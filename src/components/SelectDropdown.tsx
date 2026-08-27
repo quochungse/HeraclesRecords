@@ -15,6 +15,11 @@ import { createPortal } from "react-dom";
 export type SelectOption<T extends string> = {
   value: T;
   label: string;
+  /**
+   * Extra wording shown only in the open menu. The trigger stays on `label`, so
+   * a long qualifier can describe an option without widening the closed pill.
+   */
+  detail?: string;
 };
 
 export interface SelectDropdownProps<T extends string> {
@@ -28,6 +33,11 @@ export interface SelectDropdownProps<T extends string> {
   disabled?: boolean;
   portal?: boolean;
   title?: string;
+  /**
+   * Floor for the open menu's width. Raise it for options whose text would
+   * otherwise wrap over several lines; the closed trigger is unaffected.
+   */
+  minMenuWidth?: number;
 }
 
 interface MenuPosition {
@@ -52,6 +62,7 @@ const PORTAL_THEME_VARIABLES = [
 ] as const;
 
 const MENU_CLOSE_DURATION_MS = 180;
+const DEFAULT_MIN_MENU_WIDTH = 220;
 
 export function SelectDropdown<T extends string>({
   value,
@@ -63,7 +74,8 @@ export function SelectDropdown<T extends string>({
   renderIcon,
   disabled = false,
   portal = false,
-  title
+  title,
+  minMenuWidth
 }: SelectDropdownProps<T>) {
   const dropdownId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -113,7 +125,7 @@ export function SelectDropdown<T extends string>({
     const viewportMargin = 8;
     const menuGap = 6;
     const menuWidth = Math.min(
-      Math.max(trigger.width, 220),
+      Math.max(trigger.width, minMenuWidth ?? DEFAULT_MIN_MENU_WIDTH),
       window.innerWidth - viewportMargin * 2
     );
     const preferredHeight = Math.min(menuRef.current?.scrollHeight ?? 280, 280);
@@ -132,7 +144,7 @@ export function SelectDropdown<T extends string>({
     setPortalTheme(Object.fromEntries(
       PORTAL_THEME_VARIABLES.map((name) => [name, computedStyle.getPropertyValue(name)])
     ) as PortalTheme);
-  }, [portal]);
+  }, [portal, minMenuWidth]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -321,7 +333,18 @@ export function SelectDropdown<T extends string>({
                     {optionIcon}
                   </span>
                 ) : null}
-                <span className="app-select-option-label">{option.label}</span>
+                <span
+                  className={[
+                    "app-select-option-label",
+                    option.detail ? "has-detail" : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {option.detail
+                    ? `${option.label} (${option.detail})`
+                    : option.label}
+                </span>
               </span>
               {isSelected ? (
                 <Check

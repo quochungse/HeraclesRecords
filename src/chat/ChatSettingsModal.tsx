@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Settings2, X } from "lucide-react";
 import type {
+  AnthropicApiConnectionTest,
   ChatAuthStatus,
   ChatSettings,
   ClaudeCodeStatus,
@@ -30,13 +31,15 @@ export function ChatSettingsModal({
   checkingClaude,
   connectingClaude,
   testingClaude,
+  revokingClaude,
   mcpRefreshVersion,
   busy,
   onClose,
   onSignIn,
   onSignOut,
   onRefreshClaude,
-  onConnectClaude,
+  onClaudeSignedIn,
+  onRevokeClaude,
   onTestClaude,
   onOpenClaudeSetupGuide,
   onUpdateClaudeCode,
@@ -47,6 +50,15 @@ export function ChatSettingsModal({
   onClearOpenRouterApiKey,
   onOpenOpenRouterKeys,
   onOpenOpenRouterModels,
+  anthropicApiKey,
+  anthropicConnection,
+  testingAnthropic,
+  onAnthropicApiKeyChange,
+  onUpdateAnthropic,
+  onTestAnthropicConnection,
+  onSaveAnthropicSettings,
+  onClearAnthropicApiKey,
+  onOpenAnthropicKeyGuide,
   onLocalApiKeyChange,
   onUpdateLocalDraft,
   onDetectLocalServers,
@@ -74,13 +86,15 @@ export function ChatSettingsModal({
   checkingClaude: boolean;
   connectingClaude: boolean;
   testingClaude: boolean;
+  revokingClaude: boolean;
   mcpRefreshVersion: number;
   busy?: boolean;
   onClose: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
   onRefreshClaude: () => void;
-  onConnectClaude: () => void;
+  onClaudeSignedIn: (status: ClaudeCodeStatus) => void;
+  onRevokeClaude: () => void;
   onTestClaude: () => void;
   onOpenClaudeSetupGuide: () => void;
   onUpdateClaudeCode: (
@@ -95,6 +109,15 @@ export function ChatSettingsModal({
   onClearOpenRouterApiKey: () => void;
   onOpenOpenRouterKeys: () => void;
   onOpenOpenRouterModels: () => void;
+  anthropicApiKey: string;
+  anthropicConnection: AnthropicApiConnectionTest | null;
+  testingAnthropic: boolean;
+  onAnthropicApiKeyChange: (value: string) => void;
+  onUpdateAnthropic: (patch: Partial<ChatSettings["anthropic"]>) => void;
+  onTestAnthropicConnection: () => void;
+  onSaveAnthropicSettings: () => void;
+  onClearAnthropicApiKey: () => void;
+  onOpenAnthropicKeyGuide: () => void;
   onLocalApiKeyChange: (value: string) => void;
   onUpdateLocalDraft: (patch: Partial<ChatSettings["local"]>) => void;
   onDetectLocalServers: () => void;
@@ -168,12 +191,14 @@ export function ChatSettingsModal({
             checkingClaude={checkingClaude}
             connectingClaude={connectingClaude}
             testingClaude={testingClaude}
+            revokingClaude={revokingClaude}
             mcpRefreshVersion={mcpRefreshVersion}
             busy={busy}
             onSignIn={onSignIn}
             onSignOut={onSignOut}
             onRefreshClaude={onRefreshClaude}
-            onConnectClaude={onConnectClaude}
+            onClaudeSignedIn={onClaudeSignedIn}
+            onRevokeClaude={onRevokeClaude}
             onTestClaude={onTestClaude}
             onOpenClaudeSetupGuide={onOpenClaudeSetupGuide}
             onUpdateClaudeCode={onUpdateClaudeCode}
@@ -184,6 +209,15 @@ export function ChatSettingsModal({
             onClearOpenRouterApiKey={onClearOpenRouterApiKey}
             onOpenOpenRouterKeys={onOpenOpenRouterKeys}
             onOpenOpenRouterModels={onOpenOpenRouterModels}
+            anthropicApiKey={anthropicApiKey}
+            anthropicConnection={anthropicConnection}
+            testingAnthropic={testingAnthropic}
+            onAnthropicApiKeyChange={onAnthropicApiKeyChange}
+            onUpdateAnthropic={onUpdateAnthropic}
+            onTestAnthropicConnection={onTestAnthropicConnection}
+            onSaveAnthropicSettings={onSaveAnthropicSettings}
+            onClearAnthropicApiKey={onClearAnthropicApiKey}
+            onOpenAnthropicKeyGuide={onOpenAnthropicKeyGuide}
             onLocalApiKeyChange={onLocalApiKeyChange}
             onUpdateLocalDraft={onUpdateLocalDraft}
             onDetectLocalServers={onDetectLocalServers}

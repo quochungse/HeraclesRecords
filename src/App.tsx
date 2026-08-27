@@ -85,6 +85,7 @@ import { TRAINING_HEATMAP_DAYS } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type { TrainingHubSnapshot } from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
+import { subscribeToToasts } from "./toast";
 import { AppUpdateControls } from "./components/AppUpdateControls";
 import { DonateButton } from "./components/DonateButton";
 import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
@@ -5769,6 +5770,10 @@ function useToaster(message: string | null, error: string | null) {
     }
     lastErrorRef.current = error;
   }, [error, pushToast]);
+
+  // Toasts raised from outside App's own message/error state — nested views
+  // that have no path to it. Same stack, same auto-dismiss.
+  useEffect(() => subscribeToToasts(pushToast), [pushToast]);
 
   useEffect(() => {
     const timers = timersRef.current;

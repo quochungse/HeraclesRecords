@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-electron/
+dist-harness/
 .next/
 release/
 .DS_Store

@@ -1,8 +1,11 @@
-import { BrowserWindow, safeStorage, shell } from "electron";
+import { BrowserWindow, app, safeStorage, shell } from "electron";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { deleteSettings, getSetting, setSetting } from "./database";
+import { applyCoachAutomationSessionDeleted } from "./coachAutomationStore";
 import {
   formatScheduledExercisesForChat,
   getTrainingHubStatus,
@@ -16,7 +19,7 @@ import {
   getAllMcpTools,
   getMcpServerCachedTools
 } from "./mcpClientManager";
-import { prefixToolName } from "./mcpToolNames";
+import { prefixToolName, splitToolName } from "./mcpToolNames";
 import {
   getChatWorkoutTools,
   handleChatWorkoutTool,
@@ -47,6 +50,7 @@ import { parseFunctionCallArguments } from "./chatToolArguments";
 import {
   buildResponsesRequest,
   extractReasoningSummaryDelta,
+  extractResponseUsage,
   extractResponseTextDelta
 } from "./chatResponsesProtocol";
 import {
@@ -60,17 +64,27 @@ import {
   testOpenRouterConnectionRequest
 } from "./openRouterProvider";
 import {
+  AnthropicProviderError,
+  streamAnthropicChatCompletion,
+  testAnthropicApiConnectionRequest,
+  type AnthropicRuntimeConfig
+} from "./anthropicChatProvider";
+import {
   ClaudeCodeProviderError,
   getClaudeCodeStatus as inspectClaudeCodeStatus,
-  launchClaudeCodeLogin,
+  listClaudeCodeModels,
+  logoutClaudeCode,
+  startClaudeCodeLogin,
   streamClaudeCodeCompletion,
-  testClaudeCodeConnection as runClaudeCodeConnectionTest
+  testClaudeCodeConnection as runClaudeCodeConnectionTest,
+  type ClaudeCodeLoginSession
 } from "./claudeCodeProvider";
 import {
   CHAT_SETTINGS_KEYS,
   readChatSettingsFromStore,
   saveChatSettingsToStore,
   type ChatApiKeyStore,
+  type ChatApiKeyStores,
   type ChatSettingsStore
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
@@ -79,16 +93,29 @@ import {
   deleteChatSession,
   getChatSession,
   listChatSessions,
-  saveChatSession
+  saveChatSession,
+  setChatSessionPinned
 } from "./chatHistoryStore";
 import type {
+  ActivityVisualPreview,
+  AutomationRuntime,
+  AnthropicApiConfig,
+  AnthropicApiConnectionTest,
   ChatAuthStatus,
+  ChatEntryAutomationMarker,
   ChatSettings,
   ChatProvider,
+  ChatTokenUsage,
+  ChatToolPolicy,
+  ClaudeCodeConfig,
   ClaudeCodeConnectionTest,
+  ClaudeCodeLoginStart,
   ClaudeCodePermissions,
   ClaudeCodeStatus,
+  CoachInputPrompt,
   CorosMcpTool,
+  FitnessTrendPreview,
+  HrZonePreview,
   LocalChatDiscovery,
   LocalChatConfig,
   LocalChatConnectionTest,
@@ -96,6 +123,8 @@ import type {
   OpenRouterConnectionTest,
   ChatMessage,
   PersistedChatEntry,
+  PersistedChatSource,
+  SaveChatSessionOptions,
   StoredChatToken,
   TrainingHubActivity,
   TrainingHubDashboard,
@@ -103,7 +132,8 @@ import type {
   UploadPlanResult,
   PlanDraftPreview,
   DeleteWorkoutResult,
-  UnitSystem
+  UnitSystem,
+  WorkoutDeletePreview
 } from "./types";
 import {
   formatDistanceValue,
@@ -141,8 +171,6 @@ const MAX_TOOL_ROUNDS = 10;
 const RESPONSES_ORIGINATOR = "codex_cli_rs";
 const RESPONSES_USER_AGENT = "codex_cli_rs";
 
-const COACH_INSTRUCTIONS = buildCoachInstructions();
-
 // Settings keys (encrypted blob + a plaintext timestamp).
 const SETTINGS = {
   token: "chat.oauthToken",
@@ -156,61 +184,256 @@ const activeStreams = new Map<string, AbortController>();
 // ----- Provider settings -----
 
 export function getChatSettings(): ChatSettings {
-  return readChatSettingsFromStore(
-    chatSettingsStore,
-    localApiKeyStore,
-    openRouterApiKeyStore
-  );
+  return readChatSettingsFromStore(chatSettingsStore, chatApiKeyStores);
 }
 
 export function saveChatSettings(settings: ChatSettings): ChatSettings {
-  return saveChatSettingsToStore(
-    chatSettingsStore,
-    localApiKeyStore,
-    openRouterApiKeyStore,
-    settings
+  return saveChatSettingsToStore(chatSettingsStore, chatApiKeyStores, settings);
+}
+
+export async function testAnthropicApiConnection(
+  config?: Partial<AnthropicApiConfig>
+): Promise<AnthropicApiConnectionTest> {
+  const saved = getChatSettings().anthropic;
+  return testAnthropicApiConnectionRequest(
+    getAnthropicRuntimeConfig({ ...saved, ...config })
   );
+}
+
+/**
+ * Directory Claude Code keeps CorosLink's own credentials in. Returning
+ * undefined lets Claude Code fall back to the machine-wide ~/.claude login.
+ */
+function getClaudeCodeConfigDir(
+  settings = getChatSettings()
+): string | undefined {
+  if (settings.claudeCode.useAppScopedAuth === false) {
+    return undefined;
+  }
+  const dir = path.join(app.getPath("userData"), "claude-code");
+  // The CLI writes credentials here, so keep it owner-only.
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
 }
 
 export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus> {
   const settings = getChatSettings();
   const status = await inspectClaudeCodeStatus(
-    settings.claudeCode.executablePath
+    settings.claudeCode.executablePath,
+    getClaudeCodeConfigDir(settings)
   );
-  recordClaudeCodeStatus(status);
-  return status;
+  // Only a real turn reports the model, so carry the cached one through. Without
+  // this the renderer never learns a default discovered during a chat.
+  const merged: ClaudeCodeStatus = {
+    ...status,
+    defaultModel: status.defaultModel || settings.claudeCode.defaultModel,
+    availableModels:
+      status.availableModels || settings.claudeCode.availableModels
+  };
+  const configDir = getClaudeCodeConfigDir(settings);
+  if (
+    !merged.availableModels?.length &&
+    merged.executablePath &&
+    merged.authenticated &&
+    !probedModelDirs.has(configDir ?? "machine")
+  ) {
+    probedModelDirs.add(configDir ?? "machine");
+    merged.availableModels = await readClaudeCodeModels(
+      merged.executablePath,
+      configDir
+    );
+  }
+  recordClaudeCodeStatus(merged);
+  return merged;
 }
 
-export async function connectClaudeCode(): Promise<ClaudeCodeStatus> {
+// listClaudeCodeModels spawns the CLI and takes over a second, so it must never
+// run on the status polls that fire every 1.5-3s. One attempt per credential
+// store per run; Test connection forces a fresh read.
+const probedModelDirs = new Set<string>();
+
+async function readClaudeCodeModels(
+  executablePath: string,
+  configDir?: string
+): Promise<ClaudeCodeStatus["availableModels"]> {
+  try {
+    const models = await listClaudeCodeModels({ executablePath, configDir });
+    return models.length > 0 ? models : undefined;
+  } catch {
+    // The static list still covers the picker; retry on the next status read.
+    return undefined;
+  }
+}
+
+// Only one sign-in can be in flight; a second attempt replaces the first.
+let claudeLoginSession: ClaudeCodeLoginSession | null = null;
+
+/**
+ * Re-opens the pending sign-in page, for when Claude Code's own browser launch
+ * did not land. Exposed instead of a general "open this URL" bridge so the
+ * renderer can never ask the main process to launch a URL of its own choosing.
+ */
+export async function openClaudeCodeLoginUrl(): Promise<void> {
+  const url = claudeLoginSession?.url;
+  if (url) {
+    await shell.openExternal(url);
+  }
+}
+
+export async function beginClaudeCodeLogin(): Promise<ClaudeCodeLoginStart> {
   const settings = getChatSettings();
-  const status = await launchClaudeCodeLogin(
-    settings.claudeCode.executablePath
+  const configDir = getClaudeCodeConfigDir(settings);
+  const status = await inspectClaudeCodeStatus(
+    settings.claudeCode.executablePath,
+    configDir
   );
   recordClaudeCodeStatus(status);
-  return status;
+  if (!status.installed || !status.executablePath) {
+    throw new ClaudeCodeProviderError(status.message, "not-installed");
+  }
+
+  cancelClaudeCodeLogin();
+  const session = await startClaudeCodeLogin({
+    executablePath: status.executablePath,
+    configDir
+  });
+  claudeLoginSession = session;
+  // Claude Code opens the sign-in page itself as soon as it prints the URL.
+  // Opening it here as well produced two browser tabs, so the automatic open is
+  // left to the CLI and the app only re-opens it on request.
+  return { url: session.url, scope: configDir ? "app" : "machine" };
+}
+
+/**
+ * Resolves once the pending sign-in finishes, however it finishes.
+ *
+ * The browser flow often completes without the athlete pasting anything, so the
+ * renderer awaits this instead of treating the code box as the only way out.
+ */
+export async function awaitClaudeCodeLogin(): Promise<ClaudeCodeStatus> {
+  const session = claudeLoginSession;
+  if (!session) {
+    throw new ClaudeCodeProviderError(
+      "Start the Claude sign-in again — the pending request expired.",
+      "auth"
+    );
+  }
+  try {
+    await session.completion;
+  } finally {
+    if (claudeLoginSession === session) {
+      claudeLoginSession = null;
+    }
+  }
+  return getClaudeCodeConnectionStatus();
+}
+
+/** Fallback for when Claude shows a code instead of finishing in the browser. */
+export function submitClaudeCodeLoginCode(code: string): void {
+  const session = claudeLoginSession;
+  if (!session) {
+    throw new ClaudeCodeProviderError(
+      "Start the Claude sign-in again — the pending request expired.",
+      "auth"
+    );
+  }
+  session.submitCode(code);
+}
+
+export function cancelClaudeCodeLogin(): void {
+  claudeLoginSession?.cancel();
+  claudeLoginSession = null;
+}
+
+/**
+ * Clears the app's own Claude credentials so a different account can sign in.
+ *
+ * Deliberately refuses when the athlete opted into the machine-wide login: that
+ * store is shared with their terminal and is not ours to sign out.
+ */
+export async function revokeClaudeCodeLogin(): Promise<ClaudeCodeStatus> {
+  const settings = getChatSettings();
+  const configDir = getClaudeCodeConfigDir(settings);
+  if (!configDir) {
+    throw new ClaudeCodeProviderError(
+      "Revoking only applies to the CorosLink-only Claude login. Turn that on first, or sign out from your terminal.",
+      "auth"
+    );
+  }
+
+  // Any half-finished sign-in is against the credentials we are about to drop.
+  cancelClaudeCodeLogin();
+
+  const executablePath = (
+    await inspectClaudeCodeStatus(settings.claudeCode.executablePath, configDir)
+  ).executablePath;
+  if (executablePath) {
+    try {
+      await logoutClaudeCode({ executablePath, configDir });
+    } catch {
+      // Fall through: the credential file is removed below either way.
+    }
+  }
+
+  // The directory belongs to this app, so clearing anything the CLI left behind
+  // cannot affect another Claude login on this computer.
+  fs.rmSync(path.join(configDir, ".credentials.json"), { force: true });
+
+  return getClaudeCodeConnectionStatus();
 }
 
 export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTest> {
   const settings = getChatSettings();
+  const configDir = getClaudeCodeConfigDir(settings);
   const result = await runClaudeCodeConnectionTest(
-    settings.claudeCode.executablePath
+    settings.claudeCode.executablePath,
+    configDir
   );
-  recordClaudeCodeStatus(result.status);
-  return result;
+  // An explicit connection test is the one moment worth re-reading the list.
+  probedModelDirs.delete(configDir ?? "machine");
+  const status: ClaudeCodeStatus = {
+    ...result.status,
+    availableModels: result.status.executablePath
+      ? ((await readClaudeCodeModels(result.status.executablePath, configDir)) ??
+        settings.claudeCode.availableModels)
+      : settings.claudeCode.availableModels
+  };
+  recordClaudeCodeStatus(status);
+  return { ...result, status };
 }
 
 function recordClaudeCodeStatus(status: ClaudeCodeStatus): void {
   const current = getChatSettings();
-  saveChatSettings({
-    ...current,
-    claudeCode: {
-      ...current.claudeCode,
-      executablePath:
-        current.claudeCode.executablePath || status.executablePath,
-      lastConnectionStatus: status.state,
-      lastCheckedAt: status.checkedAt
-    }
-  });
+  const next: ClaudeCodeConfig = {
+    ...current.claudeCode,
+    executablePath: current.claudeCode.executablePath || status.executablePath,
+    // Sticky: a status read that did not observe a turn reports no model, and
+    // forgetting it would blank the picker's "Default (…)" label.
+    defaultModel: status.defaultModel || current.claudeCode.defaultModel,
+    availableModels:
+      status.availableModels || current.claudeCode.availableModels,
+    lastConnectionStatus: status.state,
+    lastCheckedAt: status.checkedAt
+  };
+  // Status is re-read every few seconds while a sign-in is pending, and each
+  // save is a dozen SQLite writes. Only the timestamp usually differs, so
+  // compare everything else and skip the write when nothing really moved.
+  if (isSameClaudeCodeRecord(current.claudeCode, next)) {
+    return;
+  }
+  saveChatSettings({ ...current, claudeCode: next });
+}
+
+function isSameClaudeCodeRecord(
+  a: ClaudeCodeConfig,
+  b: ClaudeCodeConfig
+): boolean {
+  return (
+    a.executablePath === b.executablePath &&
+    a.defaultModel === b.defaultModel &&
+    a.lastConnectionStatus === b.lastConnectionStatus &&
+    JSON.stringify(a.availableModels) === JSON.stringify(b.availableModels)
+  );
 }
 
 export function listChatSessionsForProvider(provider: ChatProvider) {
@@ -227,13 +450,23 @@ export function createChatSessionForProvider(provider: ChatProvider) {
 
 export function saveChatSessionEntries(
   id: string,
-  entries: PersistedChatEntry[]
+  entries: PersistedChatEntry[],
+  options?: SaveChatSessionOptions
 ) {
-  return saveChatSession(id, entries);
+  return saveChatSession(id, entries, undefined, options);
+}
+
+export function setChatSessionPinnedById(id: string, pinned: boolean) {
+  return setChatSessionPinned(id, pinned);
 }
 
 export function deleteChatSessionById(id: string): void {
   deleteChatSession(id);
+  // Section 2.4: bindings pointing at this conversation have to react now, not
+  // the next time a trigger happens to fire. A "dedicated" binding rebuilds its
+  // conversation on its next run; an "existing" one is disabled, because only
+  // the athlete knows which thread it should point at instead.
+  applyCoachAutomationSessionDeleted(id);
 }
 
 export async function testLocalChatConnection(
@@ -297,20 +530,28 @@ function getLocalRuntimeConfig(config = getLocalConfig()): LocalChatRuntimeConfi
   };
 }
 
-function storeEncryptedChatApiKey(
-  settingKey: string,
-  label: string,
-  apiKey: string
-): void {
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error(`Secure ${label} API key storage is not available on this system.`);
-  }
-  const encrypted = safeStorage.encryptString(apiKey).toString("base64");
-  setSetting(settingKey, encrypted);
+function getAnthropicRuntimeConfig(
+  config = getChatSettings().anthropic
+): AnthropicRuntimeConfig {
+  return {
+    model: config.model,
+    effort: config.effort,
+    apiKey:
+      typeof config.apiKey === "string" && config.apiKey.trim()
+        ? config.apiKey.trim()
+        : readEncryptedSecret(CHAT_SETTINGS_KEYS.anthropicApiKey)
+  };
 }
 
-function readStoredChatApiKey(settingKey: string): string | undefined {
-  const encoded = getSetting(settingKey);
+function storeEncryptedSecret(key: string, secret: string, label: string): void {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error(`Secure ${label} storage is not available on this system.`);
+  }
+  setSetting(key, safeStorage.encryptString(secret).toString("base64"));
+}
+
+function readEncryptedSecret(key: string): string | undefined {
+  const encoded = getSetting(key);
   if (!encoded || !safeStorage.isEncryptionAvailable()) {
     return undefined;
   }
@@ -322,11 +563,11 @@ function readStoredChatApiKey(settingKey: string): string | undefined {
 }
 
 function readStoredLocalApiKey(): string | undefined {
-  return readStoredChatApiKey(CHAT_SETTINGS_KEYS.localApiKey);
+  return readEncryptedSecret(CHAT_SETTINGS_KEYS.localApiKey);
 }
 
 function readStoredOpenRouterApiKey(): string | undefined {
-  return readStoredChatApiKey(CHAT_SETTINGS_KEYS.openRouterApiKey);
+  return readEncryptedSecret(CHAT_SETTINGS_KEYS.openRouterApiKey);
 }
 
 const chatSettingsStore: ChatSettingsStore = {
@@ -338,19 +579,40 @@ const chatSettingsStore: ChatSettingsStore = {
 const localApiKeyStore: ChatApiKeyStore = {
   hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.localApiKey)),
   saveApiKey: (apiKey) =>
-    storeEncryptedChatApiKey(CHAT_SETTINGS_KEYS.localApiKey, "local", apiKey),
+    storeEncryptedSecret(
+      CHAT_SETTINGS_KEYS.localApiKey,
+      apiKey,
+      "local API key"
+    ),
   clearApiKey: () => deleteSettings([CHAT_SETTINGS_KEYS.localApiKey])
+};
+
+const anthropicApiKeyStore: ChatApiKeyStore = {
+  hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.anthropicApiKey)),
+  saveApiKey: (apiKey) =>
+    storeEncryptedSecret(
+      CHAT_SETTINGS_KEYS.anthropicApiKey,
+      apiKey,
+      "Anthropic API key"
+    ),
+  clearApiKey: () => deleteSettings([CHAT_SETTINGS_KEYS.anthropicApiKey])
 };
 
 const openRouterApiKeyStore: ChatApiKeyStore = {
   hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.openRouterApiKey)),
   saveApiKey: (apiKey) =>
-    storeEncryptedChatApiKey(
+    storeEncryptedSecret(
       CHAT_SETTINGS_KEYS.openRouterApiKey,
-      "OpenRouter",
-      apiKey
+      apiKey,
+      "OpenRouter API key"
     ),
   clearApiKey: () => deleteSettings([CHAT_SETTINGS_KEYS.openRouterApiKey])
+};
+
+const chatApiKeyStores: ChatApiKeyStores = {
+  local: localApiKeyStore,
+  anthropic: anthropicApiKeyStore,
+  openRouter: openRouterApiKeyStore
 };
 
 // ----- Auth status -----
@@ -627,31 +889,432 @@ function getStoredToken(): StoredChatToken | null {
 
 // ----- Streaming chat -----
 
+/**
+ * Where a stream's events go. Interactive chat pushes them at a renderer;
+ * headless automation runs will accumulate them in the main process instead,
+ * so `streamChat` must not know which it is talking to.
+ */
+export interface ChatStreamSink {
+  emit(channel: string, payload: unknown): void;
+  /**
+   * Optional abort wiring, returning a teardown callback. The window sink uses
+   * it to abort when the window closes; a headless sink leaves it undefined so
+   * a run survives having no window.
+   */
+  bindAbort?(controller: AbortController): () => void;
+}
+
+/**
+ * A usage report that can be counted, or nothing.
+ *
+ * "Nobody reported" and "it was free" are different facts (13), and a number
+ * that is negative, NaN or infinite is neither — it is a third thing, and the
+ * only honest reading of it is the first. Guarded here rather than only where
+ * the run row is read, because this is where the number *enters*: a `local`
+ * provider is whatever OpenAI-compatible server the athlete pointed the app at,
+ * and a negative round would quietly reduce a total the month's budget trusts.
+ */
+export function countableUsage(
+  value: ChatTokenUsage | undefined
+): ChatTokenUsage | undefined {
+  if (!value) return undefined;
+  const { inputTokens, outputTokens } = value;
+  const usable = (count: unknown): count is number =>
+    typeof count === "number" && Number.isFinite(count) && count >= 0;
+  return usable(inputTokens) && usable(outputTokens)
+    ? { inputTokens, outputTokens }
+    : undefined;
+}
+
+export interface StreamChatOptions {
+  unitSystem?: UnitSystem;
+  /** Automation runs override the saved provider/model/effort (decision 2). */
+  runtime?: AutomationRuntime;
+  /** Automation runs narrow the tool set (decision 3). Defaults to interactive. */
+  toolPolicy?: ChatToolPolicy;
+  /** Automation role, injected as its own hardened instruction block. */
+  roleInstructions?: string;
+}
+
+/**
+ * The interactive sink: sends every event to the renderer and aborts the
+ * stream when the window goes away, which is what an athlete closing the
+ * window means.
+ */
+export function createWindowSink(
+  mainWindow: BrowserWindow | null | undefined
+): ChatStreamSink {
+  return {
+    emit(channel, payload) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, payload);
+      }
+    },
+    bindAbort(controller) {
+      const onClosed = () => controller.abort();
+      mainWindow?.once("closed", onClosed);
+      return () => mainWindow?.removeListener("closed", onClosed);
+    }
+  };
+}
+
+/**
+ * The headless sink: turns the same stream events into the
+ * `PersistedChatEntry[]` an interactive turn would have produced in the
+ * renderer, mirroring how ChatView handles `chat:streamInfo` and
+ * `chat:streamDone`. An automation run has no renderer to assemble its
+ * transcript, so this is where that assembly moves to.
+ *
+ * It deliberately omits `bindAbort`: closing the window must not abort an
+ * automation run.
+ */
+export interface ChatStreamCollectorSink extends ChatStreamSink {
+  /** The transcript so far. Complete once `chat:streamDone` has arrived. */
+  entries(): PersistedChatEntry[];
+  /** True once the run finished, whether it succeeded, cancelled or failed. */
+  finished(): boolean;
+  /** Set when the stream ended with `finishReason: "cancelled"`. */
+  cancelled(): boolean;
+  /** The `chat:streamError` message, when the stream failed. */
+  error(): string | undefined;
+  /** True when that failure was an authentication problem, not a model error. */
+  authError(): boolean;
+  /** The assistant's final text, for the run's one-line summary. */
+  text(): string;
+  /** What the turn cost, when the provider reported it (13). */
+  usage(): ChatTokenUsage | undefined;
+}
+
+function upsertEntry(
+  entries: PersistedChatEntry[],
+  entry: PersistedChatEntry,
+  matches: (candidate: PersistedChatEntry) => boolean
+): void {
+  const index = entries.findIndex(matches);
+  if (index >= 0) {
+    entries[index] = entry;
+    return;
+  }
+  entries.push(entry);
+}
+
+export function createCollectorSink(
+  automation?: ChatEntryAutomationMarker
+): ChatStreamCollectorSink {
+  const entries: PersistedChatEntry[] = [];
+  let pendingCoachPrompts: CoachInputPrompt[] = [];
+  let source: PersistedChatSource | null = null;
+  let thinking = "";
+  let streamedText = "";
+  let finalText = "";
+  let isFinished = false;
+  let wasCancelled = false;
+  let failure: string | undefined;
+  let failureWasAuth = false;
+  let tokenUsage: ChatTokenUsage | undefined;
+
+  const reset = () => {
+    pendingCoachPrompts = [];
+    source = null;
+    thinking = "";
+    streamedText = "";
+  };
+
+  const handleInfo = (payload: Record<string, unknown>) => {
+    const kind = payload.kind;
+
+    if (kind === "context") {
+      source = {
+        snapshotIncluded: Boolean(payload.snapshotIncluded),
+        mcpEnabled: Boolean(payload.mcpEnabled),
+        mcpUsed: false,
+        mcpTools: []
+      };
+      return;
+    }
+
+    if (kind === "thinking") {
+      if (typeof payload.delta === "string") {
+        thinking += payload.delta;
+      }
+      return;
+    }
+
+    if (kind === "mcp") {
+      const base: PersistedChatSource = source ?? {
+        snapshotIncluded: false,
+        mcpEnabled: true,
+        mcpUsed: false,
+        mcpTools: []
+      };
+      const tool = typeof payload.tool === "string" ? payload.tool : undefined;
+      const status = typeof payload.status === "string" ? payload.status : "";
+      const message =
+        typeof payload.message === "string" ? payload.message : undefined;
+      const mcpError =
+        /fail|error/i.test(status) || message
+          ? message ?? status
+          : base.mcpError;
+      source = {
+        ...base,
+        mcpUsed: true,
+        mcpTools: tool ? [...base.mcpTools, tool] : base.mcpTools,
+        // Omitted rather than set to undefined so the collected source matches
+        // what `parseSource` rebuilds on reload.
+        ...(mcpError ? { mcpError } : {})
+      };
+      return;
+    }
+
+    if (kind === "coachPrompt") {
+      const prompt = payload.prompt as CoachInputPrompt | undefined;
+      if (!prompt?.promptId) return;
+      pendingCoachPrompts = [
+        ...pendingCoachPrompts.filter(
+          (entry) => entry.promptId !== prompt.promptId
+        ),
+        prompt
+      ];
+      return;
+    }
+
+    if (kind === "planDraft") {
+      const draft = payload.draft as PlanDraftPreview | undefined;
+      if (!draft?.draftId) return;
+      upsertEntry(
+        entries,
+        { kind: "planDraft", draft },
+        (candidate) =>
+          candidate.kind === "planDraft" &&
+          candidate.draft.draftId === draft.draftId
+      );
+      return;
+    }
+
+    if (kind === "workoutDelete") {
+      const preview = payload.preview as WorkoutDeletePreview | undefined;
+      if (!preview?.requestId) return;
+      upsertEntry(
+        entries,
+        { kind: "workoutDelete", preview },
+        (candidate) =>
+          candidate.kind === "workoutDelete" &&
+          candidate.preview.requestId === preview.requestId
+      );
+      return;
+    }
+
+    // The visualization cards are collected whichever way the athlete has the
+    // display toggle set: ChatView filters them out of its *timeline*, but a
+    // headless run has to persist everything the turn produced, and the
+    // renderer decides what to show when it opens the conversation.
+    if (kind === "activityVisual") {
+      const preview = payload.preview as ActivityVisualPreview | undefined;
+      if (!preview?.previewId) return;
+      upsertEntry(
+        entries,
+        { kind: "activityVisual", preview },
+        (candidate) =>
+          candidate.kind === "activityVisual" &&
+          candidate.preview.previewId === preview.previewId
+      );
+      return;
+    }
+
+    if (kind === "fitnessTrend") {
+      const preview = payload.preview as FitnessTrendPreview | undefined;
+      if (!preview?.previewId) return;
+      upsertEntry(
+        entries,
+        { kind: "fitnessTrend", preview },
+        (candidate) =>
+          candidate.kind === "fitnessTrend" &&
+          candidate.preview.previewId === preview.previewId
+      );
+      return;
+    }
+
+    if (kind === "hrZoneSummary") {
+      const preview = payload.preview as HrZonePreview | undefined;
+      if (!preview?.previewId) return;
+      upsertEntry(
+        entries,
+        { kind: "hrZoneSummary", preview },
+        (candidate) =>
+          candidate.kind === "hrZoneSummary" &&
+          candidate.preview.previewId === preview.previewId
+      );
+    }
+  };
+
+  /**
+   * What the turn cost, from whichever event carried it. Recorded even on a
+   * cancelled turn and even on a failed one: the tokens were spent before the
+   * athlete pressed Stop or before the provider broke, and a budget that
+   * forgave either would let a fan-out stopped halfway — or a provider that
+   * always throws — cost nothing on paper (13).
+   */
+  const recordUsage = (value: unknown): void => {
+    const counted = countableUsage(value as ChatTokenUsage | undefined);
+    if (counted) {
+      tokenUsage = counted;
+    }
+  };
+
+  const handleDone = (payload: Record<string, unknown>) => {
+    isFinished = true;
+    recordUsage(payload.usage);
+    // ChatView reads the final text off the done payload; fall back to the
+    // accumulated tokens so a provider that omits it cannot lose the answer.
+    const fullText =
+      typeof payload.fullText === "string" && payload.fullText
+        ? payload.fullText
+        : streamedText;
+    const reasoningSummary = thinking.trim() || undefined;
+
+    if (payload.finishReason === "cancelled") {
+      wasCancelled = true;
+      reset();
+      return;
+    }
+
+    finalText = fullText;
+    const prompts = pendingCoachPrompts;
+    const turnSource = source ?? undefined;
+
+    if (fullText) {
+      entries.push({
+        kind: "message",
+        role: "assistant",
+        content: fullText,
+        ...(turnSource ? { source: turnSource } : {}),
+        ...(reasoningSummary ? { reasoningSummary } : {}),
+        ...(automation ? { automation } : {})
+      });
+    }
+    for (const prompt of prompts) {
+      upsertEntry(
+        entries,
+        { kind: "coachPrompt", prompt },
+        (candidate) =>
+          candidate.kind === "coachPrompt" &&
+          candidate.prompt.promptId === prompt.promptId
+      );
+    }
+    reset();
+  };
+
+  return {
+    emit(channel, payload) {
+      const record = (payload ?? {}) as Record<string, unknown>;
+      if (channel === "chat:streamStart") {
+        reset();
+        return;
+      }
+      if (channel === "chat:streamToken") {
+        if (typeof record.delta === "string") {
+          streamedText += record.delta;
+        }
+        return;
+      }
+      if (channel === "chat:streamInfo") {
+        handleInfo(record);
+        return;
+      }
+      if (channel === "chat:streamDone") {
+        handleDone(record);
+        return;
+      }
+      if (channel === "chat:streamError") {
+        isFinished = true;
+        failure =
+          typeof record.message === "string"
+            ? record.message
+            : "Chat request failed.";
+        failureWasAuth = record.authError === true;
+        // A failed turn spent whatever its completed rounds spent, and 13 says
+        // it is recorded on every exit that reached the model — not only the
+        // ones that got as far as `chat:streamDone`. Without this a provider
+        // that always breaks runs through the month's ceiling for free.
+        recordUsage(record.usage);
+        reset();
+      }
+    },
+    entries: () => [...entries],
+    usage: () => tokenUsage,
+    finished: () => isFinished,
+    cancelled: () => wasCancelled,
+    error: () => failure,
+    authError: () => failureWasAuth,
+    text: () => finalText
+  };
+}
+
 export async function streamChat(
-  mainWindow: BrowserWindow | null | undefined,
+  sink: ChatStreamSink,
   requestId: string,
   messages: ChatMessage[],
-  unitSystem: UnitSystem = "metric"
+  options: StreamChatOptions = {}
 ): Promise<void> {
-  unitSystem = normalizeUnitSystem(unitSystem);
+  const unitSystem = normalizeUnitSystem(options.unitSystem);
+  const toolPolicy: ChatToolPolicy =
+    options.toolPolicy === "read-only" || options.toolPolicy === "none"
+      ? options.toolPolicy
+      : "interactive";
+  const roleInstructions = options.roleInstructions;
+  const runtime = options.runtime ?? {};
+  // What this turn cost, summed across its tool rounds and across whichever
+  // provider answered. Left undefined when nobody reported: a run that cost
+  // nothing and a run nobody counted are different facts, and a budget that
+  // reads the second as the first undercounts in silence (13).
+  let usage: ChatTokenUsage | undefined;
+  const addUsage = (round: ChatTokenUsage | undefined) => {
+    const counted = countableUsage(round);
+    if (!counted) return;
+    usage = {
+      inputTokens: (usage?.inputTokens ?? 0) + counted.inputTokens,
+      outputTokens: (usage?.outputTokens ?? 0) + counted.outputTokens
+    };
+  };
   const send = (channel: string, payload: unknown) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(channel, payload);
-    }
+    sink.emit(channel, payload);
+  };
+  /**
+   * The one way this turn reports a failure. Everything it spent before it
+   * broke rides along: 13 records a cost on every exit that reached the model,
+   * and a failed turn is not a refund — a provider that reliably breaks would
+   * otherwise run an automation through the month's ceiling for free.
+   *
+   * It is a function rather than a rule to remember at each throw site because
+   * dropping the usage on one of them type-checks and compiles into a send that
+   * quietly under-reports.
+   */
+  const sendStreamError = (payload: {
+    message: string;
+    authError?: boolean;
+  }): void => {
+    send("chat:streamError", {
+      requestId,
+      ...payload,
+      ...(usage ? { usage } : {})
+    });
   };
 
   const controller = new AbortController();
   activeStreams.set(requestId, controller);
-  // Abort if the window goes away mid-stream.
-  const onClosed = () => controller.abort();
-  mainWindow?.once("closed", onClosed);
+  const releaseAbort = sink.bindAbort?.(controller);
 
   let fullText = "";
   try {
     const settings = getChatSettings();
-    if (settings.provider === "claude-code") {
+    // An automation may run on a different provider than the interactive chat
+    // without touching the saved settings (decision 2).
+    const provider = runtime.provider ?? settings.provider;
+    if (provider === "claude-code") {
+      const claudeConfigDir = getClaudeCodeConfigDir(settings);
       const status = await inspectClaudeCodeStatus(
-        settings.claudeCode.executablePath
+        settings.claudeCode.executablePath,
+        claudeConfigDir
       );
       recordClaudeCodeStatus(status);
       if (!status.authenticated || !status.executablePath) {
@@ -662,10 +1325,15 @@ export async function streamChat(
       }
 
       await ensureAllMcpConnected();
-      const chatTools = getClaudeCodeTools(settings.claudeCode.permissions);
+      const chatTools = getClaudeCodeTools(
+        settings.claudeCode.permissions,
+        toolPolicy
+      );
       const { text: instructions, hasData } = await buildTrainingContext(
         settings.claudeCode.permissions,
-        unitSystem
+        unitSystem,
+        settings.customInstructions,
+        roleInstructions
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -686,7 +1354,20 @@ export async function streamChat(
         messages,
         tools: chatTools,
         signal: controller.signal,
-        model: settings.claudeCode.model,
+        model: runtime.model ?? settings.claudeCode.model,
+        effort: runtime.effort ?? settings.claudeCode.effort,
+        configDir: claudeConfigDir,
+        onModelResolved: (model) => {
+          // An automation's override says nothing about the interactive
+          // default, so never let one overwrite the saved defaultModel.
+          if (runtime.model?.trim() || settings.claudeCode.model?.trim()) return;
+          const current = getChatSettings();
+          if (current.claudeCode.defaultModel === model) return;
+          saveChatSettings({
+            ...current,
+            claudeCode: { ...current.claudeCode, defaultModel: model }
+          });
+        },
         onToken: (delta) => {
           fullText += delta;
           send("chat:streamToken", { requestId, delta });
@@ -721,33 +1402,37 @@ export async function streamChat(
             send,
             requestId,
             unitSystem,
-            settings.claudeCode.permissions
+            settings.claudeCode.permissions,
+            toolPolicy
           );
         }
       });
       fullText = result.fullText;
+      addUsage(result.usage);
       recordClaudeCodeStatus({
         ...status,
         state: "connected",
         checkedAt: new Date().toISOString(),
         message: "Claude Code is connected and ready for Coach conversations."
       });
-      send("chat:streamDone", { requestId, fullText });
+      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
       return;
     }
 
-    if (settings.provider === "openrouter") {
+    if (provider === "openrouter") {
       const apiKey = readStoredOpenRouterApiKey();
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
       const { text: instructions, hasData } = await buildTrainingContext(
         undefined,
-        unitSystem
+        unitSystem,
+        settings.customInstructions,
+        roleInstructions
       );
 
       await ensureAllMcpConnected();
-      const chatTools = getAllChatTools();
+      const chatTools = applyChatToolPolicy(getAllChatTools(), toolPolicy);
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
         chatTools
@@ -763,7 +1448,7 @@ export async function streamChat(
 
       const result = await streamOpenRouterChatCompletion({
         config: {
-          model: settings.openRouter.model,
+          model: runtime.model ?? settings.openRouter.model,
           apiKey
         },
         instructions: effectiveInstructions,
@@ -797,27 +1482,128 @@ export async function streamChat(
           const tool = findChatTool(call.name);
           const args = parseFunctionCallArguments(call, tool);
           console.log("[chat] OpenRouter tool call:", call.name);
-          return executeChatTool(call.name, args, send, requestId, unitSystem);
+          return executeChatTool(
+            call.name,
+            args,
+            send,
+            requestId,
+            unitSystem,
+            undefined,
+            toolPolicy
+          );
         }
       });
       fullText = result.fullText;
-      send("chat:streamDone", { requestId, fullText });
+      addUsage(result.usage);
+      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
       return;
     }
 
-    if (settings.provider === "local") {
+    if (provider === "claude-api") {
+      const runtimeConfig = {
+        ...getAnthropicRuntimeConfig(settings.anthropic),
+        ...(runtime.model ? { model: runtime.model } : {}),
+        ...(runtime.effort ? { effort: runtime.effort } : {})
+      };
+      if (!runtimeConfig.apiKey) {
+        throw new AnthropicProviderError(
+          "Add your Anthropic API key in Settings to use Claude directly.",
+          "no-key"
+        );
+      }
+
+      await ensureAllMcpConnected();
+      const chatTools = applyChatToolPolicy(getAllChatTools(), toolPolicy);
       const { text: instructions, hasData } = await buildTrainingContext(
         undefined,
-        unitSystem
+        unitSystem,
+        settings.customInstructions,
+        roleInstructions
       );
-      const runtimeConfig = getLocalRuntimeConfig(settings.local);
+      const effectiveInstructions = withLiveToolInstructions(
+        instructions,
+        chatTools
+      );
+
+      send("chat:streamStart", { requestId });
+      send("chat:streamInfo", {
+        requestId,
+        kind: "context",
+        snapshotIncluded: hasData,
+        mcpEnabled: chatTools.length > 0
+      });
+
+      const result = await streamAnthropicChatCompletion({
+        config: runtimeConfig,
+        instructions: effectiveInstructions,
+        messages,
+        tools: chatTools,
+        maxToolRounds: MAX_TOOL_ROUNDS,
+        signal: controller.signal,
+        onToken: (delta) => {
+          fullText += delta;
+          send("chat:streamToken", { requestId, delta });
+        },
+        onThinking: (delta) => {
+          send("chat:streamInfo", { requestId, kind: "thinking", delta });
+        },
+        onToolCallStart: (toolName) => {
+          send("chat:streamInfo", {
+            requestId,
+            kind: "mcp",
+            tool: toolName,
+            status: "call"
+          });
+        },
+        onToolCallError: (toolName, message) => {
+          send("chat:streamInfo", {
+            requestId,
+            kind: "mcp",
+            tool: toolName,
+            status: "failed",
+            message
+          });
+        },
+        onToolCall: async (toolName, args) => {
+          console.log("[chat] tool call:", toolName);
+          return executeChatTool(
+            toolName,
+            args,
+            send,
+            requestId,
+            unitSystem,
+            undefined,
+            toolPolicy
+          );
+        }
+      });
+      fullText = result.fullText;
+      addUsage(result.usage);
+      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      return;
+    }
+
+    if (provider === "local") {
+      const { text: instructions, hasData } = await buildTrainingContext(
+        undefined,
+        unitSystem,
+        settings.customInstructions,
+        roleInstructions
+      );
+      const runtimeConfig = {
+        ...getLocalRuntimeConfig(settings.local),
+        ...(runtime.model ? { model: runtime.model } : {})
+      };
 
       if (runtimeConfig.toolsEnabled) {
         await ensureAllMcpConnected();
       }
-      const chatTools = runtimeConfig.toolsEnabled
-        ? getAllChatTools()
-        : [...getChatWorkoutTools(), ...getChatInteractionTools()];
+      const chatTools = applyChatToolPolicy(
+        runtimeConfig.toolsEnabled
+          ? getAllChatTools()
+          : [...getChatWorkoutTools(), ...getChatInteractionTools()],
+        toolPolicy
+      );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
         chatTools
@@ -872,18 +1658,29 @@ export async function streamChat(
           const tool = findChatTool(call.name);
           const args = parseFunctionCallArguments(call, tool);
           console.log("[chat] tool call:", call.name);
-          return executeChatTool(call.name, args, send, requestId, unitSystem);
+          return executeChatTool(
+            call.name,
+            args,
+            send,
+            requestId,
+            unitSystem,
+            undefined,
+            toolPolicy
+          );
         }
       });
       fullText = result.fullText;
-      send("chat:streamDone", { requestId, fullText });
+      addUsage(result.usage);
+      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
       return;
     }
 
     const token = await getValidToken();
     const { text: instructions, hasData } = await buildTrainingContext(
       undefined,
-      unitSystem
+      unitSystem,
+      settings.customInstructions,
+      roleInstructions
     );
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
@@ -895,7 +1692,7 @@ export async function streamChat(
     // leaning on the brief snapshot in `instructions`.
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
-      getAllChatTools()
+      applyChatToolPolicy(getAllChatTools(), toolPolicy)
     );
 
     send("chat:streamStart", { requestId });
@@ -921,11 +1718,7 @@ export async function streamChat(
         settings.chatgpt.model
       );
       if ("error" in opened) {
-        send("chat:streamError", {
-          requestId,
-          message: opened.error,
-          authError: opened.authError
-        });
+        sendStreamError({ message: opened.error, authError: opened.authError });
         return;
       }
 
@@ -979,6 +1772,7 @@ export async function streamChat(
             send("chat:streamToken", { requestId, delta });
             continue;
           }
+          addUsage(extractResponseUsage(event));
           const call = extractFunctionCall(event);
           if (call) functionCalls.push(call);
         }
@@ -1013,7 +1807,9 @@ export async function streamChat(
             args,
             send,
             requestId,
-            unitSystem
+            unitSystem,
+            undefined,
+            toolPolicy
           );
         } catch (toolError) {
           output =
@@ -1036,10 +1832,15 @@ export async function streamChat(
       }
     }
 
-    send("chat:streamDone", { requestId, fullText });
+    send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
   } catch (error) {
     if (controller.signal.aborted) {
-      send("chat:streamDone", { requestId, fullText, finishReason: "cancelled" });
+      send("chat:streamDone", {
+        requestId,
+        fullText,
+        finishReason: "cancelled",
+        ...(usage ? { usage } : {})
+      });
     } else {
       if (getChatSettings().provider === "claude-code") {
         const current = getChatSettings().claudeCode;
@@ -1064,14 +1865,13 @@ export async function streamChat(
       const authError = Boolean(
         (error as Error & { authError?: boolean }).authError
       );
-      send("chat:streamError", {
-        requestId,
+      sendStreamError({
         message: error instanceof Error ? error.message : "Chat request failed.",
         authError
       });
     }
   } finally {
-    mainWindow?.removeListener("closed", onClosed);
+    releaseAbort?.();
     activeStreams.delete(requestId);
   }
 }
@@ -1131,8 +1931,82 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
   fullActivityFiles: []
 };
 
+/**
+ * Section 6, decision 3: an auto run may draft and propose, never write.
+ * `upload_training_plan` and `delete_workout` are the write surface today; any
+ * future write tool must be added here as well.
+ */
+/**
+ * Section 6's read-only set, as an **allowlist**.
+ *
+ * It was a blocklist of the two known write tools, and that cannot deliver what
+ * 6 promises — *"Blocked: `upload_training_plan`, `delete_workout`, and any
+ * future write tool."* A blocklist makes a tool added tomorrow **allowed**, so
+ * decision 3 ("auto runs may draft and propose, never write to COROS") held
+ * only for as long as everybody who adds a tool remembers this file exists.
+ * Inverting it moves the default to the safe side: a new tool is unreachable
+ * from an unattended run until somebody says otherwise, which is the same rule
+ * already applied to non-COROS MCP servers one line down.
+ *
+ * `request_coach_input` is on the list deliberately: nobody is there to answer,
+ * so it returns "state your assumption and continue" and leaves a `coachPrompt`
+ * card the athlete can answer later (6).
+ *
+ * Drafting stays allowed because it is already non-destructive — the draft
+ * tools return a preview and the real write only happens from the athlete's
+ * confirmation card.
+ */
+const READ_ONLY_ALLOWED_TOOLS = new Set([
+  "list_recent_activities",
+  "get_activity_detail",
+  "get_fitness_trends",
+  "get_hr_zone_summary",
+  "list_scheduled_workouts",
+  "search_coros_exercises",
+  "draft_workout",
+  "draft_training_plan",
+  "request_coach_input"
+]);
+
+/**
+ * Narrows a tool set to what an automation run may call. Beyond the allowlist
+ * this drops every non-COROS MCP server the athlete configured: their write
+ * surface is unknown, so they are excluded by default rather than inspected.
+ */
+export function isToolAllowedUnderPolicy(
+  name: string,
+  policy: ChatToolPolicy = "interactive"
+): boolean {
+  if (policy === "none") {
+    return false;
+  }
+  if (policy !== "read-only") {
+    return true;
+  }
+  const remote = splitToolName(name);
+  // A remote tool's write surface is its server's business, and only the COROS
+  // one is known — those are already permission-gated by name before they get
+  // here (6).
+  if (remote) {
+    return remote.serverId === "coros";
+  }
+  // A local tool the app owns. Not on the list means not decided, and not
+  // decided means not reachable from a run nobody is watching.
+  return READ_ONLY_ALLOWED_TOOLS.has(name);
+}
+
+export function applyChatToolPolicy(
+  tools: CorosMcpTool[],
+  policy: ChatToolPolicy = "interactive"
+): CorosMcpTool[] {
+  return policy === "interactive"
+    ? tools
+    : tools.filter((tool) => isToolAllowedUnderPolicy(tool.name, policy));
+}
+
 export function getClaudeCodeTools(
-  permissions: ClaudeCodePermissions
+  permissions: ClaudeCodePermissions,
+  toolPolicy: ChatToolPolicy = "interactive"
 ): CorosMcpTool[] {
   const remoteAllowedNames = new Set<string>();
   for (const [permission, names] of Object.entries(CLAUDE_REMOTE_READ_TOOLS)) {
@@ -1170,13 +2044,16 @@ export function getClaudeCodeTools(
     );
   });
 
-  return [
-    ...remoteTools,
-    ...activityTools,
-    ...analyticsTools,
-    ...workoutTools,
-    ...getChatInteractionTools()
-  ];
+  return applyChatToolPolicy(
+    [
+      ...remoteTools,
+      ...activityTools,
+      ...analyticsTools,
+      ...workoutTools,
+      ...getChatInteractionTools()
+    ],
+    toolPolicy
+  );
 }
 
 async function executeChatTool(
@@ -1185,8 +2062,18 @@ async function executeChatTool(
   send: (channel: string, payload: unknown) => void,
   requestId: string,
   unitSystem: UnitSystem,
-  claudePermissions?: ClaudeCodePermissions
+  claudePermissions?: ClaudeCodePermissions,
+  toolPolicy: ChatToolPolicy = "interactive"
 ): Promise<string> {
+  // Every provider branch converges here, so this is the one place the
+  // read-only boundary cannot be routed around by a model that names a tool it
+  // was never offered.
+  if (!isToolAllowedUnderPolicy(name, toolPolicy)) {
+    throw new Error(
+      `${name} is not available to an automation run; it may only read, analyse and draft.`
+    );
+  }
+
   if (isChatInteractionTool(name)) {
     return handleChatInteractionTool(
       name as ChatInteractionToolName,
@@ -1197,7 +2084,8 @@ async function executeChatTool(
           kind: "coachPrompt",
           prompt
         });
-      }
+      },
+      toolPolicy
     );
   }
   if (isChatWorkoutTool(name)) {
@@ -1558,8 +2446,15 @@ function extractSseData(frame: string): string | null {
 
 async function buildTrainingContext(
   permissions?: ClaudeCodePermissions,
-  unitSystem: UnitSystem = "metric"
+  unitSystem: UnitSystem = "metric",
+  customInstructions?: string,
+  roleInstructions?: string
 ): Promise<{ text: string; hasData: boolean }> {
+  // Rebuilt per request so edits to the athlete's custom instructions apply live.
+  const coachInstructions = buildCoachInstructions(
+    customInstructions,
+    roleInstructions
+  );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +
     `Use ${unitSystem === "imperial" ? "miles, feet, min/mi, mph, pounds, and yards for swims" : "kilometres, metres, min/km, km/h, and kilograms"} in every user-facing answer and tool summary. ` +
@@ -1574,7 +2469,7 @@ async function buildTrainingContext(
     return {
       hasData: false,
       text:
-        `${COACH_INSTRUCTIONS}\n\n${unitInstruction}\n\n` +
+        `${coachInstructions}\n\n${unitInstruction}\n\n` +
         "NOTE: The athlete is not signed in to COROS Training Hub, so no training " +
         "data is available. Encourage them to connect it for personalised advice."
     };
@@ -1595,7 +2490,7 @@ async function buildTrainingContext(
       : Promise.resolve([] as TrainingHubUpcomingWorkout[])
   ]);
 
-  const sections: string[] = [COACH_INSTRUCTIONS, "", unitInstruction, ""];
+  const sections: string[] = [coachInstructions, "", unitInstruction, ""];
   let hasData = false;
 
   if (activities.status === "fulfilled" && activities.value.length > 0) {

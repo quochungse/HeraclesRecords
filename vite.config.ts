@@ -13,7 +13,12 @@ export default defineConfig({
     // a reload during dependency optimization, leaving the browser with stale
     // hashed React URLs and Vite's "Outdated Optimize Dep" 504 response.
     watch: {
-      ignored: ["**/bin/**", "**/dist/**", "**/dist-electron/**"]
+      ignored: [
+        "**/bin/**",
+        "**/dist/**",
+        "**/dist-electron/**",
+        "**/dist-harness/**"
+      ]
     }
   },
   build: {

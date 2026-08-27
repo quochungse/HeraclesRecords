@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
-import type { CoachInputChoice, CoachInputPrompt, CorosMcpTool } from "./types";
+import type {
+  ChatToolPolicy,
+  CoachInputChoice,
+  CoachInputPrompt,
+  CorosMcpTool
+} from "./types";
 
 export const CHAT_INTERACTION_TOOL_NAMES = ["request_coach_input"] as const;
 
@@ -116,16 +121,33 @@ export function buildCoachInputPrompt(
   };
 }
 
+/**
+ * An automation run has nobody watching, so the question cannot block the turn.
+ * The prompt is still emitted and persisted — the athlete can answer it later
+ * from the transcript — but the model is told to assume and carry on.
+ */
+export const NO_ATHLETE_AVAILABLE_RESPONSE =
+  "No athlete is available; state your assumption and continue.";
+
 export function handleChatInteractionTool(
   name: ChatInteractionToolName,
   args: Record<string, unknown>,
-  onCoachPrompt?: (prompt: CoachInputPrompt) => void
+  onCoachPrompt?: (prompt: CoachInputPrompt) => void,
+  toolPolicy: ChatToolPolicy = "interactive"
 ): string {
   if (name !== "request_coach_input") {
     throw new Error(`Unsupported Coach interaction tool: ${name}`);
   }
   const prompt = buildCoachInputPrompt(args);
   onCoachPrompt?.(prompt);
+  if (toolPolicy === "read-only") {
+    return JSON.stringify({
+      ok: true,
+      prompt_id: prompt.promptId,
+      status: "no_athlete_available",
+      action: NO_ATHLETE_AVAILABLE_RESPONSE
+    });
+  }
   return JSON.stringify({
     ok: true,
     prompt_id: prompt.promptId,

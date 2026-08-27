@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bot,
   CircleCheck,
@@ -7,9 +9,13 @@ import {
   LogOut,
   RefreshCw,
   Save,
-  Terminal
+  Terminal,
+  UserRound,
+  X
 } from "lucide-react";
 import type {
+  AnthropicApiConnectionTest,
+  AnthropicEffort,
   ChatAuthStatus,
   ChatSettings,
   ClaudeCodeStatus,
@@ -17,6 +23,17 @@ import type {
   LocalChatDiscovery,
   OpenRouterConnectionTest
 } from "../../electron/types";
+import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "../../electron/types";
+import {
+  ANTHROPIC_MODEL_OPTIONS,
+  CLAUDE_MODEL_OPTIONS,
+  REASONING_EFFORT_OPTIONS,
+  formatEffortOption,
+  formatModelOptionLabel,
+  withNamedDefaultModel
+} from "../../electron/chatModels";
+import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
+import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { McpServersPanel } from "./McpServersPanel";
 import type { CorosLinkApi } from "../coroslink-api";
 
@@ -48,12 +65,14 @@ export function ChatSettingsPanel({
   checkingClaude,
   connectingClaude,
   testingClaude,
+  revokingClaude,
   mcpRefreshVersion,
   busy,
   onSignIn,
   onSignOut,
   onRefreshClaude,
-  onConnectClaude,
+  onClaudeSignedIn,
+  onRevokeClaude,
   onTestClaude,
   onOpenClaudeSetupGuide,
   onUpdateClaudeCode,
@@ -64,6 +83,15 @@ export function ChatSettingsPanel({
   onClearOpenRouterApiKey,
   onOpenOpenRouterKeys,
   onOpenOpenRouterModels,
+  anthropicApiKey,
+  anthropicConnection,
+  testingAnthropic,
+  onAnthropicApiKeyChange,
+  onUpdateAnthropic,
+  onTestAnthropicConnection,
+  onSaveAnthropicSettings,
+  onClearAnthropicApiKey,
+  onOpenAnthropicKeyGuide,
   onLocalApiKeyChange,
   onUpdateLocalDraft,
   onDetectLocalServers,
@@ -90,12 +118,14 @@ export function ChatSettingsPanel({
   checkingClaude: boolean;
   connectingClaude: boolean;
   testingClaude: boolean;
+  revokingClaude: boolean;
   mcpRefreshVersion: number;
   busy?: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
   onRefreshClaude: () => void;
-  onConnectClaude: () => void;
+  onClaudeSignedIn: (status: ClaudeCodeStatus) => void;
+  onRevokeClaude: () => void;
   onTestClaude: () => void;
   onOpenClaudeSetupGuide: () => void;
   onUpdateClaudeCode: (
@@ -110,6 +140,15 @@ export function ChatSettingsPanel({
   onClearOpenRouterApiKey: () => void;
   onOpenOpenRouterKeys: () => void;
   onOpenOpenRouterModels: () => void;
+  anthropicApiKey: string;
+  anthropicConnection: AnthropicApiConnectionTest | null;
+  testingAnthropic: boolean;
+  onAnthropicApiKeyChange: (value: string) => void;
+  onUpdateAnthropic: (patch: Partial<ChatSettings["anthropic"]>) => void;
+  onTestAnthropicConnection: () => void;
+  onSaveAnthropicSettings: () => void;
+  onClearAnthropicApiKey: () => void;
+  onOpenAnthropicKeyGuide: () => void;
   onLocalApiKeyChange: (value: string) => void;
   onUpdateLocalDraft: (patch: Partial<ChatSettings["local"]>) => void;
   onDetectLocalServers: () => void;
@@ -128,6 +167,43 @@ export function ChatSettingsPanel({
       (server) => server.baseUrl === chatSettings.local.baseUrl
     ) ?? availableLocalServers[0];
   const discoveredLocalModels = selectedLocalServer?.models ?? [];
+  const savedCustomInstructions = chatSettings.customInstructions ?? "";
+  const [customInstructionsDraft, setCustomInstructionsDraft] = useState(
+    savedCustomInstructions
+  );
+
+  useEffect(() => {
+    setCustomInstructionsDraft(savedCustomInstructions);
+  }, [savedCustomInstructions]);
+
+  const commitCustomInstructions = () => {
+    const next = customInstructionsDraft.trim();
+    if (next === savedCustomInstructions) return;
+    onUpdateChatSettings({ customInstructions: next });
+  };
+
+  const appScopedAuth = chatSettings.claudeCode.useAppScopedAuth !== false;
+  const [claudeLoginError, setClaudeLoginError] = useState<string | null>(null);
+  const [baseInstructionsOpen, setBaseInstructionsOpen] = useState(false);
+  const [baseInstructions, setBaseInstructions] = useState<string | null>(null);
+  const [baseInstructionsError, setBaseInstructionsError] = useState<string | null>(
+    null
+  );
+
+  const openBaseInstructions = async () => {
+    setBaseInstructionsOpen(true);
+    if (baseInstructions !== null) return;
+    if (!api) {
+      setBaseInstructionsError("Could not load the base coach instructions.");
+      return;
+    }
+    setBaseInstructionsError(null);
+    try {
+      setBaseInstructions(await api.getBaseCoachInstructions());
+    } catch {
+      setBaseInstructionsError("Could not load the base coach instructions.");
+    }
+  };
 
   return (
     <div className="chat-settings-panel">
@@ -149,6 +225,53 @@ export function ChatSettingsPanel({
           When off, heart rate trends, zone summaries, and activity charts are
           hidden. The coach still responds with text.
         </p>
+      </section>
+
+      <section className="chat-settings-section">
+        <h3>Coach instructions</h3>
+        <p className="chat-settings-copy">
+          Extra preferences appended to every coaching prompt — for example your
+          goal race, training days, equipment, or preferred tone.
+        </p>
+        <p className="chat-settings-copy">
+          Your custom instructions will be used in conjunction with the{" "}
+          <button
+            type="button"
+            className="chat-inline-link"
+            onClick={() => void openBaseInstructions()}
+          >
+            Base Coach instructions
+          </button>
+          .
+        </p>
+        <label className="chat-local-field">
+          <span>Custom instructions</span>
+          <textarea
+            className="chat-custom-instructions"
+            rows={5}
+            maxLength={MAX_CUSTOM_COACH_INSTRUCTIONS}
+            placeholder="e.g. I race a marathon in October, I can only run Tue/Thu/Sat, and I have no gym access."
+            value={customInstructionsDraft}
+            onChange={(event) => setCustomInstructionsDraft(event.target.value)}
+            onBlur={commitCustomInstructions}
+            onKeyDown={(event) => {
+              // Escape closes the settings modal via a document listener
+              // before blur can fire; save the draft first.
+              if (event.key === "Escape") commitCustomInstructions();
+            }}
+          />
+        </label>
+        <p className="chat-settings-copy">
+          {customInstructionsDraft.length}/{MAX_CUSTOM_COACH_INSTRUCTIONS} characters.
+          Saved when you click outside the box.
+        </p>
+        {baseInstructionsOpen ? (
+          <BaseCoachInstructionsDialog
+            instructions={baseInstructions}
+            error={baseInstructionsError}
+            onClose={() => setBaseInstructionsOpen(false)}
+          />
+        ) : null}
       </section>
 
       <section className="chat-settings-section">
@@ -328,8 +451,9 @@ export function ChatSettingsPanel({
           <span className="chat-beta-badge">Beta</span>
         </div>
         <p className="chat-settings-copy">
-          Uses Claude Code installed and signed in on this computer. CorosLink
-          never reads or stores your Claude password or subscription credentials.
+          Runs the Claude Code CLI installed on this computer against your Claude
+          subscription. CorosLink never sees your Claude password — sign-in
+          happens in your browser and Claude Code stores the credentials.
         </p>
 
         <label className="chat-local-field">
@@ -347,20 +471,67 @@ export function ChatSettingsPanel({
           </div>
         </label>
 
-        <label className="chat-local-field">
-          <span>Model</span>
-          <select
-            value={chatSettings.claudeCode.model ?? ""}
-            onChange={(event) =>
-              onUpdateClaudeCode({ model: event.target.value })
-            }
-          >
-            <option value="">Account default</option>
-            <option value="opus">Opus (most capable)</option>
-            <option value="sonnet">Sonnet (balanced)</option>
-            <option value="haiku">Haiku (fastest)</option>
-          </select>
-        </label>
+        <div className="chat-claude-model-row">
+          <label className="chat-local-field">
+            <span>Model</span>
+            <select
+              value={chatSettings.claudeCode.model ?? ""}
+              onChange={(event) =>
+                onUpdateClaudeCode({ model: event.target.value })
+              }
+            >
+              {(
+                claudeStatus?.availableModels?.length
+                  ? claudeStatus.availableModels
+                  : chatSettings.claudeCode.availableModels?.length
+                    ? chatSettings.claudeCode.availableModels
+                    : withNamedDefaultModel(
+                        CLAUDE_MODEL_OPTIONS,
+                        chatSettings.claudeCode.defaultModel
+                      )
+              ).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {formatModelOptionLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="chat-local-field">
+            <span>Reasoning effort</span>
+            <select
+              value={chatSettings.claudeCode.effort}
+              onChange={(event) =>
+                onUpdateClaudeCode({
+                  effort: event.target.value as AnthropicEffort
+                })
+              }
+            >
+              {REASONING_EFFORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {formatEffortOption(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="chat-settings-copy">
+          Higher effort means deeper reasoning per answer and more of your
+          subscription usage. Claude quietly drops to the highest level your
+          selected model supports.
+        </p>
+
+        <ClaudeAuthScopeToggle
+          appScoped={appScopedAuth}
+          disabled={busy}
+          onChange={(next) => onUpdateClaudeCode({ useAppScopedAuth: next })}
+        />
+        <p className="chat-settings-copy">
+          {appScopedAuth
+            ? "CorosLink keeps its own Claude credentials in its app data folder. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
+            : "CorosLink will use the machine-wide Claude login in your home folder, shared with the terminal. Signing in here replaces that login."}
+        </p>
+
 
         <div className="chat-claude-status" data-state={claudeStatus?.state}>
           {checkingClaude || connectingClaude ? (
@@ -376,6 +547,16 @@ export function ChatSettingsPanel({
               {claudeStatus?.message ??
                 "Check this computer for an installed Claude Code runtime."}
             </span>
+            {claudeStatus?.email ? (
+              <span className="chat-claude-account">
+                <UserRound size={12} aria-hidden="true" />
+                {claudeStatus.email}
+                {claudeStatus.orgName ? ` · ${claudeStatus.orgName}` : ""}
+                {claudeStatus.subscriptionType
+                  ? ` · ${claudeStatus.subscriptionType}`
+                  : ""}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -404,19 +585,12 @@ export function ChatSettingsPanel({
             </button>
           ) : null}
           {claudeStatus?.installed && claudeStatus.state !== "connected" ? (
-            <button
-              type="button"
-              className="chat-local-action primary"
-              onClick={onConnectClaude}
+            <ClaudeCodeLoginCard
+              api={api}
               disabled={connectingClaude || busy}
-            >
-              {connectingClaude ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Terminal size={14} aria-hidden="true" />
-              )}
-              Sign in with Claude
-            </button>
+              onSignedIn={onClaudeSignedIn}
+              onError={(message) => setClaudeLoginError(message)}
+            />
           ) : null}
           {claudeStatus?.state === "connected" ? (
             <button
@@ -433,6 +607,29 @@ export function ChatSettingsPanel({
               Test connection
             </button>
           ) : null}
+          {appScopedAuth && claudeStatus?.authenticated ? (
+            <button
+              type="button"
+              className="chat-local-action is-danger"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Sign CorosLink out of Claude? Your Claude login elsewhere on this computer is not affected."
+                  )
+                ) {
+                  onRevokeClaude();
+                }
+              }}
+              disabled={revokingClaude || busy}
+            >
+              {revokingClaude ? (
+                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+              ) : (
+                <LogOut size={14} aria-hidden="true" />
+              )}
+              Revoke
+            </button>
+          ) : null}
           <button
             type="button"
             className="chat-local-action"
@@ -442,6 +639,10 @@ export function ChatSettingsPanel({
             Setup guide
           </button>
         </div>
+
+        {claudeLoginError ? (
+          <p className="chat-local-result is-error">{claudeLoginError}</p>
+        ) : null}
 
         <div className="chat-claude-permissions">
           <strong>Claude can access</strong>
@@ -480,6 +681,130 @@ export function ChatSettingsPanel({
           their tools to Claude. Drafts stay local until you click an upload or
           delete button.
         </p>
+      </section>
+
+      <section className="chat-settings-section chat-claude-section">
+        <h3>Claude API key</h3>
+        <p className="chat-settings-copy">
+          Talks to the Anthropic API directly with your own key, billed per
+          token to your Anthropic account. Nothing needs to be installed, and
+          the key is stored encrypted on this computer only.
+        </p>
+
+        <div className="chat-local-settings chat-local-settings-panel">
+          <label className="chat-local-field chat-local-field-key">
+            <span>API key</span>
+            <div className="chat-local-key-row">
+              <KeyRound size={14} aria-hidden="true" />
+              <input
+                value={anthropicApiKey}
+                onChange={(event) =>
+                  onAnthropicApiKeyChange(event.target.value)
+                }
+                placeholder={
+                  chatSettings.anthropic.hasApiKey ? "Saved key" : "sk-ant-…"
+                }
+                type="password"
+                spellCheck={false}
+              />
+              {chatSettings.anthropic.hasApiKey ? (
+                <button
+                  type="button"
+                  onClick={onClearAnthropicApiKey}
+                  disabled={savingSettings}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          </label>
+
+          <label className="chat-local-field">
+            <span>Model</span>
+            <select
+              value={chatSettings.anthropic.model}
+              onChange={(event) =>
+                onUpdateAnthropic({ model: event.target.value })
+              }
+            >
+              {ANTHROPIC_MODEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="chat-local-field">
+            <span>Reasoning effort</span>
+            <select
+              value={chatSettings.anthropic.effort}
+              onChange={(event) =>
+                onUpdateAnthropic({
+                  effort: event.target.value as AnthropicEffort
+                })
+              }
+            >
+              {REASONING_EFFORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {formatEffortOption(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="chat-settings-copy">
+            Higher effort spends more tokens on reasoning before answering.
+            Lower effort is cheaper and faster for routine questions.
+          </p>
+
+          <div className="chat-local-actions">
+            <button
+              type="button"
+              className="chat-local-action"
+              onClick={onOpenAnthropicKeyGuide}
+            >
+              <ExternalLink size={14} aria-hidden="true" />
+              Get a key
+            </button>
+            <button
+              type="button"
+              className="chat-local-action"
+              onClick={onTestAnthropicConnection}
+              disabled={testingAnthropic || busy}
+            >
+              {testingAnthropic ? (
+                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+              ) : (
+                <Bot size={14} aria-hidden="true" />
+              )}
+              Test
+            </button>
+            <button
+              type="button"
+              className="chat-local-action primary"
+              onClick={onSaveAnthropicSettings}
+              disabled={savingSettings || busy}
+            >
+              {savingSettings ? (
+                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+              ) : (
+                <Save size={14} aria-hidden="true" />
+              )}
+              Save
+            </button>
+          </div>
+          {anthropicConnection ? (
+            <p
+              className={
+                anthropicConnection.ok
+                  ? "chat-local-result is-ready"
+                  : "chat-local-result is-error"
+              }
+            >
+              {anthropicConnection.message}
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <section className="chat-settings-section">
@@ -654,6 +979,69 @@ export function ChatSettingsPanel({
           onChange={onMcpServersChange}
         />
       </section>
+
     </div>
+  );
+}
+
+function BaseCoachInstructionsDialog({
+  instructions,
+  error,
+  onClose
+}: {
+  instructions: string | null;
+  error: string | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    // Capture phase so Escape closes this dialog without also closing the
+    // settings modal, which listens on document in the bubble phase.
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="chat-base-instructions-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="chat-base-instructions-title"
+      onClick={onClose}
+    >
+      <div
+        className="panel chat-base-instructions-dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="chat-base-instructions-header">
+          <h4 id="chat-base-instructions-title">Base Coach instructions</h4>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close base coach instructions"
+            onClick={onClose}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="chat-base-instructions-body">
+          {error ? (
+            <p className="chat-settings-copy">{error}</p>
+          ) : instructions === null ? (
+            <p className="chat-settings-copy">
+              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />{" "}
+              Loading…
+            </p>
+          ) : (
+            <pre>{instructions}</pre>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

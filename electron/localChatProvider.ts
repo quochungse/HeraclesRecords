@@ -1,5 +1,6 @@
 import type {
   ChatMessage,
+  ChatTokenUsage,
   CorosMcpTool,
   LocalChatConnectionTest,
   LocalChatDiscovery,
@@ -331,7 +332,7 @@ export async function testLocalChatConnectionRequest(
 
 export async function streamLocalChatCompletion(
   options: StreamLocalChatOptions
-): Promise<{ fullText: string }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
   return streamOpenAiCompatibleChatCompletion(
     {
       instructions: options.instructions,
@@ -360,7 +361,7 @@ export async function streamLocalChatCompletion(
 export async function streamOpenAiCompatibleChatCompletion(
   options: StreamOpenAiCompatibleChatOptions,
   transport: OpenAiCompatibleChatTransport
-): Promise<{ fullText: string }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
   const baseUrl = transport.baseUrl.replace(/\/+$/, "");
   const model = options.model.trim();
   if (!model) {
@@ -368,6 +369,8 @@ export async function streamOpenAiCompatibleChatCompletion(
   }
 
   let fullText = "";
+  let counted = false;
+  const usage: ChatTokenUsage = { inputTokens: 0, outputTokens: 0 };
   let input = buildLocalInputMessages(options.instructions, options.messages);
   let tools = options.toolsEnabled
     ? buildLocalFunctionTools(options.tools)
@@ -395,11 +398,20 @@ export async function streamOpenAiCompatibleChatCompletion(
       continue;
     }
 
-    const { delta, functionCalls: rawFunctionCalls } = await readLocalChatStream(
+    const {
+      delta,
+      functionCalls: rawFunctionCalls,
+      usage: roundUsage
+    } = await readLocalChatStream(
       opened.response,
       options.signal,
       options.onToken
     );
+    if (roundUsage) {
+      counted = true;
+      usage.inputTokens += roundUsage.inputTokens;
+      usage.outputTokens += roundUsage.outputTokens;
+    }
     const functionCalls = normalizeLocalToolCalls(rawFunctionCalls, options.tools);
     fullText += delta;
 
@@ -442,9 +454,9 @@ export async function streamOpenAiCompatibleChatCompletion(
   if (toolsDisabled && fullText.length === 0) {
     // The retry should normally produce content; this keeps the failure mode
     // explicit if the local server accepts the no-tool request but emits nothing.
-    return { fullText };
+    return { fullText, ...(counted ? { usage } : {}) };
   }
-  return { fullText };
+  return { fullText, ...(counted ? { usage } : {}) };
 }
 
 async function fetchLocalModels(
@@ -536,7 +548,11 @@ async function openLocalChatStream(
   const request: Record<string, unknown> = {
     model,
     messages,
-    stream: true
+    stream: true,
+    // Asked for, never relied on: servers that do not know this option ignore
+    // it, and the ones that do send a final chunk carrying the token counts the
+    // run log and the budget need (13).
+    stream_options: { include_usage: true }
   };
   if (tools.length > 0) {
     request.tools = tools;
@@ -573,16 +589,41 @@ async function openLocalChatStream(
   );
 }
 
+/**
+ * OpenAI-compatible servers report usage on a final chunk, and only when the
+ * request asked for it — so this is best-effort by construction. A server that
+ * says nothing leaves the run's cost unknown rather than zero, which is what
+ * the budget needs in order to be honest about what it cannot see.
+ */
+function parseLocalChatUsage(event: unknown): ChatTokenUsage | undefined {
+  const reported = (event as { usage?: Record<string, unknown> })?.usage;
+  if (!reported) {
+    return undefined;
+  }
+  const count = (key: string): number => {
+    const value = reported[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  };
+  const inputTokens = count("prompt_tokens");
+  const outputTokens = count("completion_tokens");
+  return inputTokens || outputTokens ? { inputTokens, outputTokens } : undefined;
+}
+
 async function readLocalChatStream(
   response: Response,
   signal: AbortSignal,
   onToken: (delta: string) => void
-): Promise<{ delta: string; functionCalls: LocalToolCall[] }> {
+): Promise<{
+  delta: string;
+  functionCalls: LocalToolCall[];
+  usage?: ChatTokenUsage;
+}> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   const accumulator = new LocalToolCallAccumulator();
   let fullDelta = "";
   let buffer = "";
+  let usage: ChatTokenUsage | undefined;
 
   for (;;) {
     if (signal.aborted) break;
@@ -610,10 +651,15 @@ async function readLocalChatStream(
         onToken(delta);
       }
       accumulator.addEvent(event);
+      usage = parseLocalChatUsage(event) ?? usage;
     }
   }
 
-  return { delta: fullDelta, functionCalls: accumulator.toCalls() };
+  return {
+    delta: fullDelta,
+    functionCalls: accumulator.toCalls(),
+    ...(usage ? { usage } : {})
+  };
 }
 
 export function parseCompatibleChatStreamError(event: unknown): string {

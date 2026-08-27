@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { PanelLeft } from "lucide-react";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
-import type { ChatSessionSummary } from "../../electron/types";
+import type {
+  ChatSessionSummary,
+  CoachAutomationSessionAttention
+} from "../../electron/types";
 
 export function ChatSidebar({
   open,
@@ -9,10 +12,12 @@ export function ChatSidebar({
   sessions,
   activeSessionId,
   busy,
+  attention,
   onClose,
   onOpen,
   onNewChat,
   onSelectSession,
+  onTogglePinSession,
   onDeleteSession
 }: {
   open: boolean;
@@ -20,10 +25,13 @@ export function ChatSidebar({
   sessions: ChatSessionSummary[];
   activeSessionId: string | null;
   busy?: boolean;
+  /** Coach attention per conversation, keyed by session id (9.3). */
+  attention?: Map<string, CoachAutomationSessionAttention>;
   onClose: () => void;
   onOpen: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
+  onTogglePinSession: (sessionId: string, pinned: boolean) => void;
   onDeleteSession: (sessionId: string) => void;
 }) {
   useEffect(() => {
@@ -84,9 +92,11 @@ export function ChatSidebar({
               sessions={sessions}
               activeSessionId={activeSessionId}
               busy={busy}
+              attention={attention}
               onCollapse={onClose}
               onNewChat={onNewChat}
               onSelectSession={onSelectSession}
+              onTogglePinSession={onTogglePinSession}
               onDeleteSession={onDeleteSession}
             />
           </div>

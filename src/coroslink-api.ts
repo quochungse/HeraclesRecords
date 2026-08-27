@@ -2,6 +2,7 @@ import type {
   ActivityBackupProgress,
   BinaryStatus,
   CachedCorosMapPackage,
+  CoachAutomationSessionAttention,
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
   CorosMapDownloadJob,
@@ -25,6 +26,7 @@ import type {
   RouteWaypointRequest,
   ActivityPaceBaselines,
   RouteShareSession,
+  SaveChatSessionOptions,
   SpotifyConfig,
   SpotifyPlaylist,
   SpotifyPlaylistTrack,
@@ -92,8 +94,21 @@ import type {
   ChatMessage,
   ChatProvider,
   ChatSessionSummary,
+  CoachAutomation,
+  CoachAutomationAttachResult,
+  CoachAutomationBinding,
+  CoachAutomationBindingInput,
+  CoachAutomationBindingView,
+  CoachAutomationDetail,
+  CoachAutomationInput,
+  CoachAutomationRun,
+  CoachAutomationPause,
+  CoachAutomationSpend,
+  CoachAutomationRunQuery,
+  CoachAutomationSummary,
   ChatSettings,
   ClaudeCodeConnectionTest,
+  ClaudeCodeLoginStart,
   ClaudeCodeStatus,
   PersistedChatEntry,
   ChatStreamStart,
@@ -101,6 +116,8 @@ import type {
   ChatStreamDone,
   ChatStreamError,
   ChatStreamInfo,
+  AnthropicApiConfig,
+  AnthropicApiConnectionTest,
   LocalChatConfig,
   LocalChatConnectionTest,
   LocalChatDiscovery,
@@ -579,10 +596,15 @@ export interface CorosLinkApi {
   ) => () => void;
   getChatAuthStatus: () => Promise<ChatAuthStatus>;
   getChatSettings: () => Promise<ChatSettings>;
+  getBaseCoachInstructions: () => Promise<string>;
   saveChatSettings: (settings: ChatSettings) => Promise<ChatSettings>;
   testLocalChatConnection: (
     config?: LocalChatConfig
   ) => Promise<LocalChatConnectionTest>;
+  testAnthropicConnection: (
+    config?: Partial<AnthropicApiConfig>
+  ) => Promise<AnthropicApiConnectionTest>;
+  openAnthropicKeyGuide: () => Promise<void>;
   detectLocalChatServers: (apiKey?: string) => Promise<LocalChatDiscovery>;
   testOpenRouterConnection: (
     config?: OpenRouterConfig
@@ -590,7 +612,12 @@ export interface CorosLinkApi {
   openOpenRouterKeys: () => Promise<void>;
   openOpenRouterModels: () => Promise<void>;
   getClaudeCodeStatus: () => Promise<ClaudeCodeStatus>;
-  connectClaudeCode: () => Promise<ClaudeCodeStatus>;
+  startClaudeCodeLogin: () => Promise<ClaudeCodeLoginStart>;
+  awaitClaudeCodeLogin: () => Promise<ClaudeCodeStatus>;
+  submitClaudeCodeLoginCode: (code: string) => Promise<void>;
+  cancelClaudeCodeLogin: () => Promise<void>;
+  openClaudeCodeLoginUrl: () => Promise<void>;
+  revokeClaudeCodeLogin: () => Promise<ClaudeCodeStatus>;
   testClaudeCodeConnection: () => Promise<ClaudeCodeConnectionTest>;
   openClaudeCodeSetupGuide: () => Promise<void>;
   loginChat: () => Promise<ChatAuthStatus>;
@@ -606,9 +633,76 @@ export interface CorosLinkApi {
   createChatSession: (provider: ChatProvider) => Promise<ChatSessionSummary>;
   saveChatSession: (
     sessionId: string,
-    entries: PersistedChatEntry[]
+    entries: PersistedChatEntry[],
+    options?: SaveChatSessionOptions
+  ) => Promise<ChatSessionSummary | null>;
+  setChatSessionPinned: (
+    sessionId: string,
+    pinned: boolean
   ) => Promise<ChatSessionSummary | null>;
   deleteChatSession: (sessionId: string) => Promise<void>;
+  renameChatSession: (
+    sessionId: string,
+    title: string
+  ) => Promise<ChatSessionSummary | null>;
+  listCoachAutomations: () => Promise<CoachAutomationSummary[]>;
+  getCoachAutomation: (
+    automationId: string
+  ) => Promise<CoachAutomationDetail | null>;
+  saveCoachAutomation: (
+    input: CoachAutomationInput,
+    automationId?: string
+  ) => Promise<CoachAutomation | null>;
+  setCoachAutomationEnabled: (
+    automationId: string,
+    enabled: boolean
+  ) => Promise<CoachAutomation | null>;
+  deleteCoachAutomation: (automationId: string) => Promise<void>;
+  listCoachAutomationBindings: (
+    automationId: string
+  ) => Promise<CoachAutomationBindingView[]>;
+  attachCoachAutomation: (
+    input: CoachAutomationBindingInput
+  ) => Promise<CoachAutomationAttachResult>;
+  detachCoachAutomation: (bindingId: string) => Promise<void>;
+  setCoachAutomationBindingEnabled: (
+    bindingId: string,
+    enabled: boolean
+  ) => Promise<CoachAutomationBinding | null>;
+  reorderCoachAutomationBindings: (
+    sessionId: string,
+    bindingIds: string[]
+  ) => Promise<CoachAutomationBinding[]>;
+  listCoachAutomationsForSession: (
+    sessionId: string
+  ) => Promise<CoachAutomationBindingView[]>;
+  runCoachAutomationNow: (
+    automationId: string,
+    bindingIds?: string[]
+  ) => Promise<CoachAutomationRun[]>;
+  listCoachAutomationRuns: (
+    filter?: CoachAutomationRunQuery
+  ) => Promise<CoachAutomationRun[]>;
+  cancelCoachAutomationRun: (runId: string) => Promise<void>;
+  getCoachAutomationPause: () => Promise<CoachAutomationPause | null>;
+  resumeCoachAutomations: () => Promise<CoachAutomationPause | null>;
+  getCoachAutomationSpend: () => Promise<CoachAutomationSpend>;
+  setCoachAutomationBudget: (budget: number | null) => Promise<CoachAutomationSpend>;
+  markCoachAutomationRunsSeen: (runIds: string[]) => Promise<number>;
+  listCoachAutomationSessionAttention: () => Promise<
+    CoachAutomationSessionAttention[]
+  >;
+  markCoachAutomationSessionSeen: (sessionId: string) => Promise<number>;
+  /** A binding whose rendered state changed with no run to carry the news. */
+  onCoachAutomationBindingUpdate: (
+    callback: (binding: CoachAutomationBinding) => void
+  ) => () => void;
+  onCoachAutomationRunUpdate: (
+    callback: (run: CoachAutomationRun) => void
+  ) => () => void;
+  onCoachAutomationPauseUpdate: (
+    callback: (pause: CoachAutomationPause | null) => void
+  ) => () => void;
   onChatStreamStart: (callback: (payload: ChatStreamStart) => void) => () => void;
   onChatStreamToken: (callback: (payload: ChatStreamToken) => void) => () => void;
   onChatStreamDone: (callback: (payload: ChatStreamDone) => void) => () => void;

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CorosLink-only Claude login** — the Claude subscription provider now keeps its own credentials in the app's data folder via `CLAUDE_CONFIG_DIR`, so the app signs in to its own Claude account instead of borrowing whichever one the machine's CLI is using. Sign-in happens in-app: the browser opens Claude's page and you paste the returned code back into CorosLink. A two-way switch — Your device Claude / CorosLink-only Claude login — sits in both Settings and the sign-in screen.
+- **Signed-in Claude account shown in Settings** — the connection row now names the account (email, organisation, plan) so you can tell at a glance whether the Coach is on your personal or work Claude login. Read live from the CLI on each check and never persisted.
+- **Revoke the CorosLink Claude login** — sign the app out of Claude from Settings so a different account can take over. It only ever touches CorosLink's own credential store, never the machine-wide login shared with your terminal.
+- **Reasoning effort for the Claude subscription provider** — pick low through max next to the model, forwarded as the Agent SDK's `effort` option. Claude drops to the highest level the selected model supports rather than failing.
+- **Claude API key provider** — a fourth Coach backend that calls the Anthropic Messages API directly with your own key, billed per token, with no Claude Code install required. Pick the model (Opus 5, Fable 5, Sonnet 5, Haiku 4.5) and reasoning effort, test the key without spending tokens, and use the full COROS tool set. The key is stored encrypted on this computer.
+
+### Fixed
+
+- **Claude sign-in now actually completes.** The old flow spawned `claude auth login` detached with `stdio: "ignore"`, but the CLI prints an authorize URL and then waits on stdin for a pasted code — with no pipes it produced nothing and could never finish. The app now pipes the process, surfaces the URL, and forwards the code.
+- Custom coach instructions now have the wrapper delimiters stripped from athlete-entered text, so a pasted `</athlete_custom_instructions>` can no longer close the block early and promote the rest of the paste to operating rules.
+
 ## [0.1.29] - 2026-08-24
 
 ### Added

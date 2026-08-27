@@ -1,5 +1,6 @@
 import type {
   ActivityVisualPreview,
+  ChatEntryAutomationMarker,
   ChatMessage,
   CoachInputPrompt,
   FitnessTrendPreview,
@@ -24,6 +25,14 @@ export interface ChatMessageEntry {
   content: string;
   source?: SourceInfo;
   reasoningSummary?: string;
+  /**
+   * Set when a coach automation wrote this entry. Both converters below have to
+   * carry it: they rebuild entries field by field, so an unlisted field is
+   * dropped — and `toPersistedEntries` runs whenever the athlete replies in the
+   * conversation, which would silently strip attribution off the run's own
+   * messages.
+   */
+  automation?: ChatEntryAutomationMarker;
 }
 
 export interface ChatPlanDraftEntry {
@@ -56,6 +65,14 @@ export interface ChatHrZoneEntry {
   preview: HrZonePreview;
 }
 
+/** An automation looked and found nothing worth saying (5.5). */
+export interface ChatAutomationSilentEntry {
+  kind: "automationSilent";
+  automation: ChatEntryAutomationMarker;
+  /** Epoch milliseconds. */
+  at: number;
+}
+
 export interface ChatToolNoticeEntry {
   kind: "toolNotice";
   message: string;
@@ -69,6 +86,7 @@ export type ChatEntry =
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
   | ChatHrZoneEntry
+  | ChatAutomationSilentEntry
   | ChatToolNoticeEntry;
 
 export function isChatVisualEntry(
@@ -225,6 +243,13 @@ function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
   if (entry.kind === "hrZoneSummary") {
     return { kind: "hrZoneSummary", preview: entry.preview };
   }
+  if (entry.kind === "automationSilent") {
+    return {
+      kind: "automationSilent",
+      automation: entry.automation,
+      at: entry.at
+    };
+  }
   if (entry.kind === "toolNotice") {
     return {
       kind: "message",
@@ -240,7 +265,8 @@ function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
       ...(entry.source ? { source: entry.source } : {}),
       ...(entry.reasoningSummary
         ? { reasoningSummary: entry.reasoningSummary }
-        : {})
+        : {}),
+      ...(entry.automation ? { automation: entry.automation } : {})
     };
   }
   return null;
@@ -301,6 +327,14 @@ export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[]
       result.push({ kind: "hrZoneSummary", preview: entry.preview });
       continue;
     }
+    if (entry.kind === "automationSilent") {
+      result.push({
+        kind: "automationSilent",
+        automation: entry.automation,
+        at: entry.at
+      });
+      continue;
+    }
     result.push({
       kind: "message",
       role: entry.role,
@@ -308,7 +342,8 @@ export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[]
       ...(entry.source ? { source: entry.source } : {}),
       ...(entry.reasoningSummary
         ? { reasoningSummary: entry.reasoningSummary }
-        : {})
+        : {}),
+      ...(entry.automation ? { automation: entry.automation } : {})
     });
   }
 

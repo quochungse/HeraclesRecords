@@ -1,6 +1,7 @@
 import type { ChatSessionSummary } from "../../electron/types";
 
 export type ChatSessionGroupLabel =
+  | "Pinned"
   | "Today"
   | "Yesterday"
   | "Previous 7 days"
@@ -44,6 +45,21 @@ const GROUP_ORDER: ChatSessionGroupLabel[] = [
   "Older"
 ];
 
+/** Most recently pinned first, falling back to recency when timestamps tie. */
+function comparePinned(
+  left: ChatSessionSummary,
+  right: ChatSessionSummary
+): number {
+  const leftPinned = new Date(left.pinnedAt ?? 0).getTime();
+  const rightPinned = new Date(right.pinnedAt ?? 0).getTime();
+  if (leftPinned !== rightPinned) {
+    return rightPinned - leftPinned;
+  }
+  return (
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  );
+}
+
 export function groupChatSessions(
   sessions: ChatSessionSummary[]
 ): ChatSessionGroup[] {
@@ -52,15 +68,24 @@ export function groupChatSessions(
     buckets.set(label, []);
   }
 
+  const pinned: ChatSessionSummary[] = [];
   for (const session of sessions) {
+    if (session.pinnedAt) {
+      pinned.push(session);
+      continue;
+    }
     const label = sessionGroupLabel(session.updatedAt);
     buckets.get(label)?.push(session);
   }
+  pinned.sort(comparePinned);
 
-  return GROUP_ORDER.map((label) => ({
-    label,
-    sessions: buckets.get(label) ?? []
-  })).filter((group) => group.sessions.length > 0);
+  return [
+    { label: "Pinned" as const, sessions: pinned },
+    ...GROUP_ORDER.map((label) => ({
+      label,
+      sessions: buckets.get(label) ?? []
+    }))
+  ].filter((group) => group.sessions.length > 0);
 }
 
 export function formatSessionRelativeTime(updatedAt: string): string {

@@ -330,7 +330,7 @@ Month and week views for planned workouts and completed activities on one grid.
 
 Ask training questions with answers grounded in your COROS data.
 
-- **Providers** — ChatGPT (cloud), Claude Code, OpenRouter with your own API key, or local LLMs (Ollama / LM Studio)
+- **Providers** — ChatGPT (cloud), Claude via your subscription (Claude Code) or your own Anthropic API key, OpenRouter with your own API key, or local LLMs (Ollama / LM Studio)
 - **Model selection & extended thinking** where the provider supports them
 - **Multi-sport workout tools** — draft a single workout or adaptive multi-week plans across Run, Trail Run, Bike, Pool Swim, Strength, Indoor Climb, Bouldering, XC Ski, and HYROX, with COROS exercise catalog search for Strength and HYROX
 - **Destination-aware confirmation** — choose Workout Library, Calendar, local template, COROS Plan Library, or Plan + Calendar; review weeks, workouts, sports, start date, conflicts, grouped-plan status, and every remote write before confirming

@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
-import { Loader2, PanelLeftClose, Plus, Search } from "lucide-react";
-import type { ChatSessionSummary } from "../../electron/types";
+import { Loader2, PanelLeftClose, Pin, Plus, Search } from "lucide-react";
+import type {
+  ChatSessionSummary,
+  CoachAutomationSessionAttention
+} from "../../electron/types";
 import { ChatSessionRow } from "./ChatSessionRow";
 import { groupChatSessions } from "./chatSessionGroups";
 
@@ -8,17 +11,22 @@ export function ChatHistoryPanel({
   sessions,
   activeSessionId,
   busy,
+  attention,
   onCollapse,
   onNewChat,
   onSelectSession,
+  onTogglePinSession,
   onDeleteSession
 }: {
   sessions: ChatSessionSummary[];
   activeSessionId: string | null;
   busy?: boolean;
+  /** Coach attention per conversation, keyed by session id (9.3). */
+  attention?: Map<string, CoachAutomationSessionAttention>;
   onCollapse: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
+  onTogglePinSession: (sessionId: string, pinned: boolean) => void;
   onDeleteSession: (sessionId: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -85,8 +93,21 @@ export function ChatHistoryPanel({
           </p>
         ) : (
           groups.map((group) => (
-            <section key={group.label} className="chat-session-group">
-              <h3 className="chat-session-group-label">{group.label}</h3>
+            <section
+              key={group.label}
+              className={[
+                "chat-session-group",
+                group.label === "Pinned" ? "is-pinned-group" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <h3 className="chat-session-group-label">
+                {group.label === "Pinned" ? (
+                  <Pin size={11} aria-hidden="true" />
+                ) : null}
+                {group.label === "Pinned" ? "Pinned conversations" : group.label}
+              </h3>
               <div className="chat-session-group-list">
                 {group.sessions.map((session) => (
                   <ChatSessionRow
@@ -94,7 +115,11 @@ export function ChatHistoryPanel({
                     session={session}
                     active={session.id === activeSessionId}
                     disabled={busy}
+                    attention={attention?.get(session.id)}
                     onSelect={() => onSelectSession(session.id)}
+                    onTogglePin={() =>
+                      onTogglePinSession(session.id, !session.pinnedAt)
+                    }
                     onDelete={() => onDeleteSession(session.id)}
                   />
                 ))}

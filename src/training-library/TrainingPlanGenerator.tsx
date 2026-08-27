@@ -71,6 +71,7 @@ function calendarDay(date = new Date()): string {
 
 function providerName(provider: ChatProvider): string {
   if (provider === "claude-code") return "Claude Code";
+  if (provider === "claude-api") return "Claude API";
   if (provider === "local") return "Local model";
   return "ChatGPT";
 }
@@ -201,6 +202,13 @@ export function TrainingPlanGenerator({ api, onClose, onGenerated, onOpenCoach }
       } else if (settings.provider === "claude-code") {
         const status = await api.getClaudeCodeStatus();
         if (active) setAvailability({ provider: settings.provider, label, ready: status.authenticated, detail: status.authenticated ? status.message : "Connect Claude Code in Training Coach settings." });
+      } else if (settings.provider === "claude-api") {
+        if (!settings.anthropic.hasApiKey) {
+          if (active) setAvailability({ provider: settings.provider, label, ready: false, detail: "Add an Anthropic API key in Training Coach settings." });
+          return;
+        }
+        const tested = await api.testAnthropicConnection();
+        if (active) setAvailability({ provider: settings.provider, label, ready: tested.ok, detail: tested.message });
       } else {
         const configured = Boolean(settings.local.baseUrl.trim() && settings.local.model.trim());
         let ready = configured;

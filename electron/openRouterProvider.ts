@@ -1,4 +1,5 @@
 import type {
+  ChatTokenUsage,
   OpenRouterConfig,
   OpenRouterConnectionTest,
   OpenRouterModelOption
@@ -182,7 +183,7 @@ export interface StreamOpenRouterChatOptions
 
 export function streamOpenRouterChatCompletion(
   options: StreamOpenRouterChatOptions
-): Promise<{ fullText: string }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
   return streamOpenAiCompatibleChatCompletion(
     {
       instructions: options.instructions,

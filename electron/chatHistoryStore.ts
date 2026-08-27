@@ -5,6 +5,8 @@ import {
   getChatSessionRow,
   insertChatSessionRow,
   listChatSessionRows,
+  setChatSessionPinnedRow,
+  setChatSessionTitleRow,
   updateChatSessionRow
 } from "./database";
 import type {
@@ -12,6 +14,7 @@ import type {
   ActivityVisualHrSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
+  ChatEntryAutomationMarker,
   ChatProvider,
   ChatSessionSummary,
   CoachInputChoice,
@@ -25,6 +28,7 @@ import type {
   PlanDraftPreview,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
+  SaveChatSessionOptions,
   TrainingHubActivitySeriesPoint,
   TrainingHubThresholdZone,
   TrainingHubTrackPoint,
@@ -40,6 +44,7 @@ export interface ChatSessionRow {
   messages_json: string;
   created_at: string;
   updated_at: string;
+  pinned_at?: string | null;
 }
 
 export interface ChatSessionDatabase {
@@ -59,6 +64,8 @@ export interface ChatSessionDatabase {
     messagesJson: string,
     updatedAt: string
   ): void;
+  setSessionPinned(id: string, pinnedAt: string | null): void;
+  setSessionTitle(id: string, title: string): void;
   deleteSession(id: string): void;
 }
 
@@ -77,6 +84,8 @@ function createSqliteSessionDatabase(): ChatSessionDatabase {
       ),
     updateSession: (id, title, messagesJson, updatedAt) =>
       updateChatSessionRow(id, title, messagesJson, updatedAt),
+    setSessionPinned: (id, pinnedAt) => setChatSessionPinnedRow(id, pinnedAt),
+    setSessionTitle: (id, title) => setChatSessionTitleRow(id, title),
     deleteSession: (id) => deleteChatSessionRow(id)
   };
 }
@@ -90,6 +99,7 @@ function normalizeProvider(value: unknown): ChatProvider {
   if (
     value === "local" ||
     value === "claude-code" ||
+    value === "claude-api" ||
     value === "openrouter"
   ) {
     return value;
@@ -720,6 +730,30 @@ function parseHrZonePreview(value: unknown): HrZonePreview | null {
   };
 }
 
+/**
+ * Attribution is rebuilt field by field like everything else here: a marker
+ * missing any of its five fields is dropped rather than half-restored, so the
+ * UI never renders an automation chip it cannot attribute.
+ */
+function parseAutomationMarker(
+  value: unknown
+): ChatEntryAutomationMarker | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const fields = ["runId", "automationId", "bindingId", "name", "triggerLabel"] as const;
+  const marker: Record<string, string> = {};
+  for (const field of fields) {
+    const entry = value[field];
+    if (typeof entry !== "string" || !entry.trim()) {
+      return undefined;
+    }
+    marker[field] = entry;
+  }
+  return marker as unknown as ChatEntryAutomationMarker;
+}
+
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -736,12 +770,14 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
     typeof value.reasoningSummary === "string" && value.reasoningSummary.trim()
       ? value.reasoningSummary
       : undefined;
+  const automation = parseAutomationMarker(value.automation);
   return {
     kind: "message",
     role,
     content: value.content,
     ...(source ? { source } : {}),
-    ...(reasoningSummary ? { reasoningSummary } : {})
+    ...(reasoningSummary ? { reasoningSummary } : {}),
+    ...(automation ? { automation } : {})
   };
 }
 
@@ -785,6 +821,21 @@ function parseEntry(value: unknown): PersistedChatEntry | null {
   if (value.kind === "hrZoneSummary") {
     const preview = parseHrZonePreview(value.preview);
     return preview ? { kind: "hrZoneSummary", preview } : null;
+  }
+
+  if (value.kind === "automationSilent") {
+    // Both halves are required. The marker is who looked and the timestamp is
+    // when; a chip that can answer neither is not worth restoring, and this
+    // entry is only ever written by the runner, so half of one means the row
+    // came from somewhere unexpected.
+    const automation = parseAutomationMarker(value.automation);
+    const at =
+      typeof value.at === "number" && Number.isFinite(value.at)
+        ? value.at
+        : null;
+    return automation && at !== null
+      ? { kind: "automationSilent", automation, at }
+      : null;
   }
 
   return parseMessageEntry(value);
@@ -930,7 +981,8 @@ function toSessionSummary(row: ChatSessionRow): ChatSessionSummary {
     preview: derivePreviewFromEntries(entries),
     updatedAt: row.updated_at,
     createdAt: row.created_at,
-    messageCount: countMessages(entries)
+    messageCount: countMessages(entries),
+    pinnedAt: row.pinned_at ?? null
   };
 }
 
@@ -981,9 +1033,79 @@ export function createChatSession(
   return toSessionSummary(row);
 }
 
+/**
+ * The entries a save would silently destroy: everything the row holds past the
+ * point the caller knows about. Position is the whole test — the automation
+ * runner only ever appends, so a foreign write is always a tail.
+ *
+ * A caller that knows nothing (0) therefore keeps everything, which is the
+ * safe direction for the accident this guards against.
+ */
+function foreignTail(
+  storedJson: string,
+  knownEntryCount: number | undefined,
+  incomingCount: number
+): PersistedChatEntry[] {
+  if (knownEntryCount === undefined || !Number.isFinite(knownEntryCount)) {
+    return [];
+  }
+  // Clamped to what the caller actually sent. The count says "my array accounts
+  // for this many of the row's entries", so a caller claiming more than it sent
+  // is asserting a deletion — and nothing deletes entries: the window only ever
+  // appends to its own timeline or rewrites it in place. Honouring the claim
+  // would drop the entries between the two numbers with nothing to notice it,
+  // which is the wrong direction for a guard whose whole point is that the
+  // accident fails harmlessly.
+  const claimed = Math.max(0, Math.floor(knownEntryCount));
+  const known = Math.min(claimed, incomingCount);
+  const stored = parseChatTranscriptJson(storedJson);
+  return stored.length > known ? stored.slice(known) : [];
+}
+
+/**
+ * `options` sits after the injectable database rather than before it, against
+ * this file's usual "seam goes last" shape. Deliberate: every caller that
+ * passes a database is a test, and moving the seam would put an `undefined`
+ * placeholder in a dozen of them to spare one production call site.
+ */
 export function saveChatSession(
   id: string,
   entries: PersistedChatEntry[],
+  database: ChatSessionDatabase = defaultDatabase,
+  options: SaveChatSessionOptions = {}
+): ChatSessionSummary | null {
+  const row = database.getSession(id);
+  if (!row) {
+    return null;
+  }
+
+  const normalizedEntries = normalizeEntries([
+    ...entries,
+    ...foreignTail(row.messages_json, options.knownEntryCount, entries.length)
+  ]);
+  const title =
+    row.title === DEFAULT_SESSION_TITLE
+      ? deriveSessionTitleFromEntries(normalizedEntries)
+      : row.title;
+  const messagesJson = JSON.stringify(normalizedEntries);
+
+  // Opening a conversation replays its transcript back through this path, so
+  // without this guard simply reading a chat would give it a fresh updatedAt
+  // and jump it to the top of the sidebar. Both sides are normalized before
+  // serializing, so the comparison sees canonical key order.
+  if (messagesJson === row.messages_json && title === row.title) {
+    return toSessionSummary(row);
+  }
+
+  const updatedAt = new Date().toISOString();
+  database.updateSession(id, title, messagesJson, updatedAt);
+  const nextRow = database.getSession(id);
+  return nextRow ? toSessionSummary(nextRow) : null;
+}
+
+export function setChatSessionPinned(
+  id: string,
+  pinned: boolean,
   database: ChatSessionDatabase = defaultDatabase
 ): ChatSessionSummary | null {
   const row = database.getSession(id);
@@ -991,20 +1113,61 @@ export function saveChatSession(
     return null;
   }
 
-  const normalizedEntries = normalizeEntries(entries);
-  const title =
-    row.title === DEFAULT_SESSION_TITLE
-      ? deriveSessionTitleFromEntries(normalizedEntries)
-      : row.title;
-  const updatedAt = new Date().toISOString();
-  database.updateSession(
-    id,
-    title,
-    JSON.stringify(normalizedEntries),
-    updatedAt
-  );
+  // Keep an existing pin timestamp so re-pinning does not reshuffle the list.
+  const pinnedAt = pinned ? row.pinned_at ?? new Date().toISOString() : null;
+  database.setSessionPinned(id, pinnedAt);
   const nextRow = database.getSession(id);
   return nextRow ? toSessionSummary(nextRow) : null;
+}
+
+/**
+ * Renames a conversation. Automations need this for both the `dedicated`
+ * conversation they create up front and the `titleTemplate` of a `per-run`
+ * binding: `saveChatSession` only ever derives a title while the stored one is
+ * still the default, which would otherwise name an automation's conversation
+ * after its own playbook text.
+ *
+ * Renaming deliberately leaves `updatedAt` alone so it does not jump the
+ * conversation to the top of the sidebar.
+ */
+export function setChatSessionTitle(
+  id: string,
+  title: string,
+  database: ChatSessionDatabase = defaultDatabase
+): ChatSessionSummary | null {
+  const row = database.getSession(id);
+  if (!row) {
+    return null;
+  }
+
+  const nextTitle = truncateTitle(title);
+  if (nextTitle === row.title) {
+    return toSessionSummary(row);
+  }
+
+  database.setSessionTitle(id, nextTitle);
+  const nextRow = database.getSession(id);
+  return nextRow ? toSessionSummary(nextRow) : null;
+}
+
+/**
+ * Whether the conversation row still exists. `getChatSession` returns `[]` for
+ * both an empty transcript and a deleted one, which an automation binding has
+ * to tell apart (2.4).
+ */
+export function chatSessionExists(
+  id: string,
+  database: ChatSessionDatabase = defaultDatabase
+): boolean {
+  return database.getSession(id) !== undefined;
+}
+
+/** The conversation's current title, or null when it no longer exists. */
+export function getChatSessionTitle(
+  id: string,
+  database: ChatSessionDatabase = defaultDatabase
+): string | null {
+  return database.getSession(id)?.title ?? null;
 }
 
 export function deleteChatSession(

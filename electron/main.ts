@@ -91,6 +91,7 @@ import {
 } from "./hevyService";
 import type {
   HevySettingsInput,
+  SaveChatSessionOptions,
   StrengthHistoryRequest,
   UnitSystem,
   WorkoutSport
@@ -295,11 +296,54 @@ import {
   setUpdaterPreferences
 } from "./updaterService";
 import {
+  startCoachActivityWatcher,
+  stopCoachActivityWatcher
+} from "./coachActivityWatcher";
+import {
+  startCoachAutomationScheduler,
+  stopCoachAutomationScheduler
+} from "./coachAutomationScheduler";
+import {
+  CoachAutomationBindingError,
+  attachCoachAutomation,
+  cancelStaleCoachAutomationRuns,
+  createCoachAutomation,
+  deleteCoachAutomation,
+  detachCoachAutomation,
+  getCoachAutomation,
+  listCoachAutomationBindings,
+  listCoachAutomationBindingsForSession,
+  listCoachAutomationRuns,
+  listCoachAutomationSummaries,
+  listCoachAutomationSessionAttention,
+  markCoachAutomationRunsSeen,
+  markCoachAutomationSessionSeen,
+  reorderCoachAutomationBindings,
+  setCoachAutomationBindingEnabled,
+  setCoachAutomationEnabled,
+  updateCoachAutomation
+} from "./coachAutomationStore";
+import {
+  cancelAutomationRun,
+  getAutomationPause,
+  getAutomationSpend,
+  resumeAutomations,
+  runAutomationNow,
+  setAutomationBudget
+} from "./coachAutomationService";
+import { getChatSessionTitle, setChatSessionTitle } from "./chatHistoryStore";
+import {
   cancelChat,
   createChatSessionForProvider,
+  createWindowSink,
   deleteChatSessionById,
   detectLocalChatServers,
-  connectClaudeCode,
+  beginClaudeCodeLogin,
+  cancelClaudeCodeLogin,
+  awaitClaudeCodeLogin,
+  submitClaudeCodeLoginCode,
+  openClaudeCodeLoginUrl,
+  revokeClaudeCodeLogin,
   getClaudeCodeConnectionStatus,
   getChatAuthStatus,
   getChatSessionEntries,
@@ -309,13 +353,16 @@ import {
   logoutChat,
   saveChatSessionEntries,
   saveChatSettings,
+  setChatSessionPinnedById,
   streamChat,
   testClaudeCodeConnection,
+  testAnthropicApiConnection,
   testLocalChatConnection,
   testOpenRouterConnection,
   uploadTrainingPlanDraft,
   confirmWorkoutDelete
 } from "./chatService";
+import { buildBaseCoachInstructions } from "./chatCoachContext";
 import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
@@ -348,9 +395,16 @@ import {
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
 import type {
+  AnthropicApiConfig,
   ChatMessage,
   ChatProvider,
   ChatSettings,
+  CoachAutomationAttachResult,
+  CoachAutomationBindingInput,
+  CoachAutomationBindingView,
+  CoachAutomationDetail,
+  CoachAutomationInput,
+  CoachAutomationRunQuery,
   CorosTrainingPlanDraftInput,
   LocalChatConfig,
   OpenRouterConfig,
@@ -806,6 +860,15 @@ app.whenReady().then(() => {
   // configured servers), no browser popup.
   void ensureAllMcpConnected();
 
+  // Coach automations follow the app process, not the window: with the window
+  // closed on macOS they keep running, and the athlete sees the results as
+  // unread next time a window exists. Deliberately not wired to createWindow.
+  // A run in flight when the app quit has nothing left to finish it, so the
+  // run log would show it spinning forever (section 10).
+  cancelStaleCoachAutomationRuns();
+  startCoachActivityWatcher();
+  startCoachAutomationScheduler();
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -821,7 +884,30 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   stopRouteShare();
+  stopCoachActivityWatcher();
+  stopCoachAutomationScheduler();
 });
+
+/**
+ * A binding plus the conversation it writes into. A missing title means the
+ * athlete deleted that conversation, which the UI shows as a broken binding
+ * (2.4) — a `per-run` binding has no conversation of its own and is neither.
+ */
+function describeSession(sessionId: string | null): {
+  sessionTitle?: string;
+  sessionMissing?: boolean;
+} {
+  if (!sessionId) return {};
+  const title = getChatSessionTitle(sessionId);
+  return title === null ? { sessionMissing: true } : { sessionTitle: title };
+}
+
+function describeBindings(automationId: string): CoachAutomationBindingView[] {
+  return listCoachAutomationBindings(automationId).map((binding) => ({
+    ...binding,
+    ...describeSession(binding.sessionId)
+  }));
+}
 
 function registerIpcHandlers(): void {
   ipcMain.handle("window:setBackground", (_event, color: string) => {
@@ -1299,12 +1385,26 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("chat:getSettings", () => getChatSettings());
 
+  ipcMain.handle("chat:getBaseCoachInstructions", () =>
+    buildBaseCoachInstructions()
+  );
+
   ipcMain.handle("chat:saveSettings", (_event, settings: ChatSettings) =>
     saveChatSettings(settings)
   );
 
   ipcMain.handle("chat:testLocalConnection", (_event, config?: LocalChatConfig) =>
     testLocalChatConnection(config)
+  );
+
+  ipcMain.handle(
+    "chat:testAnthropicConnection",
+    (_event, config?: Partial<AnthropicApiConfig>) =>
+      testAnthropicApiConnection(config)
+  );
+
+  ipcMain.handle("chat:openAnthropicKeyGuide", () =>
+    shell.openExternal("https://console.anthropic.com/settings/keys")
   );
 
   ipcMain.handle("chat:detectLocalServers", (_event, apiKey?: string) =>
@@ -1328,7 +1428,19 @@ function registerIpcHandlers(): void {
     getClaudeCodeConnectionStatus()
   );
 
-  ipcMain.handle("chat:connectClaudeCode", () => connectClaudeCode());
+  ipcMain.handle("chat:startClaudeCodeLogin", () => beginClaudeCodeLogin());
+
+  ipcMain.handle("chat:awaitClaudeCodeLogin", () => awaitClaudeCodeLogin());
+
+  ipcMain.handle("chat:submitClaudeCodeLoginCode", (_event, code: string) =>
+    submitClaudeCodeLoginCode(code)
+  );
+
+  ipcMain.handle("chat:cancelClaudeCodeLogin", () => cancelClaudeCodeLogin());
+
+  ipcMain.handle("chat:openClaudeCodeLoginUrl", () => openClaudeCodeLoginUrl());
+
+  ipcMain.handle("chat:revokeClaudeCodeLogin", () => revokeClaudeCodeLogin());
 
   ipcMain.handle("chat:testClaudeCodeConnection", () =>
     testClaudeCodeConnection()
@@ -1346,7 +1458,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     "chat:send",
     (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem) =>
-      streamChat(mainWindow, requestId, messages, normalizeUnitSystem(unitSystem))
+      streamChat(createWindowSink(mainWindow), requestId, messages, {
+        unitSystem: normalizeUnitSystem(unitSystem)
+      })
   );
 
   ipcMain.handle("chat:cancel", (_event, requestId: string) =>
@@ -1367,13 +1481,155 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "chat:saveSession",
-    (_event, sessionId: string, entries: PersistedChatEntry[]) =>
-      saveChatSessionEntries(sessionId, entries)
+    (
+      _event,
+      sessionId: string,
+      entries: PersistedChatEntry[],
+      options?: SaveChatSessionOptions
+    ) => saveChatSessionEntries(sessionId, entries, options)
+  );
+
+  ipcMain.handle(
+    "chat:setSessionPinned",
+    (_event, sessionId: string, pinned: boolean) =>
+      setChatSessionPinnedById(sessionId, pinned)
   );
 
   ipcMain.handle("chat:deleteSession", (_event, sessionId: string) => {
     deleteChatSessionById(sessionId);
   });
+
+  // 2.5: automations name the conversations they create, both the dedicated
+  // one and each per-run title. Renaming leaves updatedAt alone.
+  ipcMain.handle(
+    "chat:renameSession",
+    (_event, sessionId: string, title: string) =>
+      setChatSessionTitle(sessionId, title)
+  );
+
+  // ----- Coach automations -----
+
+  ipcMain.handle("coachAutomation:list", () => listCoachAutomationSummaries());
+
+  ipcMain.handle(
+    "coachAutomation:get",
+    (_event, automationId: string): CoachAutomationDetail | null => {
+      const automation = getCoachAutomation(automationId);
+      if (!automation) return null;
+      return { automation, bindings: describeBindings(automationId) };
+    }
+  );
+
+  ipcMain.handle(
+    "coachAutomation:save",
+    (_event, input: CoachAutomationInput, automationId?: string) =>
+      automationId
+        ? updateCoachAutomation(automationId, input)
+        : createCoachAutomation(input)
+  );
+
+  ipcMain.handle(
+    "coachAutomation:setEnabled",
+    (_event, automationId: string, enabled: boolean) =>
+      setCoachAutomationEnabled(automationId, enabled)
+  );
+
+  ipcMain.handle("coachAutomation:delete", (_event, automationId: string) => {
+    deleteCoachAutomation(automationId);
+  });
+
+  ipcMain.handle("coachAutomation:listBindings", (_event, automationId: string) =>
+    describeBindings(automationId)
+  );
+
+  // Attach answers with a result rather than throwing: the refusal codes are
+  // UI copy, and an Error crossing IPC arrives with its `code` stripped.
+  ipcMain.handle(
+    "coachAutomation:attach",
+    (_event, input: CoachAutomationBindingInput): CoachAutomationAttachResult => {
+      try {
+        return { ok: true, binding: attachCoachAutomation(input) };
+      } catch (error) {
+        if (error instanceof CoachAutomationBindingError) {
+          return { ok: false, code: error.code, message: error.message };
+        }
+        throw error;
+      }
+    }
+  );
+
+  ipcMain.handle("coachAutomation:detach", (_event, bindingId: string) => {
+    detachCoachAutomation(bindingId);
+  });
+
+  ipcMain.handle(
+    "coachAutomation:setBindingEnabled",
+    (_event, bindingId: string, enabled: boolean) =>
+      setCoachAutomationBindingEnabled(bindingId, enabled)
+  );
+
+  ipcMain.handle(
+    "coachAutomation:reorderBindings",
+    (_event, sessionId: string, bindingIds: string[]) =>
+      reorderCoachAutomationBindings(sessionId, bindingIds)
+  );
+
+  // The chat UI asks which automations are attached to the open conversation.
+  ipcMain.handle(
+    "coachAutomation:listForSession",
+    (_event, sessionId: string): CoachAutomationDetail["bindings"] =>
+      listCoachAutomationBindingsForSession(sessionId).map((binding) => ({
+        ...binding,
+        ...describeSession(binding.sessionId)
+      }))
+  );
+
+  ipcMain.handle(
+    "coachAutomation:runNow",
+    (_event, automationId: string, bindingIds?: string[]) =>
+      runAutomationNow(automationId, bindingIds)
+  );
+
+  ipcMain.handle(
+    "coachAutomation:listRuns",
+    (_event, filter?: CoachAutomationRunQuery) =>
+      listCoachAutomationRuns(filter ?? {})
+  );
+
+  // Stop means the trigger, not the run: a trigger fans out to one run per
+  // place (2.3), and stopping one of them used to leave the rest to run (10).
+  // The run's own stream is still aborted — that is where the id comes in.
+  ipcMain.handle("coachAutomation:cancelRun", (_event, runId: string) => {
+    cancelAutomationRun(runId);
+  });
+
+  // Section 10's pause: read on mount, then followed by push. The renderer
+  // needs both because the trip usually happens with no window open at all —
+  // a scheduled run finding COROS asking for a login code at 07:30.
+  ipcMain.handle("coachAutomation:getPause", () => getAutomationPause());
+
+  ipcMain.handle("coachAutomation:resume", () => resumeAutomations());
+
+  // 13: what the automations have cost this month, and the ceiling.
+  ipcMain.handle("coachAutomation:getSpend", () => getAutomationSpend());
+
+  ipcMain.handle(
+    "coachAutomation:setBudget",
+    (_event, budget: number | null) => setAutomationBudget(budget)
+  );
+
+  ipcMain.handle("coachAutomation:markSeen", (_event, runIds: string[]) =>
+    markCoachAutomationRunsSeen(runIds)
+  );
+
+  ipcMain.handle("coachAutomation:sessionAttention", () =>
+    listCoachAutomationSessionAttention()
+  );
+
+  ipcMain.handle(
+    "coachAutomation:markSessionSeen",
+    (_event, sessionId: string) => markCoachAutomationSessionSeen(sessionId)
+  );
 
   ipcMain.handle("chatMcp:getStatus", () => getCorosMcpStatus());
 

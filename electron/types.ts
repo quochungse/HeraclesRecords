@@ -2331,6 +2331,20 @@ export interface PersistedChatSource {
   mcpError?: string;
 }
 
+/**
+ * Marks a transcript entry as written by an automation rather than by the
+ * athlete or an interactive turn. A conversation can host up to five
+ * automations, so the marker carries the name: the UI renders
+ * `\u26a1 <name> \u00b7 <triggerLabel>` so the athlete can tell which coach spoke.
+ */
+export interface ChatEntryAutomationMarker {
+  runId: string;
+  automationId: string;
+  bindingId: string;
+  name: string;
+  triggerLabel: string;
+}
+
 export interface PersistedChatMessageEntry {
   kind: "message";
   role: ChatRole;
@@ -2338,6 +2352,44 @@ export interface PersistedChatMessageEntry {
   source?: PersistedChatSource;
   /** Display-safe provider reasoning summary, never raw chain-of-thought. */
   reasoningSummary?: string;
+  /**
+   * Set when an automation produced this entry. The synthetic user turn that
+   * carries the playbook is stored with `role: "user"` and the same marker,
+   * rendered as a chip rather than an athlete bubble.
+   */
+  automation?: ChatEntryAutomationMarker;
+}
+
+/**
+ * An automation looked and had nothing to say (5.5). A silent run writes no
+ * answer, so without this entry the athlete watching sees the live bubble
+ * vanish mid-sentence and the conversation keeps no record that the coach ever
+ * ran — which reads as a bug rather than as a verdict.
+ */
+export interface PersistedChatAutomationSilentEntry {
+  kind: "automationSilent";
+  automation: ChatEntryAutomationMarker;
+  /** Epoch milliseconds. The chip shows when the coach looked. */
+  at: number;
+}
+
+/**
+ * How a `chat:saveSession` call describes what it is based on (5.6b). Lives
+ * here rather than beside the store because the renderer declares the same
+ * call and must not import a main-process module to do it.
+ */
+export interface SaveChatSessionOptions {
+  /**
+   * How many of the stored entries the caller's array accounts for. Anything
+   * the row holds beyond that arrived from somewhere else — in practice a coach
+   * automation writing from the main process while the window held a copy from
+   * before the run — and is kept instead of being overwritten.
+   *
+   * Omitting it replaces the row outright, which is what the runner wants: it
+   * re-read the transcript itself a moment earlier, with nothing awaited in
+   * between.
+   */
+  knownEntryCount?: number;
 }
 
 export interface CoachInputChoice {
@@ -2359,7 +2411,12 @@ export interface CoachInputPrompt {
   answeredAt?: number;
 }
 
-export type ChatProvider = "chatgpt" | "claude-code" | "openrouter" | "local";
+export type ChatProvider =
+  | "chatgpt"
+  | "claude-api"
+  | "claude-code"
+  | "openrouter"
+  | "local";
 
 export type ClaudeCodeConnectionState =
   | "not-installed"
@@ -2380,8 +2437,20 @@ export interface ClaudeCodePermissions {
 export interface ClaudeCodeConfig {
   /** Optional user-selected path. CorosLink never reads Claude credential files. */
   executablePath?: string;
+  /**
+   * When true (the default) Claude Code runs against a CorosLink-only
+   * CLAUDE_CONFIG_DIR, so the app signs in to its own account instead of
+   * borrowing whichever one the machine's CLI is using.
+   */
+  useAppScopedAuth: boolean;
   /** Model alias (e.g. "opus", "sonnet", "haiku") or full id. Empty = account default. */
   model?: string;
+  /** Reasoning effort. The Agent SDK downgrades levels a model cannot serve. */
+  effort: AnthropicEffort;
+  /** Last observed CLI default model, cached so the picker can name it. */
+  defaultModel?: string;
+  /** Cached account model list, so the picker does not probe on every render. */
+  availableModels?: Array<{ value: string; label: string }>;
   lastConnectionStatus?: ClaudeCodeConnectionState;
   lastCheckedAt?: string;
   permissions: ClaudeCodePermissions;
@@ -2395,6 +2464,14 @@ export interface ClaudeCodeStatus {
   version?: string;
   authMethod?: string;
   subscriptionType?: string;
+  /** Model Claude Code picks when none is requested, as reported by the CLI. */
+  defaultModel?: string;
+  /** Models this account can use, named with the versions the CLI reports. */
+  availableModels?: Array<{ value: string; label: string }>;
+  /** Signed-in Claude account, read live from the CLI and never persisted. */
+  email?: string;
+  /** Organisation the account belongs to, when Claude reports one. */
+  orgName?: string;
   checkedAt: string;
   message: string;
 }
@@ -2403,6 +2480,40 @@ export interface ClaudeCodeConnectionTest {
   ok: boolean;
   status: ClaudeCodeStatus;
   message: string;
+}
+
+/** Pending `claude auth login` waiting for the code from the callback page. */
+export interface ClaudeCodeLoginStart {
+  url: string;
+  /** Directory the resulting credentials land in, for display only. */
+  scope: "app" | "machine";
+}
+
+/**
+ * Reasoning effort, shared by both Claude paths: forwarded as
+ * output_config.effort on the Messages API, and as the Agent SDK's `effort`
+ * option for the subscription path.
+ */
+export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/** Direct Claude access with the athlete's own Anthropic API key. */
+export interface AnthropicApiConfig {
+  /** Messages API model id, e.g. claude-opus-5. */
+  model: string;
+  effort: AnthropicEffort;
+  /** True when an encrypted key is stored; key material is never returned. */
+  hasApiKey: boolean;
+  /** Only read when saving or testing settings; never returned by get. */
+  apiKey?: string;
+  /** Set true when saving to remove any stored key. */
+  clearApiKey?: boolean;
+}
+
+export interface AnthropicApiConnectionTest {
+  ok: boolean;
+  message: string;
+  /** Model id the key was verified against. */
+  model?: string;
 }
 
 export interface LocalChatConfig {
@@ -2449,15 +2560,29 @@ export interface OpenRouterConnectionTest {
   keyLabel?: string;
 }
 
+/** Hard cap on custom coach instructions so a pasted document cannot crowd out the coach prompt. */
+/**
+ * The answer a run gives when it looked and found nothing worth saying. A
+ * control token, not prose: it decides `silent` vs `success`, and the athlete
+ * must never read it. Lives here rather than beside the runner because the
+ * renderer needs it too — a run streaming live has to hold it back.
+ */
+export const NOTHING_TO_REPORT = "NOTHING_TO_REPORT";
+
+export const MAX_CUSTOM_COACH_INSTRUCTIONS = 4000;
+
 export interface ChatSettings {
   provider: ChatProvider;
   chatgpt: ChatGptConfig;
+  anthropic: AnthropicApiConfig;
   claudeCode: ClaudeCodeConfig;
   openRouter: OpenRouterConfig;
   local: LocalChatConfig;
   sidebarOpen?: boolean;
   /** When true, show activity/fitness/HR chart cards in the transcript. Default false. */
   visualizationsEnabled?: boolean;
+  /** Free-form athlete preferences appended to the coach system prompt. */
+  customInstructions?: string;
 }
 
 export interface ChatSessionSummary {
@@ -2468,6 +2593,372 @@ export interface ChatSessionSummary {
   updatedAt: string;
   createdAt: string;
   messageCount: number;
+  /** ISO timestamp the conversation was pinned, or null when unpinned. */
+  pinnedAt: string | null;
+}
+
+/**
+ * What a turn is allowed to do. Automation runs are `read-only` (decision 3):
+ * they may read, analyse and draft, but never write to COROS.
+ */
+/**
+ * What one turn cost, summed across its tool rounds — a tool-using answer is
+ * several provider calls and the athlete pays for all of them.
+ *
+ * Both counts are whole tokens as the provider reported them. A provider that
+ * reports nothing leaves this undefined rather than zero: "this run cost
+ * nothing" and "nobody told us what this run cost" are different facts, and a
+ * budget that treats the second as the first undercounts silently.
+ */
+export interface ChatTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
+ * What a turn may reach for. `read-only` is decision 3's automation set; `none`
+ * is for a turn that works on text it was handed and has no business calling
+ * anything — the rolling summariser of 5.7, where a tool round-trip would be
+ * both slower and a chance to wander off the one job it has.
+ */
+export type ChatToolPolicy = "interactive" | "read-only" | "none";
+
+export type AutomationTriggerKind =
+  | "schedule"
+  | "activity"
+  | "threshold"
+  | "manual";
+
+export type AutomationTrigger =
+  | {
+      kind: "schedule";
+      cadence: "daily" | "weekly";
+      /** 0=Sunday..6=Saturday; weekly only. */
+      dayOfWeek?: number;
+      /** Local wall-clock "HH:mm". */
+      timeOfDay: string;
+    }
+  | {
+      kind: "activity";
+      /** COROS sport type ids; empty means every sport. */
+      sportTypes: number[];
+      minDurationSec?: number;
+      minDistanceM?: number;
+      /**
+       * Analyse every matching activity that appeared since the last analysis,
+       * one run each in chronological order. Off (the default) analyses only
+       * the most recent match.
+       */
+      multiActivity?: boolean;
+    }
+  | {
+      kind: "threshold";
+      metric:
+        | "acuteChronicRamp"
+        | "restingHrDrift"
+        | "planAdherence"
+        | "sleepDebt";
+      value: number;
+    }
+  | { kind: "manual" };
+
+export type AutomationThresholdMetric = Extract<
+  AutomationTrigger,
+  { kind: "threshold" }
+>["metric"];
+
+export interface AutomationConditions {
+  /** Collapse several triggers inside this window into one run. */
+  batchWindowMin: number;
+  /** Minimum gap between two runs of the same binding. */
+  cooldownMin: number;
+  /** Per binding, per local day. */
+  maxRunsPerDay: number;
+  /** Local "HH:mm" range where runs are deferred, not dropped. */
+  quietHours?: { start: string; end: string };
+}
+
+/**
+ * Section 7, decided. An automation with no effort of its own runs at `low`,
+ * whatever its trigger and whatever the interactive chat is set to.
+ *
+ * Three reasons this is a flat default rather than the trigger-kind carve-out
+ * the first draft proposed (`activity` and daily `schedule` only):
+ *
+ * 1. **The editor already promises it.** `EffortSwitch` renders
+ *    `runtime.effort ?? "low"`, so a definition saved without touching that
+ *    control showed `low` and then ran at the chat's effort. The divergence was
+ *    the real problem behind the deferred paragraph.
+ * 2. **A default keyed on the trigger is invisible.** The same automation moved
+ *    from daily to weekly would silently get more expensive, with nothing on
+ *    screen to explain it. One rule the athlete can hold in their head beats a
+ *    table they cannot see.
+ * 3. **Effort is cost, not capability.** Provider and model still inherit from
+ *    chat settings — those are the coach the athlete chose. How hard it thinks
+ *    on a run nobody is watching is a different question, and a preset that
+ *    wants more says so out loud.
+ *
+ * The cost: "inherit the chat's effort" is no longer expressible. It never was
+ * visible anywhere, so nothing that was legible is lost.
+ *
+ * Lives here rather than beside the runner because the Automations panel shows
+ * the resolved value on every card, and the renderer must not import a
+ * main-process module to learn it.
+ */
+export const AUTOMATION_DEFAULT_EFFORT: AnthropicEffort = "low";
+
+export interface AutomationRuntime {
+  /** Defaults to the interactive chat provider when unset. */
+  provider?: ChatProvider;
+  model?: string;
+  effort?: AnthropicEffort;
+}
+
+/** The definition. Owns no conversation. */
+export interface CoachAutomation {
+  id: string;
+  name: string;
+  /** Persona and remit, injected into the run's system instructions. */
+  role?: string;
+  playbook: string;
+  enabled: boolean;
+  presetId?: string;
+  trigger: AutomationTrigger;
+  conditions: AutomationConditions;
+  runtime: AutomationRuntime;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/update payload for a definition; the store fills in the rest. */
+export interface CoachAutomationInput {
+  name: string;
+  role?: string;
+  playbook: string;
+  enabled?: boolean;
+  presetId?: string;
+  trigger: AutomationTrigger;
+  /**
+   * Merged over the defaults; omitted keys keep their default. An explicit
+   * `quietHours: null` is the one way to clear a stored window — leaving the
+   * key out means "unchanged", so it could not also mean "remove".
+   */
+  conditions?: Partial<Omit<AutomationConditions, "quietHours">> & {
+    quietHours?: AutomationConditions["quietHours"] | null;
+  };
+  runtime?: AutomationRuntime;
+}
+
+export type AutomationBindingMode = "per-run" | "dedicated" | "existing";
+
+/** Where the definition is active. */
+export interface CoachAutomationBinding {
+  id: string;
+  automationId: string;
+  mode: AutomationBindingMode;
+  /** null for "per-run". */
+  sessionId: string | null;
+  /** "per-run" only: "{{rule.name}} · {{activity.name}} · {{date}}". */
+  titleTemplate?: string;
+  enabled: boolean;
+  sortOrder: number;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  /**
+   * `start_time` (epoch seconds) of the newest activity this binding has
+   * already analysed. Absent means it never has, and the attach time
+   * (`createdAt`) becomes the floor instead.
+   */
+  lastActivityAt?: number;
+  /**
+   * Section 10's per-binding backoff, beside the other clocks because it is one
+   * of them. A `failed` run deliberately leaves `lastRunAt` and the watermark
+   * where they were, so without this a dead provider is re-offered the same
+   * activity on every 15-minute poll for as long as it stays dead.
+   *
+   * `backoffUntil` is the wall clock the binding is held off until; absent
+   * means it is not. `backoffLevel` counts consecutive failures and picks the
+   * step (5m, 15m, 60m); 0 or absent means healthy.
+   */
+  backoffUntil?: string;
+  backoffLevel?: number;
+  /**
+   * 3.3's transition state: whether this binding's threshold condition held the
+   * last time the scheduler looked. **Absent means never evaluated**, which is
+   * the state that matters most — a binding attached today must not fire on a
+   * condition that has been true all week, so its first look records the answer
+   * and says nothing.
+   */
+  thresholdFiring?: boolean;
+  createdAt: string;
+}
+
+/** Create payload for a binding; the store assigns id, order and timestamps. */
+export interface CoachAutomationBindingInput {
+  automationId: string;
+  mode: AutomationBindingMode;
+  /** Required for "dedicated" and "existing"; must be absent for "per-run". */
+  sessionId?: string | null;
+  /** "per-run" only. */
+  titleTemplate?: string;
+  enabled?: boolean;
+}
+
+/** Why an attach was refused, so the UI can explain rather than just fail. */
+export type CoachAutomationBindingErrorCode =
+  | "AUTOMATION_NOT_FOUND"
+  | "BINDING_LIMIT_REACHED"
+  | "BINDING_DUPLICATE"
+  | "BINDING_PER_RUN_EXISTS"
+  | "BINDING_SESSION_REQUIRED"
+  | "BINDING_SESSION_NOT_ALLOWED";
+
+/**
+ * What a conversation deletion did to the bindings pointing at it (2.4).
+ * `disabled` are "existing" bindings the athlete must re-point; `needsSession`
+ * are "dedicated" bindings that stay enabled and rebuild their conversation on
+ * the next run.
+ */
+export interface CoachAutomationSessionDeletionReport {
+  disabled: CoachAutomationBinding[];
+  needsSession: CoachAutomationBinding[];
+}
+
+export type CoachAutomationRunStatus =
+  | "running"
+  | "success"
+  | "silent"
+  | "skipped"
+  | "failed"
+  | "cancelled";
+
+export interface CoachAutomationRun {
+  id: string;
+  automationId: string;
+  bindingId: string;
+  status: CoachAutomationRunStatus;
+  triggerKind: AutomationTriggerKind;
+  triggerPayload?: Record<string, unknown>;
+  /** Conversation actually written into. */
+  sessionId?: string;
+  /** One-line TLDR for the badge/notification. */
+  summary?: string;
+  model?: string;
+  effort?: string;
+  /** What this run cost, when the provider said (13). */
+  inputTokens?: number;
+  outputTokens?: number;
+  error?: string;
+  /** cooldown | quiet-hours | no-auth | offline | budget | stale-slot */
+  skipReason?: string;
+  /** Set once the unread badge is cleared. */
+  seenAt?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+/** Run-log query, mirrored by the renderer so it never imports the db layer. */
+export interface CoachAutomationRunQuery {
+  automationId?: string;
+  bindingId?: string;
+  sessionId?: string;
+  /** Inclusive lower bound on `startedAt`, ISO. */
+  since?: string;
+  statuses?: CoachAutomationRunStatus[];
+  /** Only runs the athlete has not looked at yet (`seen_at IS NULL`). */
+  unseenOnly?: boolean;
+  limit?: number;
+}
+
+/**
+ * What the conversation list has to say about one conversation (9.3). An auto
+ * run changes the transcript and so bumps the row to the top; without this the
+ * row reorders for no visible reason.
+ */
+export interface CoachAutomationSessionAttention {
+  sessionId: string;
+  /** A live binding writes here, whether or not it ever has. */
+  attached: boolean;
+  /** Runs that landed in it and have not been looked at yet. */
+  unread: number;
+}
+
+/** One binding plus the conversation it points at, for the "where it runs" UI. */
+export interface CoachAutomationBindingView extends CoachAutomationBinding {
+  sessionTitle?: string;
+  /** True when the conversation this binding targets no longer exists (2.4). */
+  sessionMissing?: boolean;
+}
+
+/** One automation with every place it runs. */
+export interface CoachAutomationDetail {
+  automation: CoachAutomation;
+  bindings: CoachAutomationBindingView[];
+}
+
+/**
+ * Attach refusals are expected — the cap, a duplicate, a second per-run
+ * binding — and the UI has to explain each one. An Error crossing IPC loses its
+ * `code`, so attach answers with a result instead of throwing.
+ */
+export type CoachAutomationAttachResult =
+  | { ok: true; binding: CoachAutomationBinding }
+  | { ok: false; code: CoachAutomationBindingErrorCode; message: string };
+
+/** List-screen projection. */
+/**
+ * Section 10: why every automation is held, and since when.
+ *
+ * One flag for the whole feature rather than a column per binding, because the
+ * cause is one thing the athlete has to fix once — COROS is asking for a login
+ * code, and no amount of retrying anywhere will answer it. Persisted, so a
+ * restart does not quietly resume a paused world.
+ */
+export interface CoachAutomationPause {
+  /**
+   * `two-factor-required` — COROS wants a login code and no automation can
+   * supply one. `budget` — this month's token spend reached the athlete's
+   * ceiling. Both are one fact about the whole feature that the athlete fixes
+   * once, which is why they share one flag.
+   */
+  reason: "two-factor-required" | "budget";
+  since: string;
+  /** The run that tripped it, so the banner can point at something real. */
+  runId?: string;
+}
+
+/**
+ * Guard rail 3's answer for one provider. The reason is prose, not a code: it
+ * lands on the skipped run and in the banner, and both are read by a person.
+ */
+export interface ProviderAuthVerdict {
+  ok: boolean;
+  reason?: string;
+}
+
+/** 13: what the athlete has spent this month, and their ceiling. */
+export interface CoachAutomationSpend {
+  monthStart: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Null when no ceiling is set, which is the default. */
+  budget: number | null;
+  /**
+   * Runs that reported a cost, out of those that reached a provider. When these
+   * differ the total is short of the truth, and a budget that did not say so
+   * would read as comfortably under when nobody knows.
+   */
+  countedRuns: number;
+  providerRuns: number;
+}
+
+export interface CoachAutomationSummary {
+  automation: CoachAutomation;
+  bindingCount: number;
+  enabledBindingCount: number;
+  lastRun?: CoachAutomationRun;
+  /** Earliest across bindings. */
+  nextRunAt?: string;
 }
 
 export interface LocalChatConnectionTest {
@@ -3556,6 +4047,7 @@ export interface WorkoutDeletePreview {
 /** Persisted coach timeline entry (messages plus inline action cards). */
 export type PersistedChatEntry =
   | PersistedChatMessageEntry
+  | PersistedChatAutomationSilentEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }

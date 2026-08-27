@@ -37,7 +37,8 @@ import {
   Trash2,
   TriangleAlert,
   Upload,
-  User
+  User,
+  Zap
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -55,11 +56,16 @@ import {
   type UnitSystem
 } from "../units/units";
 import type {
+  AnthropicApiConnectionTest,
+  AnthropicEffort,
   ChatAuthStatus,
   ChatProvider,
   ChatSessionSummary,
   ChatSettings,
+  ChatEntryAutomationMarker,
   ClaudeCodeStatus,
+  CoachAutomationRun,
+  CoachAutomationSessionAttention,
   CoachInputChoice,
   CoachInputPrompt,
   LocalChatConnectionTest,
@@ -78,14 +84,21 @@ import type {
   WorkoutDeletePreview,
   DeleteWorkoutResult
 } from "../../electron/types";
+import { NOTHING_TO_REPORT } from "../../electron/types";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { trainingPlanFromCoachDraftPreview } from "../../electron/trainingPlanDomain";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
 import { HrZoneCard } from "./HrZoneCard";
+import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
+import { ConversationCoaches } from "./automations/ConversationCoaches";
+import { CoachAutomationsModal } from "./automations/CoachAutomationsModal";
+import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
+import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
+import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
@@ -106,7 +119,14 @@ import {
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
   chatgpt: {},
+  anthropic: {
+    model: "claude-opus-5",
+    effort: "high",
+    hasApiKey: false
+  },
   claudeCode: {
+    useAppScopedAuth: true,
+    effort: "high",
     permissions: {
       recentActivities: true,
       trainingMetrics: true,
@@ -126,7 +146,8 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
     toolsEnabled: true
   },
   sidebarOpen: true,
-  visualizationsEnabled: false
+  visualizationsEnabled: false,
+  customInstructions: ""
 };
 
 function useMediaQuery(query: string): boolean {
@@ -250,6 +271,18 @@ function CoachInputCard({
       ) : null}
     </section>
   );
+}
+
+/**
+ * An automation run streaming into the conversation that is open. Deliberately
+ * separate from the athlete's own streaming state: theirs is persisted as their
+ * turn when it ends, while a run's text is already being written to disk by the
+ * main process, and merging the two would save it twice.
+ */
+interface LiveAutomationRun {
+  runId: string;
+  name: string;
+  text: string;
 }
 
 interface ChatViewProps {
@@ -1748,14 +1781,37 @@ export function ChatView({
     useState<LocalChatConnectionTest | null>(null);
   const [localDiscovery, setLocalDiscovery] =
     useState<LocalChatDiscovery | null>(null);
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [anthropicConnection, setAnthropicConnection] =
+    useState<AnthropicApiConnectionTest | null>(null);
+  const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [claudeStatus, setClaudeStatus] = useState<ClaudeCodeStatus | null>(null);
   const [checkingClaude, setCheckingClaude] = useState(false);
   const [connectingClaude, setConnectingClaude] = useState(false);
   const [testingClaude, setTestingClaude] = useState(false);
+  const [revokingClaude, setRevokingClaude] = useState(false);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [automationsOpen, setAutomationsOpen] = useState(false);
+  const [automationsVersion, setAutomationsVersion] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState<ChatEntry[]>([]);
+  /**
+   * How many stored entries this window's timeline accounts for (5.6b). A run
+   * writing from the main process appends past that point, and the store keeps
+   * whatever lies beyond it rather than letting this window's copy — taken
+   * before the run — delete the coach's answer.
+   *
+   * Zero means "nothing is known about the row", which keeps everything.
+   */
+  const persistedBaseRef = useRef(0);
+  /**
+   * 9.3: which conversations a coach speaks into, and which of them have said
+   * something the athlete has not read. Keyed by session id.
+   */
+  const [sessionAttention, setSessionAttention] = useState<
+    Map<string, CoachAutomationSessionAttention>
+  >(new Map());
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [thinkingText, setThinkingText] = useState("");
@@ -1784,6 +1840,18 @@ export function ChatView({
   const [deletedWorkouts, setDeletedWorkouts] = useState<
     Record<string, DeleteWorkoutResult>
   >({});
+  // An automation run writing into the conversation that is open right now.
+  const [liveAutomation, setLiveAutomation] = useState<LiveAutomationRun | null>(
+    null
+  );
+  // House rule 1 asks a run with nothing to say to answer with the marker and
+  // nothing else, so a run heading for silence has no other text in flight.
+  // What has arrived is held back while it could still be that marker: it is a
+  // control token, and the athlete watching the bubble must never read it.
+  const liveAutomationText =
+    liveAutomation && !NOTHING_TO_REPORT.startsWith(liveAutomation.text.trim())
+      ? liveAutomation.text
+      : "";
 
   // Ref so the push-event handlers filter on the current request without
   // being recreated (and re-subscribed) on every keystroke.
@@ -1798,6 +1866,9 @@ export function ChatView({
   // Kept only while a paused Coach turn is resuming, so a failed/cancelled
   // request can restore the question instead of silently losing it.
   const resumedCoachPromptRef = useRef<CoachInputPrompt | null>(null);
+  // Same reason as activeRequestIdRef: the push handlers have to recognise the
+  // automation's stream without re-subscribing.
+  const liveAutomationRef = useRef<LiveAutomationRun | null>(null);
   const autoDetectLocalRef = useRef(false);
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1843,8 +1914,14 @@ export function ChatView({
   ) => {
     if (!api || !sessionId) return;
     const run = () => {
+      const persisted = toPersistedEntries(entries);
+      const knownEntryCount = persistedBaseRef.current;
+      // Advanced at send time, not on the reply. Handlers run in send order, so
+      // the row ends up holding this array; waiting for the reply would let an
+      // earlier save's answer roll the base backwards.
+      persistedBaseRef.current = persisted.length;
       void api
-        .saveChatSession(sessionId, toPersistedEntries(entries))
+        .saveChatSession(sessionId, persisted, { knownEntryCount })
         .then((summary) => {
           if (!summary) return;
           setSessions((current) => {
@@ -1875,25 +1952,113 @@ export function ChatView({
     persistTimeoutRef.current = setTimeout(run, 300);
   };
 
+  const refreshSessionAttention = useCallback(async () => {
+    if (!api) return;
+    try {
+      const rows = await api.listCoachAutomationSessionAttention();
+      setSessionAttention(new Map(rows.map((row) => [row.sessionId, row])));
+    } catch {
+      // A conversation list without its marks is still a conversation list.
+    }
+  }, [api]);
+
+  /**
+   * Opening a conversation is what reading it means (9.3). Only re-reads the
+   * marks when something actually cleared, so switching between conversations
+   * with nothing unread costs one call rather than two.
+   */
+  const markSessionRead = useCallback(
+    async (sessionId: string) => {
+      if (!api) return;
+      try {
+        if ((await api.markCoachAutomationSessionSeen(sessionId)) > 0) {
+          await refreshSessionAttention();
+        }
+      } catch {
+        // The dot is a hint, not state the athlete can lose work over.
+      }
+    },
+    [api, refreshSessionAttention]
+  );
+
   const loadSession = async (sessionId: string) => {
     if (!api) return;
     try {
       const entries = await api.getChatSession(sessionId);
+      persistedBaseRef.current = entries.length;
       setTimeline(fromPersistedEntries(entries));
       resetEphemeralChatState();
       setActiveSessionId(sessionId);
+      void markSessionRead(sessionId);
     } catch {
+      // Nothing was read, so nothing is known about the row: a save from here
+      // must not be taken as authority to shorten it.
+      persistedBaseRef.current = 0;
       setTimeline([]);
       resetEphemeralChatState();
     }
   };
 
-  const refreshSessions = async (provider: ChatProvider) => {
-    if (!api) return [];
-    const listed = await api.listChatSessions(provider);
-    setSessions(listed);
-    return listed;
+  /**
+   * Re-reads the open conversation from disk. An automation run persists in the
+   * main process, behind this window's back, so the transcript on screen is the
+   * only copy that does not know about it — and the next thing the athlete
+   * types would save that stale copy straight over the coach's answer.
+   */
+  const reloadTranscript = async (sessionId: string) => {
+    if (!api) return;
+    try {
+      const entries = await api.getChatSession(sessionId);
+      // The athlete may have switched conversations while this was in flight.
+      if (activeSessionIdRef.current !== sessionId) return;
+      // A save waiting on the debounce holds the copy this reload is replacing,
+      // and the base is about to move past it. Letting it fire would write the
+      // pre-run transcript back over the answer with a base that no longer
+      // covers it — the exact loss 5.6b's merge exists to prevent.
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+      persistedBaseRef.current = entries.length;
+      setTimeline(fromPersistedEntries(entries));
+    } catch {
+      // Keep what is on screen rather than blanking a readable transcript.
+    }
   };
+
+  /**
+   * A run log row names the conversation the coach wrote into, and reading what
+   * it said is the obvious next thing to do — so the row opens it, from behind
+   * the modal that is covering it.
+   *
+   * The list is re-read first rather than searched as it stands: a `per-run`
+   * conversation may be newer than anything this window has heard of, and one
+   * from an old run may have been deleted since. Loading a session id no row
+   * exists for would leave the sidebar with nothing selected and the composer
+   * writing into a conversation that is not there.
+   */
+  const openRunConversation = async (sessionId: string) => {
+    if (!api) return;
+    const listed = await refreshSessions(chatSettings.provider);
+    if (!listed.some((session) => session.id === sessionId)) {
+      onError("That conversation is no longer here — it may have been deleted.");
+      return;
+    }
+    onError(null);
+    setAutomationsOpen(false);
+    setAutomationsVersion((value) => value + 1);
+    await loadSession(sessionId);
+  };
+
+  const refreshSessions = useCallback(
+    async (provider: ChatProvider) => {
+      if (!api) return [];
+      const listed = await api.listChatSessions(provider);
+      setSessions(listed);
+      return listed;
+    },
+    [api]
+  );
 
   const ensureActiveSession = async (provider: ChatProvider) => {
     if (!api) return null;
@@ -1905,6 +2070,7 @@ export function ChatView({
     const created = await api.createChatSession(provider);
     setSessions([created]);
     setActiveSessionId(created.id);
+    persistedBaseRef.current = 0;
     setTimeline([]);
     resetEphemeralChatState();
     return created.id;
@@ -1913,6 +2079,149 @@ export function ChatView({
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
+
+  // Attaching or detaching a coach changes which conversations carry the mark,
+  // so the list re-reads on the same version counter the header chips use.
+  useEffect(() => {
+    void refreshSessionAttention();
+  }, [refreshSessionAttention, automationsVersion]);
+
+  /**
+   * A run reaches into the conversation list from outside this window. A
+   * `per-run` binding brings a conversation into existence every time it fires
+   * (2.2), a `dedicated` one rebuilds its own when it has been deleted, and
+   * every run bumps whatever it wrote into to the top (9.3).
+   *
+   * The sidebar renders from a list this window read once, on mount and on a
+   * provider change, so none of that was visible until the app was restarted:
+   * a conversation the window had never heard of was simply not in the array,
+   * and the reorder had nothing to reorder. The `running` update carries the
+   * session id too — the conversation exists before the model is asked
+   * anything — so a new one appears while the run is still going, which is the
+   * only way the athlete can open it and watch the answer arrive.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationRunUpdate) return;
+    // The provider on screen, not the run's: an automation may run on one of
+    // its own (decision 2), and that conversation belongs to that provider's
+    // list rather than this one.
+    const provider = chatSettings.provider;
+    return api.onCoachAutomationRunUpdate((run) => {
+      if (!run.sessionId) return;
+      void refreshSessions(provider).catch(() => undefined);
+    });
+  }, [api, chatSettings.provider, refreshSessions]);
+
+  /**
+   * 9.3: a run into a conversation the athlete is *not* looking at is exactly
+   * what the unread dot is for. The live-view subscription below ignores those,
+   * so this one watches every run.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationRunUpdate) return;
+    return api.onCoachAutomationRunUpdate((run) => {
+      // Still working: nothing has landed in any conversation yet.
+      if (run.status === "running") return;
+      if (run.sessionId && run.sessionId === activeSessionIdRef.current) {
+        // The conversation is open and the reload has already put the answer on
+        // screen, so it is read the moment it arrives.
+        void markSessionRead(run.sessionId);
+        return;
+      }
+      void refreshSessionAttention();
+    });
+  }, [api, markSessionRead, refreshSessionAttention]);
+
+  useEffect(() => {
+    liveAutomationRef.current = liveAutomation;
+  }, [liveAutomation]);
+
+  /**
+   * The run record carries ids, not the coach's name, so the chip is worth one
+   * lookup: an athlete watching a bubble needs to know which of their coaches
+   * is speaking.
+   */
+  const showLiveAutomation = useCallback(
+    (run: CoachAutomationRun) => {
+      setLiveAutomation({ runId: run.id, name: "Automation coach", text: "" });
+      void api
+        ?.getCoachAutomation(run.automationId)
+        .then((detail) => {
+          if (!detail) return;
+          setLiveAutomation((current) =>
+            current?.runId === run.id
+              ? { ...current, name: detail.automation.name }
+              : current
+          );
+        })
+        .catch(() => undefined);
+    },
+    [api]
+  );
+
+  /**
+   * Switching conversations drops whatever was streaming into the old one; the
+   * run keeps going in the main process and its output is on disk either way.
+   *
+   * And it picks up whatever is streaming into the new one. The subscription
+   * below only ever hears about a run while its conversation is already open,
+   * so opening one mid-run — which is exactly what a `per-run` binding invites
+   * the athlete to do, its conversation appearing in the sidebar the moment the
+   * run starts — showed an empty transcript with nothing to say why. The text
+   * already streamed is gone, but the bubble says who is working and the tokens
+   * from here on land in it.
+   */
+  useEffect(() => {
+    setLiveAutomation(null);
+    if (!api || !activeSessionId) return;
+    let cancelled = false;
+    void api
+      .listCoachAutomationRuns({
+        sessionId: activeSessionId,
+        statuses: ["running"],
+        limit: 1
+      })
+      .then((runs) => {
+        if (cancelled || !runs.length) return;
+        showLiveAutomation(runs[0]);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [api, activeSessionId, showLiveAutomation]);
+
+  /**
+   * A run that targets the conversation on screen has to show up in it as it
+   * happens — an automation the athlete triggered and then cannot see reads as
+   * a button that did nothing.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationRunUpdate) return;
+    return api.onCoachAutomationRunUpdate((run) => {
+      if (!run.sessionId || run.sessionId !== activeSessionIdRef.current) return;
+
+      if (run.status === "running") {
+        showLiveAutomation(run);
+        return;
+      }
+
+      if (liveAutomationRef.current?.runId === run.id) {
+        setLiveAutomation(null);
+      }
+
+      // A skip never reached the model and adds nothing. A silent run does add
+      // something now — the one-line trace saying the coach looked (5.5) — so
+      // it reloads on the same path as an answer, and the trace is what
+      // explains the live bubble disappearing.
+      if (run.status !== "success" && run.status !== "silent") return;
+      // Reloaded straight away even mid-turn. Waiting for the athlete's turn to
+      // end is worse than useless: their turn persists the whole timeline, so
+      // the copy on screen — which predates the run — would be written over the
+      // coach's answer before the deferred reload ever got to see it.
+      void reloadTranscript(run.sessionId);
+    });
+  }, [api, showLiveAutomation]);
 
   // Load sign-in/provider state on mount.
   useEffect(() => {
@@ -2085,6 +2394,12 @@ export function ChatView({
 
     const unsubscribers = [
       api.onChatStreamStart((payload) => {
+        if (payload.requestId === liveAutomationRef.current?.runId) {
+          setLiveAutomation((current) =>
+            current?.runId === payload.requestId ? { ...current, text: "" } : current
+          );
+          return;
+        }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setStreamingText("");
         setThinkingText("");
@@ -2093,11 +2408,25 @@ export function ChatView({
         pendingCoachPromptsRef.current = [];
       }),
       api.onChatStreamToken((payload) => {
+        // A run's tokens must never touch the athlete's own streaming state:
+        // that state gets persisted as their turn when the stream ends, and the
+        // runner has already written the same text from the main process.
+        if (payload.requestId === liveAutomationRef.current?.runId) {
+          setLiveAutomation((current) =>
+            current?.runId === payload.requestId
+              ? { ...current, text: current.text + payload.delta }
+              : current
+          );
+          return;
+        }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setActiveTool(null);
         setStreamingText((prev) => prev + payload.delta);
       }),
       api.onChatStreamInfo((payload) => {
+        // Cards (plan drafts, charts) belong to whoever asked for them; an
+        // automation's transcript is reloaded from disk when its run ends.
+        if (payload.requestId === liveAutomationRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
         if (payload.kind === "context") {
           sourceRef.current = {
@@ -2160,6 +2489,17 @@ export function ChatView({
       api.onChatStreamDone((payload) => {
         if (payload.requestId !== activeRequestIdRef.current) return;
         finishStreaming(payload.fullText, payload.finishReason);
+        // A turn is the only thing that reveals Claude Code's default model, and
+        // the main process saves it behind this window's back.
+        if (
+          chatSettings.provider === "claude-code" &&
+          !chatSettings.claudeCode.defaultModel
+        ) {
+          void api
+            .getChatSettings()
+            .then(setChatSettings)
+            .catch(() => undefined);
+        }
       }),
       api.onChatStreamError((payload) => {
         if (payload.requestId !== activeRequestIdRef.current) return;
@@ -2188,12 +2528,24 @@ export function ChatView({
     return () => {
       for (const unsubscribe of unsubscribers) unsubscribe();
     };
-  }, [api, chatSettings.provider, chatSettings.visualizationsEnabled, onError]);
+  }, [
+    api,
+    chatSettings.provider,
+    chatSettings.claudeCode.defaultModel,
+    chatSettings.visualizationsEnabled,
+    onError
+  ]);
 
   // Keep the transcript scrolled to the newest content.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [timeline, streamingText, thinkingText, exportingLatestActivity]);
+  }, [
+    timeline,
+    streamingText,
+    thinkingText,
+    liveAutomation,
+    exportingLatestActivity
+  ]);
 
   const handleSignIn = async () => {
     if (!api) return;
@@ -2262,22 +2614,27 @@ export function ChatView({
     }, 1500);
   };
 
-  const handleConnectClaudeCode = async () => {
-    if (!api || connectingClaude) return;
-    setConnectingClaude(true);
+  const handleClaudeSignedIn = (status: ClaudeCodeStatus) => {
+    setClaudeStatus(status);
+    if (status.state === "connecting" || status.state === "sign-in-required") {
+      pollClaudeCodeStatus();
+    }
+  };
+
+  const handleRevokeClaudeCode = async () => {
+    if (!api || revokingClaude) return;
+    setRevokingClaude(true);
     onError(null);
     try {
-      const status = await api.connectClaudeCode();
-      setClaudeStatus(status);
-      if (status.state === "connecting" || status.state === "sign-in-required") {
-        pollClaudeCodeStatus();
-      }
+      setClaudeStatus(await api.revokeClaudeCodeLogin());
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Claude sign-in failed."
+        caught instanceof Error
+          ? caught.message
+          : "Could not sign CorosLink out of Claude."
       );
     } finally {
-      setConnectingClaude(false);
+      setRevokingClaude(false);
     }
   };
 
@@ -2313,7 +2670,42 @@ export function ChatView({
     };
     const nextSettings = { ...chatSettings, claudeCode: nextClaudeCode };
     setChatSettings(nextSettings);
-    setClaudeStatus(null);
+    // Only a different binary or credential store can invalidate the
+    // connection. Clearing the status for a model, effort or permission change
+    // made showClaudeGate true and dropped the athlete out of the conversation.
+    const invalidatesConnection =
+      patch.executablePath !== undefined ||
+      patch.useAppScopedAuth !== undefined;
+    if (invalidatesConnection) {
+      setClaudeStatus(null);
+    }
+    if (!api) return;
+    try {
+      const saved = await api.saveChatSettings(nextSettings);
+      setChatSettings(saved);
+      // Switching credential stores can flip the sign-in state, so re-read it
+      // instead of leaving the caller staring at a cleared status.
+      if (invalidatesConnection) {
+        setClaudeStatus(await api.getClaudeCodeStatus());
+      }
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save Claude settings."
+      );
+    }
+  };
+
+  const handleUpdateAnthropic = async (
+    patch: Partial<ChatSettings["anthropic"]>
+  ) => {
+    const nextSettings: ChatSettings = {
+      ...chatSettings,
+      anthropic: { ...chatSettings.anthropic, ...patch }
+    };
+    setChatSettings(nextSettings);
+    setAnthropicConnection(null);
     if (!api) return;
     try {
       const saved = await api.saveChatSettings(nextSettings);
@@ -2322,8 +2714,89 @@ export function ChatView({
       onError(
         caught instanceof Error
           ? caught.message
-          : "Could not save Claude settings."
+          : "Could not save Claude API settings."
       );
+    }
+  };
+
+  const handleSaveAnthropicSettings = async () => {
+    if (!api) return;
+    setSavingSettings(true);
+    onError(null);
+    try {
+      const apiKey = anthropicApiKey.trim();
+      const saved = await api.saveChatSettings({
+        ...chatSettings,
+        anthropic: {
+          ...chatSettings.anthropic,
+          apiKey: apiKey || undefined
+        }
+      });
+      setChatSettings(saved);
+      setAnthropicApiKey("");
+      setAnthropicConnection({
+        ok: true,
+        message: saved.anthropic.hasApiKey
+          ? "Claude API settings saved."
+          : "Settings saved. Add an API key to start coaching."
+      });
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save Claude API settings."
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleClearAnthropicApiKey = async () => {
+    if (!api) return;
+    setSavingSettings(true);
+    onError(null);
+    try {
+      const saved = await api.saveChatSettings({
+        ...chatSettings,
+        anthropic: { ...chatSettings.anthropic, clearApiKey: true }
+      });
+      setChatSettings(saved);
+      setAnthropicApiKey("");
+      setAnthropicConnection({ ok: true, message: "Anthropic API key cleared." });
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : "Could not clear the API key."
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleTestAnthropicConnection = async () => {
+    if (!api || testingAnthropic) return;
+    setTestingAnthropic(true);
+    setAnthropicConnection(null);
+    onError(null);
+    try {
+      // An unsaved key in the field is tested as typed so the athlete can
+      // verify it before committing it to storage.
+      setAnthropicConnection(
+        await api.testAnthropicConnection({
+          model: chatSettings.anthropic.model,
+          effort: chatSettings.anthropic.effort,
+          apiKey: anthropicApiKey.trim() || undefined
+        })
+      );
+    } catch (caught) {
+      setAnthropicConnection({
+        ok: false,
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Claude API connection test failed."
+      });
+    } finally {
+      setTestingAnthropic(false);
     }
   };
 
@@ -2334,6 +2807,7 @@ export function ChatView({
       const created = await api.createChatSession(chatSettings.provider);
       setSessions((current) => [created, ...current]);
       setActiveSessionId(created.id);
+      persistedBaseRef.current = 0;
       setTimeline([]);
       resetEphemeralChatState();
     } catch (caught) {
@@ -2349,6 +2823,28 @@ export function ChatView({
     await loadSession(sessionId);
   };
 
+  const handleTogglePinSession = async (sessionId: string, pinned: boolean) => {
+    if (!api) return;
+    onError(null);
+    try {
+      const summary = await api.setChatSessionPinned(sessionId, pinned);
+      if (!summary) return;
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === summary.id ? summary : session
+        )
+      );
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : pinned
+            ? "Could not pin chat."
+            : "Could not unpin chat."
+      );
+    }
+  };
+
   const handleDeleteSession = async (sessionId: string) => {
     if (!api || streaming || exportingLatestActivity) return;
     onError(null);
@@ -2362,6 +2858,7 @@ export function ChatView({
           const created = await api.createChatSession(chatSettings.provider);
           setSessions([created]);
           setActiveSessionId(created.id);
+          persistedBaseRef.current = 0;
           setTimeline([]);
           resetEphemeralChatState();
         }
@@ -2391,33 +2888,64 @@ export function ChatView({
     }
   };
 
+  const handleEffortChange = async (effort: AnthropicEffort) => {
+    if (!api || !supportsReasoningEffort(chatSettings.provider)) return;
+    const nextSettings: ChatSettings =
+      chatSettings.provider === "claude-api"
+        ? { ...chatSettings, anthropic: { ...chatSettings.anthropic, effort } }
+        : { ...chatSettings, claudeCode: { ...chatSettings.claudeCode, effort } };
+
+    setChatSettings(nextSettings);
+    setSavingSettings(true);
+    onError(null);
+    try {
+      setChatSettings(await api.saveChatSettings(nextSettings));
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save the reasoning effort."
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const handleModelChange = async (model: string) => {
     if (!api || chatSettings.provider === "local") return;
     const normalizedModel = model.trim() || undefined;
     const nextSettings: ChatSettings =
-      chatSettings.provider === "claude-code"
+      chatSettings.provider === "claude-api"
         ? {
             ...chatSettings,
-            claudeCode: {
-              ...chatSettings.claudeCode,
-              model: normalizedModel
+            anthropic: {
+              ...chatSettings.anthropic,
+              model: model.trim() || chatSettings.anthropic.model
             }
           }
-        : chatSettings.provider === "openrouter"
+        : chatSettings.provider === "claude-code"
           ? {
               ...chatSettings,
-              openRouter: {
-                ...chatSettings.openRouter,
-                model: normalizedModel ?? "openrouter/auto"
+              claudeCode: {
+                ...chatSettings.claudeCode,
+                model: normalizedModel
               }
             }
-        : {
-            ...chatSettings,
-            chatgpt: {
-              ...chatSettings.chatgpt,
-              model: normalizedModel
-            }
-          };
+          : chatSettings.provider === "openrouter"
+            ? {
+                ...chatSettings,
+                openRouter: {
+                  ...chatSettings.openRouter,
+                  model: normalizedModel ?? "openrouter/auto"
+                }
+              }
+            : {
+                ...chatSettings,
+                chatgpt: {
+                  ...chatSettings.chatgpt,
+                  model: normalizedModel
+                }
+              };
 
     setChatSettings(nextSettings);
     setSavingSettings(true);
@@ -2787,6 +3315,13 @@ export function ChatView({
       onError("Enter a local model before starting the coach.");
       return false;
     }
+    if (
+      chatSettings.provider === "claude-api" &&
+      !chatSettings.anthropic.hasApiKey
+    ) {
+      onError("Save an Anthropic API key in Settings before starting the coach.");
+      return false;
+    }
     if (chatSettings.provider === "local") {
       try {
         const apiKey = localApiKey.trim();
@@ -3116,6 +3651,7 @@ export function ChatView({
   const isLocalProvider = chatSettings.provider === "local";
   const isClaudeProvider = chatSettings.provider === "claude-code";
   const isOpenRouterProvider = chatSettings.provider === "openrouter";
+  const isClaudeApiProvider = chatSettings.provider === "claude-api";
   const isChatGptProvider = chatSettings.provider === "chatgpt";
   const localModelConfigured = chatSettings.local.model.trim().length > 0;
   const isBusy = streaming || exportingLatestActivity;
@@ -3130,6 +3666,8 @@ export function ChatView({
     isClaudeProvider && claudeStatus?.state !== "connected";
   const showOpenRouterGate =
     isOpenRouterProvider && !chatSettings.openRouter.hasApiKey;
+  const showAnthropicKeyGate =
+    isClaudeApiProvider && !chatSettings.anthropic.hasApiKey;
   const showPlanPanel = useMediaQuery("(min-width: 1400px)");
   const planDrafts = timeline.flatMap((entry) =>
     entry.kind === "planDraft" ? [entry.draft] : []
@@ -3162,19 +3700,43 @@ export function ChatView({
     />
   );
   const selectedModel =
-    chatSettings.provider === "claude-code"
-      ? chatSettings.claudeCode.model ?? ""
-      : chatSettings.provider === "openrouter"
-        ? chatSettings.openRouter.model
-        : chatSettings.chatgpt.model ?? "";
+    chatSettings.provider === "claude-api"
+      ? chatSettings.anthropic.model
+      : chatSettings.provider === "claude-code"
+        ? chatSettings.claudeCode.model ?? ""
+        : chatSettings.provider === "openrouter"
+          ? chatSettings.openRouter.model
+          : chatSettings.chatgpt.model ?? "";
+  const selectedEffort =
+    chatSettings.provider === "claude-api"
+      ? chatSettings.anthropic.effort
+      : chatSettings.claudeCode.effort;
   const providerControls = (
     <div className="chat-provider-controls">
       {providerSwitch}
       <ModelSwitch
         provider={chatSettings.provider}
         model={selectedModel}
+        defaultModel={
+          chatSettings.provider === "claude-code"
+            ? (claudeStatus?.defaultModel ??
+              chatSettings.claudeCode.defaultModel)
+            : undefined
+        }
+        availableModels={
+          chatSettings.provider === "claude-code"
+            ? (claudeStatus?.availableModels ??
+              chatSettings.claudeCode.availableModels)
+            : undefined
+        }
         disabled={savingSettings || isBusy}
         onChange={(model) => void handleModelChange(model)}
+      />
+      <EffortSwitch
+        provider={chatSettings.provider}
+        effort={selectedEffort}
+        disabled={savingSettings || isBusy}
+        onChange={(effort) => void handleEffortChange(effort)}
       />
     </div>
   );
@@ -3186,10 +3748,13 @@ export function ChatView({
     sessions,
     activeSessionId,
     busy: isBusy,
+    attention: sessionAttention,
     onClose: () => void handleUpdateChatSettings({ sidebarOpen: false }),
     onOpen: () => void handleUpdateChatSettings({ sidebarOpen: true }),
     onNewChat: () => void handleNewChat(),
     onSelectSession: (sessionId: string) => void handleSelectSession(sessionId),
+    onTogglePinSession: (sessionId: string, pinned: boolean) =>
+      void handleTogglePinSession(sessionId, pinned),
     onDeleteSession: (sessionId: string) => void handleDeleteSession(sessionId)
   };
 
@@ -3213,14 +3778,26 @@ export function ChatView({
     checkingClaude,
     connectingClaude,
     testingClaude,
+    revokingClaude,
     busy: isBusy,
     onClose: () => setSettingsOpen(false),
     onSignIn: () => void handleSignIn(),
     onSignOut: () => void handleSignOut(),
     onRefreshClaude: () => void refreshClaudeCodeStatus(),
-    onConnectClaude: () => void handleConnectClaudeCode(),
+    onClaudeSignedIn: handleClaudeSignedIn,
+    onRevokeClaude: () => void handleRevokeClaudeCode(),
     onTestClaude: () => void handleTestClaudeCode(),
     onOpenClaudeSetupGuide: () => void api?.openClaudeCodeSetupGuide(),
+    anthropicApiKey,
+    anthropicConnection,
+    testingAnthropic,
+    onAnthropicApiKeyChange: setAnthropicApiKey,
+    onUpdateAnthropic: (patch: Partial<ChatSettings["anthropic"]>) =>
+      void handleUpdateAnthropic(patch),
+    onTestAnthropicConnection: () => void handleTestAnthropicConnection(),
+    onSaveAnthropicSettings: () => void handleSaveAnthropicSettings(),
+    onClearAnthropicApiKey: () => void handleClearAnthropicApiKey(),
+    onOpenAnthropicKeyGuide: () => void api?.openAnthropicKeyGuide(),
     onUpdateClaudeCode: (patch: Partial<ChatSettings["claudeCode"]>) =>
       void handleUpdateClaudeCode(patch),
     onOpenRouterApiKeyChange: setOpenRouterApiKey,
@@ -3246,6 +3823,70 @@ export function ChatView({
     return (
       <div className="chat-view chat-view-centered">
         <Loader2 className="chat-spinner" size={22} aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (showAnthropicKeyGate) {
+    return (
+      <div className="chat-view chat-view-login">
+        <div className="chat-header">
+          <div className="chat-header-title">
+            <span>Training Coach</span>
+          </div>
+          <div className="chat-header-end">
+            <button
+              type="button"
+              className="chat-settings-button"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings2 size={16} aria-hidden="true" />
+              Settings
+            </button>
+          </div>
+        </div>
+        <div className="chat-layout">
+          <ChatSidebar {...sidebarProps} />
+          <div className="chat-main chat-main-login">
+            <div className="panel chat-login-panel chat-claude-login-panel">
+              <KeyRound size={32} aria-hidden="true" />
+              <h2>Claude API key</h2>
+              <p>
+                Coach with Claude straight from the Anthropic API using your own
+                key, billed per token to your Anthropic account. The key is
+                stored encrypted on this computer and never leaves it except to
+                call Anthropic.
+              </p>
+              <div className="chat-login-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <KeyRound size={16} aria-hidden="true" />
+                  Add API key
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void api?.openAnthropicKeyGuide()}
+                  disabled={!api}
+                >
+                  <ExternalLink size={16} aria-hidden="true" />
+                  Get a key
+                </button>
+              </div>
+              <p className="chat-login-note">
+                Already have a subscription instead? Switch to Claude
+                subscription below to use Claude Code on this computer.
+              </p>
+            </div>
+            <div className="chat-composer-toolbar chat-composer-toolbar-login">
+              {providerControls}
+            </div>
+          </div>
+        </div>
+        <ChatSettingsModal {...settingsModalProps} />
       </div>
     );
   }
@@ -3279,9 +3920,20 @@ export function ChatView({
                 <span className="chat-beta-badge">Beta</span>
               </div>
               <p>
-                Use the Claude Code CLI installed on this computer with your
-                existing Claude subscription. CorosLink does not read or store
-                your Claude credentials.
+                Coach with your Claude subscription through the Claude Code CLI
+                on this computer.
+              </p>
+              <ClaudeAuthScopeToggle
+                appScoped={chatSettings.claudeCode.useAppScopedAuth !== false}
+                disabled={checkingClaude}
+                onChange={(next) =>
+                  void handleUpdateClaudeCode({ useAppScopedAuth: next })
+                }
+              />
+              <p className="chat-login-note">
+                {chatSettings.claudeCode.useAppScopedAuth !== false
+                  ? "Signing in here creates credentials that belong to CorosLink alone. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
+                  : "CorosLink will use the machine-wide Claude login in your home folder, shared with your terminal. Signing in here replaces that login."}
               </p>
               <div className="chat-login-actions">
                 {notInstalled ? (
@@ -3294,23 +3946,11 @@ export function ChatView({
                     Install Claude Code
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={() => void handleConnectClaudeCode()}
-                    disabled={connectingClaude || !api}
-                  >
-                    {connectingClaude ? (
-                      <Loader2
-                        className="chat-spinner"
-                        size={16}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Terminal size={16} aria-hidden="true" />
-                    )}
-                    Sign in with Claude
-                  </button>
+                  <ClaudeCodeLoginCard
+                    api={api}
+                    onSignedIn={handleClaudeSignedIn}
+                    onError={onError}
+                  />
                 )}
                 <button
                   type="button"
@@ -3468,6 +4108,123 @@ export function ChatView({
     );
   }
 
+/**
+ * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
+ * automations, so every entry a run produced says which coach spoke.
+ */
+function AutomationAttribution({
+  marker
+}: {
+  marker: ChatEntryAutomationMarker;
+}) {
+  return (
+    <span className="chat-automation-attribution">
+      <Zap size={12} aria-hidden="true" />
+      {marker.name}
+      <span className="chat-automation-attribution-trigger">
+        · {marker.triggerLabel}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
+ * default — it is machinery, not conversation — but openable, because an
+ * athlete judging an automation's answer needs to see what it was asked.
+ */
+function AutomationPromptChip({
+  marker,
+  prompt,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAutomationMarker;
+  prompt: string;
+  index: number;
+  highlighted: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      className={`chat-row chat-row-automation${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <button
+        type="button"
+        className="chat-automation-chip"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <Zap size={12} aria-hidden="true" />
+        {marker.name}
+        <span className="chat-automation-chip-trigger">· {marker.triggerLabel}</span>
+      </button>
+      {expanded ? <pre className="chat-automation-prompt">{prompt}</pre> : null}
+    </div>
+  );
+}
+
+/**
+ * When the coach looked. Absolute, not relative: a transcript entry is read
+ * long after it was written, and "2h ago" becomes a lie the moment the
+ * conversation is reopened.
+ */
+function formatLookedAt(at: number): string {
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) {
+    return "";
+  }
+  const time = when.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  if (when.toDateString() === new Date().toDateString()) {
+    return time;
+  }
+  const day = when.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+  return `${day}, ${time}`;
+}
+
+/**
+ * 5.5: an automation looked and had nothing to say. One line, the same pill as
+ * the playbook chip, but nothing to open — the whole point is that there is no
+ * content behind it.
+ */
+function AutomationSilentChip({
+  marker,
+  at,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAutomationMarker;
+  at: number;
+  index: number;
+  highlighted: boolean;
+}) {
+  return (
+    <div
+      className={`chat-row chat-row-automation${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <span className="chat-automation-chip chat-automation-chip-static">
+        <Zap size={12} aria-hidden="true" />
+        {marker.name} looked, nothing new
+        <span className="chat-automation-chip-trigger">
+          · {formatLookedAt(at)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
   return (
     <div className="chat-view">
       <div className="chat-header">
@@ -3484,6 +4241,13 @@ export function ChatView({
             <Settings2 size={16} aria-hidden="true" />
             Settings
           </button>
+          <ConversationCoaches
+            api={api}
+            sessionId={activeSessionId}
+            refreshVersion={automationsVersion}
+            onChanged={() => setAutomationsVersion((value) => value + 1)}
+            onManageAutomations={() => setAutomationsOpen(true)}
+          />
           <div className="chat-mcp" ref={mcpRef}>
             {(() => {
               const connectedServers = mcpStatuses.filter((s) => s.connected);
@@ -3754,6 +4518,33 @@ export function ChatView({
               );
             }
 
+            if (entry.kind === "automationSilent") {
+              return (
+                <AutomationSilentChip
+                  key={`automation-silent-${index}`}
+                  marker={entry.automation}
+                  at={entry.at}
+                  index={index}
+                  highlighted={highlightedChatEntryIndex === index}
+                />
+              );
+            }
+
+            // 5.6: the synthetic user turn an automation sends is stored with
+            // role "user", but it was never typed by the athlete — showing it as
+            // their bubble would misattribute the playbook to them.
+            if (entry.automation && entry.role === "user") {
+              return (
+                <AutomationPromptChip
+                  key={`message-${index}`}
+                  marker={entry.automation}
+                  prompt={entry.content}
+                  index={index}
+                  highlighted={highlightedChatEntryIndex === index}
+                />
+              );
+            }
+
             return (
               <div
                 key={`message-${index}`}
@@ -3772,6 +4563,9 @@ export function ChatView({
                   )}
                 </div>
                 <div className="chat-bubble">
+                  {entry.automation ? (
+                    <AutomationAttribution marker={entry.automation} />
+                  ) : null}
                   {entry.role === "assistant" ? (
                     <>
                       {entry.reasoningSummary ? (
@@ -3820,6 +4614,34 @@ export function ChatView({
                   </div>
                 )}
                 {currentSource ? <SourceBadge source={currentSource} /> : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Same avatar and bubble as the persisted answer this becomes, so
+              the reload at the end of the run does not make the row jump. */}
+          {liveAutomation ? (
+            <div className="chat-row chat-row-assistant">
+              <div className="chat-avatar chat-avatar-assistant">
+                <Sparkles size={16} aria-hidden="true" />
+              </div>
+              <div className="chat-bubble chat-bubble-streaming">
+                <span className="chat-automation-attribution">
+                  <Zap size={12} aria-hidden="true" />
+                  {liveAutomation.name}
+                  <span className="chat-automation-attribution-trigger">
+                    · running now
+                  </span>
+                </span>
+                {liveAutomationText ? (
+                  <AssistantMarkdown content={liveAutomationText} streaming />
+                ) : (
+                  <div className="chat-stream-pending">
+                    <span className="chat-stream-status">
+                      Reading your training…
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
@@ -4027,6 +4849,19 @@ export function ChatView({
         ) : null}
       </div>
       <ChatSettingsModal {...settingsModalProps} />
+      <CoachAutomationsModal
+        api={api}
+        open={automationsOpen}
+        provider={chatSettings.provider}
+        onChanged={() => setAutomationsVersion((value) => value + 1)}
+        onClose={() => {
+          setAutomationsOpen(false);
+          // Catch-all: anything the modal changed is reflected on close, even
+          // a path that forgot to report itself.
+          setAutomationsVersion((value) => value + 1);
+        }}
+        onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
+      />
     </div>
   );
 }

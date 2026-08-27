@@ -6,6 +6,7 @@ import { musicFileNamesMatch } from "./musicFileNames";
 import Database from "better-sqlite3";
 import type {
   CachedCorosMapPackage,
+  CoachAutomationRunQuery,
   GeneratedRoute,
   LocalTrack,
   NativeCorosPlanDetail,
@@ -259,11 +260,12 @@ export function initializeDatabase(userDataPath: string): Database.Database {
 
     CREATE TABLE IF NOT EXISTS chat_sessions (
       id TEXT PRIMARY KEY,
-      provider TEXT NOT NULL CHECK(provider IN ('chatgpt', 'claude-code', 'openrouter', 'local')),
+      provider TEXT NOT NULL CHECK(provider IN ('chatgpt', 'claude-api', 'claude-code', 'openrouter', 'local')),
       title TEXT NOT NULL,
       messages_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      pinned_at TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_provider_updated
@@ -367,6 +369,96 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       builtin INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0
     );
+
+    -- Coach automations. The definition knows nothing about conversations;
+    -- coach_automation_bindings holds every place it is active.
+    CREATE TABLE IF NOT EXISTS coach_automations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT,
+      playbook TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      preset_id TEXT,
+      trigger_json TEXT NOT NULL,
+      conditions_json TEXT NOT NULL,
+      runtime_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS coach_automation_bindings (
+      id TEXT PRIMARY KEY,
+      automation_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      session_id TEXT,
+      title_template TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      last_run_at TEXT,
+      next_run_at TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (automation_id) REFERENCES coach_automations(id) ON DELETE CASCADE
+    );
+
+    -- One automation cannot be attached twice to the same conversation.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_binding_unique_session
+      ON coach_automation_bindings (automation_id, session_id)
+      WHERE session_id IS NOT NULL;
+
+    -- At most one "new conversation per run" binding per automation.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_binding_unique_per_run
+      ON coach_automation_bindings (automation_id)
+      WHERE session_id IS NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_binding_session
+      ON coach_automation_bindings (session_id);
+
+    -- Every activity trigger asks "what landed after this binding's watermark",
+    -- once per binding, and the answer is ordered by start_time.
+    CREATE INDEX IF NOT EXISTS idx_training_activities_start_time
+      ON training_activities (start_time);
+
+    CREATE TABLE IF NOT EXISTS coach_automation_runs (
+      id TEXT PRIMARY KEY,
+      automation_id TEXT NOT NULL,
+      binding_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      trigger_kind TEXT NOT NULL,
+      trigger_payload_json TEXT,
+      session_id TEXT,
+      summary TEXT,
+      model TEXT,
+      effort TEXT,
+      error TEXT,
+      skip_reason TEXT,
+      seen_at TEXT,
+      started_at TEXT NOT NULL,
+      finished_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_automation_runs_automation
+      ON coach_automation_runs (automation_id, started_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_automation_runs_binding
+      ON coach_automation_runs (binding_id, started_at DESC);
+
+    -- The monthly spend (13) asks "what did every automation cost since the
+    -- 1st", which narrows by nothing but the date. The two indexes above are
+    -- both prefixed by an id, so neither can serve it — without this the budget
+    -- guard rail scans the whole run log on every run.
+    CREATE INDEX IF NOT EXISTS idx_automation_runs_started
+      ON coach_automation_runs (started_at);
+
+    -- 3.3: the two series a threshold metric needs and the app does not
+    -- otherwise keep. COROS owns resting HR and sleep; the activity watcher
+    -- snapshots them here on its slow poll so the scheduler's 60-second tick
+    -- can evaluate a threshold without a request of its own.
+    CREATE TABLE IF NOT EXISTS coach_daily_samples (
+      day           TEXT PRIMARY KEY,   -- local "YYYYMMDD", as COROS keys it
+      resting_hr    REAL,
+      sleep_minutes REAL,
+      captured_at   TEXT NOT NULL
+    );
   `);
 
   ensureColumn(db, "generated_routes", "activity_type", "TEXT");
@@ -374,6 +466,37 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // 1..5; 0 = unrated). NULL = never fetched from the detail endpoint yet.
   ensureColumn(db, "training_activities", "feel_type", "INTEGER");
   migrateChatSessionProviderConstraint(db);
+  // pinned_at holds the ISO timestamp a conversation was pinned; NULL = unpinned.
+  ensureColumn(db, "chat_sessions", "pinned_at", "TEXT");
+  // 5.7: the rolling summary that stands in for the head of a long transcript,
+  // and how many entries of that head it accounts for. On the conversation
+  // rather than the binding, because five automations can be attached to one
+  // conversation and the summary is a fact about the conversation.
+  ensureColumn(db, "chat_sessions", "coach_summary", "TEXT");
+  ensureColumn(db, "chat_sessions", "coach_summary_through", "INTEGER");
+  // coach_seen_at marks a row as already considered by the automation activity
+  // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
+  // only if the re-sync clears the stamp.
+  ensureColumn(db, "training_activities", "coach_seen_at", "TEXT");
+  // last_activity_at is the start_time (epoch seconds) of the newest activity
+  // this binding has already analysed. NULL = it never analysed one, in which
+  // case the attach time acts as the floor instead.
+  ensureColumn(db, "coach_automation_bindings", "last_activity_at", "INTEGER");
+  // backoff_until / backoff_level are section 10's per-binding backoff. A failed
+  // run leaves the other two clocks alone on purpose, so this is the only thing
+  // holding a dead provider off; NULL/0 mean the binding is healthy.
+  ensureColumn(db, "coach_automation_bindings", "backoff_until", "TEXT");
+  ensureColumn(db, "coach_automation_bindings", "backoff_level", "INTEGER");
+  // threshold_firing is 3.3's per-binding transition state, and its three
+  // values all matter: NULL = never evaluated, 0 = the condition was false last
+  // tick, 1 = it was true. NULL is what stops a binding attached today firing
+  // on a condition that has held all week.
+  ensureColumn(db, "coach_automation_bindings", "threshold_firing", "INTEGER");
+  // What each run cost (13). NULL means the provider reported
+  // nothing, which is not the same as a run that cost nothing — the budget has
+  // to be able to say what it cannot see.
+  ensureColumn(db, "coach_automation_runs", "input_tokens", "INTEGER");
+  ensureColumn(db, "coach_automation_runs", "output_tokens", "INTEGER");
   migrateChatTranscriptsToSessions(db);
 
   // Seed the built-in COROS MCP server so existing users get a registry entry
@@ -437,6 +560,7 @@ function deriveSessionTitle(messagesJson: string): string {
 
 const CHAT_SESSION_PROVIDERS = [
   "chatgpt",
+  "claude-api",
   "claude-code",
   "openrouter",
   "local"
@@ -466,7 +590,7 @@ function migrateChatSessionProviderConstraint(
 
       CREATE TABLE chat_sessions (
         id TEXT PRIMARY KEY,
-        provider TEXT NOT NULL CHECK(provider IN ('chatgpt', 'claude-code', 'openrouter', 'local')),
+        provider TEXT NOT NULL CHECK(provider IN ('chatgpt', 'claude-api', 'claude-code', 'openrouter', 'local')),
         title TEXT NOT NULL,
         messages_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -477,7 +601,7 @@ function migrateChatSessionProviderConstraint(
         SELECT
           id,
           CASE
-            WHEN provider IN ('chatgpt', 'claude-code', 'openrouter', 'local') THEN provider
+            WHEN provider IN ('chatgpt', 'claude-api', 'claude-code', 'openrouter', 'local') THEN provider
             WHEN provider = 'claude' THEN 'claude-code'
             ELSE 'chatgpt'
           END,
@@ -855,12 +979,49 @@ export interface ChatSessionRow {
   messages_json: string;
   created_at: string;
   updated_at: string;
+  pinned_at: string | null;
+}
+
+/** 5.7's stored summary for one conversation, and what it covers. */
+export interface ChatSessionCoachSummaryRow {
+  coach_summary: string | null;
+  coach_summary_through: number | null;
+}
+
+export function getChatSessionCoachSummaryRow(
+  id: string
+): ChatSessionCoachSummaryRow | undefined {
+  return requireDatabase()
+    .prepare(
+      "SELECT coach_summary, coach_summary_through FROM chat_sessions WHERE id = ?"
+    )
+    .get(id) as ChatSessionCoachSummaryRow | undefined;
+}
+
+/**
+ * Written on its own rather than through `updateSession`, which rewrites the
+ * whole transcript: rolling the summary changes nothing the athlete wrote, and
+ * a run that also rewrote `messages_json` would race the window's own saves
+ * (5.6b) for no reason.
+ */
+export function setChatSessionCoachSummaryRow(
+  id: string,
+  summary: string | null,
+  through: number | null
+): void {
+  requireDatabase()
+    .prepare(
+      `UPDATE chat_sessions
+       SET coach_summary = ?, coach_summary_through = ?
+       WHERE id = ?`
+    )
+    .run(summary, through, id);
 }
 
 export function listChatSessionRows(provider: string): ChatSessionRow[] {
   return requireDatabase()
     .prepare(
-      `SELECT id, provider, title, messages_json, created_at, updated_at
+      `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at
        FROM chat_sessions
        WHERE provider = ?
        ORDER BY updated_at DESC`
@@ -871,7 +1032,7 @@ export function listChatSessionRows(provider: string): ChatSessionRow[] {
 export function getChatSessionRow(id: string): ChatSessionRow | undefined {
   return requireDatabase()
     .prepare(
-      `SELECT id, provider, title, messages_json, created_at, updated_at
+      `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at
        FROM chat_sessions
        WHERE id = ?`
     )
@@ -909,10 +1070,552 @@ export function updateChatSessionRow(
     .run(title, messagesJson, updatedAt, id);
 }
 
+/**
+ * Renames a conversation without touching `updated_at`, so a rename never
+ * reshuffles the sidebar the way a new message does.
+ */
+export function setChatSessionTitleRow(id: string, title: string): void {
+  requireDatabase()
+    .prepare("UPDATE chat_sessions SET title = ? WHERE id = ?")
+    .run(title, id);
+}
+
+export function setChatSessionPinnedRow(
+  id: string,
+  pinnedAt: string | null
+): void {
+  requireDatabase()
+    .prepare("UPDATE chat_sessions SET pinned_at = ? WHERE id = ?")
+    .run(pinnedAt, id);
+}
+
 export function deleteChatSessionRow(id: string): void {
   requireDatabase()
     .prepare("DELETE FROM chat_sessions WHERE id = ?")
     .run(id);
+}
+
+export interface CoachAutomationRow {
+  id: string;
+  name: string;
+  role: string | null;
+  playbook: string;
+  enabled: number;
+  preset_id: string | null;
+  trigger_json: string;
+  conditions_json: string;
+  runtime_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const COACH_AUTOMATION_COLUMNS = `id, name, role, playbook, enabled, preset_id,
+         trigger_json, conditions_json, runtime_json, created_at, updated_at`;
+
+export function listCoachAutomationRows(): CoachAutomationRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_AUTOMATION_COLUMNS}
+       FROM coach_automations
+       ORDER BY created_at ASC`
+    )
+    .all() as CoachAutomationRow[];
+}
+
+export function getCoachAutomationRow(
+  id: string
+): CoachAutomationRow | undefined {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_AUTOMATION_COLUMNS}
+       FROM coach_automations
+       WHERE id = ?`
+    )
+    .get(id) as CoachAutomationRow | undefined;
+}
+
+export function insertCoachAutomationRow(row: CoachAutomationRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO coach_automations
+         (id, name, role, playbook, enabled, preset_id, trigger_json,
+          conditions_json, runtime_json, created_at, updated_at)
+       VALUES
+         (@id, @name, @role, @playbook, @enabled, @preset_id, @trigger_json,
+          @conditions_json, @runtime_json, @created_at, @updated_at)`
+    )
+    .run(row);
+}
+
+export function updateCoachAutomationRow(row: CoachAutomationRow): void {
+  requireDatabase()
+    .prepare(
+      `UPDATE coach_automations
+       SET name = @name, role = @role, playbook = @playbook, enabled = @enabled,
+           preset_id = @preset_id, trigger_json = @trigger_json,
+           conditions_json = @conditions_json, runtime_json = @runtime_json,
+           updated_at = @updated_at
+       WHERE id = @id`
+    )
+    .run(row);
+}
+
+export function deleteCoachAutomationRow(id: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM coach_automations WHERE id = ?")
+    .run(id);
+}
+
+/**
+ * Bindings declare `ON DELETE CASCADE`, but this database never turns on
+ * `PRAGMA foreign_keys`, so the cascade would silently not fire. The store
+ * deletes the bindings itself through this call.
+ */
+export function deleteCoachAutomationBindingRowsForAutomation(
+  automationId: string
+): void {
+  requireDatabase()
+    .prepare("DELETE FROM coach_automation_bindings WHERE automation_id = ?")
+    .run(automationId);
+}
+
+export function countCoachAutomationBindingRows(automationId: string): number {
+  const row = requireDatabase()
+    .prepare(
+      "SELECT COUNT(*) AS count FROM coach_automation_bindings WHERE automation_id = ?"
+    )
+    .get(automationId) as { count: number };
+  return row.count;
+}
+
+export interface CoachAutomationBindingRow {
+  id: string;
+  automation_id: string;
+  mode: string;
+  session_id: string | null;
+  title_template: string | null;
+  enabled: number;
+  sort_order: number;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_activity_at: number | null;
+  backoff_until: string | null;
+  backoff_level: number | null;
+  /** NULL = never evaluated; 0/1 = the condition last tick (3.3). */
+  threshold_firing: number | null;
+  created_at: string;
+}
+
+const COACH_BINDING_COLUMNS = `id, automation_id, mode, session_id, title_template,
+         enabled, sort_order, last_run_at, next_run_at, last_activity_at,
+         backoff_until, backoff_level, threshold_firing, created_at`;
+
+export function listCoachAutomationBindingRows(
+  automationId: string
+): CoachAutomationBindingRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_BINDING_COLUMNS}
+       FROM coach_automation_bindings
+       WHERE automation_id = ?
+       ORDER BY sort_order ASC, created_at ASC`
+    )
+    .all(automationId) as CoachAutomationBindingRow[];
+}
+
+export function listCoachAutomationBindingRowsForSession(
+  sessionId: string
+): CoachAutomationBindingRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_BINDING_COLUMNS}
+       FROM coach_automation_bindings
+       WHERE session_id = ?
+       ORDER BY sort_order ASC, created_at ASC`
+    )
+    .all(sessionId) as CoachAutomationBindingRow[];
+}
+
+export function getCoachAutomationBindingRow(
+  id: string
+): CoachAutomationBindingRow | undefined {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_BINDING_COLUMNS}
+       FROM coach_automation_bindings
+       WHERE id = ?`
+    )
+    .get(id) as CoachAutomationBindingRow | undefined;
+}
+
+export function insertCoachAutomationBindingRow(
+  row: CoachAutomationBindingRow
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO coach_automation_bindings
+         (id, automation_id, mode, session_id, title_template, enabled,
+          sort_order, last_run_at, next_run_at, last_activity_at,
+          backoff_until, backoff_level, threshold_firing, created_at)
+       VALUES
+         (@id, @automation_id, @mode, @session_id, @title_template, @enabled,
+          @sort_order, @last_run_at, @next_run_at, @last_activity_at,
+          @backoff_until, @backoff_level, @threshold_firing, @created_at)`
+    )
+    .run(row);
+}
+
+export function updateCoachAutomationBindingRow(
+  row: CoachAutomationBindingRow
+): void {
+  requireDatabase()
+    .prepare(
+      `UPDATE coach_automation_bindings
+       SET mode = @mode, session_id = @session_id,
+           title_template = @title_template, enabled = @enabled,
+           sort_order = @sort_order, last_run_at = @last_run_at,
+           next_run_at = @next_run_at, last_activity_at = @last_activity_at,
+           backoff_until = @backoff_until, backoff_level = @backoff_level,
+           threshold_firing = @threshold_firing
+       WHERE id = @id`
+    )
+    .run(row);
+}
+
+export function deleteCoachAutomationBindingRow(id: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM coach_automation_bindings WHERE id = ?")
+    .run(id);
+}
+
+export interface CoachDailySampleRow {
+  day: string;
+  resting_hr: number | null;
+  sleep_minutes: number | null;
+}
+
+/**
+ * 3.3's local cache, upserted column by column. A snapshot that reached COROS
+ * for resting HR and failed on sleep must not blank the sleep it already had,
+ * so each column keeps its stored value when the incoming row says nothing.
+ */
+export function upsertCoachDailySamples(
+  rows: CoachDailySampleRow[],
+  capturedAt: string
+): void {
+  if (!rows.length) {
+    return;
+  }
+  const database = requireDatabase();
+  const statement = database.prepare(
+    `INSERT INTO coach_daily_samples (day, resting_hr, sleep_minutes, captured_at)
+     VALUES (@day, @resting_hr, @sleep_minutes, @captured_at)
+     ON CONFLICT(day) DO UPDATE SET
+       resting_hr = COALESCE(excluded.resting_hr, coach_daily_samples.resting_hr),
+       sleep_minutes =
+         COALESCE(excluded.sleep_minutes, coach_daily_samples.sleep_minutes),
+       captured_at = excluded.captured_at`
+  );
+  const transaction = database.transaction((batch: CoachDailySampleRow[]) => {
+    for (const row of batch) {
+      statement.run({ ...row, captured_at: capturedAt });
+    }
+  });
+  transaction(rows);
+}
+
+/** Samples from `fromDay` (inclusive) onward, ascending. */
+export function listCoachDailySamples(fromDay: string): CoachDailySampleRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT day, resting_hr, sleep_minutes
+       FROM coach_daily_samples
+       WHERE day >= ?
+       ORDER BY day ASC`
+    )
+    .all(fromDay) as CoachDailySampleRow[];
+}
+
+export interface CoachThresholdLoadRow {
+  start_time: number;
+  training_load: number;
+}
+
+/** Activities carrying a training load since `fromEpochSeconds`, for 3.3. */
+export function listCoachThresholdLoads(
+  fromEpochSeconds: number
+): CoachThresholdLoadRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT start_time, training_load
+       FROM training_activities
+       WHERE start_time IS NOT NULL
+         AND start_time >= ?
+         AND training_load IS NOT NULL
+       ORDER BY start_time ASC`
+    )
+    .all(fromEpochSeconds) as CoachThresholdLoadRow[];
+}
+
+export interface CoachThresholdSlotRow {
+  happen_day: string;
+  matched: number;
+}
+
+/**
+ * Scheduled workouts from `fromDay` onward and whether one was ever matched.
+ *
+ * `skipped` and `rescheduled` are excluded: the athlete moved those on purpose,
+ * and a rule about adherence that fires on a deliberate rest day is a rule the
+ * athlete switches off.
+ */
+export function listCoachThresholdSlots(fromDay: string): CoachThresholdSlotRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT happen_day, (activity_id IS NOT NULL) AS matched
+       FROM training_activity_matches
+       WHERE happen_day >= ?
+         AND status NOT IN ('skipped', 'rescheduled')
+       ORDER BY happen_day ASC`
+    )
+    .all(fromDay) as CoachThresholdSlotRow[];
+}
+
+export interface CoachAutomationRunRow {
+  id: string;
+  automation_id: string;
+  binding_id: string;
+  status: string;
+  trigger_kind: string;
+  trigger_payload_json: string | null;
+  session_id: string | null;
+  summary: string | null;
+  model: string | null;
+  effort: string | null;
+  error: string | null;
+  skip_reason: string | null;
+  seen_at: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  started_at: string;
+  finished_at: string | null;
+}
+
+export interface CoachAutomationTokenTotals {
+  inputTokens: number;
+  outputTokens: number;
+  /** Runs that reported a cost, and runs that reached the provider at all. */
+  countedRuns: number;
+  providerRuns: number;
+}
+
+/**
+ * What the automations have spent since `sinceIso`.
+ *
+ * `countedRuns` and `providerRuns` are both reported so the UI can say when a
+ * total is short of the truth. A provider that does not report usage — a local
+ * server without `stream_options`, say — would otherwise make a budget read as
+ * comfortably under when nobody has any idea.
+ */
+export function sumCoachAutomationTokensSince(
+  sinceIso: string
+): CoachAutomationTokenTotals {
+  const row = requireDatabase()
+    .prepare(
+      `SELECT
+         COALESCE(SUM(input_tokens), 0) AS inputTokens,
+         COALESCE(SUM(output_tokens), 0) AS outputTokens,
+         SUM(CASE WHEN input_tokens IS NOT NULL
+                    OR output_tokens IS NOT NULL THEN 1 ELSE 0 END) AS countedRuns,
+         COUNT(*) AS providerRuns
+       FROM coach_automation_runs
+       WHERE started_at >= ?
+         AND status IN ('success', 'silent', 'failed', 'cancelled')`
+    )
+    .get(sinceIso) as CoachAutomationTokenTotals;
+  return {
+    inputTokens: row.inputTokens ?? 0,
+    outputTokens: row.outputTokens ?? 0,
+    countedRuns: row.countedRuns ?? 0,
+    providerRuns: row.providerRuns ?? 0
+  };
+}
+
+const COACH_RUN_COLUMNS = `id, automation_id, binding_id, status, trigger_kind,
+         trigger_payload_json, session_id, summary, model, effort, error,
+         skip_reason, seen_at, input_tokens, output_tokens,
+         started_at, finished_at`;
+
+export function listCoachAutomationRunRows(
+  filter: CoachAutomationRunQuery = {}
+): CoachAutomationRunRow[] {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filter.automationId) {
+    clauses.push("automation_id = ?");
+    params.push(filter.automationId);
+  }
+  if (filter.bindingId) {
+    clauses.push("binding_id = ?");
+    params.push(filter.bindingId);
+  }
+  if (filter.sessionId) {
+    clauses.push("session_id = ?");
+    params.push(filter.sessionId);
+  }
+  if (filter.since) {
+    clauses.push("started_at >= ?");
+    params.push(filter.since);
+  }
+  if (filter.statuses?.length) {
+    clauses.push(`status IN (${filter.statuses.map(() => "?").join(", ")})`);
+    params.push(...filter.statuses);
+  }
+  if (filter.unseenOnly) {
+    clauses.push("seen_at IS NULL");
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const limit = filter.limit ? "LIMIT ?" : "";
+  if (filter.limit) {
+    params.push(filter.limit);
+  }
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_RUN_COLUMNS}
+       FROM coach_automation_runs
+       ${where}
+       ORDER BY started_at DESC
+       ${limit}`
+    )
+    .all(...params) as CoachAutomationRunRow[];
+}
+
+export function getCoachAutomationRunRow(
+  id: string
+): CoachAutomationRunRow | undefined {
+  return requireDatabase()
+    .prepare(
+      `SELECT ${COACH_RUN_COLUMNS} FROM coach_automation_runs WHERE id = ?`
+    )
+    .get(id) as CoachAutomationRunRow | undefined;
+}
+
+export function insertCoachAutomationRunRow(row: CoachAutomationRunRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO coach_automation_runs
+         (id, automation_id, binding_id, status, trigger_kind,
+          trigger_payload_json, session_id, summary, model, effort, error,
+          skip_reason, seen_at, input_tokens, output_tokens,
+          started_at, finished_at)
+       VALUES
+         (@id, @automation_id, @binding_id, @status, @trigger_kind,
+          @trigger_payload_json, @session_id, @summary, @model, @effort, @error,
+          @skip_reason, @seen_at, @input_tokens, @output_tokens,
+          @started_at, @finished_at)`
+    )
+    .run(row);
+}
+
+export interface CoachUnseenActivityRow {
+  activity_id: string;
+  name: string | null;
+  sport_type: number;
+  sport_name: string | null;
+  start_time: number | null;
+  duration: number | null;
+  distance: number | null;
+}
+
+/**
+ * Activities the automation watcher has not processed yet. `coach_seen_at` is
+ * stamped on the row itself rather than tracked in a side table, so it survives
+ * a re-sync of the activity index.
+ */
+export function listUnseenCoachActivityRows(
+  sinceEpochSeconds?: number
+): CoachUnseenActivityRow[] {
+  const clause = sinceEpochSeconds
+    ? "AND (start_time IS NULL OR start_time >= ?)"
+    : "";
+  const params = sinceEpochSeconds ? [sinceEpochSeconds] : [];
+  return requireDatabase()
+    .prepare(
+      `SELECT activity_id, name, sport_type, sport_name, start_time, duration, distance
+       FROM training_activities
+       WHERE coach_seen_at IS NULL ${clause}
+       ORDER BY start_time DESC`
+    )
+    .all(...params) as CoachUnseenActivityRow[];
+}
+
+/**
+ * Activities newer than a binding's own watermark, oldest first, so a backlog
+ * is analysed in the order the athlete lived it. Independent of `coach_seen_at`
+ * on purpose: that column decides *when* the watcher fires, while each binding
+ * decides *what* it still owes an opinion on.
+ */
+export function listCoachActivityRowsAfter(
+  afterEpochSeconds: number | undefined,
+  limit: number
+): CoachUnseenActivityRow[] {
+  const clause = afterEpochSeconds === undefined ? "" : "AND start_time > ?";
+  const params: number[] =
+    afterEpochSeconds === undefined ? [limit] : [afterEpochSeconds, limit];
+  // Newest-first in SQL so the cap keeps the most recent N of a long backlog,
+  // then reversed so callers see them oldest-first.
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT activity_id, name, sport_type, sport_name, start_time, duration, distance
+       FROM training_activities
+       WHERE start_time IS NOT NULL ${clause}
+       ORDER BY start_time DESC
+       LIMIT ?`
+    )
+    .all(...params) as CoachUnseenActivityRow[];
+  return rows.reverse();
+}
+
+export function markCoachActivitiesSeen(activityIds: string[]): void {
+  if (!activityIds.length) {
+    return;
+  }
+  const database = requireDatabase();
+  const seenAt = new Date().toISOString();
+  const statement = database.prepare(
+    "UPDATE training_activities SET coach_seen_at = ? WHERE activity_id = ?"
+  );
+  database.transaction((ids: string[]) => {
+    for (const id of ids) statement.run(seenAt, id);
+  })(activityIds);
+}
+
+/**
+ * Cold start: stamps every activity already on disk without firing anything.
+ * Without this, switching the feature on would replay the athlete's entire
+ * history as "new".
+ */
+export function markAllCoachActivitiesSeen(): number {
+  const result = requireDatabase()
+    .prepare(
+      "UPDATE training_activities SET coach_seen_at = ? WHERE coach_seen_at IS NULL"
+    )
+    .run(new Date().toISOString());
+  return result.changes;
+}
+
+export function updateCoachAutomationRunRow(row: CoachAutomationRunRow): void {
+  requireDatabase()
+    .prepare(
+      `UPDATE coach_automation_runs
+       SET status = @status, trigger_payload_json = @trigger_payload_json,
+           session_id = @session_id, summary = @summary, model = @model,
+           effort = @effort, error = @error, skip_reason = @skip_reason,
+           seen_at = @seen_at, input_tokens = @input_tokens,
+           output_tokens = @output_tokens, finished_at = @finished_at
+       WHERE id = @id`
+    )
+    .run(row);
 }
 
 function toSpotifySyncTrack(row: SpotifySyncTrackRow): SpotifySyncTrack {
