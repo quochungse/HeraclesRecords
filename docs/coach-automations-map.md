@@ -10,6 +10,17 @@ Read against commit `d99c295` (`feature/auto_coach`). Renderer components were
 deliberately not read; the renderer column below is a call-site index, not a
 review of what those components do with the answer.
 
+> **Status after the review.** Every drift item in §7 has been resolved in
+> `coach-automations.md` by R7 step 14 — the status lines, the seventeen stale
+> line references, §8's missing channels and the `runUpdate` name, §4's bypass
+> list, §1's `ensureColumn` caveat and the missing index, §5.2's snippet, §11's
+> two missing suites and its call-site-regex claim, §5.5's phantom notification,
+> and §7.6's `budget` collision (fixed in code, not just described). Two items
+> outlived the drift list rather than being fixed: `coachAutomation:markSeen`
+> still has no caller — now documented as such in §8 — and the `types.ts`
+> comments in §7.11 are unchanged. The **inventories** above are still the
+> current shape of the feature, plus the `bindingUpdate` channel R3 added.
+
 ---
 
 ## 1. Tables and columns
