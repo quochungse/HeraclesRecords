@@ -247,6 +247,23 @@ assert.deepEqual(
 assert.deepEqual(normalizeAutomationTrigger({ kind: "threshold", metric: "sleepDebt" }), {
   kind: "manual"
 });
+// R5. A metric name nobody implements is the same class of typo as a malformed
+// time, and it degrades the same way. Without this the row stores a threshold
+// trigger the scheduler evaluates to `false` for ever — a rule that looks
+// configured on the card and can never fire, which is worse than one that
+// visibly fell back to manual.
+assert.deepEqual(
+  normalizeAutomationTrigger({ kind: "threshold", metric: "vo2maxSlump", value: 5 }),
+  { kind: "manual" },
+  "an unimplemented metric is not a threshold trigger"
+);
+for (const metric of ["acuteChronicRamp", "restingHrDrift", "planAdherence", "sleepDebt"]) {
+  assert.deepEqual(
+    normalizeAutomationTrigger({ kind: "threshold", metric, value: 5 }),
+    { kind: "threshold", metric, value: 5 },
+    `${metric} is one of the four 3.3 names`
+  );
+}
 assert.deepEqual(
   normalizeAutomationTrigger({ kind: "threshold", metric: "acuteChronicRamp", value: 25 }),
   { kind: "threshold", metric: "acuteChronicRamp", value: 25 }
@@ -301,6 +318,34 @@ assert.deepEqual(corrupt.trigger, { kind: "manual" });
 assert.deepEqual(corrupt.conditions, DEFAULT_AUTOMATION_CONDITIONS);
 assert.deepEqual(corrupt.runtime, {});
 db._rows.delete("corrupt");
+
+// --- a run row whose status is not a status --------------------------------
+// R5. Every reader downstream branches on this — the burst guard and the daily
+// cap count particular statuses, 9.3's dot counts two of them, and the card
+// shows Stop for `running`. A value that is none of them would be compared
+// against all of those lists and match nothing, so the run would be invisible
+// to every guard while still sitting in the log. Reading it as `failed` puts it
+// somewhere real: counted against the day, counted against nothing else.
+{
+  const corruptDb = createMemoryDatabase();
+  const owner = createCoachAutomation(
+    { name: "Corrupt", playbook: "p", trigger: { kind: "manual" } },
+    corruptDb
+  );
+  const good = recordCoachAutomationRun(
+    { automationId: owner.id, bindingId: "b1", status: "success", triggerKind: "manual" },
+    corruptDb
+  );
+  corruptDb.updateRun({
+    ...corruptDb.getRun(good.id),
+    status: "halfway",
+    trigger_kind: "telepathy"
+  });
+
+  const [read] = listCoachAutomationRuns({ automationId: owner.id }, corruptDb);
+  assert.equal(read.status, "failed", "a status that is not a status reads as failed");
+  assert.equal(read.triggerKind, "manual", "and a trigger kind that is not one reads as manual");
+}
 
 // --- delete: takes the bindings, leaves everything else --------------------
 db._bindings.set(weekly.id, 3);

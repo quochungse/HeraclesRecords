@@ -44,6 +44,7 @@ const {
   SESSION_BURST_PER_HOUR,
   expandTriggerToQueue,
   isWithinQuietHours,
+  MULTI_ACTIVITY_MAX_PER_TRIGGER,
   parseAutomationOutput,
   renderAutomationTemplate,
   resetAutomationQueueForTests,
@@ -1377,6 +1378,56 @@ const analysedIds = (world) =>
   const again = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(again, [], "an automatic trigger with nothing to say stays silent");
   assert.equal(world.runs.length, 3, "and logs no non-event");
+}
+
+// --- a backlog past the cap keeps its *newest* entries -----------------------
+{
+  // R5. 3.2: "a longer backlog analyses only its most recent entries, because
+  // replaying a month in one burst costs real provider spend and buries the
+  // answer the athlete wanted." Which end the cap takes from is the whole of
+  // that sentence, and every multiActivity fixture until now held ten or fewer
+  // activities — where `slice(-10)` and `slice(0, 10)` are the same list. The
+  // mutation that swapped them went undetected until this fixture ran twelve.
+  resetAutomationQueueForTests();
+  const world = createWorld();
+  addAutomation(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    // A `per-run` binding, which is the mode 9.1's post-activity debrief uses
+    // and the only one where a twelve-deep backlog is reachable: the burst
+    // guard counts per conversation, and this one writes into a new one each
+    // time. The daily cap is lifted past the sequence for the same reason —
+    // what is under test is which end of the backlog the cap takes from.
+    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 24 }
+  });
+  addBinding(world, "b1", {
+    mode: "per-run",
+    sessionId: null,
+    lastActivityAt: RUNNER_NOW_EPOCH - 30 * 86_400
+  });
+  // Oldest first, so `act-1` is the one furthest back.
+  for (let index = 1; index <= 12; index += 1) {
+    addActivity(world, `act-${index}`, 13 - index);
+  }
+
+  await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+
+  const analysed = analysedIds(world);
+  assert.equal(analysed.length, MULTI_ACTIVITY_MAX_PER_TRIGGER, "the cap holds");
+  assert.deepEqual(
+    analysed,
+    ["act-3", "act-4", "act-5", "act-6", "act-7", "act-8", "act-9", "act-10", "act-11", "act-12"],
+    "the ten most recent, oldest first — not the ten oldest"
+  );
+  assert.equal(
+    analysed.includes("act-1"),
+    false,
+    "and the two the cap dropped are gone for good: the watermark jumped past them"
+  );
+  assert.equal(
+    world.bindings.get("b1").lastActivityAt,
+    RUNNER_NOW_EPOCH - 1 * 86_400,
+    "which is what the watermark landing on the newest says"
+  );
 }
 
 // --- two triggers racing off the same watermark -----------------------------

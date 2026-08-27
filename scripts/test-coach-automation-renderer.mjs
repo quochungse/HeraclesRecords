@@ -908,6 +908,94 @@ async function main() {
     await assertQuietConsole("the popover's binding update");
   }
 
+  // -------------------------------------------------------------------------
+  // 10: the card's run flag has to outlast the gap inside its own fan-out
+  // -------------------------------------------------------------------------
+  // Ported from the weakest assertion left in the repo — a *call-site count*
+  // (`setStartingId` appearing exactly twice), which is the pattern section 11
+  // names as the one worth deleting first. It cannot say what the flag is for,
+  // and it fails just as loudly for a correct third call site as for a wrong
+  // one.
+  //
+  // What it was reaching for: a trigger fans out to one run per place and they
+  // are serialised (5.4), so between two of them there is a moment with no
+  // `running` row at all. A card reading only the log would offer "Run now" in
+  // the middle of its own fan-out — and a second press would queue a second
+  // one. The flag is set on the click and cleared when the whole fan-out has
+  // answered, and nowhere else.
+  {
+    const fanning = automation("a1", "Post-run debrief");
+    await harness(
+      "mount",
+      "CoachAutomationsPanel",
+      {},
+      {
+        listCoachAutomations: [summary(fanning)],
+        getCoachAutomationPause: null,
+        getCoachAutomationSpend: {
+          monthStart: "2026-08-01T00:00:00.000Z",
+          inputTokens: 0,
+          outputTokens: 0,
+          budget: null,
+          countedRuns: 0,
+          providerRuns: 0
+        },
+        // The fan-out is still going when the driver comes back.
+        runCoachAutomationNow: "__pending"
+      }
+    );
+    await waitFor(
+      () => harness("exists", ".coach-automation-card-actions"),
+      "the card renders"
+    );
+
+    assert.equal(
+      await harness("clickText", ".coach-automation-card-actions button", "Run now"),
+      true,
+      "one place, so it runs straight away rather than asking which"
+    );
+    await waitFor(
+      () => harness("callCount", "runCoachAutomationNow"),
+      "the fan-out started"
+    );
+
+    // The first place finished. The second has not started: no `running` row
+    // exists anywhere, which is exactly the gap.
+    await harness(
+      "emit",
+      "onCoachAutomationRunUpdate",
+      run("run-1", { status: "success", finishedAt: "2026-08-25T09:00:04.000Z" })
+    );
+    await settle();
+    assert.equal(
+      await harness("exists", '.coach-automation-card-actions button[aria-busy="true"]'),
+      true,
+      "the card still says a run is going, with no `running` row to read it from"
+    );
+    assert.equal(
+      await harness("count", ".coach-automation-card-actions button:not([disabled])"),
+      1,
+      "and the only button left alive is Manage — not a second Run now"
+    );
+
+    // The fan-out answers. Now, and only now, the card offers again.
+    await harness("resolvePending", "runCoachAutomationNow", []);
+    await waitFor(
+      async () =>
+        (await harness(
+          "exists",
+          '.coach-automation-card-actions button[aria-busy="true"]'
+        )) === false,
+      "and once the whole fan-out has answered, it offers again"
+    );
+    assert.equal(
+      await harness("count", ".coach-automation-card-actions button:not([disabled])"),
+      2,
+      "both actions are live again"
+    );
+    await assertQuietConsole("the run flag across a fan-out");
+  }
+
   // --- a tick that books several slots at once ------------------------------
   {
     // The scheduler books on its own tick, and one tick can seed every binding

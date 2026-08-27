@@ -49,6 +49,16 @@ const calls: RecordedCall[] = [];
 const listeners = new Map<string, Set<(payload: unknown) => void>>();
 const consoleErrors: string[] = [];
 
+/**
+ * Calls the driver has deliberately left hanging, by method name.
+ *
+ * A run outlives the click that started it — that is the whole of 10's "Run now
+ * reflects the run, not the promise" — so a test about what the screen does
+ * *while* a fan-out is in flight needs the fan-out to still be in flight. A stub
+ * that resolves immediately cannot express that.
+ */
+const pending = new Map<string, (value: unknown) => void>();
+
 function scriptedAnswer(method: string, args: unknown[]): unknown {
   const table = (script.__byArg as Record<string, Record<string, unknown>>)?.[
     method
@@ -89,7 +99,11 @@ function createStubApi(): CorosLinkApi {
           }
         : (...args: unknown[]) => {
             calls.push({ method: property, args });
-            return Promise.resolve(scriptedAnswer(property, args));
+            const answer = scriptedAnswer(property, args);
+            if (answer === "__pending") {
+              return new Promise((resolve) => pending.set(property, resolve));
+            }
+            return Promise.resolve(answer);
           };
       cache.set(property, value);
       return value;
@@ -172,6 +186,7 @@ const harness = {
     calls.length = 0;
     consoleErrors.length = 0;
     const container = document.getElementById("root") as HTMLElement;
+    pending.clear();
     root = createRoot(container);
     // StrictMode on purpose: it double-invokes effects, which is how a
     // subscription that never unsubscribes and an effect that is not
@@ -197,6 +212,15 @@ const harness = {
    */
   setScript(patch: Script) {
     script = { ...script, ...patch };
+  },
+
+  /** Answers a call the script left hanging. */
+  resolvePending(method: string, value: unknown = null): boolean {
+    const resolve = pending.get(method);
+    if (!resolve) return false;
+    pending.delete(method);
+    resolve(value);
+    return true;
   },
 
   unmount() {

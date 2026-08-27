@@ -222,7 +222,7 @@ const ACTIVITY_SCAN_LIMIT = 200;
  * its most recent entries: replaying a month of history in one burst costs
  * real provider spend and buries the answer the athlete actually wanted.
  */
-const MULTI_ACTIVITY_MAX_PER_TRIGGER = 10;
+export const MULTI_ACTIVITY_MAX_PER_TRIGGER = 10;
 
 /**
  * 3.2 step 3: an activity automation fires only for the sports it names, and

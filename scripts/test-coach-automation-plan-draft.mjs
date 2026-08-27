@@ -154,6 +154,36 @@ assert.equal(
   "the confirm path must not be gated by the read-only tool policy"
 );
 
+// R5. The three assertions above are about *names and shapes*, and a mutation
+// pass showed what they cannot say: change the id `chatService` puts on the
+// wire — `draft: { ...preview, draftId: preview.draftId + "-copy" }` — and all
+// three still pass, while the athlete's confirmation card then looks up a draft
+// that was never stored and the upload fails.
+//
+// The leg between the tool and the send is the one no suite can execute: it
+// runs inside `handleChatWorkoutTool`, which needs COROS behind it. So this
+// stays a source assertion, and it is tight on the one line that matters: the
+// preview goes out **as it is**, with nothing between the tool and the wire.
+const chatServiceSourceForDraft = require("node:fs").readFileSync(
+  path.join(repoRoot, "electron", "chatService.ts"),
+  "utf8"
+);
+const onPlanDraftBody = /onPlanDraft: \([^)]*\) => \{([\s\S]*?)\n      \},/.exec(
+  chatServiceSourceForDraft
+);
+assert.ok(onPlanDraftBody, "the onPlanDraft callback moved; this claim needs re-aiming");
+// Stated as a rule rather than as a shape. The first version of this assertion
+// pinned the exact five lines and went red on a harmless extraction — brittle
+// about layout, which is section 11's own complaint about regexes and no better
+// for being mine. What actually matters is that this layer does not *touch* the
+// id: it is the tool's, it is already in `chat_plan_drafts` under it, and the
+// athlete's confirmation card looks the draft up by it.
+assert.doesNotMatch(
+  onPlanDraftBody[1],
+  /draftId/,
+  "the draft that reaches the card must carry the id the tool stored, untouched"
+);
+
 // The marker rides along on the answer, so the card is attributable too.
 assert.deepEqual(reloaded[2].automation, marker);
 

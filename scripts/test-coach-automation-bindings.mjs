@@ -792,6 +792,13 @@ assert.match(
 // The projection above is only worth having if the sidebar asks for it, clears
 // it, and keeps asking.
 //
+// R5 audited what remained; each assertion below carries its own line saying
+// which kind it is. Two more were ported and deleted here: the card's run flag
+// across a fan-out (a call-site count, section 11's own example of the weakest
+// kind) and the popover's shared mutation wrapper. Three are **portable and not
+// yet ported** — the attach screen's — because `AttachAutomationScreen` is not
+// one of the harness's mounts; adding it is R7's to finish.
+//
 // What is left here is source that is *about* source: a contract between two
 // files, or a shape TypeScript cannot see. Everything below that was really a
 // claim about behaviour has moved to `test:coach-automation-renderer`, which
@@ -807,24 +814,24 @@ assert.match(
   assert.match(
     row,
     /className="chat-session-row-automation-mark"/,
-    "the row must carry the automation chip"
+    "the row must carry the automation chip" // portable: ChatSessionRow renders inside a mounted ChatView
   );
   assert.match(
     row,
     /className="chat-session-row-unread"/,
-    "the row must carry the unread dot"
+    "the row must carry the unread dot" // portable: same mount, same reason
   );
 
   const view = read("src", "chat", "ChatView.tsx");
   assert.match(
     view,
     /void markSessionRead\(sessionId\);/,
-    "opening a conversation must clear its unread mark"
+    "opening a conversation must clear its unread mark" // portable: a distinct wire from the run-update one already executed
   );
   assert.match(
     view,
     /attention: sessionAttention/,
-    "the marks must reach the sidebar"
+    "the marks must reach the sidebar" // portable: assert the row shows a mark, not that a prop is passed
   );
   // Stop ends the trigger, not the run it was pressed on (10). All three
   // surfaces reach that through one IPC handler, so the wire that can silently
@@ -835,7 +842,7 @@ assert.match(
   assert.match(
     mainSource,
     /"coachAutomation:cancelRun",\s*\(_event, runId: string\) => \{\s*cancelAutomationRun\(runId\);/,
-    "Stop must cancel the trigger, not just the run's stream"
+    "Stop must cancel the trigger, not just the run's stream" // SOURCE: main.ts handler body, which the stub replaces
   );
   for (const surface of [
     "CoachAutomationsPanel.tsx",
@@ -866,13 +873,10 @@ assert.match(
     "the header popover must be able to say it changed which coaches are attached"
   );
   const popover = read("src", "chat", "automations", "ConversationCoaches.tsx");
-  // Both of its ways of changing a binding: the shared mutation wrapper — the
-  // switch, the reorder, the detach — and the attach dialog it opens.
-  assert.match(
-    popover,
-    /await work\(\);\n\s*await refresh\(\);\n\s*onChanged\?\.\(\);/,
-    "switching, reordering or detaching a coach must say so"
-  );
+  // Its shared mutation wrapper — the switch, the reorder, the detach — was
+  // asserted here as a regex over three chained statements. Ported: the
+  // renderer suite mounts the popover, clicks a row's switch and reads whether
+  // the parent heard, which is the claim. The attach half is executed there too.
   // --- 3.4: which places a manual run reaches ------------------------------
   // From a conversation it is always that one place, whichever surface asked.
   assert.match(
@@ -920,15 +924,12 @@ assert.match(
     /run\.sessionId !== sessionId/,
     "and must not throw away the updates that tell it to"
   );
-  // A trigger fans out to one run per place and they are serialised, so between
-  // two of them no run is `running`. The card's optimistic flag has to outlast
-  // that gap or it offers "Run now" in the middle of its own fan-out — which is
-  // why it is set once and cleared once, when the whole fan-out has answered.
-  assert.equal(
-    (runPanel.match(/setStartingId\(/g) ?? []).length,
-    2,
-    "the card's run flag is set on the click and cleared on the outcome, nowhere else"
-  );
+  // The card's run flag across the gap inside its own fan-out was asserted here
+  // as a *call-site count* — `setStartingId` appearing exactly twice — which is
+  // the pattern section 11 names as the one worth deleting first: it cannot say
+  // what the flag is for, and it fails as loudly for a correct third call site
+  // as for a wrong one. It now lives in `test:coach-automation-renderer`, which
+  // holds a fan-out open and reads the button.
 
   // Genuinely about source, and staying: this is a contract between two files
   // that never run in the same process, and an argument dropped on either side
@@ -938,12 +939,12 @@ assert.match(
   assert.match(
     read("electron", "preload.ts"),
     /invoke\("coachAutomation:markSessionSeen", sessionId\)/,
-    "preload must forward the session id across the bridge"
+    "preload must forward the session id across the bridge" // SOURCE: two processes, and an argument dropped either side type-checks
   );
   assert.match(
     read("electron", "main.ts"),
     /markCoachAutomationSessionSeen\(sessionId\)/,
-    "the ipcMain handler must forward the session id"
+    "the ipcMain handler must forward the session id" // SOURCE: the other half of that pair
   );
 
   // 2.1: the store refuses a `dedicated` binding with no conversation, and it
@@ -955,7 +956,7 @@ assert.match(
   assert.match(
     attachScreen,
     /api\.createChatSession\(provider\)/,
-    "attaching a dedicated binding must create its conversation"
+    "attaching a dedicated binding must create its conversation" // portable, unmounted: the attach screen is not a harness mount
   );
   assert.match(
     attachScreen,
@@ -979,7 +980,7 @@ assert.match(
   assert.match(
     detail,
     /suggestedMode=\{suggestedBinding\?\.mode\}/,
-    "the preset's recommended binding mode must reach the attach screen"
+    "the preset's recommended binding mode must reach the attach screen" // portable, unmounted: same screen
   );
   assert.match(
     attachScreen,
@@ -994,7 +995,7 @@ assert.match(
   assert.match(
     panel,
     /skipReason === "no-auth"/,
-    "the panel must recognise a signed-out provider"
+    "the panel must recognise a signed-out provider" // portable: the panel is mounted; only the derivation is asserted here
   );
   assert.match(
     panel,
