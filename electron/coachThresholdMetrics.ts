@@ -180,7 +180,13 @@ export function isRestingHrDrift(
   const byDay = new Map(daily.map((sample) => [sample.day, sample]));
   const readingFor = (day: string): number | undefined => {
     const value = byDay.get(day)?.restingHr;
-    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    // `> 0` for the same reason `isSleepDebt` below wants it: a nought or a
+    // negative is not a reading, and this one is averaged into the baseline —
+    // so one bad row drags the baseline down and makes an ordinary morning look
+    // like three days of drift.
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+      ? value
+      : undefined;
   };
 
   const baselineDays = recentDayKeys(

@@ -25,7 +25,7 @@ Module._load = function patchedLoad(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 
-const { createCollectorSink, createWindowSink } = require(
+const { countableUsage, createCollectorSink, createWindowSink } = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
 );
 const { parseChatTranscriptJson } = require(
@@ -359,6 +359,56 @@ assert.deepEqual(persisted[1].automation, marker);
   );
 }
 
+// --- a report that cannot be counted is not a report ------------------------
+// R4 step 8's closing review. The run row's *reader* now refuses a negative
+// cost, but that only helps rows already on disk — this is where the number
+// enters. `local` is whatever OpenAI-compatible server the athlete pointed the
+// app at, and `stream_options: { include_usage: true }` is a request, not a
+// promise: what comes back is that server's idea of a number.
+{
+  for (const [label, usage] of [
+    ["negative input", { inputTokens: -900, outputTokens: 40 }],
+    ["negative output", { inputTokens: 900, outputTokens: -40 }],
+    ["NaN", { inputTokens: Number.NaN, outputTokens: 40 }],
+    ["infinite", { inputTokens: Number.POSITIVE_INFINITY, outputTokens: 40 }],
+    ["not a number at all", { inputTokens: "900", outputTokens: 40 }]
+  ]) {
+    const sink = createCollectorSink();
+    runStream(sink, [
+      ["chat:streamDone", { requestId: "r", fullText: "done", usage }]
+    ]);
+    assert.equal(
+      sink.usage(),
+      undefined,
+      `${label}: an uncountable report reads as unreported, not as a number`
+    );
+  }
+
+  // The two that *are* answers still are. Zero most of all: a cancelled turn
+  // that never reached the model genuinely cost nothing, and 13 needs that to
+  // stay distinct from nobody counting.
+  // The rule itself, driven directly: it is the one piece of this that a test
+  // can execute, because `addUsage` lives inside `streamChat` and `streamChat`
+  // needs a provider, a database and a network.
+  assert.equal(countableUsage(undefined), undefined);
+  assert.equal(countableUsage({ inputTokens: -1, outputTokens: 0 }), undefined);
+  assert.equal(countableUsage({ inputTokens: 0, outputTokens: -1 }), undefined);
+  assert.equal(countableUsage({ inputTokens: Number.NaN, outputTokens: 0 }), undefined);
+  assert.deepEqual(countableUsage({ inputTokens: 12, outputTokens: 3 }), {
+    inputTokens: 12,
+    outputTokens: 3
+  });
+
+  const free = createCollectorSink();
+  runStream(free, [
+    [
+      "chat:streamDone",
+      { requestId: "r", fullText: "", usage: { inputTokens: 0, outputTokens: 0 } }
+    ]
+  ]);
+  assert.deepEqual(free.usage(), { inputTokens: 0, outputTokens: 0 });
+}
+
 // --- and the emitting half, which no suite can execute ----------------------
 // Genuinely about source: driving `streamChat` to a real provider failure needs
 // a provider, a database and a network, and the collector above *is* the stub
@@ -380,6 +430,17 @@ assert.deepEqual(persisted[1].automation, marker);
     (source.match(/send\("chat:streamError"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
+  );
+
+  // The per-round half of the usage guard, for the same reason. A round that
+  // reports a negative would reduce a total the month's budget trusts, and the
+  // collector above cannot see it: by the time a report reaches `chat:streamDone`
+  // the rounds have already been summed. The rule has to run where they are
+  // added up, and that is inside `streamChat`.
+  assert.match(
+    source,
+    /const addUsage = \([^)]*\) => \{\s*\n\s*const counted = countableUsage\(round\);/,
+    "every tool round's report must go through the same rule"
   );
 }
 

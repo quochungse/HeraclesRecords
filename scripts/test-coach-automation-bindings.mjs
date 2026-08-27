@@ -11,6 +11,7 @@ const {
   MAX_BINDINGS_PER_SESSION,
   applyCoachAutomationSessionDeleted,
   attachCoachAutomation,
+  cancelStaleCoachAutomationRuns,
   countCoachAutomationBindings,
   countCoachAutomationBindingsForSession,
   createCoachAutomation,
@@ -1081,6 +1082,64 @@ assert.match(
     assert.equal(getCoachAutomationBudget(db), null, `a "${raw}" row is no ceiling`);
   }
   db.writeBudget(null);
+}
+
+// --- R4 step 8: what the startup reconciliation must not touch -------------
+// The app quitting mid-run leaves a `running` row, and `cancelStaleCoachAutomationRuns`
+// turns it into `cancelled` (10). It touches the run log and *nothing else*,
+// and that is load-bearing rather than incidental: a `cancelled` run that goes
+// through the runner's own `finish` **clears** the binding's backoff streak, so
+// routing this through the same exit — the obvious tidy-up somebody will
+// eventually propose — would mean a crash resets the hold on every binding that
+// was failing. The app closing is not a provider reporting itself healthy, any
+// more than the athlete pressing Stop is (10).
+//
+// The same goes for the other two clocks. A crash must leave the activity owed
+// and the cooldown where it was, because nothing about the run reached a
+// conclusion.
+{
+  const crashed = createCoachAutomation(
+    { name: "Crashed", playbook: "p", trigger: { kind: "activity", sportTypes: [] } },
+    db
+  );
+  const held = attachCoachAutomation(
+    { automationId: crashed.id, mode: "per-run" },
+    db
+  );
+  setCoachAutomationBindingSchedule(
+    held.id,
+    {
+      backoffLevel: 3,
+      backoffUntil: "2026-08-21T10:00:00.000Z",
+      lastActivityAt: 1_756_000_000,
+      lastRunAt: "2026-08-21T08:00:00.000Z"
+    },
+    db
+  );
+  recordCoachAutomationRun(
+    {
+      automationId: crashed.id,
+      bindingId: held.id,
+      status: "running",
+      triggerKind: "activity"
+    },
+    db
+  );
+
+  assert.equal(
+    cancelStaleCoachAutomationRuns(db),
+    1,
+    "fixture sanity: exactly one row was left open"
+  );
+  const after = getCoachAutomationBinding(held.id, db);
+  assert.equal(after.backoffLevel, 3, "a crash does not clear the streak");
+  assert.equal(after.backoffUntil, "2026-08-21T10:00:00.000Z");
+  assert.equal(
+    after.lastActivityAt,
+    1_756_000_000,
+    "nor advance the watermark, so the activity is still owed"
+  );
+  assert.equal(after.lastRunAt, "2026-08-21T08:00:00.000Z", "nor the cooldown clock");
 }
 
 console.log("coach automation binding tests passed");

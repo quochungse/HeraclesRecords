@@ -904,6 +904,28 @@ export interface ChatStreamSink {
   bindAbort?(controller: AbortController): () => void;
 }
 
+/**
+ * A usage report that can be counted, or nothing.
+ *
+ * "Nobody reported" and "it was free" are different facts (13), and a number
+ * that is negative, NaN or infinite is neither — it is a third thing, and the
+ * only honest reading of it is the first. Guarded here rather than only where
+ * the run row is read, because this is where the number *enters*: a `local`
+ * provider is whatever OpenAI-compatible server the athlete pointed the app at,
+ * and a negative round would quietly reduce a total the month's budget trusts.
+ */
+export function countableUsage(
+  value: ChatTokenUsage | undefined
+): ChatTokenUsage | undefined {
+  if (!value) return undefined;
+  const { inputTokens, outputTokens } = value;
+  const usable = (count: unknown): count is number =>
+    typeof count === "number" && Number.isFinite(count) && count >= 0;
+  return usable(inputTokens) && usable(outputTokens)
+    ? { inputTokens, outputTokens }
+    : undefined;
+}
+
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
   /** Automation runs override the saved provider/model/effort (decision 2). */
@@ -1133,13 +1155,9 @@ export function createCollectorSink(
    * always throws — cost nothing on paper (13).
    */
   const recordUsage = (value: unknown): void => {
-    const reported = value as ChatTokenUsage | undefined;
-    if (
-      reported &&
-      typeof reported.inputTokens === "number" &&
-      typeof reported.outputTokens === "number"
-    ) {
-      tokenUsage = reported;
+    const counted = countableUsage(value as ChatTokenUsage | undefined);
+    if (counted) {
+      tokenUsage = counted;
     }
   };
 
@@ -1251,10 +1269,11 @@ export async function streamChat(
   // reads the second as the first undercounts in silence (13).
   let usage: ChatTokenUsage | undefined;
   const addUsage = (round: ChatTokenUsage | undefined) => {
-    if (!round) return;
+    const counted = countableUsage(round);
+    if (!counted) return;
     usage = {
-      inputTokens: (usage?.inputTokens ?? 0) + round.inputTokens,
-      outputTokens: (usage?.outputTokens ?? 0) + round.outputTokens
+      inputTokens: (usage?.inputTokens ?? 0) + counted.inputTokens,
+      outputTokens: (usage?.outputTokens ?? 0) + counted.outputTokens
     };
   };
   const send = (channel: string, payload: unknown) => {

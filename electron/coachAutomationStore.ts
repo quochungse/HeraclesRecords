@@ -654,7 +654,12 @@ function toBinding(row: CoachAutomationBindingRow): CoachAutomationBinding {
     mode: BINDING_MODES.has(row.mode as AutomationBindingMode)
       ? (row.mode as AutomationBindingMode)
       : "existing",
-    sessionId: row.session_id,
+    // `per-run` owns no conversation (2.1), and the type says so. A row that
+    // carries one anyway is contradicting its own mode — the attach path
+    // refuses that combination, so it can only come from a hand edit or a
+    // migration — and every reader already behaves as though the id were not
+    // there. Reading it as null is what stops the two disagreeing.
+    sessionId: row.mode === "per-run" ? null : row.session_id,
     enabled: row.enabled === 1,
     sortOrder: row.sort_order,
     createdAt: row.created_at
@@ -671,16 +676,26 @@ function toBinding(row: CoachAutomationBindingRow): CoachAutomationBinding {
   if (nextRunAt) {
     binding.nextRunAt = nextRunAt;
   }
+  // A watermark is a `start_time` in epoch seconds, so zero and below are not
+  // watermarks — they are what a hand edit or a bad write leaves behind. The
+  // safe reading is *never analysed*, which puts the attach time back in front
+  // (3.2); trusting a zero would replay the athlete's whole history instead,
+  // which is the one thing that floor exists to prevent.
   if (
     typeof row.last_activity_at === "number" &&
-    Number.isFinite(row.last_activity_at)
+    Number.isFinite(row.last_activity_at) &&
+    row.last_activity_at > 0
   ) {
     binding.lastActivityAt = row.last_activity_at;
   }
   // 3.3: NULL means this binding has never been evaluated, which is a
   // different thing from "the condition was false" — it is what stops a
   // binding attached today firing on a condition that has held all week.
-  if (row.threshold_firing !== null && row.threshold_firing !== undefined) {
+  // Exactly 0 or 1, or it is the NULL case. Reading anything else as `false`
+  // would claim the condition *was* evaluated and did not hold — so the next
+  // tick would see a transition and announce a condition that may have held all
+  // week, which is precisely what the NULL is there to stop.
+  if (row.threshold_firing === 0 || row.threshold_firing === 1) {
     binding.thresholdFiring = row.threshold_firing === 1;
   }
   const backoffUntil = optionalText(row.backoff_until);
@@ -1146,11 +1161,20 @@ function toRun(row: CoachAutomationRunRow): CoachAutomationRun {
   }
   // Zero is a real answer here — a cancelled run that never reached the model
   // genuinely cost nothing — so these are read on nullness, not truthiness.
-  if (typeof row.input_tokens === "number" && Number.isFinite(row.input_tokens)) {
-    run.inputTokens = row.input_tokens;
+  const cost = (value: number | null): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? value
+      : undefined;
+  // Negative is not a cost. It would subtract from the month's total, and a
+  // budget that reads *under* the truth is the failure 13 calls worse than no
+  // budget — a number the athlete would trust. Unreported is the honest answer.
+  const inputTokens = cost(row.input_tokens);
+  if (inputTokens !== undefined) {
+    run.inputTokens = inputTokens;
   }
-  if (typeof row.output_tokens === "number" && Number.isFinite(row.output_tokens)) {
-    run.outputTokens = row.output_tokens;
+  const outputTokens = cost(row.output_tokens);
+  if (outputTokens !== undefined) {
+    run.outputTokens = outputTokens;
   }
   return run;
 }

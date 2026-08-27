@@ -672,4 +672,78 @@ assert.equal(
   assert.deepEqual(world.triggers, [], "switching the feature on runs nothing");
 }
 
+// ---------------------------------------------------------------------------
+// R4 step 8: the app dying between the stamp and the trigger
+// ---------------------------------------------------------------------------
+// `flushDueBatches` stamps `coach_seen_at` and *then* awaits the runner, so a
+// process that dies in between leaves rows marked seen with no run behind them.
+// The stale-`running` cleanup cannot reach this: there is no run row to
+// reconcile — the trigger never got as far as making one.
+//
+// Before the tick learned to ask again (L3), that was permanent: the watcher
+// fired only on unseen rows, so nothing ever came back for them, and with
+// `multiActivity` off the next activity to arrive replaced them. It is covered
+// now, and this is the crash-shaped statement of it.
+
+{
+  const world = createWorld();
+  world.markInitialized();
+  world.automations = [
+    activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })
+  ];
+  world.addActivity({ activity_id: "act-1" });
+
+  // The process dies the instant the trigger is handed over.
+  const dying = new CoachActivityWatcher({
+    ...world.deps,
+    runTrigger: async () => {
+      throw new Error("the app closed");
+    }
+  });
+  await dying.tick();
+  assert.deepEqual(
+    world.unseenIds(),
+    [],
+    "fixture sanity: the rows were stamped before the trigger was handed over"
+  );
+
+  // Next launch. A fresh watcher, no memory of the batch, and the row it would
+  // have looked at is already stamped — so the only thing that can bring the
+  // activity back is the tick asking on its own.
+  const relaunched = new CoachActivityWatcher(world.deps);
+  await relaunched.tick();
+  assert.equal(
+    world.triggers.length,
+    1,
+    "the next launch offers the activity the crash swallowed"
+  );
+}
+
+// And the batch that never flushed is the other half: it lives only in memory,
+// so a crash drops it — and the rows were deliberately left unstamped for
+// exactly that reason (3.2), which `stop()` states and a crash gets for free.
+{
+  const world = createWorld();
+  world.markInitialized();
+  world.automations = [activityAutomation()];
+  world.addActivity({ activity_id: "act-1" });
+
+  const dying = new CoachActivityWatcher(world.deps);
+  await dying.tick();
+  assert.deepEqual(
+    world.unseenIds(),
+    ["act-1"],
+    "a row still inside its batch window is not stamped"
+  );
+  assert.deepEqual(dying.pendingBatchSizes(), { a1: 1 });
+
+  const relaunched = new CoachActivityWatcher(world.deps);
+  await relaunched.tick();
+  assert.deepEqual(
+    relaunched.pendingBatchSizes(),
+    { a1: 1 },
+    "so the next launch collects it again from scratch"
+  );
+}
+
 console.log("coach activity watcher tests passed");

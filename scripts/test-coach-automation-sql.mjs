@@ -391,5 +391,171 @@ assert.match(
   });
 }
 
+// ---------------------------------------------------------------------------
+// R4 step 7: what a row from an earlier version, or a hand edit, reads as
+// ---------------------------------------------------------------------------
+// Nine columns arrived through `ensureColumn` across three phases, so every one
+// of them is NULL on a database that predates it. NULL is covered above and
+// throughout; what nothing covered is the other half of the question — a value
+// that is *present* and means nothing. Section 10 settled the rule when it made
+// a half-written pause read as *not paused*: the safe reading is the one where
+// a shape nobody checked cannot hold the feature hostage. These are the same
+// rule, applied to the columns that had not had it.
+//
+// Read through the real store rather than the raw row, because the reading is
+// the thing under test — `database.js` hands back what SQLite holds, and
+// `toBinding`/`toRun` are what decide what that means.
+const store = await import(distUrl("coachAutomationStore.js"));
+
+const corruptAutomationId = "auto-corrupt";
+database.insertCoachAutomationRow({
+  id: corruptAutomationId,
+  name: "Hand-edited",
+  role: null,
+  playbook: "Say something.",
+  enabled: 1,
+  preset_id: null,
+  trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
+  conditions_json: JSON.stringify({
+    batchWindowMin: 0,
+    cooldownMin: 0,
+    maxRunsPerDay: 3
+  }),
+  runtime_json: null,
+  created_at: "2026-08-25T07:00:00.000Z",
+  updated_at: "2026-08-25T07:00:00.000Z"
+});
+
+const corruptBinding = (id, patch) => {
+  database.insertCoachAutomationBindingRow({
+    id,
+    automation_id: corruptAutomationId,
+    mode: "existing",
+    session_id: `sess-${id}`,
+    title_template: null,
+    enabled: 1,
+    sort_order: 0,
+    last_run_at: null,
+    next_run_at: null,
+    last_activity_at: null,
+    backoff_until: null,
+    backoff_level: null,
+    threshold_firing: null,
+    created_at: "2026-08-25T07:00:00.000Z",
+    ...patch
+  });
+  return store.getCoachAutomationBinding(id);
+};
+
+// --- last_activity_at: a watermark is a start_time, so zero is not one ------
+{
+  // Trusting a zero would put the floor at the epoch instead of at the attach
+  // time, and the binding would replay every activity the athlete has — up to
+  // the 200-row scan cap — which is the one thing 3.2's floor exists to stop.
+  assert.equal(
+    corruptBinding("b-wm-zero", { last_activity_at: 0 }).lastActivityAt,
+    undefined,
+    "a zero watermark reads as never analysed"
+  );
+  assert.equal(
+    corruptBinding("b-wm-neg", { last_activity_at: -1 }).lastActivityAt,
+    undefined,
+    "and so does a negative one"
+  );
+  assert.equal(
+    corruptBinding("b-wm-real", { last_activity_at: 1_756_000_000 }).lastActivityAt,
+    1_756_000_000,
+    "a real one is untouched"
+  );
+}
+
+// --- threshold_firing: three values, and only three ------------------------
+{
+  // Anything else read as `false` before — which claims the condition *was*
+  // evaluated and did not hold, so the next tick sees a transition and
+  // announces a condition that may have been true all week. That is the exact
+  // announcement the NULL is there to prevent.
+  assert.equal(
+    corruptBinding("b-tf-two", { threshold_firing: 2 }).thresholdFiring,
+    undefined,
+    "a value that is neither 0 nor 1 reads as never evaluated"
+  );
+  assert.equal(
+    corruptBinding("b-tf-neg", { threshold_firing: -1 }).thresholdFiring,
+    undefined
+  );
+  assert.equal(
+    corruptBinding("b-tf-zero", { threshold_firing: 0 }).thresholdFiring,
+    false,
+    "and the two real values still mean what they say"
+  );
+  assert.equal(
+    corruptBinding("b-tf-one", { threshold_firing: 1 }).thresholdFiring,
+    true
+  );
+}
+
+// --- backoff: garbage holds nobody off -------------------------------------
+{
+  // The safe direction for a clock nobody can parse is *not held*: a binding
+  // frozen by a string somebody typed is the failure mode, not a binding that
+  // tries once too often.
+  const garbage = corruptBinding("b-bo-junk", {
+    backoff_until: "soon",
+    backoff_level: -3
+  });
+  assert.equal(garbage.backoffUntil, "soon", "the row is reported as it stands");
+  assert.equal(
+    Number.isNaN(Date.parse(garbage.backoffUntil)),
+    true,
+    "and the guard rail's own comparison is what makes it harmless"
+  );
+  assert.equal(garbage.backoffLevel, undefined, "a negative level is no level");
+}
+
+// --- a `per-run` binding owns no conversation, whatever the row says --------
+{
+  // The attach path refuses this combination, so it can only arrive by hand or
+  // by a migration. Every reader already behaves as though the id were absent —
+  // `checkSessionTarget` branches on the mode before it looks — so reading it
+  // as null is what stops the row and the behaviour disagreeing.
+  const contradictory = corruptBinding("b-perrun", {
+    mode: "per-run",
+    session_id: "sess-should-not-be-here"
+  });
+  assert.equal(contradictory.mode, "per-run");
+  assert.equal(
+    contradictory.sessionId,
+    null,
+    "a per-run binding reads as owning no conversation"
+  );
+}
+
+// --- a negative cost is not a cost -----------------------------------------
+{
+  // It would subtract from the month's SUM, and a budget reading *under* the
+  // truth is what 13 calls worse than no budget: a number the athlete trusts.
+  database.insertCoachAutomationRunRow(
+    run({ id: "r-neg", input_tokens: -5_000, output_tokens: -10 })
+  );
+  const negative = store.listCoachAutomationRuns({ automationId: "auto-1" }).find(
+    (entry) => entry.id === "r-neg"
+  );
+  assert.ok(negative, "fixture sanity: the row is there");
+  assert.equal(negative.inputTokens, undefined, "a negative cost reads as unreported");
+  assert.equal(negative.outputTokens, undefined);
+
+  // Zero stays a real answer: a cancelled run that never reached the model
+  // genuinely cost nothing, and that is different from nobody counting.
+  database.insertCoachAutomationRunRow(
+    run({ id: "r-zero", input_tokens: 0, output_tokens: 0 })
+  );
+  const free = store.listCoachAutomationRuns({ automationId: "auto-1" }).find(
+    (entry) => entry.id === "r-zero"
+  );
+  assert.equal(free.inputTokens, 0, "zero is a cost, not an absence");
+  assert.equal(free.outputTokens, 0);
+}
+
 fs.rmSync(tempRoot, { recursive: true, force: true });
 console.log("coach automation sql tests passed");

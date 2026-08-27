@@ -672,6 +672,49 @@ function harness({ automations, bindings, firing = false, outcome }) {
   assert.equal(h.state.snapshotReads, 0, "and costs no read");
 }
 
+// --- a nought is not a reading, and this one is averaged --------------------
+{
+  // R4 step 7. `isSleepDebt` has always wanted `> 0` from its nights; this one
+  // took anything finite, and it feeds a *baseline* — so one zero from a bad
+  // COROS payload or a hand edit drags the average down and turns an ordinary
+  // morning into three days of drift. A rule that announces a problem the
+  // athlete does not have is worse than one that stays quiet.
+  // The streak has to sit *between* the two baselines, or both readings agree
+  // and the fixture proves nothing — the trap the trimming suite already fell
+  // into once. Baseline 50 over 30 days; one zero drags it to 48.3. A streak of
+  // 54 clears 48.3 + 5 and does not clear 50 + 5, so the two readings disagree
+  // here and only here.
+  const withZero = hrFixture(50, [54, 54, 54]);
+  withZero[0] = { ...withZero[0], restingHr: 0 };
+  assert.equal(
+    isRestingHrDrift(NOW, withZero, 5),
+    false,
+    "a zero is dropped rather than averaged in"
+  );
+
+  // The same fixture with that day simply absent must agree — which is the
+  // point: an unreadable value and a missing one are the same fact.
+  assert.equal(
+    isRestingHrDrift(NOW, withZero.slice(1), 5),
+    false,
+    "and a missing day reads identically"
+  );
+
+  // And the guard has not made the metric unable to fire.
+  assert.equal(
+    isRestingHrDrift(NOW, hrFixture(50, [56, 56, 56]), 5),
+    true,
+    "a real drift still fires"
+  );
+  // The fixture is on the right side of the line for the reason above: without
+  // the guard, the same 54 would have fired.
+  assert.equal(
+    isRestingHrDrift(NOW, hrFixture(48.333333333333336, [54, 54, 54]), 5),
+    true,
+    "fixture sanity: 54 does clear a baseline dragged down by one zero"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // A crossing the runner refused is still owed
 // ---------------------------------------------------------------------------
