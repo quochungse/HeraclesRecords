@@ -119,12 +119,12 @@ export function UpdateAvailablePrompt({
   const progress = Math.round(snapshot.downloadPercent ?? 0);
   const statusText =
     snapshot.status === "downloading"
-      ? `Downloading ${progress}% — CorosLink will restart when it is ready.`
+      ? `Downloading ${progress}% — Heracles Records will restart when it is ready.`
       : isManualInstall
         ? "The installer will open in your browser."
         : isDownloaded
           ? "The update is downloaded and ready to install."
-          : "CorosLink will download the update and restart to finish installing it.";
+          : "Heracles Records will download the update and restart to finish installing it.";
 
   const decline = () => {
     if (previewKey === undefined) {
@@ -155,9 +155,9 @@ export function UpdateAvailablePrompt({
           </span>
           <div>
             <p className="update-prompt-eyebrow">Update available</p>
-            <h2 id="update-prompt-title">CorosLink {visibleVersion}</h2>
+            <h2 id="update-prompt-title">Heracles Records {visibleVersion}</h2>
             <p id="update-prompt-description">
-              Everything new since CorosLink {snapshot.currentVersion}.
+              Everything new since Heracles Records {snapshot.currentVersion}.
             </p>
           </div>
         </header>

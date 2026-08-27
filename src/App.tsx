@@ -1081,7 +1081,7 @@ export default function App() {
       .then((result) => {
         if (result?.installMethod === "manual") {
           setMessage(
-            "Opened the GitHub download page. Install the new build over CorosLink in Applications.",
+            "Opened the GitHub download page. Install the new build over Heracles Records in Applications.",
           );
         }
       })
@@ -4363,7 +4363,7 @@ function YouTubeMusicView({
                 <p className="eyebrow">YouTube Music</p>
                 <h2>Sign in to connect</h2>
                 <span>
-                  Sign in below and CorosLink captures the access it needs
+                  Sign in below and Heracles Records captures the access it needs
                   automatically — no DevTools required. Then pull in your
                   playlists and liked songs.
                 </span>
@@ -4376,7 +4376,7 @@ function YouTubeMusicView({
             {dependencyReady ? null : (
               <p className="youtube-music-connect-note">
                 {status?.dependencyError ??
-                  "The bundled Python runtime or ytmusicapi is missing, so sign-in can't be saved. Reinstall CorosLink or run npm run binaries:prepare."}
+                  "The bundled Python runtime or ytmusicapi is missing, so sign-in can't be saved. Reinstall Heracles Records or run npm run binaries:prepare."}
               </p>
             )}
 
@@ -5242,7 +5242,7 @@ function SpotifySyncView({
 
                 <p className="spotify-connect-note">
                   Credentials stay on this device and are only used for Spotify.
-                  CorosLink reads playlists you own or collaborate on, then
+                  Heracles Records reads playlists you own or collaborate on, then
                   matches tracks through YouTube search.
                 </p>
               </form>
@@ -6841,7 +6841,7 @@ function AppleMusicView({
                 <h2>Sign in to connect</h2>
                 <span>
                   Sign in below, then open your <strong>Library</strong> —
-                  CorosLink captures the access it needs automatically. No
+                  Heracles Records captures the access it needs automatically. No
                   DevTools and no Apple Developer account required.
                 </span>
               </div>

@@ -1519,7 +1519,7 @@ export function buildRouteFromGpxContent(
 
 /**
  * Asks the user for a GPX file, converts it into a saved route (with a
- * CorosLink-format GPX on disk so export/share work), and returns it.
+ * Heracles Records-format GPX on disk so export/share work), and returns it.
  * Resolves null when the dialog is cancelled.
  */
 export async function importRouteFromGpx(
@@ -1652,7 +1652,7 @@ export function buildRouteGpx(route: GeneratedRoute): string {
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<gpx version="1.1" creator="CorosLink" xmlns="http://www.topografix.com/GPX/1/1">',
+    '<gpx version="1.1" creator="Heracles Records" xmlns="http://www.topografix.com/GPX/1/1">',
     "  <metadata>",
     `    <name>${escapeXml(route.name)}</name>`,
     `    <desc>${escapeXml(describeRoute(route))}</desc>`,
@@ -2098,7 +2098,7 @@ function publishCorosMapInstallProgress(
 function toWatchInstallError(caught: unknown, watchRootPath: string): Error {
   if (isWatchDisconnectedInstallError(caught, watchRootPath)) {
     return new Error(
-      "The watch disconnected while installing maps. Reconnect the watch and run Install again. CorosLink merges map files, so files that already copied can remain on the watch."
+      "The watch disconnected while installing maps. Reconnect the watch and run Install again. Heracles Records merges map files, so files that already copied can remain on the watch."
     );
   }
 

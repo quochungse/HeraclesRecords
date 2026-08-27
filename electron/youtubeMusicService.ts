@@ -445,7 +445,7 @@ async function checkYtMusicApi(): Promise<PythonCheckResult> {
       pythonAvailable: false,
       ytmusicapiAvailable: false,
       error:
-        "The bundled Python runtime is missing. Reinstall CorosLink or run npm run binaries:prepare."
+        "The bundled Python runtime is missing. Reinstall Heracles Records or run npm run binaries:prepare."
     };
   }
 
@@ -473,14 +473,14 @@ async function requireYtMusicApi(): Promise<
   if (!check.pythonCommand) {
     throw new Error(
       check.error ??
-        "The bundled Python runtime is missing. Reinstall CorosLink or run npm run binaries:prepare."
+        "The bundled Python runtime is missing. Reinstall Heracles Records or run npm run binaries:prepare."
     );
   }
 
   if (!check.ytmusicapiAvailable) {
     throw new Error(
       check.error ??
-        "The bundled ytmusicapi package is missing. Reinstall CorosLink or run npm run binaries:prepare."
+        "The bundled ytmusicapi package is missing. Reinstall Heracles Records or run npm run binaries:prepare."
     );
   }
 
@@ -642,7 +642,7 @@ function formatYtMusicApiCheckError(error: unknown): string {
     message.includes("No module named 'ytmusicapi'") ||
     message.includes('No module named "ytmusicapi"')
   ) {
-    return "The bundled ytmusicapi package is missing. Reinstall CorosLink or run npm run binaries:prepare.";
+    return "The bundled ytmusicapi package is missing. Reinstall Heracles Records or run npm run binaries:prepare.";
   }
 
   return message;

@@ -589,7 +589,7 @@ export function RouteStudio({
           </h2>
           <p>
             {mode === "generate"
-              ? "Pick a start — CorosLink builds the rest."
+              ? "Pick a start — Heracles Records builds the rest."
               : mode === "draw"
                 ? "Click the map to drop points; drag to refine."
                 : mode === "sketch"

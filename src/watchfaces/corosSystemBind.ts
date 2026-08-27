@@ -57,7 +57,7 @@ export interface CorosSystemBindAuth {
   /**
    * Per-account/device data produced by a live official-session provider.
    * This is not an archive asset and must never be captured, persisted, or
-   * replayed by CorosLink.
+   * replayed by Heracles Records.
    */
   compressedData: Uint8Array;
 }

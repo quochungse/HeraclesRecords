@@ -183,7 +183,7 @@ export async function detectClaudeCodeExecutable(
  * Builds the environment every Claude Code invocation runs under.
  *
  * `configDir` points Claude Code at a private credential store via
- * CLAUDE_CONFIG_DIR, so CorosLink can hold its own subscription login without
+ * CLAUDE_CONFIG_DIR, so Heracles Records can hold its own subscription login without
  * reading or disturbing the account the user is signed into elsewhere on this
  * computer. Omit it to share the machine-wide login in ~/.claude.
  */
@@ -281,7 +281,7 @@ export async function getClaudeCodeStatus(
       authenticated: false,
       checkedAt,
       message:
-        "Claude Code is not installed. Install it to use your Claude subscription with CorosLink."
+        "Claude Code is not installed. Install it to use your Claude subscription with Heracles Records."
     };
   }
 
@@ -546,7 +546,7 @@ export async function logoutClaudeCode(options: {
 }): Promise<void> {
   if (!options.configDir.trim()) {
     throw new ClaudeCodeProviderError(
-      "Refusing to sign out without a CorosLink-only credential directory.",
+      "Refusing to sign out without a Heracles Records-only credential directory.",
       "connection"
     );
   }
@@ -734,7 +734,7 @@ export async function streamClaudeCodeCompletion(
       const inputShape = jsonSchemaToZodShape(sourceTool.inputSchema);
       return sdk.tool(
         sourceTool.name,
-        sourceTool.description ?? "CorosLink Coach tool",
+        sourceTool.description ?? "Heracles Records Coach tool",
         inputShape,
         async (args) => {
           const parsedArgs = args as Record<string, unknown>;
@@ -760,7 +760,7 @@ export async function streamClaudeCodeCompletion(
       name: "coroslink",
       version: "1.0.0",
       instructions:
-        "Use only these CorosLink tools for approved training data, plan drafts, and calendar changes. Uploads and deletions always require explicit athlete confirmation via the buttons in chat.",
+        "Use only these Heracles Records tools for approved training data, plan drafts, and calendar changes. Uploads and deletions always require explicit athlete confirmation via the buttons in chat.",
       tools: definitions,
       alwaysLoad: true
     });
@@ -946,7 +946,7 @@ function formatClaudePrompt(messages: ChatMessage[]): string {
     )
     .join("\n\n");
   return (
-    "Continue the CorosLink Coach conversation below. Answer the athlete's latest " +
+    "Continue the Heracles Records Coach conversation below. Answer the athlete's latest " +
     "message, using approved tools only when they materially help.\n\n" +
     transcript
   );

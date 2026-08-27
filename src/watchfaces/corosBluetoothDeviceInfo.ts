@@ -285,7 +285,7 @@ export class CorosBluetoothDeviceInfoSession {
   static async connect(): Promise<CorosBluetoothDeviceInfoSession> {
     const bluetooth = (navigator as Navigator & { bluetooth?: CorosWebBluetooth }).bluetooth;
     if (!bluetooth) {
-      throw new Error("Web Bluetooth is unavailable in this CorosLink build.");
+      throw new Error("Web Bluetooth is unavailable in this Heracles Records build.");
     }
     const device = await bluetooth.requestDevice({
       acceptAllDevices: true,

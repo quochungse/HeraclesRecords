@@ -772,7 +772,7 @@ export async function importCorosWatchfaceShareLink(
 
 /**
  * Reads COROS's battery-consumption history for a user-supplied paired watch.
- * The device identifiers are deliberately not persisted by CorosLink.
+ * The device identifiers are deliberately not persisted by Heracles Records.
  */
 export async function getCorosBatteryReport(
   input: CorosBatteryQueryInput
@@ -1010,7 +1010,7 @@ export async function readCorosWatchfaceProjectPackage(
     typeof manifest.sourceTemplateId !== "string" ||
     !/^\d{1,20}$/.test(manifest.sourceTemplateId)
   ) {
-    throw new Error("This is not a supported CorosLink watch-face project.");
+    throw new Error("This is not a supported Heracles Records watch-face project.");
   }
   const normalizedFirmwareType = normalizeOptionalFirmwareType(
     manifest.firmwareType
@@ -1610,7 +1610,7 @@ export async function createCorosWatchfaceArchive(
   const generated = await inspectArchive(outputPath);
   const selected: SelectedArchive = {
     ...generated,
-    fileName: "CorosLink custom face.dat",
+    fileName: "Heracles Records custom face.dat",
     ...(firmwareType ? { firmwareType } : {})
   };
   selectedArchives.set(selected.archiveId, selected);

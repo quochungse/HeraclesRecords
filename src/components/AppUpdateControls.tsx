@@ -132,7 +132,7 @@ function UpdatePreferencesMenu({
           ) : (
             <p className="update-settings-note">
               Auto-updates run in installed builds. Preferences below apply
-              when you install CorosLink.
+              when you install Heracles Records.
             </p>
           )}
 
@@ -219,8 +219,8 @@ export function AppUpdateControls({
           onClick={onInstall}
           title={
             manual
-              ? `Download CorosLink ${snapshot.availableVersion} from GitHub (required for this macOS build)`
-              : `Install CorosLink ${snapshot.availableVersion}`
+              ? `Download Heracles Records ${snapshot.availableVersion} from GitHub (required for this macOS build)`
+              : `Install Heracles Records ${snapshot.availableVersion}`
           }
         >
           <Sparkles size={15} aria-hidden="true" />
@@ -244,7 +244,7 @@ export function AppUpdateControls({
           disabled={downloading}
           title={
             snapshot.releaseNotes ??
-            `Download CorosLink ${snapshot.availableVersion}`
+            `Download Heracles Records ${snapshot.availableVersion}`
           }
         >
           {downloading ? (
@@ -273,7 +273,7 @@ export function AppUpdateControls({
           className="update-chip downloading"
           title={
             snapshot.releaseNotes ??
-            `CorosLink ${snapshot.availableVersion} is available`
+            `Heracles Records ${snapshot.availableVersion} is available`
           }
         >
           {snapshot.status === "downloading" ? (
@@ -298,7 +298,7 @@ export function AppUpdateControls({
         title={
           snapshot.status === "error"
             ? snapshot.error
-            : `CorosLink ${snapshot.currentVersion}`
+            : `Heracles Records ${snapshot.currentVersion}`
         }
       >
         {busy || snapshot.status === "checking" ? (

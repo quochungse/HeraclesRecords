@@ -414,6 +414,11 @@ import type {
   WorkoutEditRef
 } from "./types";
 
+// userData lives at <appData>/Heracles Records, the default Electron derives
+// from the product name. Data from the pre-rename <appData>/coroslink folder
+// was copied across once, by hand, in August 2026; that folder is still on disk
+// and is not read any more.
+
 let mainWindow: BrowserWindow | undefined;
 let rendererReady = false;
 let pendingCommunityWatchfaceOpen: CommunityWatchfaceOpenRequest | undefined;
@@ -676,7 +681,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 900,
     minHeight: 640,
-    title: "CorosLink",
+    title: "Heracles Records",
     ...(iconPath ? { icon: iconPath } : {}),
     backgroundColor: DEFAULT_WINDOW_BACKGROUND,
     // Let the app's own header act as the title bar so the macOS traffic
@@ -1144,7 +1149,7 @@ function registerIpcHandlers(): void {
     "watchfaces:exportProject",
     async (_event, input: CorosWatchfaceProjectExportInput) => {
       const baseName =
-        sanitizeExportFileName(input?.name) || "CorosLink-watch-face";
+        sanitizeExportFileName(input?.name) || "Heracles-Records-watch-face";
       const saveOptions = {
         title: "Export editable watch face for website",
         defaultPath: `${baseName}.zip`,
@@ -1171,7 +1176,7 @@ function registerIpcHandlers(): void {
         throw new Error("Build a final watch-face archive before exporting it.");
       }
       const baseName =
-        sanitizeExportFileName(input.name) || "CorosLink-watch-face";
+        sanitizeExportFileName(input.name) || "Heracles-Records-watch-face";
       const saveOptions = {
         title: "Export final watch-face ZIP",
         defaultPath: `${baseName}.zip`,

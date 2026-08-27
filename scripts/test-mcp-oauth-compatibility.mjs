@@ -12,19 +12,19 @@ const { mcpOAuthClientName, mcpOAuthInvalidationTargets } = await import(
 
 assert.equal(
   mcpOAuthClientName("https://mcp.strava.com/mcp", "Strava"),
-  "Claude Code (Strava via CorosLink)"
+  "Claude Code (Strava via Heracles Records)"
 );
 assert.equal(
   mcpOAuthClientName("https://MCP.STRAVA.COM/mcp", "My Strava"),
-  "Claude Code (My Strava via CorosLink)"
+  "Claude Code (My Strava via Heracles Records)"
 );
 assert.equal(
   mcpOAuthClientName("https://mcp.strava.com.evil.example/mcp", "Untrusted"),
-  "CorosLink"
+  "Heracles Records"
 );
 assert.equal(
   mcpOAuthClientName("https://freddy.coach/mcp", "Freddy"),
-  "CorosLink"
+  "Heracles Records"
 );
 
 assert.deepEqual(mcpOAuthInvalidationTargets("tokens"), ["tokens"]);

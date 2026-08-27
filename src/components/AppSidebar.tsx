@@ -269,7 +269,7 @@ export function AppSidebar({
             transition={labelTransition}
             aria-hidden={!showLabels}
           >
-            <strong>CorosLink</strong>
+            <strong>Heracles Records</strong>
           </motion.div>
         </div>
 

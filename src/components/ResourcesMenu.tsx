@@ -25,10 +25,10 @@ interface ResourceGroup {
   links: ResourceLink[];
 }
 
-// Curated from GitHub issues #7 (CorosLink links) and #8 (COROS resources).
+// Curated from GitHub issues #7 (Heracles Records links) and #8 (COROS resources).
 const LINK_GROUPS: ResourceGroup[] = [
   {
-    heading: "CorosLink",
+    heading: "Heracles Records",
     links: [
       {
         label: "Website",
@@ -37,12 +37,12 @@ const LINK_GROUPS: ResourceGroup[] = [
       },
       {
         label: "Source on GitHub",
-        href: "https://github.com/JunAkerBuilds/CorosLink",
+        href: "https://github.com/quochungse/HeraclesRecords",
         icon: Code2,
       },
       {
         label: "Report an issue",
-        href: "https://github.com/JunAkerBuilds/CorosLink/issues",
+        href: "https://github.com/quochungse/HeraclesRecords/issues",
         icon: Bug,
       },
       {

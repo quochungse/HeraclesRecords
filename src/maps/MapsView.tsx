@@ -288,7 +288,7 @@ function CorosMapsTab({
     onMessage(null);
     try {
       setDownloadJobs(await api.downloadCorosMapPackage(pkg));
-      onMessage(`Started downloading ${pkg.title} inside CorosLink.`);
+      onMessage(`Started downloading ${pkg.title} inside Heracles Records.`);
     } catch (caught) {
       onError(toErrorMessage(caught));
     } finally {

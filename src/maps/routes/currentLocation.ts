@@ -72,7 +72,7 @@ function describeLocationError(error: GeolocationPositionError): string {
   switch (error.code) {
     case 1:
       return (
-        "Location access was denied. Allow CorosLink in System Settings > " +
+        "Location access was denied. Allow Heracles Records in System Settings > " +
         "Privacy & Security > Location Services, then try again."
       );
     case 2:

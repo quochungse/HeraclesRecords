@@ -3,12 +3,12 @@ export function mcpOAuthClientName(
   serverName: string
 ): string {
   // Strava's current MCP rollout only provisions its published Claude client
-  // during dynamic registration. Keep CorosLink visible in the identifier while
+  // during dynamic registration. Keep Heracles Records visible in the identifier while
   // using the Claude-compatible prefix that Strava accepts.
   if (new URL(resourceUrl).hostname.toLowerCase() === "mcp.strava.com") {
-    return `Claude Code (${serverName} via CorosLink)`;
+    return `Claude Code (${serverName} via Heracles Records)`;
   }
-  return "CorosLink";
+  return "Heracles Records";
 }
 
 export type McpOAuthInvalidationScope =
@@ -32,6 +32,6 @@ export function mcpOAuthInvalidationTargets(
   if (scope === "client") return ["clientInformation"];
   if (scope === "tokens") return ["tokens"];
   if (scope === "verifier") return ["verifier"];
-  // Discovery metadata is not persisted by CorosLink.
+  // Discovery metadata is not persisted by Heracles Records.
   return [];
 }

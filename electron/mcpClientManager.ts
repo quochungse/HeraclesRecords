@@ -403,7 +403,7 @@ class McpOAuthProvider implements OAuthClientProvider {
             ok: false,
             error: new Error(
               `${serverName} OAuth callback port ${loopbackPort} is already in use. ` +
-                `Close other CorosLink windows, or run: lsof -nP -iTCP:${loopbackPort} -sTCP:LISTEN`
+                `Close other Heracles Records windows, or run: lsof -nP -iTCP:${loopbackPort} -sTCP:LISTEN`
             )
           });
           return;
@@ -606,7 +606,7 @@ async function connectOnce(
   if (server.authType !== "oauth") {
     const transport = buildTransport(server);
     const mcpClient = new Client(
-      { name: "CorosLink", version: app.getVersion() },
+      { name: "Heracles Records", version: app.getVersion() },
       { capabilities: {} }
     );
     await mcpClient.connect(transport);
@@ -623,7 +623,7 @@ async function connectOnce(
     );
     const transport = buildTransport(server, authProvider);
     const mcpClient = new Client(
-      { name: "CorosLink", version: app.getVersion() },
+      { name: "Heracles Records", version: app.getVersion() },
       { capabilities: {} }
     );
 

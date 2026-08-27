@@ -2,7 +2,7 @@ import { Laptop, ShieldCheck } from "lucide-react";
 
 /**
  * Picks which credential store Claude Code runs against: the machine-wide login
- * shared with the user's terminal, or a CorosLink-only one.
+ * shared with the user's terminal, or a Heracles Records-only one.
  *
  * Shown both in Settings and on the sign-in gate, because the choice decides
  * where a sign-in lands and is easiest to get wrong right before signing in.
@@ -45,7 +45,7 @@ export function ClaudeAuthScopeToggle({
         onClick={() => select(true)}
       >
         <ShieldCheck size={14} aria-hidden="true" />
-        CorosLink-only Claude login
+        Heracles Records-only Claude login
       </button>
     </div>
   );

@@ -200,7 +200,7 @@ export function ClaudeCodeLoginCard({
       </div>
       <p className="chat-settings-copy">
         {scope === "app"
-          ? "Approve on Claude's page, picking the account you want CorosLink to use — it is kept separate from any other Claude login on this computer."
+          ? "Approve on Claude's page, picking the account you want Heracles Records to use — it is kept separate from any other Claude login on this computer."
           : "Approve on Claude's page. This replaces the machine-wide Claude login in your home directory."}{" "}
         If Claude shows you a code, paste it below. Otherwise this card closes by
         itself once you are back.

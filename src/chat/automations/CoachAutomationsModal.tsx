@@ -103,7 +103,7 @@ export function CoachAutomationsModal({
             An automation is a coach that runs on its own — after an activity, for
             example — and writes what it finds into one or more conversations.
             Runs are read-only: they can read, analyse and draft, but never write
-              to COROS. They only run while CorosLink is open.
+              to COROS. They only run while Heracles Records is open.
             </p>
           )}
           <AutomationsNavProvider value={setNav}>

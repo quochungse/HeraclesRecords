@@ -15,7 +15,23 @@ if (!fs.existsSync(sourcePath)) {
   process.exit(1);
 }
 
-fs.mkdirSync(buildDir, { recursive: true });
+// sips and iconutil ship with macOS and exist nowhere else, so off-macOS fall
+// back to the Pillow writer, which emits the same ic07-ic14 chunk set.
+function hasMacIconTools() {
+  try {
+    execFileSync("which", ["sips", "iconutil"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!hasMacIconTools()) {
+  execFileSync("python3", [path.join(__dirname, "generate-icons.py"), sourcePath], {
+    stdio: "inherit"
+  });
+  process.exit(0);
+}
 
 const iconPngPath = path.join(buildDir, "icon.png");
 execFileSync("sips", ["-s", "format", "png", sourcePath, "--out", iconPngPath, "-z", "1024", "1024"], {

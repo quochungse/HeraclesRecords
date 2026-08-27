@@ -5,7 +5,7 @@ import type { RouteGeocodeResult } from "../types";
 // so bursts (e.g. type-ahead search) can never exceed that rate.
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const NOMINATIM_USER_AGENT =
-  "CorosLink/1.0 (https://github.com/Akerrules/CorosLink)";
+  "HeraclesRecords/1.0 (https://github.com/quochungse/HeraclesRecords)";
 const NOMINATIM_MIN_INTERVAL_MS = 1_100;
 
 let lastRequestAt = 0;

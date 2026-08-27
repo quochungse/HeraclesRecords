@@ -187,7 +187,7 @@ function readLayerPreferences(): {
   }
 }
 
-/** Exported Z-Anatomy structure ids translated into CorosLink training groups. */
+/** Exported Z-Anatomy structure ids translated into Heracles Records training groups. */
 const STRUCTURE_TO_MUSCLE: Record<string, MuscleId> = {
   sternocleidomastoid: "neck",
   deep_cervical_flexors: "neck",

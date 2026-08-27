@@ -243,7 +243,7 @@ export function AutomationDefinitionForm({
             </label>
           </div>
           <p className="coach-automation-hint">
-            Your local time, and only while CorosLink is running. A slot missed by
+            Your local time, and only while Heracles Records is running. A slot missed by
             more than a day is written off rather than delivered late.
           </p>
         </fieldset>

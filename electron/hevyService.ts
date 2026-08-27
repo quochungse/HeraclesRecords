@@ -103,7 +103,7 @@ function readApiKey(): string | undefined {
 function storeApiKey(apiKey: string): void {
   if (!credentialStorage.isEncryptionAvailable()) {
     throw new Error(
-      "Secure credential storage is unavailable. CorosLink did not save the Hevy API key."
+      "Secure credential storage is unavailable. Heracles Records did not save the Hevy API key."
     );
   }
   setSetting(

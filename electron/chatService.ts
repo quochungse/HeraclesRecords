@@ -201,7 +201,7 @@ export async function testAnthropicApiConnection(
 }
 
 /**
- * Directory Claude Code keeps CorosLink's own credentials in. Returning
+ * Directory Claude Code keeps Heracles Records's own credentials in. Returning
  * undefined lets Claude Code fall back to the machine-wide ~/.claude login.
  */
 function getClaudeCodeConfigDir(
@@ -356,7 +356,7 @@ export async function revokeClaudeCodeLogin(): Promise<ClaudeCodeStatus> {
   const configDir = getClaudeCodeConfigDir(settings);
   if (!configDir) {
     throw new ClaudeCodeProviderError(
-      "Revoking only applies to the CorosLink-only Claude login. Turn that on first, or sign out from your terminal.",
+      "Revoking only applies to the Heracles Records-only Claude login. Turn that on first, or sign out from your terminal.",
       "auth"
     );
   }

@@ -65,7 +65,7 @@ const STORAGE_LOCATION_SPECS: StorageLocationSpec[] = [
     id: "user-data",
     label: "App data folder",
     description:
-      "Everything CorosLink stores on this computer, including settings and credentials.",
+      "Everything Heracles Records stores on this computer, including settings and credentials.",
     kind: "directory",
     resolvePath: () => app.getPath("userData")
   }

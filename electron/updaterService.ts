@@ -61,26 +61,32 @@ function isMacAdHocSigned(): boolean {
   }
 }
 
+// Must stay in step with the `artifactName` patterns in package.json's build
+// config. Those deliberately spell "HeraclesRecords" without a space: GitHub
+// only accepts [0-9A-Za-z._-] in asset names, so a space would be rewritten on
+// upload and every URL built here would 404.
+const RELEASES_URL = "https://github.com/quochungse/HeraclesRecords/releases";
+
 function getManualInstallUrl(version: string): string {
   const arch = process.arch === "arm64" ? "arm64" : "x64";
 
   if (process.platform === "darwin") {
-    return `https://github.com/JunAkerBuilds/CorosLink/releases/download/v${version}/CorosLink-${version}-${arch}.dmg`;
+    return `${RELEASES_URL}/download/v${version}/HeraclesRecords-${version}-${arch}.dmg`;
   }
 
   if (process.platform === "win32") {
-    return `https://github.com/JunAkerBuilds/CorosLink/releases/download/v${version}/CorosLink-Setup-${version}.exe`;
+    return `${RELEASES_URL}/download/v${version}/HeraclesRecords-Setup-${version}.exe`;
   }
 
-  return `https://github.com/JunAkerBuilds/CorosLink/releases/download/v${version}/CorosLink-${version}.AppImage`;
+  return `${RELEASES_URL}/download/v${version}/HeraclesRecords-${version}.AppImage`;
 }
 
 function getReleasePageUrl(version?: string): string {
   if (!version) {
-    return "https://github.com/JunAkerBuilds/CorosLink/releases/latest";
+    return `${RELEASES_URL}/latest`;
   }
 
-  return `https://github.com/JunAkerBuilds/CorosLink/releases/tag/v${version}`;
+  return `${RELEASES_URL}/tag/v${version}`;
 }
 
 function formatUpdaterError(error: unknown): string {
@@ -94,8 +100,8 @@ function formatUpdaterError(error: unknown): string {
   if (message.includes("404")) {
     const version = snapshot.availableVersion;
     const target = version
-      ? `CorosLink ${version}`
-      : "the latest CorosLink release";
+      ? `Heracles Records ${version}`
+      : "the latest Heracles Records release";
     return `Update download failed. Download ${target} from GitHub: ${getReleasePageUrl(version)}`;
   }
 

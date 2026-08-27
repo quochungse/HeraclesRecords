@@ -32,7 +32,7 @@ interface OpenRouterKeyPayload {
 function openRouterHeaders(apiKey: string): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey}`,
-    "X-Title": "CorosLink"
+    "X-Title": "Heracles Records"
   };
 }
 
@@ -204,7 +204,7 @@ export function streamOpenRouterChatCompletion(
       baseUrl: OPENROUTER_API_BASE_URL,
       apiKey: options.config.apiKey,
       requestLabel: "OpenRouter",
-      headers: { "X-Title": "CorosLink" },
+      headers: { "X-Title": "Heracles Records" },
       allowToolsFallback: false
     }
   );

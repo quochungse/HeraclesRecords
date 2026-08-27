@@ -1,9 +1,9 @@
 {
-  "name": "coroslink",
-  "version": "0.1.30",
+  "name": "heracles-records",
+  "version": "1.0.0",
   "private": true,
-  "description": "Unofficial COROS Pace Pro companion — media, watch sync, and training analytics.",
-  "author": "CorosLink Contributors",
+  "description": "Personal training records with unofficial COROS companion — media, watch sync, and training analytics.",
+  "author": "quochungse",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
@@ -112,11 +112,11 @@
     "website:build": "npm run build --prefix website"
   },
   "build": {
-    "appId": "app.coroslink",
-    "productName": "CorosLink",
+    "appId": "app.heraclesrecords",
+    "productName": "Heracles Records",
     "protocols": [
       {
-        "name": "CorosLink Watch Faces",
+        "name": "Heracles Records Watch Faces",
         "schemes": [
           "coroslink"
         ]
@@ -124,8 +124,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "JunAkerBuilds",
-      "repo": "CorosLink"
+      "owner": "quochungse",
+      "repo": "HeraclesRecords"
     },
     "icon": "build/icon.png",
     "afterPack": "scripts/after-pack.cjs",
@@ -175,7 +175,7 @@
         "dmg",
         "zip"
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "artifactName": "HeraclesRecords-${version}-${arch}.${ext}",
       "category": "public.app-category.music",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
@@ -183,7 +183,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSLocationUsageDescription": "CorosLink uses your location only when you choose Use my location to set a route starting point."
+        "NSLocationUsageDescription": "Heracles Records uses your location only when you choose Use my location to set a route starting point."
       },
       "notarize": true
     },
@@ -194,7 +194,7 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
-      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "artifactName": "HeraclesRecords-Setup-${version}.${ext}",
       "files": [
         "!**/claude.exe"
       ]
@@ -203,6 +203,7 @@
       "target": [
         "AppImage"
       ],
+      "artifactName": "HeraclesRecords-${version}.${ext}",
       "category": "AudioVideo",
       "icon": "build/icon.png"
     }

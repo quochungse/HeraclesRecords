@@ -1,6 +1,6 @@
 export type BinaryName = "yt-dlp" | "ffmpeg";
 
-/** User-selected measurement system for CorosLink presentation and writes. */
+/** User-selected measurement system for Heracles Records presentation and writes. */
 export type UnitSystem = "metric" | "imperial";
 
 export interface BinaryCheck {
@@ -292,7 +292,7 @@ export interface CorosWatchfaceArchive {
   firmwareType?: string;
   /** Detected from resolution folders, independent of COROS's firmware ID. */
   resolutionProfile: CorosWatchfaceResolutionProfile;
-  /** Portable CorosLink project metadata bundled with an editable website ZIP. */
+  /** Portable Heracles Records project metadata bundled with an editable website ZIP. */
   editableProject?: CorosWatchfaceEditableProject;
 }
 
@@ -2512,10 +2512,10 @@ export interface ClaudeCodePermissions {
 }
 
 export interface ClaudeCodeConfig {
-  /** Optional user-selected path. CorosLink never reads Claude credential files. */
+  /** Optional user-selected path. Heracles Records never reads Claude credential files. */
   executablePath?: string;
   /**
-   * When true (the default) Claude Code runs against a CorosLink-only
+   * When true (the default) Claude Code runs against a Heracles Records-only
    * CLAUDE_CONFIG_DIR, so the app signs in to its own account instead of
    * borrowing whichever one the machine's CLI is using.
    */

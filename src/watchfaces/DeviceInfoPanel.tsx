@@ -63,7 +63,7 @@ function ProtectedWatchfaceStatus() {
         <span>Not exposed by read-only Bluetooth</span>
       </div>
       <p>
-        The installed face is part of the protected COROS session. CorosLink will show it only when a legitimate,
+        The installed face is part of the protected COROS session. Heracles Records will show it only when a legitimate,
         read-safe provider exists.
       </p>
     </aside>

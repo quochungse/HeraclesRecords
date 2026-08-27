@@ -450,7 +450,7 @@ export function formatActivityDetailForChat(
     } else {
       sections.push(
         "Time series: HR/pace samples are not available in the COROS detail response for this activity. " +
-          "For full per-second data, export the FIT file from CorosLink."
+          "For full per-second data, export the FIT file from Heracles Records."
       );
     }
   }

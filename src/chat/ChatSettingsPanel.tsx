@@ -315,7 +315,7 @@ export function ChatSettingsPanel({
           <span className="chat-beta-badge">BYOK</span>
         </div>
         <p className="chat-settings-copy">
-          Use your OpenRouter account and credits for coaching. CorosLink stores
+          Use your OpenRouter account and credits for coaching. Heracles Records stores
           the key encrypted on this computer and only sends it to OpenRouter.
         </p>
 
@@ -452,7 +452,7 @@ export function ChatSettingsPanel({
         </div>
         <p className="chat-settings-copy">
           Runs the Claude Code CLI installed on this computer against your Claude
-          subscription. CorosLink never sees your Claude password — sign-in
+          subscription. Heracles Records never sees your Claude password — sign-in
           happens in your browser and Claude Code stores the credentials.
         </p>
 
@@ -528,8 +528,8 @@ export function ChatSettingsPanel({
         />
         <p className="chat-settings-copy">
           {appScopedAuth
-            ? "CorosLink keeps its own Claude credentials in its app data folder. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
-            : "CorosLink will use the machine-wide Claude login in your home folder, shared with the terminal. Signing in here replaces that login."}
+            ? "Heracles Records keeps its own Claude credentials in its app data folder. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
+            : "Heracles Records will use the machine-wide Claude login in your home folder, shared with the terminal. Signing in here replaces that login."}
         </p>
 
 
@@ -614,7 +614,7 @@ export function ChatSettingsPanel({
               onClick={() => {
                 if (
                   window.confirm(
-                    "Sign CorosLink out of Claude? Your Claude login elsewhere on this computer is not affected."
+                    "Sign Heracles Records out of Claude? Your Claude login elsewhere on this computer is not affected."
                   )
                 ) {
                   onRevokeClaude();

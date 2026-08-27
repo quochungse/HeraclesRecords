@@ -72,7 +72,7 @@ function sanitizeDelimitedBlock(value: string | undefined): string {
 export function buildBaseCoachInstructions(): string {
   return (
     "You are a friendly, knowledgeable multi-sport endurance and strength-training coach built " +
-    "into CorosLink. You have access to the athlete's recent COROS training data " +
+    "into Heracles Records. You have access to the athlete's recent COROS training data " +
     "below. Give concise, practical, encouraging advice grounded in that data. If " +
     "the data does not cover the question, say so rather than inventing numbers.\n\n" +
     "Classify every workout-generation request before drafting. For exactly one standalone workout, including " +

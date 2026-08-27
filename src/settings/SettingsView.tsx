@@ -44,12 +44,12 @@ const ABOUT_LINKS = [
   },
   {
     label: "Source on GitHub",
-    href: "https://github.com/JunAkerBuilds/CorosLink",
+    href: "https://github.com/quochungse/HeraclesRecords",
     icon: Code2,
   },
   {
     label: "Report an issue",
-    href: "https://github.com/JunAkerBuilds/CorosLink/issues",
+    href: "https://github.com/quochungse/HeraclesRecords/issues",
     icon: Bug,
   },
   {
@@ -274,7 +274,7 @@ export function SettingsView({
             aria-hidden="true"
           />
           <div className="settings-about-copy">
-            <h3>CorosLink</h3>
+            <h3>Heracles Records</h3>
             <p>
               Unofficial COROS companion for media, watch sync, and training
               analytics.
@@ -348,7 +348,7 @@ export function SettingsView({
             <h2>Units</h2>
             <p>
               Choose how distance, pace, elevation, swimming, and strength
-              values appear throughout CorosLink.
+              values appear throughout Heracles Records.
             </p>
           </div>
         </div>

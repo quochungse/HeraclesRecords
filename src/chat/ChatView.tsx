@@ -1001,9 +1001,9 @@ function PlanPreviewCard({
   const destinationLabel: Record<TrainingPlanDestination, string> = {
     workoutLibrary: "COROS Workout Library",
     calendar: "COROS Calendar",
-    localPlan: "CorosLink Training Library",
+    localPlan: "Heracles Records Training Library",
     nativePlan: "COROS Plan Library",
-    localTemplate: "Local CorosLink template",
+    localTemplate: "Local Heracles Records template",
     nativePlanAndCalendar: "COROS plan + Calendar"
   };
 
@@ -1286,7 +1286,7 @@ function PlanPreviewCard({
               </span>
               <span className="chat-plan-destination-copy">
                 <strong>Training Plan</strong>
-                <small>Keep these workouts together as one editable plan in CorosLink.</small>
+                <small>Keep these workouts together as one editable plan in Heracles Records.</small>
               </span>
               <CircleCheck
                 className="chat-plan-destination-check"
@@ -1371,7 +1371,7 @@ function PlanPreviewCard({
               {destination === "localPlan"
                 ? `This will be saved as one grouped plan with ${draft.entries.length} ${
                     draft.entries.length === 1 ? "workout" : "workouts"
-                  } in your CorosLink Training Library.`
+                  } in your Heracles Records Training Library.`
                 : destination === "calendar"
                   ? `${scheduledWorkoutCount} ${
                       scheduledWorkoutCount === 1 ? "workout" : "workouts"
@@ -2753,7 +2753,7 @@ export function ChatView({
       onError(
         caught instanceof Error
           ? caught.message
-          : "Could not sign CorosLink out of Claude."
+          : "Could not sign Heracles Records out of Claude."
       );
     } finally {
       setRevokingClaude(false);
@@ -4054,8 +4054,8 @@ export function ChatView({
               />
               <p className="chat-login-note">
                 {chatSettings.claudeCode.useAppScopedAuth !== false
-                  ? "Signing in here creates credentials that belong to CorosLink alone. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
-                  : "CorosLink will use the machine-wide Claude login in your home folder, shared with your terminal. Signing in here replaces that login."}
+                  ? "Signing in here creates credentials that belong to Heracles Records alone. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
+                  : "Heracles Records will use the machine-wide Claude login in your home folder, shared with your terminal. Signing in here replaces that login."}
               </p>
               <div className="chat-login-actions">
                 {notInstalled ? (

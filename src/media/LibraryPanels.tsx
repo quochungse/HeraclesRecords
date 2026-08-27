@@ -496,7 +496,7 @@ export function LocalLibraryPanel({
     <section className="library-panel library-panel--local" aria-label="Local cache">
       <header className="library-panel-header">
         <div>
-          <p className="eyebrow">CorosLink</p>
+          <p className="eyebrow">Heracles Records</p>
           <h3>Local cache</h3>
         </div>
         <em>

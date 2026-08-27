@@ -47,6 +47,10 @@ def _load_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/System/Library/Fonts/Supplemental/Arial.ttf",
         "/Library/Fonts/Arial.ttf",
+        # Linux fallbacks. Liberation Sans is metrically compatible with
+        # Arial, so the layout matches what macOS renders.
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ):
         path = Path(candidate)
         if path.exists():
@@ -85,7 +89,7 @@ def render_background(width: int, height: int) -> Image.Image:
     title_font = _load_font(max(18, width // 24))
     hint_font = _load_font(max(13, width // 34))
 
-    title = "Drag CorosLink to Applications"
+    title = "Drag Heracles Records to Applications"
     hint = "Then eject this disk image and open from Applications"
 
     # Pillow 10+ uses textbbox; fall back for older releases.
@@ -101,7 +105,7 @@ def render_background(width: int, height: int) -> Image.Image:
     draw.text(((width - title_w) / 2, 28), title, fill=TEXT, font=title_font)
     draw.text(((width - hint_w) / 2, height - 42), hint, fill=MUTED, font=hint_font)
 
-    for x, label in ((app_x, "CorosLink"), (apps_x, "Applications")):
+    for x, label in ((app_x, "Heracles Records"), (apps_x, "Applications")):
         if hasattr(draw, "textbbox"):
             box = draw.textbbox((0, 0), label, font=hint_font)
             label_w = box[2] - box[0]

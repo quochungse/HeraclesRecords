@@ -1221,7 +1221,7 @@ export function WatchfacesView({
             </p>
             {!status.secureStorageAvailable ? (
               <p className="watchface-auth-warning">
-                Your sign-in will be removed when you close CorosLink.
+                Your sign-in will be removed when you close Heracles Records.
               </p>
             ) : null}
           </section>
@@ -3239,7 +3239,7 @@ function PublishDialog(props: PublishDialogProps) {
             {!props.secureStorageAvailable ? (
               <p className="watchface-auth-warning">
                 Secure storage is unavailable. This session will be cleared when
-                CorosLink closes.
+                Heracles Records closes.
               </p>
             ) : null}
           </>

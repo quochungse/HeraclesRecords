@@ -951,7 +951,7 @@ export function StrengthView({
               </span>
             </label>
             <p className="strength-hevy-privacy">
-              CorosLink reads completed workouts only. It never writes to Hevy or
+              Heracles Records reads completed workouts only. It never writes to Hevy or
               sends Hevy workouts to COROS.
             </p>
             <footer>

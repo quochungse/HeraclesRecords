@@ -613,7 +613,7 @@ const completionRequest = openRouterRequests.find(({ href }) =>
 );
 assert.ok(completionRequest);
 assert.equal(completionRequest.init.headers.Authorization, "Bearer sk-or-v1-test");
-assert.equal(completionRequest.init.headers["X-Title"], "CorosLink");
+assert.equal(completionRequest.init.headers["X-Title"], "Heracles Records");
 const completionBody = JSON.parse(String(completionRequest.init.body));
 assert.equal(completionBody.model, "openrouter/auto");
 assert.equal(completionBody.tools[0].function.name, "get_training_load");
