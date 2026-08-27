@@ -692,9 +692,11 @@ A `through` past the end of a transcript describes a conversation that is no lon
 
 `getClaudeCodeTools(permissions)` ([chatService.ts:1356](../electron/chatService.ts#L1356)) gains a policy argument. Under `read-only`:
 
-**Allowed:** `list_recent_activities`, `get_activity_detail`, `get_fitness_trends`, `get_hr_zone_summary`, `list_scheduled_workouts`, `search_coros_exercises`, `draft_workout`, `draft_training_plan`, and COROS MCP read tools already gated by `permissions`.
+**Allowed:** `list_recent_activities`, `get_activity_detail`, `get_fitness_trends`, `get_hr_zone_summary`, `list_scheduled_workouts`, `search_coros_exercises`, `draft_workout`, `draft_training_plan`, `request_coach_input`, and COROS MCP read tools already gated by `permissions`.
 
 **Blocked:** `upload_training_plan`, `delete_workout`, and any future write tool. Non-COROS MCP servers the athlete configured are **excluded** from auto runs by default — their write surface is unknown.
+
+**It is an allowlist, and it has to be.** The list above is the mechanism, not a description of one: `READ_ONLY_ALLOWED_TOOLS` holds exactly those names and a local tool that is not on it is unreachable from an unattended run. It was a *blocklist* of the two write tools until R6, which cannot deliver "any future write tool" — a tool added tomorrow was allowed, and decision 3 held only for as long as everybody adding one remembered this file existed. `test:coach-automation-guards` now scrapes every `*_TOOL_NAMES` export and fails if a tool the app owns is on neither side, so adding one forces the decision rather than defaulting to reachable.
 
 Drafting stays allowed because it is already non-destructive: `upload_training_plan` refuses to write from a tool call and returns `confirmation_required` ([chatWorkoutTools.ts:789](../electron/chatWorkoutTools.ts#L789)); the real write happens from the athlete's confirmation card via `chat:uploadPlanDraft`. An automation therefore produces a `planDraft` entry that waits in the transcript until the athlete approves it. Identical in every phase.
 
@@ -1066,6 +1068,21 @@ Every phase-2 addition multiplied what this feature spends — a schedule fires 
 **Each pause lifts on its own cause, not on any good news.** The two reasons share one flag, and the run pipeline clears a 2FA pause the moment a COROS session answers — which a "Run now" reaches even while a *budget* pause is up, because the athlete's own button bypasses the gate. Clearing there would take the banner down and let one more unattended run through before guard rail 4b put it back, so the clear is narrowed to the reason it is about.
 
 **"Run now" spends anyway.** Every other rate guard yields to 3.4's bypass and this one is no different: an athlete who has been shown the number and presses the button has decided. A ceiling that also refused them would be a ceiling on their own decisions rather than on unattended spend.
+
+### What the feature costs, counted
+
+Measured rather than estimated, so nobody has to count it again — the workings are in [coach-automations-cost-and-exposure.md](./coach-automations-cost-and-exposure.md), and the watcher's per-tick reads are asserted in `test:coach-activity-watcher`.
+
+| | Cost |
+|---|---|
+| Scheduler tick, steady state | 4 store calls: one automation list, one binding list per automation. The threshold snapshot is read **once** per tick and only when a threshold rule exists |
+| Watcher tick | 1 automation list, 1 COROS-auth read, 1 unseen-activity scan, 1 COROS index fetch — plus one payload-free trigger per enabled activity automation, which is what makes a refused activity come round again (4) |
+| One run | ~21 store calls and **1 provider turn**, plus one turn per tool round the model asks for, plus one for a roll. A roll happens once every `LIMIT - KEEP` = 40 runs |
+| Rows per day, four automations and one activity | ~4 run rows, 1 conversation (the `per-run` debrief's), 1 daily sample. About 1,500 run rows a year |
+
+**Nothing prunes the run log**, deliberately (2.4). At that rate nothing degrades: the log is read with `limit: 50` behind `idx_automation_runs_automation`, and the monthly `SUM` has `idx_automation_runs_started`.
+
+The one unbounded number is **skips**. A binding refused persistently — a signed-out provider is the realistic case — writes one row per 15-minute poll for as long as it lasts, which is 96 a day. Queries do not degrade; the run log becomes hard to read, which is the same complaint 10 makes about the 2FA case. Bounding it is an open decision, not a defect.
 
 ---
 

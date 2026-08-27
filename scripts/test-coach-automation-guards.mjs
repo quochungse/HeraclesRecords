@@ -127,11 +127,74 @@ for (const tool of everything) {
     `${tool.name} must be unavailable under "none"`
   );
 }
+// R6 step 12. This block used to assert the opposite — that a name the app does
+// not know is **allowed** under read-only — because the policy was a blocklist
+// of the two write tools it happened to know about. Section 6 promises
+// something a blocklist cannot deliver: "Blocked: `upload_training_plan`,
+// `delete_workout`, and *any future write tool*." So decision 3 held only for
+// as long as everybody adding a tool remembered this file existed.
 assert.equal(
-  isToolAllowedUnderPolicy("get_recent_activities", "read-only"),
-  true,
-  "and the read-only set is untouched by adding it"
+  isToolAllowedUnderPolicy("upload_everything_to_coros", "read-only"),
+  false,
+  "a tool the app has not decided about is not reachable from an unattended run"
 );
+assert.equal(
+  isToolAllowedUnderPolicy("upload_everything_to_coros", "interactive"),
+  true,
+  "and the athlete's own turn is unaffected — this is about runs nobody is watching"
+);
+// The same default protects the MCP surface from a change nobody has made yet.
+// Foreign tools arrive prefixed today — `getAllMcpTools` puts the server id on
+// every one — so the `serverId !== "coros"` rule is what excludes them (6). If
+// that prefixing ever stopped, an unprefixed foreign name would fall through to
+// the local list, and under the old blocklist it would have been **allowed**.
+// Now it is not, and that is the whole value of a default that says no.
+assert.equal(
+  isToolAllowedUnderPolicy("write_file", "read-only"),
+  false,
+  "a bare name the app does not own is not reachable, prefix or no prefix"
+);
+
+// The teeth: every tool the app owns has to be on one side or the other, so
+// adding one without deciding fails here rather than defaulting to reachable.
+{
+  const dist = (file) => require(path.join(repoRoot, "dist-electron", file));
+  const localToolNames = [
+    ...dist("chatActivityTools.js").CHAT_ACTIVITY_TOOL_NAMES,
+    ...dist("chatAnalyticsTools.js").CHAT_ANALYTICS_TOOL_NAMES,
+    ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
+    ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
+  ];
+  assert.ok(localToolNames.length >= 11, "the tool-name scrape has drifted");
+
+  // 6's own lists: eight reads plus `request_coach_input`, which is reachable
+  // and answers "no athlete is available"; the two writes are refused.
+  const expectedAllowed = new Set([
+    "list_recent_activities",
+    "get_activity_detail",
+    "get_fitness_trends",
+    "get_hr_zone_summary",
+    "list_scheduled_workouts",
+    "search_coros_exercises",
+    "draft_workout",
+    "draft_training_plan",
+    "request_coach_input"
+  ]);
+  const expectedBlocked = new Set(["upload_training_plan", "delete_workout"]);
+
+  for (const name of localToolNames) {
+    const decided = expectedAllowed.has(name) || expectedBlocked.has(name);
+    assert.ok(
+      decided,
+      `${name} is a tool the app owns and section 6 has not said which side it is on`
+    );
+    assert.equal(
+      isToolAllowedUnderPolicy(name, "read-only"),
+      expectedAllowed.has(name),
+      `${name} must be ${expectedAllowed.has(name) ? "allowed" : "blocked"} under read-only`
+    );
+  }
+}
 
 // The one caller of "none" is 5.7's summariser, and the runner suite injects
 // that dep — so nothing executes the policy the real one asks for. This is the

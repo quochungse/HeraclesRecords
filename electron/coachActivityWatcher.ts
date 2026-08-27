@@ -217,11 +217,24 @@ export class CoachActivityWatcher {
       return;
     }
     this.ticking = true;
+    // Hoisted above both try blocks: the snapshot below runs whatever the
+    // activity half did, so it needs the same two reads and must not repeat
+    // them. Defaults cover the read itself throwing, in which case the snapshot
+    // has nothing to act on either.
+    let automations: CoachAutomation[] = [];
+    let connected = false;
     try {
-      const coldStart = await this.poll();
-      const fired = await this.flushDueBatches();
+      // Read once and passed down. Four separate reads of the same list per
+      // tick — poll, the flush, the catch-up and the snapshot — is four full
+      // `listCoachAutomations()` calls, each of which parses and normalises
+      // every stored definition. The list cannot change inside one tick: this
+      // is the main process and nothing here awaits an IPC handler.
+      automations = this.deps.listAutomations();
+      connected = this.deps.isCorosAuthenticated();
+      const coldStart = await this.poll(automations, connected);
+      const fired = await this.flushDueBatches(automations);
       if (!coldStart) {
-        await this.offerOwedActivities(fired);
+        await this.offerOwedActivities(fired, automations, connected);
       }
     } catch (error) {
       this.deps.onError(error);
@@ -230,7 +243,7 @@ export class CoachActivityWatcher {
       // Last, and outside the work above: activities are the time-sensitive
       // half of this tick — a run the athlete is waiting for — and a slow COROS
       // asked about a 30-day baseline must not stand in front of them.
-      await this.snapshotDailySamples(this.deps.now());
+      await this.snapshotDailySamples(this.deps.now(), automations, connected);
     } catch (error) {
       this.deps.onError(error);
     } finally {
@@ -239,18 +252,19 @@ export class CoachActivityWatcher {
   }
 
   /** True when this tick was the cold start that stamped the back catalogue. */
-  private async poll(): Promise<boolean> {
-    const automations = this.deps
-      .listAutomations()
-      .filter(
-        (automation) => automation.enabled && automation.trigger.kind === "activity"
-      );
+  private async poll(
+    all: CoachAutomation[],
+    connected: boolean
+  ): Promise<boolean> {
+    const automations = all.filter(
+      (automation) => automation.enabled && automation.trigger.kind === "activity"
+    );
 
     // The cold-start stamp still has to happen with no automations configured,
     // otherwise the athlete's whole history is "new" the day they add one.
     const firstRun = !this.deps.getSetting(INITIALIZED_SETTING);
 
-    if (!this.deps.isCorosAuthenticated()) {
+    if (!connected) {
       return false;
     }
 
@@ -321,16 +335,20 @@ export class CoachActivityWatcher {
    * pending produces an empty plan, which a non-manual trigger logs nothing for,
    * so the only automations this costs anything are the ones genuinely waiting.
    */
-  private async offerOwedActivities(fired: Set<string>): Promise<void> {
+  private async offerOwedActivities(
+    fired: Set<string>,
+    all: CoachAutomation[],
+    connected: boolean
+  ): Promise<void> {
     // Behind the same gate `poll` uses, so the watcher keeps its one rule: it
     // does no work of any kind while COROS is disconnected. The runner's own
     // COROS check would try a reconnect on every one of these, and the tick
     // that finds the connection back re-offers everything anyway — nothing is
     // lost by waiting for it, which is the whole point of this method.
-    if (!this.deps.isCorosAuthenticated()) {
+    if (!connected) {
       return;
     }
-    for (const automation of this.deps.listAutomations()) {
+    for (const automation of all) {
       if (!automation.enabled || automation.trigger.kind !== "activity") {
         continue;
       }
@@ -355,7 +373,11 @@ export class CoachActivityWatcher {
    * missed top-up changes nothing, and a threshold that fired on a *cache* gap
    * rather than on the athlete's data would be worse than one that waited.
    */
-  private async snapshotDailySamples(now: Date): Promise<void> {
+  private async snapshotDailySamples(
+    now: Date,
+    all: CoachAutomation[],
+    connected: boolean
+  ): Promise<void> {
     // Deliberately not behind the "is anything listening for activities" check
     // in `poll`: a threshold rule has no activity trigger, so gating on *that*
     // would starve exactly the feature this cache exists for.
@@ -366,15 +388,13 @@ export class CoachActivityWatcher {
     // of cost section 13 exists to notice. A rule created later finds the cache
     // empty for one tick and then full, and its first evaluation only seeds
     // (3.3), so nothing is missed by waiting.
-    if (!this.deps.isCorosAuthenticated()) {
+    if (!connected) {
       return;
     }
-    const wanted = this.deps
-      .listAutomations()
-      .some(
-        (automation) =>
-          automation.enabled && automation.trigger.kind === "threshold"
-      );
+    const wanted = all.some(
+      (automation) =>
+        automation.enabled && automation.trigger.kind === "threshold"
+    );
     if (!wanted) {
       return;
     }
@@ -435,12 +455,10 @@ export class CoachActivityWatcher {
   }
 
   /** The automations this flush fired a trigger for. */
-  private async flushDueBatches(): Promise<Set<string>> {
+  private async flushDueBatches(all: CoachAutomation[]): Promise<Set<string>> {
     const fired = new Set<string>();
     const now = this.deps.now().getTime();
-    const automations = new Map(
-      this.deps.listAutomations().map((automation) => [automation.id, automation])
-    );
+    const automations = new Map(all.map((automation) => [automation.id, automation]));
 
     for (const [automationId, batch] of [...this.batches]) {
       const automation = automations.get(automationId);

@@ -1936,17 +1936,42 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
  * `upload_training_plan` and `delete_workout` are the write surface today; any
  * future write tool must be added here as well.
  */
-const READ_ONLY_BLOCKED_TOOLS = new Set(["upload_training_plan", "delete_workout"]);
-
 /**
- * Narrows a tool set to what an automation run may call. Beyond the named
- * write tools this drops every non-COROS MCP server the athlete configured:
- * their write surface is unknown, so they are excluded by default rather than
- * inspected.
+ * Section 6's read-only set, as an **allowlist**.
+ *
+ * It was a blocklist of the two known write tools, and that cannot deliver what
+ * 6 promises — *"Blocked: `upload_training_plan`, `delete_workout`, and any
+ * future write tool."* A blocklist makes a tool added tomorrow **allowed**, so
+ * decision 3 ("auto runs may draft and propose, never write to COROS") held
+ * only for as long as everybody who adds a tool remembers this file exists.
+ * Inverting it moves the default to the safe side: a new tool is unreachable
+ * from an unattended run until somebody says otherwise, which is the same rule
+ * already applied to non-COROS MCP servers one line down.
+ *
+ * `request_coach_input` is on the list deliberately: nobody is there to answer,
+ * so it returns "state your assumption and continue" and leaves a `coachPrompt`
+ * card the athlete can answer later (6).
  *
  * Drafting stays allowed because it is already non-destructive — the draft
  * tools return a preview and the real write only happens from the athlete's
  * confirmation card.
+ */
+const READ_ONLY_ALLOWED_TOOLS = new Set([
+  "list_recent_activities",
+  "get_activity_detail",
+  "get_fitness_trends",
+  "get_hr_zone_summary",
+  "list_scheduled_workouts",
+  "search_coros_exercises",
+  "draft_workout",
+  "draft_training_plan",
+  "request_coach_input"
+]);
+
+/**
+ * Narrows a tool set to what an automation run may call. Beyond the allowlist
+ * this drops every non-COROS MCP server the athlete configured: their write
+ * surface is unknown, so they are excluded by default rather than inspected.
  */
 export function isToolAllowedUnderPolicy(
   name: string,
@@ -1958,11 +1983,16 @@ export function isToolAllowedUnderPolicy(
   if (policy !== "read-only") {
     return true;
   }
-  if (READ_ONLY_BLOCKED_TOOLS.has(name)) {
-    return false;
-  }
   const remote = splitToolName(name);
-  return !remote || remote.serverId === "coros";
+  // A remote tool's write surface is its server's business, and only the COROS
+  // one is known — those are already permission-gated by name before they get
+  // here (6).
+  if (remote) {
+    return remote.serverId === "coros";
+  }
+  // A local tool the app owns. Not on the list means not decided, and not
+  // decided means not reachable from a run nobody is watching.
+  return READ_ONLY_ALLOWED_TOOLS.has(name);
 }
 
 export function applyChatToolPolicy(

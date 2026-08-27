@@ -746,4 +746,48 @@ assert.equal(
   );
 }
 
+// ---------------------------------------------------------------------------
+// R6 step 11: what a tick costs, pinned
+// ---------------------------------------------------------------------------
+// Counted rather than estimated, and asserted so it cannot drift. The two reads
+// below were four and three respectively — poll, the flush, the catch-up and the
+// snapshot each asking again — and `listCoachAutomations()` parses and
+// normalises every stored definition on each call. The list cannot change
+// inside one tick: this is the main process and nothing here awaits an IPC
+// handler.
+{
+  const world = createWorld();
+  world.markInitialized();
+  world.automations = [
+    activityAutomation({ id: "a1" }, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } }),
+    activityAutomation({ id: "a2" }, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } }),
+    // A threshold rule, so the snapshot half of the tick runs too and its own
+    // reads are inside the count.
+    { ...activityAutomation({ id: "a3" }), trigger: { kind: "threshold", metric: "sleepDebt", value: 4 } }
+  ];
+
+  let listReads = 0;
+  let authReads = 0;
+  const counted = new CoachActivityWatcher({
+    ...world.deps,
+    listAutomations: () => {
+      listReads += 1;
+      return world.deps.listAutomations();
+    },
+    isCorosAuthenticated: () => {
+      authReads += 1;
+      return world.deps.isCorosAuthenticated();
+    }
+  });
+
+  await counted.tick();
+  assert.equal(listReads, 1, "one tick reads the automation list once");
+  assert.equal(authReads, 1, "and asks about COROS once");
+
+  // A second tick is a second read, not a cached one: the athlete can add a
+  // coach between ticks and the next one has to see it.
+  await counted.tick();
+  assert.equal(listReads, 2, "and reads again on the next tick");
+}
+
 console.log("coach activity watcher tests passed");
