@@ -1,8 +1,27 @@
 # Coach Automations (proactive coach runs)
 
-Status: **phase 1 shipped, phase 2 shipped, phase 3 shipped**. The rest of phase 3 is still design. Target: CorosLink desktop (Electron main + React renderer). Written 2026-08-21, revised 2026-08-25 against the built code.
+Status: **all three phases shipped, and reviewed**. Target: CorosLink desktop (Electron main + React renderer). Written 2026-08-21, revised 2026-08-25 against the built code, reconciled 2026-08-27 after the review below.
 
-Sections describing built behaviour are a record of what exists; sections 3.3, 5.7 and the phase 3 plan are still design. Where the build diverged from the original design the divergence is written down with its reason — those reasons are the useful part.
+Every section describes what exists. Nothing here is design any more — the two that were, 3.3 and 5.7, shipped in phase 3. Where the build diverged from the original design the divergence is written down with its reason; those reasons are the useful part.
+
+**The review.** Seven rounds, run along failure modes rather than modules, on the plan in [coach-automations-review.md](./coach-automations-review.md). It found 25 defects and fixed them, and its workings live in six companion files rather than here — this document says what the feature *is*, and they say how it was checked:
+
+| | What it holds |
+|---|---|
+| [map](./coach-automations-map.md) | every table, column, IPC channel, dep seam and suite, and where this document had drifted from the code |
+| [refusals](./coach-automations-refusals.md) | every ordered pair of the twenty ways a run can be declined, and what each writes |
+| [lifecycle](./coach-automations-lifecycle.md) | the schedule slot, the activity watermark and the threshold flag through every way a run can end |
+| [conversations](./coach-automations-conversations.md) | the three writers on one transcript, and every interleaving that could lose an entry |
+| [pushes](./coach-automations-pushes.md) | every piece of main-process state, the push that announces it, and the surfaces that render it |
+| [persistence](./coach-automations-persistence.md) | what every column reads as from an older version, a hand edit, or a crash |
+| [test integrity](./coach-automations-test-integrity.md) | 48 mutations over the suites everything above rests on |
+| [cost and exposure](./coach-automations-cost-and-exposure.md) | what a tick, a run and a year cost, and what the tool policy lets through |
+
+Three lessons recur often enough to be worth stating once, because they are how almost every defect here was found:
+
+1. **A fixture that sits where two readings agree proves nothing**, and looks exactly like one that does. Three separate tests passed against inverted logic for this reason.
+2. **A default dep is code no suite can reach.** Every suite injects fakes on purpose; `createDefaultDeps` and the body of `streamChat` are therefore permanently outside them, and three rounds each found a wire there with no cover.
+3. **A test can assert the defect it was written beside.** Four did — the merge that deleted a coach's answer, the watcher that never asked again, the tool policy that let a new tool through, and the run cost that was never recorded.
 
 A **Coach Automation** is a reusable coach definition — a role, a job, and a trigger condition — that the athlete can attach to one or more conversations. When its trigger fires, it runs one coach turn headlessly in the main process and writes the result into every conversation it is attached to.
 
@@ -22,7 +41,7 @@ Automation (role + job + trigger)  ──attached to──▶  Binding (a conver
 
 ### Execution lifetime (decision 1)
 
-Keep this simple: the scheduler and the activity watcher start in `app.whenReady()` and stop in `before-quit` ([main.ts:825](../electron/main.ts#L825)) — never wired to the window. If the app is running, automations run; if it is not, they do not, and the next launch catches up (3.1). On macOS that means they keep going with the window closed ([main.ts:819](../electron/main.ts#L819)); elsewhere they stop with the app.
+Keep this simple: the scheduler and the activity watcher start in `app.whenReady()` and stop in `before-quit` ([main.ts:885](../electron/main.ts#L885)) — never wired to the window. If the app is running, automations run; if it is not, they do not, and the next launch catches up (3.1). On macOS that means they keep going with the window closed ([main.ts:879](../electron/main.ts#L879)); elsewhere they stop with the app.
 
 Nothing is built to keep the process alive — no auto-launch, no tray, no OS scheduling. A run with no window open still completes and persists; the athlete sees it as unread next time a window exists.
 
@@ -39,7 +58,9 @@ Nothing is built to keep the process alive — no auto-launch, no tray, no OS sc
 
 ## 1. Data model
 
-New tables, following the `CREATE TABLE IF NOT EXISTS` block in [database.ts:147](../electron/database.ts#L147). Additive columns later go through `ensureColumn` ([database.ts:536](../electron/database.ts#L536)).
+New tables, following the `CREATE TABLE IF NOT EXISTS` block in [database.ts:147](../electron/database.ts#L147). Additive columns later go through `ensureColumn` ([database.ts:662](../electron/database.ts#L662)).
+
+**The block below is the model, not the schema.** Nine of its columns arrived through `ensureColumn` across three phases — on bindings: `last_activity_at`, `backoff_until`, `backoff_level`, `threshold_firing`; on runs: `input_tokens`, `output_tokens`; on `chat_sessions`: `coach_summary`, `coach_summary_through`; on `training_activities`: `coach_seen_at` — so they are absent from a database that predates them and NULL on one that has just been migrated. They are shown inline because that is how the tables read; what each NULL means, and what a hand-edited value reads as, is in [persistence](./coach-automations-persistence.md).
 
 ```sql
 -- The definition. Knows nothing about conversations.
@@ -129,6 +150,11 @@ CREATE INDEX IF NOT EXISTS idx_automation_runs_automation
   ON coach_automation_runs (automation_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_automation_runs_binding
   ON coach_automation_runs (binding_id, started_at DESC);
+
+-- 13's monthly spend narrows by nothing but the date, and the two above are
+-- both prefixed by an id, so neither can serve it.
+CREATE INDEX IF NOT EXISTS idx_automation_runs_started
+  ON coach_automation_runs (started_at);
 
 -- 3.3: the two series a threshold metric needs and the app does not otherwise
 -- keep. COROS owns resting HR and sleep; the activity watcher snapshots them
@@ -301,7 +327,7 @@ One trigger event produces **one run per enabled binding**, not one run broadcas
 
 The cost consequence must be visible: the automation editor shows *"Runs in 3 places → 3 model calls per trigger"*, and the list screen shows the binding count next to the name. A single-binding default keeps new automations cheap.
 
-**Serialization is mandatory, not an optimisation.** `saveChatSession` ([chatHistoryStore.ts:985](../electron/chatHistoryStore.ts#L985)) writes the whole entry array; two runs finishing into the same conversation concurrently would clobber each other last-write-wins. Runs targeting the same `session_id` therefore execute **sequentially in `sort_order`**, which has a useful side effect: a later coach sees the earlier coach's message in the transcript and can build on it.
+**Serialization is mandatory, not an optimisation.** `saveChatSession` ([chatHistoryStore.ts:1071](../electron/chatHistoryStore.ts#L1071)) writes the whole entry array; two runs finishing into the same conversation concurrently would clobber each other last-write-wins. Runs targeting the same `session_id` therefore execute **sequentially in `sort_order`**, which has a useful side effect: a later coach sees the earlier coach's message in the transcript and can build on it.
 
 **Burst guard:** at most 5 automation messages per conversation per hour. A run over the limit records a `burst` skip; the trigger that would have produced it comes round again on the next poll.
 
@@ -317,7 +343,7 @@ The cost consequence must be visible: the automation editor shows *"Runs in 3 pl
 
 ### 2.5 Naming conversations
 
-There is no rename API today: `createChatSession` ([chatHistoryStore.ts:963](../electron/chatHistoryStore.ts#L963)) inserts `DEFAULT_SESSION_TITLE`, and `saveChatSession` only derives a title from the first entries while the title is still the default — which would name an automation's conversation after its own prompt text.
+There is no rename API today: `createChatSession` ([chatHistoryStore.ts:1014](../electron/chatHistoryStore.ts#L1014)) inserts `DEFAULT_SESSION_TITLE`, and `saveChatSession` only derives a title from the first entries while the title is still the default — which would name an automation's conversation after its own prompt text.
 
 Phase 1 therefore adds `setChatSessionTitle(id, title)` to the store plus a `chat:renameSession` IPC channel, used for both `dedicated` conversations and `per-run` `titleTemplate` rendering. Template variables: `{{rule.name}}`, `{{date}}`, `{{activity.name}}`, `{{activity.sport}}`, `{{week.range}}`.
 
@@ -339,7 +365,7 @@ Desktop apps are not always running, so the scheduler is **not** a cron. Each bi
 | Slot due, missed by **more than 24h** | One `stale-slot` skip, and the next slot booked **from now** — the whole backlog behind it goes with it. |
 | Slot due | Book the next slot, *then* run. |
 
-Ticker: `setInterval` at 60s in the main process, started inside `app.whenReady()` and cleared on `before-quit` ([main.ts:854](../electron/main.ts#L854)) — **not** tied to `createWindow` / `"closed"`.
+Ticker: `setInterval` at 60s in the main process, started inside `app.whenReady()` and cleared on `before-quit` ([main.ts:888](../electron/main.ts#L888)) — **not** tied to `createWindow` / `"closed"`.
 
 **The catch-up pass is the ordinary tick.** `start()` ticks immediately rather than waiting out the first minute, and a slot that came due while the app was closed is simply a slot in the past. There is no second code path for it.
 
@@ -351,7 +377,7 @@ Four things the build had to get right that the design above does not say on its
 
 **Every step is a calendar step.** `setDate(getDate() + n)`, never `+ 86_400_000`. The day a clock springs forward is 23 real hours long, so a scheduler that advanced by a fixed span would deliver the 07:00 briefing at 08:00 every day until the next boundary. A time the clock skips entirely (02:30 on a spring-forward morning) resolves to the moment the clock passes it rather than vanishing.
 
-**Editing a trigger clears every slot it had booked.** Moving a briefing from 07:00 to 21:00 must not deliver one more 07:00 first, so `updateCoachAutomation` nulls `next_run_at` on that automation's bindings when the trigger actually changed ([coachAutomationStore.ts:463](../electron/coachAutomationStore.ts#L463)). Re-sending an identical trigger is not a change. This is also what keeps a quiet-hours deferral safe: because nothing else second-guesses a stored slot, a deferred one is left exactly where the scheduler put it.
+**Editing a trigger clears every slot it had booked.** Moving a briefing from 07:00 to 21:00 must not deliver one more 07:00 first, so `updateCoachAutomation` nulls `next_run_at` on that automation's bindings when the trigger actually changed ([coachAutomationStore.ts:508](../electron/coachAutomationStore.ts#L508)). Re-sending an identical trigger is not a change. This is also what keeps a quiet-hours deferral safe: because nothing else second-guesses a stored slot, a deferred one is left exactly where the scheduler put it.
 
 ### 3.2 New activity
 
@@ -385,7 +411,9 @@ Rows are stamped `coach_seen_at` **at flush, not at ingest**, so quitting mid-wi
 | `multiActivity` on | All of them, **one run each**, in the order the athlete lived them |
 | "Run now", never analysed anything | The newest match, **ignoring the attach floor** — the athlete asked for an answer now, and a coach attached five minutes ago would otherwise have nothing to say |
 
-The watermark advances only on `success` or `silent` — the model looked. A `failed` or `cancelled` run leaves it, so the activity returns with the next trigger.
+The watermark advances only on `success` or `silent` — the model looked — and only **after the answer is on disk**, so a run whose persistence throws leaves it where it was rather than recording an activity nobody can read. A `failed` or `cancelled` run leaves it too, so the activity returns with the next trigger.
+
+**And something has to come back for it.** `coach_seen_at` is stamped at flush, before the runner answers and whatever it answers, so the watcher's own "is anything unseen" test can never re-fire for a refused activity. The tick therefore asks again on every poll: one payload-free trigger per enabled activity automation, whose binding-level plan is empty — and costs no row — when nothing is owed. Without it, a run refused for any reason at all left the activity owed by the watermark and asked for by nobody, and with `multiActivity` off the next activity to arrive replaced it. See [lifecycle](./coach-automations-lifecycle.md).
 
 Two caps, both deliberate: a scan reaches back at most 200 activities, and one catch-up sequence runs at most 10. A longer backlog analyses only its most recent entries, because replaying a month in one burst costs real provider spend and buries the answer the athlete wanted.
 
@@ -416,6 +444,8 @@ Three rules the snapshot follows, each for a reason section 10 already establish
 - **A failure is not stamped.** The cache keeps whatever it had — the metrics read multi-week windows, so one missed top-up changes nothing — but the next tick tries again rather than buying six hours of silence.
 - **It happens only when a threshold rule exists.** This cache feeds nothing else, and most athletes never write one; filling it anyway would buy them a COROS request every six hours forever for a table nobody reads. A rule created later finds it empty for one tick and full after — and its first evaluation only seeds, so nothing is missed by waiting.
 - **Sleep is read only when the COROS MCP connection already exists.** Its own helper will open an OAuth window to get there, which is right when an athlete asked for a sleep screen and unacceptable on a path that runs unattended, possibly with no window at all.
+
+**A crossing the runner refused is still owed.** Quiet hours *defer* it in the scheduler, exactly as 3.1 defers a slot and for the same reason — the state is left unwritten, so the first tick after the window closes sees the identical transition and announces it then, and the night writes no rows. Any other refusal rolls the state back and the crossing is re-offered on the binding's own retry rhythm rather than on the tick, because one identical skip a minute is the log 10 built the pause to stop filling. A run that *reached* the provider is not a refusal, whatever it concluded.
 
 **The firing state is per binding, on disk, and has three values.** It sits beside `next_run_at` as `threshold_firing`, and `NULL` is the one that matters: it means *never evaluated*. A binding's first tick records what the condition says and announces nothing — otherwise attaching a "tell me when my ramp is steep" coach during a steep block would immediately report a block the athlete has just finished training. After that a `false → true` transition fires and nothing else does, so a metric hovering on its threshold reports once rather than once an hour.
 
@@ -453,9 +483,11 @@ Evaluated per binding, in this order; the first failure records a `skipped` run 
 | 7 | Binding's `maxRunsPerDay` not exhausted | `budget` |
 | 8 | Conversation burst guard (2.3) not exhausted | `burst` |
 
-One reason is not in the table because it is not the runner's: `stale-slot` is recorded by the scheduler for a slot it decided never to hand over (3.1). And two refusals leave the table as soon as they happen: guard rail 4b and the 2FA demand both raise the **pause** (10, 13), which is read before the fan-out — so the first one records a row and every trigger after it records nothing at all.
+One reason is not in the table because it is not the runner's: `stale-slot` is recorded by the scheduler for a slot it decided never to hand over (3.1).
 
-A manual run bypasses 4b, 5, 5b, 6, 7 and 8 (3.4) — including the backoff, because the athlete pressing "Run now" has usually just fixed whatever was broken and an hour of silence is the wrong answer to that. Every guard reads the binding **as it stands now**, not the snapshot taken when the trigger fanned out — a catch-up sequence writes to that row between its own runs.
+**Guards 4b and 7 record the same code and are not the same event.** 4b is the month's ceiling: one fact about every automation the athlete has, so it raises the pause and stops the fan-out. 7 is this binding's own three-runs-a-day: it clears at midnight, says nothing about the other places, and raises nothing. The recorded `skip_reason` is `budget` for both — the words on the row are what tells them apart, following the precedent 10 sets for `no-auth`. Folding the two into one return value meant exhausting one binding's day held every automation in the app; see [refusals](./coach-automations-refusals.md). And two refusals leave the table as soon as they happen: guard rail 4b and the 2FA demand both raise the **pause** (10, 13), which is read before the fan-out — so the first one records a row and every trigger after it records nothing at all.
+
+A manual run bypasses **1**, 4b, 5, 5b, 6, 7 and 8 (3.4) — including the backoff, because the athlete pressing "Run now" has usually just fixed whatever was broken and an hour of silence is the wrong answer to that. Guard 1 is in that list for the reason 3.4 gives: paused places are listed unticked rather than hidden, so "run this one now even though it is paused" is a thing the athlete can mean. Every guard reads the binding **as it stands now**, not the snapshot taken when the trigger fanned out — a catch-up sequence writes to that row between its own runs.
 
 **Quiet hours skip for an activity, and defer for a slot.** An activity trigger has nothing to defer *to*: the activity is not going anywhere, and the next poll will find it still unanalysed because the watermark did not move. A slot is a real loss, so the scheduler moves it to the end of the window (3.1) and the run never reaches guard rail 5. The guard stays in the runner as the backstop for the paths that are not the scheduler — chiefly a run the runner was handed directly.
 
@@ -473,9 +505,9 @@ The backoff is the opposite, and deliberately so: it is checked on **every** ste
 
 ### 5.1 The blocking problem
 
-Today the transcript is assembled and persisted **in the renderer**: `persistHistory` in [ChatView.tsx:1848](../src/chat/ChatView.tsx#L1848) turns stream events into `PersistedChatEntry[]` and calls `chat:saveSession`. The main process only stores what the renderer hands it. A headless run has no renderer turn, so this logic must move.
+Today the transcript is assembled and persisted **in the renderer**: `persistHistory` in [ChatView.tsx:1910](../src/chat/ChatView.tsx#L1910) turns stream events into `PersistedChatEntry[]` and calls `chat:saveSession`. The main process only stores what the renderer hands it. A headless run has no renderer turn, so this logic must move.
 
-`streamChat` ([chatService.ts:835](../electron/chatService.ts#L835)) pushes everything through a local `send()` that writes to `mainWindow.webContents`. It already null-guards the window ([chatService.ts:843](../electron/chatService.ts#L843)), but it also aborts the stream when the window closes ([chatService.ts:850](../electron/chatService.ts#L850)).
+`streamChat` ([chatService.ts:1253](../electron/chatService.ts#L1253)) pushes everything through a local `send()` that writes to `mainWindow.webContents`. It already null-guards the window ([chatService.ts:944](../electron/chatService.ts#L944)), but it also aborts the stream when the window closes ([chatService.ts:953](../electron/chatService.ts#L953)).
 
 ### 5.2 Refactor: stream sinks
 
@@ -492,8 +524,8 @@ export interface StreamChatOptions {
   unitSystem?: UnitSystem;
   /** Automation runs override the saved model/effort (decision 2). */
   runtime?: AutomationRuntime;
-  /** Automation runs narrow the tool set (decision 3). */
-  toolPolicy?: "interactive" | "read-only";
+  /** Automation runs narrow the tool set (decision 3); `none` is 5.7's summariser. */
+  toolPolicy?: ChatToolPolicy;
   /** Automation role, injected as its own hardened instruction block. */
   roleInstructions?: string;
 }
@@ -507,7 +539,7 @@ export async function streamChat(
 ```
 
 - `createWindowSink(mainWindow)` — current behaviour, including abort-on-close.
-- `createCollectorSink()` — accumulates tokens, `thinking`, and every card `kind` into a `PersistedChatEntry[]`, mirroring what [ChatView.tsx:2109](../src/chat/ChatView.tsx#L2109) does with `chat:streamInfo`, and does **not** abort when the window closes.
+- `createCollectorSink(marker?)` — accumulates tokens, `thinking`, and every card `kind` into a `PersistedChatEntry[]`, attributing each to the marker it was given (5.6), mirroring what [ChatView.tsx:2109](../src/chat/ChatView.tsx#L2109) does with `chat:streamInfo`, and does **not** abort when the window closes.
 
 The runner uses a **tee sink**: collector (always) + window sink (when a window exists), so an open Coach view shows the run streaming live while persistence happens in main regardless.
 
@@ -517,7 +549,7 @@ Because a run may start, continue, or finish with no window at all, the tee sink
 
 ### 5.3 Role injection
 
-`buildCoachInstructions(customInstructions)` ([chatCoachContext.ts:18](../electron/chatCoachContext.ts#L18)) already wraps athlete text in a delimited `<athlete_custom_instructions>` block and strips those delimiters from the input so a paste cannot escape it. The automation `role` goes through the **same** hardening as a second block:
+`buildCoachInstructions(customInstructions)` ([chatCoachContext.ts:18](../electron/chatCoachContext.ts#L9)) already wraps athlete text in a delimited `<athlete_custom_instructions>` block and strips those delimiters from the input so a paste cannot escape it. The automation `role` goes through the **same** hardening as a second block:
 
 ```
 <automation_role> … </automation_role>
@@ -569,7 +601,7 @@ how the answer is laid out.
    whatever it asked for.
 ```
 
-`NOTHING_TO_REPORT` → run status `silent`, no badge, and **nothing the model wrote** reaches the transcript. What lands instead is a one-line trace — `⚡ Post-run debrief looked, nothing new · 9:49` — persisted as a `PersistedChatAutomationSilentEntry`. The opening line of a reported answer becomes the `summary` column → run-log row and (phase 3) notification body.
+`NOTHING_TO_REPORT` → run status `silent`, no badge, and **nothing the model wrote** reaches the transcript. What lands instead is a one-line trace — `⚡ Post-run debrief looked, nothing new · 9:49` — persisted as a `PersistedChatAutomationSilentEntry`. The opening line of a reported answer becomes the `summary` column → run-log row, and the card's *"Last run 2h ago · "Tempo felt controlled…""* line (9.1). There is no notification: native notifications are phase 4 and out of scope (12).
 
 **Why the trace exists.** The first build wrote genuinely nothing, and a conversation that keeps no record of a run cannot be told apart from an automation that is broken. Worse, the athlete watching a run stream in saw the bubble vanish mid-sentence. A toast covered that for one release; it only reached whoever happened to be looking, and said nothing to whoever opened the conversation the next morning. The trace answers both, so the toast is gone.
 
@@ -605,7 +637,7 @@ The one guard is general, not a list of markdown constructs to skip: a line with
 
 ### 5.6 Transcript attribution
 
-Add an optional field to `PersistedChatMessageEntry` ([types.ts:2330](../electron/types.ts#L2330)):
+Add an optional field to `PersistedChatMessageEntry` ([types.ts:2360](../electron/types.ts#L2360)):
 
 ```ts
 automation?: {
@@ -617,7 +649,7 @@ automation?: {
 };
 ```
 
-**Important:** `parseEntry` / `parseMessageEntry` in [chatHistoryStore.ts:748](../electron/chatHistoryStore.ts#L748) rebuild entries field by field, so an unlisted field is silently dropped on reload. The parser must be extended in the same change, with a store test covering round-trip.
+**Important:** `parseEntry` / `parseMessageEntry` in [chatHistoryStore.ts:784](../electron/chatHistoryStore.ts#L784) rebuild entries field by field, so an unlisted field is silently dropped on reload. The parser must be extended in the same change, with a store test covering round-trip.
 
 Because a conversation can host up to five automations, the marker carries the automation **name**: the UI renders `⚡ <name> · <triggerLabel>` so the athlete can tell which coach spoke. The synthetic user turn is stored with `role: "user"` and the same marker, rendered as a chip rather than an athlete bubble.
 
@@ -639,7 +671,9 @@ export interface SaveChatSessionOptions {
 }
 ```
 
-Anything the row holds **past that point** is kept and re-appended after the incoming array. Position is the whole test, and it works because the runner only ever appends — a foreign write is always a tail. Omitting the option replaces the row outright, which is what the runner itself wants: it re-read the transcript a moment earlier with nothing awaited in between.
+Anything the row holds **past that point** is kept and re-appended after the incoming array. Position is the whole test, and it works because the runner only ever appends — a foreign write is always a tail. Omitting the option replaces the row outright, which is what the runner itself wants: it re-read the transcript a moment earlier with nothing awaited in between — both are synchronous SQLite calls in one single-threaded process, so no IPC handler can interleave.
+
+**The count is clamped to the array it arrived with.** A caller claiming to account for more entries than it sent is asserting a deletion, and nothing deletes entries — the window only appends to its own timeline or rewrites it in place. Honouring the claim dropped the difference silently, which is the loss this whole mechanism exists to prevent, arrived at from the other direction.
 
 It is a *count*, not an append-only mode, because the window legitimately rewrites its own earlier entries — a plan-draft card gaining upload state, a coach prompt gaining its answer — so it cannot send only what is new. Stating what its array is based on keeps that freedom over its own prefix while never touching a foreign tail.
 
@@ -675,6 +709,10 @@ The summary lives on the **conversation** (`chat_sessions.coach_summary`), not o
 
 Nothing is ever dropped: every entry is either inside the summary or inside the tail, and the two account for the whole transcript.
 
+**The roll runs on the automation's own provider and model** (decision 2), not the interactive chat's: it is a turn taken on this automation's behalf, guard rail 3 pre-flighted *that* provider and no other, and 13 charges its tokens to this run's row. Effort is the one thing that does not inherit — it is cost rather than capability (7), and a summariser compressing text it was handed has nothing to think harder about.
+
+**The pair is one fact on the way in and on the way out.** A stored summary with no count, or a count of zero, is a half-written row: a real roll only fires once the uncovered stretch passes `LIMIT`, so the count it writes can never be below `LIMIT - KEEP`. Such a row reads as *no summary* — the same reading 10 gives a half-written pause — because trusting it sends a summary of turns the model is also about to read in full, and nothing downstream could notice.
+
 **The summariser is a `none`-tool turn.** `ChatToolPolicy` gained a third value for it. The summariser is compressing text it was handed and has nothing to look up, so a tool round-trip is both slower and a chance to wander off the one job it has. It runs under the same idle bound as a run (10), for the same reason: it is a provider call on the automation path, and it happens while a run is still being prepared, before there is a run id for Stop to aim at.
 
 **A roll is best-effort.** If it fails — a provider that declined, or went quiet — the run does **not** fail and the middle of the conversation is **not** dropped. It sends what it would have sent before the roll: everything the stored summary does not already cover. That costs more this once, and the next run rolls again. The alternative, trimming to the tail without a summary to stand in for the head, would quietly delete a year of context and produce an answer that reads perfectly well.
@@ -690,7 +728,7 @@ A `through` past the end of a transcript describes a conversation that is no lon
 `ChatToolPolicy` has three values: `interactive` (everything), `read-only` (decision 3's automation set) and `none`. The third is 5.7's summariser, which works on text it was handed and has no business calling anything.
 
 
-`getClaudeCodeTools(permissions)` ([chatService.ts:1356](../electron/chatService.ts#L1356)) gains a policy argument. Under `read-only`:
+`getClaudeCodeTools(permissions)` ([chatService.ts:2007](../electron/chatService.ts#L2007)) gains a policy argument. Under `read-only`:
 
 **Allowed:** `list_recent_activities`, `get_activity_detail`, `get_fitness_trends`, `get_hr_zone_summary`, `list_scheduled_workouts`, `search_coros_exercises`, `draft_workout`, `draft_training_plan`, `request_coach_input`, and COROS MCP read tools already gated by `permissions`.
 
@@ -700,7 +738,7 @@ A `through` past the end of a transcript describes a conversation that is no lon
 
 Drafting stays allowed because it is already non-destructive: `upload_training_plan` refuses to write from a tool call and returns `confirmation_required` ([chatWorkoutTools.ts:789](../electron/chatWorkoutTools.ts#L789)); the real write happens from the athlete's confirmation card via `chat:uploadPlanDraft`. An automation therefore produces a `planDraft` entry that waits in the transcript until the athlete approves it. Identical in every phase.
 
-`request_coach_input` ([chatInteractionTools.ts:18](../electron/chatInteractionTools.ts#L18)): in an auto run nobody is present to answer. The tool returns *"No athlete is available; state your assumption and continue."*, and the resulting `coachPrompt` entry is persisted so the athlete can answer later.
+`request_coach_input` ([chatInteractionTools.ts:9](../electron/chatInteractionTools.ts#L9)): in an auto run nobody is present to answer. The tool returns *"No athlete is available; state your assumption and continue."*, and the resulting `coachPrompt` entry is persisted so the athlete can answer later.
 
 ---
 
@@ -726,7 +764,7 @@ The automation editor reuses [ModelSwitch.tsx](../src/chat/ModelSwitch.tsx) and 
 
 ## 8. IPC surface
 
-`electron/main.ts` (alongside the `chat:*` handlers around [main.ts:1301](../electron/main.ts#L1301)) and `electron/preload.ts`:
+`electron/main.ts` (alongside the `chat:*` handlers around [main.ts:1512](../electron/main.ts#L1512)) and `electron/preload.ts`:
 
 | Channel | Purpose |
 |---|---|
@@ -744,9 +782,26 @@ The automation editor reuses [ModelSwitch.tsx](../src/chat/ModelSwitch.tsx) and 
 | `coachAutomation:runNow` | Manual run for one or all bindings; returns run ids |
 | `coachAutomation:listRuns` | Run log, filterable by binding |
 | `coachAutomation:cancelRun` | Abort an in-flight run |
-| `coachAutomation:markSeen` | Clear the unread badge |
-| `coachAutomation:onRunUpdate` | Push: run started / finished / failed |
+| `coachAutomation:markSeen` | Clear the unread badge for a set of runs. **Wired end to end and called by nothing** — the sidebar clears marks through `markSessionSeen` below. Kept because the run-log surface 9.2 describes would use it |
+| `coachAutomation:markSessionSeen` | Clear a conversation's marks; this is the one `loadSession` calls (9.3) |
+| `coachAutomation:sessionAttention` | The `⚡`/dot projection for the conversation list (9.3) |
+| `coachAutomation:getPause` | The pause, read on mount (10) |
+| `coachAutomation:resume` | The single way back from a pause (10) |
+| `coachAutomation:getSpend` | The month's spend and the ceiling (13) |
+| `coachAutomation:setBudget` | Set or clear the ceiling (13) |
 | `chat:renameSession` | New; needed by 2.5 |
+
+Three pushes, and that is the whole of the main process's way of telling a window anything:
+
+| Push | Carries | Announces |
+|---|---|---|
+| `coachAutomation:runUpdate` | the run | started / finished / failed / skipped, from the runner and from the scheduler's `stale-slot` |
+| `coachAutomation:pauseUpdate` | the pause or null | 10's flag going up or coming down |
+| `coachAutomation:bindingUpdate` | the binding | a binding whose *rendered* state changed with no run behind it: the slot the scheduler booked (9.1's next-run line), a binding guard rail 2 broke, a `dedicated` binding adopting the conversation it rebuilt |
+
+`bindingUpdate` is deliberately **not** sent for the clocks nothing renders — `last_run_at`, the activity watermark, the backoff pair, `threshold_firing`. A push per binding per run for state no surface shows is the chatter that makes the next reviewer distrust the ones that matter.
+
+Every channel string is paired across `main.ts` and `preload.ts` by `test:ipc-surface`, including the pushes: a typo in either half compiles, type-checks, passes every renderer test, and leaves the push silently dead.
 
 ---
 
@@ -797,7 +852,7 @@ Sub-screens do not draw their own headers. Each publishes its title and back act
 
 1. **Definition** — name, role, playbook (preset starting point + variable hints), the trigger kind and its fields, model/effort, guard rails, and a danger zone.
 
-   The trigger picker offers **after a new activity**, **on a schedule** and **manual only**; threshold (3.3) appears only when a definition already carries one, so the control never renders with nothing selected. Switching kinds resets the trigger rather than remembering the old one — the kinds share no fields, so there is nothing to preserve. A schedule shows cadence, weekday (weekly only) and a time; an activity shows sports, minimums and `multiActivity`.
+   The trigger picker offers all four kinds — **after a new activity**, **on a schedule**, **when a metric crosses a threshold** and **manual only**. Threshold was held back from the picker while 3.3 was unbuilt, on the grounds that the control must never render with nothing selected; phase 3 built it and opened the picker, because otherwise a threshold rule could not be created at all. Switching kinds resets the trigger rather than remembering the old one — the kinds share no fields, so there is nothing to preserve. A schedule shows cadence, weekday (weekly only) and a time; an activity shows sports, minimums and `multiActivity`.
 
    Guard rails gained **quiet hours**, which had a place in the data model from phase 1 and no way to set. Clearing it needs an explicit `conditions.quietHours: null`: an absent key already means "unchanged", so it could not also mean "remove".
 
@@ -840,7 +895,7 @@ Only those two statuses count. They are the two that write to the transcript, an
 
 **"A run is in flight here" is derived, never accumulated.** The popover's per-row spinner reads a `statuses: ["running"]` query re-run on every refresh, not a map built up from the pushes. Accumulating looked cheaper and was wrong twice: the terminal update for a `per-run` binding names the conversation the run *created*, not the one the binding is attached to, so its entry was never cleared; and switching conversations and back left the map holding runs that had finished while the athlete was elsewhere. For the same reason the subscription is deliberately **unfiltered** — filtering on the open session's id threw away every update about a `per-run` row on screen. Runs are serialised process-wide (5.4), so the query reads at most one row.
 
-**Ordering caveat:** commit `d893206` deliberately stopped read-only opens from bumping `updated_at`, and `saveChatSession` skips the write when the transcript is unchanged ([chatHistoryStore.ts:1006](../electron/chatHistoryStore.ts#L1006)). An auto run *does* change the transcript, so it bumps the conversation to the top. That is intended, and the dot is what stops it reading as a glitch. Unread state lives in `coach_automation_runs.seen_at`, not a new flag on `chat_sessions`, so marking a conversation read touches no row the sidebar orders by — the list does not reshuffle underneath the athlete as they click.
+**Ordering caveat:** commit `d893206` deliberately stopped read-only opens from bumping `updated_at`, and `saveChatSession` skips the write when the transcript is unchanged ([chatHistoryStore.ts:1096](../electron/chatHistoryStore.ts#L1096)). An auto run *does* change the transcript, so it bumps the conversation to the top. That is intended, and the dot is what stops it reading as a glitch. Unread state lives in `coach_automation_runs.seen_at`, not a new flag on `chat_sessions`, so marking a conversation read touches no row the sidebar orders by — the list does not reshuffle underneath the athlete as they click.
 
 ## 10. Failure handling
 
@@ -854,9 +909,12 @@ Only those two statuses count. They are the two that write to the transcript, an
 | Provider error / rate limit | `failed` with message, and the binding backs off 5m → 15m → 60m | ✅ |
 | One binding throwing mid-fan-out | that binding records a `failed` run, the rest still run | ✅ |
 | App quits mid-run | run left `running`; on next start, stale `running` rows become `cancelled` | ✅ — shipped in phase 1, not phase 3 |
+| A run that reached the model and then could not write its answer | one `failed` row through the run's own exit, the watermark left, and the backoff applied | ✅ |
 | Provider stops answering mid-run | `failed` after 3 minutes of silence, the stream aborted, and the binding backs off exactly as a thrown run does; "Run now" offers **Stop** throughout | ✅ |
 
 **A timed-out run leaves both clocks where they were.** Like a thrown one, it returns before `last_run_at` and the activity watermark advance, so the work is not lost. On its own that leaves nothing to slow the retry down — an activity trigger would offer the same activity again on the next 15-minute poll, and again after that — which is what the **backoff** is for.
+
+**The startup reconciliation touches the run log and nothing else**, and that is load-bearing rather than incidental. A `cancelled` run taken through the runner's own exit *clears* the binding's backoff streak — so routing the reconciliation through it, which is the obvious tidy-up, would mean a crash resets the hold on every binding that was failing. The app closing is not a provider reporting itself healthy, any more than the athlete pressing Stop is.
 
 **The backoff is a third clock on the binding, and a guard rail in the runner.** A `failed` run holds its binding off for 5 minutes, then 15, then 60, and stays at 60; anything that reached the provider and did not fail clears the streak. It lives beside `last_run_at` and the watermark because it is the same kind of thing — per-binding state that survives a restart — and it is enforced where every other *whether* is enforced (4), not in the scheduler. The scheduler goes on booking and firing slots; the runner declines them with a `backoff` skip. Two consequences worth stating:
 
@@ -923,6 +981,8 @@ Follow the existing `scripts/test-*.mjs` convention (see `package.json`):
 | `test:coach-automation-plan-draft` | draft approval from an auto run still writes through `chat:uploadPlanDraft` | ✅ |
 | `test:chat-history-store` | the `automation` field round-trip, the silent-run trace round-trip and its half-formed rejections, `setChatSessionTitle`, the renderer/runner save race and the option's path through the IPC chain | ✅ |
 | `test:coach-automation-schedule` | next-slot maths, seeding, book-before-run ordering, missed-slot skipping, quiet-hours deferral, both DST boundaries, per-binding independence, tick re-entrancy | ✅ |
+| `test:chat-stream-sink` | 5.2's seam, which every headless run goes through: the window sink's abort-on-close and its teardown, the collector building the transcript an interactive turn would have, a re-emitted card replacing rather than appending, and 13's usage arriving on a *failed* turn as well as a finished one | ✅ |
+| `test:ipc-surface` | section 8's contract: every channel string paired across `main.ts` and `preload.ts`, no push also registered as a handler, no listener whose emitter was renamed away, and the preload/renderer key sets agreeing | ✅ |
 
 The habits this feature earned the hard way:
 
@@ -936,9 +996,15 @@ The habits this feature earned the hard way:
 
 **Renderer wiring is executed now, not grepped.** `test:coach-automation-renderer` mounts the real components in a hidden Electron `BrowserWindow` against a stubbed `CorosLinkApi`, drives them through the DOM, and asserts in node so a failure reads like every other suite. Electron rather than a DOM emulation because it is already a dev dependency and already hosts a suite, so the harness costs nothing new — and because the bugs being chased are the kind a real browser has.
 
-**What is left at the source level is source that is about source.** A regex still earns its keep for a contract between two files that never run in the same process — the preload/main pair, where an argument dropped on either side type-checks and compiles into a call that quietly does the wrong thing. The harness cannot see across that bridge, because the harness *is* the stub standing in for it. The same goes for the marker held back from the live bubble (5.5) and the pair of `chatTypes` converters, which are claims about shape rather than behaviour.
+**What is left at the source level is source that is about source**, and each of the survivors now carries a line saying which kind it is. A regex earns its keep for a contract between two files that never run in the same process — the preload/main pair, where an argument dropped on either side type-checks and compiles into a call that quietly does the wrong thing. The harness cannot see across that bridge, because the harness *is* the stub standing in for it. The same goes for the marker held back from the live bubble (5.5) and the pair of `chatTypes` converters, which are claims about shape rather than behaviour.
 
-**The regex that counted call sites was the one worth deleting first.** It asserted `onCoachAutomationRunUpdate` appeared exactly three times in `ChatView.tsx` and called that "a run into a conversation that is not open must still update the marks" — a claim it cannot make, since three listeners all doing the same thing satisfy it. Its replacement is two behavioural claims: a run into a conversation nobody is looking at re-reads the marks and is *not* marked read, and the same run into the open one is.
+**And for a default dep, which no suite can reach.** Every suite here injects fakes, deliberately — which makes `createDefaultDeps` and the body of `streamChat` permanently outside them. Four assertions live there for that reason and nothing else: the three emitters of `bindingUpdate`, the single `chat:streamError` send that carries what the turn spent, `addUsage` routing every tool round through the same rule, and the draft the plan-draft tool hands to the wire untouched. Each is a *rule* rather than a shape — the first version of the last one pinned five exact lines and went red on a harmless refactor, which is the failure mode a regex has and a rule does not.
+
+Six more are portable and **not** ported: four on the sidebar marks and one on the signed-out banner, whose surfaces the harness already mounts, and three on `AttachAutomationScreen`, which it does not. They are marked in place. The test that decided which to port first was not "is it a regex" but "is it the only thing covering a bug".
+
+**A regex that counts call sites is the weakest kind, and there were two.** The first asserted `onCoachAutomationRunUpdate` appeared exactly three times in `ChatView.tsx` and called that "a run into a conversation that is not open must still update the marks" — a claim it cannot make, since three listeners all doing the same thing satisfy it. Its replacement is two behavioural claims: a run into a conversation nobody is looking at re-reads the marks and is *not* marked read, and the same run into the open one is.
+
+The second survived that pass: `setStartingId` appearing exactly twice, standing in for "the card's run flag outlasts the gap inside its own fan-out". It fails as loudly for a correct third call site as for a wrong one, and cutting the wire it protects left the *whole* renderer suite green — so it was the only cover for a real bug. Ported: the harness now holds a fan-out open with a promise it resolves by hand, and reads the button. A stub that answers immediately cannot express "the fan-out is still going", which is the whole of 10's *"Run now reflects the run, not the promise."*
 
 **A fixture can sit exactly where two readings agree.** The trimming suite's "the count is measured from the summary" test used a 200-entry conversation whose summary covered 180 — and there the correct reading and the wrong one produce *identical* output, because the roll a start-counted reading would trigger has nothing left to fold in. The mutation that swapped one for the other went undetected until the fixture moved to 100 entries with 50 covered, where the two genuinely disagree. Picking the boundary is not enough; the fixture has to sit where the mutation would show.
 
@@ -1030,15 +1096,37 @@ Phase 2 reordered this list. Threshold triggers are still the headline, but they
 
    Three things the plan did not have. Nothing in the app had **ever** asked a provider what a turn cost, so the step ran through all four of them — and one of them, a local OpenAI-compatible server, can decline to answer, which is what forced the distinction between *unreported* and *free*. A budget that reads the second as the first is worse than no budget, because it is a number the athlete would trust. **Failed and cancelled runs are counted**: the tokens were spent, and forgiving them leaves a ceiling a broken provider can run through for nothing. And reaching the ceiling reuses item 3's **pause** rather than being a guard rail on its own — the month's allowance is one fact about every automation, so a skip per binding per poll until the 1st is the run log that machinery already exists to stop filling.
 
-**Smaller things, carried rather than forgotten:**
+**Smaller things, triaged.** Each of the three was carried through three phases; the review closed them out.
 
-- A run's partial text is lost when a conversation is opened mid-run. The collector in the runner has it; nothing exposes it, so the re-established bubble starts empty (5.6b).
-- A run whose automation overrode the provider (decision 2) writes into that provider's conversation list. The run log reports the row as gone rather than offering to switch (9.3).
-- The scheduler's tick awaits the runs it starts. Bounded now, and harmless while runs are serialised anyway — but the tick is not purely a decision, which any future parallelism has to reckon with.
+| Carried item | Verdict |
+|---|---|
+| A run's partial text is lost when a conversation is opened mid-run — the collector has it, nothing exposes it, so the re-established bubble starts empty (5.6b) | **Kept as a limitation, deliberately.** Exposing it means a fourth push carrying accumulated text, or a query for a partial transcript; the bubble already names the coach, says *running now*, and the reload at the end brings the whole answer. The gap is seconds of text the athlete gets anyway |
+| A run whose automation overrode the provider writes into that provider's conversation list; the run log reports the row as gone rather than offering to switch (9.3) | **Kept, and now the stated behaviour rather than a loose end.** Switching provider underneath an athlete who clicked a run-log row is worse than telling them the conversation is elsewhere. The alternative — showing every provider's conversations in one list — is a change to the chat, not to automations |
+| The scheduler's tick awaits the runs it starts, so the tick is not purely a decision | **Closed.** It is bounded by the idle watchdog (10), runs are serialised process-wide (5.4), and R2 established that the tick's own state — the booked slot, the threshold flag — is written before the run and rolled back only on a refusal. Any future parallelism reckons with 5.4's queue, not with the tick |
+
+**Four more the review chose not to fix, each for a reason and each written down where it belongs:**
+
+- **`sort_order` does not order runs across triggers.** 2.3 promises *"sequentially in `sort_order`"*; sequentially is built and correct, the ordering is not — a fan-out is one automation, and one automation has at most one binding per conversation, so the tiebreaker never breaks a tie. Two automations writing into one conversation are ordered by whichever fired first. Honouring it needs a queue both the scheduler and the watcher feed, which is architecture. See [lifecycle](./coach-automations-lifecycle.md).
+- **The pause banner reaches only the Automations panel.** 10 already says so; what it did not say is the consequence on the conversation side, where the popover goes on offering "Run here now" — which still works, because 3.4's bypass means a manual run goes through. See [pushes](./coach-automations-pushes.md).
+- **A skip repeats once per poll while a refusal lasts** — 96 rows a day for a binding whose provider is signed out. That is 4's stated rhythm and the price of an activity coming round again at all; bounding it interacts with the fan-out's pause check, 9.3's toast and the log's own purpose. See [cost and exposure](./coach-automations-cost-and-exposure.md).
+- **A crash between the roll and the run row loses the roll's cost.** One synchronous step wide, and there is no row to put the number on. See [persistence](./coach-automations-persistence.md).
 
 ### Phase 4 — Beyond the process lifetime
 
 Explicitly out of scope. Auto-launch at login, a tray presence that keeps the app alive with no window, native notifications. Everything before this phase runs only while the app itself is running (decision 1).
+
+### Deliberately out of scope, so nobody rediscovers it
+
+Restated in one place, because each of these looks like an omission until you know it was a decision:
+
+- **Nothing keeps the process alive.** Decision 1, and phase 4 is where that changes. A run with no window still completes and persists; the athlete sees it as unread next time a window exists.
+- **No native notification.** 5.5's summary line feeds the run log and the card, and nothing else.
+- **The run log is never pruned.** 2.4 keeps run history on purpose. ~1,500 rows a year for four automations, and both queries that read it are indexed.
+- **`threshold_firing`, the activity watermark, the backoff clocks and the rolling summary have no surface.** They are machinery; the run log is what the athlete reads. Whether the backoff deserves a countdown is a design question, not a gap.
+- **"Inherit the chat's effort" is not expressible.** 7 traded it for one rule the athlete can hold in their head; it was never visible anywhere.
+- **Non-COROS MCP servers are unreachable from a run**, and a *new* local tool is too until somebody puts it on 6's allowlist. Both are the safe default, deliberately.
+- **A backlog longer than ten loses its oldest entries.** 3.2, and the reason is provider spend rather than an oversight.
+- **The athlete's own activity names reach the prompt unsanitised**, in the focus line, at the same level as their own playbook. The *role* block is hardened because it reaches the system instructions; this one does not. Revisit if activity names ever come from anywhere but the athlete's own watch.
 
 ## 13. Cost
 
@@ -1054,6 +1142,12 @@ Every phase-2 addition multiplied what this feature spends — a schedule fires 
 | `claude-code` | ✅ | the Agent SDK's `result` message, whole query |
 | `chatgpt` | ✅ | `response.completed`, per round |
 | `local` | best-effort | `stream_options: { include_usage: true }`, which a server may ignore |
+
+**A failed turn is not a refund**, and for a long time it was: usage reached the run row only through `chat:streamDone`, which a stream that errors never sends — so *no* failed run had ever recorded a cost, which is the exact hole this section claims to close. Every error send now carries what the turn spent, through one helper rather than a rule remembered at each throw site.
+
+**And a report that cannot be counted is not a report.** Negative, `NaN` and infinite all read as *unreported*, at both entry points: the per-round sum inside `streamChat` and the collector's own ingest. It matters because of who reports it — `local` is whatever OpenAI-compatible server the athlete pointed the app at, and a negative round quietly reduces a total whose final value looks perfectly reasonable. Zero stays a cost: a cancelled run that never reached the model genuinely cost nothing.
+
+**The rolling summariser's turn is on the bill.** 5.7 is the one feature built to make a long conversation affordable, and it pays for that with a provider turn of its own; reading only the run's own stream left that turn outside this total, so the budget under-reported by exactly the thing whose whole purpose is cost.
 
 **The ceiling is read before the total.** The total is a `SUM` over the whole run log and no ceiling is the default, so asking in the other order would make every athlete who never set a budget pay for that scan on every run to discard the answer. The scan itself has its own index — the run log's other two are both prefixed by an id, so neither can serve a query that narrows by nothing but the date.
 
@@ -1129,7 +1223,9 @@ The original ten prompts are preserved below as a record of the shape; anyone re
 
 15. ~~**Presets and defaults**~~ — **built**. Sections 9.1 and 7 describe what exists. Two things the prompt did not have: the presets moved from `src/` to `electron/` so the store's normalizers could be run over them in a test, and three of the four recommend a `dedicated` binding — which turned out to have never worked (2.1).
 
-**UAT** — six bugs, listed in 12. No prompt: they came from using the thing. The shape they share is worth carrying into phase 3 — phase 2 moved the work into the main process and left the renderer reading a world it had stopped being notified of, so *every push the main process sends is part of the feature's contract, not an optimisation*. It also added two things the plan never had: a bound on how long a run may say nothing (10), and the "where should this run?" picker 3.4 had always described but nobody had built.
+**UAT** — six bugs, listed in 12. No prompt: they came from using the thing.
+
+A second UAT closed the review, on the real app against a stub provider and an isolated profile: the whole walk-through from an empty database to a run landing in the sidebar. It found **no behavioural bug** — the four rounds before it had taken those — and one stale sentence in 9.2, which is above. What it did confirm, and no suite can: the app boots clean, a `per-run` conversation appears in the sidebar without a restart and titled from the real activity name, the silent trace is the only thing in its conversation, the card's spend line rounds, and the token count on the row is exactly what the provider reported. The shape they share is worth carrying into phase 3 — phase 2 moved the work into the main process and left the renderer reading a world it had stopped being notified of, so *every push the main process sends is part of the feature's contract, not an optimisation*. It also added two things the plan never had: a bound on how long a run may say nothing (10), and the "where should this run?" picker 3.4 had always described but nobody had built.
 
 ### Phase 3
 
