@@ -358,6 +358,12 @@ const gymFixture = {
 
 const gymDetail = parseActivityDetail(gymFixture);
 
+// A gym lap is short enough that the old magnitude heuristic left it in
+// centiseconds: 4712 stayed 4712 and rendered as 1:18:32 inside an hour-long
+// session. Detail durations are always centiseconds, whatever their size.
+assert.equal(gymDetail.duration, 3828);
+assert.equal(gymDetail.laps[0]?.duration, 47);
+
 assert.equal(gymDetail.dynamics, undefined, "no dynamics from an all-zero summary");
 assert.equal(gymDetail.adjustedPace, undefined);
 assert.equal(gymDetail.weather, undefined, "no weather object means no weather");
@@ -386,5 +392,120 @@ assert.equal(
   "4 s/km is not a pace a human ran"
 );
 assert.deepEqual(sentinelDetail.hrZones, [], "a zone split with no time is no split");
+
+// A whole activity can be short too — 90 s must not read as 90 min.
+const shortDetail = parseActivityDetail({
+  summary: { totalTime: 9000, distance: 30000 },
+  lapList: [
+    {
+      type: 2,
+      lapItemList: [
+        { time: 4500, avgHr: 120 },
+        { startTimestamp: 178765877300, endTimestamp: 178765881800, avgHr: 124 }
+      ]
+    }
+  ]
+});
+
+assert.equal(shortDetail.duration, 90);
+assert.equal(shortDetail.laps[0]?.duration, 45);
+assert.equal(
+  shortDetail.laps[1]?.duration,
+  45,
+  "lap timestamps are centiseconds too"
+);
+
+// One `lapItemList` carrying the same session twice: set-and-rest rows
+// (mode 14/15) and the per-exercise roll-up of those same rows (mode 16/17).
+// Both span the whole activity, so reading them as one list doubles it.
+const twoViewFixture = {
+  summary: { totalTime: 100000, sportType: 402 },
+  lapList: [
+    {
+      type: 2,
+      lapItemList: [
+        { lapType: 0, mode: 14, time: 20000, avgHr: 120, reps: 10 },
+        { lapType: 0, mode: 15, time: 30000, avgHr: 100 },
+        { lapType: 0, mode: 14, time: 25000, avgHr: 124, reps: 8 },
+        { lapType: 0, mode: 15, time: 25000, avgHr: 102 },
+        { lapType: 0, mode: 16, time: 45000, avgHr: 122 },
+        { lapType: 0, mode: 17, time: 55000, avgHr: 101 }
+      ]
+    }
+  ]
+};
+
+const twoViewDetail = parseActivityDetail(twoViewFixture);
+
+assert.equal(twoViewDetail.laps.length, 4, "the set-by-set view wins on row count");
+assert.equal(
+  twoViewDetail.laps.reduce((total, lap) => total + (lap.duration ?? 0), 0),
+  twoViewDetail.duration,
+  "laps span the activity exactly once"
+);
+assert.equal(twoViewDetail.laps[0]?.duration, 200);
+assert.equal(twoViewDetail.laps[3]?.duration, 250);
+
+// The same two views, but with COROS filing them under different lapTypes —
+// which it does on some sessions and not others. The granularity, not the
+// lapType, is what makes them two views.
+const twoViewSplitLapTypeDetail = parseActivityDetail({
+  summary: { totalTime: 100000, sportType: 402 },
+  lapList: [
+    {
+      type: 2,
+      lapItemList: [
+        { lapType: 0, mode: 14, time: 20000, avgHr: 120, reps: 10 },
+        { lapType: 0, mode: 15, time: 30000, avgHr: 100 },
+        { lapType: 0, mode: 14, time: 25000, avgHr: 124, reps: 8 },
+        { lapType: 0, mode: 15, time: 25000, avgHr: 102 },
+        { lapType: 1, mode: 16, time: 45000, avgHr: 122 },
+        { lapType: 1, mode: 17, time: 55000, avgHr: 101 }
+      ]
+    }
+  ]
+});
+
+assert.equal(twoViewSplitLapTypeDetail.laps.length, 4);
+
+// A structured run puts warm-up, interval, recovery and cool-down laps in one
+// group. Those modes are one timeline and must survive intact.
+const structuredRunDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 400000 },
+  lapList: [
+    {
+      type: 10,
+      lapItemList: [
+        { lapType: 0, mode: 4, distance: 100000, time: 30000, avgHr: 130 },
+        { lapType: 0, mode: 2, distance: 100000, time: 20000, avgHr: 170 },
+        { lapType: 0, mode: 3, distance: 100000, time: 25000, avgHr: 140 },
+        { lapType: 0, mode: 5, distance: 100000, time: 25000, avgHr: 125 }
+      ]
+    }
+  ]
+});
+
+assert.equal(structuredRunDetail.laps.length, 4, "run lap modes are not views");
+assert.equal(
+  structuredRunDetail.laps.reduce((total, lap) => total + (lap.duration ?? 0), 0),
+  structuredRunDetail.duration
+);
+
+// A single-granularity payload is untouched by the split.
+const singleViewDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 200000 },
+  lapList: [
+    {
+      type: 10,
+      lapItemList: [
+        { lapType: 0, distance: 100000, time: 50000, avgHr: 150 },
+        { lapType: 0, distance: 100000, time: 50000, avgHr: 155 }
+      ]
+    }
+  ]
+});
+
+assert.equal(singleViewDetail.laps.length, 2);
+assert.equal(singleViewDetail.laps[0]?.duration, 500);
 
 console.log("Activity detail parser tests passed.");

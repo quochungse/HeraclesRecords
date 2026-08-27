@@ -4570,6 +4570,25 @@ function normalizeActivityDistanceMeters(value?: number): number | undefined {
   return normalizeCorosDetailDistanceMeters(value);
 }
 
+/**
+ * Durations out of `/activity/detail/query`, in seconds.
+ *
+ * That payload stores every duration at 0.01 s precision — the same x100
+ * convention as its distances — for `summary.totalTime`, each lap's `time`, and
+ * the lap timestamps. This used to go through the personal-record helper, which
+ * only divides once a value clears 10 000. That threshold is right for records,
+ * whose payloads genuinely mix seconds and centiseconds, and wrong here: a
+ * 47.12 s gym lap arrives as 4712, stayed 4712, and rendered as 1:18:32, so an
+ * hour-long strength session showed 58 laps adding up to sixty hours.
+ */
+function normalizeCorosDetailDurationSeconds(value?: number): number | undefined {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return Math.round(value / 100);
+}
+
 function normalizeActivityElevationMeters(value?: number): number | undefined {
   return normalizeElevationGainMeters(value);
 }
@@ -4637,6 +4656,40 @@ function flattenLapItems(entry: unknown): Record<string, unknown>[] {
   return [lap];
 }
 
+/**
+ * A gym `lapItemList` carries the same session at two granularities: `mode` 14
+ * is a set and 15 the rest after it, while 16 and 17 are those same sets and
+ * rests rolled up per exercise. Both cover the whole activity, so reading them
+ * as one list counts every set twice — an hour of strength came out as 58 laps
+ * adding up to two hours. Separating the roll-up rows leaves the caller two
+ * candidate views to choose between.
+ *
+ * A group is only ever split when it holds both kinds. A structured run puts
+ * warm-up, interval, recovery and cool-down laps (`mode` 2 through 5) in one
+ * group with no roll-up rows anywhere near them, and that is one timeline, not
+ * four views of it. `lapType` looks like the discriminator on some payloads and
+ * is not one: the same account has strength sessions that file the two
+ * granularities under different `lapType`s and sessions that file both under 0.
+ */
+const COROS_LAP_MODE_ROLLUP = new Set([16, 17]);
+
+function isRollupLapItem(item: Record<string, unknown>): boolean {
+  const mode = toOptionalNumber(item.mode);
+  return mode !== undefined && COROS_LAP_MODE_ROLLUP.has(mode);
+}
+
+function splitLapItemsByGranularity(
+  items: Record<string, unknown>[]
+): Record<string, unknown>[][] {
+  const rollup = items.filter(isRollupLapItem);
+
+  if (rollup.length === 0 || rollup.length === items.length) {
+    return [items];
+  }
+
+  return [items.filter((item) => !isRollupLapItem(item)), rollup];
+}
+
 function lapGroupSignature(items: Record<string, unknown>[]): string {
   return JSON.stringify(
     items.map((item) => [
@@ -4684,13 +4737,15 @@ function extractActivityLaps(raw: Record<string, unknown>): TrainingHubActivityL
         continue;
       }
 
-      const signature = lapGroupSignature(items);
-      if (seen.has(signature)) {
-        continue;
-      }
+      for (const group of splitLapItemsByGranularity(items)) {
+        const signature = lapGroupSignature(group);
+        if (seen.has(signature)) {
+          continue;
+        }
 
-      seen.add(signature);
-      candidateGroups.push(items);
+        seen.add(signature);
+        candidateGroups.push(group);
+      }
     }
   }
 
@@ -5884,7 +5939,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
         toOptionalNumber(summary.startTime) ??
         toOptionalNumber(summary.startTimestamp)
     ),
-    duration: normalizeActivityDuration(durationRaw),
+    duration: normalizeCorosDetailDurationSeconds(durationRaw),
     distance: normalizeActivityDistanceMeters(distanceRaw),
     avgHr:
       toOptionalNumber(raw.avgHr) ??
@@ -5923,7 +5978,7 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
     toOptionalNumber(lap.time) ??
     toOptionalNumber(lap.duration);
 
-  let duration = normalizeActivityDuration(durationRaw);
+  let duration = normalizeCorosDetailDurationSeconds(durationRaw);
 
   if (!duration) {
     const startTimestamp = toOptionalNumber(lap.startTimestamp);
@@ -5934,7 +5989,9 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
       endTimestamp !== undefined &&
       endTimestamp > startTimestamp
     ) {
-      duration = normalizeActivityDuration(endTimestamp - startTimestamp);
+      duration = normalizeCorosDetailDurationSeconds(
+        endTimestamp - startTimestamp
+      );
     }
   }
 

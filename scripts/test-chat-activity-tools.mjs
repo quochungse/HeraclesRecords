@@ -285,7 +285,7 @@ const gymText = formatActivityDetailForChat(
       avgPower: 0,
       aerobicEffect: 1.6
     },
-    lapList: [{ type: 2, lapItemList: [{ time: 471200, avgHr: 104, maxHr: 136 }] }]
+    lapList: [{ type: 2, lapItemList: [{ time: 4712, avgHr: 104, maxHr: 136 }] }]
   }),
   false,
   "metric"
@@ -296,6 +296,7 @@ assert.doesNotMatch(gymText, /Conditions:/);
 assert.doesNotMatch(gymText, /HR zones/);
 assert.match(gymText, /Training effect: aerobic 1\.6\/5/);
 assert.match(gymText, /Lap \| Distance \| Duration \| Avg HR \| Max HR \| Pace\n/);
+assert.match(gymText, /1 \| — \| 0:47 \| 104 \| 136 \| —/, "a 47 s gym lap is not 1:18:32");
 
 // Cycling labels cadence as rpm.
 const bikeText = formatActivityDetailForChat(
