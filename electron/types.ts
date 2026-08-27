@@ -1991,6 +1991,76 @@ export interface TrainingHubActivityLap {
   maxHr?: number;
   pace?: number;
   elevationGain?: number;
+  /** Steps per minute for foot sports, rpm for cycling. */
+  avgCadence?: number;
+  maxCadence?: number;
+  /** Metres. COROS sends centimetres. */
+  strideLength?: number;
+  /** Ground contact time, milliseconds. */
+  groundTime?: number;
+  /** Vertical oscillation, centimetres. COROS sends millimetres. */
+  verticalOscillation?: number;
+  /** Vertical oscillation as a percentage of stride length. COROS sends tenths. */
+  verticalRatio?: number;
+  avgPower?: number;
+}
+
+/**
+ * Activity-level running/cycling dynamics.
+ *
+ * COROS reports each of these twice — once as a `summary.avg*` field and once
+ * as the `avg` of the matching `graphList` channel — and the two disagree: on a
+ * Pace Pro run `summary.avgGroundTime`, `avgVertVibration` and `avgVertRatio`
+ * all come back 0 while the graph channels carry 303 ms, 85 mm and 10.0%. Zero
+ * is COROS's "not recorded" here, so the parser reads the summary first and
+ * falls back to the channel, which lands on the real number either way.
+ */
+export interface TrainingHubActivityDynamics {
+  /** Steps per minute for foot sports, rpm for cycling. */
+  avgCadence?: number;
+  maxCadence?: number;
+  /** Metres. */
+  strideLength?: number;
+  /** Ground contact time, milliseconds. */
+  groundTime?: number;
+  /** Vertical oscillation, centimetres. */
+  verticalOscillation?: number;
+  /** Vertical oscillation as a percentage of stride length. */
+  verticalRatio?: number;
+  avgPower?: number;
+  maxPower?: number;
+}
+
+/**
+ * One bucket of an activity's own zone distribution. `index` 0 is COROS's
+ * below-zone-1 bucket — it repeats zone 1's bounds rather than carrying its
+ * own, so only `high` is meaningful there.
+ */
+export interface TrainingHubActivityZoneBucket {
+  index: number;
+  /** Lower bound in bpm. */
+  low?: number;
+  /** Upper bound in bpm. */
+  high?: number;
+  seconds?: number;
+  percent?: number;
+}
+
+/** Training effect and VO2max as COROS scored this single activity. */
+export interface TrainingHubActivityEffect {
+  /** Aerobic training effect, 0–5. */
+  aerobic?: number;
+  /** Anaerobic training effect, 0–5. */
+  anaerobic?: number;
+  /** VO2max as of this activity. */
+  vo2max?: number;
+}
+
+/** Conditions COROS recorded for the activity. Absent for indoor sports. */
+export interface TrainingHubActivityWeather {
+  temperatureC?: number;
+  feelsLikeC?: number;
+  humidityPct?: number;
 }
 
 export interface TrainingHubTrackPoint {
@@ -2135,7 +2205,14 @@ export interface TrainingHubActivityDetail {
   calories?: number;
   elevationGain?: number;
   trainingLoad?: number;
+  /** Grade-adjusted pace in seconds per kilometre. */
+  adjustedPace?: number;
   laps: TrainingHubActivityLap[];
+  dynamics?: TrainingHubActivityDynamics;
+  /** This activity's own HR zone distribution, empty when COROS sent none. */
+  hrZones: TrainingHubActivityZoneBucket[];
+  effect?: TrainingHubActivityEffect;
+  weather?: TrainingHubActivityWeather;
   track?: TrainingHubActivityTrack;
   series?: TrainingHubActivitySeriesPoint[];
   strength?: StrengthDetail;

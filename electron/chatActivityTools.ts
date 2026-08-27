@@ -12,7 +12,11 @@ import type {
   CorosMcpTool,
   TrainingHubActivity,
   TrainingHubActivityDetail,
+  TrainingHubActivityDynamics,
+  TrainingHubActivityEffect,
   TrainingHubActivityLap,
+  TrainingHubActivityWeather,
+  TrainingHubActivityZoneBucket,
   UnitSystem
 } from "./types";
 import {
@@ -64,10 +68,12 @@ export function getChatActivityTools(): CorosMcpTool[] {
     {
       name: "get_activity_detail",
       description:
-        "Fetch detailed COROS activity data including lap/split breakdown (distance, " +
-        "duration, avg/max HR, pace). Use activity_id and sport_type from " +
-        "list_recent_activities or the training snapshot. Prefer this local tool over " +
-        "COROS MCP for lap and split analysis.",
+        "Fetch detailed COROS activity data: lap/split breakdown (distance, duration, " +
+        "avg/max HR, pace, cadence, stride length, ground contact time, vertical ratio, " +
+        "power), the activity's own HR zone split, grade-adjusted pace, aerobic and " +
+        "anaerobic training effect, VO2max, and the weather it was run in. Use " +
+        "activity_id and sport_type from list_recent_activities or the training " +
+        "snapshot. Prefer this local tool over COROS MCP for lap and split analysis.",
       inputSchema: {
         type: "object",
         properties: {
@@ -396,6 +402,9 @@ export function formatActivityDetailForChat(
       : undefined,
     detail.duration ? `Duration: ${formatDurationSeconds(detail.duration)}` : undefined,
     performance,
+    detail.adjustedPace
+      ? `Adjusted pace (grade-adjusted): ${formatPaceSeconds(detail.adjustedPace, unitSystem)}`
+      : undefined,
     detail.avgHr ? `Avg HR: ${detail.avgHr} bpm` : undefined,
     detail.maxHr ? `Max HR: ${detail.maxHr} bpm` : undefined,
     detail.elevationGain
@@ -406,6 +415,20 @@ export function formatActivityDetailForChat(
   ].filter(Boolean);
 
   const sections = ["Activity detail", summaryParts.join("\n")];
+
+  const context = [
+    formatActivityDynamics(detail.dynamics, cycling),
+    formatActivityEffect(detail.effect),
+    formatActivityWeather(detail.weather)
+  ].filter(Boolean);
+  if (context.length > 0) {
+    sections.push("", context.join("\n"));
+  }
+
+  const zones = formatActivityHrZones(detail.hrZones);
+  if (zones) {
+    sections.push("", zones);
+  }
 
   if (detail.laps.length > 0) {
     sections.push("", formatLapTable(detail.laps, unitSystem, swim, cycling));
@@ -435,6 +458,143 @@ export function formatActivityDetailForChat(
   return sections.join("\n");
 }
 
+/**
+ * Running/cycling dynamics stay in metric with the unit spelled out, in both
+ * unit systems. They are reported that way by COROS and read that way in the
+ * literature; converting stride length to feet or ground contact to anything
+ * else would invent a convention the athlete has never seen on their watch.
+ * Pace and distance still follow the athlete's chosen units.
+ */
+function formatActivityDynamics(
+  dynamics: TrainingHubActivityDynamics | undefined,
+  cycling: boolean
+): string | undefined {
+  if (!dynamics) {
+    return undefined;
+  }
+
+  const cadenceUnit = cycling ? "rpm" : "spm";
+  const parts = [
+    dynamics.avgCadence !== undefined
+      ? `cadence ${Math.round(dynamics.avgCadence)} ${cadenceUnit}` +
+        (dynamics.maxCadence !== undefined
+          ? ` (max ${Math.round(dynamics.maxCadence)})`
+          : "")
+      : undefined,
+    dynamics.strideLength !== undefined
+      ? `stride length ${dynamics.strideLength.toFixed(2)} m`
+      : undefined,
+    dynamics.groundTime !== undefined
+      ? `ground contact ${Math.round(dynamics.groundTime)} ms`
+      : undefined,
+    dynamics.verticalOscillation !== undefined
+      ? `vertical oscillation ${dynamics.verticalOscillation.toFixed(1)} cm`
+      : undefined,
+    dynamics.verticalRatio !== undefined
+      ? `vertical ratio ${dynamics.verticalRatio.toFixed(1)}%`
+      : undefined,
+    dynamics.avgPower !== undefined
+      ? `power ${Math.round(dynamics.avgPower)} W` +
+        (dynamics.maxPower !== undefined
+          ? ` (max ${Math.round(dynamics.maxPower)} W)`
+          : "")
+      : undefined
+  ].filter(Boolean);
+
+  return parts.length > 0
+    ? `${cycling ? "Cycling" : "Running"} dynamics: ${parts.join(" · ")}`
+    : undefined;
+}
+
+function formatActivityEffect(
+  effect: TrainingHubActivityEffect | undefined
+): string | undefined {
+  if (!effect) {
+    return undefined;
+  }
+
+  const parts = [
+    effect.aerobic !== undefined
+      ? `aerobic ${effect.aerobic.toFixed(1)}/5`
+      : undefined,
+    effect.anaerobic !== undefined
+      ? `anaerobic ${effect.anaerobic.toFixed(1)}/5`
+      : undefined,
+    effect.vo2max !== undefined
+      ? `VO2max ${Math.round(effect.vo2max)}`
+      : undefined
+  ].filter(Boolean);
+
+  return parts.length > 0 ? `Training effect: ${parts.join(" · ")}` : undefined;
+}
+
+function formatActivityWeather(
+  weather: TrainingHubActivityWeather | undefined
+): string | undefined {
+  if (!weather) {
+    return undefined;
+  }
+
+  const parts = [
+    weather.temperatureC !== undefined
+      ? `${weather.temperatureC.toFixed(1)} °C`
+      : undefined,
+    weather.feelsLikeC !== undefined
+      ? `feels like ${weather.feelsLikeC.toFixed(1)} °C`
+      : undefined,
+    weather.humidityPct !== undefined
+      ? `humidity ${Math.round(weather.humidityPct)}%`
+      : undefined
+  ].filter(Boolean);
+
+  return parts.length > 0 ? `Conditions: ${parts.join(" · ")}` : undefined;
+}
+
+/**
+ * The activity's own zone split, which is what makes "this easy run spent a
+ * third of its time in Z3" sayable. Zones with no time are dropped rather than
+ * printed as rows of zeros.
+ */
+function formatActivityHrZones(
+  zones: TrainingHubActivityZoneBucket[] | undefined
+): string | undefined {
+  const used = (zones ?? []).filter((zone) => (zone.seconds ?? 0) > 0);
+  if (used.length === 0) {
+    return undefined;
+  }
+
+  const rows = used.map((zone) => {
+    const label =
+      zone.index === 0
+        ? `Below Z1${zone.high !== undefined ? ` (<${zone.high} bpm)` : ""}`
+        : `Z${zone.index}` +
+          (zone.low !== undefined && zone.high !== undefined
+            ? ` ${zone.low}–${zone.high} bpm`
+            : "");
+    const time = formatDurationSeconds(zone.seconds ?? 0);
+    return `- ${label}: ${time}${
+      zone.percent !== undefined ? ` (${Math.round(zone.percent)}%)` : ""
+    }`;
+  });
+
+  return ["HR zones (this activity):", ...rows].join("\n");
+}
+
+interface LapDynamicsColumn {
+  header: string;
+  value: (lap: TrainingHubActivityLap) => string | undefined;
+}
+
+// Only columns some lap actually carries are added, so a pool swim or a gym
+// session keeps the narrow table it had before.
+const LAP_DYNAMICS_COLUMNS: LapDynamicsColumn[] = [
+  { header: "Cad", value: (lap) => lap.avgCadence?.toFixed(0) },
+  { header: "Stride (m)", value: (lap) => lap.strideLength?.toFixed(2) },
+  { header: "GCT (ms)", value: (lap) => lap.groundTime?.toFixed(0) },
+  { header: "Vert ratio (%)", value: (lap) => lap.verticalRatio?.toFixed(1) },
+  { header: "Power (W)", value: (lap) => lap.avgPower?.toFixed(0) }
+];
+
 function formatLapTable(
   laps: TrainingHubActivityLap[],
   unitSystem: UnitSystem,
@@ -442,7 +602,13 @@ function formatLapTable(
   cycling: boolean
 ): string {
   const capped = laps.slice(0, MAX_LAPS);
-  const header = `Lap | Distance | Duration | Avg HR | Max HR | ${cycling ? "Speed" : "Pace"}`;
+  const dynamicsColumns = LAP_DYNAMICS_COLUMNS.filter((column) =>
+    capped.some((lap) => column.value(lap) !== undefined)
+  );
+  const header = [
+    `Lap | Distance | Duration | Avg HR | Max HR | ${cycling ? "Speed" : "Pace"}`,
+    ...dynamicsColumns.map((column) => column.header)
+  ].join(" | ");
   const rows = capped.map((lap) => {
     const cols = [
       String(lap.index),
@@ -452,7 +618,8 @@ function formatLapTable(
       lap.maxHr ? `${lap.maxHr}` : "—",
       cycling && lap.distance && lap.duration
         ? formatSpeedValue((lap.distance / 1000) / (lap.duration / 3600), unitSystem)
-        : lap.pace ? formatPaceSeconds(lap.pace, unitSystem) : "—"
+        : lap.pace ? formatPaceSeconds(lap.pace, unitSystem) : "—",
+      ...dynamicsColumns.map((column) => column.value(lap) ?? "—")
     ];
     return cols.join(" | ");
   });
