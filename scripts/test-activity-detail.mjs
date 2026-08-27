@@ -192,4 +192,199 @@ assert.equal(walkDetail.laps.length, 4);
 assert.equal(walkDetail.laps[0]?.distance, 865);
 assert.equal(walkDetail.laps[1]?.distance, 863);
 
+// --- Dynamics, HR zones, training effect, weather and adjusted pace ---
+//
+// Shapes copied from a live /activity/detail/query response. The numbers are
+// deliberately chosen so a wrong reading cannot pass: the summary and the graph
+// channel disagree on cadence (163 vs 999) so "summary first" is observable,
+// and every scaled field is scaled by a factor big enough to see (84 -> 0.84).
+const dynamicsFixture = {
+  summary: {
+    name: "Easy 9 km",
+    sportType: 100,
+    totalTime: 457125,
+    distance: 1041026,
+    avgHr: 152,
+    maxHr: 160,
+    adjustedPace: 439,
+    // COROS zeroes these three on a Pace Pro run and only fills the channels.
+    avgGroundTime: 0,
+    avgVertVibration: 0,
+    avgVertRatio: 0,
+    avgCadence: 163,
+    maxCadence: 170,
+    avgStepLen: 84,
+    avgPower: 160,
+    maxPower: 201,
+    aerobicEffect: 3.8,
+    anaerobicEffect: 0.2,
+    currentVo2Max: 47
+  },
+  weather: { temperature: 304, bodyFeelTemp: 317, humidity: 610, windSpeed: 200 },
+  zoneList: [
+    {
+      type: 130,
+      zoneItemList: [{ leftScope: 471000, rightScope: 400000, second: 158, percent: 3, zoneIndex: 0 }]
+    },
+    {
+      type: 126,
+      zoneItemList: [
+        { leftScope: 133, rightScope: 154, second: 66, percent: 1, zoneIndex: 0 },
+        { leftScope: 133, rightScope: 154, second: 2871, percent: 63, zoneIndex: 1 },
+        { leftScope: 155, rightScope: 168, second: 1634, percent: 36, zoneIndex: 2 },
+        { leftScope: 169, rightScope: 173, second: 0, percent: 0, zoneIndex: 3 }
+      ]
+    }
+  ],
+  graphList: [
+    { key: "cadence", type: 109, graphItem: { avg: 999, max: 999 } },
+    { key: "groundTime", type: 145, graphItem: { avg: 303, max: 383 } },
+    { key: "verticalVibration", type: 147, graphItem: { avg: 85, max: 97 } },
+    { key: "verticalStrideRatio", type: 148, graphItem: { avg: 100, max: 156 } },
+    { key: "cadenceLength", type: 124, graphItem: { avg: 99, max: 97 } }
+  ],
+  lapList: [
+    {
+      type: 10,
+      lapItemList: [
+        {
+          distance: 100000,
+          time: 42267,
+          avgHr: 139,
+          maxHr: 151,
+          avgPace: 422.68,
+          avgCadence: 163,
+          maxCadence: 168,
+          avgStrideLength: 87,
+          strideHeight: 86,
+          strideRatio: 97,
+          groundTime: 285,
+          avgPower: 167
+        },
+        {
+          distance: 100000,
+          time: 42400,
+          avgHr: 151,
+          maxHr: 155,
+          avgPace: 424,
+          avgCadence: 164,
+          maxCadence: 170,
+          avgStrideLength: 86,
+          strideHeight: 85,
+          strideRatio: 99,
+          groundTime: 295,
+          avgPower: 165
+        }
+      ]
+    }
+  ]
+};
+
+const dynamicsDetail = parseActivityDetail(dynamicsFixture);
+
+assert.equal(dynamicsDetail.adjustedPace, 439);
+
+// Summary wins where it is populated, channel fills in where it is zeroed.
+assert.equal(dynamicsDetail.dynamics?.avgCadence, 163);
+assert.equal(dynamicsDetail.dynamics?.maxCadence, 170);
+assert.equal(dynamicsDetail.dynamics?.strideLength, 0.84);
+assert.equal(dynamicsDetail.dynamics?.groundTime, 303);
+assert.equal(dynamicsDetail.dynamics?.verticalOscillation, 8.5);
+assert.equal(dynamicsDetail.dynamics?.verticalRatio, 10);
+assert.equal(dynamicsDetail.dynamics?.avgPower, 160);
+assert.equal(dynamicsDetail.dynamics?.maxPower, 201);
+
+assert.equal(dynamicsDetail.laps[0]?.avgCadence, 163);
+assert.equal(dynamicsDetail.laps[0]?.maxCadence, 168);
+assert.equal(dynamicsDetail.laps[0]?.strideLength, 0.87);
+assert.equal(dynamicsDetail.laps[0]?.groundTime, 285);
+assert.equal(dynamicsDetail.laps[0]?.verticalOscillation, 8.6);
+assert.equal(dynamicsDetail.laps[0]?.verticalRatio, 9.7);
+assert.equal(dynamicsDetail.laps[0]?.avgPower, 167);
+
+// The HR group is picked out of a zoneList whose first entry is pace.
+assert.equal(dynamicsDetail.hrZones.length, 4);
+assert.equal(dynamicsDetail.hrZones[0]?.index, 0);
+assert.equal(dynamicsDetail.hrZones[0]?.low, undefined, "below-Z1 bucket has no floor");
+assert.equal(dynamicsDetail.hrZones[0]?.high, 133);
+assert.equal(dynamicsDetail.hrZones[0]?.seconds, 66);
+assert.equal(dynamicsDetail.hrZones[1]?.low, 133);
+assert.equal(dynamicsDetail.hrZones[1]?.high, 154);
+assert.equal(dynamicsDetail.hrZones[1]?.percent, 63);
+assert.equal(dynamicsDetail.hrZones[3]?.seconds, undefined, "an unused zone carries no time");
+
+assert.equal(dynamicsDetail.effect?.aerobic, 3.8);
+assert.equal(dynamicsDetail.effect?.anaerobic, 0.2);
+assert.equal(dynamicsDetail.effect?.vo2max, 47);
+
+assert.equal(dynamicsDetail.weather?.temperatureC, 30.4);
+assert.equal(dynamicsDetail.weather?.feelsLikeC, 31.7);
+assert.equal(dynamicsDetail.weather?.humidityPct, 61);
+
+// A gym session: COROS sends 0 for every field its watch did not record, and 0
+// must not reach the coach as a measurement.
+const gymFixture = {
+  summary: {
+    name: "Strength",
+    sportType: 402,
+    totalTime: 382800,
+    avgHr: 107,
+    maxHr: 136,
+    adjustedPace: 0,
+    avgCadence: 0,
+    maxCadence: 0,
+    avgStepLen: 0,
+    avgGroundTime: 0,
+    avgVertVibration: 0,
+    avgVertRatio: 0,
+    avgPower: 0,
+    maxPower: 0,
+    aerobicEffect: 1.6,
+    anaerobicEffect: 0,
+    currentVo2Max: 47
+  },
+  zoneList: [
+    {
+      type: 126,
+      zoneItemList: [
+        { leftScope: 133, rightScope: 154, second: 3815, percent: 100, zoneIndex: 0 }
+      ]
+    }
+  ],
+  lapList: [
+    { type: 2, lapItemList: [{ time: 4712, avgHr: 104, maxHr: 136, avgCadence: 0, avgStrideLength: 0 }] }
+  ]
+};
+
+const gymDetail = parseActivityDetail(gymFixture);
+
+assert.equal(gymDetail.dynamics, undefined, "no dynamics from an all-zero summary");
+assert.equal(gymDetail.adjustedPace, undefined);
+assert.equal(gymDetail.weather, undefined, "no weather object means no weather");
+assert.equal(gymDetail.laps[0]?.avgCadence, undefined);
+assert.equal(gymDetail.laps[0]?.strideLength, undefined);
+assert.equal(gymDetail.effect?.aerobic, 1.6);
+assert.equal(gymDetail.effect?.anaerobic, undefined);
+assert.equal(gymDetail.hrZones.length, 1);
+
+// Sentinels and empty zone splits.
+const sentinelDetail = parseActivityDetail({
+  summary: { totalTime: 100000, adjustedPace: 4 },
+  weather: { temperature: 65535, humidity: 0 },
+  zoneList: [
+    {
+      type: 126,
+      zoneItemList: [{ leftScope: 133, rightScope: 154, second: 0, percent: 0, zoneIndex: 0 }]
+    }
+  ]
+});
+
+assert.equal(sentinelDetail.weather, undefined, "65535 is a sentinel, not 6553.5 C");
+assert.equal(
+  sentinelDetail.adjustedPace,
+  undefined,
+  "4 s/km is not a pace a human ran"
+);
+assert.deepEqual(sentinelDetail.hrZones, [], "a zone split with no time is no split");
+
 console.log("Activity detail parser tests passed.");

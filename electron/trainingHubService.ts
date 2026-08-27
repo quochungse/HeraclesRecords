@@ -38,6 +38,10 @@ import type {
   StrengthHistory,
   TrainingHubActivity,
   TrainingHubActivityDetail,
+  TrainingHubActivityDynamics,
+  TrainingHubActivityEffect,
+  TrainingHubActivityWeather,
+  TrainingHubActivityZoneBucket,
   TrainingHubActivityFileType,
   TrainingHubActivityLap,
   TrainingHubExportFormat,
@@ -5630,6 +5634,223 @@ export function mergeActivityDetailWithList(
   };
 }
 
+// ----- Dynamics, zones, effect and weather from the activity detail payload -----
+
+/** COROS's HR zone channel in `zoneList`. 130 is pace, 134 power. */
+const COROS_HR_ZONE_TYPE = 126;
+
+// A weather temperature arrives in tenths of a degree. Anything outside this
+// band is a sentinel rather than a reading (`sweatLoss: 65535` in the same
+// payload shows COROS does use them).
+const MIN_WEATHER_TEMPERATURE_TENTHS = -600;
+const MAX_WEATHER_TEMPERATURE_TENTHS = 600;
+
+/**
+ * COROS writes 0, not null, for every dynamics and effect field its device did
+ * not record: a strength session comes back with `avgCadence: 0`,
+ * `avgStrideLength: 0`, `avgPower: 0` and the rest. Reading those as values
+ * would put "cadence 0 spm" in front of the coach on every gym session, so a
+ * non-positive number means absent throughout this section.
+ */
+function positiveNumber(value: unknown): number | undefined {
+  const numeric = toOptionalNumber(value);
+  return numeric !== undefined && numeric > 0 ? numeric : undefined;
+}
+
+function roundTo(value: number | undefined, decimals: number): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+/** `graphList` holds `{ key, type, graphItem: { avg, max, min, sum, … } }`. */
+function graphChannelStat(
+  raw: Record<string, unknown>,
+  key: string,
+  stat: "avg" | "max"
+): number | undefined {
+  for (const entry of pickArray(raw, ["graphList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const channel = entry as Record<string, unknown>;
+    if (channel.key !== key) {
+      continue;
+    }
+    const item = channel.graphItem;
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    return positiveNumber((item as Record<string, unknown>)[stat]);
+  }
+
+  return undefined;
+}
+
+export function parseActivityDynamics(
+  raw: Record<string, unknown>,
+  summary: Record<string, unknown>
+): TrainingHubActivityDynamics | undefined {
+  // Summary first, graph channel second: where both are populated they agree,
+  // and where the summary is zeroed the channel still carries the number.
+  const dynamics: TrainingHubActivityDynamics = {
+    avgCadence:
+      positiveNumber(summary.avgCadence) ?? graphChannelStat(raw, "cadence", "avg"),
+    maxCadence:
+      positiveNumber(summary.maxCadence) ?? graphChannelStat(raw, "cadence", "max"),
+    strideLength: roundTo(
+      corosCentimetersToMeters(
+        positiveNumber(summary.avgStepLen) ??
+          graphChannelStat(raw, "cadenceLength", "avg")
+      ),
+      2
+    ),
+    groundTime:
+      positiveNumber(summary.avgGroundTime) ??
+      graphChannelStat(raw, "groundTime", "avg"),
+    verticalOscillation: roundTo(
+      millimetresToCentimetres(
+        positiveNumber(summary.avgVertVibration) ??
+          graphChannelStat(raw, "verticalVibration", "avg")
+      ),
+      1
+    ),
+    verticalRatio: roundTo(
+      tenthsToUnits(
+        positiveNumber(summary.avgVertRatio) ??
+          graphChannelStat(raw, "verticalStrideRatio", "avg")
+      ),
+      1
+    ),
+    avgPower: positiveNumber(summary.avgPower) ?? graphChannelStat(raw, "power", "avg"),
+    maxPower: positiveNumber(summary.maxPower) ?? graphChannelStat(raw, "power", "max")
+  };
+
+  return Object.values(dynamics).some((value) => value !== undefined)
+    ? dynamics
+    : undefined;
+}
+
+function millimetresToCentimetres(value?: number): number | undefined {
+  return value === undefined ? undefined : value / 10;
+}
+
+function tenthsToUnits(value?: number): number | undefined {
+  return value === undefined ? undefined : value / 10;
+}
+
+/**
+ * The activity's own HR zone split. Bucket 0 is COROS's below-zone-1 time and
+ * repeats zone 1's bounds instead of carrying its own, so its `low` is dropped
+ * and only the ceiling is kept.
+ */
+export function parseActivityHrZones(
+  raw: Record<string, unknown>
+): TrainingHubActivityZoneBucket[] {
+  for (const entry of pickArray(raw, ["zoneList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const group = entry as Record<string, unknown>;
+    if (toOptionalNumber(group.type) !== COROS_HR_ZONE_TYPE) {
+      continue;
+    }
+
+    const buckets = (pickArray(group, ["zoneItemList"]) ?? [])
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object"
+      )
+      .map((item, position) => {
+        const index = toOptionalNumber(item.zoneIndex) ?? position;
+        return {
+          index,
+          ...(index > 0 ? { low: positiveNumber(item.leftScope) } : {}),
+          high: positiveNumber(
+            index > 0 ? item.rightScope : item.leftScope
+          ),
+          seconds: positiveNumber(item.second),
+          percent: toOptionalNumber(item.percent)
+        };
+      });
+
+    if (buckets.some((bucket) => bucket.seconds !== undefined)) {
+      return buckets;
+    }
+  }
+
+  return [];
+}
+
+export function parseActivityEffect(
+  summary: Record<string, unknown>
+): TrainingHubActivityEffect | undefined {
+  const effect: TrainingHubActivityEffect = {
+    aerobic: positiveNumber(summary.aerobicEffect),
+    anaerobic: positiveNumber(summary.anaerobicEffect),
+    vo2max: positiveNumber(summary.currentVo2Max) ?? positiveNumber(summary.hrmVo2Max)
+  };
+
+  return Object.values(effect).some((value) => value !== undefined)
+    ? effect
+    : undefined;
+}
+
+function parseWeatherTenthsOfDegree(value: unknown): number | undefined {
+  const tenths = toOptionalNumber(value);
+  if (
+    tenths === undefined ||
+    tenths < MIN_WEATHER_TEMPERATURE_TENTHS ||
+    tenths > MAX_WEATHER_TEMPERATURE_TENTHS
+  ) {
+    return undefined;
+  }
+
+  return Math.round(tenths) / 10;
+}
+
+/**
+ * Temperature and humidity only. `windSpeed` is in the same object but its unit
+ * cannot be pinned down from the payload — `windDirection: 2250` reads as 225.0
+ * degrees, which would make `windSpeed: 200` either 20 km/h or 20 m/s, and the
+ * two lead to opposite coaching advice. Left out rather than guessed.
+ */
+export function parseActivityWeather(
+  raw: Record<string, unknown>
+): TrainingHubActivityWeather | undefined {
+  const weather = pickObject(raw, ["weather"]);
+  if (!weather) {
+    return undefined;
+  }
+
+  const humidityTenths = toOptionalNumber(weather.humidity);
+  const parsed: TrainingHubActivityWeather = {
+    temperatureC: parseWeatherTenthsOfDegree(weather.temperature),
+    feelsLikeC: parseWeatherTenthsOfDegree(weather.bodyFeelTemp),
+    humidityPct:
+      humidityTenths !== undefined && humidityTenths > 0 && humidityTenths <= 1000
+        ? Math.round(humidityTenths) / 10
+        : undefined
+  };
+
+  return Object.values(parsed).some((value) => value !== undefined)
+    ? parsed
+    : undefined;
+}
+
+/** Grade-adjusted pace, seconds per kilometre. */
+function parseAdjustedPace(summary: Record<string, unknown>): number | undefined {
+  const raw = positiveNumber(summary.adjustedPace);
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const normalized = normalizeActivityDuration(raw) ?? raw;
+  return isPlausiblePaceSecondsPerKm(normalized) ? normalized : undefined;
+}
+
 export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubActivityDetail {
   const summary = pickObject(raw, ["summaryInfo", "summary", "activitySummary"]) ?? raw;
   const laps = extractActivityLaps(raw);
@@ -5676,7 +5897,12 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     trainingLoad:
       toOptionalNumber(raw.trainingLoad) ??
       toOptionalNumber(summary.trainingLoad),
+    adjustedPace: parseAdjustedPace(summary),
     laps,
+    dynamics: parseActivityDynamics(raw, summary),
+    hrZones: parseActivityHrZones(raw),
+    effect: parseActivityEffect(summary),
+    weather: parseActivityWeather(raw),
     track,
     series: parseActivitySeries(raw),
     strength: parseStrengthDetail(raw),
@@ -5730,7 +5956,23 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
       toOptionalNumber(lap.ascent) ??
         toOptionalNumber(lap.elevationGain) ??
         toOptionalNumber(lap.elevGain)
-    )
+    ),
+    // Same 0-means-absent convention as the activity-level dynamics.
+    avgCadence: positiveNumber(lap.avgCadence),
+    maxCadence: positiveNumber(lap.maxCadence),
+    strideLength: roundTo(
+      corosCentimetersToMeters(positiveNumber(lap.avgStrideLength)),
+      2
+    ),
+    groundTime: positiveNumber(lap.groundTime),
+    // COROS names per-lap vertical oscillation `strideHeight`; the graph
+    // channel calls the same quantity `verticalVibration`.
+    verticalOscillation: roundTo(
+      millimetresToCentimetres(positiveNumber(lap.strideHeight)),
+      1
+    ),
+    verticalRatio: roundTo(tenthsToUnits(positiveNumber(lap.strideRatio)), 1),
+    avgPower: positiveNumber(lap.avgPower)
   };
 }
 
