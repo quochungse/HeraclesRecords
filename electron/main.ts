@@ -1681,6 +1681,13 @@ function registerIpcHandlers(): void {
     }
   });
   ipcMain.handle("mcp:statuses", () => getMcpStatuses());
+  // Non-interactive reconnect of every enabled server from stored auth.
+  // Never opens an OAuth window: the Coach view asks the athlete first,
+  // then calls mcp:connect for the servers they chose to authorize.
+  ipcMain.handle("mcp:ensureConnected", async () => {
+    await ensureAllMcpConnected();
+    return getMcpStatuses();
+  });
   ipcMain.handle("mcp:setBearer", async (_event, id: string, token: string) => {
     setMcpBearer(id, token);
     await disconnectMcpServer(id, { clearAuthorization: false });
@@ -2069,11 +2076,11 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle("trainingHub:getSleepData", (_event, days?: number) =>
-    getTrainingSleepData(mainWindow, days ?? 7)
+    getTrainingSleepData(days ?? 7)
   );
 
   ipcMain.handle("trainingHub:getDailyHealthData", (_event, days?: number) =>
-    getTrainingDailyHealthData(mainWindow, days ?? 1)
+    getTrainingDailyHealthData(days ?? 1)
   );
 
   ipcMain.handle("intervals:getStatus", () => getIntervalsStatus());

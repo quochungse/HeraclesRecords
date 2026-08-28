@@ -1,9 +1,6 @@
-import type { BrowserWindow } from "electron";
 import {
   callCorosMcpTool,
-  connectCorosMcp,
   ensureCorosMcpConnected,
-  getCorosMcpStatus,
   getCorosMcpTools,
   listCorosMcpTools
 } from "./corosMcpService";
@@ -1728,23 +1725,6 @@ function buildSleepToolArgs(
   });
 }
 
-async function ensureMcpForSleep(
-  mainWindow?: BrowserWindow | null
-): Promise<boolean> {
-  if (await ensureCorosMcpConnected()) {
-    return true;
-  }
-
-  const status = getCorosMcpStatus();
-  if (!status.authorized) {
-    await connectCorosMcp(mainWindow, true);
-    return getCorosMcpStatus().connected;
-  }
-
-  await connectCorosMcp(mainWindow, true);
-  return getCorosMcpStatus().connected;
-}
-
 export function sleepResponseQuality(records: TrainingHubSleepRecord[]): number {
   const latest = pickLatestSleepRecord(records);
   if (!latest) {
@@ -1800,10 +1780,12 @@ async function fetchSleepRecords(
 }
 
 export async function getTrainingSleepData(
-  mainWindow?: BrowserWindow | null,
   days = 14
 ): Promise<TrainingHubSleepSummary> {
-  const connected = await ensureMcpForSleep(mainWindow);
+  // Silent reconnect only, using stored tokens. A background wellness
+  // refresh must never pop an OAuth window on its own — the Coach view asks
+  // the athlete before any interactive authorization.
+  const connected = await ensureCorosMcpConnected();
   if (!connected) {
     return {
       records: [],

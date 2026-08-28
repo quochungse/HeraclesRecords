@@ -6206,7 +6206,13 @@ export async function readNativeTrainingPlanEndpoint<T>(
     | { method: "GET"; params: Record<string, string | number> }
 ): Promise<T> {
   if (path === "/training/plan/query" && options.method === "POST") {
-    const result = await trainingHubPost<T>(path, options.body);
+    // COROS answers an empty plan list with a successful `data: null` rather
+    // than `[]`, so an account with no plans must not read as a refresh
+    // failure. Callers funnel the result through `objectArray`, which turns
+    // the undefined back into an empty list.
+    const result = await trainingHubPost<T>(path, options.body, {
+      allowEmptyData: true
+    });
     return result as T;
   }
   if (path === "/training/plan/detail" && options.method === "GET") {

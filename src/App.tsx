@@ -726,7 +726,9 @@ export default function App() {
     mcpAutoConnectAttemptedRef.current = true;
 
     try {
-      await api.connectCorosMcp();
+      // Silent only. A dead MCP session must not throw a login window at the
+      // athlete on launch; the Coach view asks before anything interactive.
+      await api.ensureMcpConnected();
     } catch {
       // Sleep panel degrades gracefully when MCP is unavailable.
     }
@@ -2555,6 +2557,7 @@ export default function App() {
                     onActivityChange={setCoachBusy}
                     pendingPrompt={coachPrefill}
                     onPendingPromptConsumed={() => setCoachPrefill(null)}
+                    active={activeView === "coach"}
                   />
                 </Suspense>
               </div>

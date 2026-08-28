@@ -60,7 +60,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  const summary = await getTrainingSleepData(null, 7);
+  const summary = await getTrainingSleepData(7);
   console.log("\ngetTrainingSleepData summary:", JSON.stringify(summary, null, 2));
 
   app.exit(0);

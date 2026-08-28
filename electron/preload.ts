@@ -1160,6 +1160,8 @@ const api = {
     ipcRenderer.invoke("mcp:disconnect", id),
   getMcpStatuses: (): Promise<McpServerStatus[]> =>
     ipcRenderer.invoke("mcp:statuses"),
+  ensureMcpConnected: (): Promise<McpServerStatus[]> =>
+    ipcRenderer.invoke("mcp:ensureConnected"),
   setMcpBearer: (id: string, token: string): Promise<void> =>
     ipcRenderer.invoke("mcp:setBearer", id, token),
   uploadTrainingPlanDraft: (

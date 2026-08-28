@@ -72,6 +72,7 @@ import type {
   LocalChatDiscovery,
   OpenRouterConnectionTest,
   CorosMcpStatus,
+  McpServerConfig,
   McpServerStatus,
   PlanDraftPreview,
   PlanDraftPreviewEntry,
@@ -93,6 +94,7 @@ import { FitnessTrendCard } from "./FitnessTrendCard";
 import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
+import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ConversationCoaches } from "./automations/ConversationCoaches";
 import { CoachAutomationsModal } from "./automations/CoachAutomationsModal";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
@@ -295,6 +297,12 @@ interface ChatViewProps {
   /** Text preloaded into the composer (e.g. "Ask Coach" from the calendar). */
   pendingPrompt?: string | null;
   onPendingPromptConsumed?: () => void;
+  /**
+   * True while the Coach view is the visible one. The panel stays mounted when
+   * the athlete navigates away, so anything that should happen "on opening
+   * Coach" keys on this rather than on mount.
+   */
+  active?: boolean;
 }
 
 function canonicalPlanDistanceMeters(source: PlanWorkoutEntryInput): number {
@@ -1761,7 +1769,8 @@ export function ChatView({
   onReviewPlan,
   onActivityChange,
   pendingPrompt,
-  onPendingPromptConsumed
+  onPendingPromptConsumed,
+  active = true
 }: ChatViewProps) {
   const { unitSystem } = useUnitSystem();
   const [authStatus, setAuthStatus] = useState<ChatAuthStatus | null>(null);
@@ -1820,6 +1829,8 @@ export function ChatView({
   const [currentSource, setCurrentSource] = useState<SourceInfo | null>(null);
   const [mcpStatus, setMcpStatus] = useState<CorosMcpStatus | null>(null);
   const [mcpStatuses, setMcpStatuses] = useState<McpServerStatus[]>([]);
+  const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
+  const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
   const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
   const [mcpBusy, setMcpBusy] = useState(false);
   const [showTools, setShowTools] = useState(false);
@@ -2306,6 +2317,117 @@ export function ChatView({
       clearTimeout(timer);
     };
   }, [api, refreshMcpStatuses]);
+
+  // Ask about dead MCP sessions here rather than at launch: nothing opens an
+  // OAuth window on the athlete's behalf any more, so this is the one place
+  // the question gets asked, and only for the view whose tools need it.
+  //
+  // Keyed on `active`, not on mount: the Coach panel stays mounted once it has
+  // been opened, so a mount effect would fire once per app run and "Later"
+  // could never come back.
+  useEffect(() => {
+    if (!api || !active) return;
+    let cancelled = false;
+
+    void (async () => {
+      // Let the silent reconnect settle before calling a session dead, so a
+      // slow restore is not reported as a failure.
+      const [statuses, servers] = await Promise.all([
+        api.ensureMcpConnected().catch(() => null),
+        api.listMcpServers().catch(() => [] as McpServerConfig[])
+      ]);
+      if (cancelled || !statuses) return;
+
+      // authType "none" servers have nothing to authorize, so a failure there
+      // is a network problem and "Authorize" would be a dead end.
+      const authRequired = new Set(
+        servers
+          .filter((server) => server.authType !== "none")
+          .map((server) => server.id)
+      );
+      // `authenticated` means credentials are on disk, so it is the record
+      // that this server was connected at some point. Requiring it keeps the
+      // prompt to sessions that broke, and stays silent about servers that
+      // were registered but never connected — those are not a fault to report.
+      const broken = statuses.filter(
+        (status) =>
+          status.enabled &&
+          status.authenticated &&
+          !status.connected &&
+          authRequired.has(status.id)
+      );
+
+      setMcpStatuses(statuses);
+      if (broken.length > 0) {
+        setMcpPrompt(broken);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, active]);
+
+  // Skip: drop the stored session, and nothing else.
+  //
+  // That is enough to settle the question. The prompt only fires for servers
+  // whose credentials are on disk, so clearing them takes this server out of
+  // the set and it stops being asked about. The server stays enabled and
+  // reconnectable from the MCP panel.
+  const handleMcpPromptSkip = useCallback(async () => {
+    if (!api || mcpPrompt.length === 0) return;
+    setMcpPromptBusy(true);
+    try {
+      await Promise.all(
+        mcpPrompt.map(async (server) => {
+          try {
+            await api.disconnectMcpServer(server.id);
+          } catch (caught) {
+            onError(
+              caught instanceof Error
+                ? caught.message
+                : `${server.name} session could not be cleared.`
+            );
+          }
+        })
+      );
+    } finally {
+      setMcpPrompt([]);
+      setMcpPromptBusy(false);
+      await refreshMcpStatuses();
+    }
+  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
+
+  // Later: touch nothing. The effect above re-runs the next time Coach becomes
+  // the active view, so the question comes back on its own.
+  const handleMcpPromptLater = useCallback(() => {
+    setMcpPrompt([]);
+  }, []);
+
+  const handleMcpPromptAuthorize = useCallback(async () => {
+    if (!api || mcpPrompt.length === 0) return;
+    const targets = mcpPrompt;
+    setMcpPromptBusy(true);
+    setMcpPrompt([]);
+    try {
+      for (const server of targets) {
+        // Sequential on purpose: each authorization opens its own modal window
+        // and they share one loopback callback port, so two at once collide.
+        try {
+          await api.connectMcpServer(server.id);
+        } catch (caught) {
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : `${server.name} connection failed.`
+          );
+        }
+      }
+    } finally {
+      setMcpPromptBusy(false);
+      await refreshMcpStatuses();
+    }
+  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
 
   useEffect(() => {
     if (!showTools || settingsOpen) {
@@ -4849,6 +4971,13 @@ function AutomationSilentChip({
         ) : null}
       </div>
       <ChatSettingsModal {...settingsModalProps} />
+      <McpSessionPrompt
+        servers={mcpPrompt}
+        busy={mcpPromptBusy}
+        onSkip={() => void handleMcpPromptSkip()}
+        onLater={handleMcpPromptLater}
+        onAuthorize={() => void handleMcpPromptAuthorize()}
+      />
       <CoachAutomationsModal
         api={api}
         open={automationsOpen}

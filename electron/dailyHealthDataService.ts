@@ -1,9 +1,6 @@
-import type { BrowserWindow } from "electron";
 import {
   callCorosMcpTool,
-  connectCorosMcp,
   ensureCorosMcpConnected,
-  getCorosMcpStatus,
   getCorosMcpTools,
   listCorosMcpTools
 } from "./corosMcpService";
@@ -630,23 +627,6 @@ function buildDailyHealthToolArgs(
   });
 }
 
-async function ensureMcpForDailyHealth(
-  mainWindow?: BrowserWindow | null
-): Promise<boolean> {
-  if (await ensureCorosMcpConnected()) {
-    return true;
-  }
-
-  const status = getCorosMcpStatus();
-  if (!status.authorized) {
-    await connectCorosMcp(mainWindow, true);
-    return getCorosMcpStatus().connected;
-  }
-
-  await connectCorosMcp(mainWindow, true);
-  return getCorosMcpStatus().connected;
-}
-
 async function fetchDailyHealthRecords(
   dailyHealthTool: CorosMcpTool,
   days: number
@@ -681,10 +661,12 @@ async function fetchDailyHealthRecords(
 }
 
 export async function getTrainingDailyHealthData(
-  mainWindow?: BrowserWindow | null,
   days = 1
 ): Promise<TrainingHubDailyHealthSummary> {
-  const connected = await ensureMcpForDailyHealth(mainWindow);
+  // Silent reconnect only, using stored tokens. A background wellness
+  // refresh must never pop an OAuth window on its own — the Coach view asks
+  // the athlete before any interactive authorization.
+  const connected = await ensureCorosMcpConnected();
   if (!connected) {
     return {
       records: [],

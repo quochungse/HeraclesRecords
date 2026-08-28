@@ -722,6 +722,8 @@ export interface CorosLinkApi {
   connectMcpServer: (id: string) => Promise<McpServerStatus>;
   disconnectMcpServer: (id: string) => Promise<void>;
   getMcpStatuses: () => Promise<McpServerStatus[]>;
+  /** Silent reconnect from stored auth; never opens an OAuth window. */
+  ensureMcpConnected: () => Promise<McpServerStatus[]>;
   setMcpBearer: (id: string, token: string) => Promise<void>;
   uploadTrainingPlanDraft: (
     draftId: string,

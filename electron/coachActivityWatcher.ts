@@ -114,13 +114,13 @@ function createDefaultDeps(): CoachActivityWatcherDeps {
         }
       }
 
-      // Sleep comes through the COROS MCP server, and its own helper will open
-      // an OAuth window to get there. That is fine when the athlete asked for a
-      // sleep screen and unacceptable here: this runs unattended, possibly with
-      // no window at all. So sleep is read only when the connection already
-      // exists, and the cache keeps yesterday's answer when it does not.
+      // Sleep comes through the COROS MCP server. getTrainingSleepData only
+      // ever reconnects silently from stored tokens now, so it cannot raise a
+      // window on this unattended path; the status check just skips the work
+      // when there is no session. Either way the cache keeps yesterday's
+      // answer rather than writing a hole into the samples.
       if (getCorosMcpStatus().connected) {
-        const sleep = await getTrainingSleepData(null, DAILY_SAMPLE_LOOKBACK_DAYS);
+        const sleep = await getTrainingSleepData(DAILY_SAMPLE_LOOKBACK_DAYS);
         for (const record of sleep.records) {
           if (record.kind === "nap") continue;
           if (
