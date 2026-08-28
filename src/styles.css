@@ -990,6 +990,75 @@ input::placeholder {
   color: var(--accent-strong);
 }
 
+/* --- Grouped navigation ------------------------------------------------- */
+
+.app-sidebar-nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.app-sidebar-nav-item.is-group .app-sidebar-nav-copy {
+  flex: 1;
+}
+
+.app-sidebar-nav-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: 0.65;
+  transform: rotate(-90deg);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-sidebar-nav-chevron.is-open {
+  transform: rotate(0deg);
+}
+
+.app-sidebar-nav-children {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+/* Rail sits under the group icon's centre so the nesting reads at a glance. */
+.app-sidebar-nav-children::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 23px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--glass-border),
+    color-mix(in srgb, var(--glass-border) 20%, transparent)
+  );
+  pointer-events: none;
+}
+
+/*
+ * Nested rows keep the full-width button box — only their contents shift — so
+ * the shared active indicator still lines up with every row.
+ */
+.app-sidebar-nav-item.is-nested {
+  min-height: 40px;
+  padding-left: 34px;
+  font-size: 13.5px;
+}
+
+@keyframes sidebar-nav-child-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.app-sidebar-nav-children > .app-sidebar-nav-item {
+  animation: sidebar-nav-child-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .app-sidebar.is-collapsed .app-sidebar-indicator {
   left: 0;
   right: 0;
@@ -1121,12 +1190,17 @@ input::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .app-sidebar-indicator,
   .app-sidebar-nav-item,
+  .app-sidebar-nav-chevron,
   .app-sidebar-overlay {
     transition: none;
   }
 
   .app-sidebar-nav-item:hover {
     transform: none;
+  }
+
+  .app-sidebar-nav-children > .app-sidebar-nav-item {
+    animation: none;
   }
 }
 
