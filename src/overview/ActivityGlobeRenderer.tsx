@@ -10,6 +10,10 @@ import {
 } from "react";
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import {
+  ACCENT_PALETTE_DETAILS,
+  type AccentPalette
+} from "../theme/accentPalette";
+import {
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -22,6 +26,16 @@ import {
   SRGBColorSpace,
 } from "three";
 import type { GeoHeatBucket, GlobePoint } from "./activityVisitHeatmap";
+
+/** #rrggbb -> rgba(), for the globe point colours which need an alpha. */
+function withAlpha(hex: string, alpha: number): string {
+  const value = hex.replace("#", "");
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 
 interface ActivityGlobeRendererProps {
   frameKey: string;
@@ -229,6 +243,11 @@ const ActivityGlobeRendererComponent = forwardRef<
   const [paperTheme, setPaperTheme] = useState(
     () => document.documentElement.dataset.theme === "paper",
   );
+  // WebGL cannot read CSS custom properties, so the palette is mirrored from
+  // the same root attribute the stylesheet keys off.
+  const [accent, setAccent] = useState<AccentPalette>(
+    () => (document.documentElement.dataset.accent as AccentPalette) ?? "gold",
+  );
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -388,10 +407,13 @@ const ActivityGlobeRendererComponent = forwardRef<
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setPaperTheme(document.documentElement.dataset.theme === "paper");
+      setAccent(
+        (document.documentElement.dataset.accent as AccentPalette) ?? "gold",
+      );
     });
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "data-accent"],
     });
     return () => observer.disconnect();
   }, []);
@@ -673,12 +695,12 @@ const ActivityGlobeRendererComponent = forwardRef<
         }}
         pointColor={(point) => {
           const activity = point as ActivityPoint;
-          if (activity.key === selectedLocation?.key) {
-            return paperTheme ? "#087b5b" : "#83f3ce";
-          }
-          return paperTheme
-            ? "rgba(8, 123, 91, 0.76)"
-            : "rgba(66, 214, 165, 0.55)";
+          const tone = ACCENT_PALETTE_DETAILS[accent][
+            paperTheme ? "paper" : "dark"
+          ];
+          return activity.key === selectedLocation?.key
+            ? tone.strong
+            : withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
         }}
         pointResolution={12}
         pointsMerge={false}
@@ -692,7 +714,9 @@ const ActivityGlobeRendererComponent = forwardRef<
         pathPointLng={(point) => (point as GlobePoint).lon}
         pathPointAlt={0.006}
         pathResolution={0.7}
-        pathColor={() => (paperTheme ? "#087b5b" : "#83f3ce")}
+        pathColor={() =>
+          ACCENT_PALETTE_DETAILS[accent][paperTheme ? "paper" : "dark"].strong
+        }
         pathStroke={0.13}
         pathTransitionDuration={0}
         ringsData={ringData}

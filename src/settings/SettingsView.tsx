@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Bike,
   Bug,
+  Check,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -14,16 +15,23 @@ import {
   Globe2,
   HardDrive,
   Loader2,
+  Moon,
   Mountain,
   RefreshCw,
   Ruler,
   Sparkles,
+  Sun,
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { AppInfo, AppUpdateSnapshot } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatBytes } from "../media/libraryUtils";
+import { useTheme } from "../theme/ThemeProvider";
+import {
+  ACCENT_PALETTES,
+  ACCENT_PALETTE_DETAILS
+} from "../theme/accentPalette";
 import {
   DEFAULT_SPORT_COLORS,
   SPORT_COLOR_CATEGORIES,
@@ -104,6 +112,11 @@ interface SettingsViewProps {
   onError: (message: string) => void;
 }
 
+const THEME_MODES = [
+  { id: "dark" as const, label: "Dark", icon: Moon },
+  { id: "paper" as const, label: "Light", icon: Sun }
+];
+
 export function SettingsView({
   api,
   updateSnapshot,
@@ -117,6 +130,7 @@ export function SettingsView({
     null,
   );
   const [settingsPage, setSettingsPage] = useState<"main" | "storage">("main");
+  const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
   const { unitSystem, setUnitSystem } = useUnitSystem();
 
@@ -387,6 +401,76 @@ export function SettingsView({
         <div className="section-heading settings-sport-heading">
           <div>
             <p className="eyebrow">Appearance</p>
+            <h2>Themes</h2>
+          </div>
+          <div className="settings-theme-mode" role="group" aria-label="Color mode">
+            {THEME_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                className={`settings-theme-mode-option${theme === mode.id ? " is-active" : ""}`}
+                type="button"
+                aria-pressed={theme === mode.id}
+                onClick={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setTheme(mode.id, {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                  });
+                }}
+              >
+                <mode.icon size={15} aria-hidden="true" />
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="settings-sport-hint">
+          The palette recolours buttons, links, charts and highlights. Light and
+          dark are independent of it — every palette ships both.
+        </p>
+        <ul className="settings-theme-list">
+          {ACCENT_PALETTES.map((palette) => {
+            const detail = ACCENT_PALETTE_DETAILS[palette];
+            const active = accent === palette;
+            const swatchStyle = {
+              "--swatch-from": detail.swatch[0],
+              "--swatch-to": detail.swatch[1]
+            } as CSSProperties;
+
+            return (
+              <li key={palette}>
+                <button
+                  className={`settings-theme-option${active ? " is-active" : ""}`}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setAccent(palette, {
+                      x: rect.left + rect.width / 2,
+                      y: rect.top + rect.height / 2
+                    });
+                  }}
+                >
+                  <span
+                    className="settings-theme-swatch"
+                    style={swatchStyle}
+                    aria-hidden="true"
+                  />
+                  <span className="settings-theme-copy">
+                    <strong>{detail.label}</strong>
+                    <span>{detail.description}</span>
+                  </span>
+                  {active ? (
+                    <Check size={17} strokeWidth={2.4} aria-hidden="true" />
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="section-heading settings-sport-heading settings-sport-subheading">
+          <div>
             <h2>Activity colors</h2>
           </div>
           <button

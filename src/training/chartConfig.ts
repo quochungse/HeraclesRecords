@@ -87,11 +87,11 @@ export function getTrainingChartActiveDot(theme: Theme) {
 
 const DARK_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = {
   load: {
-    stroke: "#4fd6a6",
-    halo: "rgba(79, 214, 166, 0.3)",
-    soft: "rgba(79, 214, 166, 0.14)",
-    chip: "#8becc8",
-    stops: { top: "#4fd6a6", mid: "#2d9a74", bottom: "#2d9a74" }
+    stroke: "#f3bf5c",
+    halo: "rgba(243, 191, 92, 0.3)",
+    soft: "rgba(243, 191, 92, 0.14)",
+    chip: "#f7d489",
+    stops: { top: "#f3bf5c", mid: "#b8892f", bottom: "#b8892f" }
   },
   rpe: {
     stroke: "#b79bff",
@@ -118,11 +118,11 @@ const DARK_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = {
 
 const PAPER_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = {
   load: {
-    stroke: "#0f8a66",
-    halo: "rgba(15, 138, 102, 0.24)",
-    soft: "rgba(15, 138, 102, 0.12)",
-    chip: "#0b6b4f",
-    stops: { top: "#12946e", mid: "#0f7f5f", bottom: "#0f7f5f" }
+    stroke: "#8a5a12",
+    halo: "rgba(138, 90, 18, 0.24)",
+    soft: "rgba(138, 90, 18, 0.12)",
+    chip: "#6b450d",
+    stops: { top: "#9a6414", mid: "#7a4f0f", bottom: "#7a4f0f" }
   },
   rpe: {
     stroke: "#7c5cd6",

@@ -16,21 +16,42 @@ import {
   type Theme,
   type ThemeOrigin
 } from "./theme";
+import {
+  applyAccentPalette,
+  readStoredAccentPalette,
+  storeAccentPalette,
+  type AccentPalette
+} from "./accentPalette";
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme, origin?: ThemeOrigin) => void;
   toggleTheme: (origin?: ThemeOrigin) => void;
+  accent: AccentPalette;
+  setAccent: (accent: AccentPalette, origin?: ThemeOrigin) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => readStoredTheme());
+  const [accent, setAccentState] = useState<AccentPalette>(() =>
+    readStoredAccentPalette()
+  );
 
   useEffect(() => {
     storeTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    storeAccentPalette(accent);
+  }, [accent]);
+
+  // The palette is written on mount too: index.html ships no attribute, so a
+  // stored non-default palette would otherwise only appear after a change.
+  useEffect(() => {
+    applyAccentPalette(accent);
+  }, [accent]);
 
   const setTheme = useCallback((next: Theme, origin?: ThemeOrigin) => {
     // Commit the state change *and* the DOM attribute inside the view
@@ -49,9 +70,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [theme, setTheme]
   );
 
+  const setAccent = useCallback((next: AccentPalette, origin?: ThemeOrigin) => {
+    // Same view-transition treatment as the light/dark swap so a palette
+    // change wipes in from the control the user clicked.
+    runThemeTransition(origin, () => {
+      flushSync(() => setAccentState(next));
+      applyAccentPalette(next);
+    });
+  }, []);
+
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme]
+    () => ({ theme, setTheme, toggleTheme, accent, setAccent }),
+    [theme, setTheme, toggleTheme, accent, setAccent]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

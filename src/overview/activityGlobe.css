@@ -10,23 +10,24 @@
   --map-text-primary: #edf1f3;
   --map-text-secondary: #a5afb6;
   --map-text-muted: #748089;
-  --map-accent: #35bd91;
-  --map-accent-hover: #46c99e;
-  --map-accent-muted: rgba(53, 189, 145, 0.12);
-  --map-accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
-  --map-on-accent: #f2fbf7;
+  --map-accent: var(--accent);
+  --map-accent-hover: var(--accent-strong);
+  --map-accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
+  --map-accent-gradient: var(--accent-gradient);
+  /* Neutral, not gold-tinted: it sits on whichever palette is active. */
+  --map-on-accent: #0d0f12;
   --map-globe-background: transparent;
   --map-globe-radial: rgba(83, 153, 207, 0.12);
   --map-globe-rim-light: rgba(121, 184, 226, 0.08);
   --map-globe-star: rgba(181, 216, 239, 0.42);
   --map-globe-star-dim: rgba(124, 164, 192, 0.22);
   --map-globe-geography: rgba(205, 218, 221, 0.34);
-  --map-globe-selected: #83f3ce;
+  --map-globe-selected: var(--accent-strong);
   --map-globe-label-bg: rgba(6, 12, 14, 0.92);
   --map-globe-label-border: rgba(131, 243, 206, 0.16);
   --map-globe-label-text: #eaf8f3;
   --map-globe-control-shadow: rgba(1, 8, 12, 0.3);
-  --map-heat-low: rgba(53, 189, 145, 0.2);
+  --map-heat-low: rgba(231, 176, 76, 0.2);
   --map-heat-medium: rgba(72, 204, 160, 0.6);
   --map-heat-high: rgba(194, 247, 226, 0.94);
   --map-panel-shadow:
@@ -50,10 +51,10 @@
   --map-text-primary: #171c20;
   --map-text-secondary: #4d575e;
   --map-text-muted: #737e85;
-  --map-accent: #0f8967;
-  --map-accent-hover: #0b7658;
-  --map-accent-muted: rgba(15, 137, 103, 0.1);
-  --map-accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
+  --map-accent: var(--accent);
+  --map-accent-hover: var(--accent-strong);
+  --map-accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
+  --map-accent-gradient: var(--accent-gradient);
   --map-on-accent: #f4fbf8;
   --map-globe-background: transparent;
   --map-globe-radial: rgba(57, 116, 156, 0.07);
@@ -61,7 +62,7 @@
   --map-globe-star: rgba(65, 91, 108, 0.14);
   --map-globe-star-dim: rgba(65, 91, 108, 0.07);
   --map-globe-geography: rgba(84, 95, 103, 0.56);
-  --map-globe-selected: #087b5b;
+  --map-globe-selected: var(--accent);
   --map-globe-label-bg: rgba(32, 39, 43, 0.91);
   --map-globe-label-border: rgba(8, 123, 91, 0.2);
   --map-globe-label-text: #f5faf8;

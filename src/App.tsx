@@ -95,7 +95,6 @@ import {
 } from "./components/AppSidebar";
 import { ResourcesMenu } from "./components/ResourcesMenu";
 import { StartupViewMenu } from "./components/StartupViewMenu";
-import { ThemeToggle } from "./theme/ThemeToggle";
 import { WatchConnectionSmokeControls } from "./components/WatchConnectionSmokeControls";
 import type { PrimaryView } from "./navigation/primaryNav";
 import {
@@ -2182,7 +2181,6 @@ export default function App() {
       <header className="app-header app-header--slim">
         <div className="app-header-end">
           <DonateButton />
-          <ThemeToggle />
           <StartupViewMenu
             value={startupView}
             onChange={handleStartupViewChange}

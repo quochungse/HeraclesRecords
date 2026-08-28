@@ -12,9 +12,7 @@
   --sport-other: #7fd8cf;
 
   --bg-base: #05080b;
-  --bg-ambient-green: rgba(47, 190, 145, 0.1);
-  --bg-ambient-teal: rgba(31, 182, 166, 0.07);
-  --bg-ambient-gold: rgba(216, 155, 34, 0.04);
+  --bg-ambient-tertiary: rgba(216, 155, 34, 0.04);
   --bg-ambient-white: rgba(255, 255, 255, 0.035);
 
   --glass-bg: rgba(255, 255, 255, 0.06);
@@ -36,13 +34,6 @@
 
   --surface: #0c1814;
 
-  --accent: #2fbe91;
-  --accent-strong: #4fd6a6;
-  --accent-2: #1fb6a6;
-  --accent-hover: #26a37c;
-  --accent-glow: rgba(47, 190, 145, 0.32);
-  --accent-soft: rgba(47, 190, 145, 0.12);
-  --accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
   --accent-gold: #d89b22;
 
   --success-bg: rgba(47, 190, 145, 0.15);
@@ -81,19 +72,19 @@
       rgba(255, 255, 255, 0.04) 26%,
       transparent 54%
     ),
-    linear-gradient(220deg, rgba(47, 190, 145, 0.1) 0%, transparent 46%),
+    linear-gradient(220deg, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 46%),
     linear-gradient(180deg, rgba(16, 20, 26, 0.92) 0%, rgba(10, 14, 20, 0.78) 100%);
   --sidebar-overlay-bg: var(--sidebar-glass-bg);
   --sidebar-overlay-shadow: var(--sidebar-glass-shadow);
   --sidebar-indicator-bg: linear-gradient(
     135deg,
-    rgba(47, 190, 145, 0.24) 0%,
-    rgba(31, 182, 166, 0.14) 100%
+    color-mix(in srgb, var(--accent) 24%, transparent) 0%,
+    color-mix(in srgb, var(--accent-2) 14%, transparent) 100%
   );
-  --sidebar-indicator-border: rgba(79, 214, 166, 0.28);
+  --sidebar-indicator-border: color-mix(in srgb, var(--accent-strong) 28%, transparent);
   --sidebar-indicator-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 8px 22px rgba(47, 190, 145, 0.14);
+    0 8px 22px color-mix(in srgb, var(--accent) 14%, transparent);
 
   --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
 
@@ -117,9 +108,7 @@
   color-scheme: light;
 
   --bg-base: #f6f3ec; /* warm paper */
-  --bg-ambient-green: rgba(47, 190, 145, 0.06);
-  --bg-ambient-teal: rgba(31, 182, 166, 0.05);
-  --bg-ambient-gold: rgba(216, 155, 34, 0.05);
+  --bg-ambient-tertiary: rgba(216, 155, 34, 0.05);
   --bg-ambient-white: rgba(255, 255, 255, 0.5); /* light wash, not dark */
 
   /* Glass surfaces become near-white cards on paper */
@@ -142,13 +131,6 @@
 
   --surface: #ffffff;
 
-  --accent: #12946e; /* teal, darkened for contrast on white */
-  --accent-strong: #0f7f5f;
-  --accent-2: #128a7f;
-  --accent-hover: #0c6f52;
-  --accent-glow: rgba(18, 148, 110, 0.22);
-  --accent-soft: rgba(18, 148, 110, 0.12);
-  --accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
   --accent-gold: #b9791a;
 
   --success-bg: rgba(47, 190, 145, 0.16);
@@ -178,22 +160,238 @@
       rgba(255, 255, 255, 0.1) 32%,
       transparent 58%
     ),
-    linear-gradient(225deg, rgba(18, 148, 110, 0.05) 0%, transparent 48%),
+    linear-gradient(225deg, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 48%),
     #f6f3ec;
   --sidebar-overlay-bg: var(--sidebar-glass-bg);
   --sidebar-overlay-shadow: var(--sidebar-glass-shadow);
   --sidebar-indicator-bg: linear-gradient(
     135deg,
-    rgba(18, 148, 110, 0.16) 0%,
-    rgba(18, 138, 127, 0.09) 100%
+    color-mix(in srgb, var(--accent) 16%, transparent) 0%,
+    color-mix(in srgb, var(--accent-2) 9%, transparent) 100%
   );
-  --sidebar-indicator-border: rgba(18, 148, 110, 0.22);
+  --sidebar-indicator-border: color-mix(in srgb, var(--accent) 22%, transparent);
   --sidebar-indicator-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 6px 16px rgba(18, 148, 110, 0.1);
+    0 6px 16px color-mix(in srgb, var(--accent) 10%, transparent);
 
   color: var(--text-primary);
   background: var(--bg-base);
+}
+
+/* --- Accent palettes ------------------------------------------------------
+   Switchable from Settings -> Appearance -> Themes. Gold is the default and
+   carries no data-accent attribute, so it also covers a cleared setting.
+   Every value below was checked to clear WCAG AA (4.5:1) against its own
+   theme background before being committed. */
+
+:root, :root[data-accent="gold"] {
+  --accent: #e7b04c;
+  --accent-strong: #f3bf5c;
+  --accent-2: #c78f38;
+  --accent-hover: #cf9a3d;
+  --accent-muted: #b8892f;
+  --accent-glow: rgba(231, 176, 76, .32);
+  --accent-soft: rgba(231, 176, 76, .12);
+  --accent-gradient: linear-gradient(135deg, #e7b04c 0%, #c78f38 100%);
+  --bg-ambient-primary: rgba(231, 176, 76, 0.1);
+  --bg-ambient-secondary: rgba(199, 143, 56, 0.07);
+  --palette-accent: #e7b04c;
+  --palette-accent-strong: #f3bf5c;
+  --palette-accent-2: #c78f38;
+  --palette-accent-hover: #cf9a3d;
+  --palette-accent-muted: #b8892f;
+  --palette-accent-glow: rgba(231, 176, 76, .32);
+  --palette-accent-soft: rgba(231, 176, 76, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #e7b04c 0%, #c78f38 100%);
+}
+
+:root[data-accent="teal"] {
+  --accent: #2fbe91;
+  --accent-strong: #4fd6a6;
+  --accent-2: #1fb6a6;
+  --accent-hover: #26a37c;
+  --accent-muted: #2d9a74;
+  --accent-glow: rgba(47, 190, 145, .32);
+  --accent-soft: rgba(47, 190, 145, .12);
+  --accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
+  --bg-ambient-primary: rgba(47, 190, 145, 0.1);
+  --bg-ambient-secondary: rgba(31, 182, 166, 0.07);
+  --palette-accent: #2fbe91;
+  --palette-accent-strong: #4fd6a6;
+  --palette-accent-2: #1fb6a6;
+  --palette-accent-hover: #26a37c;
+  --palette-accent-muted: #2d9a74;
+  --palette-accent-glow: rgba(47, 190, 145, .32);
+  --palette-accent-soft: rgba(47, 190, 145, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
+}
+
+:root[data-accent="indigo"] {
+  --accent: #818cf8;
+  --accent-strong: #99a2ff;
+  --accent-2: #5965d4;
+  --accent-hover: #6d78e4;
+  --accent-muted: #5862c0;
+  --accent-glow: rgba(129, 140, 248, .32);
+  --accent-soft: rgba(129, 140, 248, .12);
+  --accent-gradient: linear-gradient(135deg, #818cf8 0%, #5965d4 100%);
+  --bg-ambient-primary: rgba(129, 140, 248, 0.1);
+  --bg-ambient-secondary: rgba(89, 101, 212, 0.07);
+  --palette-accent: #818cf8;
+  --palette-accent-strong: #99a2ff;
+  --palette-accent-2: #5965d4;
+  --palette-accent-hover: #6d78e4;
+  --palette-accent-muted: #5862c0;
+  --palette-accent-glow: rgba(129, 140, 248, .32);
+  --palette-accent-soft: rgba(129, 140, 248, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #818cf8 0%, #5965d4 100%);
+}
+
+:root[data-accent="rose"] {
+  --accent: #fb7185;
+  --accent-strong: #ff8799;
+  --accent-2: #d74b60;
+  --accent-hover: #e75f72;
+  --accent-muted: #c34c5d;
+  --accent-glow: rgba(251, 113, 133, .32);
+  --accent-soft: rgba(251, 113, 133, .12);
+  --accent-gradient: linear-gradient(135deg, #fb7185 0%, #d74b60 100%);
+  --bg-ambient-primary: rgba(251, 113, 133, 0.1);
+  --bg-ambient-secondary: rgba(215, 75, 96, 0.07);
+  --palette-accent: #fb7185;
+  --palette-accent-strong: #ff8799;
+  --palette-accent-2: #d74b60;
+  --palette-accent-hover: #e75f72;
+  --palette-accent-muted: #c34c5d;
+  --palette-accent-glow: rgba(251, 113, 133, .32);
+  --palette-accent-soft: rgba(251, 113, 133, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #fb7185 0%, #d74b60 100%);
+}
+
+:root[data-accent="sky"] {
+  --accent: #38bdf8;
+  --accent-strong: #4ec9ff;
+  --accent-2: #1b9bd4;
+  --accent-hover: #2aabe4;
+  --accent-muted: #208fc0;
+  --accent-glow: rgba(56, 189, 248, .32);
+  --accent-soft: rgba(56, 189, 248, .12);
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #1b9bd4 100%);
+  --bg-ambient-primary: rgba(56, 189, 248, 0.1);
+  --bg-ambient-secondary: rgba(27, 155, 212, 0.07);
+  --palette-accent: #38bdf8;
+  --palette-accent-strong: #4ec9ff;
+  --palette-accent-2: #1b9bd4;
+  --palette-accent-hover: #2aabe4;
+  --palette-accent-muted: #208fc0;
+  --palette-accent-glow: rgba(56, 189, 248, .32);
+  --palette-accent-soft: rgba(56, 189, 248, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #38bdf8 0%, #1b9bd4 100%);
+}
+
+:root[data-theme="paper"], :root[data-theme="paper"][data-accent="gold"] {
+  --accent: #9a6414;
+  --accent-strong: #7a4f0f;
+  --accent-2: #8a5a12;
+  --accent-hover: #6b450d;
+  --accent-muted: #b9791a;
+  --accent-glow: rgba(154, 100, 20, .22);
+  --accent-soft: rgba(154, 100, 20, .12);
+  --accent-gradient: linear-gradient(135deg, #b9791a 0%, #8a5a12 100%);
+  --bg-ambient-primary: rgba(154, 100, 20, 0.06);
+  --bg-ambient-secondary: rgba(138, 90, 18, 0.05);
+  --palette-accent: #9a6414;
+  --palette-accent-strong: #7a4f0f;
+  --palette-accent-2: #8a5a12;
+  --palette-accent-hover: #6b450d;
+  --palette-accent-muted: #b9791a;
+  --palette-accent-glow: rgba(154, 100, 20, .22);
+  --palette-accent-soft: rgba(154, 100, 20, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #b9791a 0%, #8a5a12 100%);
+}
+
+:root[data-theme="paper"][data-accent="teal"] {
+  --accent: #12946e;
+  --accent-strong: #0f7f5f;
+  --accent-2: #128a7f;
+  --accent-hover: #0c6f52;
+  --accent-muted: #12946e;
+  --accent-glow: rgba(18, 148, 110, .22);
+  --accent-soft: rgba(18, 148, 110, .12);
+  --accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
+  --bg-ambient-primary: rgba(18, 148, 110, 0.06);
+  --bg-ambient-secondary: rgba(18, 138, 127, 0.05);
+  --palette-accent: #12946e;
+  --palette-accent-strong: #0f7f5f;
+  --palette-accent-2: #128a7f;
+  --palette-accent-hover: #0c6f52;
+  --palette-accent-muted: #12946e;
+  --palette-accent-glow: rgba(18, 148, 110, .22);
+  --palette-accent-soft: rgba(18, 148, 110, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
+}
+
+:root[data-theme="paper"][data-accent="indigo"] {
+  --accent: #5763d3;
+  --accent-strong: #404aaf;
+  --accent-2: #4c57c1;
+  --accent-hover: #333d9b;
+  --accent-muted: #6d7aec;
+  --accent-glow: rgba(87, 99, 211, .22);
+  --accent-soft: rgba(87, 99, 211, .12);
+  --accent-gradient: linear-gradient(135deg, #6d7aec 0%, #4c57c1 100%);
+  --bg-ambient-primary: rgba(87, 99, 211, 0.06);
+  --bg-ambient-secondary: rgba(76, 87, 193, 0.05);
+  --palette-accent: #5763d3;
+  --palette-accent-strong: #404aaf;
+  --palette-accent-2: #4c57c1;
+  --palette-accent-hover: #333d9b;
+  --palette-accent-muted: #6d7aec;
+  --palette-accent-glow: rgba(87, 99, 211, .22);
+  --palette-accent-soft: rgba(87, 99, 211, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #6d7aec 0%, #4c57c1 100%);
+}
+
+:root[data-theme="paper"][data-accent="rose"] {
+  --accent: #c63a4e;
+  --accent-strong: #a22739;
+  --accent-2: #b43144;
+  --accent-hover: #8e1e2e;
+  --accent-muted: #e04d62;
+  --accent-glow: rgba(198, 58, 78, .22);
+  --accent-soft: rgba(198, 58, 78, .12);
+  --accent-gradient: linear-gradient(135deg, #e04d62 0%, #b43144 100%);
+  --bg-ambient-primary: rgba(198, 58, 78, 0.06);
+  --bg-ambient-secondary: rgba(180, 49, 68, 0.05);
+  --palette-accent: #c63a4e;
+  --palette-accent-strong: #a22739;
+  --palette-accent-2: #b43144;
+  --palette-accent-hover: #8e1e2e;
+  --palette-accent-muted: #e04d62;
+  --palette-accent-glow: rgba(198, 58, 78, .22);
+  --palette-accent-soft: rgba(198, 58, 78, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #e04d62 0%, #b43144 100%);
+}
+
+:root[data-theme="paper"][data-accent="sky"] {
+  --accent: #0076aa;
+  --accent-strong: #005d86;
+  --accent-2: #006a98;
+  --accent-hover: #004f72;
+  --accent-muted: #0a8bc3;
+  --accent-glow: rgba(0, 118, 170, .22);
+  --accent-soft: rgba(0, 118, 170, .12);
+  --accent-gradient: linear-gradient(135deg, #0a8bc3 0%, #006a98 100%);
+  --bg-ambient-primary: rgba(0, 118, 170, 0.06);
+  --bg-ambient-secondary: rgba(0, 106, 152, 0.05);
+  --palette-accent: #0076aa;
+  --palette-accent-strong: #005d86;
+  --palette-accent-2: #006a98;
+  --palette-accent-hover: #004f72;
+  --palette-accent-muted: #0a8bc3;
+  --palette-accent-glow: rgba(0, 118, 170, .22);
+  --palette-accent-soft: rgba(0, 118, 170, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #0a8bc3 0%, #006a98 100%);
 }
 
 * {
@@ -1738,9 +1936,9 @@ input::placeholder {
   z-index: -1;
   background:
     radial-gradient(ellipse 55% 45% at 18% -5%, var(--bg-ambient-white), transparent 70%),
-    radial-gradient(ellipse 45% 40% at 82% 105%, var(--bg-ambient-green), transparent 70%),
-    radial-gradient(ellipse 40% 35% at 5% 60%, var(--bg-ambient-teal), transparent 70%),
-    radial-gradient(ellipse 30% 25% at 92% 18%, var(--bg-ambient-gold), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 82% 105%, var(--bg-ambient-primary), transparent 70%),
+    radial-gradient(ellipse 40% 35% at 5% 60%, var(--bg-ambient-secondary), transparent 70%),
+    radial-gradient(ellipse 30% 25% at 92% 18%, var(--bg-ambient-tertiary), transparent 70%),
     var(--bg-base);
   pointer-events: none;
 }
@@ -2456,8 +2654,8 @@ input::placeholder {
 }
 
 .activity-globe-chip--accent {
-  border-color: rgba(47, 190, 145, 0.28);
-  background: rgba(47, 190, 145, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--accent-strong);
 }
 
@@ -2743,7 +2941,7 @@ input::placeholder {
 }
 
 :root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a {
-  color: #0f7f5f;
+  color: var(--accent-strong);
 }
 
 .activity-globe-status,
@@ -2792,9 +2990,9 @@ input::placeholder {
   border-radius: var(--radius-pill);
   background: linear-gradient(
     90deg,
-    rgba(47, 190, 145, 0.18),
-    rgba(47, 190, 145, 0.72),
-    rgba(79, 214, 166, 0.95),
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    color-mix(in srgb, var(--accent) 72%, transparent),
+    color-mix(in srgb, var(--accent-strong) 95%, transparent),
     rgba(255, 246, 210, 0.95)
   );
 }
@@ -2823,7 +3021,7 @@ input::placeholder {
 
 .activity-globe-action:hover {
   border-color: var(--success-border);
-  background: rgba(47, 190, 145, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .activity-globe-action:active {
@@ -2846,7 +3044,7 @@ input::placeholder {
 }
 
 :root[data-theme="paper"] .activity-globe-action:hover {
-  background: rgba(18, 148, 110, 0.17);
+  background: color-mix(in srgb, var(--accent) 17%, transparent);
 }
 
 :root[data-theme="paper"] .activity-globe-featured,
@@ -3233,7 +3431,7 @@ input::placeholder {
   border-color: var(--glass-border);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-green), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-primary), transparent 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
     #14171c;
   box-shadow: var(--glass-shadow), var(--glass-inset);
@@ -3804,7 +4002,7 @@ input::placeholder {
     transparent,
     var(--accent-soft),
     rgba(255, 255, 255, 0.12),
-    var(--bg-ambient-teal),
+    var(--bg-ambient-secondary),
     transparent
   );
 }
@@ -4187,11 +4385,11 @@ input::placeholder {
 }
 
 tbody tr.is-selected {
-  background: rgba(45, 154, 116, 0.08);
+  background: color-mix(in srgb, var(--accent-muted) 8%, transparent);
 }
 
 tbody tr.is-selected:hover {
-  background: rgba(45, 154, 116, 0.12);
+  background: color-mix(in srgb, var(--accent-muted) 12%, transparent);
 }
 
 .badge {
@@ -4582,8 +4780,8 @@ td span {
   gap: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 88% 8%, rgba(47, 190, 145, 0.22), transparent 34%),
-    linear-gradient(135deg, rgba(31, 182, 166, 0.11), transparent 58%),
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-2) 11%, transparent), transparent 58%),
     var(--glass-bg);
 }
 
@@ -4812,7 +5010,7 @@ td span {
   place-items: center;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 50%, rgba(47, 190, 145, 0.2), transparent 42%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 42%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.16));
   color: var(--accent-strong);
 }
@@ -5206,7 +5404,7 @@ td span {
 }
 
 .wf-selectable-component.is-enabled {
-  background: rgba(45, 154, 116, 0.075);
+  background: color-mix(in srgb, var(--accent-muted) 7.5%, transparent);
   color: var(--text-primary);
 }
 
@@ -6546,9 +6744,9 @@ td span {
   display: grid;
   gap: 8px;
   margin-top: 14px;
-  border: 1px solid rgba(45, 154, 116, 0.24);
+  border: 1px solid color-mix(in srgb, var(--accent-muted) 24%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(45, 154, 116, 0.1);
+  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
   padding: 12px;
 }
 
@@ -6884,7 +7082,7 @@ td span {
 }
 
 .app-select-option.is-selected {
-  background: rgba(45, 154, 116, 0.16);
+  background: color-mix(in srgb, var(--accent-muted) 16%, transparent);
 }
 
 .app-select-option svg {
@@ -7090,10 +7288,10 @@ td span {
   display: grid;
   gap: 14px;
   margin-top: 16px;
-  border: 1px solid rgba(45, 154, 116, 0.24);
+  border: 1px solid color-mix(in srgb, var(--accent-muted) 24%, transparent);
   border-radius: var(--radius-sm);
   background:
-    linear-gradient(135deg, rgba(45, 154, 116, 0.14), rgba(216, 155, 34, 0.08)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-muted) 14%, transparent), rgba(216, 155, 34, 0.08)),
     rgba(0, 0, 0, 0.22);
   padding: 14px;
 }
@@ -7111,7 +7309,7 @@ td span {
   height: 42px;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: rgba(45, 154, 116, 0.18);
+  background: color-mix(in srgb, var(--accent-muted) 18%, transparent);
   color: var(--accent);
 }
 
@@ -7311,7 +7509,7 @@ td span {
   padding: 14px 18px;
   border: 1px solid var(--glass-border);
   background:
-    linear-gradient(135deg, rgba(47, 190, 145, 0.1), rgba(255, 255, 255, 0.04) 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), rgba(255, 255, 255, 0.04) 42%),
     rgba(255, 255, 255, 0.06);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   backdrop-filter: blur(var(--glass-blur)) saturate(160%);
@@ -7373,8 +7571,8 @@ td span {
 
 .training-command-center.is-connected .training-details-button:hover,
 .training-command-center.is-connected .training-connection-button:hover:not(:disabled) {
-  border-color: rgba(45, 154, 116, 0.32);
-  background: rgba(45, 154, 116, 0.1);
+  border-color: color-mix(in srgb, var(--accent-muted) 32%, transparent);
+  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
 }
 
 .training-connection-actions {
@@ -7491,7 +7689,7 @@ td span {
 }
 
 .training-command-copy h2 em {
-  color: #36c98f;
+  color: var(--accent);
   font-style: normal;
 }
 
@@ -7537,7 +7735,7 @@ td span {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
     rgba(255, 255, 255, 0.035);
-  color: #42d99d;
+  color: var(--accent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 12px 24px rgba(0, 0, 0, 0.24);
@@ -7624,8 +7822,8 @@ td span {
 }
 
 .training-details-button:hover {
-  border-color: rgba(45, 154, 116, 0.45);
-  background: rgba(45, 154, 116, 0.1);
+  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
   color: var(--text-primary);
 }
 
@@ -7790,10 +7988,10 @@ td span {
 }
 
 .training-login-input:focus-within {
-  border-color: rgba(64, 211, 155, 0.68);
+  border-color: color-mix(in srgb, var(--accent) 68%, transparent);
   background: rgba(255, 255, 255, 0.046);
   box-shadow:
-    0 0 0 3px rgba(52, 211, 153, 0.13),
+    0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent),
     0 12px 24px rgba(0, 0, 0, 0.14);
 }
 
@@ -7838,13 +8036,13 @@ td span {
   width: 100%;
   min-height: 50px;
   border-radius: 7px;
-  background: linear-gradient(135deg, #4bd39d 0%, #28aa7d 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   font-size: 15px;
-  box-shadow: 0 15px 28px rgba(45, 154, 116, 0.24);
+  box-shadow: 0 15px 28px color-mix(in srgb, var(--accent-muted) 24%, transparent);
 }
 
 .training-login-actions .primary-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #58dfa9 0%, #2fbe91 100%);
+  background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
 }
 
 .training-login-remember {
@@ -7865,15 +8063,15 @@ td span {
   place-items: center;
   flex-shrink: 0;
   appearance: none;
-  border: 1px solid rgba(54, 201, 143, 0.78);
+  border: 1px solid rgba(223, 168, 67, 0.78);
   border-radius: 4px;
-  background: rgba(54, 201, 143, 0.08);
+  background: rgba(223, 168, 67, 0.08);
   cursor: pointer;
 }
 
 .training-login-remember input:checked {
-  background: #2fbe91;
-  box-shadow: 0 0 0 3px rgba(47, 190, 145, 0.14);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .training-login-remember input:checked::after {
@@ -7937,8 +8135,8 @@ td span {
 
 .training-login-browser-link:hover,
 .training-login-browser-link:focus-visible {
-  border-color: rgba(64, 211, 155, 0.55);
-  background: rgba(64, 211, 155, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: #ffffff;
   transform: translateY(-1px);
 }
@@ -8437,7 +8635,7 @@ td span {
 
 .playlist-button.active {
   border-color: var(--success-border);
-  background: rgba(45, 154, 116, 0.12);
+  background: color-mix(in srgb, var(--accent-muted) 12%, transparent);
 }
 
 .playlist-button.active::before {
@@ -10597,9 +10795,9 @@ td span {
   place-items: center;
   width: 30px;
   height: 30px;
-  border: 1px solid var(--stat-icon-border, rgba(45, 154, 116, 0.2));
+  border: 1px solid var(--stat-icon-border, color-mix(in srgb, var(--accent-muted) 20%, transparent));
   border-radius: 9px;
-  background: var(--stat-icon-bg, rgba(45, 154, 116, 0.12));
+  background: var(--stat-icon-bg, color-mix(in srgb, var(--accent-muted) 12%, transparent));
   color: var(--stat-icon-color, var(--success-text));
 }
 
@@ -10779,8 +10977,8 @@ td span {
   border-radius: var(--radius-xl);
   padding: clamp(14px, 1.7vw, 22px);
   background:
-    radial-gradient(120% 90% at 0% 0%, rgba(45, 154, 116, 0.13), transparent 52%),
-    radial-gradient(110% 90% at 100% 0%, rgba(45, 154, 116, 0.07), transparent 48%),
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--accent-muted) 13%, transparent), transparent 52%),
+    radial-gradient(110% 90% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 48%),
     rgba(255, 255, 255, 0.015);
   animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -10802,7 +11000,7 @@ td span {
   gap: 8px;
   border: 1px solid var(--success-border);
   border-radius: var(--radius-pill);
-  background: rgba(45, 154, 116, 0.1);
+  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
   padding: 7px 15px;
   color: var(--success-text);
   font-size: 13px;
@@ -11931,7 +12129,7 @@ td span {
 }
 
 .training-fitness-swatch--distance {
-  background: linear-gradient(135deg, #dcd57a 0%, #2d9a74 100%);
+  background: linear-gradient(135deg, #dcd57a 0%, var(--accent-muted) 100%);
 }
 
 .training-fitness-swatch--duration {
@@ -12157,8 +12355,8 @@ td span {
   min-height: clamp(220px, 28vh, 320px);
   height: 100%;
   background:
-    radial-gradient(130% 90% at 50% 110%, rgba(45, 154, 116, 0.14), transparent 58%),
-    radial-gradient(80% 60% at 0% 0%, rgba(45, 154, 116, 0.06), transparent 50%),
+    radial-gradient(130% 90% at 50% 110%, color-mix(in srgb, var(--accent-muted) 14%, transparent), transparent 58%),
+    radial-gradient(80% 60% at 0% 0%, color-mix(in srgb, var(--accent-muted) 6%, transparent), transparent 50%),
     rgba(255, 255, 255, 0.02);
   animation: training-card-enter 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -12309,7 +12507,7 @@ td span {
      original green when a day has load but no matching activity — this is the
      legacy pre-sport-colors heatmap green, intentionally not a --sport-* value
      (and intentionally distinct from --sport-run). */
-  --cell-color: #2d9a74;
+  --cell-color: var(--accent-muted);
   position: relative;
   width: 100%;
   height: 100%;
@@ -12515,15 +12713,17 @@ td span {
   font-weight: 600;
 }
 
+/* The Less -> More scale must stay hue-neutral: grid cells encode sport as hue
+   and load as alpha, so a tinted ramp claims a meaning it does not have. It
+   used --accent-muted, which sat next to the sport legend looking like a sixth
+   sport and collided outright with --sport-bike's gold. Neutral ink stepped by
+   alpha says "amount of shading" and nothing else. */
 .training-heatmap-legend-cell {
+  --heatmap-legend-ink: #ffffff;
   width: clamp(14px, 1.4vw, 18px);
   height: clamp(14px, 1.4vw, 18px);
   border-radius: clamp(3px, 0.4vw, 5px);
   transition: transform 0.2s ease;
-}
-
-.training-heatmap-legend-cell[data-level="4"] {
-  box-shadow: 0 0 8px rgba(45, 154, 116, 0.35);
 }
 
 .training-heatmap-legend-cell[data-level="0"] {
@@ -12531,19 +12731,20 @@ td span {
 }
 
 .training-heatmap-legend-cell[data-level="1"] {
-  background: rgba(45, 154, 116, 0.28);
+  background: color-mix(in srgb, var(--heatmap-legend-ink) 20%, transparent);
 }
 
 .training-heatmap-legend-cell[data-level="2"] {
-  background: rgba(45, 154, 116, 0.48);
+  background: color-mix(in srgb, var(--heatmap-legend-ink) 38%, transparent);
 }
 
 .training-heatmap-legend-cell[data-level="3"] {
-  background: rgba(45, 154, 116, 0.72);
+  background: color-mix(in srgb, var(--heatmap-legend-ink) 60%, transparent);
 }
 
 .training-heatmap-legend-cell[data-level="4"] {
-  background: linear-gradient(145deg, #3eb889 0%, #2d9a74 100%);
+  background: color-mix(in srgb, var(--heatmap-legend-ink) 85%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--heatmap-legend-ink) 22%, transparent);
 }
 
 .training-heatmap-summary {
@@ -12741,8 +12942,8 @@ td span {
 }
 
 .training-chart-panel {
-  --chart-panel-tint: rgba(79, 214, 166, 0.08);
-  --chart-curve-glow: rgba(79, 214, 166, 0.3);
+  --chart-panel-tint: color-mix(in srgb, var(--accent-strong) 8%, transparent);
+  --chart-curve-glow: color-mix(in srgb, var(--accent-strong) 30%, transparent);
   display: grid;
   gap: 20px;
   min-height: clamp(300px, 34vh, 430px);
@@ -13616,7 +13817,7 @@ td span {
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 100% 0%, rgba(45, 154, 116, 0.07), transparent 58%),
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
     rgba(255, 255, 255, 0.034);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   -webkit-backdrop-filter: none;
@@ -13708,7 +13909,7 @@ td span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), #34d399);
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
   transform-origin: left center;
   animation: training-fill 0.85s ease both;
 }
@@ -13754,7 +13955,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.12), transparent 62%),
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 12%, transparent), transparent 62%),
     rgba(255, 255, 255, 0.025);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   padding: 9px 10px;
@@ -13771,7 +13972,7 @@ td span {
   inset: 10px auto 10px 0;
   width: 2px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, #6ee7a8, var(--accent));
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
   opacity: 0.66;
 }
 
@@ -13788,10 +13989,10 @@ td span {
 }
 
 .race-card:hover {
-  border-color: rgba(45, 154, 116, 0.32);
+  border-color: color-mix(in srgb, var(--accent-muted) 32%, transparent);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.18), transparent 62%),
-    rgba(45, 154, 116, 0.06);
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 18%, transparent), transparent 62%),
+    color-mix(in srgb, var(--accent-muted) 6%, transparent);
   transform: translateY(-2px);
 }
 
@@ -13904,7 +14105,7 @@ td span {
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 100% 0%, var(--bg-ambient-green), transparent 58%),
+    radial-gradient(120% 80% at 100% 0%, var(--bg-ambient-primary), transparent 58%),
     rgba(255, 255, 255, 0.034);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   -webkit-backdrop-filter: none;
@@ -14293,7 +14494,7 @@ td span {
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 100% 0%, var(--bg-ambient-green), transparent 58%),
+    radial-gradient(120% 80% at 100% 0%, var(--bg-ambient-primary), transparent 58%),
     rgba(255, 255, 255, 0.034);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
@@ -14614,7 +14815,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 0% 0%, rgba(45, 154, 116, 0.07), transparent 58%),
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
     rgba(255, 255, 255, 0.034);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   -webkit-backdrop-filter: none;
@@ -14661,14 +14862,14 @@ tr.data-intervals-row-missing {
   align-items: flex-start;
   gap: 16px;
   padding: 18px 20px;
-  border: 1px solid rgba(45, 154, 116, 0.48);
+  border: 1px solid color-mix(in srgb, var(--accent-muted) 48%, transparent);
   border-radius: var(--radius-md);
   background:
-    linear-gradient(135deg, rgba(45, 154, 116, 0.2), rgba(45, 154, 116, 0.06)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-muted) 20%, transparent), color-mix(in srgb, var(--accent-muted) 6%, transparent)),
     rgba(255, 255, 255, 0.04);
   box-shadow:
-    inset 0 1px 0 rgba(110, 231, 168, 0.16),
-    0 16px 36px rgba(45, 154, 116, 0.12);
+    inset 0 1px 0 color-mix(in srgb, var(--accent-strong) 16%, transparent),
+    0 16px 36px color-mix(in srgb, var(--accent-muted) 12%, transparent);
 }
 
 .training-upcoming-today-empty {
@@ -14698,9 +14899,9 @@ tr.data-intervals-row-missing {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, #35a87f, var(--accent));
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
   color: #fff;
-  box-shadow: 0 8px 20px rgba(45, 154, 116, 0.32);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-muted) 32%, transparent);
 }
 
 .training-upcoming-today-copy {
@@ -14716,10 +14917,10 @@ tr.data-intervals-row-missing {
 }
 
 .training-upcoming-today-pill {
-  border: 1px solid rgba(110, 231, 168, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 35%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(45, 154, 116, 0.22);
-  color: #9ef0c9;
+  background: color-mix(in srgb, var(--accent-muted) 22%, transparent);
+  color: var(--accent-strong);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -14884,7 +15085,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 100% 0%, rgba(45, 154, 116, 0.07), transparent 58%),
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
     rgba(255, 255, 255, 0.034);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   -webkit-backdrop-filter: none;
@@ -14918,9 +15119,9 @@ tr.data-intervals-row-missing {
 }
 
 .training-records-tab.active {
-  border-color: rgba(45, 154, 116, 0.35);
-  background: rgba(45, 154, 116, 0.14);
-  color: #8fe3c0;
+  border-color: color-mix(in srgb, var(--accent-muted) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-muted) 14%, transparent);
+  color: var(--accent-strong);
 }
 
 .training-records-banner {
@@ -15113,7 +15314,7 @@ tr.data-intervals-row-missing {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.12), transparent 62%),
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 12%, transparent), transparent 62%),
     rgba(255, 255, 255, 0.025);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   overflow: hidden;
@@ -15206,8 +15407,8 @@ tr.data-intervals-row-missing {
   width: 28px;
   height: 28px;
   border-radius: var(--radius-pill);
-  background: rgba(45, 154, 116, 0.16);
-  color: #8fe3c0;
+  background: color-mix(in srgb, var(--accent-muted) 16%, transparent);
+  color: var(--accent-strong);
 }
 
 .training-record-card.is-empty .training-record-card-icon {
@@ -15280,7 +15481,7 @@ tr.data-intervals-row-missing {
 }
 
 .training-record-spark-fill {
-  fill: rgba(45, 154, 116, 0.22);
+  fill: color-mix(in srgb, var(--accent-muted) 22%, transparent);
 }
 
 .training-record-spark-line {
@@ -15610,10 +15811,10 @@ tr.data-intervals-row-missing {
 }
 
 .activity-detail-sport {
-  border: 1px solid rgba(45, 154, 116, 0.28);
+  border: 1px solid color-mix(in srgb, var(--accent-muted) 28%, transparent);
   border-radius: 999px;
-  background: rgba(45, 154, 116, 0.12);
-  color: #74c08f;
+  background: color-mix(in srgb, var(--accent-muted) 12%, transparent);
+  color: var(--accent-strong);
   padding: 2px 10px;
   font-size: 11px;
   font-weight: 700;
@@ -15838,12 +16039,12 @@ tr.data-intervals-row-missing {
 }
 
 .training-table-row.is-selected {
-  background: rgba(45, 154, 116, 0.1);
+  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
 }
 
 .training-table-row.is-selected td {
-  border-top-color: rgba(45, 154, 116, 0.18);
-  border-bottom-color: rgba(45, 154, 116, 0.18);
+  border-top-color: color-mix(in srgb, var(--accent-muted) 18%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--accent-muted) 18%, transparent);
 }
 
 .training-laps-section {
@@ -17307,7 +17508,7 @@ tr.data-intervals-row-missing {
       transparent,
       var(--accent-soft),
       rgba(255, 255, 255, 0.12),
-      var(--bg-ambient-teal),
+      var(--bg-ambient-secondary),
       transparent
     );
   }
@@ -17441,11 +17642,11 @@ tr.data-intervals-row-missing {
 
   /* "Signal" accent — a real color reserved for live/connected states
      (COROS MCP), plus small pops in the model's output. */
-  --chat-signal: #34d399;
-  --chat-signal-strong: #6ee7a8;
-  --chat-signal-soft: rgba(52, 211, 153, 0.13);
-  --chat-signal-border: rgba(52, 211, 153, 0.42);
-  --chat-signal-glow: rgba(52, 211, 153, 0.3);
+  --chat-signal: var(--palette-accent);
+  --chat-signal-strong: var(--palette-accent-strong);
+  --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
+  --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
+  --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
 
   position: relative;
   display: flex;
@@ -17835,7 +18036,8 @@ tr.data-intervals-row-missing {
 }
 
 .chat-plan-list-meta [data-status="saved"] {
-  color: var(--chat-signal-strong);
+  /* A status, not an accent: stays green whatever palette is picked. */
+  color: var(--success-text);
 }
 
 .chat-plan-list-item > svg {
@@ -18214,13 +18416,13 @@ tr.data-intervals-row-missing {
 
 .chat-sidebar {
   /* Revert chat-scoped gray palette for sidebar subtree only */
-  --accent: #2fbe91;
-  --accent-strong: #4fd6a6;
-  --accent-2: #1fb6a6;
-  --accent-hover: #26a37c;
-  --accent-glow: rgba(47, 190, 145, 0.32);
-  --accent-soft: rgba(47, 190, 145, 0.12);
-  --accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
+  --accent: var(--palette-accent);
+  --accent-strong: var(--palette-accent-strong);
+  --accent-2: var(--palette-accent-2);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-glow: var(--palette-accent-glow);
+  --accent-soft: var(--palette-accent-soft);
+  --accent-gradient: var(--palette-accent-gradient);
 
   position: relative;
   isolation: isolate;
@@ -20044,10 +20246,10 @@ tr.data-intervals-row-missing {
 
 .chat-select--local,
 .chat-select-menu--local {
-  --chat-select-tone: #35c4b0;
-  --chat-select-tone-strong: #70e3d3;
-  --chat-select-tone-soft: rgba(53, 196, 176, 0.14);
-  --chat-select-tone-shadow: rgba(53, 196, 176, 0.2);
+  --chat-select-tone: var(--accent);
+  --chat-select-tone-strong: var(--accent-strong);
+  --chat-select-tone-soft: rgba(217, 166, 63, 0.14);
+  --chat-select-tone-shadow: rgba(217, 166, 63, 0.2);
 }
 
 .chat-provider-menu .app-select-option[data-value="chatgpt"] {
@@ -20069,9 +20271,9 @@ tr.data-intervals-row-missing {
 }
 
 .chat-provider-menu .app-select-option[data-value="local"] {
-  --chat-select-tone: #35c4b0;
-  --chat-select-tone-strong: #70e3d3;
-  --chat-select-tone-soft: rgba(53, 196, 176, 0.14);
+  --chat-select-tone: var(--accent);
+  --chat-select-tone-strong: var(--accent-strong);
+  --chat-select-tone-soft: rgba(217, 166, 63, 0.14);
 }
 
 .chat-provider-select {
@@ -22838,7 +23040,7 @@ tr.data-intervals-row-missing {
 }
 .route-search-input:focus-within {
   border-color: var(--accent);
-  background: rgba(47, 190, 145, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .route-search-input input {
   flex: 1;
@@ -23703,11 +23905,11 @@ tr.data-intervals-row-missing {
   --accent-glow: rgba(38, 34, 28, 0.12);
   --accent-soft: rgba(38, 34, 28, 0.07);
   --accent-gradient: linear-gradient(135deg, #8a837a 0%, #5c5752 100%);
-  --chat-signal: #0c7f74;
-  --chat-signal-strong: #0a6b62;
-  --chat-signal-soft: rgba(18, 138, 127, 0.12);
-  --chat-signal-border: rgba(18, 138, 127, 0.35);
-  --chat-signal-glow: rgba(18, 138, 127, 0.2);
+  --chat-signal: var(--palette-accent);
+  --chat-signal-strong: var(--palette-accent-strong);
+  --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
+  --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
+  --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
   background:
     radial-gradient(
       1100px 520px at 50% -8%,
@@ -23748,7 +23950,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .app-sidebar-brand .brand-mark {
   box-shadow:
     0 0 0 1px rgba(38, 34, 28, 0.06),
-    0 10px 22px rgba(18, 148, 110, 0.14);
+    0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 :root[data-theme="paper"] .app-sidebar-nav-item:hover {
@@ -23790,13 +23992,13 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-sidebar {
-  --accent: #12948e;
-  --accent-strong: #0c7f74;
-  --accent-2: #18a89e;
-  --accent-hover: #0a6b62;
-  --accent-glow: rgba(18, 148, 110, 0.24);
-  --accent-soft: rgba(18, 148, 110, 0.12);
-  --accent-gradient: linear-gradient(135deg, #12948e 0%, #0c7f74 100%);
+  --accent: var(--palette-accent);
+  --accent-strong: var(--palette-accent-strong);
+  --accent-2: var(--palette-accent-2);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-glow: var(--palette-accent-glow);
+  --accent-soft: var(--palette-accent-soft);
+  --accent-gradient: var(--palette-accent-gradient);
 
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -23830,10 +24032,10 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .chat-history-search:focus-within {
   background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(18, 148, 110, 0.35);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   box-shadow:
     var(--glass-inset),
-    0 0 0 3px rgba(18, 148, 110, 0.12);
+    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 :root[data-theme="paper"] .chat-session-row:hover:not(:disabled) {
@@ -23845,11 +24047,11 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-session-row.is-active {
-  background: rgba(18, 148, 110, 0.12);
-  border-color: rgba(18, 148, 110, 0.28);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 8px 20px rgba(18, 148, 110, 0.1);
+    0 8px 20px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 :root[data-theme="paper"] .chat-settings-modal {
@@ -23898,10 +24100,10 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .chat-select--local,
 :root[data-theme="paper"] .chat-select-menu--local {
-  --chat-select-tone: #0c7f74;
-  --chat-select-tone-strong: #08665d;
-  --chat-select-tone-soft: rgba(12, 127, 116, 0.11);
-  --chat-select-tone-shadow: rgba(12, 127, 116, 0.16);
+  --chat-select-tone: var(--accent-2);
+  --chat-select-tone-strong: var(--accent-hover);
+  --chat-select-tone-soft: rgba(125, 82, 16, 0.11);
+  --chat-select-tone-shadow: rgba(125, 82, 16, 0.16);
 }
 
 :root[data-theme="paper"]
@@ -23931,9 +24133,9 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"]
   .chat-provider-menu
   .app-select-option[data-value="local"] {
-  --chat-select-tone: #0c7f74;
-  --chat-select-tone-strong: #08665d;
-  --chat-select-tone-soft: rgba(12, 127, 116, 0.11);
+  --chat-select-tone: var(--accent-2);
+  --chat-select-tone-strong: var(--accent-hover);
+  --chat-select-tone-soft: rgba(125, 82, 16, 0.11);
 }
 
 :root[data-theme="paper"] .chat-provider-select .app-select-trigger,
@@ -24055,7 +24257,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .library-sync-panel {
   border-color: var(--glass-border);
   background:
-    radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-green), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-primary), transparent 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
     var(--glass-bg-elevated);
   box-shadow: var(--shadow-card);
@@ -24169,7 +24371,7 @@ tr.data-intervals-row-missing {
     transparent,
     var(--accent-soft),
     rgba(38, 34, 28, 0.1),
-    var(--bg-ambient-teal),
+    var(--bg-ambient-secondary),
     transparent
   );
 }
@@ -24293,7 +24495,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .spotify-art-fallback,
 :root[data-theme="paper"] .youtube-music-art-fallback {
   background:
-    linear-gradient(135deg, rgba(18, 148, 110, 0.12), rgba(38, 34, 28, 0.04)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(38, 34, 28, 0.04)),
     rgba(38, 34, 28, 0.03);
   color: var(--accent);
 }
@@ -24344,7 +24546,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-command-center.is-connected.is-compact {
   background:
-    linear-gradient(135deg, rgba(47, 190, 145, 0.1), rgba(255, 255, 255, 0.62) 46%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), rgba(255, 255, 255, 0.62) 46%),
     rgba(255, 255, 255, 0.48);
   border-color: rgba(38, 34, 28, 0.1);
   box-shadow: var(--glass-inset), var(--shadow-soft);
@@ -24365,12 +24567,12 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-command-center.is-connected .training-details-button:hover,
 :root[data-theme="paper"] .training-command-center.is-connected .training-connection-button:hover:not(:disabled) {
-  border-color: rgba(18, 148, 110, 0.28);
-  background: rgba(18, 148, 110, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 :root[data-theme="paper"] .training-command-center.is-connected .training-status-dot.is-connected {
-  box-shadow: 0 0 0 4px rgba(18, 148, 110, 0.12);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* Training Intelligence + heatmap wrappers set their own near-transparent
@@ -24562,8 +24764,8 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-table-row.is-selected td {
-  border-top-color: rgba(18, 148, 110, 0.28);
-  border-bottom-color: rgba(18, 148, 110, 0.28);
+  border-top-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 /* Sport chips use pale pastel text tuned for dark rows; darken each so the
@@ -24605,9 +24807,9 @@ tr.data-intervals-row-missing {
 
 /* Brighter, fresher ring tones on paper — success-text reads too dark/heavy. */
 :root[data-theme="paper"] .training-ring-panel.tone-high {
-  --ring-color: #2fbe91;
-  --ring-glow: rgba(47, 190, 145, 0.32);
-  border-color: rgba(47, 190, 145, 0.26);
+  --ring-color: var(--accent);
+  --ring-glow: color-mix(in srgb, var(--accent) 32%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 :root[data-theme="paper"] .training-ring-panel.tone-mid {
@@ -24696,14 +24898,20 @@ tr.data-intervals-row-missing {
  * levels already read on white and are left intact. */
 :root[data-theme="paper"] .training-heatmap-panel {
   background:
-    radial-gradient(130% 90% at 50% 110%, rgba(45, 154, 116, 0.1), transparent 58%),
-    radial-gradient(80% 60% at 0% 0%, rgba(45, 154, 116, 0.05), transparent 50%),
+    radial-gradient(130% 90% at 50% 110%, color-mix(in srgb, var(--accent-muted) 10%, transparent), transparent 58%),
+    radial-gradient(80% 60% at 0% 0%, color-mix(in srgb, var(--accent-muted) 5%, transparent), transparent 50%),
     var(--glass-bg-elevated);
 }
 
 :root[data-theme="paper"] .training-heatmap-cell[data-level="0"],
 :root[data-theme="paper"] .training-heatmap-legend-cell[data-level="0"] {
   background: rgba(38, 34, 28, 0.08);
+}
+
+/* Warm grey rather than the near-black #26221c: on cream, 85% of the ink is
+   the ramp's top step and must read as "most", not as a hole in the page. */
+:root[data-theme="paper"] .training-heatmap-legend-cell {
+  --heatmap-legend-ink: #4a4238;
 }
 
 :root[data-theme="paper"] .training-heatmap-cell.is-empty {
@@ -24714,7 +24922,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):focus-visible {
   box-shadow:
     0 0 0 2px rgba(38, 34, 28, 0.18),
-    0 6px 18px rgba(45, 154, 116, 0.3);
+    0 6px 18px color-mix(in srgb, var(--accent-muted) 30%, transparent);
 }
 
 :root[data-theme="paper"] .training-heatmap-tooltip {
@@ -24730,12 +24938,12 @@ tr.data-intervals-row-missing {
 
 /* --- Training Hub: connected command bar ----------------------------------- */
 :root[data-theme="paper"] .training-sync-dot {
-  box-shadow: 0 0 0 5px rgba(18, 148, 110, 0.12);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* --- Training Hub: charts -------------------------------------------------- */
 :root[data-theme="paper"] .training-chart-panel {
-  --chart-curve-glow: rgba(15, 138, 102, 0.2);
+  --chart-curve-glow: color-mix(in srgb, var(--accent-2) 20%, transparent);
   box-shadow: var(--shadow-card);
 }
 
@@ -24745,8 +24953,8 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-chart-panel[data-metric="hrv"] {
-  --chart-panel-tint: rgba(18, 148, 110, 0.07);
-  --chart-curve-glow: rgba(15, 127, 95, 0.2);
+  --chart-panel-tint: color-mix(in srgb, var(--accent) 7%, transparent);
+  --chart-curve-glow: color-mix(in srgb, var(--accent-strong) 20%, transparent);
 }
 
 :root[data-theme="paper"] .training-chart-panel[data-metric="sleep"] {
@@ -24761,7 +24969,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-chart-legend-dot.is-accent {
-  box-shadow: 0 0 6px rgba(18, 148, 110, 0.35);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* --- Training Hub: tooltips ------------------------------------------------ */
@@ -24815,16 +25023,16 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .race-card {
   border-color: rgba(38, 34, 28, 0.1);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.1), transparent 62%),
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 10%, transparent), transparent 62%),
     rgba(38, 34, 28, 0.025);
   box-shadow: var(--shadow-inset);
 }
 
 :root[data-theme="paper"] .race-card:hover {
-  border-color: rgba(18, 148, 110, 0.32);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.14), transparent 62%),
-    rgba(18, 148, 110, 0.06);
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 14%, transparent), transparent 62%),
+    color-mix(in srgb, var(--accent) 6%, transparent);
   box-shadow: var(--shadow-soft);
 }
 
@@ -24904,9 +25112,9 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-upcoming-today {
-  border-color: rgba(18, 148, 110, 0.35);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   background:
-    linear-gradient(135deg, rgba(18, 148, 110, 0.12), rgba(18, 148, 110, 0.04)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), color-mix(in srgb, var(--accent) 4%, transparent)),
     rgba(255, 255, 255, 0.6);
   box-shadow: var(--shadow-inset), var(--shadow-soft);
 }
@@ -24927,8 +25135,8 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-upcoming-today-pill {
-  border-color: rgba(18, 148, 110, 0.3);
-  background: rgba(18, 148, 110, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--success-text);
 }
 
@@ -24943,7 +25151,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-upcoming-dot {
-  box-shadow: 0 0 8px rgba(18, 148, 110, 0.25);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 /* --- Training Hub: personal records ---------------------------------------- */
@@ -24961,8 +25169,8 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-records-tab.active {
-  border-color: rgba(18, 148, 110, 0.35);
-  background: rgba(18, 148, 110, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-strong);
 }
 
@@ -24987,7 +25195,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-record-card {
   border-color: rgba(38, 34, 28, 0.1);
   background:
-    radial-gradient(120% 120% at 0% 100%, rgba(45, 154, 116, 0.08), transparent 62%),
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 8%, transparent), transparent 62%),
     rgba(38, 34, 28, 0.025);
   box-shadow: var(--shadow-inset);
 }
@@ -25080,7 +25288,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-login-reconnect {
-  border-color: rgba(18, 148, 110, 0.28);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   background: var(--accent-soft);
 }
 
@@ -25102,10 +25310,10 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-login-input:focus-within {
-  border-color: rgba(18, 148, 110, 0.45);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--glass-bg-elevated);
   box-shadow:
-    0 0 0 3px rgba(18, 148, 110, 0.12),
+    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent),
     var(--shadow-soft);
 }
 
@@ -25136,13 +25344,13 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-login-remember input {
-  border-color: rgba(18, 148, 110, 0.45);
-  background: rgba(18, 148, 110, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 :root[data-theme="paper"] .training-login-remember input:checked {
   background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(18, 148, 110, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* ==========================================================================
@@ -25179,32 +25387,130 @@ tr.data-intervals-row-missing {
   }
 }
 
-/* Sun/moon glyph does a soft rotate-and-scale in as it swaps. */
-.theme-toggle-icon {
-  display: inline-flex;
-  animation: theme-icon-swap 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes theme-icon-swap {
-  from {
-    opacity: 0;
-    transform: rotate(-140deg) scale(0.4);
-  }
-  to {
-    opacity: 1;
-    transform: rotate(0) scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;
   }
+}
 
-  .theme-toggle-icon {
-    animation: none;
-  }
+/* --- Settings: Appearance -> Themes --------------------------------------- */
+/* Dark/light sits in the section heading; the palette list sits under it, so
+   the two axes of the theme read as one control rather than two features. */
+.settings-theme-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+}
+
+.settings-theme-mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.settings-theme-mode-option:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg-hover);
+}
+
+.settings-theme-mode-option.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.settings-theme-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 0 0 26px;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.settings-theme-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--glass-border));
+  background: var(--glass-bg-hover);
+}
+
+.settings-theme-option.is-active {
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* The swatch shows the palette it selects, not the active one, so it is
+   painted from inline stops rather than the --accent tokens. */
+.settings-theme-swatch {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    135deg,
+    var(--swatch-from) 0%,
+    var(--swatch-to) 100%
+  );
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.settings-theme-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-theme-copy strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.settings-theme-copy span {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.settings-theme-option.is-active .settings-theme-copy span {
+  color: color-mix(in srgb, var(--accent-strong) 62%, var(--text-muted));
+}
+
+/* Second heading inside the same card needs less top air than the first. */
+.settings-sport-subheading {
+  margin-top: 4px;
 }
 
 /* ============================================================
