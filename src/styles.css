@@ -14123,6 +14123,46 @@ td span {
   align-items: stretch;
 }
 
+/*
+ * On the Activities screen the split panel is the whole page rather than one
+ * card in a scrolling dashboard, so the panes take whatever height they are
+ * handed instead of the fixed clamp above. Both panes already scroll inside
+ * themselves, so nothing is lost off the bottom.
+ */
+.activities-view > .training-activities-split-panel {
+  --training-activities-pane-height: 100%;
+}
+
+.activities-view > .training-activities-split-panel > .training-activities-split {
+  flex: 1;
+  min-height: 0;
+  /*
+   * An explicit row track is what makes the panes' `height: 100%` resolve.
+   * Left implicit, the row is auto-sized, so the percentage is circular, falls
+   * back to content height, and both panes overflow the panel.
+   */
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* Under 1200px the panes stack, so hand scrolling back to the screen. */
+@media (max-width: 1200px) {
+  .stack.stack-fill.activities-view {
+    overflow-y: auto;
+  }
+
+  .stack.stack-fill.activities-view > .panel.training-activities-split-panel {
+    --training-activities-pane-height: clamp(460px, 58vh, 760px);
+    flex: 0 0 auto;
+  }
+
+  .activities-view
+    > .training-activities-split-panel
+    > .training-activities-split {
+    flex: 0 0 auto;
+    grid-template-rows: none;
+  }
+}
+
 .training-activities-list,
 .training-activities-detail {
   min-width: 0;
@@ -16141,6 +16181,66 @@ tr.data-intervals-row-missing {
 
 .training-raw-toggle {
   display: flex;
+}
+
+/* Raw JSON opens in its own dialog, same shape as the expanded route map. */
+.training-raw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 22px;
+}
+
+.training-raw-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 94vw);
+  height: 88vh;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.training-raw-modal-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.training-raw-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.training-raw-modal-title h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.training-raw-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+}
+
+/* The inline preview's 220px cap would fight the dialog's full-height pane. */
+.training-raw-modal-body > .training-raw-json {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .training-raw-json {

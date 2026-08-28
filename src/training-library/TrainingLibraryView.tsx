@@ -213,7 +213,7 @@ export function TrainingLibraryView({
         <h1>Training Library</h1>
         <p>Connect COROS Training Hub to load your workouts, plans, and completed activities.</p>
         <button type="button" className="primary-button" onClick={onOpenTraining}>
-          Connect Training Hub
+          Connect in Overview
         </button>
       </section>
     );
@@ -1541,7 +1541,7 @@ function AdherenceSection({ api, matches, onRefresh, onMessage, onError }: Adher
       <section className="tl-panel tl-recent">
         <header>
           <h2>Recent activities</h2>
-          <p>Open Training Hub for charts, laps, route, and strength detail.</p>
+          <p>Open Activities for charts, laps, route, and strength detail.</p>
         </header>
         <div className="tl-index">
           <div className="tl-index-head tl-activity-row">

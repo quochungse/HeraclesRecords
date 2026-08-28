@@ -1155,7 +1155,7 @@ export function StrengthView({
               Connect Hevy
             </button>
             <button type="button" className="secondary-button" onClick={onOpenTraining}>
-              Open Training Hub
+              Open Overview
             </button>
           </div>
         </section>

@@ -165,9 +165,14 @@ const LazyWatchfacesView = lazy(() =>
     default: WatchfacesView,
   })),
 );
-const LazyTrainingHubView = lazy(() =>
-  import("./training/TrainingHubView").then(({ TrainingHubView }) => ({
-    default: TrainingHubView,
+const LazyTrainingOverview = lazy(() =>
+  import("./training/TrainingOverview").then(({ TrainingOverview }) => ({
+    default: TrainingOverview,
+  })),
+);
+const LazyActivitiesView = lazy(() =>
+  import("./training/ActivitiesView").then(({ ActivitiesView }) => ({
+    default: ActivitiesView,
   })),
 );
 const LazyGearView = IS_DEVELOPMENT_BUILD
@@ -794,7 +799,8 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!api || activeView !== "training") {
+    // Overview hosts the sign-in surface now, so both screens want a fresh status.
+    if (!api || (activeView !== "training" && activeView !== "overview")) {
       return;
     }
     void api
@@ -2053,7 +2059,8 @@ export default function App() {
     }
   }
 
-  const isOverviewDashboard = activeView === "overview";
+  const isOverviewDashboard =
+    activeView === "overview" || activeView === "coros-overview";
   const trainingHubSnapshot = useMemo<TrainingHubSnapshot | null>(() => {
     if (
       !trainingHubAnalytics &&
@@ -2273,7 +2280,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "media" || activeView === "coach" || activeView === "library") && "content-fill",
+            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2282,11 +2289,52 @@ export default function App() {
           <BridgeMissing />
         ) : (
           <>
-            {activeView === "overview" ? (
-              <MediaOverviewTab
+            {activeView === "coros-overview" ? (
+              <CorosOverviewTab
                 downloads={downloads}
                 watchStatus={watchStatus}
                 storage={storage}
+                watchConnected={Boolean(watchStatus?.connected)}
+                onOpenLibrary={() => openMediaTab("library")}
+              />
+            ) : null}
+            {activeView === "overview" ? (
+              <MediaOverviewTab
+                trainingOverview={
+                  <div className="dashboard-block">
+                    <Suspense
+                      fallback={<DeferredSurfaceFallback label="training" />}
+                    >
+                      <LazyTrainingOverview
+                        status={trainingHubStatus}
+                        email={trainingHubEmail}
+                        password={trainingHubPassword}
+                        remember={trainingHubRemember}
+                        twoFactorEmail={trainingHub2faEmail}
+                        twoFactorCode={trainingHub2faCode}
+                        onTwoFactorCodeChange={setTrainingHub2faCode}
+                        onVerifyTwoFactor={handleTrainingHubVerify2fa}
+                        onResendTwoFactor={handleTrainingHubResend2fa}
+                        onCancelTwoFactor={handleTrainingHubCancel2fa}
+                        activities={trainingHubActivities}
+                        upcomingWorkouts={trainingHubUpcomingWorkouts}
+                        snapshot={trainingHubSnapshot}
+                        rpeBackfill={rpeBackfill}
+                        busy={busy}
+                        sleepConnecting={sleepConnecting}
+                        onEmailChange={setTrainingHubEmail}
+                        onPasswordChange={setTrainingHubPassword}
+                        onRememberChange={setTrainingHubRemember}
+                        onLogin={handleTrainingHubLogin}
+                        onReconnect={handleTrainingHubReconnect}
+                        onLogout={handleTrainingHubLogout}
+                        onRefresh={handleTrainingHubRefresh}
+                      />
+                    </Suspense>
+                  </div>
+                }
+                downloads={downloads}
+                watchStatus={watchStatus}
                 watchConnected={Boolean(watchStatus?.connected)}
                 trainingConnected={Boolean(trainingHubStatus?.authenticated)}
                 trainingActivities={trainingHubActivities}
@@ -2422,37 +2470,17 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "training" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="training" />}>
-                <LazyTrainingHubView
-                  api={api}
+              <Suspense fallback={<DeferredSurfaceFallback label="activities" />}>
+                <LazyActivitiesView
                   status={trainingHubStatus}
-                  email={trainingHubEmail}
-                  password={trainingHubPassword}
-                  remember={trainingHubRemember}
-                  twoFactorEmail={trainingHub2faEmail}
-                  twoFactorCode={trainingHub2faCode}
-                  onTwoFactorCodeChange={setTrainingHub2faCode}
-                  onVerifyTwoFactor={handleTrainingHubVerify2fa}
-                  onResendTwoFactor={handleTrainingHubResend2fa}
-                  onCancelTwoFactor={handleTrainingHubCancel2fa}
                   activities={trainingHubActivities}
-                  upcomingWorkouts={trainingHubUpcomingWorkouts}
-                  snapshot={trainingHubSnapshot}
                   sportTypes={trainingHubSportTypes}
-                  rpeBackfill={rpeBackfill}
                   activityDetail={trainingHubActivityDetail}
                   selectedActivity={selectedTrainingHubActivity}
                   busy={busy}
-                  sleepConnecting={sleepConnecting}
-                  onEmailChange={setTrainingHubEmail}
-                  onPasswordChange={setTrainingHubPassword}
-                  onRememberChange={setTrainingHubRemember}
-                  onLogin={handleTrainingHubLogin}
-                  onReconnect={handleTrainingHubReconnect}
-                  onLogout={handleTrainingHubLogout}
-                  onRefresh={handleTrainingHubRefresh}
                   onLoadDetail={handleTrainingHubActivityDetail}
                   onExportFile={handleTrainingHubExport}
+                  onConnect={() => setActiveView("overview")}
                 />
               </Suspense>
             ) : null}
@@ -2470,7 +2498,7 @@ export default function App() {
                   <LazyTrainingLibraryView
                     api={api}
                     status={trainingHubStatus}
-                    onOpenTraining={() => setActiveView("training")}
+                    onOpenTraining={() => setActiveView("overview")}
                     onOpenCoach={(prompt) => {
                       setCoachPrefill(prompt ?? null);
                       setActiveView("coach");
@@ -2491,7 +2519,7 @@ export default function App() {
                   showDevelopmentTools={
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
-                  onOpenTraining={() => setActiveView("training")}
+                  onOpenTraining={() => setActiveView("overview")}
                 />
               </Suspense>
             ) : null}
@@ -2499,7 +2527,7 @@ export default function App() {
               <DataView
                 api={api}
                 status={trainingHubStatus}
-                onOpenTraining={() => setActiveView("training")}
+                onOpenTraining={() => setActiveView("overview")}
               />
             ) : null}
             {activeView === "settings" ? (
@@ -2520,7 +2548,7 @@ export default function App() {
                   refreshToken={calendarRefreshToken}
                   onMessage={setMessage}
                   onError={setError}
-                  onOpenTraining={() => setActiveView("training")}
+                  onOpenTraining={() => setActiveView("overview")}
                   onOpenCoach={(prompt) => {
                     setCoachPrefill(prompt);
                     setActiveView("coach");
@@ -2834,7 +2862,7 @@ function RecentTrackList({
   );
 }
 
-interface MediaOverviewTabProps {
+interface CorosOverviewTabProps {
   downloads: LocalTrack[];
   watchStatus: WatchStatus | null;
   storage: {
@@ -2845,43 +2873,17 @@ interface MediaOverviewTabProps {
     capacityLabel: string;
   } | null;
   watchConnected: boolean;
-  trainingConnected: boolean;
-  trainingActivities: TrainingHubActivity[];
-  trainingActivityDetail: TrainingHubActivityDetail | null;
-  busy: string | null;
-  onTransfer: (id: string) => void;
-  onDeleteDownload: (track: LocalTrack) => void;
   onOpenLibrary: () => void;
-  onSelectTrainingActivity: (activity: TrainingHubActivity) => void;
 }
 
-function MediaOverviewTab({
+function CorosOverviewTab({
   downloads,
   watchStatus,
   storage,
   watchConnected,
-  trainingConnected,
-  trainingActivities,
-  trainingActivityDetail,
-  busy,
-  onTransfer,
-  onDeleteDownload,
   onOpenLibrary,
-  onSelectTrainingActivity,
-}: MediaOverviewTabProps) {
-  const greeting = useTimeOfDayGreeting();
+}: CorosOverviewTabProps) {
   const watchTracks = watchStatus?.tracks ?? [];
-  const recentDownloads = useMemo(
-    () =>
-      [...downloads]
-        .sort(
-          (left, right) =>
-            new Date(right.createdAt).getTime() -
-            new Date(left.createdAt).getTime(),
-        )
-        .slice(0, 5),
-    [downloads],
-  );
   const transferredCount = useMemo(
     () =>
       downloads.filter((track) =>
@@ -2908,7 +2910,8 @@ function MediaOverviewTab({
     <div className="dashboard">
       <header className="dashboard-welcome dashboard-block">
         <div>
-          <h1 className="dashboard-greeting">{greeting}</h1>
+          <p className="eyebrow">Coros Connect</p>
+          <h1 className="dashboard-greeting">Coros Overview</h1>
           <p className="dashboard-subtitle">{watchPresentation.companion}</p>
         </div>
       </header>
@@ -3008,6 +3011,64 @@ function MediaOverviewTab({
           onClick={onOpenLibrary}
         />
       </div>
+    </div>
+  );
+}
+
+interface MediaOverviewTabProps {
+  /** The training panels, handed in ready-made so App keeps the ~20 props. */
+  trainingOverview: ReactNode;
+  downloads: LocalTrack[];
+  watchStatus: WatchStatus | null;
+  watchConnected: boolean;
+  trainingConnected: boolean;
+  trainingActivities: TrainingHubActivity[];
+  trainingActivityDetail: TrainingHubActivityDetail | null;
+  busy: string | null;
+  onTransfer: (id: string) => void;
+  onDeleteDownload: (track: LocalTrack) => void;
+  onOpenLibrary: () => void;
+  onSelectTrainingActivity: (activity: TrainingHubActivity) => void;
+}
+
+function MediaOverviewTab({
+  trainingOverview,
+  downloads,
+  watchStatus,
+  watchConnected,
+  trainingConnected,
+  trainingActivities,
+  trainingActivityDetail,
+  busy,
+  onTransfer,
+  onDeleteDownload,
+  onOpenLibrary,
+  onSelectTrainingActivity,
+}: MediaOverviewTabProps) {
+  const greeting = useTimeOfDayGreeting();
+  const recentDownloads = useMemo(
+    () =>
+      [...downloads]
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )
+        .slice(0, 5),
+    [downloads],
+  );
+  const watchPresentation = getWatchPresentation(watchStatus);
+
+  return (
+    <div className="dashboard">
+      <header className="dashboard-welcome dashboard-block">
+        <div>
+          <h1 className="dashboard-greeting">{greeting}</h1>
+          <p className="dashboard-subtitle">{watchPresentation.companion}</p>
+        </div>
+      </header>
+
+      {trainingOverview}
 
       {downloads.length > 0 ? (
         <section className="panel dashboard-recent dashboard-block">

@@ -7,6 +7,7 @@ import {
   Dumbbell,
   Flame,
   Footprints,
+  Gauge,
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
@@ -18,6 +19,7 @@ import {
 
 export type PrimaryView =
   | "overview"
+  | "coros-overview"
   | "media"
   | "training"
   | "gear"
@@ -81,7 +83,7 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
     label: "Training",
     icon: Flame,
     items: [
-      { id: "training", label: "Training Hub", icon: Activity },
+      { id: "training", label: "Activities", icon: Activity },
       { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
       { id: "library", label: "Training Library", icon: BookOpen },
     ],
@@ -91,6 +93,7 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
     label: "Coros Connect",
     icon: Cable,
     items: [
+      { id: "coros-overview", label: "Coros Overview", icon: Gauge },
       { id: "media", label: "Media", icon: Music },
       { id: "maps", label: "Maps", icon: MapIcon, beta: true },
       { id: "watchfaces", label: "Watch Faces", icon: Watch, beta: true },

@@ -1,6 +1,5 @@
 import { type CSSProperties, useMemo, useState } from "react";
 import {
-  Activity,
   ArrowRightFromLine,
   ChartNoAxesColumnIncreasing,
   Database,
@@ -20,7 +19,6 @@ import {
   User,
   RefreshCw
 } from "lucide-react";
-import { ActivityDetailPanel } from "./components/ActivityDetailPanel";
 import { FitnessScoresPanel } from "./components/FitnessScoresPanel";
 import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
 import { PersonalRecordsPanel } from "./components/PersonalRecordsPanel";
@@ -28,7 +26,6 @@ import { RacePredictorCards } from "./components/RacePredictorCards";
 import { RecoveryRing } from "./components/RecoveryRing";
 import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
-import { TrainingActivityTable } from "./components/TrainingActivityTable";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import {
   PerceivedEffortPanel,
@@ -36,11 +33,10 @@ import {
 } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { Vo2MaxWidget } from "./components/Vo2MaxWidget";
-import type { TrainingHubViewProps } from "./types";
+import type { TrainingOverviewProps } from "./types";
 import loginPageBackground from "../../public/assets/training-hub/Login-page-bg.png";
 
-export function TrainingHubView({
-  api,
+export function TrainingOverview({
   status,
   email,
   password,
@@ -50,10 +46,7 @@ export function TrainingHubView({
   activities,
   upcomingWorkouts,
   snapshot,
-  sportTypes,
   rpeBackfill,
-  activityDetail,
-  selectedActivity,
   busy,
   sleepConnecting,
   onEmailChange,
@@ -66,10 +59,8 @@ export function TrainingHubView({
   onCancelTwoFactor,
   onReconnect,
   onLogout,
-  onRefresh,
-  onLoadDetail,
-  onExportFile
-}: TrainingHubViewProps) {
+  onRefresh
+}: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   const canReconnect =
     !connected && Boolean(status?.rememberCredentials) && Boolean(status?.email);
@@ -84,9 +75,6 @@ export function TrainingHubView({
     : ({
         "--training-signin-bg": `url(${loginPageBackground})`
       } as CSSProperties);
-  const activityCountLabel = `${activities.length} recent ${
-    activities.length === 1 ? "activity" : "activities"
-  }`;
   const summary = useMemo(
     () =>
       snapshot?.summary ?? {
@@ -507,41 +495,10 @@ export function TrainingHubView({
             <PersonalRecordsPanel dashboard={snapshot?.dashboard ?? null} />
           </div>
 
-          <section className="panel training-activities-split-panel">
-            <div className="training-activities-split">
-              <div className="training-activities-list">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Recent Activities</p>
-                    <h2>{activityCountLabel}</h2>
-                  </div>
-                  <Activity size={22} aria-hidden="true" />
-                </div>
-                <TrainingActivityTable
-                  activities={activities}
-                  sportTypes={sportTypes}
-                  selectedActivityId={selectedActivity?.activityId ?? null}
-                  busy={busy}
-                  onLoadDetail={onLoadDetail}
-                  onExportFile={onExportFile}
-                />
-              </div>
-              <div className="training-activities-detail">
-                <ActivityDetailPanel
-                  detail={activityDetail}
-                  listActivity={selectedActivity}
-                  sportTypes={sportTypes}
-                  busy={busy}
-                  embedded
-                />
-              </div>
-            </div>
-          </section>
-
         </>
       ) : null}
     </div>
   );
 }
 
-export type { TrainingHubViewProps };
+export type { TrainingOverviewProps };

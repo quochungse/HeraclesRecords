@@ -457,7 +457,7 @@ export function CalendarView({
             activities, and weekly stats in one calendar.
           </p>
           <button type="button" className="primary-button" onClick={onOpenTraining}>
-            Connect in Training Hub
+            Connect in Overview
           </button>
         </div>
       </section>

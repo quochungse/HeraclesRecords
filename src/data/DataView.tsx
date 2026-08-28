@@ -40,7 +40,7 @@ export function DataView({ api, status, onOpenTraining }: DataViewProps) {
             </p>
           </div>
           <button type="button" className="primary-button" onClick={onOpenTraining}>
-            Open Training Hub
+            Open Overview
           </button>
         </section>
       ) : (

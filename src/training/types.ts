@@ -84,6 +84,11 @@ export interface HeatmapGrid {
   monthLabels: HeatmapMonthLabel[];
 }
 
+/**
+ * The full COROS training surface. No component takes this whole shape any
+ * more — TrainingOverviewProps and ActivitiesViewProps below are carved out of
+ * it, and it stays as the single place that spells the surface out.
+ */
 export interface TrainingHubViewProps {
   api: CorosLinkApi;
   status: TrainingHubStatus | null;
@@ -119,5 +124,35 @@ export interface TrainingHubViewProps {
     fileType: TrainingHubActivityFileType
   ) => void;
 }
+
+/**
+ * Everything the old Training Hub screen rendered except the activity list and
+ * its detail pane — sign-in included, since that surface now sits on Overview.
+ */
+export type TrainingOverviewProps = Omit<
+  TrainingHubViewProps,
+  | "api"
+  | "sportTypes"
+  | "activityDetail"
+  | "selectedActivity"
+  | "onLoadDetail"
+  | "onExportFile"
+>;
+
+/** The Activities screen: the recent-activity list plus its detail pane. */
+export type ActivitiesViewProps = Pick<
+  TrainingHubViewProps,
+  | "status"
+  | "activities"
+  | "sportTypes"
+  | "activityDetail"
+  | "selectedActivity"
+  | "busy"
+  | "onLoadDetail"
+  | "onExportFile"
+> & {
+  /** Sends the disconnected state to Overview, where signing in lives. */
+  onConnect: () => void;
+};
 
 export type { TrainingHubDailyMetric };

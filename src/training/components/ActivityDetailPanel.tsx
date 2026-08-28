@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Braces, Loader2, X } from "lucide-react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -65,6 +66,21 @@ export function ActivityDetailPanel({
 
     return undefined;
   }, [detail, listActivity, sportTypes]);
+
+  useEffect(() => {
+    if (!showRaw) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowRaw(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showRaw]);
 
   const isLoading =
     listActivity &&
@@ -229,15 +245,48 @@ export function ActivityDetailPanel({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => setShowRaw((current) => !current)}
+          onClick={() => setShowRaw(true)}
         >
-          {showRaw ? "Hide raw JSON" : "Show raw JSON"}
+          Show raw JSON
         </button>
       </div>
 
-      {showRaw ? (
-        <pre className="training-raw-json">{JSON.stringify(detail.raw, null, 2)}</pre>
-      ) : null}
+      {showRaw &&
+        createPortal(
+          <div
+            className="training-raw-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="training-raw-modal-title"
+            onClick={() => setShowRaw(false)}
+          >
+            <section
+              className="panel training-raw-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="training-raw-modal-header">
+                <div className="training-raw-modal-title">
+                  <Braces size={16} aria-hidden="true" />
+                  <h2 id="training-raw-modal-title">Raw JSON</h2>
+                </div>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Close raw JSON"
+                  onClick={() => setShowRaw(false)}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </header>
+              <div className="training-raw-modal-body">
+                <pre className="training-raw-json">
+                  {JSON.stringify(detail.raw, null, 2)}
+                </pre>
+              </div>
+            </section>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
