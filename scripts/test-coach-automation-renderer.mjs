@@ -456,6 +456,56 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // 9.3: a run into the open conversation while the Coach view is not on screen
+  // -------------------------------------------------------------------------
+  // The Coach panel stays mounted once it has been opened, so a conversation
+  // stays "open" long after the athlete has walked away to Overview. Reading
+  // that as "the athlete is looking at it" marked an auto run read the instant
+  // it landed, and the unread dot — the only thing that says an automation ran
+  // while nobody was watching — was cleared before it was ever drawn.
+  {
+    await harness("mount", "ChatView", { active: false }, {
+      ...CHAT_VIEW_BASE,
+      listChatSessions: [session("s1", "Morning briefing")],
+      listCoachAutomationRuns: []
+    });
+    await waitFor(
+      () => harness("exists", ".chat-session-row"),
+      "ChatView renders its sidebar even behind another view"
+    );
+
+    await harness("clearCalls");
+    await harness(
+      "emit",
+      "onCoachAutomationRunUpdate",
+      run("r1", { status: "success", sessionId: "s1", summary: "Load is ramping." })
+    );
+    await waitFor(
+      () => harness("callCount", "listCoachAutomationSessionAttention"),
+      "a run into a conversation nobody is looking at must re-read the marks"
+    );
+    assert.equal(
+      await harness("callCount", "markCoachAutomationSessionSeen"),
+      0,
+      "the conversation is open but off screen — marking it read loses the dot"
+    );
+
+    // Coming back to the Coach view *is* reading it: the answer is on screen by
+    // then, so a dot left standing could never be cleared.
+    await harness("clearCalls");
+    await harness("setProps", { active: true });
+    const [seenOnReturn] = await waitFor(
+      async () => {
+        const made = await harness("calls", "markCoachAutomationSessionSeen");
+        return made.length ? made : null;
+      },
+      "returning to the Coach view reads what landed while it was hidden"
+    );
+    assert.deepEqual(seenOnReturn.args, ["s1"]);
+    await assertQuietConsole("a run landing behind another view");
+  }
+
+  // -------------------------------------------------------------------------
   // 5.6b: the live bubble re-establishing on a conversation opened mid-run
   // -------------------------------------------------------------------------
   // Ported from a regex over `statuses: ["running"] ... showLiveAutomation`.

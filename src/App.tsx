@@ -337,7 +337,20 @@ export default function App() {
 
     return window.matchMedia("(max-width: 720px)").matches;
   });
-  const [coachBusy, setCoachBusy] = useState(false);
+  const [coachStreaming, setCoachStreaming] = useState(false);
+  /**
+   * Runs an automation started on its own, keyed by run id. An auto run happens
+   * in the main process and never touches the composer, so `coachStreaming` --
+   * which only ever reports what the athlete typed -- leaves the nav dot dark
+   * for exactly the runs the athlete had no other way of noticing.
+   *
+   * Watched here rather than in ChatView because ChatView is not mounted until
+   * the Coach view is first opened: a run firing while the athlete sits on
+   * Overview would otherwise have no listener at all.
+   */
+  const [runningAutomationIds, setRunningAutomationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
   const [watchfacesMounted, setWatchfacesMounted] = useState(
     activeView === "watchfaces",
@@ -535,6 +548,54 @@ export default function App() {
   useEffect(() => {
     autoTransferRef.current = autoTransfer;
   }, [autoTransfer]);
+
+  /**
+   * The Coach nav dot for runs nobody asked for. A run already in flight when
+   * this window opened is seeded from the run log -- `cancelStaleCoachAutomationRuns`
+   * settles the rows left over from a previous launch at startup, so anything
+   * still `running` really is.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationRunUpdate) {
+      return;
+    }
+    let cancelled = false;
+    void api
+      .listCoachAutomationRuns({ statuses: ["running"] })
+      .then((runs) => {
+        if (cancelled) return;
+        // Merged rather than replaced: a run that started while this lookup was
+        // in flight is already in the set, and is not in the answer.
+        setRunningAutomationIds((current) => {
+          const next = new Set(current);
+          for (const run of runs) next.add(run.id);
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    const unsubscribe = api.onCoachAutomationRunUpdate((run) => {
+      setRunningAutomationIds((current) => {
+        const running = run.status === "running";
+        if (running === current.has(run.id)) {
+          return current;
+        }
+        const next = new Set(current);
+        if (running) {
+          next.add(run.id);
+        } else {
+          next.delete(run.id);
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [api]);
+
+  /** Either kind of coach work: the athlete's turn, or an automation's. */
+  const coachBusy = coachStreaming || runningAutomationIds.size > 0;
 
   useEffect(() => {
     if (activeView === "coach") {
@@ -2580,7 +2641,7 @@ export default function App() {
                       setPendingCoachPlan(plan);
                       setActiveView("library");
                     }}
-                    onActivityChange={setCoachBusy}
+                    onActivityChange={setCoachStreaming}
                     pendingPrompt={coachPrefill}
                     onPendingPromptConsumed={() => setCoachPrefill(null)}
                     active={activeView === "coach"}

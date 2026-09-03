@@ -127,7 +127,17 @@ const spy = (name: string) => (...args: unknown[]) => {
 };
 
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
-  ChatView: () => <ChatView api={api} onError={spy("onError") as () => void} />,
+  ChatView: (options) => (
+    <ChatView
+      api={api}
+      onError={spy("onError") as () => void}
+      // The Coach panel stays mounted behind other views, so "mounted" and "on
+      // screen" are two different props' worth of question and a test has to be
+      // able to ask the second one.
+      active={(options.active as boolean | undefined) ?? true}
+      onActivityChange={spy("onActivityChange") as (active: boolean) => void}
+    />
+  ),
   CoachAutomationsPanel: () => (
     <CoachAutomationsPanel
       api={api}
@@ -163,6 +173,8 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
 // ---------------------------------------------------------------------------
 
 let root: Root | null = null;
+/** What the last `mount` asked for, so `setProps` can re-render the same thing. */
+let mounted: { name: string; options: Record<string, unknown> } | null = null;
 
 function query(selector: string): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>(selector)];
@@ -178,6 +190,26 @@ function findByText(selector: string, text: string): HTMLElement | undefined {
   );
 }
 
+/**
+ * StrictMode on purpose: it double-invokes effects, which is how a subscription
+ * that never unsubscribes and an effect that is not idempotent both announce
+ * themselves.
+ *
+ * `UnitSystemProvider` is the app's own, not a stub. It is the only context
+ * these components read, and every one of them throws without it — which is the
+ * harness earning its keep before it has asserted anything.
+ */
+function renderMounted() {
+  if (!root || !mounted) return;
+  root.render(
+    <StrictMode>
+      <UnitSystemProvider>
+        {MOUNTS[mounted.name](mounted.options)}
+      </UnitSystemProvider>
+    </StrictMode>
+  );
+}
+
 const harness = {
   /** Mounts one component. `script` replaces whatever the last test set. */
   mount(name: string, options: Record<string, unknown> = {}, next: Script = {}) {
@@ -187,19 +219,24 @@ const harness = {
     consoleErrors.length = 0;
     const container = document.getElementById("root") as HTMLElement;
     pending.clear();
+    mounted = { name, options };
     root = createRoot(container);
-    // StrictMode on purpose: it double-invokes effects, which is how a
-    // subscription that never unsubscribes and an effect that is not
-    // idempotent both announce themselves.
-    //
-    // `UnitSystemProvider` is the app's own, not a stub. It is the only context
-    // these components read, and every one of them throws without it — which
-    // is the harness earning its keep before it has asserted anything.
-    root.render(
-      <StrictMode>
-        <UnitSystemProvider>{MOUNTS[name](options)}</UnitSystemProvider>
-      </StrictMode>
-    );
+    renderMounted();
+  },
+
+  /**
+   * Re-renders the mounted component with changed props, keeping its state.
+   *
+   * A remount would answer a different question: whether the surface gets it
+   * right on a fresh mount. What a prop test is about is the surface reacting
+   * to the parent changing its mind — the athlete switching away from the Coach
+   * view and back — with everything the component has learned still in place.
+   */
+  setProps(patch: Record<string, unknown>) {
+    if (!mounted) return false;
+    mounted = { ...mounted, options: { ...mounted.options, ...patch } };
+    renderMounted();
+    return true;
   },
 
   /**
@@ -226,6 +263,7 @@ const harness = {
   unmount() {
     root?.unmount();
     root = null;
+    mounted = null;
     listeners.clear();
     (document.getElementById("root") as HTMLElement).innerHTML = "";
   },

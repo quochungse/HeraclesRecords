@@ -1880,6 +1880,10 @@ export function ChatView({
   // Same reason as activeRequestIdRef: the push handlers have to recognise the
   // automation's stream without re-subscribing.
   const liveAutomationRef = useRef<LiveAutomationRun | null>(null);
+  // Whether the Coach panel is the view on screen. The panel stays mounted once
+  // it has been opened, so "the conversation is open" is not the same question
+  // as "the athlete can see it" -- and only the second one means read.
+  const viewActiveRef = useRef(active);
   const autoDetectLocalRef = useRef(false);
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2133,9 +2137,16 @@ export function ChatView({
     return api.onCoachAutomationRunUpdate((run) => {
       // Still working: nothing has landed in any conversation yet.
       if (run.status === "running") return;
-      if (run.sessionId && run.sessionId === activeSessionIdRef.current) {
-        // The conversation is open and the reload has already put the answer on
-        // screen, so it is read the moment it arrives.
+      if (
+        run.sessionId &&
+        run.sessionId === activeSessionIdRef.current &&
+        viewActiveRef.current
+      ) {
+        // The conversation is open *and* on screen, and the reload has already
+        // put the answer in it, so it is read the moment it arrives. With the
+        // Coach panel behind another view this branch would mark a run read
+        // that the athlete never saw, and the dot the run exists to raise would
+        // be cleared before it was ever drawn.
         void markSessionRead(run.sessionId);
         return;
       }
@@ -2146,6 +2157,18 @@ export function ChatView({
   useEffect(() => {
     liveAutomationRef.current = liveAutomation;
   }, [liveAutomation]);
+
+  /**
+   * Coming back to the Coach view is reading whatever landed while it was
+   * hidden -- the transcript is already on screen with the answer in it, so a
+   * dot on the row the athlete is looking at would never clear.
+   */
+  useEffect(() => {
+    viewActiveRef.current = active;
+    if (active && activeSessionId) {
+      void markSessionRead(activeSessionId);
+    }
+  }, [active, activeSessionId, markSessionRead]);
 
   /**
    * The run record carries ids, not the coach's name, so the chip is worth one
