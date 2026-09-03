@@ -152,7 +152,6 @@ const SKIP_REASON_LABELS: Record<string, string> = {
   cooldown: "too soon after the last run",
   budget: "monthly token budget reached",
   burst: "conversation busy",
-  "batch-window": "waiting for more activities",
   backoff: "backing off after a failure",
   "no-activity": "no new activity to analyse",
   "stale-slot": "missed slot"

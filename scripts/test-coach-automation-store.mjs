@@ -169,7 +169,6 @@ assert.deepEqual(weekly.trigger, {
 });
 assert.equal(weekly.trigger.minDistanceM, undefined, "non-positive filter dropped");
 assert.deepEqual(weekly.conditions, {
-  batchWindowMin: 20,
   cooldownMin: 30,
   maxRunsPerDay: 3,
   quietHours: { start: "22:00", end: "06:30" }
@@ -210,10 +209,10 @@ assert.equal(renamed.createdAt, daily.createdAt);
 assert.ok(renamed.updatedAt >= daily.updatedAt);
 
 // A partial conditions patch on a customised automation keeps the custom values.
-const rebatched = updateCoachAutomation(weekly.id, { conditions: { batchWindowMin: 5 } }, db);
-assert.equal(rebatched.conditions.batchWindowMin, 5);
-assert.equal(rebatched.conditions.cooldownMin, 30, "custom cooldown preserved");
-assert.deepEqual(rebatched.conditions.quietHours, { start: "22:00", end: "06:30" });
+const capped = updateCoachAutomation(weekly.id, { conditions: { maxRunsPerDay: 5 } }, db);
+assert.equal(capped.conditions.maxRunsPerDay, 5);
+assert.equal(capped.conditions.cooldownMin, 30, "custom cooldown preserved");
+assert.deepEqual(capped.conditions.quietHours, { start: "22:00", end: "06:30" });
 
 // Explicit null clears the quiet window.
 const noQuiet = updateCoachAutomation(weekly.id, { conditions: { quietHours: null } }, db);

@@ -201,7 +201,6 @@ export function setCoachAutomationPause(
 const defaultDatabase = createSqliteAutomationDatabase();
 
 export const DEFAULT_AUTOMATION_CONDITIONS: AutomationConditions = {
-  batchWindowMin: 20,
   cooldownMin: 120,
   maxRunsPerDay: 3
 };
@@ -362,7 +361,6 @@ export function normalizeAutomationConditions(
   }
 
   const conditions: AutomationConditions = {
-    batchWindowMin: clampInt(value.batchWindowMin, base.batchWindowMin, 0, 720),
     cooldownMin: clampInt(value.cooldownMin, base.cooldownMin, 0, 10_080),
     maxRunsPerDay: clampInt(value.maxRunsPerDay, base.maxRunsPerDay, 1, 24)
   };

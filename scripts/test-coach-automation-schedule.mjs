@@ -225,7 +225,7 @@ const briefing = (patch = {}) => ({
   playbook: "Brief me.",
   enabled: true,
   trigger: daily("07:00"),
-  conditions: { batchWindowMin: 20, cooldownMin: 120, maxRunsPerDay: 3 },
+  conditions: { cooldownMin: 120, maxRunsPerDay: 3 },
   runtime: {},
   ...patch
 });
@@ -346,7 +346,6 @@ const binding = (patch = {}) => ({
   const quiet = briefing({
     trigger: daily("23:00"),
     conditions: {
-      batchWindowMin: 20,
       cooldownMin: 120,
       maxRunsPerDay: 3,
       quietHours: { start: "22:00", end: "06:00" }

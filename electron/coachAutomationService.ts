@@ -331,7 +331,6 @@ export type AutomationSkipReason =
   | "cooldown"
   | "budget"
   | "burst"
-  | "batch-window"
   /** Held off after a failed run, until this binding's backoff expires (10). */
   | "backoff"
   /** Activity-driven, but nothing new to analyse since this binding's watermark. */

@@ -58,7 +58,7 @@ const activityAutomation = (trigger = {}, patch = {}) => ({
   playbook: "Debrief {{activity.name}}.",
   enabled: true,
   trigger: { kind: "activity", sportTypes: [], ...trigger },
-  conditions: { batchWindowMin: 20, cooldownMin: 0, maxRunsPerDay: 9 },
+  conditions: { cooldownMin: 0, maxRunsPerDay: 9 },
   runtime: {},
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
@@ -198,7 +198,7 @@ const advance = (world, minutes) => {
 
 {
   const world = createWorld();
-  world.automations = [activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })];
+  world.automations = [activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })];
   for (let index = 0; index < 40; index += 1) {
     world.addActivity({ activity_id: `old-${index}` });
   }
@@ -238,73 +238,39 @@ const advance = (world, minutes) => {
 }
 
 // ---------------------------------------------------------------------------
-// 3.2 step 5: batching inside batchWindowMin
+// 3.2 step 5: one trigger per automation, however many activities landed
 // ---------------------------------------------------------------------------
 
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [activityAutomation()]; // batchWindowMin 20
+  world.automations = [activityAutomation()];
   world.addActivity({ activity_id: "act-1", name: "Long run", start_time: NOW_EPOCH - 900 });
+  world.addActivity({ activity_id: "act-2", name: "Evening swim", start_time: NOW_EPOCH - 800 });
 
   const watcher = new CoachActivityWatcher(world.deps);
   await watcher.tick();
-  assert.deepEqual(world.triggers, [], "held inside the batch window");
-  assert.deepEqual(watcher.pendingBatchSizes(), { a1: 1 });
-  assert.deepEqual(
-    world.unseenIds(),
-    ["act-1"],
-    "a batched row is not stamped until it fires, so a quit does not lose it"
-  );
-
-  // A second activity 15 minutes later joins the same batch.
-  advance(world, 15);
-  world.addActivity({ activity_id: "act-2", name: "Evening swim", start_time: NOW_EPOCH - 800 });
-  await watcher.tick();
-  assert.deepEqual(world.triggers, [], "still inside the window");
-  assert.deepEqual(watcher.pendingBatchSizes(), { a1: 2 });
-
-  // Past the window, both collapse into ONE trigger carrying both ids.
-  advance(world, 10);
-  await watcher.tick();
-  assert.equal(world.triggers.length, 1, "several activities produce one run");
+  assert.equal(world.triggers.length, 1, "two new activities produce one run");
   const [fired] = world.triggers;
   assert.equal(fired.automationId, "a1");
   assert.equal(fired.kind, "activity");
-  // The batch decides *when* to fire; which activities each binding then
+  // The poll decides *when* to fire; which activities each binding then
   // analyses is the runner's call, from that binding's own watermark — so the
   // trigger deliberately carries no activity payload.
   assert.equal(fired.payload, undefined);
-  assert.deepEqual(world.unseenIds(), [], "stamped once it fired");
-  assert.deepEqual(watcher.pendingBatchSizes(), {});
+  assert.deepEqual(world.unseenIds(), [], "stamped as it fired");
 
   // The trigger *does* come round again — and that is the point, not a leak.
   // Section 4 promises that a refused activity is still owed on the next poll,
-  // and it was not: the rows were stamped at flush, so the watcher's "is there
-  // anything unseen" firing condition never fired again and the activity was
-  // dropped. This block used to assert the opposite ("the same activity is
-  // never fired twice"), which is a claim the watcher is in no position to
-  // make: 3.2 gives it *when*, and which activities a binding still owes is the
-  // runner's answer from that binding's own watermark.
+  // and it was not: the rows are stamped as the poll fires, so the watcher's
+  // "is there anything unseen" firing condition never came round again and the
+  // activity was dropped. This block used to assert the opposite ("the same
+  // activity is never fired twice"), which is a claim the watcher is in no
+  // position to make: 3.2 gives it *when*, and which activities a binding still
+  // owes is the runner's answer from that binding's own watermark.
   await watcher.tick();
   assert.equal(world.triggers.length, 2, "the tick asks again");
   assert.equal(world.triggers[1].payload, undefined, "payload-free, like the first");
-  assert.deepEqual(watcher.pendingBatchSizes(), {}, "and it opens no new batch");
-}
-
-// batchWindowMin 0 fires on the same tick.
-{
-  const world = createWorld();
-  world.markInitialized();
-  world.automations = [
-    activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })
-  ];
-  world.addActivity({ activity_id: "act-1" });
-
-  const watcher = new CoachActivityWatcher(world.deps);
-  await watcher.tick();
-  assert.equal(world.triggers.length, 1);
-  assert.deepEqual(world.unseenIds(), []);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +280,7 @@ const advance = (world, minutes) => {
 {
   const world = createWorld();
   world.markInitialized();
-  const zero = { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 };
+  const zero = { cooldownMin: 0, maxRunsPerDay: 9 };
   world.automations = [
     activityAutomation({ sportTypes: [100] }, { id: "runs", conditions: zero }),
     activityAutomation({ sportTypes: [200] }, { id: "swims", conditions: zero }),
@@ -340,6 +306,30 @@ const advance = (world, minutes) => {
 }
 
 // ---------------------------------------------------------------------------
+// An automation switched off between ticks stops being asked
+// ---------------------------------------------------------------------------
+// Also the detector for caching the automation list across ticks: a list read
+// once and reused never sees `enabled = false`.
+
+{
+  const world = createWorld();
+  world.markInitialized();
+  world.automations = [activityAutomation()];
+  world.addActivity({ activity_id: "act-1" });
+
+  const watcher = new CoachActivityWatcher(world.deps);
+  await watcher.tick();
+  assert.equal(world.triggers.length, 1);
+
+  world.automations[0].enabled = false;
+  advance(world, 30);
+  world.addActivity({ activity_id: "act-2" });
+  await watcher.tick();
+  assert.equal(world.triggers.length, 1, "switched off, so nothing more is asked");
+  assert.deepEqual(world.unseenIds(), [], "and the marker still advances");
+}
+
+// ---------------------------------------------------------------------------
 // With no activity automation configured the marker still advances
 // ---------------------------------------------------------------------------
 
@@ -359,28 +349,6 @@ const advance = (world, minutes) => {
     [],
     "otherwise a rule added next week would fire for the whole backlog"
   );
-}
-
-// ---------------------------------------------------------------------------
-// An automation switched off mid-window drops its batch
-// ---------------------------------------------------------------------------
-
-{
-  const world = createWorld();
-  world.markInitialized();
-  world.automations = [activityAutomation()];
-  world.addActivity({ activity_id: "act-1" });
-
-  const watcher = new CoachActivityWatcher(world.deps);
-  await watcher.tick();
-  assert.deepEqual(watcher.pendingBatchSizes(), { a1: 1 });
-
-  world.automations[0].enabled = false;
-  advance(world, 30);
-  await watcher.tick();
-  assert.deepEqual(world.triggers, []);
-  assert.deepEqual(watcher.pendingBatchSizes(), {});
-  assert.deepEqual(world.unseenIds(), [], "and stops holding the rows back");
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +405,7 @@ const advance = (world, minutes) => {
   });
   world.markInitialized();
   world.automations = [
-    activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })
+    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -474,7 +442,7 @@ const thresholdRule = (patch = {}) => ({
   id: "a-threshold",
   enabled: true,
   trigger: { kind: "threshold", metric: "sleepDebt", value: 5 },
-  conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 3 },
+  conditions: { cooldownMin: 0, maxRunsPerDay: 3 },
   ...patch
 });
 
@@ -594,8 +562,9 @@ assert.equal(
 // ---------------------------------------------------------------------------
 // Section 4's promise: a refused activity is still owed on the next poll
 // ---------------------------------------------------------------------------
-// `coach_seen_at` is stamped at flush, before the runner answers and whatever it
-// answers — right, because the flag means "the watcher has looked". But the
+// `coach_seen_at` is stamped as the poll fires, before the runner answers and
+// whatever it answers — right, because the flag means "the watcher has looked".
+// But the
 // watcher's firing condition was "is anything unseen", so a run refused for any
 // reason left the activity owed by the binding's watermark and asked for by
 // nobody. With `multiActivity` off, which is the default, the next activity to
@@ -605,7 +574,7 @@ assert.equal(
   const world = createWorld();
   world.markInitialized();
   world.automations = [
-    activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })
+    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -639,9 +608,8 @@ assert.equal(
   assert.deepEqual(world.refreshes.length, 1, "and still only one index refresh");
 }
 
-// A batch still inside its window is not jumped. Firing the catch-up there would
-// analyse the activities the window is deliberately holding, which is the one
-// thing batching exists for.
+// The poll and the catch-up do not both fire for the same automation on the
+// same tick: the poll reports what it fired and the catch-up skips those.
 {
   const world = createWorld();
   world.markInitialized();
@@ -650,13 +618,7 @@ assert.equal(
 
   const watcher = new CoachActivityWatcher(world.deps);
   await watcher.tick();
-  assert.deepEqual(world.triggers, [], "inside the batch window");
-  assert.deepEqual(watcher.pendingBatchSizes(), { a1: 1 }, "and still collecting");
-
-  advance(world, 5);
-  await watcher.tick();
-  assert.deepEqual(world.triggers, [], "still held, not asked around");
-  assert.deepEqual(watcher.pendingBatchSizes(), { a1: 1 });
+  assert.equal(world.triggers.length, 1, "asked once, not twice");
 }
 
 // The cold start still says nothing at all: stamping the back catalogue and then
@@ -675,8 +637,8 @@ assert.equal(
 // ---------------------------------------------------------------------------
 // R4 step 8: the app dying between the stamp and the trigger
 // ---------------------------------------------------------------------------
-// `flushDueBatches` stamps `coach_seen_at` and *then* awaits the runner, so a
-// process that dies in between leaves rows marked seen with no run behind them.
+// The poll stamps `coach_seen_at` and *then* awaits the runner, so a process
+// that dies in between leaves rows marked seen with no run behind them.
 // The stale-`running` cleanup cannot reach this: there is no run row to
 // reconcile — the trigger never got as far as making one.
 //
@@ -689,7 +651,7 @@ assert.equal(
   const world = createWorld();
   world.markInitialized();
   world.automations = [
-    activityAutomation({}, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } })
+    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -707,9 +669,9 @@ assert.equal(
     "fixture sanity: the rows were stamped before the trigger was handed over"
   );
 
-  // Next launch. A fresh watcher, no memory of the batch, and the row it would
-  // have looked at is already stamped — so the only thing that can bring the
-  // activity back is the tick asking on its own.
+  // Next launch. A fresh watcher, and the row it would have looked at is
+  // already stamped — so the only thing that can bring the activity back is the
+  // tick asking on its own.
   const relaunched = new CoachActivityWatcher(world.deps);
   await relaunched.tick();
   assert.equal(
@@ -719,39 +681,12 @@ assert.equal(
   );
 }
 
-// And the batch that never flushed is the other half: it lives only in memory,
-// so a crash drops it — and the rows were deliberately left unstamped for
-// exactly that reason (3.2), which `stop()` states and a crash gets for free.
-{
-  const world = createWorld();
-  world.markInitialized();
-  world.automations = [activityAutomation()];
-  world.addActivity({ activity_id: "act-1" });
-
-  const dying = new CoachActivityWatcher(world.deps);
-  await dying.tick();
-  assert.deepEqual(
-    world.unseenIds(),
-    ["act-1"],
-    "a row still inside its batch window is not stamped"
-  );
-  assert.deepEqual(dying.pendingBatchSizes(), { a1: 1 });
-
-  const relaunched = new CoachActivityWatcher(world.deps);
-  await relaunched.tick();
-  assert.deepEqual(
-    relaunched.pendingBatchSizes(),
-    { a1: 1 },
-    "so the next launch collects it again from scratch"
-  );
-}
-
 // ---------------------------------------------------------------------------
 // R6 step 11: what a tick costs, pinned
 // ---------------------------------------------------------------------------
 // Counted rather than estimated, and asserted so it cannot drift. The two reads
-// below were four and three respectively — poll, the flush, the catch-up and the
-// snapshot each asking again — and `listCoachAutomations()` parses and
+// below were four and three respectively — poll, the flush, the catch-up and
+// the snapshot each asking again — and `listCoachAutomations()` parses and
 // normalises every stored definition on each call. The list cannot change
 // inside one tick: this is the main process and nothing here awaits an IPC
 // handler.
@@ -759,8 +694,8 @@ assert.equal(
   const world = createWorld();
   world.markInitialized();
   world.automations = [
-    activityAutomation({ id: "a1" }, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } }),
-    activityAutomation({ id: "a2" }, { conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 } }),
+    activityAutomation({ id: "a1" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
+    activityAutomation({ id: "a2" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
     // A threshold rule, so the snapshot half of the tick runs too and its own
     // reads are inside the count.
     { ...activityAutomation({ id: "a3" }), trigger: { kind: "threshold", metric: "sleepDebt", value: 4 } }

@@ -168,17 +168,10 @@ async function withDeadline<T>(
   }
 }
 
-interface PendingBatch {
-  automationId: string;
-  openedAt: number;
-  activities: CoachUnseenActivityRow[];
-}
-
 export class CoachActivityWatcher {
   private readonly deps: CoachActivityWatcherDeps;
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
-  private readonly batches = new Map<string, PendingBatch>();
 
   constructor(deps: Partial<CoachActivityWatcherDeps> = {}) {
     this.deps = { ...createDefaultDeps(), ...deps };
@@ -202,9 +195,6 @@ export class CoachActivityWatcher {
       clearInterval(this.timer);
       this.timer = null;
     }
-    // Anything still batched is deliberately dropped rather than stamped: the
-    // rows stay unseen, so the next launch picks them up again.
-    this.batches.clear();
   }
 
   isRunning(): boolean {
@@ -224,15 +214,14 @@ export class CoachActivityWatcher {
     let automations: CoachAutomation[] = [];
     let connected = false;
     try {
-      // Read once and passed down. Four separate reads of the same list per
-      // tick — poll, the flush, the catch-up and the snapshot — is four full
+      // Read once and passed down. Three separate reads of the same list per
+      // tick — poll, the catch-up and the snapshot — is three full
       // `listCoachAutomations()` calls, each of which parses and normalises
       // every stored definition. The list cannot change inside one tick: this
       // is the main process and nothing here awaits an IPC handler.
       automations = this.deps.listAutomations();
       connected = this.deps.isCorosAuthenticated();
-      const coldStart = await this.poll(automations, connected);
-      const fired = await this.flushDueBatches(automations);
+      const { coldStart, fired } = await this.poll(automations, connected);
       if (!coldStart) {
         await this.offerOwedActivities(fired, automations, connected);
       }
@@ -251,11 +240,18 @@ export class CoachActivityWatcher {
     }
   }
 
-  /** True when this tick was the cold start that stamped the back catalogue. */
+  /**
+   * Fires one payload-free trigger per matching automation, and reports which
+   * ones — the catch-up below must not ask a second time for an automation this
+   * poll already fired.
+   *
+   * `coldStart` is true on the tick that stamped the back catalogue.
+   */
   private async poll(
     all: CoachAutomation[],
     connected: boolean
-  ): Promise<boolean> {
+  ): Promise<{ coldStart: boolean; fired: Set<string> }> {
+    const fired = new Set<string>();
     const automations = all.filter(
       (automation) => automation.enabled && automation.trigger.kind === "activity"
     );
@@ -265,7 +261,7 @@ export class CoachActivityWatcher {
     const firstRun = !this.deps.getSetting(INITIALIZED_SETTING);
 
     if (!connected) {
-      return false;
+      return { coldStart: false, fired };
     }
 
     const now = this.deps.now();
@@ -276,7 +272,7 @@ export class CoachActivityWatcher {
     if (firstRun) {
       this.deps.markAllSeen();
       this.deps.setSetting(INITIALIZED_SETTING, now.toISOString());
-      return true;
+      return { coldStart: true, fired };
     }
 
     if (!automations.length) {
@@ -284,46 +280,45 @@ export class CoachActivityWatcher {
       // next week would fire for everything that landed in the meantime.
       const unseen = this.deps.listUnseenActivities();
       this.deps.markSeen(unseen.map((activity) => activity.activity_id));
-      return false;
+      return { coldStart: false, fired };
     }
 
     const lookbackStart = Math.floor(start.getTime() / 1000);
     const unseen = this.deps.listUnseenActivities(lookbackStart);
     if (!unseen.length) {
-      return false;
+      return { coldStart: false, fired };
     }
 
-    for (const automation of automations) {
-      const matches = unseen.filter((activity) =>
-        activityMatchesAutomation(activity, automation)
-      );
-      if (matches.length) {
-        this.addToBatch(automation, matches, now);
-      }
-    }
+    const matched = automations.filter((automation) =>
+      unseen.some((activity) => activityMatchesAutomation(activity, automation))
+    );
 
     // Rows are stamped once every automation has had its look, whether or not
-    // any of them matched. An unmatched activity is genuinely handled.
-    const batched = new Set<string>();
-    for (const batch of this.batches.values()) {
-      for (const activity of batch.activities) batched.add(activity.activity_id);
+    // any of them matched. An unmatched activity is genuinely handled, and a
+    // matched one is stamped before the trigger goes out: the flag means "the
+    // watcher has looked at this", and it has. What each binding still owes is
+    // the runner's answer from that binding's own watermark, and a run the
+    // stamp outlived is re-offered by the catch-up below.
+    this.deps.markSeen(unseen.map((activity) => activity.activity_id));
+
+    // Several activities landing between two polls produce one trigger per
+    // automation, not one per activity: the trigger says *look*, and the runner
+    // selects the activities and fills in each run's payload itself.
+    for (const automation of matched) {
+      fired.add(automation.id);
+      await this.deps.runTrigger({ automationId: automation.id, kind: "activity" });
     }
-    this.deps.markSeen(
-      unseen
-        .map((activity) => activity.activity_id)
-        .filter((id) => !batched.has(id))
-    );
-    return false;
+    return { coldStart: false, fired };
   }
 
   /**
    * Section 4's promise, which nothing was keeping: *"the next poll will find it
    * still unanalysed because the watermark did not move."*
    *
-   * It did not. `coach_seen_at` is stamped at flush, before the runner has
-   * answered and whatever it answers — which is right, because the flag means
+   * It did not. `coach_seen_at` is stamped as the poll fires, before the runner
+   * has answered and whatever it answers — which is right, because the flag means
    * "the watcher has looked at this" and the watcher did. But the watcher's
-   * *firing* condition was "there are unseen rows", so once a batch was stamped
+   * *firing* condition was "there are unseen rows", so once a row was stamped
    * the trigger never came round again. A run refused for any reason — quiet
    * hours, a cooldown, a backoff, either pause, a signed-out provider — left
    * the activity owed by the binding's watermark and asked for by nobody. With
@@ -353,13 +348,7 @@ export class CoachActivityWatcher {
         continue;
       }
       if (fired.has(automation.id)) {
-        // Already asked this tick, by the batch that just flushed.
-        continue;
-      }
-      if (this.batches.has(automation.id)) {
-        // Still collecting. Firing now would analyse the activities the batch
-        // window is deliberately holding, which is the one thing batching is
-        // for.
+        // Already asked this tick, by the poll that just found new activity.
         continue;
       }
       await this.deps.runTrigger({ automationId: automation.id, kind: "activity" });
@@ -426,77 +415,6 @@ export class CoachActivityWatcher {
     } catch (error) {
       this.deps.onError(error);
     }
-  }
-
-  /**
-   * 3.2 step 5: several activities arriving inside `batchWindowMin` collapse
-   * into one run per binding, whose payload carries all their ids.
-   */
-  private addToBatch(
-    automation: CoachAutomation,
-    activities: CoachUnseenActivityRow[],
-    now: Date
-  ): void {
-    const existing = this.batches.get(automation.id);
-    if (!existing) {
-      this.batches.set(automation.id, {
-        automationId: automation.id,
-        openedAt: now.getTime(),
-        activities: [...activities]
-      });
-      return;
-    }
-    const known = new Set(existing.activities.map((entry) => entry.activity_id));
-    for (const activity of activities) {
-      if (!known.has(activity.activity_id)) {
-        existing.activities.push(activity);
-      }
-    }
-  }
-
-  /** The automations this flush fired a trigger for. */
-  private async flushDueBatches(all: CoachAutomation[]): Promise<Set<string>> {
-    const fired = new Set<string>();
-    const now = this.deps.now().getTime();
-    const automations = new Map(all.map((automation) => [automation.id, automation]));
-
-    for (const [automationId, batch] of [...this.batches]) {
-      const automation = automations.get(automationId);
-      if (!automation || !automation.enabled) {
-        // Switched off while its batch was waiting: drop it and stop holding
-        // the rows back from the seen marker.
-        this.batches.delete(automationId);
-        this.deps.markSeen(batch.activities.map((entry) => entry.activity_id));
-        continue;
-      }
-
-      const windowMs = automation.conditions.batchWindowMin * 60_000;
-      if (now - batch.openedAt < windowMs) {
-        continue;
-      }
-
-      this.batches.delete(automationId);
-      // Stamped only now: an app that quits mid-window leaves the rows unseen
-      // so the next launch picks them up rather than losing them.
-      this.deps.markSeen(batch.activities.map((entry) => entry.activity_id));
-
-      // The batch decides *when* to fire, not what gets analysed: each binding
-      // has its own watermark (a conversation attached yesterday owes a
-      // different set than one attached last month), so the runner selects the
-      // activities and fills in each run's payload itself.
-      fired.add(automationId);
-      await this.deps.runTrigger({ automationId, kind: "activity" });
-    }
-    return fired;
-  }
-
-  /** Test seam: the batches waiting on their window. */
-  pendingBatchSizes(): Record<string, number> {
-    const sizes: Record<string, number> = {};
-    for (const [id, batch] of this.batches) {
-      sizes[id] = batch.activities.length;
-    }
-    return sizes;
   }
 }
 

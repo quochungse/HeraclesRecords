@@ -52,7 +52,7 @@ const POST_ACTIVITY_DEBRIEF: CoachAutomationPreset = {
       "Only raise something if it is materially different from recent history.",
     trigger: { kind: "activity", sportTypes: [], minDurationSec: 1200 },
     runtime: {},
-    conditions: { batchWindowMin: 20, cooldownMin: 120, maxRunsPerDay: 3 }
+    conditions: { cooldownMin: 120, maxRunsPerDay: 3 }
   },
   suggestedBinding: {
     mode: "per-run",
@@ -88,7 +88,6 @@ const MORNING_BRIEFING: CoachAutomationPreset = {
     // and quiet hours keep it from arriving in the middle of the night if the
     // laptop was closed at 07:00 and opened at 02:00.
     conditions: {
-      batchWindowMin: 0,
       cooldownMin: 0,
       maxRunsPerDay: 1,
       quietHours: { start: "22:00", end: "06:00" }
@@ -126,7 +125,7 @@ const WEEKLY_REVIEW: CoachAutomationPreset = {
       timeOfDay: "18:00"
     },
     runtime: { effort: "medium" },
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 1 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 1 }
   },
   suggestedBinding: { mode: "dedicated" }
 };
@@ -160,7 +159,7 @@ const WEEK_AHEAD_PLAN: CoachAutomationPreset = {
       timeOfDay: "06:30"
     },
     runtime: { effort: "medium" },
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 1 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 1 }
   },
   suggestedBinding: { mode: "dedicated" }
 };

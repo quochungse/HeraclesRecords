@@ -375,7 +375,7 @@ const thresholdAutomation = (patch = {}) => ({
   playbook: "Say something about the ramp.",
   enabled: true,
   trigger: { kind: "threshold", metric: "acuteChronicRamp", value: 30 },
-  conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 },
+  conditions: { cooldownMin: 0, maxRunsPerDay: 9 },
   runtime: {},
   ...patch
 });
@@ -836,7 +836,6 @@ const REFUSED = [{ id: "run-1", status: "skipped", skipReason: "cooldown" }];
   // is hours long, and one skip a minute through it is the log this is avoiding.
   const quiet = thresholdAutomation({
     conditions: {
-      batchWindowMin: 0,
       cooldownMin: 0,
       maxRunsPerDay: 9,
       quietHours: { start: "22:00", end: "07:00" }
@@ -872,7 +871,6 @@ const REFUSED = [{ id: "run-1", status: "skipped", skipReason: "cooldown" }];
   // what re-arms the rule, so deferring it would be the crossing lost twice.
   const quiet = thresholdAutomation({
     conditions: {
-      batchWindowMin: 0,
       cooldownMin: 0,
       maxRunsPerDay: 9,
       quietHours: { start: "22:00", end: "07:00" }

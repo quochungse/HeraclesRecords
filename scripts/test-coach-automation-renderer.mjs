@@ -76,7 +76,7 @@ const automation = (id, name, patch = {}) => ({
   playbook: "Summarise yesterday.",
   enabled: true,
   trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:30" },
-  conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 3 },
+  conditions: { cooldownMin: 0, maxRunsPerDay: 3 },
   runtime: {},
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",

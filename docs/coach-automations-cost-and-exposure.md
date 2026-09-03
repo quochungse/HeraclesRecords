@@ -49,9 +49,9 @@ each per tick, and two reads across two ticks — the athlete can add a coach
 between ticks and the next one has to see it.
 **Mutations:** the snapshot asking again; the catch-up asking again → both red.
 Caching the list **across** ticks is red too, and instructively so: it is caught
-not by the count above but by a pre-existing behavioural test — *"an automation
-switched off while its batch was waiting"* — which fails because a cached list
-never sees `enabled = false`. That test exists for exactly this reason, so the
+not by the count above but by a behavioural test — *"an automation switched off
+between ticks stops being asked"* — which fails because a cached list never sees
+`enabled = false`. That test exists for exactly this reason, so the
 cross-tick half of the count assertion is documentation-grade rather than the
 detector of record. (My first mutation for it was equivalent: the variable is
 declared inside `tick()`, so it resets. The real one caches on the instance.)

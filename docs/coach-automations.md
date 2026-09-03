@@ -214,8 +214,6 @@ export type AutomationTrigger =
   | { kind: "manual" };
 
 export interface AutomationConditions {
-  /** Collapse several triggers inside this window into one run. */
-  batchWindowMin: number;        // default 20
   /** Minimum gap between two runs of the same binding. */
   cooldownMin: number;           // default 120
   /** Per binding, per local day. */
@@ -387,7 +385,7 @@ Four things the build had to get right that the design above does not say on its
 
 | Component | Decides |
 |---|---|
-| `coachActivityWatcher.ts` | **When** to fire. Polls, diffs `coach_seen_at`, batches by `batchWindowMin`, fires one payload-free trigger per automation. |
+| `coachActivityWatcher.ts` | **When** to fire. Polls, diffs `coach_seen_at`, fires one payload-free trigger per automation. |
 | `coachAutomationService.ts` | **What** to analyse. Per binding, from that binding's own `last_activity_at` watermark. |
 
 Watcher loop, every 15 minutes for as long as the process is alive:
@@ -395,9 +393,11 @@ Watcher loop, every 15 minutes for as long as the process is alive:
 1. Fetch page 1 of the activity index for the last 7 days.
 2. Diff `activity_id` against `training_activities.coach_seen_at` (added via `ensureColumn`).
 3. Match new rows against every enabled `activity` automation (sport, duration, distance).
-4. Hold matches in a batch for `batchWindowMin`, then fire `{ automationId, kind: "activity" }`.
+4. Fire `{ automationId, kind: "activity" }` once per matching automation, however many of its activities the poll found.
 
-Rows are stamped `coach_seen_at` **at flush, not at ingest**, so quitting mid-window leaves them unseen and the next launch picks them up. Cold start stamps everything already on disk, so switching the feature on does not replay the athlete's back catalogue.
+**The batch window is gone.** `conditions.batchWindowMin` held matches back for up to 20 minutes so several activities landing together became one run; nothing else read it, and the poll interval already collapses them — 15 minutes of arrivals reach the runner as one trigger, and the runner decides what each binding owes from its own watermark either way. What the window bought was a delay the athlete could see. The field, its control, and the never-recorded `"batch-window"` skip reason were removed together; old stored conditions keep the key in their JSON and `normalizeAutomationConditions` drops it on read.
+
+Rows are stamped `coach_seen_at` **as the poll fires, before the runner answers** — the flag means "the watcher has looked at this", and it has. A run the stamp outlives is re-offered by the catch-up below rather than lost. Cold start stamps everything already on disk, so switching the feature on does not replay the athlete's back catalogue.
 
 #### Per-binding selection
 
@@ -889,8 +889,6 @@ Sub-screens do not draw their own headers. Each publishes its title and back act
 
    Guard rails gained **quiet hours**, which had a place in the data model from phase 1 and no way to set. Clearing it needs an explicit `conditions.quietHours: null`: an absent key already means "unchanged", so it could not also mean "remove".
 
-   **Batch window is shown only for activity triggers.** It is how long several activities landing together are held so they become one run — the activity watcher reads it and nothing else does. On a schedule automation it is a control that does nothing.
-
    Deleting a coach opens a confirm dialog that **lists the conversations it is attached to** and states plainly that those conversations are kept. The list is the point: it is the only place the athlete can see what a delete actually affects.
 
 2. **Where it runs** — the binding list. Per row: enabled toggle first, last run + outcome, open conversation, run here now, reorder, detach; a row whose binding is off is greyed. Attaching is a **full screen**, not a dialog — the list of conversations needs the height, and it lists those already at 5 automations as disabled with the reason shown.
@@ -1009,7 +1007,7 @@ Follow the existing `scripts/test-*.mjs` convention (see `package.json`):
 | `test:coach-automation-sql` | the run-row filters against **real SQLite**, the activity scan's index, the binding columns phase 3 added (backoff, and the three values of `threshold_firing`), the daily-sample cache's column-wise upsert, 5.7's summary columns round-tripping while the transcript beside them is untouched, and section 13's monthly SUM — which rows it counts, which it leaves out, and how it separates "reported nothing" from "cost nothing" | ✅ |
 | `test:coach-automation-guards` | read-only tool allowlist, the `none` policy handing back nothing at all, `request_coach_input` no-athlete response | ✅ |
 | `test:coach-automation-runner` | fan-out and ordering, output contract, activity selection (all six rules of 3.2), cooldown-vs-catch-up, the daily cap ending a sequence, two triggers racing off one watermark, the mid-run append race (for an answer and for the silent-run trace), silent/failed watermark handling, section 7's effort default across every trigger kind, the idle watchdog — a provider that goes quiet, one that talks for six windows without a gap, and a stall not holding the runs behind it — the failure backoff (its three steps and its ceiling, what clears it and what does not, the manual bypass, a sequence stopping on it, and a timed-out run backing off identically to a thrown one), cancelling a trigger (one press ending a fan-out, the step behind a stall, the Stop that lands mid-preparation, and one that no live trigger owns), guard rail 3's pre-flight for all four providers — including that one provider's problem holds back none of the others and that an unrecorded CLI state is not a refusal — the 2FA pause (one row rather than one per binding, a held trigger logging nothing, the manual probe, the self-heal, Resume re-tripping, and an offline COROS pausing nothing), 5.7's context trimming (the limit's boundary, the split accounting for the whole transcript, the count measured from the summary rather than the start, a stale `through` abandoning the summary, the prompts on both sides of a roll, and a failed roll falling back to the full transcript rather than dropping its middle), and section 13's cost (the month's boundary, the ceiling's `>=`, every exit that reached a provider recording what it spent, an unreported cost staying unknown, and the budget pause tripping once and lifting on all three of its causes) | ✅ |
-| `test:coach-activity-watcher` | cold start, batching, payload-free triggers, per-automation matching, and 3.3's sample snapshot — throttled, bounded, unstamped on failure, and not gated on there being an activity trigger | ✅ |
+| `test:coach-activity-watcher` | cold start, one trigger per automation however many activities landed, payload-free triggers, per-automation matching, and 3.3's sample snapshot — throttled, bounded, unstamped on failure, and not gated on there being an activity trigger | ✅ |
 | `test:coach-automation-threshold` | each metric's boundary in both directions, the windows they read and what falls outside them, a missing reading breaking a streak rather than passing through it, the baseline excluding the streak it measures, an old miss ageing out, the per-binding transition (seed-and-be-silent, fire once, sixty ticks of hovering, recovery re-arming), the state written before the run, and it surviving a restart | ✅ |
 | `test:coach-automation-plan-draft` | draft approval from an auto run still writes through `chat:uploadPlanDraft` | ✅ |
 | `test:chat-history-store` | the `automation` field round-trip, the silent-run trace round-trip and its half-formed rejections, `setChatSessionTitle`, the renderer/runner save race and the option's path through the IPC chain | ✅ |

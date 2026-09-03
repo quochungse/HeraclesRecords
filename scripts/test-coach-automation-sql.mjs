@@ -188,7 +188,6 @@ assert.match(
     preset_id: null,
     trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
     conditions_json: JSON.stringify({
-      batchWindowMin: 0,
       cooldownMin: 0,
       maxRunsPerDay: 3
     }),
@@ -417,7 +416,6 @@ database.insertCoachAutomationRow({
   preset_id: null,
   trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
   conditions_json: JSON.stringify({
-    batchWindowMin: 0,
     cooldownMin: 0,
     maxRunsPerDay: 3
   }),

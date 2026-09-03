@@ -72,7 +72,6 @@ function fingerprint(input: CoachAutomationInput): string {
     presetId: trimmed(input.presetId),
     trigger: input.trigger,
     conditions: {
-      batchWindowMin: input.conditions?.batchWindowMin,
       cooldownMin: input.conditions?.cooldownMin,
       maxRunsPerDay: input.conditions?.maxRunsPerDay,
       quietHours: input.conditions?.quietHours ?? null

@@ -480,7 +480,7 @@ function addAutomation(world, id, patch = {}) {
     playbook: "Summarise yesterday for {{date}}.",
     enabled: true,
     trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:30" },
-    conditions: { batchWindowMin: 20, cooldownMin: 120, maxRunsPerDay: 3 },
+    conditions: { cooldownMin: 120, maxRunsPerDay: 3 },
     runtime: {},
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
@@ -574,7 +574,7 @@ function addSession(world, id, entries = []) {
 {
   resetAutomationQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: { batchWindowMin: 20, cooldownMin: 0, maxRunsPerDay: 9 } });
+  addAutomation(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } });
   addSession(world, "sA");
   addBinding(world, "b1", { sessionId: "sA", sortOrder: 0 });
   addBinding(world, "b2", { sessionId: "sA", sortOrder: 1 });
@@ -1078,7 +1078,7 @@ for (const [label, configure] of [
   resetAutomationQueueForTests();
   const world = createWorld();
   addAutomation(world, "a1", {
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 50 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 50 }
   });
   addBinding(world, "b1", { mode: "per-run", sessionId: null });
   for (let index = 0; index < SESSION_BURST_PER_HOUR + 2; index += 1) {
@@ -1104,7 +1104,7 @@ for (const [label, configure] of [
   resetAutomationQueueForTests();
   const world = createWorld();
   addAutomation(world, "a1", {
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 9 }
   });
   addSession(world, "sA");
   addSession(world, "sB");
@@ -1142,7 +1142,6 @@ for (const [label, configure] of [
   const world = createWorld();
   addAutomation(world, "a1", {
     conditions: {
-      batchWindowMin: 20,
       cooldownMin: 120,
       maxRunsPerDay: 1,
       quietHours: { start: "00:00", end: "23:59" }
@@ -1317,7 +1316,7 @@ for (const [label, configure] of [
 // ---------------------------------------------------------------------------
 
 const ACTIVITY_TRIGGER = { kind: "activity", sportTypes: [] };
-const NO_LIMITS = { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 9 };
+const NO_LIMITS = { cooldownMin: 0, maxRunsPerDay: 9 };
 
 /** Which activity each run analysed, in the order the runs happened. */
 const analysedIds = (world) =>
@@ -1402,7 +1401,7 @@ const analysedIds = (world) =>
     // guard counts per conversation, and this one writes into a new one each
     // time. The daily cap is lifted past the sequence for the same reason —
     // what is under test is which end of the backlog the cap takes from.
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 24 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 24 }
   });
   addBinding(world, "b1", {
     mode: "per-run",
@@ -1541,7 +1540,7 @@ const analysedIds = (world) =>
   const world = createWorld();
   addAutomation(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
-    conditions: { batchWindowMin: 0, cooldownMin: 120, maxRunsPerDay: 9 }
+    conditions: { cooldownMin: 120, maxRunsPerDay: 9 }
   });
   addSession(world, "s1");
   addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
@@ -1563,7 +1562,7 @@ const analysedIds = (world) =>
   const world = createWorld();
   addAutomation(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
-    conditions: { batchWindowMin: 0, cooldownMin: 0, maxRunsPerDay: 2 }
+    conditions: { cooldownMin: 0, maxRunsPerDay: 2 }
   });
   addSession(world, "s1");
   addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
@@ -3203,7 +3202,6 @@ Module._load = originalLoad;
   resetAutomationQueueForTests();
   const world = threePlaceWorld();
   world.automations.get("a1").conditions = {
-    batchWindowMin: 0,
     cooldownMin: 0,
     maxRunsPerDay: 1
   };

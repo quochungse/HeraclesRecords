@@ -365,22 +365,6 @@ export function AutomationDefinitionForm({
       <fieldset className="coach-automation-fieldset" disabled={disabled}>
         <legend>Guard rails</legend>
         <div className="coach-automation-row">
-          {/* The batch window only means anything to the activity watcher —
-              it is how long several activities landing together are held so
-              they become one run. A schedule fires on its own clock. */}
-          {activityTrigger ? (
-            <label className="chat-local-field">
-              <span>Batch window (min)</span>
-              <input
-                type="number"
-                min={0}
-                value={draft.conditions?.batchWindowMin ?? 20}
-                onChange={(event) =>
-                  patchConditions({ batchWindowMin: Number(event.target.value) })
-                }
-              />
-            </label>
-          ) : null}
           <label className="chat-local-field">
             <span>Cooldown (min)</span>
             <input

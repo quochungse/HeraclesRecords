@@ -17,7 +17,7 @@ const BLANK: CoachAutomationInput = {
   playbook: "",
   trigger: { kind: "activity", sportTypes: [] },
   runtime: { effort: "low" },
-  conditions: { batchWindowMin: 20, cooldownMin: 120, maxRunsPerDay: 3 }
+  conditions: { cooldownMin: 120, maxRunsPerDay: 3 }
 };
 
 /**

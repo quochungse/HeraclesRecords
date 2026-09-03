@@ -144,8 +144,8 @@ rather than fixed.
 
 ### 7. The point the reconciliation cannot reach, and how it got covered
 
-`flushDueBatches` stamps `coach_seen_at` and **then** awaits the runner. A
-process that dies in between leaves rows marked seen with no run behind them —
+The poll stamps `coach_seen_at` and **then** awaits the runner. A process that
+dies in between leaves rows marked seen with no run behind them —
 and there is no `running` row to reconcile, because the trigger never got as far
 as making one.
 
@@ -155,15 +155,16 @@ and with `multiActivity` off — the default — the next activity to arrive
 replaced them. R2 found that from the refusal side; it is the same hole from the
 crash side, and the same fix closes both.
 
-Its other half was already right and is now asserted too: a batch still inside
-its window lives only in memory, so a crash drops it — and the rows were
-deliberately left unstamped for exactly that reason (3.2). `stop()` states it
-for a clean quit; a crash gets it for free.
+Its other half went with the batch window. Rows used to be stamped at flush, so
+matches still collecting stayed unseen and a crash mid-window re-collected them
+— in-memory state that a crash was *supposed* to drop. With the window removed
+the poll stamps and fires in the same step and the watcher holds nothing between
+ticks, so the gap above is the only one left, and the L3 catch-up is what closes
+it.
 
 **Tests** — `test-coach-activity-watcher.mjs`: a trigger that dies on handover
-leaves the rows stamped, and the next launch offers the activity anyway; a batch
-mid-window is not stamped and is re-collected. **Mutations:** removing the
-re-offer; stamping at ingest instead of at flush → both red.
+leaves the rows stamped, and the next launch offers the activity anyway.
+**Mutations:** removing the re-offer → red.
 
 ### 8. Checked and found sound
 

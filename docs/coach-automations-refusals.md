@@ -330,9 +330,11 @@ free* is what carries it.
   minutes while the refusal lasts. Bounded, and visible in the run log, which is
   where the athlete reads why a coach is quiet. Whether the log wants pruning at
   all is R6 step 11's question, not this one.
-- **`AutomationSkipReason` carries `"batch-window"`**, which nothing ever
+- ~~**`AutomationSkipReason` carries `"batch-window"`**, which nothing ever
   records; only the renderer's label map mentions it. Dead, not wrong — R1's
-  drift list territory.
+  drift list territory.~~ **Removed** with the batch window itself
+  ([3.2](./coach-automations.md#32-new-activity)): the reason, its label, and
+  `conditions.batchWindowMin` went together.
 - **F3's `error` text** is new copy on a run-log row. R3 step 5 owns whether every
   surface that renders a skip shows it.
 - **Whether guard 7 deserves its own `skip_reason`** rather than sharing

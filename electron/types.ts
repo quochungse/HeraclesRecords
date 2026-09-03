@@ -2835,8 +2835,6 @@ export type AutomationThresholdMetric = Extract<
 >["metric"];
 
 export interface AutomationConditions {
-  /** Collapse several triggers inside this window into one run. */
-  batchWindowMin: number;
   /** Minimum gap between two runs of the same binding. */
   cooldownMin: number;
   /** Per binding, per local day. */

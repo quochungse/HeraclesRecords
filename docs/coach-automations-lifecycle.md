@@ -230,10 +230,10 @@ still unanalysed because the watermark did not move."*
 
 The watermark did not move. Nothing looked.
 
-`coach_seen_at` is stamped at flush — before the runner has answered, and
-whatever it answers — which is right: the flag means *"the watcher has looked at
-this"*, and it had. But the watcher's **firing** condition was "are there any
-unseen rows", so once a batch was stamped the trigger never came round again. A
+`coach_seen_at` is stamped as the poll fires — before the runner has answered,
+and whatever it answers — which is right: the flag means *"the watcher has looked
+at this"*, and it had. But the watcher's **firing** condition was "are there any
+unseen rows", so once a row was stamped the trigger never came round again. A
 run refused for any reason at all — quiet hours, a cooldown, a backoff, either
 pause, a signed-out provider, an offline COROS — left the activity owed by the
 binding's watermark and asked for by nobody.
@@ -251,18 +251,16 @@ read section 10's *"nothing is lost while paused"* and checked only that the
 watermark holds, which it does; step 3 traced the watermark through every
 ending and never asked who would come back for it.
 
-**Fixed.** The tick asks again: after the batches flush, every enabled activity
-automation that was not just fired and has no batch still collecting gets a
-payload-free trigger. 3.2's split is untouched — this says *look again*, and the
+**Fixed.** The tick asks again: after the poll has fired for whatever it found,
+every enabled activity automation it did not just fire gets a payload-free
+trigger. 3.2's split is untouched — this says *look again*, and the
 runner still decides what is owed. A binding with nothing pending produces an
 empty plan, and a non-manual trigger with an empty plan logs nothing, so the only
 automations this costs anything are the ones genuinely waiting.
 
-Three things it must not do, each of which is a test:
+Two things it must not do, each of which is a test:
 
-- **not jump a batch still inside its window**, which is the one thing batching
-  is for;
-- **not fire twice on the tick a batch flushed**;
+- **not fire twice on a tick whose poll already fired** for that automation;
 - **not run on the cold start**, where stamping the back catalogue and then
   immediately asking about it would replay the athlete's history — the one thing
   that stamp exists to stop.
@@ -281,13 +279,12 @@ the refusal clears or the watermark moves. Silence was cheaper and wrong.
 
 **Tests** — `scripts/test-coach-activity-watcher.mjs`: a refused activity is
 re-offered on the next poll and the one after; a binding with nothing owed still
-gets asked and costs one index refresh; a collecting batch is not jumped; the
-cold start says nothing. Plus the pre-existing *"the same activity is never fired
-twice"* assertion, rewritten — it was a claim the watcher is in no position to
-make.
-**Mutations:** removing the re-offer; jumping a collecting batch; running it on
-the cold start; firing twice on a flush tick; dropping the COROS gate → all five
-red.
+gets asked and costs one index refresh; an automation the poll just fired is
+asked once, not twice; the cold start says nothing. Plus the pre-existing *"the
+same activity is never fired twice"* assertion, rewritten — it was a claim the
+watcher is in no position to make.
+**Mutations:** removing the re-offer; running it on the cold start; firing twice
+on a tick the poll already fired; dropping the COROS gate → all four red.
 
 ---
 
@@ -303,8 +300,9 @@ half that stops two runs clobbering each other through `saveChatSession`. **In
 automation, and `idx_binding_unique_session` means one automation has at most one
 binding per conversation — so the tiebreaker never breaks a tie. Two automations
 writing into the same conversation are two separate triggers, ordered by
-whichever fired first: creation order in the scheduler's tick, batch-map order in
-the activity watcher, and no shared order at all between the two components.
+whichever fired first: creation order in the scheduler's tick, automation-list
+order in the activity watcher, and no shared order at all between the two
+components.
 
 So an athlete who reorders coaches in "Where it runs" changes nothing about the
 order their answers arrive in.
