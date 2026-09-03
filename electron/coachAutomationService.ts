@@ -55,6 +55,7 @@ import type {
   CoachAutomationRun,
   CoachAutomationRunQuery,
   CoachAutomationSpend,
+  CoachAutomationUpdate,
   PersistedChatEntry,
   ProviderAuthVerdict
 } from "./types";
@@ -636,6 +637,24 @@ export function emitAutomationBindingUpdate(
 ): void {
   if (!binding) return;
   emitToAnyWindow("coachAutomation:bindingUpdate", binding);
+}
+
+/**
+ * A definition that changed, with no run and no binding to carry the news.
+ *
+ * Every automation surface renders the definition — the name on a chip, the
+ * trigger under it, the master switch that decides whether a binding is live —
+ * and until now nothing put a definition change on the wire. The surfaces kept
+ * up through `automationsVersion`, a counter local to ChatView's tree, so a
+ * surface that counter does not reach went on showing the old name and the old
+ * trigger until something unrelated refreshed it. Detaching and re-attaching
+ * was the athlete's way out, because a binding update *does* have a wire.
+ *
+ * Emitted on the two edits and the delete, not on the clocks: `last_run_at` and
+ * the watermarks live on the binding and already have their own rule.
+ */
+export function emitAutomationUpdate(update: CoachAutomationUpdate): void {
+  emitToAnyWindow("coachAutomation:automationUpdate", update);
 }
 
 /**

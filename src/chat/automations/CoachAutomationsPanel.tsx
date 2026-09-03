@@ -107,6 +107,15 @@ export function CoachAutomationsPanel({
     return api.onCoachAutomationPauseUpdate(setPause);
   }, [api]);
 
+  // The cards are the definitions, so an edit from anywhere — the detail screen
+  // behind this one, or a second surface — is exactly what they render.
+  useEffect(() => {
+    if (!api?.onCoachAutomationUpdate) return;
+    return api.onCoachAutomationUpdate(() => {
+      void refresh();
+    });
+  }, [api, refresh]);
+
   // Re-read alongside the cards: every run that lands changes the number, and
   // the run updates that refresh the cards are exactly when it moves.
   const refreshSpend = useCallback(async () => {

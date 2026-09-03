@@ -109,6 +109,7 @@ import type {
   CoachAutomationSpend,
   CoachAutomationRunQuery,
   CoachAutomationSummary,
+  CoachAutomationUpdate,
   ChatSettings,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
@@ -1083,6 +1084,17 @@ const api = {
     ipcRenderer.on("coachAutomation:bindingUpdate", listener);
     return () =>
       ipcRenderer.removeListener("coachAutomation:bindingUpdate", listener);
+  },
+  onCoachAutomationUpdate: (
+    callback: (update: CoachAutomationUpdate) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      update: CoachAutomationUpdate
+    ) => callback(update);
+    ipcRenderer.on("coachAutomation:automationUpdate", listener);
+    return () =>
+      ipcRenderer.removeListener("coachAutomation:automationUpdate", listener);
   },
   onCoachAutomationPauseUpdate: (
     callback: (pause: CoachAutomationPause | null) => void

@@ -2948,6 +2948,25 @@ export interface CoachAutomationRunQuery {
 }
 
 /**
+ * A definition that changed, on the wire.
+ *
+ * The definition is the one thing every automation surface renders and no
+ * channel carried: the name on a chip, the trigger under it, and the master
+ * switch that decides whether a binding is live at all. Editing a coach reached
+ * the other surfaces only through `automationsVersion`, a renderer-local
+ * counter — so an edit was invisible to anything that counter does not reach,
+ * and the athlete's way out was to detach and re-attach, because *that* emits a
+ * binding update and a binding update forces a re-read.
+ *
+ * `automation` is null when the definition was deleted, which is the one change
+ * a surface cannot re-read for itself.
+ */
+export interface CoachAutomationUpdate {
+  automationId: string;
+  automation: CoachAutomation | null;
+}
+
+/**
  * What the conversation list has to say about one conversation (9.3). An auto
  * run changes the transcript and so bumps the row to the top; without this the
  * row reorders for no visible reason.

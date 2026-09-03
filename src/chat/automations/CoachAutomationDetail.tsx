@@ -200,6 +200,29 @@ export function CoachAutomationDetail({
     });
   }, [api, automationId]);
 
+  /**
+   * The definition changing under this screen — the master switch flipped from
+   * the list behind it, or the coach deleted from a second surface.
+   *
+   * `draft` is deliberately untouched: the athlete may be part-way through a
+   * playbook, and nothing about someone else's edit justifies discarding what
+   * they have typed. `saved` moves, which is what makes the form show itself as
+   * edited against the definition that is actually stored.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationUpdate) return;
+    return api.onCoachAutomationUpdate((update) => {
+      if (update.automationId !== automationId) return;
+      // Deleted: there is nothing left for this screen to be about.
+      if (!update.automation) {
+        onBackRef.current();
+        return;
+      }
+      setAutomation(update.automation);
+      setSaved(toInput(update.automation));
+    });
+  }, [api, automationId]);
+
   const patchDraft = (patch: Partial<CoachAutomationInput>) => {
     setDraft((current) => (current ? { ...current, ...patch } : current));
   };

@@ -106,6 +106,7 @@ import type {
   CoachAutomationSpend,
   CoachAutomationRunQuery,
   CoachAutomationSummary,
+  CoachAutomationUpdate,
   ChatSettings,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
@@ -699,6 +700,15 @@ export interface CorosLinkApi {
   ) => () => void;
   onCoachAutomationRunUpdate: (
     callback: (run: CoachAutomationRun) => void
+  ) => () => void;
+  /**
+   * A definition that changed anywhere: the name on a chip, the trigger under
+   * it, the master switch — or the whole coach being deleted. Every surface
+   * that renders a coach follows this, so an edit reaches the places the coach
+   * is already attached without the athlete detaching and re-attaching it.
+   */
+  onCoachAutomationUpdate: (
+    callback: (update: CoachAutomationUpdate) => void
   ) => () => void;
   onCoachAutomationPauseUpdate: (
     callback: (pause: CoachAutomationPause | null) => void

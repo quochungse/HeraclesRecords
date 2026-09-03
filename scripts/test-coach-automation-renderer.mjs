@@ -354,6 +354,89 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // The popover following an edit to the coach it is already showing
+  // -------------------------------------------------------------------------
+  // Every row here is drawn from the definition — the coach's name, the trigger
+  // under it, the master switch that decides whether it reads "Running here" —
+  // and a definition change carried no push at all. `refreshVersion` covers an
+  // edit made through the Automations modal the parent owns and nothing else,
+  // so a rename left every conversation the coach is attached to showing the
+  // old name. Detaching and re-attaching was the way out, because that emits a
+  // binding update and a binding update forces a re-read.
+  {
+    await harness(
+      "mount",
+      "ConversationCoaches",
+      { sessionId: "s1" },
+      {
+        listCoachAutomationsForSession: [binding("b1")],
+        listCoachAutomations: [summary(automation("a1", "Morning briefing"))],
+        listCoachAutomationRuns: []
+      }
+    );
+    await waitFor(
+      () => harness("exists", ".chat-coaches-pill"),
+      "the chip renders"
+    );
+    await harness("click", ".chat-coaches-pill");
+    await waitFor(
+      async () =>
+        (await harness("text", ".chat-coaches-row-name"))?.includes(
+          "Morning briefing"
+        ) || null,
+      "the attached coach is named in the popover"
+    );
+
+    // The athlete renames the coach somewhere else. Nothing about this
+    // conversation's bindings changed, and no run happened.
+    await harness("setScript", {
+      listCoachAutomations: [summary(automation("a1", "Evening debrief"))]
+    });
+    await harness("emit", "onCoachAutomationUpdate", {
+      automationId: "a1",
+      automation: automation("a1", "Evening debrief")
+    });
+    await waitFor(
+      async () =>
+        (await harness("text", ".chat-coaches-row-name"))?.includes(
+          "Evening debrief"
+        ) || null,
+      "the row follows the edit without the athlete detaching and re-attaching"
+    );
+    await assertQuietConsole("an edit reaching the popover");
+  }
+
+  // -------------------------------------------------------------------------
+  // The master switch reaching the conversations the coach is attached to
+  // -------------------------------------------------------------------------
+  // A binding runs only when its own switch and the automation's are both on,
+  // which is what the runner checks and what `listCoachAutomationSessionAttention`
+  // counts. Switching a coach off therefore moves the ⚡ mark on conversations
+  // this window never touched — with no binding update and no run to say so.
+  {
+    await harness("mount", "ChatView", {}, {
+      ...CHAT_VIEW_BASE,
+      listChatSessions: [session("s1", "Morning briefing")],
+      listCoachAutomationRuns: []
+    });
+    await waitFor(
+      () => harness("exists", ".chat-session-row"),
+      "ChatView renders its sidebar"
+    );
+
+    await harness("clearCalls");
+    await harness("emit", "onCoachAutomationUpdate", {
+      automationId: "a1",
+      automation: automation("a1", "Morning briefing", { enabled: false })
+    });
+    await waitFor(
+      () => harness("callCount", "listCoachAutomationSessionAttention"),
+      "switching a coach off has to re-read the marks it just changed"
+    );
+    await assertQuietConsole("a definition change reaching the attention marks");
+  }
+
+  // -------------------------------------------------------------------------
   // 9.3: a run reaching into the conversation list
   // -------------------------------------------------------------------------
   // Ported from a regex over `if (!run.sessionId) return; void refreshSessions`.

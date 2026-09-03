@@ -17,12 +17,12 @@ turned up.
 
 ## 1. The whole push surface
 
-Two channels. That is all of it.
-
 | Channel | Emitted by | Payload |
 |---|---|---|
 | `coachAutomation:runUpdate` | `emitAutomationRunUpdate` — the runner on every row it writes, the scheduler on a `stale-slot` skip | one `CoachAutomationRun` |
 | `coachAutomation:pauseUpdate` | `emitAutomationPauseUpdate` — the runner's `setPause` dep | the pause, or null |
+| `coachAutomation:bindingUpdate` | `emitAutomationBindingUpdate` — the scheduler booking a slot, guard rail 2 breaking a binding, a `dedicated` binding adopting its rebuilt conversation | one `CoachAutomationBinding` |
+| `coachAutomation:automationUpdate` | `emitAutomationUpdate` — the `save`, `setEnabled` and `delete` handlers in `main.ts` | `{ automationId, automation }`, `automation` null on a delete |
 
 Plus the tee sink ([coachAutomationService.ts:1819](../electron/coachAutomationService.ts#L1819)),
 which forwards a run's `chat:stream*` events to whatever window exists. Every
@@ -30,31 +30,39 @@ window handler filters those on `activeRequestIdRef` or `liveAutomationRef`, so
 a run's stream cannot corrupt the athlete's own turn — 5.6b's rule, and it
 holds.
 
-Both automation pushes go through `emitToAnyWindow`, which resolves the window
+Every automation push goes through `emitToAnyWindow`, which resolves the window
 lazily on each emit. Correct per 5.6b, and it means a run with no window open
 simply drops its pushes — which is what the mount reads are for.
 
 ## 2. Every surface, and what it follows
 
-| Surface | Reads on mount | Follows `runUpdate` | Follows `pauseUpdate` |
-|---|---|---|---|
-| `CoachAutomationsPanel` | summaries, pause, spend | full `refresh()` + spend | ✅ |
-| `CoachAutomationDetail` | automation, **bindings**, runs | **runs only** | ✗ |
-| `ConversationCoaches` | bindings, automations, running runs | full `refresh()`, unfiltered | ✗ |
-| `ChatView` — conversation list | on mount and provider change | `refreshSessions` when the run has a session | ✗ |
-| `ChatView` — attention marks | on mount and `automationsVersion` | `refreshSessionAttention`, or marks read if open | ✗ |
-| `ChatView` — live bubble | — | filtered on the active session | ✗ |
-| `AttachAutomationScreen` | sessions, automations, bindings | ✗ | ✗ |
-| `AttachCoachToConversationDialog` | automations | ✗ | ✗ |
-| `RunNowDialog` | bindings | ✗ | ✗ |
-| `DeleteAutomationDialog` | nothing — `bindings` arrives as a prop from the detail screen | inherits G2 | ✗ |
-| `AutomationDefinitionForm`, `CoachAutomationCreate` | nothing live | n/a | n/a |
+| Surface | Reads on mount | Follows `runUpdate` | Follows `pauseUpdate` | Follows `automationUpdate` |
+|---|---|---|---|---|
+| `CoachAutomationsPanel` | summaries, pause, spend | full `refresh()` + spend | ✅ | full `refresh()` |
+| `CoachAutomationDetail` | automation, **bindings**, runs | **runs only** | ✗ | `automation` + `saved`, never `draft`; back out on a delete |
+| `ConversationCoaches` | bindings, automations, running runs | full `refresh()`, unfiltered | ✗ | full `refresh()` |
+| `ChatView` — conversation list | on mount and provider change | `refreshSessions` when the run has a session | ✗ | ✗ |
+| `ChatView` — attention marks | on mount and `automationsVersion` | `refreshSessionAttention`, or marks read if open | ✗ | `refreshSessionAttention` — the master switch decides whether ⚡ is live |
+| `ChatView` — live bubble | — | filtered on the active session | ✗ | ✗ |
+| `AttachAutomationScreen` | sessions, automations, bindings | ✗ | ✗ | ✗ — mounted per use (G5) |
+| `AttachCoachToConversationDialog` | automations | ✗ | ✗ | ✗ — mounted per use (G5) |
+| `RunNowDialog` | bindings | ✗ | ✗ | ✗ — mounted per use (G5) |
+| `DeleteAutomationDialog` | nothing — `bindings` arrives as a prop from the detail screen | inherits G2 | ✗ | n/a |
+| `AutomationDefinitionForm`, `CoachAutomationCreate` | nothing live | n/a | n/a | n/a |
 
 `automationsVersion` is ChatView's second channel: the modal reports on
 `onChanged` and again on close, the popover on every mutation it makes, and the
 run-log row bumps it on the way into a conversation. Every panel mutation goes
 through `withBusy`, which calls it — including the master toggle, which is what
 moves the ⚡ mark.
+
+`automationUpdate` is what `automationsVersion` could never be: a counter local
+to ChatView's tree reaches the surfaces ChatView renders, and an edit made
+anywhere else reached nothing. `ConversationCoaches`, `CoachAutomationsPanel`,
+`CoachAutomationDetail` and ChatView's attention marks all follow it now.
+`CoachAutomationDetail` deliberately updates `automation` and `saved` and
+**never `draft`** — the athlete may be part-way through a playbook, and someone
+else's edit is no reason to discard what they have typed.
 
 ---
 

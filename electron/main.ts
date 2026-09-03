@@ -325,6 +325,7 @@ import {
 } from "./coachAutomationStore";
 import {
   cancelAutomationRun,
+  emitAutomationUpdate,
   getAutomationPause,
   getAutomationSpend,
   resumeAutomations,
@@ -1525,22 +1526,40 @@ function registerIpcHandlers(): void {
     }
   );
 
+  // Every definition change goes out on the wire, so a surface showing the
+  // coach — a chip in the conversation header, a card on the list — follows the
+  // edit instead of waiting for something unrelated to refresh it.
   ipcMain.handle(
     "coachAutomation:save",
-    (_event, input: CoachAutomationInput, automationId?: string) =>
-      automationId
+    (_event, input: CoachAutomationInput, automationId?: string) => {
+      const automation = automationId
         ? updateCoachAutomation(automationId, input)
-        : createCoachAutomation(input)
+        : createCoachAutomation(input);
+      // A save against an id that no longer exists answers null and changed
+      // nothing; there is no news in that.
+      if (automation) {
+        emitAutomationUpdate({ automationId: automation.id, automation });
+      }
+      return automation;
+    }
   );
 
   ipcMain.handle(
     "coachAutomation:setEnabled",
-    (_event, automationId: string, enabled: boolean) =>
-      setCoachAutomationEnabled(automationId, enabled)
+    (_event, automationId: string, enabled: boolean) => {
+      const automation = setCoachAutomationEnabled(automationId, enabled);
+      if (automation) {
+        emitAutomationUpdate({ automationId, automation });
+      }
+      return automation;
+    }
   );
 
   ipcMain.handle("coachAutomation:delete", (_event, automationId: string) => {
     deleteCoachAutomation(automationId);
+    // Null is the whole point here: a surface cannot re-read a definition that
+    // is gone, so the push has to say so rather than leave it to a 404.
+    emitAutomationUpdate({ automationId, automation: null });
   });
 
   ipcMain.handle("coachAutomation:listBindings", (_event, automationId: string) =>

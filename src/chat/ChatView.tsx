@@ -2102,6 +2102,20 @@ export function ChatView({
   }, [refreshSessionAttention, automationsVersion]);
 
   /**
+   * The ⚡ mark is "a live coach speaks here", and a coach's master switch is
+   * half of what makes it live — `listCoachAutomationSessionAttention` skips
+   * every binding of a disabled automation. Switching a coach off therefore
+   * moves the mark on conversations this window never touched, with no binding
+   * and no run to say so.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationUpdate) return;
+    return api.onCoachAutomationUpdate(() => {
+      void refreshSessionAttention();
+    });
+  }, [api, refreshSessionAttention]);
+
+  /**
    * A run reaches into the conversation list from outside this window. A
    * `per-run` binding brings a conversation into existence every time it fires
    * (2.2), a `dedicated` one rebuilds its own when it has been deleted, and

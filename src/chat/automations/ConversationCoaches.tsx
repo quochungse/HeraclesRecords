@@ -111,6 +111,25 @@ export function ConversationCoaches({
     });
   }, [api, refresh]);
 
+  /**
+   * Every row here is drawn from the *definition* — the coach's name, the
+   * trigger under it, and the master switch that decides whether the row reads
+   * "Running here" at all — so an edit changes this popover without touching a
+   * binding or producing a run.
+   *
+   * The `refreshVersion` counter covers an edit made from the Automations modal
+   * the parent also owns. It cannot cover one made anywhere else, and there was
+   * nothing else to hear: renaming a coach left every conversation it is
+   * attached to showing the old name until a run landed or the athlete detached
+   * and re-attached it, which is the one action that did emit something.
+   */
+  useEffect(() => {
+    if (!api?.onCoachAutomationUpdate) return;
+    return api.onCoachAutomationUpdate(() => {
+      void refresh();
+    });
+  }, [api, refresh]);
+
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: MouseEvent) => {
