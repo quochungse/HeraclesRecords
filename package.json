@@ -40,6 +40,7 @@
     "test:claude-code": "npm run build:electron && node scripts/test-claude-code-provider.mjs",
     "test:anthropic-provider": "npm run build:electron && node scripts/test-anthropic-provider.mjs",
     "test:chat-history-store": "npm run build:electron && node scripts/test-chat-history-store.mjs",
+    "test:chat-context-compaction": "npm run build:electron && node scripts/test-chat-context-compaction.mjs",
     "test:coach-automation-store": "npm run build:electron && node scripts/test-coach-automation-store.mjs",
     "test:coach-automation-bindings": "npm run build:electron && node scripts/test-coach-automation-bindings.mjs",
     "test:coach-automation-guards": "npm run build:electron && node scripts/test-coach-automation-guards.mjs",

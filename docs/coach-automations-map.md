@@ -65,8 +65,8 @@ looks like.
 
 | Table | Column | Type | Doc section |
 |---|---|---|---|
-| `chat_sessions` | `coach_summary` | TEXT | 5.7 |
-| `chat_sessions` | `coach_summary_through` | INTEGER | 5.7 |
+| `chat_sessions` | `coach_summary` | TEXT | 5.7 (written by the chat too) |
+| `chat_sessions` | `coach_summary_through` | INTEGER | 5.7 (written by the chat too) |
 | `training_activities` | `coach_seen_at` | TEXT | 3.2 |
 | `coach_automation_bindings` | `last_activity_at` | INTEGER | 3.2 |
 | `coach_automation_bindings` | `backoff_until` | TEXT | 10 |
@@ -176,9 +176,11 @@ No other `app_settings` key belongs to this feature.
 | `MULTI_ACTIVITY_MAX_PER_TRIGGER` | 10 | coachAutomationService.ts:224 | 3.2 |
 | `SESSION_BURST_PER_HOUR` | 5 | coachAutomationService.ts:330 | 2.3 |
 | `AUTOMATION_BACKOFF_STEPS_MS` | 5m / 15m / 60m | coachAutomationService.ts:345 | 10 |
-| `AUTOMATION_IDLE_TIMEOUT_MS` | 3 min | coachAutomationService.ts:1297 | 10 |
+| `AUTOMATION_IDLE_TIMEOUT_MS` | 3 min | coachAutomationService.ts | 10 |
+| `SUMMARISER_IDLE_TIMEOUT_MS` | 3 min | chatContextService.ts | 5.7 |
 | `SUMMARY_MAX` | 140 | coachAutomationService.ts:65 | 5.5 |
-| `AUTOMATION_CONTEXT_LIMIT` / `_KEEP` | 60 / 20 | coachAutomationService.ts:1131, 1134 | 5.7 |
+| `DEFAULT_CONTEXT_LIMIT` / `_KEEP` | 60 / 20 — now **defaults**, overridden by `chat.compactContext.*` | chatContextCompaction.ts | 5.7 |
+| `MIN_CONTEXT_KEEP` / `MIN_CONTEXT_GAP` / `MAX_CONTEXT_LIMIT` | 2 / 4 / 400 | chatContextCompaction.ts | 5.7 |
 | `AUTOMATION_DEFAULT_EFFORT` | `"low"` | types.ts:2674 | 7 |
 | `THRESHOLD_LOOKBACK_DAYS` | 33 (`max(28, 30+3, 7)`) | coachThresholdMetrics.ts:44 | 3.3 |
 | `PLAN_ADHERENCE_LOOKBACK_DAYS` | 14 | coachThresholdMetrics.ts:41 | 3.3 |
@@ -226,6 +228,19 @@ Every suite is `scripts/test-*.mjs`, per the `package.json` convention.
   phase 3 plan are still design." Both are built:
   `coachThresholdMetrics.ts` + `threshold_firing` for 3.3,
   `planTranscriptContext` + `coach_summary`/`coach_summary_through` for 5.7.
+- 5.7 is no longer automation-only. `planTranscriptContext`,
+  `applyTranscriptContext` and `toWireMessages` moved to
+  [chatContextCompaction.ts](../electron/chatContextCompaction.ts), the roll and
+  the summary storage to
+  [chatContextService.ts](../electron/chatContextService.ts), and the window to
+  chat settings; `coachAutomationService.ts` re-exports
+  `AUTOMATION_CONTEXT_LIMIT` / `_KEEP` (as the *defaults*) for its suites.
+  The runner reads the configured window through a `getContextWindow()` dep, so
+  the suite injects it the way it injects `getChatProvider`. Two new `chat:*`
+  channels: `chat:compactContext` (plans, rolls, stores) and
+  `chat:inspectContext` (plans only — no roll, no write, no provider call; the
+  dev-build inspector). Both take the window's live transcript, with the stored
+  one as the fallback for a conversation the window has not opened.
 
 ### 7.2 Stale line-number cross-references
 
@@ -384,5 +399,9 @@ Worth stating, because it bounds where reviewing against the doc is safe:
   write-before-run ordering and the trigger-edit reset are all as §3.3 describes
   ([coachAutomationScheduler.ts:303](../electron/coachAutomationScheduler.ts#L303),
   [coachAutomationStore.ts:579](../electron/coachAutomationStore.ts#L579)).
-- 5.7's elastic window is 60/20, measured from `through`, with an invalid
-  `through` abandoning the summary — exactly as written.
+- 5.7's elastic window defaults to 60/20, measured from `through`, with an
+  invalid `through` abandoning the summary — exactly as written. Both numbers are
+  now settings (`chat.compactContext.limit` / `.keep`, normalised on the way in
+  and on the way out), and the interactive chat rolls the same summary. The one
+  sentence that stopped being true is "the count it writes can never be below
+  `LIMIT - KEEP`": `chat:compactContext` with `force` rolls on request.

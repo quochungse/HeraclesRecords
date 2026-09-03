@@ -91,6 +91,8 @@ import type {
   ApplePodcastShow,
   ApplePodcastShowDetail,
   ChatAuthStatus,
+  ChatContextCompaction,
+  ChatContextInspection,
   ChatMessage,
   ChatProvider,
   ChatSessionSummary,
@@ -629,6 +631,25 @@ export interface CorosLinkApi {
     unitSystem: UnitSystem
   ) => Promise<void>;
   cancelChat: (requestId: string) => Promise<void>;
+  /**
+   * Resolves what a turn in this conversation should send: the rolling summary
+   * and where the verbatim tail starts. `entries` is the window's live
+   * transcript; omitting it compacts what is on disk, which is what the
+   * conversation menu does for a thread that is not open.
+   */
+  compactChatContext: (
+    sessionId: string,
+    entries?: PersistedChatEntry[],
+    options?: { force?: boolean }
+  ) => Promise<ChatContextCompaction>;
+  /**
+   * What compaction has done to this conversation, for the dev-build
+   * inspector. Plans but never rolls, so opening it costs nothing.
+   */
+  inspectChatContext: (
+    sessionId: string,
+    entries?: PersistedChatEntry[]
+  ) => Promise<ChatContextInspection>;
   listChatSessions: (provider: ChatProvider) => Promise<ChatSessionSummary[]>;
   getChatSession: (sessionId: string) => Promise<PersistedChatEntry[]>;
   createChatSession: (provider: ChatProvider) => Promise<ChatSessionSummary>;

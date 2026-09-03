@@ -698,20 +698,22 @@ A `silent` run's live bubble is replaced by the trace of 5.5, so the window relo
 
 ### 5.7 Context trimming
 
-For `dedicated` and `existing` bindings the transcript grows without bound: a daily briefing writes two entries a day and nobody ever deletes it. The runner sends a stored **rolling summary** in place of the head of the conversation and the recent turns in full, so a year-old thread still costs one turn. The full transcript stays on disk — this trims the context window, never the record.
+> **This is no longer automation-only.** It shipped here and now belongs to the chat as a whole: the interactive coach rolls the same summary, through the same window, on the same conversation row, and the numbers are a setting rather than two constants. The mechanism lives in [chatContextCompaction.ts](../electron/chatContextCompaction.ts) (pure) and [chatContextService.ts](../electron/chatContextService.ts) (the roll and the storage); this section is still where the reasoning is written down, and what follows now describes both callers. What changed is listed at the end.
+
+For `dedicated` and `existing` bindings the transcript grows without bound: a daily briefing writes two entries a day and nobody ever deletes it. So does a conversation the athlete types in every morning. Both send a stored **rolling summary** in place of the head of the conversation and the recent turns in full, so a year-old thread still costs one turn. The full transcript stays on disk — this trims the context window, never the record.
 
 The summary lives on the **conversation** (`chat_sessions.coach_summary`), not on the binding, because five automations can be attached to one conversation and the summary is a fact about the conversation. Beside it, `coach_summary_through` counts how many entries at the head it accounts for. Those two are one fact and are always written together: a row carrying a summary without its count would describe turns the model is also about to read in full.
 
-**The count is measured from the summary, not from the start of the conversation** — and that is the difference between this and the fixed window the section first described. A literal "always send the last 20" needs the summary re-rolled on **every** run, because every run adds two entries to the head. Instead the runner rolls only when the stretch the summary does not cover passes 60, and rolls it back to 20:
+**The count is measured from the summary, not from the start of the conversation** — and that is the difference between this and the fixed window the section first described. A literal "always send the last 20" needs the summary re-rolled on **every** turn, because every turn adds two entries to the head. Instead a roll happens only when the stretch the summary does not cover passes the limit, and rolls it back to `keep` — 60 and 20 out of the box:
 
 - **A roll is a model call**, so doing one per run would double what an automation costs — on a feature whose whole purpose is what a long conversation costs.
 - **A summary re-summarised is a compression of a compression.** Rolling once every forty runs is forty times less lossy than rolling every run, and what survives forty rounds of paraphrase is whatever happened to be in the last one.
 
 Nothing is ever dropped: every entry is either inside the summary or inside the tail, and the two account for the whole transcript.
 
-**The roll runs on the automation's own provider and model** (decision 2), not the interactive chat's: it is a turn taken on this automation's behalf, guard rail 3 pre-flighted *that* provider and no other, and 13 charges its tokens to this run's row. Effort is the one thing that does not inherit — it is cost rather than capability (7), and a summariser compressing text it was handed has nothing to think harder about.
+**The roll runs on the automation's own provider and model** (decision 2), not the interactive chat's: it is a turn taken on this automation's behalf, guard rail 3 pre-flighted *that* provider and no other, and 13 charges its tokens to this run's row. An interactive roll passes no runtime at all and so inherits the saved chat settings, which is the same rule read from the other side. Effort is the one thing that does not inherit in either case — it is cost rather than capability (7), and a summariser compressing text it was handed has nothing to think harder about.
 
-**The pair is one fact on the way in and on the way out.** A stored summary with no count, or a count of zero, is a half-written row: a real roll only fires once the uncovered stretch passes `LIMIT`, so the count it writes can never be below `LIMIT - KEEP`. Such a row reads as *no summary* — the same reading 10 gives a half-written pause — because trusting it sends a summary of turns the model is also about to read in full, and nothing downstream could notice.
+**The pair is one fact on the way in and on the way out.** A stored summary with no count, or a count of zero, is a half-written row. Such a row reads as *no summary* — the same reading 10 gives a half-written pause — because trusting it sends a summary of turns the model is also about to read in full, and nothing downstream could notice. (The original text added that a real roll can never write a count below `limit - keep`; **that is no longer true** — "Compact context" rolls a short conversation on request — so the check is on the pair being whole, not on the count being large.)
 
 **The summariser is a `none`-tool turn.** `ChatToolPolicy` gained a third value for it. The summariser is compressing text it was handed and has nothing to look up, so a tool round-trip is both slower and a chance to wander off the one job it has. It runs under the same idle bound as a run (10), for the same reason: it is a provider call on the automation path, and it happens while a run is still being prepared, before there is a run id for Stop to aim at.
 
@@ -720,6 +722,37 @@ Nothing is ever dropped: every entry is either inside the summary or inside the 
 A `through` past the end of a transcript describes a conversation that is no longer there, so the summary is abandoned rather than trusted. It should not happen — the window's saves merge rather than truncate (5.6b), and a deleted conversation takes its row with it — but of everything here it is the one failure that cannot be noticed by reading the answer.
 
 `per-run` bindings need no special case: a conversation created for one run has nothing to trim, and the same count says so.
+
+#### What generalising it changed
+
+| | Then | Now |
+|---|---|---|
+| Callers | the runner | the runner and `chat:send`'s caller in the window |
+| The numbers | `AUTOMATION_CONTEXT_LIMIT` / `_KEEP`, constants | `chat.compactContext.limit` / `.keep`, with those two as defaults, plus `.enabled` |
+| Where the code lives | `coachAutomationService.ts` | `chatContextCompaction.ts` (pure) + `chatContextService.ts` (roll + storage); the runner re-exports the old names for its suites |
+| Who owns the entry array | the runner reads it from disk | the runner still does; the window sends its own, in-flight turn included, because reading it back here would race the window's own saves (5.6b) |
+| Rolling on demand | — | `chat:compactContext` with `force`, from the conversation's `⋯` menu. Same window, same tail, so a forced roll and a triggered one leave the conversation in the same shape |
+| Seeing what was sent | — | `chat:inspectContext` + [ContextHistoryDialog.tsx](../src/chat/ContextHistoryDialog.tsx), dev builds only |
+| `toWireMessages` | dropped `coachPrompt` entries | expands them into the question and its answer. There were two copies of this function, one per process, and they had drifted: an automation could not see what it had asked, so it asked again |
+
+**The window is one setting, not two.** The summary is a fact about the conversation, and a conversation can host both an athlete typing and up to five coaches. Two windows that disagreed about where the tail starts would roll each other's work forward — one of them re-summarising a summary the other had just written, which is the compression-of-a-compression this design exists to avoid.
+
+**Compaction is invisible by construction, so the manual action has to say something.** The transcript on screen and on disk is untouched; the only observable effect is on the *next* turn. A forced roll therefore reports what it did — compacted, already short enough, or the summariser declined — rather than completing silently and looking like a no-op.
+
+All three go to the app's one toast stack (`showToast`), the benign two included. It started as a dedicated banner above the transcript for the successes and the toast for the failure, which was wrong for a reason worth writing down: *every* outcome here is equally invisible, so splitting them across two surfaces means an athlete watching the wrong corner of the window for half of them. `runNow.ts` had already settled the same question the same way — "No new activity to analyse yet." is an error-kind toast, not a third surface.
+
+**A failed roll carries its reason.** Best-effort silence is right for the per-turn pass, where the next turn simply rolls again; for the athlete pressing the button it is a dead control with a generic sentence attached. `rollTranscriptSummary` funnels every exit that produced no summary through one `failed(reason)` helper — provider error, idle timeout, cancellation, an empty answer, a throw — so no failure can reach a caller as a bare `null`, and the reason is logged in the main process as well as returned. Five distinguishable causes had been collapsed into one message, and that is exactly the shape of defect this document keeps finding: two readings that look identical from the outside.
+
+**Dev builds get an inspector, and it must not roll.** Compaction being invisible is right for the athlete and useless while building it: the transcript on screen is complete whatever the model was given, so the two only diverge after a roll and nothing on screen says one happened. "Show context history" in the conversation's `⋯` menu — gated on `import.meta.env.DEV`, which is a compile-time constant, so the item and its handler leave a production bundle rather than merely being hidden in one — shows the stored summary, the turns going over verbatim, and the counts.
+
+`inspectChatSessionContext` **plans and stops**: no roll, no write, no provider call. Two reasons, and the second is the one that decided the shape:
+
+1. A debug view that spends a summariser turn to show you what you are spending is a trap.
+2. A view that rolled would change the thing it claims to report. Opening it would advance `coach_summary_through`, and the state you came to look at would be the state your looking created.
+
+That is why it reports `pending` separately from `tail` rather than showing "what the next turn sends" as one list. When a roll is due, the next turn will fold `pending` into the summary first — but it has not yet, and until it does those turns are still going over in full. It also reports `through` as what the summary covers **now**, not `planTranscriptContext`'s `through`, which is what that count *becomes*: an inspector reporting the future value would say a summary covers turns it has never seen.
+
+**The interactive roll is best-effort in one more direction than the automation one.** No session yet, no bridge, or a summariser that declined all resolve the same way: send the conversation whole. A trimmed context is an optimisation, and an optimisation that eats the athlete's messages is a bug with a good excuse. The one case that needed handling on top of the automation path is Stop pressed *during* a roll: the turn has not reached a provider, so there is no stream for the cancel to find and no `chat:streamError` coming to clear the spinner. The window drops the turn itself; the summariser finishes on its own under its own request id and its own idle bound.
 
 ---
 

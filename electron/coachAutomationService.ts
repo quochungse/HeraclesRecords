@@ -1,13 +1,26 @@
-import { randomUUID } from "node:crypto";
 import { BrowserWindow } from "electron";
 import {
   cancelChat,
   createCollectorSink,
+  createIdleWatchdog,
   getChatAuthStatus,
   getChatSettings,
   streamChat
 } from "./chatService";
 import type { ChatStreamCollectorSink, ChatStreamSink } from "./chatService";
+import {
+  applyTranscriptContext,
+  summaryContextMessage,
+  toWireMessages,
+  type ContextWindow,
+  type StoredTranscriptSummary
+} from "./chatContextCompaction";
+import {
+  getContextWindow,
+  readSessionSummary,
+  rollTranscriptSummary,
+  writeSessionSummary
+} from "./chatContextService";
 import {
   chatSessionExists,
   createChatSession,
@@ -31,9 +44,7 @@ import {
   updateCoachAutomationRun
 } from "./coachAutomationStore";
 import {
-  getChatSessionCoachSummaryRow,
   listCoachActivityRowsAfter,
-  setChatSessionCoachSummaryRow,
   sumCoachAutomationTokensSince
 } from "./database";
 import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
@@ -548,6 +559,13 @@ export interface CoachAutomationRunnerDeps {
   getSessionSummary(sessionId: string): StoredTranscriptSummary;
   setSessionSummary(sessionId: string, summary: string, through: number): void;
   /**
+   * 5.7: the window the athlete configured, shared with the interactive chat.
+   *
+   * A seam rather than a direct `getChatSettings()` for the reason every other
+   * seam here is one: the default reads SQLite, and no suite has a database.
+   */
+  getContextWindow(): ContextWindow;
+  /**
    * 5.7: folds entries into the running summary. A null `summary` means it
    * could not — a roll is best-effort, and the run it is preparing for still
    * has to happen.
@@ -702,85 +720,21 @@ function createDefaultDeps(): CoachAutomationRunnerDeps {
       if (!chatSessionExists(sessionId)) return undefined;
       return getChatSession(sessionId);
     },
-    getSessionSummary: (sessionId) => {
-      const row = getChatSessionCoachSummaryRow(sessionId);
-      const summary = row?.coach_summary?.trim();
-      return {
-        ...(summary ? { summary } : {}),
-        through:
-          typeof row?.coach_summary_through === "number" &&
-          Number.isFinite(row.coach_summary_through)
-            ? row.coach_summary_through
-            : 0
-      };
-    },
+    getSessionSummary: (sessionId) => readSessionSummary(sessionId),
     setSessionSummary: (sessionId, summary, through) => {
-      setChatSessionCoachSummaryRow(sessionId, summary, through);
+      writeSessionSummary(sessionId, summary, through);
     },
-    rollSummary: async (previous, entries, runtime) => {
-      // Its own request id, not the run's: this happens while the run is being
-      // prepared and has no row yet, so there is nothing for Stop to aim at.
-      // The bound below is what ends it either way.
-      const requestId = `coach-summary-${randomUUID()}`;
-      const collector = createCollectorSink();
-      const watchdog = createIdleWatchdog(AUTOMATION_IDLE_TIMEOUT_MS);
-      const sink: ChatStreamSink = {
-        emit(channel, payload) {
-          watchdog.touch();
-          collector.emit(channel, payload);
-        }
-      };
-      // Whatever the roll spent goes back with it on every exit, including the
-      // ones that produce nothing. A roll is a full provider turn (13) and the
-      // caller folds it into the run it was preparing for.
-      const spent = () => {
-        const usage = collector.usage();
-        return usage ? { usage } : {};
-      };
-      try {
-        const streaming = streamChat(
-          sink,
-          requestId,
-          [{ role: "user", content: buildRollingSummaryTurn(previous, entries) }],
-          {
-            // Nothing to look up: it is compressing text it was handed, and a
-            // tool round-trip here is both slower and a way to wander off.
-            toolPolicy: "none",
-            // The run's own provider and model (decision 2), not the
-            // interactive chat's. A roll is a turn taken on this automation's
-            // behalf: its cost lands on this run's row (13), guard rail 3
-            // pre-flighted *this* provider and no other, and an automation
-            // pointed at a second provider must not quietly spend on the first.
-            //
-            // Effort is the one thing that does not inherit. It is cost rather
-            // than capability (7), and a summariser compressing text it was
-            // handed has nothing to think harder about — so a coach set to
-            // `high` gets a `high` answer and a `low` summary.
-            runtime: { ...runtime, effort: AUTOMATION_DEFAULT_EFFORT }
-          }
-        );
-        streaming.catch(() => undefined);
-        let timedOut = false;
-        await Promise.race([
-          streaming,
-          watchdog.expired.then(() => {
-            timedOut = true;
-          })
-        ]);
-        if (timedOut) {
-          cancelChat(requestId);
-          return { summary: null, ...spent() };
-        }
-        if (collector.error() || collector.cancelled()) {
-          return { summary: null, ...spent() };
-        }
-        return { summary: collector.text().trim() || null, ...spent() };
-      } catch {
-        return { summary: null, ...spent() };
-      } finally {
-        watchdog.stop();
-      }
-    },
+    getContextWindow: () => getContextWindow(),
+    rollSummary: (previous, entries, runtime) =>
+      // The run's own provider and model (decision 2), not the interactive
+      // chat's. A roll is a turn taken on this automation's behalf: its cost
+      // lands on this run's row (13), guard rail 3 pre-flighted *this* provider
+      // and no other, and an automation pointed at a second provider must not
+      // quietly spend on the first.
+      rollTranscriptSummary(previous, entries, {
+        runtime,
+        idleTimeoutMs: AUTOMATION_IDLE_TIMEOUT_MS
+      }),
     createSession: (provider) => createChatSession(provider).id,
     saveSession: (sessionId, entries) => {
       saveChatSession(sessionId, entries);
@@ -1207,146 +1161,27 @@ function asText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
-  return entries.flatMap((entry) =>
-    entry.kind === "message" && entry.content.trim()
-      ? [{ role: entry.role, content: entry.content }]
-      : []
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Context trimming (5.7)
 // ---------------------------------------------------------------------------
 
 /**
- * 5.7: how far a transcript may run past what the summary already covers
- * before the runner rolls it forward.
- *
- * The count is measured from the summary, not from the start of the
- * conversation, and that is the difference between this and a fixed window. A
- * fixed "always send the last 20" would need the summary re-rolled on **every**
- * run, because every run adds two entries to the head. Rolling once every
- * `LIMIT - KEEP` runs instead is cheaper — a run is a model call and so is a
- * roll — and, more importantly, less lossy: a summary re-summarised forty times
- * a year is forty rounds of compression, and what survives is whatever
- * happened to be in the last one.
+ * 5.7 shipped as automation-only and is no longer: the interactive chat rolls
+ * the same summary, through the same window, on the same conversation row. The
+ * mechanism moved to [chatContextCompaction.ts](./chatContextCompaction.ts) and
+ * the numbers moved to chat settings; these two are what an athlete who has
+ * never opened that section gets, and what the suites here still assert.
  */
-export const AUTOMATION_CONTEXT_LIMIT = 60;
-
-/** How many recent entries survive a roll and go to the model verbatim. */
-export const AUTOMATION_CONTEXT_KEEP = 20;
-
-/** What the runner has stored about a conversation's summary, if anything. */
-export interface StoredTranscriptSummary {
-  summary?: string;
-  /** Entries at the head of the transcript the summary accounts for. */
-  through: number;
-}
-
-export interface TranscriptContextPlan {
-  /** Sent ahead of the tail, standing in for everything before it. */
-  summary?: string;
-  /** Sent verbatim. */
-  tail: PersistedChatEntry[];
-  /** Entries that have to be folded into the summary first; usually empty. */
-  toSummarise: PersistedChatEntry[];
-  /** What `through` becomes once they are folded in. */
-  through: number;
-}
-
-/**
- * What of a transcript this run should send, and what has to be folded into the
- * summary first. Pure: the folding itself is a model call and belongs to the
- * caller.
- *
- * A `through` past the end of the transcript describes a conversation that is
- * no longer there, so the summary is abandoned rather than trusted. It should
- * not happen — the window's saves merge rather than truncate (5.6b), and a
- * deleted conversation takes its row with it — but a summary that claims to
- * cover entries nobody can see is the one failure here that cannot be noticed
- * by reading the result.
- */
-export function planTranscriptContext(
-  entries: PersistedChatEntry[],
-  stored: StoredTranscriptSummary
-): TranscriptContextPlan {
-  // A count past the end describes a conversation that is no longer there, and
-  // a summary with no count at all — or a count of zero — describes nothing: a
-  // real roll only happens once the uncovered stretch passes LIMIT, so the
-  // count it writes can never be less than `LIMIT - KEEP`. Either way the pair
-  // is half-written, and 5.7 is explicit that the two are one fact. The safe
-  // reading is *no summary*, the same way section 10 reads a half-written pause
-  // as *not paused*: trusting it would send a summary of turns the model is
-  // also about to read in full, and nothing downstream could notice.
-  const valid =
-    stored.through > 0 &&
-    stored.through <= entries.length &&
-    Boolean(stored.summary);
-  const through = valid ? stored.through : 0;
-  const summary = valid ? stored.summary : undefined;
-
-  const live = entries.length - through;
-  if (live <= AUTOMATION_CONTEXT_LIMIT) {
-    return {
-      ...(summary ? { summary } : {}),
-      tail: entries.slice(through),
-      toSummarise: [],
-      through
-    };
-  }
-
-  const nextThrough = entries.length - AUTOMATION_CONTEXT_KEEP;
-  return {
-    ...(summary ? { summary } : {}),
-    tail: entries.slice(nextThrough),
-    toSummarise: entries.slice(through, nextThrough),
-    through: nextThrough
-  };
-}
-
-/**
- * How the summary reaches the model. A plain user turn, labelled, rather than
- * anything provider-specific: it has to read the same way to four providers,
- * and it has to be obvious to the model that this is a compression of the
- * conversation rather than something the athlete just said.
- */
-export function summaryContextMessage(summary: string): ChatMessage {
-  return {
-    role: "user",
-    content: [
-      "[Earlier in this conversation, summarised]",
-      summary,
-      "[End of summary. The messages that follow are the recent turns in full.]"
-    ].join("\n\n")
-  };
-}
-
-/** The turn that folds new entries into the running summary. */
-export function buildRollingSummaryTurn(
-  previous: string | undefined,
-  entries: PersistedChatEntry[]
-): string {
-  const transcript = toWireMessages(entries)
-    .map((message) => `${message.role === "user" ? "Athlete" : "Coach"}: ${message.content}`)
-    .join("\n\n");
-  return [
-    previous
-      ? "Here is the running summary of a coaching conversation so far, followed by the turns that have happened since it was written."
-      : "Here are the opening turns of a coaching conversation.",
-    ...(previous ? ["", "--- Running summary ---", previous] : []),
-    "",
-    "--- Newer turns ---",
-    transcript,
-    "",
-    "Rewrite the running summary so it covers everything above, including the",
-    "newer turns. It is the only record of these turns the coach will have on",
-    "future runs, so keep what a coach would need: the athlete's goals, races,",
-    "injuries and constraints, decisions taken, and how the training has",
-    "actually gone. Drop pleasantries and anything already superseded. Write it",
-    "as notes, not as a letter, and reply with the summary and nothing else."
-  ].join("\n");
-}
+export {
+  DEFAULT_CONTEXT_LIMIT as AUTOMATION_CONTEXT_LIMIT,
+  DEFAULT_CONTEXT_KEEP as AUTOMATION_CONTEXT_KEEP,
+  buildRollingSummaryTurn,
+  planTranscriptContext,
+  summaryContextMessage,
+  toWireMessages,
+  type StoredTranscriptSummary,
+  type TranscriptContextPlan
+} from "./chatContextCompaction";
 
 /** The 2.5 variables, resolved once from the run's own trigger payload. */
 function templateVars(
@@ -1410,32 +1245,6 @@ function buildPlaybookTurn(
  * keeps one.
  */
 export const AUTOMATION_IDLE_TIMEOUT_MS = 3 * 60_000;
-
-interface IdleWatchdog {
-  /** Resolves — never rejects — once nothing has been emitted for the window. */
-  readonly expired: Promise<void>;
-  /** Called for every stream event: the run is alive, start the clock over. */
-  touch(): void;
-  stop(): void;
-}
-
-function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let fire: () => void = () => undefined;
-  const expired = new Promise<void>((resolve) => {
-    fire = resolve;
-  });
-  const arm = () => {
-    clearTimeout(timer);
-    timer = setTimeout(fire, timeoutMs);
-  };
-  arm();
-  return {
-    expired,
-    touch: arm,
-    stop: () => clearTimeout(timer)
-  };
-}
 
 /**
  * Returns null when the fan-out was stopped before this run began — including
@@ -1584,34 +1393,27 @@ async function runOneBinding(
   // 5.7: a year-old briefing thread must still cost one turn. Done here, while
   // the run is still being prepared, so the mid-preparation Stop check below
   // covers the window a roll opens — a roll is itself a model call.
-  const stored = resolved.getSessionSummary(session.sessionId);
-  const plan = planTranscriptContext(session.entries, stored);
-  let summary = plan.summary;
-  let tail = plan.tail;
+  const context = await applyTranscriptContext({
+    entries: session.entries,
+    stored: resolved.getSessionSummary(session.sessionId),
+    window: resolved.getContextWindow(),
+    roll: (previous, toSummarise) =>
+      resolved.rollSummary(
+        previous,
+        toSummarise,
+        resolveAutomationRuntime(automation)
+      ),
+    store: (rolled, through) =>
+      resolved.setSessionSummary(session.sessionId, rolled, through)
+  });
+  const summary = context.summary;
+  const tail = context.tail;
   // A roll is a provider turn on this run's behalf, so its tokens belong to
   // this run's row (13). Held here because the roll happens before the row
   // exists, and folded into whatever the run ends up recording — including the
   // exits that never reach the model, which is exactly when a roll that has
   // already spent would otherwise vanish from the month's total.
-  let rollUsage: ChatTokenUsage | undefined;
-  if (plan.toSummarise.length) {
-    const rolled = await resolved.rollSummary(
-      plan.summary,
-      plan.toSummarise,
-      resolveAutomationRuntime(automation)
-    );
-    rollUsage = rolled.usage;
-    if (rolled.summary) {
-      summary = rolled.summary;
-      resolved.setSessionSummary(session.sessionId, rolled.summary, plan.through);
-    } else {
-      // Best-effort, and a failure must neither fail the run nor drop the
-      // middle of the conversation on the floor. The run sends what it would
-      // have sent before the roll — everything the stored summary does not
-      // already cover — which costs more this once and rolls again next time.
-      tail = [...plan.toSummarise, ...plan.tail];
-    }
-  }
+  const rollUsage: ChatTokenUsage | undefined = context.usage;
   /** What to record on a run that ended here, roll included. */
   const costOf = (streamUsage: ChatTokenUsage | undefined) => {
     const total = addTokenUsage(rollUsage, streamUsage);

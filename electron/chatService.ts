@@ -926,6 +926,40 @@ export function countableUsage(
     : undefined;
 }
 
+/**
+ * A stream that has gone quiet, as opposed to one that is legitimately slow.
+ *
+ * A turn that walks a month of activities through several tool rounds is
+ * legitimately slow; a provider that has stopped answering emits nothing at
+ * all, and a sink sees every token, tool call and status line, so it is the one
+ * place that can tell the two apart.
+ */
+export interface IdleWatchdog {
+  /** Resolves — never rejects — once nothing has been emitted for the window. */
+  readonly expired: Promise<void>;
+  /** Called for every stream event: the turn is alive, start the clock over. */
+  touch(): void;
+  stop(): void;
+}
+
+export function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let fire: () => void = () => undefined;
+  const expired = new Promise<void>((resolve) => {
+    fire = resolve;
+  });
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(fire, timeoutMs);
+  };
+  arm();
+  return {
+    expired,
+    touch: arm,
+    stop: () => clearTimeout(timer)
+  };
+}
+
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
   /** Automation runs override the saved provider/model/effort (decision 2). */

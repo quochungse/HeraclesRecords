@@ -114,6 +114,8 @@ import type {
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
+  ChatContextCompaction,
+  ChatContextInspection,
   PersistedChatEntry,
   ChatStreamStart,
   ChatStreamToken,
@@ -974,6 +976,17 @@ const api = {
   ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem),
   cancelChat: (requestId: string): Promise<void> =>
     ipcRenderer.invoke("chat:cancel", requestId),
+  compactChatContext: (
+    sessionId: string,
+    entries?: PersistedChatEntry[],
+    options?: { force?: boolean }
+  ): Promise<ChatContextCompaction> =>
+    ipcRenderer.invoke("chat:compactContext", sessionId, entries, options),
+  inspectChatContext: (
+    sessionId: string,
+    entries?: PersistedChatEntry[]
+  ): Promise<ChatContextInspection> =>
+    ipcRenderer.invoke("chat:inspectContext", sessionId, entries),
   listChatSessions: (provider: ChatProvider): Promise<ChatSessionSummary[]> =>
     ipcRenderer.invoke("chat:listSessions", provider),
   getChatSession: (sessionId: string): Promise<PersistedChatEntry[]> =>

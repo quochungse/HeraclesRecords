@@ -19309,6 +19309,15 @@ tr.data-intervals-row-missing {
   background: var(--glass-bg-hover);
 }
 
+.chat-session-row-popover button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chat-session-row-popover button:disabled:hover {
+  background: transparent;
+}
+
 .chat-session-row-popover button.is-danger {
   color: var(--error-text);
 }
@@ -19774,6 +19783,16 @@ tr.data-intervals-row-missing {
   border-color: var(--accent);
 }
 
+.chat-compact-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.chat-compact-fields input:disabled {
+  opacity: 0.5;
+}
+
 .chat-custom-instructions {
   width: 100%;
   border: 1px solid var(--glass-border);
@@ -19853,6 +19872,165 @@ tr.data-intervals-row-missing {
   font: inherit;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.chat-context-history-dialog {
+  width: min(860px, 100%);
+  max-height: min(82vh, 780px);
+}
+
+/* Marks the two dev-only surfaces as dev-only on screen, not just in the
+   bundle: the menu item and the dialog it opens. */
+.chat-session-row-dev-tag,
+.chat-context-dev-tag {
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chat-session-row-dev-tag {
+  margin-left: auto;
+}
+
+.chat-context-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-context-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.chat-context-stat {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 7px 9px;
+}
+
+.chat-context-stat dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.chat-context-stat dd {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-context-flag {
+  margin: 0;
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-hover);
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chat-context-section {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.chat-context-section-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 7px;
+  border: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-context-section-toggle:hover {
+  background: var(--glass-bg-hover);
+}
+
+.chat-context-section-toggle svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.chat-context-section-toggle > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-context-section-count {
+  flex: none;
+  border-radius: 999px;
+  background: var(--glass-bg-hover);
+  color: var(--text-muted);
+  padding: 1px 7px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-context-section-body {
+  border-top: 1px solid var(--glass-border);
+  padding: 10px;
+}
+
+.chat-context-section-body pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.chat-context-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: chat-context-message;
+}
+
+.chat-context-messages li {
+  border-left: 2px solid var(--glass-border);
+  padding-left: 9px;
+}
+
+.chat-context-messages li.is-user {
+  border-left-color: var(--accent);
+}
+
+.chat-context-message-role {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .chat-local-key-row {

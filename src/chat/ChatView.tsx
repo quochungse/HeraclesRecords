@@ -43,6 +43,7 @@ import {
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CorosLinkApi } from "../coroslink-api";
+import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   POUNDS_PER_KILOGRAM,
@@ -59,6 +60,8 @@ import type {
   AnthropicApiConnectionTest,
   AnthropicEffort,
   ChatAuthStatus,
+  ChatContextCompaction,
+  ChatContextInspection,
   ChatProvider,
   ChatSessionSummary,
   ChatSettings,
@@ -74,6 +77,7 @@ import type {
   CorosMcpStatus,
   McpServerConfig,
   McpServerStatus,
+  PersistedChatEntry,
   PlanDraftPreview,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
@@ -97,16 +101,21 @@ import { ChatSettingsModal } from "./ChatSettingsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ConversationCoaches } from "./automations/ConversationCoaches";
 import { CoachAutomationsModal } from "./automations/CoachAutomationsModal";
+import {
+  DEFAULT_COMPACT_CONTEXT,
+  summaryContextMessage,
+  toWireMessages
+} from "../../electron/chatContextCompaction";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
+import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
   fromPersistedEntries,
   toPersistedEntries,
-  toWireMessages,
   upsertActivityVisualEntry,
   upsertCoachPromptEntry,
   upsertFitnessTrendEntry,
@@ -149,7 +158,8 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   },
   sidebarOpen: true,
   visualizationsEnabled: false,
-  customInstructions: ""
+  customInstructions: "",
+  compactContext: DEFAULT_COMPACT_CONTEXT
 };
 
 function useMediaQuery(query: string): boolean {
@@ -1822,6 +1832,25 @@ export function ChatView({
     Map<string, CoachAutomationSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
+  /** A summariser turn is running ahead of the athlete's own. */
+  const [compacting, setCompacting] = useState(false);
+  /** Read by Stop, which fires from a handler the state has not reached. */
+  const compactingRef = useRef(false);
+  /** The conversation the menu's "Compact context" is working on, if any. */
+  const [compactingSessionId, setCompactingSessionId] = useState<string | null>(
+    null
+  );
+  /**
+   * Dev builds only: the conversation whose context is being inspected. Held as
+   * the whole request rather than a boolean so a second open of a different row
+   * cannot render the first one's answer under the second one's title.
+   */
+  const [contextInspection, setContextInspection] = useState<{
+    sessionId: string;
+    title: string;
+    result: ChatContextInspection | null;
+    error: string | null;
+  } | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [thinkingText, setThinkingText] = useState("");
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -3432,6 +3461,125 @@ export function ChatView({
     }
   };
 
+  /**
+   * Rolls the conversation's summary forward when the window says it is time,
+   * ahead of the athlete's own turn.
+   *
+   * Best-effort in every direction. No session yet (the very first turn), no
+   * bridge, or a summariser that declined all answer the same way: send the
+   * conversation whole. The one thing this must never do is fail the turn the
+   * athlete is waiting on — a trimmed context is an optimisation, and an
+   * optimisation that eats messages is a bug with a good excuse.
+   */
+  const compactBeforeSend = async (
+    sessionId: string | null,
+    entries: PersistedChatEntry[]
+  ): Promise<ChatContextCompaction | null> => {
+    if (!api || !sessionId) return null;
+    compactingRef.current = true;
+    setCompacting(true);
+    try {
+      return await api.compactChatContext(sessionId, entries);
+    } catch {
+      return null;
+    } finally {
+      compactingRef.current = false;
+      setCompacting(false);
+    }
+  };
+
+  /**
+   * "Compact context" from the conversation menu: roll now rather than waiting
+   * for the window to fill. Runs on the athlete's request, so it works even
+   * with the automatic pass switched off in settings.
+   *
+   * The transcript on screen and on disk is untouched either way — this only
+   * ever changes what the next turn sends.
+   */
+  const handleCompactSession = async (sessionId: string) => {
+    if (!api || compactingSessionId) return;
+    setCompactingSessionId(sessionId);
+    try {
+      const result = await api.compactChatContext(
+        sessionId,
+        // The open conversation's live timeline may hold turns the debounced
+        // save has not written yet; any other one is only on disk.
+        sessionId === activeSessionIdRef.current
+          ? toPersistedEntries(timeline)
+          : undefined,
+        { force: true }
+      );
+      // All three outcomes go to the one toast stack, including the two that
+      // are not failures. Compaction changes nothing on screen, so every
+      // outcome is equally invisible and needs saying — and a second surface
+      // just for the benign ones would mean an athlete watching the wrong
+      // corner of the window for half of them.
+      if (result.failed) {
+        showToast(
+          result.failureReason
+            ? `Nothing was compacted: ${result.failureReason}. The conversation is unchanged.`
+            : "The summariser did not answer, so nothing was compacted. The conversation is unchanged.",
+          "error"
+        );
+      } else if (!result.rolled) {
+        showToast(
+          "This conversation is already short enough — nothing to compact.",
+          "error"
+        );
+      } else {
+        showToast(
+          `Compacted. The next message sends a summary plus the last ${result.tailLength} ${
+            result.tailLength === 1 ? "entry" : "entries"
+          } in full.`
+        );
+      }
+    } catch (caught) {
+      showToast(
+        caught instanceof Error
+          ? caught.message
+          : "Could not compact this conversation.",
+        "error"
+      );
+    } finally {
+      setCompactingSessionId(null);
+    }
+  };
+
+  /**
+   * Dev builds only: "Show context history".
+   *
+   * Reads what the next turn in this conversation would send. The main process
+   * plans without rolling, so opening this changes nothing and costs nothing —
+   * which is the only way a debug view of the context can be trusted to be
+   * showing the context it would have had anyway.
+   */
+  const handleShowSessionContext = async (sessionId: string) => {
+    if (!api) return;
+    const title =
+      sessions.find((session) => session.id === sessionId)?.title ??
+      "This conversation";
+    setContextInspection({ sessionId, title, result: null, error: null });
+    try {
+      const result = await api.inspectChatContext(
+        sessionId,
+        // Same reasoning as the compact action: the open conversation may hold
+        // turns the debounced save has not written yet.
+        sessionId === activeSessionIdRef.current
+          ? toPersistedEntries(timeline)
+          : undefined
+      );
+      setContextInspection((current) =>
+        current?.sessionId === sessionId ? { ...current, result } : current
+      );
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Could not read the context.";
+      setContextInspection((current) =>
+        current?.sessionId === sessionId ? { ...current, error: message } : current
+      );
+    }
+  };
+
   const sendMessage = async (
     trimmed: string,
     answeredPrompt?: { promptId: string; choiceId: string }
@@ -3558,7 +3706,22 @@ export function ChatView({
     setStreamingText("");
     onError(null);
 
-    const wireMessages = toWireMessages(nextEntries);
+    // The entries the main process counts are the persisted ones, so the wire
+    // transcript is built from that array rather than from the timeline: a
+    // `tailStart` measured in one and sliced from the other would cut the
+    // conversation at a boundary that does not exist in it.
+    const persisted = toPersistedEntries(nextEntries);
+    const context = await compactBeforeSend(
+      activeSessionIdRef.current,
+      persisted
+    );
+    // Stop landed while the summariser was running. Nothing has reached a
+    // provider, and the athlete's turn is already in the transcript.
+    if (activeRequestIdRef.current !== requestId) return true;
+    const wireMessages = [
+      ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
+      ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
+    ];
     try {
       await api.sendChat(requestId, wireMessages, unitSystem);
     } catch (caught) {
@@ -3597,6 +3760,16 @@ export function ChatView({
   const handleStop = () => {
     if (!api || !activeRequestIdRef.current) return;
     void api.cancelChat(activeRequestIdRef.current);
+    // A turn still being compacted has not reached a provider, so there is no
+    // stream for the cancel above to find and no `chat:streamError` coming to
+    // clear the spinner. The summariser turn itself runs under its own request
+    // id and its own idle bound, and finishes on its own.
+    if (compactingRef.current) {
+      compactingRef.current = false;
+      activeRequestIdRef.current = null;
+      setCompacting(false);
+      setStreaming(false);
+    }
   };
 
   const handleUploadPlanDraft = async (
@@ -3908,14 +4081,32 @@ export function ChatView({
     activeSessionId,
     busy: isBusy,
     attention: sessionAttention,
+    compactingSessionId,
     onClose: () => void handleUpdateChatSettings({ sidebarOpen: false }),
     onOpen: () => void handleUpdateChatSettings({ sidebarOpen: true }),
     onNewChat: () => void handleNewChat(),
     onSelectSession: (sessionId: string) => void handleSelectSession(sessionId),
     onTogglePinSession: (sessionId: string, pinned: boolean) =>
       void handleTogglePinSession(sessionId, pinned),
+    onCompactSession: (sessionId: string) => void handleCompactSession(sessionId),
+    onShowSessionContext: (sessionId: string) =>
+      void handleShowSessionContext(sessionId),
     onDeleteSession: (sessionId: string) => void handleDeleteSession(sessionId)
   };
+
+  /**
+   * Dev builds only, and portaled, so where it sits in the tree does not
+   * matter — but it has to sit in *every* branch below, because the sidebar
+   * that opens it renders in the sign-in gates too.
+   */
+  const contextHistoryDialog = contextInspection ? (
+    <ContextHistoryDialog
+      title={contextInspection.title}
+      inspection={contextInspection.result}
+      error={contextInspection.error}
+      onClose={() => setContextInspection(null)}
+    />
+  ) : null;
 
   const settingsModalProps = {
     api,
@@ -4046,6 +4237,8 @@ export function ChatView({
           </div>
         </div>
         <ChatSettingsModal {...settingsModalProps} />
+      {contextHistoryDialog}
+        {contextHistoryDialog}
       </div>
     );
   }
@@ -4139,6 +4332,8 @@ export function ChatView({
           </div>
         </div>
         <ChatSettingsModal {...settingsModalProps} />
+      {contextHistoryDialog}
+        {contextHistoryDialog}
       </div>
     );
   }
@@ -4205,6 +4400,8 @@ export function ChatView({
           </div>
         </div>
         <ChatSettingsModal {...settingsModalProps} />
+      {contextHistoryDialog}
+        {contextHistoryDialog}
       </div>
     );
   }
@@ -4263,6 +4460,8 @@ export function ChatView({
           </div>
         </div>
         <ChatSettingsModal {...settingsModalProps} />
+      {contextHistoryDialog}
+        {contextHistoryDialog}
       </div>
     );
   }
@@ -4760,11 +4959,13 @@ function AutomationSilentChip({
                   <div className="chat-stream-pending">
                     {activeTool || !thinkingText ? (
                       <span className="chat-stream-status">
-                        {activeTool
-                          ? `Using ${activeTool.replace(/_/g, " ")}…`
-                          : resumedCoachPromptRef.current
-                            ? "Resuming plan…"
-                            : "Working on it…"}
+                        {compacting
+                          ? "Compacting the conversation…"
+                          : activeTool
+                            ? `Using ${activeTool.replace(/_/g, " ")}…`
+                            : resumedCoachPromptRef.current
+                              ? "Resuming plan…"
+                              : "Working on it…"}
                       </span>
                     ) : null}
                     {thinkingText ? (
@@ -5008,6 +5209,7 @@ function AutomationSilentChip({
         ) : null}
       </div>
       <ChatSettingsModal {...settingsModalProps} />
+      {contextHistoryDialog}
       <McpSessionPrompt
         servers={mcpPrompt}
         busy={mcpPromptBusy}

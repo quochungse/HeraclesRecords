@@ -12,10 +12,13 @@ export function ChatHistoryPanel({
   activeSessionId,
   busy,
   attention,
+  compactingSessionId,
   onCollapse,
   onNewChat,
   onSelectSession,
   onTogglePinSession,
+  onCompactSession,
+  onShowSessionContext,
   onDeleteSession
 }: {
   sessions: ChatSessionSummary[];
@@ -23,10 +26,15 @@ export function ChatHistoryPanel({
   busy?: boolean;
   /** Coach attention per conversation, keyed by session id (9.3). */
   attention?: Map<string, CoachAutomationSessionAttention>;
+  /** The conversation a summariser turn is running for, if any. */
+  compactingSessionId?: string | null;
   onCollapse: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
   onTogglePinSession: (sessionId: string, pinned: boolean) => void;
+  onCompactSession: (sessionId: string) => void;
+  /** Dev builds only: opens the context inspector for one conversation. */
+  onShowSessionContext: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -116,10 +124,13 @@ export function ChatHistoryPanel({
                     active={session.id === activeSessionId}
                     disabled={busy}
                     attention={attention?.get(session.id)}
+                    compacting={compactingSessionId === session.id}
                     onSelect={() => onSelectSession(session.id)}
                     onTogglePin={() =>
                       onTogglePinSession(session.id, !session.pinnedAt)
                     }
+                    onCompact={() => onCompactSession(session.id)}
+                    onShowContext={() => onShowSessionContext(session.id)}
                     onDelete={() => onDeleteSession(session.id)}
                   />
                 ))}

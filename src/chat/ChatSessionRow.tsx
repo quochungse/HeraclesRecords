@@ -1,4 +1,13 @@
-import { MoreHorizontal, Pin, PinOff, Trash2, Zap } from "lucide-react";
+import {
+  Bug,
+  Layers,
+  Loader2,
+  MoreHorizontal,
+  Pin,
+  PinOff,
+  Trash2,
+  Zap
+} from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -17,8 +26,19 @@ import { formatSessionRelativeTime } from "./chatSessionGroups";
 const MENU_WIDTH = 180;
 const MENU_GAP = 6;
 const VIEWPORT_MARGIN = 8;
-/** Used only for the first placement pass, before the menu can be measured. */
-const MENU_ESTIMATED_HEIGHT = 92;
+/**
+ * `import.meta.env.DEV` is a compile-time constant, so the inspector's menu
+ * item and its handler are dropped from a production bundle rather than merely
+ * hidden in one.
+ */
+const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
+
+/**
+ * Used only for the first placement pass, before the menu can be measured — so
+ * it has to count the dev item, or a menu near the bottom of the screen flips
+ * on its second frame in exactly the build where it is opened most.
+ */
+const MENU_ESTIMATED_HEIGHT = IS_DEVELOPMENT_BUILD ? 158 : 124;
 
 /**
  * The chat view rescopes part of the palette (see `.chat-view` in styles.css),
@@ -46,13 +66,20 @@ function ChatSessionRowMenu({
   session,
   pinned,
   disabled,
+  compacting,
   onTogglePin,
+  onCompact,
+  onShowContext,
   onDelete
 }: {
   session: ChatSessionSummary;
   pinned: boolean;
   disabled?: boolean;
+  /** A summariser turn is running for this conversation. */
+  compacting?: boolean;
   onTogglePin: () => void;
+  onCompact: () => void;
+  onShowContext: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -165,6 +192,32 @@ function ChatSessionRowMenu({
         {pinned ? "Unpin" : "Pin"}
       </button>
       <button
+        type="button"
+        role="menuitem"
+        disabled={compacting || session.messageCount === 0}
+        title="Summarise the older turns so the next message costs less"
+        onClick={(event) => runAction(event, onCompact)}
+      >
+        {compacting ? (
+          <Loader2 className="chat-spinner" size={15} aria-hidden="true" />
+        ) : (
+          <Layers size={15} aria-hidden="true" />
+        )}
+        Compact context
+      </button>
+      {IS_DEVELOPMENT_BUILD ? (
+        <button
+          type="button"
+          role="menuitem"
+          title="What the next message would actually send"
+          onClick={(event) => runAction(event, onShowContext)}
+        >
+          <Bug size={15} aria-hidden="true" />
+          Show context history
+          <span className="chat-session-row-dev-tag">Dev</span>
+        </button>
+      ) : null}
+      <button
         className="is-danger"
         type="button"
         role="menuitem"
@@ -210,18 +263,25 @@ export function ChatSessionRow({
   session,
   active,
   disabled,
+  compacting,
   attention,
   onSelect,
   onTogglePin,
+  onCompact,
+  onShowContext,
   onDelete
 }: {
   session: ChatSessionSummary;
   active: boolean;
   disabled?: boolean;
+  /** A summariser turn is running for this conversation. */
+  compacting?: boolean;
   /** 9.3: whether a coach speaks here, and whether it has said something new. */
   attention?: CoachAutomationSessionAttention;
   onSelect: () => void;
   onTogglePin: () => void;
+  onCompact: () => void;
+  onShowContext: () => void;
   onDelete: () => void;
 }) {
   const pinned = Boolean(session.pinnedAt);
@@ -312,7 +372,10 @@ export function ChatSessionRow({
           session={session}
           pinned={pinned}
           disabled={disabled}
+          compacting={compacting}
           onTogglePin={onTogglePin}
+          onCompact={onCompact}
+          onShowContext={onShowContext}
           onDelete={handleDelete}
         />
       </span>

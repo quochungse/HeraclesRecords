@@ -187,7 +187,7 @@ One line each, so the next reviewer does not redo them.
 |---|---|
 | runner's `readBack()` → `saveSession` | no `await` between them, single-threaded main process — no IPC handler can interleave |
 | two runs into one conversation | `enqueue` serialises every run process-wide, so the second reads what the first wrote |
-| five automations sharing a conversation | the summary is on the conversation (5.7), so whichever run rolls, the rest benefit |
+| five automations sharing a conversation | the summary is on the conversation (5.7), so whichever run rolls, the rest benefit — the interactive chat now included, which is why the window is one setting and not one per caller |
 | a run whose binding is detached mid-run | clock writes find no row and return quietly; the answer still lands |
 | the athlete rewriting entries the summary covers | the summary is a paraphrase; a rewritten prefix makes it stale, never wrong about position |
 | `knownEntryCount: 0` with an empty array | keeps the whole row — 5.6b's stated safe direction, and the window's array *is* empty when its read failed |

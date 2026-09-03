@@ -199,30 +199,15 @@ export function upsertHrZoneEntry(
   return [...entries, { kind: "hrZoneSummary", preview }];
 }
 
-export function toWireMessages(entries: ChatEntry[]): ChatMessage[] {
-  return entries.flatMap((entry): ChatMessage[] => {
-    if (entry.kind === "message") {
-      return [{ role: entry.role, content: entry.content }];
-    }
-    if (entry.kind === "coachPrompt") {
-      const choices = entry.prompt.choices
-        .map((choice) => `- ${choice.label}`)
-        .join("\n");
-      const promptMessage: ChatMessage =
-        {
-          role: "assistant",
-          content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices}`
-        };
-      return entry.prompt.answer
-        ? [
-            promptMessage,
-            { role: "user", content: entry.prompt.answer }
-          ]
-        : [promptMessage];
-    }
-    return [];
-  });
-}
+/*
+ * The transcript as the model sees it used to be built here, from `ChatEntry`.
+ * It now lives in `electron/chatContextCompaction.ts` and runs on
+ * `PersistedChatEntry` instead, because the rolling summary counts entries and
+ * has to count the same ones the main process stored. Two functions that
+ * flattened two nearly-identical shapes had already drifted apart: this one
+ * expanded a `coachPrompt` into the question and its answer, the main-process
+ * one dropped it, and an automation therefore could not see what it had asked.
+ */
 
 function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
   if (entry.kind === "coachPrompt") {

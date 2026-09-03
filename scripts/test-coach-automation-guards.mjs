@@ -196,19 +196,29 @@ assert.equal(
   }
 }
 
-// The one caller of "none" is 5.7's summariser, and the runner suite injects
-// that dep — so nothing executes the policy the real one asks for. This is the
-// shape test-ipc-surface.mjs exists for: a wire that type-checks either way and
-// silently costs a tool round-trip per roll if it rots.
+// The one caller of "none" is the rolling summariser, and every suite that
+// reaches it injects that dep — so nothing executes the policy the real one
+// asks for. This is the shape test-ipc-surface.mjs exists for: a wire that
+// type-checks either way and silently costs a tool round-trip per roll if it
+// rots. It moved out of the runner when the interactive chat started sharing
+// it, so the assertion follows it rather than the file it used to live in.
 {
-  const runner = readFileSync(
-    path.join(repoRoot, "electron", "coachAutomationService.ts"),
+  const summariser = readFileSync(
+    path.join(repoRoot, "electron", "chatContextService.ts"),
     "utf8"
   );
   assert.match(
-    runner,
+    summariser,
     /buildRollingSummaryTurn\(previous, entries\)[\s\S]{0,400}?toolPolicy: "none"/,
     "the rolling summariser must ask for no tools at all"
+  );
+  assert.doesNotMatch(
+    readFileSync(
+      path.join(repoRoot, "electron", "coachAutomationService.ts"),
+      "utf8"
+    ),
+    /buildRollingSummaryTurn\(/,
+    "the runner must roll through the shared summariser, not a second copy"
   );
 }
 assert.deepEqual(

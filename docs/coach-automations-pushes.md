@@ -206,7 +206,7 @@ distinction is on the record.
 | `threshold_firing` | 3.3's transition state. An athlete cannot tell whether a threshold rule has seeded or is armed; 9.2 only renders the trigger's *fields* |
 | `last_activity_at` | the activity watermark; 3.2 never proposes showing it |
 | `backoff_until` / `backoff_level` | the run log's `failed` rows are the visible half; 10 does not promise a countdown |
-| `coach_summary` / `coach_summary_through` | 5.7 is explicitly invisible — *"this trims the context window, never the record"* |
+| `coach_summary` / `coach_summary_through` | 5.7 is explicitly invisible — *"this trims the context window, never the record"*. Still true of every automatic roll. The one exception is the athlete's own **Compact context**, which is answered inline by the window that asked for it rather than pushed, because nothing else on screen changes |
 | the threshold retry hold | in memory, per binding, added in R2 |
 
 `backoff` is the interesting one: an athlete whose coach is held off for an hour

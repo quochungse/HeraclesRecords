@@ -363,6 +363,10 @@ import {
   uploadTrainingPlanDraft,
   confirmWorkoutDelete
 } from "./chatService";
+import {
+  compactChatSessionContext,
+  inspectChatSessionContext
+} from "./chatContextService";
 import { buildBaseCoachInstructions } from "./chatCoachContext";
 import {
   OPENROUTER_KEYS_URL,
@@ -1471,6 +1475,28 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("chat:cancel", (_event, requestId: string) =>
     cancelChat(requestId)
+  );
+
+  // The window hands over its live transcript, in-flight turn included: reading
+  // it back from disk here would race the window's own saves. `entries` is
+  // omitted only by the conversation menu, which can act on a thread the window
+  // has never opened.
+  ipcMain.handle(
+    "chat:compactContext",
+    (
+      _event,
+      sessionId: string,
+      entries?: PersistedChatEntry[],
+      options?: { force?: boolean }
+    ) => compactChatSessionContext(sessionId, entries, options ?? {})
+  );
+
+  // Dev-build inspector. Plans and stops: no roll, no write, no provider call —
+  // looking at the context must not change it or bill for the look.
+  ipcMain.handle(
+    "chat:inspectContext",
+    (_event, sessionId: string, entries?: PersistedChatEntry[]) =>
+      inspectChatSessionContext(sessionId, entries)
   );
 
   ipcMain.handle("chat:listSessions", (_event, provider: ChatProvider) =>

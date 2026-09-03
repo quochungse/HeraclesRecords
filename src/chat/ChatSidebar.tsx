@@ -13,11 +13,14 @@ export function ChatSidebar({
   activeSessionId,
   busy,
   attention,
+  compactingSessionId,
   onClose,
   onOpen,
   onNewChat,
   onSelectSession,
   onTogglePinSession,
+  onCompactSession,
+  onShowSessionContext,
   onDeleteSession
 }: {
   open: boolean;
@@ -27,11 +30,16 @@ export function ChatSidebar({
   busy?: boolean;
   /** Coach attention per conversation, keyed by session id (9.3). */
   attention?: Map<string, CoachAutomationSessionAttention>;
+  /** The conversation a summariser turn is running for, if any. */
+  compactingSessionId?: string | null;
   onClose: () => void;
   onOpen: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
   onTogglePinSession: (sessionId: string, pinned: boolean) => void;
+  onCompactSession: (sessionId: string) => void;
+  /** Dev builds only: opens the context inspector for one conversation. */
+  onShowSessionContext: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 }) {
   useEffect(() => {
@@ -93,10 +101,13 @@ export function ChatSidebar({
               activeSessionId={activeSessionId}
               busy={busy}
               attention={attention}
+              compactingSessionId={compactingSessionId}
               onCollapse={onClose}
               onNewChat={onNewChat}
               onSelectSession={onSelectSession}
               onTogglePinSession={onTogglePinSession}
+              onCompactSession={onCompactSession}
+              onShowSessionContext={onShowSessionContext}
               onDeleteSession={onDeleteSession}
             />
           </div>

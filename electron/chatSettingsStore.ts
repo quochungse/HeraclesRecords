@@ -1,5 +1,6 @@
 import type { AnthropicEffort, ChatProvider, ChatSettings } from "./types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "./types";
+import { normalizeContextWindow } from "./chatContextCompaction";
 import {
   DEFAULT_LOCAL_CHAT_BASE_URL,
   normalizeLocalChatBaseUrl
@@ -37,7 +38,10 @@ export const CHAT_SETTINGS_KEYS = {
   localToolsEnabled: "chat.local.toolsEnabled",
   sidebarOpen: "chat.sidebar.open",
   visualizationsEnabled: "chat.visualizations.enabled",
-  customInstructions: "chat.customInstructions"
+  customInstructions: "chat.customInstructions",
+  compactContextEnabled: "chat.compactContext.enabled",
+  compactContextLimit: "chat.compactContext.limit",
+  compactContextKeep: "chat.compactContext.keep"
 } as const;
 
 export interface ChatSettingsStore {
@@ -128,8 +132,28 @@ export function readChatSettingsFromStore(
     visualizationsEnabled:
       store.get(CHAT_SETTINGS_KEYS.visualizationsEnabled) === "true",
     customInstructions:
-      store.get(CHAT_SETTINGS_KEYS.customInstructions) || undefined
+      store.get(CHAT_SETTINGS_KEYS.customInstructions) || undefined,
+    compactContext: {
+      // Defaults on. A conversation nobody compacts grows without bound, and
+      // the athlete who would notice the bill is the one least likely to go
+      // looking for a setting that would have prevented it.
+      enabled: store.get(CHAT_SETTINGS_KEYS.compactContextEnabled) !== "false",
+      // A stored pair is read through the same normaliser a typed one is: a
+      // half-written pair — one key set by an older version, the other absent —
+      // must not resolve to a window where `keep` exceeds `limit`.
+      ...normalizeContextWindow({
+        limit: readNumber(store.get(CHAT_SETTINGS_KEYS.compactContextLimit)),
+        keep: readNumber(store.get(CHAT_SETTINGS_KEYS.compactContextKeep))
+      })
+    }
   };
+}
+
+/** Undefined rather than NaN, so `normalizeContextWindow` falls back cleanly. */
+function readNumber(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 export function saveChatSettingsToStore(
@@ -245,6 +269,19 @@ export function saveChatSettingsToStore(
       CHAT_SETTINGS_KEYS.visualizationsEnabled,
       settings.visualizationsEnabled ? "true" : "false"
     );
+  }
+
+  if (settings.compactContext) {
+    store.set(
+      CHAT_SETTINGS_KEYS.compactContextEnabled,
+      settings.compactContext.enabled === false ? "false" : "true"
+    );
+    // Clamped on the way in as well as on the way out. The renderer's number
+    // inputs are the only writer today, and "the only writer today" is exactly
+    // the assumption that stops being true without anybody noticing.
+    const window = normalizeContextWindow(settings.compactContext);
+    store.set(CHAT_SETTINGS_KEYS.compactContextLimit, String(window.limit));
+    store.set(CHAT_SETTINGS_KEYS.compactContextKeep, String(window.keep));
   }
 
   if (typeof settings.customInstructions === "string") {

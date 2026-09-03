@@ -2648,6 +2648,27 @@ export const NOTHING_TO_REPORT = "NOTHING_TO_REPORT";
 
 export const MAX_CUSTOM_COACH_INSTRUCTIONS = 4000;
 
+/**
+ * The rolling-summary window, shared by the interactive chat and by automation
+ * runs. One pair of numbers rather than two: the summary lives on the
+ * conversation, so a chat and a coach talking in the same thread that disagreed
+ * about where the tail starts would roll each other's work forward.
+ *
+ * Bounds and defaults live in `chatContextCompaction.ts`.
+ */
+export interface CompactContextSettings {
+  /**
+   * Whether long transcripts are compacted before they are sent. Off means a
+   * conversation is always sent in full — the record is identical either way,
+   * this only ever trims the context window.
+   */
+  enabled: boolean;
+  /** How far past the summary a transcript may run before it is rolled. */
+  limit: number;
+  /** How many recent entries survive a roll and go to the model verbatim. */
+  keep: number;
+}
+
 export interface ChatSettings {
   provider: ChatProvider;
   chatgpt: ChatGptConfig;
@@ -2660,6 +2681,75 @@ export interface ChatSettings {
   visualizationsEnabled?: boolean;
   /** Free-form athlete preferences appended to the coach system prompt. */
   customInstructions?: string;
+  /** The rolling-summary window for chat and automations alike. */
+  compactContext: CompactContextSettings;
+}
+
+/**
+ * What a compaction pass decided, as the renderer sees it.
+ *
+ * `tailStart` indexes the entry array the renderer handed over, so it can build
+ * the wire transcript from the same array it already holds rather than trusting
+ * the main process to have the athlete's in-flight turn.
+ */
+export interface ChatContextCompaction {
+  /** Prepended to the tail as a labelled user turn, when there is one. */
+  summary?: string;
+  /** Where the verbatim tail begins in the entries that were sent. */
+  tailStart: number;
+  /** Entries the stored summary now accounts for. */
+  through: number;
+  /** Whether this call ran a summariser turn. */
+  rolled: boolean;
+  /** A roll ran and produced nothing; the untrimmed tail is what to send. */
+  failed: boolean;
+  /**
+   * Why it produced nothing, when the roll knew. Shown for the athlete's own
+   * "Compact context" and ignored by the automatic pass, which tries again on
+   * the next turn.
+   */
+  failureReason?: string;
+  /** How many entries the tail holds, for the "compacted N turns" notice. */
+  tailLength: number;
+  /** Total entries considered, so a caller can say what was compressed. */
+  entryCount: number;
+}
+
+/**
+ * What compaction has actually done to a conversation, for the dev-build
+ * inspector.
+ *
+ * Read-only by construction: it plans but never rolls, so opening it costs no
+ * model call. A debug view that spends tokens to show you what you are spending
+ * is a trap, and one that silently advances the stored summary would change the
+ * thing it claims to be reporting.
+ *
+ * `pending` is therefore what makes this honest rather than merely informative:
+ * when a roll is due, these are the turns the *next* message folds into the
+ * summary, and until then they are still going over in full.
+ */
+export interface ChatContextInspection {
+  /** The stored rolling summary, if there is one. */
+  summary?: string;
+  /** Entries at the head the stored summary accounts for. */
+  through: number;
+  /** The window in force, after normalisation. */
+  window: { limit: number; keep: number };
+  /** Whether the automatic per-turn pass is switched on. */
+  enabled: boolean;
+  /** Entries in the transcript inspected. */
+  entryCount: number;
+  /** Where the verbatim tail begins in that transcript. */
+  tailStart: number;
+  /** Turns the next message would fold into the summary before sending. */
+  pending: ChatMessage[];
+  /** Turns sent verbatim. */
+  tail: ChatMessage[];
+  /**
+   * Characters across the summary turn, `pending` and `tail` — what this turn
+   * costs if the roll has not happened yet, which is the number worth seeing.
+   */
+  characterCount: number;
 }
 
 export interface ChatSessionSummary {

@@ -296,6 +296,7 @@ function createWorld(overrides = {}) {
     activities: [],
     /** 5.7: sessionId -> { summary, through }, and every roll asked for. */
     summaries: new Map(),
+    contextWindow: { limit: AUTOMATION_CONTEXT_LIMIT, keep: AUTOMATION_CONTEXT_KEEP },
     summaryWrites: [],
     rolls: [],
     /** What the summariser comes back with; null is a roll that failed. */
@@ -383,6 +384,10 @@ function createWorld(overrides = {}) {
     },
     getSessionSummary: (sessionId) =>
       state.summaries.get(sessionId) ?? { through: 0 },
+    // The window is a chat setting now, shared with the interactive coach, and
+    // the default dep reads it out of SQLite. Injected here for the same reason
+    // getChatProvider is: this suite has no database.
+    getContextWindow: () => ({ ...state.contextWindow }),
     setSessionSummary: (sessionId, summary, through) => {
       state.summaries.set(sessionId, { summary, through });
       state.summaryWrites.push({ sessionId, summary, through });
@@ -2664,6 +2669,45 @@ const lastWire = (world) =>
     1 + AUTOMATION_CONTEXT_KEEP + 1,
     "and the playbook — a year-old thread costs one turn's worth of context"
   );
+}
+
+// --- the window is a setting, and the runner uses the one it is handed ------
+{
+  resetAutomationQueueForTests();
+  const world = createWorld();
+  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", transcript(30));
+  addBinding(world, "b1");
+  // Below the shipped 60, so a runner still reading the constant would send
+  // this transcript whole and roll nothing — the fixture is on the side where
+  // the two readings disagree.
+  world.contextWindow = { limit: 20, keep: 6 };
+
+  await runAutomationNow("a1", undefined, world.deps);
+  assert.equal(world.rolls.length, 1, "a narrower window rolls sooner");
+  assert.equal(world.rolls[0].count, 30 - 6);
+  assert.equal(world.summaryWrites[0].through, 24);
+  assert.equal(
+    lastWire(world).length,
+    1 + 6 + 1,
+    "summary + the configured tail + the playbook"
+  );
+}
+
+// --- a wider window than the transcript rolls nothing -----------------------
+{
+  resetAutomationQueueForTests();
+  const world = createWorld();
+  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", transcript(100));
+  addBinding(world, "b1");
+  // Above the shipped 60: the same 100-entry transcript that rolls by default
+  // must now go whole, which no constant-reading runner could do.
+  world.contextWindow = { limit: 200, keep: 20 };
+
+  await runAutomationNow("a1", undefined, world.deps);
+  assert.deepEqual(world.rolls, [], "a wider window defers the roll");
+  assert.equal(lastWire(world).length, 100 + 1, "and the whole transcript goes");
 }
 
 // --- the next run reuses it rather than rolling again -----------------------

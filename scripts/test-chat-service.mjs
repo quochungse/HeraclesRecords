@@ -993,4 +993,81 @@ const withoutCustom = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
 assert.equal(withoutCustom.customInstructions, undefined);
 assert.equal(settingsValues.has("chat.customInstructions"), false);
 
+// --- the compaction window is a stored setting ------------------------------
+// Defaults on, and on the shipped pair, for a store that has never seen these
+// keys — an athlete who upgrades gets compaction without opting in.
+assert.deepEqual(scopedByDefault.compactContext, {
+  enabled: true,
+  limit: 60,
+  keep: 20
+});
+
+const compact = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...withoutCustom,
+  compactContext: { enabled: true, limit: 120, keep: 30 }
+});
+assert.deepEqual(compact.compactContext, { enabled: true, limit: 120, keep: 30 });
+assert.deepEqual(
+  readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext,
+  { enabled: true, limit: 120, keep: 30 },
+  "and survives the round trip"
+);
+
+// A pair that disagrees is repaired on the way in, not stored as typed: a
+// `limit` at or below `keep` would roll on every single turn, which is the
+// per-turn re-summarisation the window exists to avoid.
+const inverted = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...compact,
+  compactContext: { enabled: true, limit: 5, keep: 40 }
+});
+assert.equal(inverted.compactContext.keep, 40, "the tail the athlete asked for is kept");
+assert.equal(inverted.compactContext.limit, 44, "and the limit is lifted clear of it");
+assert.equal(settingsValues.get("chat.compactContext.limit"), "44", "as stored, not just as returned");
+
+// Out of range in both directions, and non-numeric, land somewhere usable.
+assert.equal(
+  saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+    ...compact,
+    compactContext: { enabled: true, limit: 99999, keep: 0 }
+  }).compactContext.limit,
+  400
+);
+assert.equal(
+  saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+    ...compact,
+    compactContext: { enabled: true, limit: 99999, keep: 0 }
+  }).compactContext.keep,
+  2
+);
+assert.deepEqual(
+  readChatSettingsFromStore(
+    {
+      get: (key) =>
+        key === "chat.compactContext.limit"
+          ? "not-a-number"
+          : key === "chat.compactContext.keep"
+            ? ""
+            : undefined,
+      set: () => {},
+      delete: () => {}
+    },
+    fakeKeyStores
+  ).compactContext,
+  { enabled: true, limit: 60, keep: 20 },
+  "an unreadable pair reads as the default, never as NaN"
+);
+
+// Off is stored as off. Everything else defaults to on, so only an explicit
+// "false" may turn it off — a half-written row must not silently disable the
+// one feature that keeps a long conversation affordable.
+const compactOff = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...compact,
+  compactContext: { ...compact.compactContext, enabled: false }
+});
+assert.equal(compactOff.compactContext.enabled, false);
+assert.equal(
+  readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext.enabled,
+  false
+);
+
 console.log("chat service tests passed");
