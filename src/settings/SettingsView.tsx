@@ -1,10 +1,12 @@
 import {
   ArrowLeft,
   Bike,
+  BrainCircuit,
   Bug,
   Check,
   ChevronDown,
   ChevronRight,
+  Cloud,
   Code2,
   Coffee,
   Dumbbell,
@@ -14,13 +16,16 @@ import {
   Footprints,
   Globe2,
   HardDrive,
+  Link2,
   Loader2,
   Moon,
   Mountain,
   RefreshCw,
   Ruler,
+  Server,
   Sparkles,
   Sun,
+  Watch,
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
@@ -69,6 +74,38 @@ const ABOUT_LINKS = [
     label: "Support the project",
     href: "https://www.buymeacoffee.com/addridoa",
     icon: Coffee,
+  },
+];
+
+/**
+ * The Connections rows that have no behaviour yet. They are laid out now so the
+ * section is complete and wiring one up later is a matter of swapping the
+ * disabled button for a real handler — the row markup does not change.
+ */
+const PENDING_CONNECTIONS: {
+  id: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    id: "mcp-servers",
+    label: "MCP Servers",
+    description:
+      "Model Context Protocol servers the coach can call as tools.",
+    icon: Server,
+  },
+  {
+    id: "coach-models",
+    label: "Coach Models",
+    description: "Providers and models the AI coach runs on.",
+    icon: BrainCircuit,
+  },
+  {
+    id: "cloud-sync",
+    label: "Cloud Sync",
+    description: "Back up training data and settings across devices.",
+    icon: Cloud,
   },
 ];
 
@@ -293,13 +330,6 @@ export function SettingsView({
 
   return (
     <section className="settings-view">
-      <CorosConnectionCard
-        status={trainingStatus}
-        busy={trainingBusy}
-        onRefresh={onTrainingRefresh}
-        onLogout={onTrainingLogout}
-      />
-
       <div className="panel settings-about-panel">
         <div className="settings-about-header">
           <img
@@ -369,6 +399,59 @@ export function SettingsView({
               <span>{label}</span>
               <ExternalLink size={12} aria-hidden="true" />
             </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel settings-connections-panel">
+        <div className="settings-connections-heading">
+          <span className="settings-connections-icon" aria-hidden="true">
+            <Link2 size={22} strokeWidth={1.9} />
+          </span>
+          <div>
+            <p className="eyebrow">Integrations</p>
+            <h2>Connections</h2>
+            <p>
+              Accounts and services Heracles Records talks to on your behalf.
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-connections-list">
+          {trainingStatus?.authenticated ? (
+            <CorosConnectionCard
+              embedded
+              status={trainingStatus}
+              busy={trainingBusy}
+              onRefresh={onTrainingRefresh}
+              onLogout={onTrainingLogout}
+            />
+          ) : (
+            <div className="settings-nav-row is-static">
+              <span className="settings-nav-row-icon" aria-hidden="true">
+                <Watch size={22} strokeWidth={1.9} />
+              </span>
+              <span className="settings-nav-row-copy">
+                <strong>COROS account</strong>
+                <span>
+                  Not connected. Sign in from Overview to sync activities and
+                  workouts.
+                </span>
+              </span>
+            </div>
+          )}
+
+          {PENDING_CONNECTIONS.map(({ id, label, description, icon: Icon }) => (
+            <button className="settings-nav-row" type="button" key={id} disabled>
+              <span className="settings-nav-row-icon" aria-hidden="true">
+                <Icon size={22} strokeWidth={1.9} />
+              </span>
+              <span className="settings-nav-row-copy">
+                <strong>{label}</strong>
+                <span>{description}</span>
+              </span>
+              <span className="badge">Soon</span>
+            </button>
           ))}
         </div>
       </div>

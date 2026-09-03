@@ -17,20 +17,29 @@ export interface CorosConnectionCardProps {
   busy: string | null;
   onRefresh: () => void;
   onLogout: () => void;
+  /**
+   * Drop the standalone panel chrome. The connected variant already carries its
+   * own border, glass background and blur, so keeping `panel` as well would
+   * double the frame once the card sits inside the Connections panel.
+   */
+  embedded?: boolean;
 }
 
 /**
- * The connected-account bar for the COROS Training Hub session. It lives at the
- * top of Settings; Overview only renders the sign-in surface, so this card is
- * the single place a connected session is reviewed, refreshed, or dropped.
+ * The connected-account bar for the COROS Training Hub session. It is the first
+ * row of the Connections section in Settings; Overview only renders the sign-in
+ * surface, so this card is the single place a connected session is reviewed,
+ * refreshed, or dropped.
  *
- * Renders nothing while no session is authenticated.
+ * Renders nothing while no session is authenticated — Settings shows its own
+ * disconnected row in that case.
  */
 export function CorosConnectionCard({
   status,
   busy,
   onRefresh,
-  onLogout
+  onLogout,
+  embedded = false
 }: CorosConnectionCardProps) {
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
 
@@ -39,7 +48,9 @@ export function CorosConnectionCard({
   }
 
   return (
-    <section className="panel training-command-center is-connected is-compact">
+    <section
+      className={`${embedded ? "" : "panel "}training-command-center is-connected is-compact`}
+    >
       <div className="training-connection-shell">
         <div className="training-connection-bar">
           <div className="training-connection-primary">

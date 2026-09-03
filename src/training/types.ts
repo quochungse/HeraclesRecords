@@ -129,7 +129,7 @@ export interface TrainingHubViewProps {
  * Everything the old Training Hub screen rendered except the activity list and
  * its detail pane — sign-in included, since that surface now sits on Overview.
  * Refresh and disconnect are gone too: the connected-account card that owns
- * them moved to the top of Settings (see CorosConnectionCard).
+ * them moved into the Connections section of Settings (see CorosConnectionCard).
  */
 export type TrainingOverviewProps = Omit<
   TrainingHubViewProps,

@@ -31667,18 +31667,21 @@ tr.data-intervals-row-missing {
   padding: 20px;
 }
 
-.settings-units-heading {
+.settings-units-heading,
+.settings-connections-heading {
   display: flex;
   align-items: flex-start;
   gap: 13px;
 }
 
-.settings-units-heading h2 {
+.settings-units-heading h2,
+.settings-connections-heading h2 {
   margin: 3px 0 0;
   font-size: clamp(21px, 2.2vw, 26px);
 }
 
-.settings-units-heading p:not(.eyebrow) {
+.settings-units-heading p:not(.eyebrow),
+.settings-connections-heading p:not(.eyebrow) {
   max-width: 520px;
   margin: 7px 0 0;
   color: var(--text-muted);
@@ -31686,7 +31689,8 @@ tr.data-intervals-row-missing {
   line-height: 1.5;
 }
 
-.settings-units-icon {
+.settings-units-icon,
+.settings-connections-icon {
   display: grid;
   width: 44px;
   height: 44px;
@@ -32018,7 +32022,11 @@ tr.data-intervals-row-missing {
   margin: 0 0 10px;
 }
 
-.settings-storage-link {
+/* The navigable settings row. `.settings-storage-link` was the first of
+   these; the Connections rows are the same shape and share these rules rather
+   than carrying a second copy of them. */
+.settings-storage-link,
+.settings-nav-row {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr) auto;
   align-items: center;
@@ -32037,18 +32045,21 @@ tr.data-intervals-row-missing {
     transform 0.18s ease;
 }
 
-.settings-storage-link:hover {
+.settings-storage-link:hover,
+.settings-nav-row:hover:not(:disabled):not(.is-static) {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
   background: var(--glass-bg-hover);
   transform: translateY(-1px);
 }
 
-.settings-storage-link:focus-visible {
+.settings-storage-link:focus-visible,
+.settings-nav-row:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.settings-storage-link-icon {
+.settings-storage-link-icon,
+.settings-nav-row-icon {
   display: grid;
   width: 46px;
   height: 46px;
@@ -32059,23 +32070,62 @@ tr.data-intervals-row-missing {
   color: var(--accent);
 }
 
-.settings-storage-link-copy {
+.settings-storage-link-copy,
+.settings-nav-row-copy {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.settings-storage-link-copy strong {
+.settings-storage-link-copy strong,
+.settings-nav-row-copy strong {
   font-size: 15px;
 }
 
-.settings-storage-link-copy > span {
+.settings-storage-link-copy > span,
+.settings-nav-row-copy > span {
   color: var(--text-muted);
   font-size: 12px;
 }
 
 .settings-storage-link-chevron {
   color: var(--text-muted);
+}
+
+.settings-connections-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* The COROS card brings its own connected-state chrome, so it needs no panel
+   frame here — only the row's alignment, so it lines up with the rows below. */
+.settings-connections-list > .training-command-center {
+  margin: 0;
+  animation: none;
+}
+
+/* Rows whose action is not defined yet, and the disconnected COROS row: both
+   keep the shape of a navigable row without pretending to be one.
+   The global `button:disabled` fades to 0.55 and shows a not-allowed cursor,
+   which reads as "you did something wrong" rather than "not built yet" — these
+   rows dim through their own muted colors instead, so the badge stays legible. */
+.settings-nav-row:disabled,
+.settings-nav-row.is-static {
+  cursor: default;
+  opacity: 1;
+}
+
+.settings-nav-row:disabled .settings-nav-row-icon,
+.settings-nav-row.is-static .settings-nav-row-icon {
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-muted);
+}
+
+.settings-nav-row:disabled .settings-nav-row-copy strong,
+.settings-nav-row.is-static .settings-nav-row-copy strong {
+  color: var(--text-secondary);
 }
 
 .settings-subpage {
@@ -32253,12 +32303,14 @@ tr.data-intervals-row-missing {
 
 @media (prefers-reduced-motion: reduce) {
   .settings-sport-row,
-  .settings-storage-link {
+  .settings-storage-link,
+  .settings-nav-row {
     transition: none;
   }
 
   .settings-sport-row:hover,
-  .settings-storage-link:hover {
+  .settings-storage-link:hover,
+  .settings-nav-row:hover {
     transform: none;
   }
 }
