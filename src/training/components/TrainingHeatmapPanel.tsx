@@ -8,13 +8,28 @@ import {
   type PointerEvent as ReactPointerEvent
 } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
-import type { TrainingHubActivity } from "../../../electron/types";
+import type {
+  StrengthSession,
+  TrainingHubActivity
+} from "../../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
   formatOptionalNumber
 } from "../formatters";
-import { TRAINING_HEATMAP_DAYS } from "../chartConfig";
+import {
+  TRAINING_HEATMAP_RANGE_DAYS,
+  TRAINING_HEATMAP_RANGES,
+  type TrainingHeatmapRange
+} from "../chartConfig";
+import {
+  buildHeatmapDayEntries,
+  buildSportSharesByDay,
+  formatHappenDayShort,
+  indexStrengthSessions,
+  sportStripeGradient,
+  type HeatmapDayEntry
+} from "../heatmapDaySummary";
 import {
   buildHeatmapCells,
   buildHeatmapGrid,
@@ -50,6 +65,12 @@ const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
   validate: selectionIsOneOf(["trainingLoad", "rpeLoad"])
 });
 
+const HEATMAP_RANGE_PREFERENCE = defineSelectionPreference<TrainingHeatmapRange>({
+  key: "training.heatmapRange",
+  defaultValue: "year",
+  validate: selectionIsOneOf(TRAINING_HEATMAP_RANGES)
+});
+
 interface TrainingHeatmapPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
@@ -57,6 +78,10 @@ interface TrainingHeatmapPanelProps {
 }
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+/** Days per band in the Last-30-days strip. Mirrored by --heatmap-strip-columns. */
+const HEATMAP_STRIP_COLUMNS = 10;
+/** Entries a card lists before the rest collapse into a "+N more" line. */
+const HEATMAP_CARD_MAX_ENTRIES = 3;
 const LEGEND_LEVELS = [0, 1, 2, 3, 4] as const;
 const HEATMAP_PROXIMITY_RADIUS = 120;
 const HEATMAP_WAVE_SETTLE_MS = 220;
@@ -142,6 +167,11 @@ export function TrainingHeatmapPanel({
   const [metric, setMetric] = useSelectionPreference(
     HEATMAP_METRIC_PREFERENCE
   );
+  const [range, setRange] = useSelectionPreference(HEATMAP_RANGE_PREFERENCE);
+  const [strengthSessions, setStrengthSessions] = useState<StrengthSession[]>(
+    []
+  );
+  const strengthRequestedRef = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const pointerFrameRef = useRef<number | null>(null);
   const pointerClientRef = useRef({ x: 0, y: 0 });
@@ -149,6 +179,10 @@ export function TrainingHeatmapPanel({
   const activeProximityCellsRef = useRef<Set<HTMLSpanElement>>(new Set());
   const heatmapWaveHasPlayedRef = useRef(false);
   const isRpe = metric === "rpeLoad";
+  const rangeDays = TRAINING_HEATMAP_RANGE_DAYS[range];
+  // The short range drops the weekday grid entirely: thirty days fit as bands
+  // of ten dated cards, each naming what was actually trained that day.
+  const isCompactRange = range === "month";
 
   const dayList = useMemo(
     () =>
@@ -162,8 +196,8 @@ export function TrainingHeatmapPanel({
     [snapshot, activities]
   );
   const cells = useMemo(
-    () => buildHeatmapCells(dayList, TRAINING_HEATMAP_DAYS, metric),
-    [dayList, metric]
+    () => buildHeatmapCells(dayList, rangeDays, metric),
+    [dayList, rangeDays, metric]
   );
   // RPE feelTypes may still be backfilling from the COROS detail endpoint.
   const rpeBackfillActive =
@@ -181,17 +215,77 @@ export function TrainingHeatmapPanel({
     [activities]
   );
   // Only show sports that actually appear in the visible range, in canonical
-  // order — including those that only ever show up as a pie slice.
+  // order — including those that only ever show up as a pie slice. Activities
+  // span the full year, so the lookup is keyed off the rendered cells.
   const presentSports = useMemo(() => {
     const seen = new Set<SportColorCategory>();
-    for (const set of sportsByDay.values()) {
-      for (const cat of set) {
+    for (const cell of cells) {
+      for (const cat of sportsByDay.get(cell.happenDay) ?? []) {
         seen.add(cat);
       }
     }
     return SPORT_COLOR_CATEGORIES.filter((cat) => seen.has(cat));
-  }, [sportsByDay]);
+  }, [cells, sportsByDay]);
   const hasData = cells.some((cell) => cell.level > 0);
+  // Cards name what a strength day worked ("Strength: Shoulders, Chest"), which
+  // only the cached breakdown knows. Fetch it the first time the short range is
+  // opened — the year heatmap never needs it, and the service serves from
+  // SQLite, pulling at most a chunk of missing details from COROS per call.
+  useEffect(() => {
+    if (!isCompactRange || strengthRequestedRef.current) {
+      return;
+    }
+
+    const api = window.corosLink;
+    if (!api?.syncStrengthHistory) {
+      return;
+    }
+
+    strengthRequestedRef.current = true;
+    let cancelled = false;
+    void api
+      .syncStrengthHistory({ days: rangeDays })
+      .then((history) => {
+        if (!cancelled) {
+          setStrengthSessions(history.sessions);
+        }
+      })
+      .catch(() => {
+        // Cards fall back to the plain sport name; nothing else depends on it.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCompactRange, rangeDays]);
+
+  const strengthByActivity = useMemo(
+    () => indexStrengthSessions(strengthSessions),
+    [strengthSessions]
+  );
+  const dayEntries = useMemo(
+    () =>
+      isCompactRange
+        ? buildHeatmapDayEntries(activities, strengthByActivity, unitSystem)
+        : new Map<string, HeatmapDayEntry[]>(),
+    [isCompactRange, activities, strengthByActivity, unitSystem]
+  );
+  // Stripe segments per day, so a day holding two sports shows both.
+  const sportShares = useMemo(
+    () => (isCompactRange ? buildSportSharesByDay(activities) : new Map()),
+    [isCompactRange, activities]
+  );
+  // The strip reads left to right, oldest first, in bands of ten days.
+  const bands = useMemo(() => {
+    if (!isCompactRange) {
+      return [];
+    }
+    const chunks: HeatmapCell[][] = [];
+    for (let index = 0; index < cells.length; index += HEATMAP_STRIP_COLUMNS) {
+      chunks.push(cells.slice(index, index + HEATMAP_STRIP_COLUMNS));
+    }
+    return chunks;
+  }, [isCompactRange, cells]);
 
   useLayoutEffect(() => {
     const gridElement = gridRef.current;
@@ -507,9 +601,25 @@ export function TrainingHeatmapPanel({
               RPE
             </button>
           </div>
-          <span className="training-range-pill">
-            Last {TRAINING_HEATMAP_DAYS} days
-          </span>
+          <div
+            className="training-metric-toggle"
+            role="group"
+            aria-label="Heatmap range"
+          >
+            {TRAINING_HEATMAP_RANGES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`training-metric-option${
+                  range === option ? " is-active" : ""
+                }`}
+                aria-pressed={range === option}
+                onClick={() => setRange(option)}
+              >
+                Last {TRAINING_HEATMAP_RANGE_DAYS[option]} days
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -524,7 +634,139 @@ export function TrainingHeatmapPanel({
 
       {hasData ? (
         <>
-          <div className="training-heatmap-scroll">
+          {isCompactRange ? (
+            <div
+              className="training-heatmap-strip"
+              role="list"
+              aria-label={`${
+                isRpe ? "RPE load" : "Training load"
+              } over the last ${rangeDays} days`}
+              style={
+                {
+                  "--heatmap-strip-columns": HEATMAP_STRIP_COLUMNS
+                } as CSSProperties
+              }
+            >
+              {bands.map((band, bandIndex) => (
+                <div className="training-heatmap-band" key={`band-${bandIndex}`}>
+                  {band.map((cell, index) => (
+                    <span
+                      key={`date-${cell.happenDay}`}
+                      className="training-heatmap-band-date"
+                      style={{ gridColumn: index + 1, gridRow: 1 }}
+                      aria-hidden="true"
+                    >
+                      {formatHappenDayShort(cell.happenDay)}
+                    </span>
+                  ))}
+                  {band.map((cell, index) => {
+                    const entries = dayEntries.get(cell.happenDay) ?? [];
+                    const dominantSport =
+                      cell.level > 0 ? sportByDay.get(cell.happenDay) : undefined;
+                    const cardStyle: Record<string, string | number> = {
+                      gridColumn: index + 1,
+                      gridRow: 2
+                    };
+                    if (dominantSport) {
+                      cardStyle["--cell-color"] = `var(--sport-${dominantSport})`;
+                    }
+                    const stripe = sportStripeGradient(
+                      sportShares.get(cell.happenDay)
+                    );
+                    if (stripe) {
+                      cardStyle.backgroundImage = stripe;
+                    }
+                    const spoken = entries
+                      .map((entry) =>
+                        `${entry.title} ${entry.meta.join(" ")}`.trim()
+                      )
+                      .join("; ");
+
+                    return (
+                      <div
+                        key={cell.happenDay}
+                        className="training-heatmap-cell is-card"
+                        data-level={cell.level}
+                        role="listitem"
+                        tabIndex={0}
+                        aria-label={`${formatCellAriaLabel(
+                          cell,
+                          metric,
+                          unitSystem
+                        )}${spoken ? `, ${spoken}` : ""}`}
+                        style={cardStyle as CSSProperties}
+                      >
+                        {entries.length > 0 ? (
+                          <ul className="training-heatmap-card-entries">
+                            {entries
+                              .slice(0, HEATMAP_CARD_MAX_ENTRIES)
+                              .map((entry) => (
+                                <li
+                                  key={entry.activityId}
+                                  className="training-heatmap-card-entry"
+                                >
+                                  <span
+                                    className="training-heatmap-card-dot"
+                                    style={
+                                      {
+                                        "--cell-color": `var(--sport-${entry.sport})`
+                                      } as CSSProperties
+                                    }
+                                    aria-hidden="true"
+                                  />
+                                  <span className="training-heatmap-card-body">
+                                    <span className="training-heatmap-card-title">
+                                      {entry.title}
+                                    </span>
+                                    {entry.meta.length > 0 ? (
+                                      <span className="training-heatmap-card-meta">
+                                        {entry.meta.map((part, partIndex) => (
+                                          <span
+                                            key={part}
+                                            className="training-heatmap-card-meta-part"
+                                          >
+                                            {partIndex > 0 ? `· ${part}` : part}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </li>
+                              ))}
+                            {entries.length > HEATMAP_CARD_MAX_ENTRIES ? (
+                              <li className="training-heatmap-card-more">
+                                +{entries.length - HEATMAP_CARD_MAX_ENTRIES} more
+                              </li>
+                            ) : null}
+                          </ul>
+                        ) : (
+                          <span className="training-heatmap-card-rest">Rest</span>
+                        )}
+
+                        <span className="training-heatmap-tooltip" role="tooltip">
+                          <strong>{cell.label}</strong>
+                          <span>
+                            {isRpe ? "RPE load" : "Load"}:{" "}
+                            {isRpe
+                              ? `${formatOptionalNumber(cell.rpeLoad)} AU`
+                              : formatOptionalNumber(cell.trainingLoad)}
+                          </span>
+                          <span>
+                            Distance:{" "}
+                            {formatDistanceMeters(cell.distance, unitSystem)}
+                          </span>
+                          <span>
+                            Duration: {formatDurationSeconds(cell.duration)}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="training-heatmap-scroll">
             <div
               className="training-heatmap-layout"
               style={
@@ -565,7 +807,7 @@ export function TrainingHeatmapPanel({
                 onPointerLeave={handleGridPointerLeave}
                 aria-label={`${
                   isRpe ? "RPE load" : "Training load"
-                } over the last ${TRAINING_HEATMAP_DAYS} days`}
+                } over the last ${rangeDays} days`}
               >
                 {grid.cells.map((cell, index) => {
                   if (!cell) {
@@ -626,7 +868,8 @@ export function TrainingHeatmapPanel({
                 })}
               </div>
             </div>
-          </div>
+            </div>
+          )}
 
           <div className="training-heatmap-footer">
             <div className="training-heatmap-legends">
@@ -681,8 +924,8 @@ export function TrainingHeatmapPanel({
             {isRpe
               ? rpeBackfillActive
                 ? "RPE data is still loading — rate activities in COROS to see it here."
-                : `No rated sessions in the last ${TRAINING_HEATMAP_DAYS} days.`
-              : `No training data in the last ${TRAINING_HEATMAP_DAYS} days.`}
+                : `No rated sessions in the last ${rangeDays} days.`
+              : `No training data in the last ${rangeDays} days.`}
           </p>
         </div>
       )}

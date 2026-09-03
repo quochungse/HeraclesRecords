@@ -2,6 +2,16 @@ import type { Theme } from "../theme/theme";
 
 export const TRAINING_HEATMAP_DAYS = 365;
 
+/** Ranges the load heatmap can be switched between, in render order. */
+export type TrainingHeatmapRange = "year" | "month";
+
+export const TRAINING_HEATMAP_RANGES = ["year", "month"] as const;
+
+export const TRAINING_HEATMAP_RANGE_DAYS: Record<TrainingHeatmapRange, number> = {
+  year: TRAINING_HEATMAP_DAYS,
+  month: 30
+};
+
 export interface TrainingChartColors {
   accent: string;
   accentBright: string;

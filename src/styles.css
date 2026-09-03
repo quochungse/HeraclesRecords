@@ -12015,16 +12015,6 @@ td span {
   margin: 0;
 }
 
-.training-range-pill {
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 5px 13px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .training-metric-select-wrap {
   display: flex;
   flex-shrink: 0;
@@ -12730,6 +12720,176 @@ td span {
   font-weight: 600;
   line-height: 1.35;
   white-space: nowrap;
+}
+
+/* --- Load heatmap: Last 30 days --------------------------------------------
+   A year of squares carries no room for words, so the short range trades the
+   weekday grid for three full-width bands of ten day cards. Each band titles
+   its own columns with d/M dates and each card names what was trained, which
+   is why these rules sit after every base cell rule: `.is-card` has to win the
+   size, hover and level-fill declarations above. */
+.training-heatmap-strip {
+  display: grid;
+  gap: clamp(12px, 1.4vw, 18px);
+  width: 100%;
+  min-width: 0;
+  padding: 2px 2px 6px;
+}
+
+.training-heatmap-band {
+  display: grid;
+  grid-template-columns: repeat(var(--heatmap-strip-columns, 10), minmax(0, 1fr));
+  gap: 6px clamp(4px, 0.55vw, 8px);
+  width: 100%;
+  min-width: 0;
+}
+
+.training-heatmap-band-date {
+  color: var(--text-secondary);
+  font-size: clamp(10px, 0.85vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-align: center;
+}
+
+.training-heatmap-cell.is-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  min-height: clamp(58px, 7vh, 78px);
+  aspect-ratio: auto;
+  padding: 7px 8px 7px 11px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+  /* The left accent is painted, not a border: a day with two sports splits it
+     into load-proportional bands, which border-left cannot express (and
+     border-image drops the corner radius). Positioned against the padding box
+     so the 1px frame stays clear of it. */
+  background-repeat: no-repeat;
+  background-origin: padding-box;
+  background-position: left top;
+  background-size: 3px 100%;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--cell-color) 75%, transparent) 0 100%
+  );
+}
+
+/* Text has to stay legible on top of the fill, so the card ramp tops out where
+   the square ramp is only getting started. Intensity still reads, because the
+   sport hue and the load bar carry it too. */
+.training-heatmap-cell.is-card[data-level="1"] {
+  background-color: color-mix(in srgb, var(--cell-color) 10%, transparent);
+}
+
+.training-heatmap-cell.is-card[data-level="2"] {
+  background-color: color-mix(in srgb, var(--cell-color) 17%, transparent);
+}
+
+.training-heatmap-cell.is-card[data-level="3"] {
+  background-color: color-mix(in srgb, var(--cell-color) 25%, transparent);
+}
+
+.training-heatmap-cell.is-card[data-level="4"] {
+  background-color: color-mix(in srgb, var(--cell-color) 34%, transparent);
+  box-shadow: none;
+}
+
+/* A day with nothing on it keeps the stripe, drawn in the frame colour so the
+   card still lines up with its neighbours. Days that were trained but scored no
+   load overwrite this from the inline stripe. */
+.training-heatmap-cell.is-card[data-level="0"] {
+  background-image: linear-gradient(to bottom, var(--glass-border) 0 100%);
+}
+
+/* Cards are large enough that the square's 1.1 pop would shove its neighbours;
+   the border and glow carry the hover instead. */
+.training-heatmap-cell.is-card:hover,
+.training-heatmap-cell.is-card:focus-visible {
+  scale: 1;
+  filter: brightness(1.08);
+  border-color: color-mix(in srgb, var(--cell-color) 55%, var(--glass-border));
+  box-shadow: none;
+}
+
+.training-heatmap-card-entries {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+
+/* The dot sits in its own column: inline, it steals the first line's width and
+   forces "Strength:" to break mid-word in a narrow card. */
+.training-heatmap-card-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0 5px;
+  min-width: 0;
+}
+
+.training-heatmap-card-body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.training-heatmap-card-more {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: clamp(9px, 0.75vw, 11px);
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.training-heatmap-card-title {
+  color: var(--text-primary);
+  font-size: clamp(10px, 0.8vw, 11.5px);
+  font-weight: 700;
+  line-height: 1.25;
+  /* break-word, not anywhere: a word only splits when it cannot fit a line on
+     its own, so "Shoulders, Arms" still breaks at the space. */
+  overflow-wrap: break-word;
+}
+
+.training-heatmap-card-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--cell-color);
+}
+
+.training-heatmap-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  color: var(--text-secondary);
+  font-size: clamp(9px, 0.75vw, 11px);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* The separator rides in front of the value it belongs to, so a wrap never
+   leaves a dangling "·" at the end of a line. */
+.training-heatmap-card-meta-part {
+  white-space: nowrap;
+}
+
+.training-heatmap-card-rest {
+  color: var(--text-secondary);
+  font-size: clamp(9px, 0.75vw, 11px);
+  font-weight: 600;
+  opacity: 0.5;
+  text-align: center;
 }
 
 .training-heatmap-footer {
@@ -25021,8 +25181,7 @@ tr.data-intervals-row-missing {
 
 /* --- Training Hub: graph menus (fitness metrics + zone select) ------------- */
 :root[data-theme="paper"] .metric-multiselect-trigger,
-:root[data-theme="paper"] .training-zone-select-trigger,
-:root[data-theme="paper"] .training-range-pill {
+:root[data-theme="paper"] .training-zone-select-trigger {
   background: rgba(38, 34, 28, 0.05);
   border-color: var(--glass-border);
 }
