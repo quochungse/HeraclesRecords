@@ -2,21 +2,17 @@ import { type CSSProperties, useMemo, useState } from "react";
 import {
   ArrowRightFromLine,
   ChartNoAxesColumnIncreasing,
-  Database,
   Eye,
   EyeOff,
   ExternalLink,
   ArrowLeft,
-  Globe2,
   KeyRound,
   LockKeyhole,
   Loader2,
-  LogOut,
   Mail,
   Monitor,
   ShieldCheck,
   Trophy,
-  User,
   RefreshCw
 } from "lucide-react";
 import { FitnessScoresPanel } from "./components/FitnessScoresPanel";
@@ -57,9 +53,7 @@ export function TrainingOverview({
   onVerifyTwoFactor,
   onResendTwoFactor,
   onCancelTwoFactor,
-  onReconnect,
-  onLogout,
-  onRefresh
+  onReconnect
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   const canReconnect =
@@ -68,7 +62,6 @@ export function TrainingOverview({
   const awaitingTwoFactor = Boolean(twoFactorEmail);
   const verifying = busy === "training-verify";
   const resending = busy === "training-resend";
-  const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const signInBackgroundStyle = connected
     ? undefined
@@ -90,356 +83,279 @@ export function TrainingOverview({
 
   return (
     <div className="stack training-dashboard">
-      <section
-        className={`panel training-command-center ${
-          connected ? "is-connected is-compact" : "is-disconnected"
-        }`}
-        style={signInBackgroundStyle}
-      >
-        {connected ? (
-          <div className="training-connection-shell">
-            <div className="training-connection-bar">
-              <div className="training-connection-primary">
-                <span
-                  className="training-status-dot is-connected"
-                  aria-hidden="true"
-                />
-                <span className="training-connection-label">
-                  COROS account connected
-                </span>
-                <span className="badge ready">
-                  <ShieldCheck size={12} aria-hidden="true" />
-                  Authenticated
-                </span>
+      {connected ? null : (
+        <section
+          className="panel training-command-center is-disconnected"
+          style={signInBackgroundStyle}
+        >
+          <div className="training-command-copy">
+            <div className="training-signin-copy-inner">
+              <div className="training-command-kicker">
+                <Monitor size={18} aria-hidden="true" />
+                <p className="eyebrow">Training Hub</p>
               </div>
-              <div className="training-connection-actions settings-actions">
-                <button
-                  className="training-details-button"
-                  type="button"
-                  onClick={() => setShowConnectionDetails((current) => !current)}
-                >
-                  {showConnectionDetails ? (
-                    <EyeOff size={14} aria-hidden="true" />
-                  ) : (
-                    <Eye size={14} aria-hidden="true" />
-                  )}
-                  {showConnectionDetails ? "Hide" : "Details"}
-                </button>
-                <button
-                  className="secondary-button training-connection-button"
-                  type="button"
-                  disabled={busy === "training-refresh"}
-                  onClick={onRefresh}
-                >
-                  {busy === "training-refresh" ? (
-                    <Loader2 className="spin" size={15} aria-hidden="true" />
-                  ) : (
-                    <RefreshCw size={15} aria-hidden="true" />
-                  )}
-                  Refresh
-                </button>
-                <button
-                  className="secondary-button danger-button training-connection-button"
-                  type="button"
-                  disabled={busy === "training-logout"}
-                  onClick={onLogout}
-                >
-                  <LogOut size={15} aria-hidden="true" />
-                  Disconnect
-                </button>
-              </div>
-            </div>
-            {showConnectionDetails ? (
-              <div className="training-connection-meta">
-                <span className="training-connection-meta-item">
-                  <User size={14} aria-hidden="true" />
-                  <span>User ID</span>
-                  <strong>{status?.userId ?? "Unknown"}</strong>
+              <h2>
+                <span>COROS</span>
+                <span>
+                  <em>Training</em> Hub
                 </span>
-                <span className="training-connection-meta-item">
-                  <Globe2 size={14} aria-hidden="true" />
-                  <span>Region</span>
-                  <strong>{status?.regionId ?? "Unknown"}</strong>
-                </span>
-                <span className="training-connection-meta-item">
-                  <Database size={14} aria-hidden="true" />
-                  <span>API host</span>
-                  <strong>{status?.baseUrl ?? "Unknown"}</strong>
-                </span>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <>
-            <div className="training-command-copy">
-              <div className="training-signin-copy-inner">
-                <div className="training-command-kicker">
-                  <Monitor size={18} aria-hidden="true" />
-                  <p className="eyebrow">Training Hub</p>
-                </div>
-                <h2>
-                  <span>COROS</span>
-                  <span>
-                    <em>Training</em> Hub
+              </h2>
+              <p className="training-signin-lead">
+                Desktop access to training load, recovery, activity detail, and
+                race readiness.
+              </p>
+
+              <div className="training-signin-feature-list">
+                <div className="training-signin-feature">
+                  <span className="training-signin-feature-icon">
+                    <ChartNoAxesColumnIncreasing size={24} aria-hidden="true" />
                   </span>
-                </h2>
-                <p className="training-signin-lead">
-                  Desktop access to training load, recovery, activity detail, and
-                  race readiness.
-                </p>
-
-                <div className="training-signin-feature-list">
-                  <div className="training-signin-feature">
-                    <span className="training-signin-feature-icon">
-                      <ChartNoAxesColumnIncreasing size={24} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <strong>Deep Insights</strong>
-                      <p>
-                        Track recovery, training load, VO2 max, and more with
-                        advanced analytics.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="training-signin-feature">
-                    <span className="training-signin-feature-icon">
-                      <Trophy size={24} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <strong>All Your Data</strong>
-                      <p>
-                        Sync activities, view PRs, and analyze performance over
-                        time.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="training-signin-feature">
-                    <span className="training-signin-feature-icon">
-                      <ShieldCheck size={24} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <strong>Secure &amp; Private</strong>
-                      <p>
-                        Remembered credentials are encrypted and stored locally
-                        on this device.
-                      </p>
-                    </div>
+                  <div>
+                    <strong>Deep Insights</strong>
+                    <p>
+                      Track recovery, training load, VO2 max, and more with
+                      advanced analytics.
+                    </p>
                   </div>
                 </div>
-
+                <div className="training-signin-feature">
+                  <span className="training-signin-feature-icon">
+                    <Trophy size={24} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>All Your Data</strong>
+                    <p>
+                      Sync activities, view PRs, and analyze performance over
+                      time.
+                    </p>
+                  </div>
+                </div>
+                <div className="training-signin-feature">
+                  <span className="training-signin-feature-icon">
+                    <ShieldCheck size={24} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>Secure &amp; Private</strong>
+                    <p>
+                      Remembered credentials are encrypted and stored locally
+                      on this device.
+                    </p>
+                  </div>
+                </div>
               </div>
+
             </div>
+          </div>
 
-            {awaitingTwoFactor ? (
-              <form
-                className="training-login-panel"
-                onSubmit={onVerifyTwoFactor}
-              >
-                <div className="training-login-panel-header">
-                  <strong>Verify it's you</strong>
-                  <p>
-                    Enter the 6-digit code we emailed to{" "}
-                    <strong>{twoFactorEmail}</strong>.
-                  </p>
-                </div>
-
-                <div className="training-login-fields">
-                  <label className="field training-login-field">
-                    <span>Verification code</span>
-                    <div className="training-login-input">
-                      <KeyRound size={18} aria-hidden="true" />
-                      <input
-                        value={twoFactorCode}
-                        onChange={(event) =>
-                          onTwoFactorCodeChange(
-                            event.target.value.replace(/\D/g, "").slice(0, 6),
-                          )
-                        }
-                        placeholder="123456"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        autoFocus
-                        disabled={verifying}
-                      />
-                    </div>
-                  </label>
-                </div>
-
-                <div className="settings-actions training-login-actions">
-                  <button
-                    className="primary-button"
-                    type="submit"
-                    disabled={twoFactorCode.trim().length < 6 || verifying}
-                  >
-                    {verifying ? (
-                      <Loader2 className="spin" size={17} aria-hidden="true" />
-                    ) : (
-                      <ArrowRightFromLine size={17} aria-hidden="true" />
-                    )}
-                    Verify and sign in
-                  </button>
-                </div>
-
-                <div className="training-login-2fa-actions">
-                  <button
-                    className="training-login-text-button"
-                    type="button"
-                    onClick={onResendTwoFactor}
-                    disabled={resending || verifying}
-                  >
-                    {resending ? (
-                      <Loader2 className="spin" size={15} aria-hidden="true" />
-                    ) : (
-                      <RefreshCw size={15} aria-hidden="true" />
-                    )}
-                    Resend code
-                  </button>
-                  <button
-                    className="training-login-text-button"
-                    type="button"
-                    onClick={onCancelTwoFactor}
-                    disabled={verifying}
-                  >
-                    <ArrowLeft size={15} aria-hidden="true" />
-                    Use a different account
-                  </button>
-                </div>
-
-                <p className="training-login-footer">
-                  <ShieldCheck size={16} aria-hidden="true" />
-                  Your credentials are encrypted and never shared.
-                </p>
-              </form>
-            ) : (
-            <form className="training-login-panel" onSubmit={onLogin}>
+          {awaitingTwoFactor ? (
+            <form
+              className="training-login-panel"
+              onSubmit={onVerifyTwoFactor}
+            >
               <div className="training-login-panel-header">
-                <strong>Welcome back</strong>
-                <p>Sign in to access your COROS Training Hub data</p>
+                <strong>Verify it's you</strong>
+                <p>
+                  Enter the 6-digit code we emailed to{" "}
+                  <strong>{twoFactorEmail}</strong>.
+                </p>
               </div>
-
-              {canReconnect ? (
-                <div className="training-login-reconnect">
-                  <div className="training-login-reconnect-text">
-                    <strong>Saved COROS account: {status?.email}</strong>
-                    <small>
-                      Create a Training Hub session using your saved COROS
-                      credentials — no password needed.
-                    </small>
-                  </div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={onReconnect}
-                    disabled={reconnecting}
-                  >
-                    {reconnecting ? (
-                      <Loader2 className="spin" size={17} aria-hidden="true" />
-                    ) : (
-                      <RefreshCw size={17} aria-hidden="true" />
-                    )}
-                    Sign in
-                  </button>
-                </div>
-              ) : null}
 
               <div className="training-login-fields">
                 <label className="field training-login-field">
-                  <span>Email</span>
+                  <span>Verification code</span>
                   <div className="training-login-input">
-                    <Mail size={18} aria-hidden="true" />
+                    <KeyRound size={18} aria-hidden="true" />
                     <input
-                      value={email}
-                      onChange={(event) => onEmailChange(event.target.value)}
-                      placeholder="you@example.com"
-                      type="email"
-                      autoComplete="username"
-                      disabled={busy === "training-login"}
+                      value={twoFactorCode}
+                      onChange={(event) =>
+                        onTwoFactorCodeChange(
+                          event.target.value.replace(/\D/g, "").slice(0, 6),
+                        )
+                      }
+                      placeholder="123456"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      autoFocus
+                      disabled={verifying}
                     />
-                  </div>
-                </label>
-                <label className="field training-login-field">
-                  <span>Password</span>
-                  <div className="training-login-input">
-                    <LockKeyhole size={18} aria-hidden="true" />
-                    <input
-                      value={password}
-                      onChange={(event) => onPasswordChange(event.target.value)}
-                      placeholder="COROS password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      disabled={busy === "training-login"}
-                    />
-                    <button
-                      className="training-login-visibility"
-                      type="button"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      onClick={() => setShowPassword((current) => !current)}
-                      disabled={busy === "training-login"}
-                    >
-                      {showPassword ? (
-                        <EyeOff size={17} aria-hidden="true" />
-                      ) : (
-                        <Eye size={17} aria-hidden="true" />
-                      )}
-                    </button>
                   </div>
                 </label>
               </div>
-
-              <label className="training-login-remember">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(event) => onRememberChange(event.target.checked)}
-                  disabled={busy === "training-login"}
-                />
-                <span>
-                  Save this COROS account
-                  <small>
-                    Securely stores an encrypted password digest so Training
-                    Hub and Watch Face Studio can each create their own session.
-                  </small>
-                </span>
-              </label>
 
               <div className="settings-actions training-login-actions">
                 <button
                   className="primary-button"
                   type="submit"
-                  disabled={!email.trim() || !password || busy === "training-login"}
+                  disabled={twoFactorCode.trim().length < 6 || verifying}
                 >
-                  {busy === "training-login" ? (
+                  {verifying ? (
                     <Loader2 className="spin" size={17} aria-hidden="true" />
                   ) : (
                     <ArrowRightFromLine size={17} aria-hidden="true" />
                   )}
-                  Sign in to COROS
+                  Verify and sign in
                 </button>
               </div>
 
-              <div className="training-login-divider">
-                <span>or</span>
+              <div className="training-login-2fa-actions">
+                <button
+                  className="training-login-text-button"
+                  type="button"
+                  onClick={onResendTwoFactor}
+                  disabled={resending || verifying}
+                >
+                  {resending ? (
+                    <Loader2 className="spin" size={15} aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={15} aria-hidden="true" />
+                  )}
+                  Resend code
+                </button>
+                <button
+                  className="training-login-text-button"
+                  type="button"
+                  onClick={onCancelTwoFactor}
+                  disabled={verifying}
+                >
+                  <ArrowLeft size={15} aria-hidden="true" />
+                  Use a different account
+                </button>
               </div>
-
-              <a
-                className="training-login-browser-link"
-                href="https://t.coros.com/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={16} aria-hidden="true" />
-                Open COROS Training Hub in Browser
-              </a>
 
               <p className="training-login-footer">
                 <ShieldCheck size={16} aria-hidden="true" />
                 Your credentials are encrypted and never shared.
               </p>
             </form>
-            )}
-          </>
-        )}
-      </section>
+          ) : (
+          <form className="training-login-panel" onSubmit={onLogin}>
+            <div className="training-login-panel-header">
+              <strong>Welcome back</strong>
+              <p>Sign in to access your COROS Training Hub data</p>
+            </div>
+
+            {canReconnect ? (
+              <div className="training-login-reconnect">
+                <div className="training-login-reconnect-text">
+                  <strong>Saved COROS account: {status?.email}</strong>
+                  <small>
+                    Create a Training Hub session using your saved COROS
+                    credentials — no password needed.
+                  </small>
+                </div>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={onReconnect}
+                  disabled={reconnecting}
+                >
+                  {reconnecting ? (
+                    <Loader2 className="spin" size={17} aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={17} aria-hidden="true" />
+                  )}
+                  Sign in
+                </button>
+              </div>
+            ) : null}
+
+            <div className="training-login-fields">
+              <label className="field training-login-field">
+                <span>Email</span>
+                <div className="training-login-input">
+                  <Mail size={18} aria-hidden="true" />
+                  <input
+                    value={email}
+                    onChange={(event) => onEmailChange(event.target.value)}
+                    placeholder="you@example.com"
+                    type="email"
+                    autoComplete="username"
+                    disabled={busy === "training-login"}
+                  />
+                </div>
+              </label>
+              <label className="field training-login-field">
+                <span>Password</span>
+                <div className="training-login-input">
+                  <LockKeyhole size={18} aria-hidden="true" />
+                  <input
+                    value={password}
+                    onChange={(event) => onPasswordChange(event.target.value)}
+                    placeholder="COROS password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    disabled={busy === "training-login"}
+                  />
+                  <button
+                    className="training-login-visibility"
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((current) => !current)}
+                    disabled={busy === "training-login"}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={17} aria-hidden="true" />
+                    ) : (
+                      <Eye size={17} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <label className="training-login-remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => onRememberChange(event.target.checked)}
+                disabled={busy === "training-login"}
+              />
+              <span>
+                Save this COROS account
+                <small>
+                  Securely stores an encrypted password digest so Training
+                  Hub and Watch Face Studio can each create their own session.
+                </small>
+              </span>
+            </label>
+
+            <div className="settings-actions training-login-actions">
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={!email.trim() || !password || busy === "training-login"}
+              >
+                {busy === "training-login" ? (
+                  <Loader2 className="spin" size={17} aria-hidden="true" />
+                ) : (
+                  <ArrowRightFromLine size={17} aria-hidden="true" />
+                )}
+                Sign in to COROS
+              </button>
+            </div>
+
+            <div className="training-login-divider">
+              <span>or</span>
+            </div>
+
+            <a
+              className="training-login-browser-link"
+              href="https://t.coros.com/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={16} aria-hidden="true" />
+              Open COROS Training Hub in Browser
+            </a>
+
+            <p className="training-login-footer">
+              <ShieldCheck size={16} aria-hidden="true" />
+              Your credentials are encrypted and never shared.
+            </p>
+          </form>
+          )}
+        </section>
+      )}
 
       {connected ? (
         <>

@@ -24,7 +24,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import type { AppInfo, AppUpdateSnapshot } from "../../electron/types";
+import type {
+  AppInfo,
+  AppUpdateSnapshot,
+  TrainingHubStatus,
+} from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatBytes } from "../media/libraryUtils";
 import { useTheme } from "../theme/ThemeProvider";
@@ -32,6 +36,7 @@ import {
   ACCENT_PALETTES,
   ACCENT_PALETTE_DETAILS
 } from "../theme/accentPalette";
+import { CorosConnectionCard } from "../training/components/CorosConnectionCard";
 import {
   DEFAULT_SPORT_COLORS,
   SPORT_COLOR_CATEGORIES,
@@ -110,6 +115,11 @@ interface SettingsViewProps {
   updateBusy: boolean;
   onCheckForUpdates: () => void;
   onError: (message: string) => void;
+  /** COROS Training Hub session, shown as the connected-account card up top. */
+  trainingStatus: TrainingHubStatus | null;
+  trainingBusy: string | null;
+  onTrainingRefresh: () => void;
+  onTrainingLogout: () => void;
 }
 
 const THEME_MODES = [
@@ -123,6 +133,10 @@ export function SettingsView({
   updateBusy,
   onCheckForUpdates,
   onError,
+  trainingStatus,
+  trainingBusy,
+  onTrainingRefresh,
+  onTrainingLogout,
 }: SettingsViewProps) {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -279,6 +293,13 @@ export function SettingsView({
 
   return (
     <section className="settings-view">
+      <CorosConnectionCard
+        status={trainingStatus}
+        busy={trainingBusy}
+        onRefresh={onTrainingRefresh}
+        onLogout={onTrainingLogout}
+      />
+
       <div className="panel settings-about-panel">
         <div className="settings-about-header">
           <img

@@ -2388,8 +2388,6 @@ export default function App() {
                         onRememberChange={setTrainingHubRemember}
                         onLogin={handleTrainingHubLogin}
                         onReconnect={handleTrainingHubReconnect}
-                        onLogout={handleTrainingHubLogout}
-                        onRefresh={handleTrainingHubRefresh}
                       />
                     </Suspense>
                   </div>
@@ -2598,6 +2596,10 @@ export default function App() {
                 updateBusy={busy === "update-check"}
                 onCheckForUpdates={() => void handleCheckForUpdates()}
                 onError={setError}
+                trainingStatus={trainingHubStatus}
+                trainingBusy={busy}
+                onTrainingRefresh={handleTrainingHubRefresh}
+                onTrainingLogout={handleTrainingHubLogout}
               />
             ) : null}
             {activeView === "calendar" ? (
