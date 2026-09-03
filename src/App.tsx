@@ -116,6 +116,8 @@ import {
 } from "./media/libraryUtils";
 import { trackAvatarColor, trackInitial } from "./media/trackAvatar";
 import { useTimeOfDayGreeting } from "./hooks/useTimeOfDayGreeting";
+import { selectOverviewGreeting } from "./overviewGreeting";
+import { useUnitSystem } from "./units/UnitSystemProvider";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -2398,6 +2400,9 @@ export default function App() {
                 trainingConnected={Boolean(trainingHubStatus?.authenticated)}
                 trainingActivities={trainingHubActivities}
                 trainingActivityDetail={trainingHubActivityDetail}
+                trainingUpcomingWorkouts={trainingHubUpcomingWorkouts}
+                trainingSnapshot={trainingHubSnapshot}
+                trainingSportTypes={trainingHubSportTypes}
                 busy={busy}
                 onTransfer={handleTransfer}
                 onDeleteDownload={handleDeleteDownload}
@@ -3087,6 +3092,10 @@ interface MediaOverviewTabProps {
   trainingConnected: boolean;
   trainingActivities: TrainingHubActivity[];
   trainingActivityDetail: TrainingHubActivityDetail | null;
+  /** Feeds the contextual subtitle only — the panels get their own copies. */
+  trainingUpcomingWorkouts: TrainingHubUpcomingWorkout[];
+  trainingSnapshot: TrainingHubSnapshot | null;
+  trainingSportTypes: TrainingHubSportType[];
   busy: string | null;
   onTransfer: (id: string) => void;
   onDeleteDownload: (track: LocalTrack) => void;
@@ -3102,6 +3111,9 @@ function MediaOverviewTab({
   trainingConnected,
   trainingActivities,
   trainingActivityDetail,
+  trainingUpcomingWorkouts,
+  trainingSnapshot,
+  trainingSportTypes,
   busy,
   onTransfer,
   onDeleteDownload,
@@ -3109,6 +3121,7 @@ function MediaOverviewTab({
   onSelectTrainingActivity,
 }: MediaOverviewTabProps) {
   const greeting = useTimeOfDayGreeting();
+  const { unitSystem } = useUnitSystem();
   const recentDownloads = useMemo(
     () =>
       [...downloads]
@@ -3121,13 +3134,44 @@ function MediaOverviewTab({
     [downloads],
   );
   const watchPresentation = getWatchPresentation(watchStatus);
+  // `greeting` is a dependency on purpose: it flips at the morning/afternoon/
+  // evening boundaries, which is exactly when the subtitle should turn over.
+  const subtitle = useMemo(
+    () =>
+      selectOverviewGreeting(
+        {
+          watchConnected,
+          trainingConnected,
+          upcomingWorkouts: trainingUpcomingWorkouts,
+          activities: trainingActivities,
+          sportTypes: trainingSportTypes,
+          summary: trainingSnapshot?.summary ?? null,
+          sleep: trainingSnapshot?.sleep ?? null,
+          downloadCount: downloads.length,
+          unitSystem,
+        },
+        watchPresentation.companion,
+      ),
+    [
+      greeting,
+      watchConnected,
+      trainingConnected,
+      trainingUpcomingWorkouts,
+      trainingActivities,
+      trainingSportTypes,
+      trainingSnapshot,
+      downloads.length,
+      unitSystem,
+      watchPresentation.companion,
+    ],
+  );
 
   return (
     <div className="dashboard">
       <header className="dashboard-welcome dashboard-block">
         <div>
           <h1 className="dashboard-greeting">{greeting}</h1>
-          <p className="dashboard-subtitle">{watchPresentation.companion}</p>
+          <p className="dashboard-subtitle">{subtitle}</p>
         </div>
       </header>
 
