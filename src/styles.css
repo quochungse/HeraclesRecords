@@ -18649,7 +18649,11 @@ tr.data-intervals-row-missing {
   pointer-events: auto;
 }
 
-.chat-settings-backdrop {
+/* The modal shell. `.chat-settings-*` was the first of these; Settings
+   dialogs use the same frame and share these rules rather than repeating
+   them. */
+.chat-settings-backdrop,
+.app-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -18659,7 +18663,8 @@ tr.data-intervals-row-missing {
   padding: 22px;
 }
 
-.chat-settings-modal {
+.chat-settings-modal,
+.app-modal {
   display: flex;
   flex-direction: column;
   width: min(760px, 96vw);
@@ -18672,7 +18677,8 @@ tr.data-intervals-row-missing {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 
-.chat-settings-modal-header {
+.chat-settings-modal-header,
+.app-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18681,22 +18687,38 @@ tr.data-intervals-row-missing {
   border-bottom: 1px solid var(--glass-border);
 }
 
-.chat-settings-modal-title {
+.chat-settings-modal-title,
+.app-modal-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.chat-settings-modal-title h2 {
+.chat-settings-modal-title h2,
+.app-modal-title h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
 }
 
-.chat-settings-modal-body {
+.chat-settings-modal-body,
+.app-modal-body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.app-modal-body {
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.app-modal-copy {
+  margin: 0 0 14px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .chat-settings-modal .chat-settings-panel {
@@ -32631,26 +32653,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   gap: 14px;
 }
 
-.mcp-servers-overview {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 11px;
-  min-height: 58px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--glass-border));
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--accent) 10%, transparent),
-      transparent 62%
-    ),
-    color-mix(in srgb, var(--glass-bg) 78%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.mcp-servers-overview-icon,
 .mcp-server-icon,
 .mcp-server-preset-icon {
   display: inline-flex;
@@ -32663,12 +32665,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--accent-strong);
 }
 
-.mcp-servers-overview-icon {
-  width: 36px;
-  height: 36px;
-}
-
-.mcp-servers-overview > div,
 .mcp-servers-empty > div,
 .mcp-servers-subheading > div {
   display: grid;
@@ -32676,7 +32672,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   min-width: 0;
 }
 
-.mcp-servers-overview strong,
 .mcp-servers-empty strong,
 .mcp-servers-subheading strong {
   color: var(--text-primary);
@@ -32684,7 +32679,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   font-weight: 700;
 }
 
-.mcp-servers-overview span:not(.mcp-servers-overview-icon),
 .mcp-servers-empty span,
 .mcp-servers-subheading span {
   color: var(--text-muted);

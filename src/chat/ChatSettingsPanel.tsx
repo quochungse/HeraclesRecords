@@ -41,7 +41,6 @@ import {
 } from "../../electron/chatModels";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
-import { McpServersPanel } from "./McpServersPanel";
 import type { CorosLinkApi } from "../coroslink-api";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
@@ -73,7 +72,6 @@ export function ChatSettingsPanel({
   connectingClaude,
   testingClaude,
   revokingClaude,
-  mcpRefreshVersion,
   busy,
   onSignIn,
   onSignOut,
@@ -105,7 +103,6 @@ export function ChatSettingsPanel({
   onTestLocalConnection,
   onSaveLocalSettings,
   onClearLocalApiKey,
-  onMcpServersChange,
   onUpdateChatSettings
 }: {
   api: CorosLinkApi | undefined;
@@ -126,7 +123,6 @@ export function ChatSettingsPanel({
   connectingClaude: boolean;
   testingClaude: boolean;
   revokingClaude: boolean;
-  mcpRefreshVersion: number;
   busy?: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
@@ -162,7 +158,6 @@ export function ChatSettingsPanel({
   onTestLocalConnection: () => void;
   onSaveLocalSettings: () => void;
   onClearLocalApiKey: () => void;
-  onMcpServersChange: () => void | Promise<void>;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
 }) {
   const availableLocalServers =
@@ -712,8 +707,9 @@ export function ChatSettingsPanel({
         <p className="chat-settings-copy">
           These selections control built-in COROS and Training Hub data.
           Connected custom MCP servers are trusted separately and can expose
-          their tools to Claude. Drafts stay local until you click an upload or
-          delete button.
+          their tools to Claude — add and remove them in Settings, under
+          Connections. Drafts stay local until you click an upload or delete
+          button.
         </p>
       </section>
 
@@ -997,21 +993,6 @@ export function ChatSettingsPanel({
               </p>
             ) : null}
         </div>
-      </section>
-
-      <section className="chat-settings-section">
-        <h3>MCP servers</h3>
-        <p className="chat-settings-copy">
-          Connect additional Model Context Protocol servers so the coach can call
-          their tools. Their tools appear alongside COROS, namespaced per server.
-          Only add servers you trust because tool descriptions and returned data
-          are shared with the selected coach provider.
-        </p>
-        <McpServersPanel
-          api={api}
-          refreshVersion={mcpRefreshVersion}
-          onChange={onMcpServersChange}
-        />
       </section>
 
       <section className="chat-settings-section">

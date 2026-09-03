@@ -32,7 +32,6 @@ export function ChatSettingsModal({
   connectingClaude,
   testingClaude,
   revokingClaude,
-  mcpRefreshVersion,
   busy,
   onClose,
   onSignIn,
@@ -65,7 +64,6 @@ export function ChatSettingsModal({
   onTestLocalConnection,
   onSaveLocalSettings,
   onClearLocalApiKey,
-  onMcpServersChange,
   onUpdateChatSettings
 }: {
   api: CorosLinkApi | undefined;
@@ -87,7 +85,6 @@ export function ChatSettingsModal({
   connectingClaude: boolean;
   testingClaude: boolean;
   revokingClaude: boolean;
-  mcpRefreshVersion: number;
   busy?: boolean;
   onClose: () => void;
   onSignIn: () => void;
@@ -124,7 +121,6 @@ export function ChatSettingsModal({
   onTestLocalConnection: () => void;
   onSaveLocalSettings: () => void;
   onClearLocalApiKey: () => void;
-  onMcpServersChange: () => void | Promise<void>;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
 }) {
   useEffect(() => {
@@ -192,7 +188,6 @@ export function ChatSettingsModal({
             connectingClaude={connectingClaude}
             testingClaude={testingClaude}
             revokingClaude={revokingClaude}
-            mcpRefreshVersion={mcpRefreshVersion}
             busy={busy}
             onSignIn={onSignIn}
             onSignOut={onSignOut}
@@ -224,7 +219,6 @@ export function ChatSettingsModal({
             onTestLocalConnection={onTestLocalConnection}
             onSaveLocalSettings={onSaveLocalSettings}
             onClearLocalApiKey={onClearLocalApiKey}
-            onMcpServersChange={onMcpServersChange}
             onUpdateChatSettings={onUpdateChatSettings}
           />
         </div>

@@ -4,7 +4,6 @@ import {
   CircleCheck,
   KeyRound,
   Loader2,
-  Network,
   Plus,
   Plug,
   PlugZap,
@@ -38,6 +37,26 @@ const PRESETS: Array<McpServerInput & { description: string }> = [
     description: "Activities, routes, and performance data"
   }
 ];
+
+/**
+ * Roll the raw statuses into the counts a summary line needs. The panel itself
+ * no longer shows them — the Connections row in Settings that opens this panel
+ * does, so the numbers sit next to the thing you click rather than being
+ * repeated once the panel is already open.
+ */
+export function summarizeMcpStatuses(
+  servers: { id: string }[],
+  statuses: McpServerStatus[]
+): { total: number; connected: number; tools: number } {
+  return {
+    total: servers.length,
+    connected: statuses.filter((status) => status.connected).length,
+    tools: statuses.reduce(
+      (total, status) => total + (status.connected ? status.toolCount : 0),
+      0
+    )
+  };
+}
 
 export function McpServersPanel({
   api,
@@ -99,36 +118,9 @@ export function McpServersPanel({
 
   const existingIds = new Set(servers.map((s) => s.id));
   const availablePresets = PRESETS.filter((p) => !existingIds.has(p.id ?? ""));
-  const connectedCount = Object.values(statuses).filter(
-    (status) => status.connected
-  ).length;
-  const toolCount = Object.values(statuses).reduce(
-    (total, status) => total + (status.connected ? status.toolCount : 0),
-    0
-  );
 
   return (
     <div className="mcp-servers-panel">
-      <div className="mcp-servers-overview" aria-live="polite">
-        <span className="mcp-servers-overview-icon" aria-hidden="true">
-          <Network size={17} />
-        </span>
-        <div>
-          <strong>
-            {loading
-              ? "Checking connections"
-              : `${connectedCount} of ${servers.length} connected`}
-          </strong>
-          <span>
-            {loading
-              ? "Loading server status and available tools"
-              : toolCount > 0
-                ? `${toolCount} tools ready for the coach`
-                : "Connect a server to make its tools available"}
-          </span>
-        </div>
-      </div>
-
       {error ? (
         <p className="mcp-servers-error" role="alert">
           <AlertCircle size={15} aria-hidden="true" />

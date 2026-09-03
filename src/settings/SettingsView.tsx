@@ -34,7 +34,9 @@ import type {
   AppUpdateSnapshot,
   TrainingHubStatus,
 } from "../../electron/types";
+import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { CorosLinkApi } from "../coroslink-api";
+import { McpServersModal } from "./McpServersModal";
 import { formatBytes } from "../media/libraryUtils";
 import { useTheme } from "../theme/ThemeProvider";
 import {
@@ -89,13 +91,6 @@ const PENDING_CONNECTIONS: {
   icon: LucideIcon;
 }[] = [
   {
-    id: "mcp-servers",
-    label: "MCP Servers",
-    description:
-      "Model Context Protocol servers the coach can call as tools.",
-    icon: Server,
-  },
-  {
     id: "coach-models",
     label: "Coach Models",
     description: "Providers and models the AI coach runs on.",
@@ -108,6 +103,26 @@ const PENDING_CONNECTIONS: {
     icon: Cloud,
   },
 ];
+
+interface McpSummary {
+  total: number;
+  connected: number;
+  tools: number;
+}
+
+function mcpSummaryLine(summary: McpSummary | null): string {
+  if (!summary) {
+    return "Checking connections…";
+  }
+  if (summary.total === 0) {
+    return "No servers added. Connect one to give the coach more tools.";
+  }
+
+  const servers = `${summary.connected} of ${summary.total} connected`;
+  return summary.tools > 0
+    ? `${servers} · ${summary.tools} ${summary.tools === 1 ? "tool" : "tools"} ready for the coach`
+    : servers;
+}
 
 const PLATFORM_LABELS: Record<string, string> = {
   darwin: "macOS",
@@ -181,6 +196,9 @@ export function SettingsView({
     null,
   );
   const [settingsPage, setSettingsPage] = useState<"main" | "storage">("main");
+  const [mcpModalOpen, setMcpModalOpen] = useState(false);
+  const [mcpSummary, setMcpSummary] = useState<McpSummary | null>(null);
+  const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
   const { unitSystem, setUnitSystem } = useUnitSystem();
@@ -198,6 +216,36 @@ export function SettingsView({
     storeSportColors(next);
     applySportColors(next);
   }
+
+  // The row's own summary. It reads the same two calls the panel does rather
+  // than the panel reporting upward, so the number is right before the dialog
+  // has ever been opened.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [servers, statuses] = await Promise.all([
+          api.listMcpServers(),
+          api.getMcpStatuses()
+        ]);
+        if (!cancelled) {
+          setMcpSummary(summarizeMcpStatuses(servers, statuses));
+        }
+      } catch {
+        // A failed status read is not worth an error toast in Settings; the
+        // row falls back to its "checking" line and the dialog reports the
+        // real failure when it is opened.
+        if (!cancelled) {
+          setMcpSummary(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, mcpRefreshVersion]);
 
   const loadAppInfo = useCallback(async () => {
     setLoading(true);
@@ -441,6 +489,26 @@ export function SettingsView({
             </div>
           )}
 
+          <button
+            className="settings-nav-row"
+            type="button"
+            onClick={() => setMcpModalOpen(true)}
+          >
+            <span className="settings-nav-row-icon" aria-hidden="true">
+              <Server size={22} strokeWidth={1.9} />
+            </span>
+            <span className="settings-nav-row-copy">
+              <strong>MCP Servers</strong>
+              <span>{mcpSummaryLine(mcpSummary)}</span>
+            </span>
+            <ChevronRight
+              className="settings-storage-link-chevron"
+              size={20}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </button>
+
           {PENDING_CONNECTIONS.map(({ id, label, description, icon: Icon }) => (
             <button className="settings-nav-row" type="button" key={id} disabled>
               <span className="settings-nav-row-icon" aria-hidden="true">
@@ -666,6 +734,14 @@ export function SettingsView({
           />
         </button>
       </div>
+
+      <McpServersModal
+        api={api}
+        open={mcpModalOpen}
+        refreshVersion={mcpRefreshVersion}
+        onClose={() => setMcpModalOpen(false)}
+        onChange={() => setMcpRefreshVersion((version) => version + 1)}
+      />
     </section>
   );
 }

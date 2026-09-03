@@ -1860,7 +1860,6 @@ export function ChatView({
   const [mcpStatuses, setMcpStatuses] = useState<McpServerStatus[]>([]);
   const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
   const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
-  const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
   const [mcpBusy, setMcpBusy] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [selectedPlanDraftId, setSelectedPlanDraftId] = useState<
@@ -2370,19 +2369,23 @@ export function ChatView({
     if (statusesResult.status === "fulfilled") {
       setMcpStatuses(statusesResult.value);
     }
-    setMcpRefreshVersion((version) => version + 1);
   }, [api]);
 
   // Load MCP connection status on mount (and shortly after, to catch the
   // silent startup reconnect completing in the main process).
+  //
+  // Keyed on `active` as well, because servers are added and removed from
+  // Settings now, not from here. This panel stays mounted once opened, so
+  // without this the tool list would still show whatever was connected the
+  // first time Coach was opened.
   useEffect(() => {
-    if (!api) return;
+    if (!api || !active) return;
     void refreshMcpStatuses();
     const timer = setTimeout(() => void refreshMcpStatuses(), 2500);
     return () => {
       clearTimeout(timer);
     };
-  }, [api, refreshMcpStatuses]);
+  }, [active, api, refreshMcpStatuses]);
 
   // Ask about dead MCP sessions here rather than at launch: nothing opens an
   // OAuth window on the athlete's behalf any more, so this is the one place
@@ -4130,7 +4133,6 @@ export function ChatView({
 
   const settingsModalProps = {
     api,
-    mcpRefreshVersion,
     open: settingsOpen,
     chatSettings,
     authStatus,
@@ -4184,7 +4186,6 @@ export function ChatView({
     onTestLocalConnection: () => void handleTestLocalConnection(),
     onSaveLocalSettings: () => void handleSaveLocalSettings(),
     onClearLocalApiKey: () => void handleClearLocalApiKey(),
-    onMcpServersChange: refreshMcpStatuses,
     onUpdateChatSettings: (patch: Partial<ChatSettings>) =>
       void handleUpdateChatSettings(patch)
   };
