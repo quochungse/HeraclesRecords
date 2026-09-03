@@ -11,7 +11,7 @@ import {
 } from "./database";
 import type {
   ActivityHrTrendPreview,
-  ActivityVisualHrSection,
+  ActivityVisualChannelSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
   ChatEntryAutomationMarker,
@@ -408,22 +408,33 @@ function parseSeriesPoint(value: unknown): TrainingHubActivitySeriesPoint | null
     return null;
   }
 
+  // Every channel the sample can carry, so a reloaded conversation draws the
+  // same charts it drew when the tool ran. A channel missing here is a channel
+  // that silently empties out on the next session restore.
   const point: TrainingHubActivitySeriesPoint = {};
-  if (typeof value.distance === "number") {
-    point.distance = value.distance;
-  }
-  if (typeof value.hr === "number") {
-    point.hr = value.hr;
-  }
-  if (typeof value.pace === "number") {
-    point.pace = value.pace;
-  }
-  if (typeof value.power === "number") {
-    point.power = value.power;
+  for (const channel of SERIES_POINT_CHANNELS) {
+    const sample = value[channel];
+    if (typeof sample === "number") {
+      point[channel] = sample;
+    }
   }
 
   return Object.keys(point).length > 0 ? point : null;
 }
+
+const SERIES_POINT_CHANNELS = [
+  "elapsed",
+  "distance",
+  "hr",
+  "pace",
+  "power",
+  "altitude",
+  "cadence",
+  "strideLength",
+  "groundTime",
+  "verticalOscillation",
+  "verticalRatio"
+] as const satisfies readonly (keyof TrainingHubActivitySeriesPoint)[];
 
 function parseTrackPoint(value: unknown): TrainingHubTrackPoint | null {
   if (!isRecord(value)) {
@@ -449,11 +460,12 @@ function parseVisualLapPoint(value: unknown): ActivityVisualLapPoint | null {
     maxHr: typeof value.maxHr === "number" ? value.maxHr : undefined,
     distance: typeof value.distance === "number" ? value.distance : undefined,
     duration: typeof value.duration === "number" ? value.duration : undefined,
-    pace: typeof value.pace === "number" ? value.pace : undefined
+    pace: typeof value.pace === "number" ? value.pace : undefined,
+    avgCadence: typeof value.avgCadence === "number" ? value.avgCadence : undefined
   };
 }
 
-function parseHrSection(value: unknown): ActivityVisualHrSection | null {
+function parseChannelSection(value: unknown): ActivityVisualChannelSection | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -505,11 +517,19 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
 
   const sections: ActivityVisualPreview["sections"] = {};
   if (value.sections.hr !== undefined) {
-    const hr = parseHrSection(value.sections.hr);
+    const hr = parseChannelSection(value.sections.hr);
     if (!hr) {
       return null;
     }
     sections.hr = hr;
+  }
+
+  if (value.sections.cadence !== undefined) {
+    const cadence = parseChannelSection(value.sections.cadence);
+    if (!cadence) {
+      return null;
+    }
+    sections.cadence = cadence;
   }
 
   if (value.sections.pace !== undefined) {

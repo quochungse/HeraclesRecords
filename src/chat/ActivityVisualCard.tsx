@@ -8,7 +8,10 @@ import {
   YAxis
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
-import type { ActivityVisualPreview } from "../../electron/types";
+import type {
+  ActivityVisualLapPoint,
+  ActivityVisualPreview
+} from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -40,33 +43,98 @@ function formatPaceValue(
   return formatPaceSecondsPerKm(paceSecondsPerKm, unitSystem);
 }
 
-function HrTooltip({ active, payload, label }: TooltipContentProps) {
+function LapBarTooltip({
+  active,
+  payload,
+  label,
+  formatValue
+}: TooltipContentProps & { formatValue: (value: number) => string }) {
   if (!active || !payload?.length) {
     return null;
   }
 
-  const hr = payload[0]?.value;
+  const value = payload[0]?.value;
 
   return (
     <div className="training-chart-tooltip">
       <span>{label}</span>
-      <strong>{typeof hr === "number" ? `${Math.round(hr)} bpm` : "-"}</strong>
+      <strong>{typeof value === "number" ? formatValue(value) : "-"}</strong>
     </div>
   );
 }
 
-function buildHrBarData(preview: ActivityVisualPreview) {
-  return (preview.sections.hr?.laps ?? [])
-    .filter((lap) => lap.avgHr !== undefined && Number.isFinite(lap.avgHr))
-    .map((lap) => ({
-      label: `Lap ${lap.index}`,
-      hr: lap.avgHr!
-    }));
+interface LapBarDatum {
+  label: string;
+  value: number;
+}
+
+/**
+ * The per-lap view of a channel, for the activities where COROS records lap
+ * averages and no sample stream. Shared by heart rate and cadence so the two
+ * fall back to the same chart rather than to two copies of it.
+ */
+function ChatLapBarChart({
+  data,
+  name,
+  formatValue
+}: {
+  data: LapBarDatum[];
+  name: string;
+  formatValue: (value: number) => string;
+}) {
+  const { colors } = useChartColors();
+
+  return (
+    <div className="chat-visual-chart-shell">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={trainingChartMargin}>
+          <XAxis
+            dataKey="label"
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={16}
+          />
+          <YAxis
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+            domain={["auto", "auto"]}
+          />
+          <Tooltip
+            content={(props) => (
+              <LapBarTooltip {...props} formatValue={formatValue} />
+            )}
+            cursor={{ fill: colors.cursor }}
+            contentStyle={trainingChartTooltipStyle}
+          />
+          <Bar
+            dataKey="value"
+            name={name}
+            fill={colors.accentBright}
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function buildLapBarData(
+  laps: ActivityVisualLapPoint[] | undefined,
+  pick: (lap: ActivityVisualLapPoint) => number | undefined
+): LapBarDatum[] {
+  return (laps ?? [])
+    .map((lap) => ({ label: `Lap ${lap.index}`, value: pick(lap) }))
+    .filter((datum): datum is LapBarDatum =>
+      datum.value !== undefined && Number.isFinite(datum.value)
+    );
 }
 
 export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
   const { unitSystem } = useUnitSystem();
-  const { colors } = useChartColors();
   const swim = preview.sportType === 300 || preview.sportType === 301;
   const cycling = isCyclingSportType(preview.sportType);
   const hrSeriesData = useMemo(
@@ -76,7 +144,27 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
         : [],
     [preview, swim, unitSystem]
   );
-  const hrBarData = useMemo(() => buildHrBarData(preview), [preview]);
+  const hrBarData = useMemo(
+    () => buildLapBarData(preview.sections.hr?.laps, (lap) => lap.avgHr),
+    [preview]
+  );
+  const cadenceSeriesData = useMemo(
+    () =>
+      preview.sections.cadence?.chartKind === "series" &&
+      preview.sections.cadence.series
+        ? buildDistanceSeriesData(
+            preview.sections.cadence.series,
+            "cadence",
+            unitSystem,
+            swim
+          )
+        : [],
+    [preview, swim, unitSystem]
+  );
+  const cadenceBarData = useMemo(
+    () => buildLapBarData(preview.sections.cadence?.laps, (lap) => lap.avgCadence),
+    [preview]
+  );
   const paceData = useMemo(
     () =>
       preview.sections.pace?.series
@@ -105,9 +193,13 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
     [preview, unitSystem]
   );
 
+  const cadenceUnit = cycling ? "rpm" : "spm";
   const title = preview.name ?? "Activity";
   const subtitle = preview.startTime ?? undefined;
   const laps = preview.sections.laps ?? [];
+  // The column only appears where a lap actually recorded cadence, so a pool
+  // swim keeps the narrow table it has now.
+  const lapsHaveCadence = laps.some((lap) => lap.avgCadence !== undefined);
 
   return (
     <div className="chat-visual-card">
@@ -143,38 +235,11 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
               formatValue={(value) => `${Math.round(value)} bpm`}
             />
           ) : hrBarData.length >= 2 ? (
-            <div className="chat-visual-chart-shell">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hrBarData} margin={trainingChartMargin}>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    minTickGap={16}
-                  />
-                  <YAxis
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={36}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    content={(props) => <HrTooltip {...props} />}
-                    cursor={{ fill: colors.cursor }}
-                    contentStyle={trainingChartTooltipStyle}
-                  />
-                  <Bar
-                    dataKey="hr"
-                    name="Avg HR"
-                    fill={colors.accentBright}
-                    radius={[4, 4, 0, 0]}
-                    isAnimationActive={false}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <ChatLapBarChart
+              data={hrBarData}
+              name="Avg HR"
+              formatValue={(value) => `${Math.round(value)} bpm`}
+            />
           ) : (
             <p className="chat-visual-empty">
               Heart rate samples are not available for this activity.
@@ -226,6 +291,29 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
         </section>
       ) : null}
 
+      {preview.sections.cadence ? (
+        <section className="chat-visual-section">
+          <h5>Cadence</h5>
+          {preview.sections.cadence.chartKind === "series" &&
+          cadenceSeriesData.length >= 2 ? (
+            <ChatMiniAreaChart
+              data={cadenceSeriesData}
+              gradientId={`chatCadenceFill-${preview.previewId}`}
+              name="Cadence"
+              formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
+            />
+          ) : cadenceBarData.length >= 2 ? (
+            <ChatLapBarChart
+              data={cadenceBarData}
+              name="Avg cadence"
+              formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
+            />
+          ) : (
+            <p className="chat-visual-empty">Cadence samples are not available.</p>
+          )}
+        </section>
+      ) : null}
+
       {preview.sections.elevation ? (
         <section className="chat-visual-section">
           <h5>Elevation</h5>
@@ -255,6 +343,7 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
                   <th>Avg HR</th>
                   <th>Max HR</th>
                   <th>{cycling ? "Speed" : "Pace"}</th>
+                  {lapsHaveCadence ? <th>{cadenceUnit.toUpperCase()}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -272,6 +361,9 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
                           ? formatPaceValue(lap.pace, unitSystem)
                           : "—"}
                     </td>
+                    {lapsHaveCadence ? (
+                      <td>{formatOptionalNumber(lap.avgCadence)}</td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

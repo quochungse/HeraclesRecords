@@ -118,8 +118,14 @@ export function ChatMiniAreaChart({
 }
 
 export function buildDistanceSeriesData(
-  series: { distance?: number; hr?: number; pace?: number; power?: number }[],
-  valueKey: "hr" | "pace" | "power",
+  series: {
+    distance?: number;
+    hr?: number;
+    pace?: number;
+    power?: number;
+    cadence?: number;
+  }[],
+  valueKey: "hr" | "pace" | "power" | "cadence",
   unitSystem: UnitSystem,
   swim = false,
   paceAsSpeed = false

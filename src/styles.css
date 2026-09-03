@@ -22822,6 +22822,10 @@ tr.data-intervals-row-missing {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* A flex item defaults to min-width: auto, which refuses to shrink below its
+     content — the lap table would push straight through the card edge instead
+     of scrolling inside it. */
+  min-width: 0;
 }
 
 .chat-visual-section h5 {
@@ -22829,6 +22833,40 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 650;
   color: var(--text-secondary);
+}
+
+/* The lap table scrolls sideways inside the card rather than widening it. The
+   global `table` rule sets min-width: 720px, which every other table in the app
+   cancels from its own shell; this one had no shell at all. */
+.chat-plan-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.chat-plan-table {
+  min-width: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-plan-table th,
+.chat-plan-table td {
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chat-plan-table th {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.chat-plan-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .chat-zone-card {

@@ -3,10 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import {
+  elevationUnit,
   formatDistanceValue,
   formatPaceValue,
   formatSpeedValue,
   formatWeightValue,
+  metersToElevation,
   normalizeUnitSystem
 } from "./unitSystem.js";
 import {
@@ -44,6 +46,7 @@ import type {
   TrainingHubActivityZoneBucket,
   TrainingHubActivityFileType,
   TrainingHubActivityLap,
+  TrainingHubLapPhase,
   TrainingHubExportFormat,
   TrainingHubActivityTrack,
   TrainingHubTrackPoint,
@@ -4673,6 +4676,26 @@ function flattenLapItems(entry: unknown): Record<string, unknown>[] {
  */
 const COROS_LAP_MODE_ROLLUP = new Set([16, 17]);
 
+/**
+ * What each structured-workout lap `mode` is for.
+ *
+ * Read off a structured run that files its four laps as modes 4, 2, 3, 5 in the
+ * order they were run, with average HR 130, 170, 140 and 125: only warm-up →
+ * interval → recovery → cool-down fits that HR shape, so 4 is the warm-up and 2
+ * the work rep, not the other way round. 14 and 15 are the gym set and the rest
+ * after it, already established by the roll-up grouping above. Every other
+ * value — 0 on an unstructured run, 16/17 on the roll-up rows — is left
+ * unmapped rather than guessed at.
+ */
+const COROS_LAP_PHASES: Record<number, TrainingHubLapPhase> = {
+  2: "work",
+  3: "recovery",
+  4: "warmup",
+  5: "cooldown",
+  14: "set",
+  15: "rest"
+};
+
 function isRollupLapItem(item: Record<string, unknown>): boolean {
   const mode = toOptionalNumber(item.mode);
   return mode !== undefined && COROS_LAP_MODE_ROLLUP.has(mode);
@@ -5275,17 +5298,81 @@ function pickNumericSeries(
   return undefined;
 }
 
+/**
+ * Parallel per-sample arrays, one per recorded channel, as COROS lays them out
+ * inside a `graphList` entry or at the root of the detail payload. Each is
+ * independently present: a wrist-only run carries `hr` and `pace` and nothing
+ * from the running-form group.
+ */
+interface ActivitySeriesChannels {
+  elapsed?: number[];
+  distance?: number[];
+  hr?: number[];
+  pace?: number[];
+  power?: number[];
+  altitude?: number[];
+  cadence?: number[];
+  strideLength?: number[];
+  groundTime?: number[];
+  verticalOscillation?: number[];
+  verticalRatio?: number[];
+}
+
+const SERIES_CHANNEL_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
+  elapsed: ["timeList", "elapsedList", "secondList", "durationList"],
+  distance: ["distanceList", "distance"],
+  hr: ["heartRateList", "hrList", "heartRates", "heartRate", "avgHrList"],
+  pace: ["paceList", "speedList", "avgPaceList"],
+  power: ["powerList", "wattsList", "avgPowerList"],
+  altitude: ["altitudeList", "altitude", "elevationList", "elevation"],
+  cadence: ["cadenceList", "cadence", "avgCadenceList"],
+  strideLength: [
+    "cadenceLengthList",
+    "strideLengthList",
+    "avgStrideLengthList",
+    "cadenceLength"
+  ],
+  groundTime: ["groundTimeList", "groundTime"],
+  verticalOscillation: [
+    "verticalVibrationList",
+    "strideHeightList",
+    "verticalVibration"
+  ],
+  verticalRatio: [
+    "verticalStrideRatioList",
+    "strideRatioList",
+    "verticalStrideRatio"
+  ]
+};
+
+/**
+ * Read every channel a source object carries. The channel-summary form of a
+ * `graphList` entry — `{ key: "cadence", graphItem: { avg, max } }` — holds
+ * objects rather than arrays under those names, so it drops out here and is
+ * picked up by `graphChannelStat` instead.
+ */
+function pickSeriesChannels(
+  source: Record<string, unknown>
+): ActivitySeriesChannels {
+  const channels: ActivitySeriesChannels = {};
+  for (const [channel, keys] of Object.entries(SERIES_CHANNEL_KEYS) as [
+    keyof ActivitySeriesChannels,
+    string[]
+  ][]) {
+    const series = pickNumericSeries(source, keys);
+    if (series) {
+      channels[channel] = series;
+    }
+  }
+  return channels;
+}
+
 function mergeSeriesArrays(
-  distance?: number[],
-  hr?: number[],
-  pace?: number[],
-  power?: number[]
+  channels: ActivitySeriesChannels
 ): TrainingHubActivitySeriesPoint[] {
   const length = Math.max(
-    distance?.length ?? 0,
-    hr?.length ?? 0,
-    pace?.length ?? 0,
-    power?.length ?? 0
+    0,
+    ...Object.values(channels).map((series) => series?.length ?? 0)
   );
 
   if (length === 0) {
@@ -5295,6 +5382,13 @@ function mergeSeriesArrays(
   const points: TrainingHubActivitySeriesPoint[] = [];
   for (let index = 0; index < length; index += 1) {
     const point: TrainingHubActivitySeriesPoint = {};
+    const { elapsed, distance, hr, pace, power } = channels;
+
+    // Left in the payload's own units; `scaleSeriesElapsed` converts the whole
+    // channel once it can be checked against the activity duration.
+    if (elapsed && elapsed[index] !== undefined && elapsed[index]! >= 0) {
+      point.elapsed = elapsed[index];
+    }
     if (distance && distance[index] !== undefined) {
       point.distance = normalizeActivityDistanceMeters(distance[index]);
     }
@@ -5310,12 +5404,10 @@ function mergeSeriesArrays(
     if (power && power[index] !== undefined) {
       point.power = Math.round(power[index]!);
     }
-    if (
-      point.distance !== undefined ||
-      point.hr !== undefined ||
-      point.pace !== undefined ||
-      point.power !== undefined
-    ) {
+
+    assignFormSample(point, channels, index);
+
+    if (Object.values(point).some((value) => value !== undefined)) {
       points.push(point);
     }
   }
@@ -5323,22 +5415,115 @@ function mergeSeriesArrays(
   return points;
 }
 
+/**
+ * Altitude and the running-form group, scaled the same way the summary and lap
+ * fields are: altitude and stride length arrive x100, vertical oscillation in
+ * millimetres, vertical ratio in tenths of a percent. A non-positive sample is
+ * COROS's "not recorded" here, exactly as it is at activity level.
+ */
+function assignFormSample(
+  point: TrainingHubActivitySeriesPoint,
+  channels: ActivitySeriesChannels,
+  index: number
+): void {
+  const samples: [keyof TrainingHubActivitySeriesPoint, number | undefined][] = [
+    ["altitude", roundTo(normalizeTrackElevation(channels.altitude?.[index]), 1)],
+    ["cadence", positiveNumber(channels.cadence?.[index])],
+    [
+      "strideLength",
+      roundTo(corosCentimetersToMeters(positiveNumber(channels.strideLength?.[index])), 2)
+    ],
+    ["groundTime", positiveNumber(channels.groundTime?.[index])],
+    [
+      "verticalOscillation",
+      roundTo(
+        millimetresToCentimetres(positiveNumber(channels.verticalOscillation?.[index])),
+        1
+      )
+    ],
+    [
+      "verticalRatio",
+      roundTo(tenthsToUnits(positiveNumber(channels.verticalRatio?.[index])), 1)
+    ]
+  ];
+
+  for (const [field, value] of samples) {
+    if (value !== undefined) {
+      point[field] = field === "cadence" || field === "groundTime"
+        ? Math.round(value)
+        : value;
+    }
+  }
+}
+
+/**
+ * Per-point field names inside a `frequencyList`, where COROS sends an array of
+ * sample objects rather than one array per channel. Distance keeps its own
+ * `normalizeActivityDistanceMeters` treatment in `mergeSeriesArrays`, so the
+ * raw value is collected here unscaled, exactly as the parallel-array form is.
+ */
+const FREQUENCY_POINT_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
+  elapsed: ["time", "elapsed", "second", "duration"],
+  distance: ["distance", "totalDistance"],
+  hr: ["heartRate", "hr", "avgHr"],
+  pace: ["pace", "speed", "avgPace"],
+  power: ["power", "watts", "avgPower"],
+  altitude: ["altitude", "elevation", "elev"],
+  cadence: ["cadence", "avgCadence"],
+  strideLength: ["cadenceLength", "strideLength", "avgStrideLength"],
+  groundTime: ["groundTime"],
+  verticalOscillation: ["verticalVibration", "strideHeight"],
+  verticalRatio: ["verticalStrideRatio", "strideRatio"]
+};
+
+/**
+ * A channel is only collected when every sample object carries it, so the
+ * arrays stay index-aligned with each other. Dropping absent samples instead
+ * would shift a sparse channel onto the wrong points.
+ */
+function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
+  const points = list.filter(
+    (entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object"
+  );
+  if (points.length === 0) {
+    return {};
+  }
+
+  const channels: ActivitySeriesChannels = {};
+  for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
+    keyof ActivitySeriesChannels,
+    string[]
+  ][]) {
+    const values = points.map((point) => {
+      for (const key of keys) {
+        const value = toOptionalNumber(point[key]);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+      return undefined;
+    });
+
+    if (values.every((value) => value !== undefined)) {
+      channels[channel] = values as number[];
+    }
+  }
+
+  return channels;
+}
+
 function collectSeriesCandidates(raw: Record<string, unknown>): TrainingHubActivitySeriesPoint[][] {
   const candidates: TrainingHubActivitySeriesPoint[][] = [];
-  const rootDistance = pickNumericSeries(raw, ["distanceList", "distance"]);
-  const rootHr = pickNumericSeries(raw, [
-    "heartRateList",
-    "hrList",
-    "heartRates",
-    "avgHrList"
-  ]);
-  const rootPace = pickNumericSeries(raw, ["paceList", "speedList", "avgPaceList"]);
-  const rootPower = pickNumericSeries(raw, ["powerList", "wattsList", "avgPowerList"]);
 
-  const rootSeries = mergeSeriesArrays(rootDistance, rootHr, rootPace, rootPower);
-  if (rootSeries.length > 0) {
-    candidates.push(rootSeries);
-  }
+  const pushMerged = (channels: ActivitySeriesChannels): void => {
+    const merged = mergeSeriesArrays(channels);
+    if (merged.length > 0) {
+      candidates.push(merged);
+    }
+  };
+
+  pushMerged(pickSeriesChannels(raw));
 
   const graphList = raw.graphList;
   const graphItems = Array.isArray(graphList)
@@ -5352,80 +5537,91 @@ function collectSeriesCandidates(raw: Record<string, unknown>): TrainingHubActiv
       continue;
     }
     const series = item as Record<string, unknown>;
-    const distance =
-      pickNumericSeries(series, ["distanceList", "distance"]) ??
-      (Array.isArray(series.frequencyList)
-        ? series.frequencyList
-            .map((point) =>
-              point && typeof point === "object"
-                ? normalizeActivityDistanceMeters(
-                    toOptionalNumber((point as Record<string, unknown>).distance)
-                  )
-                : undefined
-            )
-            .filter((value): value is number => value !== undefined)
-        : undefined);
-    const hr = pickNumericSeries(series, [
-      "heartRateList",
-      "hrList",
-      "heartRates",
-      "heartRate",
-      "avgHrList"
-    ]);
-    const pace = pickNumericSeries(series, ["paceList", "speedList", "avgPaceList"]);
-    const power = pickNumericSeries(series, ["powerList", "wattsList", "avgPowerList"]);
-    const merged = mergeSeriesArrays(distance, hr, pace, power);
-    if (merged.length > 0) {
-      candidates.push(merged);
+    const channels = pickSeriesChannels(series);
+    if (Array.isArray(series.frequencyList)) {
+      pushMerged({ ...channelsFromFrequencyList(series.frequencyList), ...channels });
+    } else {
+      pushMerged(channels);
     }
   }
 
   if (Array.isArray(raw.frequencyList)) {
-    const distance = raw.frequencyList
-      .map((point) =>
-        point && typeof point === "object"
-          ? normalizeActivityDistanceMeters(
-              toOptionalNumber((point as Record<string, unknown>).distance)
-            )
-          : undefined
-      )
-      .filter((value): value is number => value !== undefined);
-    const hr = raw.frequencyList
-      .map((point) =>
-        point && typeof point === "object"
-          ? toOptionalNumber((point as Record<string, unknown>).heartRate) ??
-            toOptionalNumber((point as Record<string, unknown>).hr) ??
-            toOptionalNumber((point as Record<string, unknown>).avgHr)
-          : undefined
-      )
-      .filter((value): value is number => value !== undefined);
-    const pace = raw.frequencyList
-      .map((point) =>
-        point && typeof point === "object"
-          ? toOptionalNumber((point as Record<string, unknown>).pace) ??
-            toOptionalNumber((point as Record<string, unknown>).speed)
-          : undefined
-      )
-      .filter((value): value is number => value !== undefined);
-    const merged = mergeSeriesArrays(distance, hr, pace, undefined);
-    if (merged.length > 0) {
-      candidates.push(merged);
-    }
+    pushMerged(channelsFromFrequencyList(raw.frequencyList));
   }
 
   return candidates;
 }
 
+/**
+ * Put the `elapsed` channel into seconds, or drop it.
+ *
+ * COROS is inconsistent about time units across its endpoints — detail payloads
+ * store durations at 0.01 s precision, the list API sends seconds — and there
+ * is no field in the payload that says which one a sample array used. So rather
+ * than guess, the last sample is checked against the activity's own duration:
+ * whichever divisor lands within 10% of it is the right one, and if neither
+ * does the channel is a timestamp of some other kind and is removed. A wrong
+ * time column in front of the coach is worse than no time column.
+ */
+function scaleSeriesElapsed(
+  points: TrainingHubActivitySeriesPoint[],
+  durationSeconds: number | undefined
+): TrainingHubActivitySeriesPoint[] {
+  const last = [...points].reverse().find((point) => point.elapsed !== undefined);
+  if (last?.elapsed === undefined) {
+    return points;
+  }
+
+  const divisor =
+    durationSeconds && durationSeconds > 0
+      ? [1, 100, 1000].find(
+          (candidate) =>
+            Math.abs(last.elapsed! / candidate - durationSeconds) <=
+            durationSeconds * 0.1
+        )
+      : undefined;
+
+  return points.map((point) => {
+    if (point.elapsed === undefined) {
+      return point;
+    }
+    if (divisor === undefined) {
+      const { elapsed: _dropped, ...rest } = point;
+      return rest;
+    }
+    return { ...point, elapsed: Math.round(point.elapsed / divisor) };
+  });
+}
+
 export function parseActivitySeries(
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  durationSeconds?: number
 ): TrainingHubActivitySeriesPoint[] {
   const candidates = collectSeriesCandidates(raw);
   if (candidates.length === 0) {
     return [];
   }
 
-  return candidates.sort((left, right) => right.length - left.length)[0] ?? [];
+  const best = candidates.sort((left, right) => right.length - left.length)[0] ?? [];
+  return scaleSeriesElapsed(best, durationSeconds);
 }
+
+const SERIES_LAST_VALUE_CHANNELS = [
+  "elapsed",
+  "distance",
+  "altitude"
+] as const satisfies readonly (keyof TrainingHubActivitySeriesPoint)[];
+
+const SERIES_MEAN_CHANNELS = [
+  ["hr", 0],
+  ["pace", 0],
+  ["power", 0],
+  ["cadence", 0],
+  ["strideLength", 2],
+  ["groundTime", 0],
+  ["verticalOscillation", 1],
+  ["verticalRatio", 1]
+] as const satisfies readonly [keyof TrainingHubActivitySeriesPoint, number][];
 
 export function downsampleActivitySeries(
   points: TrainingHubActivitySeriesPoint[],
@@ -5447,41 +5643,85 @@ export function downsampleActivitySeries(
     }
 
     const point: TrainingHubActivitySeriesPoint = {};
-    const distances = bucket
-      .map((item) => item.distance)
-      .filter((value): value is number => value !== undefined);
-    const hrs = bucket.map((item) => item.hr).filter((value): value is number => value !== undefined);
-    const paces = bucket
-      .map((item) => item.pace)
-      .filter((value): value is number => value !== undefined);
-    const powers = bucket
-      .map((item) => item.power)
-      .filter((value): value is number => value !== undefined);
 
-    if (distances.length > 0) {
-      point.distance = distances[distances.length - 1];
-    }
-    if (hrs.length > 0) {
-      point.hr = Math.round(hrs.reduce((sum, value) => sum + value, 0) / hrs.length);
-    }
-    if (paces.length > 0) {
-      point.pace = Math.round(paces.reduce((sum, value) => sum + value, 0) / paces.length);
-    }
-    if (powers.length > 0) {
-      point.power = Math.round(powers.reduce((sum, value) => sum + value, 0) / powers.length);
+    // Cumulative channels take the last value in the bucket so the axis still
+    // reads as a progression; measured ones take the bucket mean. Altitude is
+    // cumulative in neither sense but is a position, not a rate, so the last
+    // reading is the one that belongs at the bucket's distance.
+    for (const channel of SERIES_LAST_VALUE_CHANNELS) {
+      const value = bucketChannel(bucket, channel).at(-1);
+      if (value !== undefined) {
+        point[channel] = value;
+      }
     }
 
-    if (
-      point.distance !== undefined ||
-      point.hr !== undefined ||
-      point.pace !== undefined ||
-      point.power !== undefined
-    ) {
+    for (const [channel, decimals] of SERIES_MEAN_CHANNELS) {
+      const values = bucketChannel(bucket, channel);
+      if (values.length > 0) {
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        point[channel] = roundTo(mean, decimals);
+      }
+    }
+
+    if (Object.values(point).some((value) => value !== undefined)) {
       sampled.push(point);
     }
   }
 
   return sampled;
+}
+
+function bucketChannel(
+  bucket: TrainingHubActivitySeriesPoint[],
+  channel: keyof TrainingHubActivitySeriesPoint
+): number[] {
+  return bucket
+    .map((item) => item[channel])
+    .filter((value): value is number => value !== undefined);
+}
+
+interface SeriesColumn {
+  header: string;
+  value: (point: TrainingHubActivitySeriesPoint) => string | undefined;
+}
+
+/**
+ * Elapsed time as `m:ss` or `h:mm:ss`. Kept local rather than reusing the chat
+ * formatter's copy, which lives downstream of this module.
+ */
+function formatElapsedClock(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  const paddedSeconds = String(secs).padStart(2, "0");
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${paddedSeconds}`
+    : `${minutes}:${paddedSeconds}`;
+}
+
+/**
+ * Columns added only when some sample carries them, so a wrist-only run keeps
+ * the four-column table it had before and a Pace Pro run with a pod gains the
+ * altitude and running-form columns. Distance, HR, pace and power stay
+ * unconditional: they are what a coach reads first, and a dash reads better
+ * than a table whose shape moves between activities.
+ */
+function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
+  return [
+    {
+      header: `Alt (${elevationUnit(unitSystem)})`,
+      value: (point) =>
+        point.altitude !== undefined
+          ? `${Math.round(metersToElevation(point.altitude, unitSystem))}`
+          : undefined
+    },
+    { header: "Cad", value: (point) => point.cadence?.toFixed(0) },
+    { header: "Stride (m)", value: (point) => point.strideLength?.toFixed(2) },
+    { header: "GCT (ms)", value: (point) => point.groundTime?.toFixed(0) },
+    { header: "VO (cm)", value: (point) => point.verticalOscillation?.toFixed(1) },
+    { header: "Vert ratio (%)", value: (point) => point.verticalRatio?.toFixed(1) }
+  ];
 }
 
 export function formatActivitySeriesForChat(
@@ -5494,9 +5734,29 @@ export function formatActivitySeriesForChat(
     return "Time series: no HR/pace/power samples available.";
   }
 
-  const header = `Distance | HR | ${cycling ? "Speed" : "Pace"} | Power`;
+  const hasElapsed = points.some((point) => point.elapsed !== undefined);
+  const optional = optionalSeriesColumns(unitSystem).filter((column) =>
+    points.some((point) => column.value(point) !== undefined)
+  );
+
+  const header = [
+    hasElapsed ? "Time" : undefined,
+    "Distance",
+    "HR",
+    cycling ? "Speed" : "Pace",
+    "Power",
+    ...optional.map((column) => column.header)
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
   const rows = points.map((point) =>
     [
+      hasElapsed
+        ? point.elapsed !== undefined
+          ? formatElapsedClock(point.elapsed)
+          : "—"
+        : undefined,
       point.distance !== undefined
         ? formatDistanceValue(point.distance, unitSystem, { swim })
         : "—",
@@ -5506,8 +5766,11 @@ export function formatActivitySeriesForChat(
           ? formatSpeedValue(3600 / point.pace, unitSystem)
           : formatPaceValue(point.pace, unitSystem).replace(" /", "/")
         : "—",
-      point.power !== undefined ? `${point.power} W` : "—"
-    ].join(" | ")
+      point.power !== undefined ? `${point.power} W` : "—",
+      ...optional.map((column) => column.value(point) ?? "—")
+    ]
+      .filter((cell) => cell !== undefined)
+      .join(" | ")
   );
 
   return ["Time series (downsampled):", header, ...rows].join("\n");
@@ -5744,43 +6007,108 @@ function graphChannelStat(
   return undefined;
 }
 
+/**
+ * A maximum is only kept when it actually exceeds its own average. COROS emits
+ * pairs that cannot both be true — the `cadenceLength` channel comes back
+ * `{ avg: 99, max: 97 }` on a real run — and "stride length 0.99 m (max
+ * 0.97 m)" in front of the coach is worse than reporting no maximum at all.
+ */
+function maxAbove(
+  average: number | undefined,
+  maximum: number | undefined
+): number | undefined {
+  if (maximum === undefined) {
+    return undefined;
+  }
+
+  return average !== undefined && maximum < average ? undefined : maximum;
+}
+
 export function parseActivityDynamics(
   raw: Record<string, unknown>,
   summary: Record<string, unknown>
 ): TrainingHubActivityDynamics | undefined {
   // Summary first, graph channel second: where both are populated they agree,
   // and where the summary is zeroed the channel still carries the number.
+  const avgCadence =
+    positiveNumber(summary.avgCadence) ?? graphChannelStat(raw, "cadence", "avg");
+  const strideLength = roundTo(
+    corosCentimetersToMeters(
+      positiveNumber(summary.avgStepLen) ??
+        graphChannelStat(raw, "cadenceLength", "avg")
+    ),
+    2
+  );
+  const groundTime =
+    positiveNumber(summary.avgGroundTime) ??
+    graphChannelStat(raw, "groundTime", "avg");
+  const verticalOscillation = roundTo(
+    millimetresToCentimetres(
+      positiveNumber(summary.avgVertVibration) ??
+        graphChannelStat(raw, "verticalVibration", "avg")
+    ),
+    1
+  );
+  const verticalRatio = roundTo(
+    tenthsToUnits(
+      positiveNumber(summary.avgVertRatio) ??
+        graphChannelStat(raw, "verticalStrideRatio", "avg")
+    ),
+    1
+  );
+  const avgPower =
+    positiveNumber(summary.avgPower) ?? graphChannelStat(raw, "power", "avg");
+
   const dynamics: TrainingHubActivityDynamics = {
-    avgCadence:
-      positiveNumber(summary.avgCadence) ?? graphChannelStat(raw, "cadence", "avg"),
-    maxCadence:
-      positiveNumber(summary.maxCadence) ?? graphChannelStat(raw, "cadence", "max"),
-    strideLength: roundTo(
-      corosCentimetersToMeters(
-        positiveNumber(summary.avgStepLen) ??
-          graphChannelStat(raw, "cadenceLength", "avg")
-      ),
-      2
+    avgCadence,
+    maxCadence: maxAbove(
+      avgCadence,
+      positiveNumber(summary.maxCadence) ?? graphChannelStat(raw, "cadence", "max")
     ),
-    groundTime:
-      positiveNumber(summary.avgGroundTime) ??
-      graphChannelStat(raw, "groundTime", "avg"),
-    verticalOscillation: roundTo(
-      millimetresToCentimetres(
-        positiveNumber(summary.avgVertVibration) ??
-          graphChannelStat(raw, "verticalVibration", "avg")
-      ),
-      1
+    strideLength,
+    maxStrideLength: maxAbove(
+      strideLength,
+      roundTo(
+        corosCentimetersToMeters(
+          positiveNumber(summary.maxStepLen) ??
+            graphChannelStat(raw, "cadenceLength", "max")
+        ),
+        2
+      )
     ),
-    verticalRatio: roundTo(
-      tenthsToUnits(
-        positiveNumber(summary.avgVertRatio) ??
-          graphChannelStat(raw, "verticalStrideRatio", "avg")
-      ),
-      1
+    groundTime,
+    maxGroundTime: maxAbove(
+      groundTime,
+      positiveNumber(summary.maxGroundTime) ??
+        graphChannelStat(raw, "groundTime", "max")
     ),
-    avgPower: positiveNumber(summary.avgPower) ?? graphChannelStat(raw, "power", "avg"),
-    maxPower: positiveNumber(summary.maxPower) ?? graphChannelStat(raw, "power", "max")
+    verticalOscillation,
+    maxVerticalOscillation: maxAbove(
+      verticalOscillation,
+      roundTo(
+        millimetresToCentimetres(
+          positiveNumber(summary.maxVertVibration) ??
+            graphChannelStat(raw, "verticalVibration", "max")
+        ),
+        1
+      )
+    ),
+    verticalRatio,
+    maxVerticalRatio: maxAbove(
+      verticalRatio,
+      roundTo(
+        tenthsToUnits(
+          positiveNumber(summary.maxVertRatio) ??
+            graphChannelStat(raw, "verticalStrideRatio", "max")
+        ),
+        1
+      )
+    ),
+    avgPower,
+    maxPower: maxAbove(
+      avgPower,
+      positiveNumber(summary.maxPower) ?? graphChannelStat(raw, "power", "max")
+    )
   };
 
   return Object.values(dynamics).some((value) => value !== undefined)
@@ -5923,6 +6251,13 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     "totalAscent",
     "elevGain"
   ]);
+  const descentRaw = pickActivityNumber(raw, summary, [
+    "descent",
+    "elevationLoss",
+    "totalDescent",
+    "elevLoss"
+  ]);
+  const duration = normalizeCorosDetailDurationSeconds(durationRaw);
 
   return {
     activityId:
@@ -5939,7 +6274,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
         toOptionalNumber(summary.startTime) ??
         toOptionalNumber(summary.startTimestamp)
     ),
-    duration: normalizeCorosDetailDurationSeconds(durationRaw),
+    duration,
     distance: normalizeActivityDistanceMeters(distanceRaw),
     avgHr:
       toOptionalNumber(raw.avgHr) ??
@@ -5949,6 +6284,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
       toOptionalNumber(summary.maxHr),
     calories: pickActivityCalories(raw, summary),
     elevationGain: normalizeActivityElevationMeters(elevationRaw),
+    elevationLoss: normalizeActivityElevationMeters(descentRaw),
     trainingLoad:
       toOptionalNumber(raw.trainingLoad) ??
       toOptionalNumber(summary.trainingLoad),
@@ -5959,7 +6295,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,
-    series: parseActivitySeries(raw),
+    series: parseActivitySeries(raw, duration),
     strength: parseStrengthDetail(raw),
     raw
   };
@@ -5996,6 +6332,7 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
   }
 
   const avgPace = toOptionalNumber(lap.avgPace);
+  const mode = toOptionalNumber(lap.mode);
 
   return {
     index: index + 1,
@@ -6003,6 +6340,8 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
     duration,
     avgHr: toOptionalNumber(lap.avgHr),
     maxHr: toOptionalNumber(lap.maxHr),
+    mode,
+    phase: mode !== undefined ? COROS_LAP_PHASES[mode] : undefined,
     pace:
       (avgPace !== undefined &&
       isPlausiblePaceSecondsPerKm(normalizeActivityDuration(avgPace) ?? avgPace)

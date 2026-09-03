@@ -1983,6 +1983,21 @@ export interface TrainingHubRacePredictor {
   raw?: Record<string, unknown>;
 }
 
+/**
+ * What a structured-workout lap was for. Read off the COROS lap `mode`, which
+ * a structured run files as 2–5 (interval, recovery, warm-up, cool-down) and a
+ * gym session as 14/15 (set, rest). `mode` values outside those leave `phase`
+ * absent rather than guessing — the same field is 0 on an unstructured run and
+ * carries roll-up codes 16/17 the lap grouping already separates out.
+ */
+export type TrainingHubLapPhase =
+  | "warmup"
+  | "work"
+  | "recovery"
+  | "cooldown"
+  | "set"
+  | "rest";
+
 export interface TrainingHubActivityLap {
   index: number;
   distance?: number;
@@ -1991,6 +2006,10 @@ export interface TrainingHubActivityLap {
   maxHr?: number;
   pace?: number;
   elevationGain?: number;
+  /** Raw COROS lap `mode`, kept so an unmapped value stays inspectable. */
+  mode?: number;
+  /** Structured-workout phase, when `mode` names one. */
+  phase?: TrainingHubLapPhase;
   /** Steps per minute for foot sports, rpm for cycling. */
   avgCadence?: number;
   maxCadence?: number;
@@ -2021,12 +2040,20 @@ export interface TrainingHubActivityDynamics {
   maxCadence?: number;
   /** Metres. */
   strideLength?: number;
+  /** Metres. */
+  maxStrideLength?: number;
   /** Ground contact time, milliseconds. */
   groundTime?: number;
+  /** Ground contact time, milliseconds. */
+  maxGroundTime?: number;
   /** Vertical oscillation, centimetres. */
   verticalOscillation?: number;
+  /** Vertical oscillation, centimetres. */
+  maxVerticalOscillation?: number;
   /** Vertical oscillation as a percentage of stride length. */
   verticalRatio?: number;
+  /** Vertical oscillation as a percentage of stride length. */
+  maxVerticalRatio?: number;
   avgPower?: number;
   maxPower?: number;
 }
@@ -2074,11 +2101,31 @@ export interface TrainingHubActivityTrack {
   points: TrainingHubTrackPoint[];
 }
 
+/**
+ * One sample of an activity's recorded channels. Every field is optional and
+ * populated independently: COROS fills whichever channels the watch and its
+ * pods recorded, so a wrist-only easy run carries HR and pace while a Pace Pro
+ * run adds the whole running-form group.
+ */
 export interface TrainingHubActivitySeriesPoint {
+  /** Seconds from the start of the activity. */
+  elapsed?: number;
   distance?: number;
   hr?: number;
   pace?: number;
   power?: number;
+  /** Metres above sea level. */
+  altitude?: number;
+  /** Steps per minute for foot sports, rpm for cycling. */
+  cadence?: number;
+  /** Metres. COROS sends centimetres. */
+  strideLength?: number;
+  /** Ground contact time, milliseconds. */
+  groundTime?: number;
+  /** Vertical oscillation, centimetres. COROS sends millimetres. */
+  verticalOscillation?: number;
+  /** Vertical oscillation as a percentage of stride length. COROS sends tenths. */
+  verticalRatio?: number;
 }
 
 export interface StrengthSet {
@@ -2204,6 +2251,8 @@ export interface TrainingHubActivityDetail {
   maxHr?: number;
   calories?: number;
   elevationGain?: number;
+  /** Total descent in metres. */
+  elevationLoss?: number;
   trainingLoad?: number;
   /** Grade-adjusted pace in seconds per kilometre. */
   adjustedPace?: number;
@@ -3688,13 +3737,23 @@ export interface ActivityVisualLapPoint {
   distance?: number;
   duration?: number;
   pace?: number;
+  /** Steps per minute for foot sports, rpm for cycling. */
+  avgCadence?: number;
 }
 
-export interface ActivityVisualHrSection {
+/**
+ * A channel the card can draw either way. `series` is the per-sample recording
+ * and `laps` the per-lap averages, which is all COROS returns for plenty of
+ * activities — a channel with only lap averages still draws as a bar per lap
+ * rather than dropping off the card.
+ */
+export interface ActivityVisualChannelSection {
   chartKind: "series" | "laps";
   series?: TrainingHubActivitySeriesPoint[];
   laps?: ActivityVisualLapPoint[];
 }
+
+export type ActivityVisualHrSection = ActivityVisualChannelSection;
 
 export interface ActivityVisualPreview {
   previewId: string;
@@ -3708,6 +3767,7 @@ export interface ActivityVisualPreview {
     hr?: ActivityVisualHrSection;
     pace?: { series: TrainingHubActivitySeriesPoint[] };
     power?: { series: TrainingHubActivitySeriesPoint[] };
+    cadence?: ActivityVisualChannelSection;
     elevation?: { points: TrainingHubTrackPoint[] };
     laps?: ActivityVisualLapPoint[];
   };

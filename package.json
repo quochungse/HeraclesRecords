@@ -55,6 +55,7 @@
     "test:coach-automation-plan-draft": "npm run build:electron && node scripts/test-coach-automation-plan-draft.mjs",
     "test:ipc-surface": "node scripts/test-ipc-surface.mjs",
     "test:chat-session-groups": "node --experimental-strip-types scripts/test-chat-session-groups.mjs",
+    "test:activity-detail": "npm run build:electron && node scripts/test-activity-detail.mjs",
     "test:chat-activity-tools": "npm run build:electron && node scripts/test-chat-activity-tools.mjs",
     "test:chat-analytics-tools": "npm run build:electron && node scripts/test-chat-analytics-tools.mjs",
     "test:sleep-data-parser": "npm run build:electron && node scripts/test-sleep-data-parser.mjs",

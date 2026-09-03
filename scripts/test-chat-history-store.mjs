@@ -787,4 +787,58 @@ assert.deepEqual(
   );
 }
 
+// An activity visual survives a save/reload with every channel it was drawn
+// from. Dropping a channel here empties the chart on the next session restore
+// without any error to show for it.
+const activityVisualEntry = {
+  kind: "activityVisual",
+  preview: {
+    previewId: "act-1:req-1",
+    activityId: "act-1",
+    sportType: 100,
+    name: "Easy 9 km",
+    startTime: "2026-03-02",
+    avgHr: 152,
+    maxHr: 168,
+    sections: {
+      hr: {
+        chartKind: "series",
+        series: [
+          { elapsed: 0, distance: 0, hr: 140, cadence: 175, groundTime: 240 },
+          { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
+        ]
+      },
+      cadence: {
+        chartKind: "laps",
+        laps: [
+          { index: 1, avgHr: 140, avgCadence: 172 },
+          { index: 2, avgHr: 148, avgCadence: 169 }
+        ]
+      },
+      laps: [
+        { index: 1, avgHr: 140, avgCadence: 172 },
+        { index: 2, avgHr: 148, avgCadence: 169 }
+      ]
+    }
+  }
+};
+
+const restoredVisual = parseChatTranscriptJson(
+  JSON.stringify([activityVisualEntry])
+);
+assert.equal(restoredVisual.length, 1);
+assert.deepEqual(restoredVisual[0].preview.sections.cadence, {
+  chartKind: "laps",
+  series: undefined,
+  laps: [
+    { index: 1, avgHr: 140, maxHr: undefined, distance: undefined, duration: undefined, pace: undefined, avgCadence: 172 },
+    { index: 2, avgHr: 148, maxHr: undefined, distance: undefined, duration: undefined, pace: undefined, avgCadence: 169 }
+  ]
+});
+assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
+  { elapsed: 0, distance: 0, hr: 140, cadence: 175, groundTime: 240 },
+  { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
+]);
+assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
+
 console.log("chat history store tests passed");

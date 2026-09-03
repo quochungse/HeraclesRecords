@@ -508,4 +508,149 @@ const singleViewDetail = parseActivityDetail({
 assert.equal(singleViewDetail.laps.length, 2);
 assert.equal(singleViewDetail.laps[0]?.duration, 500);
 
+// --- Lap phases off the COROS lap mode ---
+//
+// The structured-run fixture above files its laps as modes 4, 2, 3, 5, which is
+// what fixes the mapping: only warm-up -> interval -> recovery -> cool-down fits
+// its 130 / 170 / 140 / 125 average HR.
+assert.deepEqual(
+  structuredRunDetail.laps.map((lap) => lap.phase),
+  ["warmup", "work", "recovery", "cooldown"]
+);
+assert.deepEqual(
+  structuredRunDetail.laps.map((lap) => lap.mode),
+  [4, 2, 3, 5]
+);
+
+// Gym set-and-rest rows, and an unmapped mode staying unlabelled.
+const gymPhaseDetail = parseActivityDetail({
+  summary: { totalTime: 100000 },
+  lapList: [
+    {
+      type: 2,
+      lapItemList: [
+        { mode: 14, time: 4000, reps: 10 },
+        { mode: 15, time: 12000 },
+        { mode: 99, time: 4000 }
+      ]
+    }
+  ]
+});
+assert.deepEqual(
+  gymPhaseDetail.laps.map((lap) => lap.phase),
+  ["set", "rest", undefined]
+);
+assert.equal(gymPhaseDetail.laps[2]?.mode, 99, "an unmapped mode is still readable");
+
+// --- Peak running-form values, and the maximum COROS reports below its average ---
+assert.equal(dynamicsDetail.dynamics?.maxStrideLength, 0.97);
+assert.equal(dynamicsDetail.dynamics?.maxGroundTime, 383);
+assert.equal(dynamicsDetail.dynamics?.maxVerticalOscillation, 9.7);
+assert.equal(dynamicsDetail.dynamics?.maxVerticalRatio, 15.6);
+
+// With no summary avgStepLen the channel supplies both ends, and that channel
+// reports max 97 below avg 99 — an impossible pair, so no maximum is kept.
+const impossibleMaxDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 200000 },
+  graphList: [{ key: "cadenceLength", graphItem: { avg: 99, max: 97 } }]
+});
+assert.equal(impossibleMaxDetail.dynamics?.strideLength, 0.99);
+assert.equal(
+  impossibleMaxDetail.dynamics?.maxStrideLength,
+  undefined,
+  "a max below its own average is not a measurement"
+);
+
+// --- Descent ---
+assert.equal(
+  parseActivityDetail({
+    summary: { totalTime: 100000, ascent: 100500, descent: 99800 }
+  }).elevationLoss,
+  998
+);
+
+// --- Series channels beyond HR, pace and power ---
+//
+// A frequencyList of sample objects: every channel the watch recorded comes
+// through, scaled the same way the summary and lap fields are.
+const seriesDetail = parseActivityDetail({
+  summary: { totalTime: 300000, distance: 1000000 },
+  frequencyList: Array.from({ length: 10 }, (_, index) => ({
+    time: index * 33333,
+    distance: index * 100000,
+    heartRate: 140 + index,
+    pace: 300,
+    altitude: 12000 + index * 100,
+    cadence: 170 - index,
+    cadenceLength: 110,
+    groundTime: 240 + index,
+    verticalVibration: 85,
+    verticalStrideRatio: 100
+  }))
+});
+
+const firstSample = seriesDetail.series?.[1];
+assert.equal(firstSample?.cadence, 169);
+assert.equal(firstSample?.strideLength, 1.1);
+assert.equal(firstSample?.groundTime, 241);
+assert.equal(firstSample?.verticalOscillation, 8.5);
+assert.equal(firstSample?.verticalRatio, 10);
+assert.equal(firstSample?.altitude, 121);
+
+// The last sample sits at 333.33 s x 100; scaled against a 3000 s activity that
+// is centiseconds, so the channel is divided by 100.
+assert.equal(seriesDetail.series?.at(-1)?.elapsed, 3000);
+
+// One array per channel inside a graphList entry, the other shape COROS uses.
+const graphSeriesDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 400000 },
+  graphList: [
+    {
+      distanceList: [100000, 200000, 300000, 400000],
+      cadenceList: [180, 178, 176, 174],
+      groundTimeList: [230, 235, 240, 245],
+      verticalStrideRatioList: [90, 92, 94, 96]
+    },
+    { key: "cadence", graphItem: { avg: 177, max: 181 } }
+  ]
+});
+assert.equal(graphSeriesDetail.series?.length, 4);
+assert.equal(graphSeriesDetail.series?.[0]?.cadence, 180);
+assert.equal(graphSeriesDetail.series?.[3]?.verticalRatio, 9.6);
+assert.equal(
+  graphSeriesDetail.dynamics?.avgCadence,
+  177,
+  "the channel-summary entry still feeds the averages"
+);
+
+// A time channel that is neither seconds nor centiseconds of this activity is
+// some other timestamp, and is dropped rather than rendered.
+const bogusTimeDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 200000 },
+  frequencyList: [
+    { time: 178765877300, distance: 100000, heartRate: 140 },
+    { time: 178765881800, distance: 200000, heartRate: 145 }
+  ]
+});
+assert.ok(bogusTimeDetail.series?.length);
+assert.equal(
+  bogusTimeDetail.series?.every((point) => point.elapsed === undefined),
+  true
+);
+
+// A sparse channel is left out entirely rather than compacted onto the wrong
+// samples: dropping the missing entries would shift power onto earlier points.
+const sparseDetail = parseActivityDetail({
+  summary: { totalTime: 100000, distance: 300000 },
+  frequencyList: [
+    { distance: 100000, heartRate: 140, power: 200 },
+    { distance: 200000, heartRate: 145 },
+    { distance: 300000, heartRate: 150, power: 220 }
+  ]
+});
+assert.equal(
+  sparseDetail.series?.every((point) => point.power === undefined),
+  true
+);
+
 console.log("Activity detail parser tests passed.");
