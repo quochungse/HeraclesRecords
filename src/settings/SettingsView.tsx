@@ -34,8 +34,14 @@ import type {
   AppUpdateSnapshot,
   TrainingHubStatus,
 } from "../../electron/types";
+import {
+  coachModelsSummaryLine,
+  summarizeCoachModels,
+  type CoachModelsSummary
+} from "../chat/CoachModelsPanel";
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { CorosLinkApi } from "../coroslink-api";
+import { CoachModelsModal } from "./CoachModelsModal";
 import { McpServersModal } from "./McpServersModal";
 import { formatBytes } from "../media/libraryUtils";
 import { useTheme } from "../theme/ThemeProvider";
@@ -90,12 +96,6 @@ const PENDING_CONNECTIONS: {
   description: string;
   icon: LucideIcon;
 }[] = [
-  {
-    id: "coach-models",
-    label: "Coach Models",
-    description: "Providers and models the AI coach runs on.",
-    icon: BrainCircuit,
-  },
   {
     id: "cloud-sync",
     label: "Cloud Sync",
@@ -199,6 +199,9 @@ export function SettingsView({
   const [mcpModalOpen, setMcpModalOpen] = useState(false);
   const [mcpSummary, setMcpSummary] = useState<McpSummary | null>(null);
   const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
+  const [coachModelsOpen, setCoachModelsOpen] = useState(false);
+  const [coachModels, setCoachModels] = useState<CoachModelsSummary | null>(null);
+  const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
   const { unitSystem, setUnitSystem } = useUnitSystem();
@@ -246,6 +249,35 @@ export function SettingsView({
       cancelled = true;
     };
   }, [api, mcpRefreshVersion]);
+
+  // Same shape as the MCP row: the summary reads the settings and both account
+  // statuses itself, so the row is right before the dialog is ever opened.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [chatSettings, authStatus, claudeStatus] = await Promise.all([
+          api.getChatSettings(),
+          api.getChatAuthStatus(),
+          api.getClaudeCodeStatus()
+        ]);
+        if (!cancelled) {
+          setCoachModels(
+            summarizeCoachModels(chatSettings, authStatus, claudeStatus)
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setCoachModels(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, coachRefreshVersion]);
 
   const loadAppInfo = useCallback(async () => {
     setLoading(true);
@@ -509,6 +541,26 @@ export function SettingsView({
             />
           </button>
 
+          <button
+            className="settings-nav-row"
+            type="button"
+            onClick={() => setCoachModelsOpen(true)}
+          >
+            <span className="settings-nav-row-icon" aria-hidden="true">
+              <BrainCircuit size={22} strokeWidth={1.9} />
+            </span>
+            <span className="settings-nav-row-copy">
+              <strong>Coach Models</strong>
+              <span>{coachModelsSummaryLine(coachModels)}</span>
+            </span>
+            <ChevronRight
+              className="settings-storage-link-chevron"
+              size={20}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </button>
+
           {PENDING_CONNECTIONS.map(({ id, label, description, icon: Icon }) => (
             <button className="settings-nav-row" type="button" key={id} disabled>
               <span className="settings-nav-row-icon" aria-hidden="true">
@@ -741,6 +793,13 @@ export function SettingsView({
         refreshVersion={mcpRefreshVersion}
         onClose={() => setMcpModalOpen(false)}
         onChange={() => setMcpRefreshVersion((version) => version + 1)}
+      />
+
+      <CoachModelsModal
+        api={api}
+        open={coachModelsOpen}
+        onClose={() => setCoachModelsOpen(false)}
+        onChange={() => setCoachRefreshVersion((version) => version + 1)}
       />
     </section>
   );

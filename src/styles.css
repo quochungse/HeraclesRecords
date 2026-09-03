@@ -18721,6 +18721,138 @@ tr.data-intervals-row-missing {
   line-height: 1.55;
 }
 
+/* Coach models stacks five provider cards, each with its own fields; the
+   narrower dialog width crams them. */
+.app-modal.is-wide {
+  width: min(860px, 96vw);
+}
+
+/* A dialog whose content always overflows anyway is pinned to the height it
+   would settle at. Left to `max-height` it opens at the size of whatever has
+   loaded so far and grows as the rest arrives, which reads as a flicker. */
+.app-modal.is-tall {
+  height: min(92vh, 900px);
+}
+
+/* The panel is the Coach settings panel's stack of sections, without the
+   scroll container Coach wraps it in — the dialog body scrolls instead.
+   Scoped to the dialog so it beats `.chat-settings-panel`, which sets its own
+   overflow further down the file. */
+.app-modal .coach-models-panel {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  gap: 16px;
+}
+
+/* Coach's own modal gives its sections roomier padding; match it here so the
+   two dialogs do not read as different components. */
+.app-modal .chat-settings-section {
+  padding: 16px;
+}
+
+/* Field rows inside Coach models size themselves to the dialog, not to the
+   window. `.chat-local-settings` was written for the full-width Coach view:
+   five fixed columns, relaxed only by a `max-width: 1080px` media query — and
+   a media query asks about the window, which says nothing about an 860px
+   dialog. So on any window wider than 1080px the five columns kept their
+   desktop widths and ran ~200px past the dialog edge, clipping Save and
+   squeezing the reasoning-effort explainer to one word per line; below 1080px
+   the same layout happened to fit, which is why it read as a large-window bug.
+   `auto-fit` reflows on the width actually available, so a field that no
+   longer fits drops to the next row instead of overflowing. */
+.coach-models-panel .chat-local-settings-panel {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Direct children only: the permission checkboxes in `.chat-claude-permissions`
+   are `.chat-local-tools` too, and they keep their own two-column grid.
+   These are the rows that want the whole line — a prose paragraph, a row of
+   buttons, a connection result — rather than one column among the fields. */
+.coach-models-panel .chat-local-settings-panel > .chat-settings-copy,
+.coach-models-panel .chat-local-settings-panel > .chat-local-tools,
+.coach-models-panel .chat-local-settings-panel > .chat-local-actions,
+.coach-models-panel .chat-local-settings-panel > .chat-local-result {
+  grid-column: 1 / -1;
+}
+
+/* Buttons wrap onto a second line rather than running off the dialog. The
+   OpenRouter and Claude-subscription rows already carried their own
+   `flex-wrap`; the Claude API key and Local model rows did not, and those are
+   the two that ran off the edge. */
+.coach-models-panel .chat-local-actions {
+  flex-wrap: wrap;
+}
+
+/* `nowrap` belongs to the wide Coach layout, where this label sits in a
+   fixed column. On its own full-width row it can wrap like any other text,
+   which is what keeps it inside a narrow dialog. */
+.coach-models-panel .chat-local-settings-panel > .chat-local-tools {
+  white-space: normal;
+}
+
+/* The Claude subscription section is the longest one in the dialog and its
+   `.chat-settings-section` gap spaces every child the same 10px, so its
+   groups — what the section is, which credentials to run on, what the
+   connection is doing, and which model to use — ran together as one list.
+   Only what *starts* a group takes the extra margin, so it lands on the seam
+   rather than inside a group: the executable field stays tucked under the
+   switch that reveals it, and a group's heading carries the seam rather than
+   the control underneath it. */
+.coach-models-panel .chat-claude-section > .chat-claude-group-title,
+.coach-models-panel .chat-claude-section > .chat-claude-status {
+  margin-top: 14px;
+}
+
+/* Names the group the way `.chat-claude-permissions > strong` names its own,
+   so the two sub-headings in this section read as the same thing rather than
+   as a heading and a stray bold line. */
+.chat-claude-group-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* The same row as the Connections list, sitting above the Coach settings
+   sections. It matches their background rather than the panel's so the stack
+   reads as one list. */
+.chat-settings-nav-row {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/* One block per provider section, at roughly the height the real ones settle
+   at, so the dialog opens at its final size instead of growing into it. */
+.coach-models-skeleton {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.16);
+  padding: 16px;
+}
+
+.coach-models-skeleton i {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+}
+
+.coach-models-skeleton-title {
+  width: 34%;
+  height: 15px;
+}
+
+.coach-models-skeleton-line {
+  width: 76%;
+}
+
+.coach-models-skeleton-field {
+  width: 100%;
+  height: 34px;
+  border-radius: var(--radius-sm);
+}
+
 .chat-settings-modal .chat-settings-panel {
   height: auto;
   max-height: calc(min(92vh, 900px) - 58px);
@@ -18730,19 +18862,6 @@ tr.data-intervals-row-missing {
 
 .chat-settings-modal .chat-settings-section {
   padding: 16px;
-}
-
-.chat-settings-modal .chat-local-settings-panel {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.chat-settings-modal .chat-local-field-key,
-.chat-settings-modal .chat-local-tools,
-.chat-settings-modal .chat-local-actions,
-.chat-settings-modal .chat-local-result {
-  grid-column: 1 / -1;
 }
 
 .chat-settings-button {

@@ -1,142 +1,79 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Settings2, X } from "lucide-react";
-import type {
-  AnthropicApiConnectionTest,
-  ChatAuthStatus,
-  ChatSettings,
-  ClaudeCodeStatus,
-  LocalChatConnectionTest,
-  LocalChatDiscovery,
-  OpenRouterConnectionTest
-} from "../../electron/types";
+import type { ChatSettings } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import { CoachModelsModal } from "../settings/CoachModelsModal";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
+import {
+  coachModelsSummaryLine,
+  summarizeCoachModels,
+  type CoachModelsSummary
+} from "./CoachModelsPanel";
 
 export function ChatSettingsModal({
   api,
   open,
   chatSettings,
-  authStatus,
-  claudeStatus,
-  openRouterApiKey,
-  openRouterConnection,
-  localApiKey,
-  localConnection,
-  localDiscovery,
-  savingSettings,
-  testingLocal,
-  testingOpenRouter,
-  detectingLocal,
-  signingIn,
-  checkingClaude,
-  connectingClaude,
-  testingClaude,
-  revokingClaude,
-  busy,
   onClose,
-  onSignIn,
-  onSignOut,
-  onRefreshClaude,
-  onClaudeSignedIn,
-  onRevokeClaude,
-  onTestClaude,
-  onOpenClaudeSetupGuide,
-  onUpdateClaudeCode,
-  onOpenRouterApiKeyChange,
-  onUpdateOpenRouterDraft,
-  onTestOpenRouterConnection,
-  onSaveOpenRouterSettings,
-  onClearOpenRouterApiKey,
-  onOpenOpenRouterKeys,
-  onOpenOpenRouterModels,
-  anthropicApiKey,
-  anthropicConnection,
-  testingAnthropic,
-  onAnthropicApiKeyChange,
-  onUpdateAnthropic,
-  onTestAnthropicConnection,
-  onSaveAnthropicSettings,
-  onClearAnthropicApiKey,
-  onOpenAnthropicKeyGuide,
-  onLocalApiKeyChange,
-  onUpdateLocalDraft,
-  onDetectLocalServers,
-  onTestLocalConnection,
-  onSaveLocalSettings,
-  onClearLocalApiKey,
   onUpdateChatSettings
 }: {
   api: CorosLinkApi | undefined;
   open: boolean;
   chatSettings: ChatSettings;
-  authStatus: ChatAuthStatus | null;
-  claudeStatus: ClaudeCodeStatus | null;
-  openRouterApiKey: string;
-  openRouterConnection: OpenRouterConnectionTest | null;
-  localApiKey: string;
-  localConnection: LocalChatConnectionTest | null;
-  localDiscovery: LocalChatDiscovery | null;
-  savingSettings: boolean;
-  testingLocal: boolean;
-  testingOpenRouter: boolean;
-  detectingLocal: boolean;
-  signingIn: boolean;
-  checkingClaude: boolean;
-  connectingClaude: boolean;
-  testingClaude: boolean;
-  revokingClaude: boolean;
-  busy?: boolean;
   onClose: () => void;
-  onSignIn: () => void;
-  onSignOut: () => void;
-  onRefreshClaude: () => void;
-  onClaudeSignedIn: (status: ClaudeCodeStatus) => void;
-  onRevokeClaude: () => void;
-  onTestClaude: () => void;
-  onOpenClaudeSetupGuide: () => void;
-  onUpdateClaudeCode: (
-    patch: Partial<ChatSettings["claudeCode"]>
-  ) => void;
-  onOpenRouterApiKeyChange: (value: string) => void;
-  onUpdateOpenRouterDraft: (
-    patch: Partial<ChatSettings["openRouter"]>
-  ) => void;
-  onTestOpenRouterConnection: () => void;
-  onSaveOpenRouterSettings: () => void;
-  onClearOpenRouterApiKey: () => void;
-  onOpenOpenRouterKeys: () => void;
-  onOpenOpenRouterModels: () => void;
-  anthropicApiKey: string;
-  anthropicConnection: AnthropicApiConnectionTest | null;
-  testingAnthropic: boolean;
-  onAnthropicApiKeyChange: (value: string) => void;
-  onUpdateAnthropic: (patch: Partial<ChatSettings["anthropic"]>) => void;
-  onTestAnthropicConnection: () => void;
-  onSaveAnthropicSettings: () => void;
-  onClearAnthropicApiKey: () => void;
-  onOpenAnthropicKeyGuide: () => void;
-  onLocalApiKeyChange: (value: string) => void;
-  onUpdateLocalDraft: (patch: Partial<ChatSettings["local"]>) => void;
-  onDetectLocalServers: () => void;
-  onTestLocalConnection: () => void;
-  onSaveLocalSettings: () => void;
-  onClearLocalApiKey: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
 }) {
+  const [coachModelsOpen, setCoachModelsOpen] = useState(false);
+  const [coachModels, setCoachModels] = useState<CoachModelsSummary | null>(
+    null
+  );
+  const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
+
   useEffect(() => {
     if (!open) {
       return;
     }
 
+    // Escape belongs to whichever dialog is on top. Both listen on the
+    // document, so one calling stopPropagation would not spare the other —
+    // this one stands down while the models dialog is open.
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !coachModelsOpen) {
         onClose();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, coachModelsOpen, onClose]);
+
+  useEffect(() => {
+    if (!open || !api) {
+      return;
+    }
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [chatSettings, authStatus, claudeStatus] = await Promise.all([
+          api.getChatSettings(),
+          api.getChatAuthStatus(),
+          api.getClaudeCodeStatus()
+        ]);
+        if (!cancelled) {
+          setCoachModels(
+            summarizeCoachModels(chatSettings, authStatus, claudeStatus)
+          );
+        }
+      } catch {
+        if (!cancelled) setCoachModels(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, open, coachRefreshVersion]);
 
   if (!open) {
     return null;
@@ -172,57 +109,19 @@ export function ChatSettingsModal({
           <ChatSettingsPanel
             api={api}
             chatSettings={chatSettings}
-            authStatus={authStatus}
-            claudeStatus={claudeStatus}
-            openRouterApiKey={openRouterApiKey}
-            openRouterConnection={openRouterConnection}
-            localApiKey={localApiKey}
-            localConnection={localConnection}
-            localDiscovery={localDiscovery}
-            savingSettings={savingSettings}
-            testingLocal={testingLocal}
-            testingOpenRouter={testingOpenRouter}
-            detectingLocal={detectingLocal}
-            signingIn={signingIn}
-            checkingClaude={checkingClaude}
-            connectingClaude={connectingClaude}
-            testingClaude={testingClaude}
-            revokingClaude={revokingClaude}
-            busy={busy}
-            onSignIn={onSignIn}
-            onSignOut={onSignOut}
-            onRefreshClaude={onRefreshClaude}
-            onClaudeSignedIn={onClaudeSignedIn}
-            onRevokeClaude={onRevokeClaude}
-            onTestClaude={onTestClaude}
-            onOpenClaudeSetupGuide={onOpenClaudeSetupGuide}
-            onUpdateClaudeCode={onUpdateClaudeCode}
-            onOpenRouterApiKeyChange={onOpenRouterApiKeyChange}
-            onUpdateOpenRouterDraft={onUpdateOpenRouterDraft}
-            onTestOpenRouterConnection={onTestOpenRouterConnection}
-            onSaveOpenRouterSettings={onSaveOpenRouterSettings}
-            onClearOpenRouterApiKey={onClearOpenRouterApiKey}
-            onOpenOpenRouterKeys={onOpenOpenRouterKeys}
-            onOpenOpenRouterModels={onOpenOpenRouterModels}
-            anthropicApiKey={anthropicApiKey}
-            anthropicConnection={anthropicConnection}
-            testingAnthropic={testingAnthropic}
-            onAnthropicApiKeyChange={onAnthropicApiKeyChange}
-            onUpdateAnthropic={onUpdateAnthropic}
-            onTestAnthropicConnection={onTestAnthropicConnection}
-            onSaveAnthropicSettings={onSaveAnthropicSettings}
-            onClearAnthropicApiKey={onClearAnthropicApiKey}
-            onOpenAnthropicKeyGuide={onOpenAnthropicKeyGuide}
-            onLocalApiKeyChange={onLocalApiKeyChange}
-            onUpdateLocalDraft={onUpdateLocalDraft}
-            onDetectLocalServers={onDetectLocalServers}
-            onTestLocalConnection={onTestLocalConnection}
-            onSaveLocalSettings={onSaveLocalSettings}
-            onClearLocalApiKey={onClearLocalApiKey}
+            coachModelsSummary={coachModelsSummaryLine(coachModels)}
+            onOpenCoachModels={() => setCoachModelsOpen(true)}
             onUpdateChatSettings={onUpdateChatSettings}
           />
         </div>
       </section>
+
+      <CoachModelsModal
+        api={api}
+        open={coachModelsOpen}
+        onClose={() => setCoachModelsOpen(false)}
+        onChange={() => setCoachRefreshVersion((version) => version + 1)}
+      />
     </div>
   );
 }

@@ -109,6 +109,7 @@ import {
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
+import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
@@ -1789,26 +1790,8 @@ export function ChatView({
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [testingLocal, setTestingLocal] = useState(false);
-  const [testingOpenRouter, setTestingOpenRouter] = useState(false);
-  const [detectingLocal, setDetectingLocal] = useState(false);
-  const [openRouterApiKey, setOpenRouterApiKey] = useState("");
-  const [openRouterConnection, setOpenRouterConnection] =
-    useState<OpenRouterConnectionTest | null>(null);
-  const [localApiKey, setLocalApiKey] = useState("");
-  const [localConnection, setLocalConnection] =
-    useState<LocalChatConnectionTest | null>(null);
-  const [localDiscovery, setLocalDiscovery] =
-    useState<LocalChatDiscovery | null>(null);
-  const [anthropicApiKey, setAnthropicApiKey] = useState("");
-  const [anthropicConnection, setAnthropicConnection] =
-    useState<AnthropicApiConnectionTest | null>(null);
-  const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [claudeStatus, setClaudeStatus] = useState<ClaudeCodeStatus | null>(null);
   const [checkingClaude, setCheckingClaude] = useState(false);
-  const [connectingClaude, setConnectingClaude] = useState(false);
-  const [testingClaude, setTestingClaude] = useState(false);
-  const [revokingClaude, setRevokingClaude] = useState(false);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [automationsOpen, setAutomationsOpen] = useState(false);
@@ -2371,6 +2354,29 @@ export function ChatView({
     }
   }, [api]);
 
+  // Provider settings and the Claude account are edited in Settings now, under
+  // Connections, so re-read them whenever Coach comes back to the front. This
+  // panel stays mounted once opened; without this the provider picker would
+  // still show whatever was configured the first time it was shown.
+  useEffect(() => {
+    if (!api || !active || checkingAuth) return;
+    let cancelled = false;
+
+    void (async () => {
+      const [settings, claude] = await Promise.allSettled([
+        api.getChatSettings(),
+        api.getClaudeCodeStatus()
+      ]);
+      if (cancelled) return;
+      if (settings.status === "fulfilled") setChatSettings(settings.value);
+      if (claude.status === "fulfilled") setClaudeStatus(claude.value);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [active, api, checkingAuth]);
+
   // Load MCP connection status on mount (and shortly after, to catch the
   // silent startup reconnect completing in the main process).
   //
@@ -2812,41 +2818,7 @@ export function ChatView({
     }
   };
 
-  const handleRevokeClaudeCode = async () => {
-    if (!api || revokingClaude) return;
-    setRevokingClaude(true);
-    onError(null);
-    try {
-      setClaudeStatus(await api.revokeClaudeCodeLogin());
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not sign Heracles Records out of Claude."
-      );
-    } finally {
-      setRevokingClaude(false);
-    }
-  };
 
-  const handleTestClaudeCode = async () => {
-    if (!api || testingClaude) return;
-    setTestingClaude(true);
-    onError(null);
-    try {
-      const result = await api.testClaudeCodeConnection();
-      setClaudeStatus(result.status);
-      if (!result.ok) onError(result.message);
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Claude connection test failed."
-      );
-    } finally {
-      setTestingClaude(false);
-    }
-  };
 
   const handleUpdateClaudeCode = async (
     patch: Partial<ChatSettings["claudeCode"]>
@@ -2888,108 +2860,9 @@ export function ChatView({
     }
   };
 
-  const handleUpdateAnthropic = async (
-    patch: Partial<ChatSettings["anthropic"]>
-  ) => {
-    const nextSettings: ChatSettings = {
-      ...chatSettings,
-      anthropic: { ...chatSettings.anthropic, ...patch }
-    };
-    setChatSettings(nextSettings);
-    setAnthropicConnection(null);
-    if (!api) return;
-    try {
-      const saved = await api.saveChatSettings(nextSettings);
-      setChatSettings(saved);
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save Claude API settings."
-      );
-    }
-  };
 
-  const handleSaveAnthropicSettings = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const apiKey = anthropicApiKey.trim();
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        anthropic: {
-          ...chatSettings.anthropic,
-          apiKey: apiKey || undefined
-        }
-      });
-      setChatSettings(saved);
-      setAnthropicApiKey("");
-      setAnthropicConnection({
-        ok: true,
-        message: saved.anthropic.hasApiKey
-          ? "Claude API settings saved."
-          : "Settings saved. Add an API key to start coaching."
-      });
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save Claude API settings."
-      );
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleClearAnthropicApiKey = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        anthropic: { ...chatSettings.anthropic, clearApiKey: true }
-      });
-      setChatSettings(saved);
-      setAnthropicApiKey("");
-      setAnthropicConnection({ ok: true, message: "Anthropic API key cleared." });
-    } catch (caught) {
-      onError(
-        caught instanceof Error ? caught.message : "Could not clear the API key."
-      );
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleTestAnthropicConnection = async () => {
-    if (!api || testingAnthropic) return;
-    setTestingAnthropic(true);
-    setAnthropicConnection(null);
-    onError(null);
-    try {
-      // An unsaved key in the field is tested as typed so the athlete can
-      // verify it before committing it to storage.
-      setAnthropicConnection(
-        await api.testAnthropicConnection({
-          model: chatSettings.anthropic.model,
-          effort: chatSettings.anthropic.effort,
-          apiKey: anthropicApiKey.trim() || undefined
-        })
-      );
-    } catch (caught) {
-      setAnthropicConnection({
-        ok: false,
-        message:
-          caught instanceof Error
-            ? caught.message
-            : "Claude API connection test failed."
-      });
-    } finally {
-      setTestingAnthropic(false);
-    }
-  };
 
   const handleNewChat = async () => {
     if (!api || streaming || exportingLatestActivity) return;
@@ -3081,8 +2954,6 @@ export function ChatView({
     if (!api || provider === chatSettings.provider) return;
     const nextSettings: ChatSettings = { ...chatSettings, provider };
     setChatSettings(nextSettings);
-    setLocalConnection(null);
-    setOpenRouterConnection(null);
     onError(null);
     try {
       const saved = await api.saveChatSettings(nextSettings);
@@ -3173,113 +3044,10 @@ export function ChatView({
     }
   };
 
-  const updateOpenRouterDraft = (
-    patch: Partial<ChatSettings["openRouter"]>
-  ) => {
-    setChatSettings((current) => ({
-      ...current,
-      openRouter: {
-        ...current.openRouter,
-        ...patch
-      }
-    }));
-    setOpenRouterConnection(null);
-  };
 
-  const handleSaveOpenRouterSettings = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const apiKey = openRouterApiKey.trim();
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        openRouter: {
-          ...chatSettings.openRouter,
-          apiKey: apiKey || undefined
-        }
-      });
-      setChatSettings(saved);
-      setOpenRouterApiKey("");
-      setOpenRouterConnection((current) => ({
-        ok: true,
-        message: "OpenRouter settings saved.",
-        models: current?.models ?? []
-      }));
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save OpenRouter settings."
-      );
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleClearOpenRouterApiKey = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        openRouter: {
-          ...chatSettings.openRouter,
-          clearApiKey: true
-        }
-      });
-      setChatSettings(saved);
-      setOpenRouterApiKey("");
-      setOpenRouterConnection({
-        ok: true,
-        message: "OpenRouter API key cleared.",
-        models: []
-      });
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not clear the OpenRouter API key."
-      );
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleTestOpenRouterConnection = async () => {
-    if (!api || testingOpenRouter) return;
-    setTestingOpenRouter(true);
-    setOpenRouterConnection(null);
-    onError(null);
-    try {
-      const result = await api.testOpenRouterConnection({
-        ...chatSettings.openRouter,
-        apiKey: openRouterApiKey.trim() || undefined
-      });
-      setOpenRouterConnection(result);
-      if (!result.ok) onError(result.message);
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "OpenRouter connection test failed."
-      );
-    } finally {
-      setTestingOpenRouter(false);
-    }
-  };
 
-  const updateLocalDraft = (patch: Partial<ChatSettings["local"]>) => {
-    setChatSettings((current) => ({
-      ...current,
-      local: {
-        ...current.local,
-        ...patch
-      }
-    }));
-    setLocalConnection(null);
-  };
 
   const handleUpdateChatSettings = async (patch: Partial<ChatSettings>) => {
     const nextSettings = { ...chatSettings, ...patch };
@@ -3293,137 +3061,13 @@ export function ChatView({
     }
   };
 
-  const handleSaveLocalSettings = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const apiKey = localApiKey.trim();
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        local: {
-          ...chatSettings.local,
-          apiKey: apiKey || undefined
-        }
-      });
-      setChatSettings(saved);
-      setLocalApiKey("");
-      setLocalConnection({
-        ok: true,
-        message: "Local model settings saved.",
-        normalizedBaseUrl: saved.local.baseUrl
-      });
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Local settings failed.");
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleClearLocalApiKey = async () => {
-    if (!api) return;
-    setSavingSettings(true);
-    onError(null);
-    try {
-      const saved = await api.saveChatSettings({
-        ...chatSettings,
-        local: {
-          ...chatSettings.local,
-          clearApiKey: true
-        }
-      });
-      setChatSettings(saved);
-      setLocalApiKey("");
-      setLocalConnection({
-        ok: true,
-        message: "Local API key cleared.",
-        normalizedBaseUrl: saved.local.baseUrl
-      });
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not clear API key.");
-    } finally {
-      setSavingSettings(false);
-    }
-  };
 
-  const handleDetectLocalServers = async (auto = false) => {
-    if (!api || detectingLocal) return;
-    setDetectingLocal(true);
-    if (!auto) {
-      setLocalConnection(null);
-      onError(null);
-    }
-    try {
-      const discovery = await api.detectLocalChatServers(
-        localApiKey.trim() || undefined
-      );
-      setLocalDiscovery(discovery);
-      const available = discovery.servers.filter(
-        (server) => server.ok && server.models.length > 0
-      );
-      if (available.length === 0) {
-        const runningEmpty = discovery.servers.filter((server) => server.ok);
-        setLocalConnection({
-          ok: false,
-          message:
-            runningEmpty.length > 0
-              ? `${runningEmpty.map((server) => server.label).join(" and ")} ${runningEmpty.length === 1 ? "is" : "are"} running, but no models were found. Pull an Ollama model or load a model in LM Studio, then detect again.`
-              : "No Ollama or LM Studio server found on localhost ports 11434 or 1234."
-        });
-        return;
-      }
 
-      const currentBaseUrl = chatSettings.local.baseUrl;
-      const currentModel = chatSettings.local.model;
-      const preferred =
-        available.find(
-          (server) =>
-            server.baseUrl === currentBaseUrl &&
-            server.models.includes(currentModel)
-        ) ??
-        available.find((server) => server.baseUrl === currentBaseUrl) ??
-        available[0];
-      const model = preferred.models.includes(currentModel)
-        ? currentModel
-        : preferred.models[0];
-      const nextSettings: ChatSettings = {
-        ...chatSettings,
-        provider: "local",
-        local: {
-          ...chatSettings.local,
-          baseUrl: preferred.baseUrl,
-          model
-        }
-      };
-      const apiKey = localApiKey.trim();
-      const saved = await api.saveChatSettings({
-        ...nextSettings,
-        local: {
-          ...nextSettings.local,
-          apiKey: apiKey || undefined
-        }
-      });
-      setChatSettings(saved);
-      setLocalApiKey("");
-      setLocalConnection({
-        ok: true,
-        message: `Detected ${preferred.label} with ${preferred.models.length} model${preferred.models.length === 1 ? "" : "s"}.`,
-        normalizedBaseUrl: preferred.baseUrl,
-        models: preferred.models
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Local model detection failed.";
-      if (auto) {
-        setLocalConnection({ ok: false, message });
-      } else {
-        onError(message);
-      }
-    } finally {
-      setDetectingLocal(false);
-    }
-  };
-
+  // First run on the local provider with no model chosen: pick one silently so
+  // Coach is usable without a trip to Settings. The Coach Models dialog runs the
+  // same routine from its Detect button — a failure here stays quiet, because
+  // nothing the athlete did caused it.
   useEffect(() => {
     if (
       !api ||
@@ -3435,35 +3079,13 @@ export function ChatView({
       return;
     }
     autoDetectLocalRef.current = true;
-    void handleDetectLocalServers(true);
-  }, [api, checkingAuth, chatSettings.provider, chatSettings.local.model]);
+    void detectAndAdoptLocalServer(api, chatSettings, "")
+      .then((result) => {
+        if (result.settings) setChatSettings(result.settings);
+      })
+      .catch(() => undefined);
+  }, [api, checkingAuth, chatSettings, chatSettings.provider, chatSettings.local.model]);
 
-  const handleTestLocalConnection = async () => {
-    if (!api) return;
-    setTestingLocal(true);
-    setLocalConnection(null);
-    onError(null);
-    try {
-      const result = await api.testLocalChatConnection({
-        ...chatSettings.local,
-        apiKey: localApiKey.trim() || undefined
-      });
-      setLocalConnection(result);
-      if (result.normalizedBaseUrl) {
-        setChatSettings((current) => ({
-          ...current,
-          local: {
-            ...current.local,
-            baseUrl: result.normalizedBaseUrl ?? current.local.baseUrl
-          }
-        }));
-      }
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Local connection test failed.");
-    } finally {
-      setTestingLocal(false);
-    }
-  };
 
   const handleConnectMcp = async () => {
     if (!api || mcpBusy) return;
@@ -3612,32 +3234,10 @@ export function ChatView({
     }
     if (
       chatSettings.provider === "openrouter" &&
-      !chatSettings.openRouter.hasApiKey &&
-      !openRouterApiKey.trim()
+      !chatSettings.openRouter.hasApiKey
     ) {
-      onError("Add an OpenRouter API key in Coach settings first.");
+      onError("Add an OpenRouter API key in Settings, under Connections.");
       return false;
-    }
-    if (chatSettings.provider === "openrouter") {
-      try {
-        const apiKey = openRouterApiKey.trim();
-        const saved = await api.saveChatSettings({
-          ...chatSettings,
-          openRouter: {
-            ...chatSettings.openRouter,
-            apiKey: apiKey || undefined
-          }
-        });
-        setChatSettings(saved);
-        setOpenRouterApiKey("");
-      } catch (caught) {
-        onError(
-          caught instanceof Error
-            ? caught.message
-            : "OpenRouter settings failed."
-        );
-        return false;
-      }
     }
     if (chatSettings.provider === "local" && !chatSettings.local.model.trim()) {
       onError("Enter a local model before starting the coach.");
@@ -3647,25 +3247,10 @@ export function ChatView({
       chatSettings.provider === "claude-api" &&
       !chatSettings.anthropic.hasApiKey
     ) {
-      onError("Save an Anthropic API key in Settings before starting the coach.");
+      onError(
+        "Save an Anthropic API key in Settings, under Connections, before starting the coach."
+      );
       return false;
-    }
-    if (chatSettings.provider === "local") {
-      try {
-        const apiKey = localApiKey.trim();
-        const saved = await api.saveChatSettings({
-          ...chatSettings,
-          local: {
-            ...chatSettings.local,
-            apiKey: apiKey || undefined
-          }
-        });
-        setChatSettings(saved);
-        setLocalApiKey("");
-      } catch (caught) {
-        onError(caught instanceof Error ? caught.message : "Local settings failed.");
-        return false;
-      }
     }
     let answeredPromptIndex = answeredPrompt
       ? timeline.findIndex(
@@ -4135,57 +3720,7 @@ export function ChatView({
     api,
     open: settingsOpen,
     chatSettings,
-    authStatus,
-    claudeStatus,
-    openRouterApiKey,
-    openRouterConnection,
-    localApiKey,
-    localConnection,
-    localDiscovery,
-    savingSettings,
-    testingLocal,
-    testingOpenRouter,
-    detectingLocal,
-    signingIn,
-    checkingClaude,
-    connectingClaude,
-    testingClaude,
-    revokingClaude,
-    busy: isBusy,
     onClose: () => setSettingsOpen(false),
-    onSignIn: () => void handleSignIn(),
-    onSignOut: () => void handleSignOut(),
-    onRefreshClaude: () => void refreshClaudeCodeStatus(),
-    onClaudeSignedIn: handleClaudeSignedIn,
-    onRevokeClaude: () => void handleRevokeClaudeCode(),
-    onTestClaude: () => void handleTestClaudeCode(),
-    onOpenClaudeSetupGuide: () => void api?.openClaudeCodeSetupGuide(),
-    anthropicApiKey,
-    anthropicConnection,
-    testingAnthropic,
-    onAnthropicApiKeyChange: setAnthropicApiKey,
-    onUpdateAnthropic: (patch: Partial<ChatSettings["anthropic"]>) =>
-      void handleUpdateAnthropic(patch),
-    onTestAnthropicConnection: () => void handleTestAnthropicConnection(),
-    onSaveAnthropicSettings: () => void handleSaveAnthropicSettings(),
-    onClearAnthropicApiKey: () => void handleClearAnthropicApiKey(),
-    onOpenAnthropicKeyGuide: () => void api?.openAnthropicKeyGuide(),
-    onUpdateClaudeCode: (patch: Partial<ChatSettings["claudeCode"]>) =>
-      void handleUpdateClaudeCode(patch),
-    onOpenRouterApiKeyChange: setOpenRouterApiKey,
-    onUpdateOpenRouterDraft: updateOpenRouterDraft,
-    onTestOpenRouterConnection: () =>
-      void handleTestOpenRouterConnection(),
-    onSaveOpenRouterSettings: () => void handleSaveOpenRouterSettings(),
-    onClearOpenRouterApiKey: () => void handleClearOpenRouterApiKey(),
-    onOpenOpenRouterKeys: () => void api?.openOpenRouterKeys(),
-    onOpenOpenRouterModels: () => void api?.openOpenRouterModels(),
-    onLocalApiKeyChange: setLocalApiKey,
-    onUpdateLocalDraft: updateLocalDraft,
-    onDetectLocalServers: () => void handleDetectLocalServers(),
-    onTestLocalConnection: () => void handleTestLocalConnection(),
-    onSaveLocalSettings: () => void handleSaveLocalSettings(),
-    onClearLocalApiKey: () => void handleClearLocalApiKey(),
     onUpdateChatSettings: (patch: Partial<ChatSettings>) =>
       void handleUpdateChatSettings(patch)
   };

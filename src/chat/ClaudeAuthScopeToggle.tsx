@@ -1,8 +1,12 @@
 import { Laptop, ShieldCheck } from "lucide-react";
 
 /**
- * Picks which credential store Claude Code runs against: the machine-wide login
- * shared with the user's terminal, or a Heracles Records-only one.
+ * Picks which credential store Claude Code runs against: a Heracles
+ * Records-only one, or the machine-wide login shared with the user's terminal.
+ *
+ * The app-scoped side leads because it is the default (`useAppScopedAuth`
+ * defaults to true) and the safer of the two — picking the other one puts a
+ * sign-in on top of whatever login the terminal is already using.
  *
  * Shown both in Settings and on the sign-in gate, because the choice decides
  * where a sign-in lands and is easiest to get wrong right before signing in.
@@ -29,16 +33,6 @@ export function ClaudeAuthScopeToggle({
     >
       <button
         type="button"
-        className={appScoped ? "" : "is-active"}
-        aria-pressed={!appScoped}
-        disabled={disabled}
-        onClick={() => select(false)}
-      >
-        <Laptop size={14} aria-hidden="true" />
-        Your device Claude
-      </button>
-      <button
-        type="button"
         className={appScoped ? "is-active" : ""}
         aria-pressed={appScoped}
         disabled={disabled}
@@ -46,6 +40,16 @@ export function ClaudeAuthScopeToggle({
       >
         <ShieldCheck size={14} aria-hidden="true" />
         Heracles Records-only Claude login
+      </button>
+      <button
+        type="button"
+        className={appScoped ? "" : "is-active"}
+        aria-pressed={!appScoped}
+        disabled={disabled}
+        onClick={() => select(false)}
+      >
+        <Laptop size={14} aria-hidden="true" />
+        Your device Claude
       </button>
     </div>
   );
