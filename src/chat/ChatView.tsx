@@ -3033,6 +3033,24 @@ export function ChatView({
     }
   };
 
+  const handleRenameSession = async (sessionId: string, title: string) => {
+    if (!api) return;
+    onError(null);
+    try {
+      const summary = await api.renameChatSession(sessionId, title);
+      if (!summary) return;
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === summary.id ? summary : session
+        )
+      );
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : "Could not rename chat."
+      );
+    }
+  };
+
   const handleDeleteSession = async (sessionId: string) => {
     if (!api || streaming || exportingLatestActivity) return;
     onError(null);
@@ -4088,6 +4106,8 @@ export function ChatView({
     onSelectSession: (sessionId: string) => void handleSelectSession(sessionId),
     onTogglePinSession: (sessionId: string, pinned: boolean) =>
       void handleTogglePinSession(sessionId, pinned),
+    onRenameSession: (sessionId: string, title: string) =>
+      void handleRenameSession(sessionId, title),
     onCompactSession: (sessionId: string) => void handleCompactSession(sessionId),
     onShowSessionContext: (sessionId: string) =>
       void handleShowSessionContext(sessionId),

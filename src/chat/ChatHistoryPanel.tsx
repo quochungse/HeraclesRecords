@@ -17,6 +17,7 @@ export function ChatHistoryPanel({
   onNewChat,
   onSelectSession,
   onTogglePinSession,
+  onRenameSession,
   onCompactSession,
   onShowSessionContext,
   onDeleteSession
@@ -32,6 +33,7 @@ export function ChatHistoryPanel({
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
   onTogglePinSession: (sessionId: string, pinned: boolean) => void;
+  onRenameSession: (sessionId: string, title: string) => void;
   onCompactSession: (sessionId: string) => void;
   /** Dev builds only: opens the context inspector for one conversation. */
   onShowSessionContext: (sessionId: string) => void;
@@ -129,6 +131,7 @@ export function ChatHistoryPanel({
                     onTogglePin={() =>
                       onTogglePinSession(session.id, !session.pinnedAt)
                     }
+                    onRename={(title) => onRenameSession(session.id, title)}
                     onCompact={() => onCompactSession(session.id)}
                     onShowContext={() => onShowSessionContext(session.id)}
                     onDelete={() => onDeleteSession(session.id)}

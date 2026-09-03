@@ -19180,6 +19180,26 @@ tr.data-intervals-row-missing {
   white-space: nowrap;
 }
 
+/* The rename input takes the title's place in the row, so it has to sit on the
+   same baseline and metrics — an inline field, not a boxed one. */
+.chat-session-row-title-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--accent-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: text;
+}
+
+.chat-session-row-title-input:focus {
+  outline: none;
+}
+
 .chat-session-row-pin-mark {
   flex: none;
   margin-right: 5px;

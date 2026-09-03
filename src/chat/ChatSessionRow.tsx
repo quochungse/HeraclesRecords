@@ -3,6 +3,7 @@ import {
   Layers,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Pin,
   PinOff,
   Trash2,
@@ -38,7 +39,7 @@ const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
  * it has to count the dev item, or a menu near the bottom of the screen flips
  * on its second frame in exactly the build where it is opened most.
  */
-const MENU_ESTIMATED_HEIGHT = IS_DEVELOPMENT_BUILD ? 158 : 124;
+const MENU_ESTIMATED_HEIGHT = IS_DEVELOPMENT_BUILD ? 192 : 158;
 
 /**
  * The chat view rescopes part of the palette (see `.chat-view` in styles.css),
@@ -68,6 +69,7 @@ function ChatSessionRowMenu({
   disabled,
   compacting,
   onTogglePin,
+  onRename,
   onCompact,
   onShowContext,
   onDelete
@@ -78,6 +80,8 @@ function ChatSessionRowMenu({
   /** A summariser turn is running for this conversation. */
   compacting?: boolean;
   onTogglePin: () => void;
+  /** Turns the row's title into an input; the row owns the edit itself. */
+  onRename: () => void;
   onCompact: () => void;
   onShowContext: () => void;
   onDelete: () => void;
@@ -194,6 +198,14 @@ function ChatSessionRowMenu({
       <button
         type="button"
         role="menuitem"
+        onClick={(event) => runAction(event, onRename)}
+      >
+        <Pencil size={15} aria-hidden="true" />
+        Rename
+      </button>
+      <button
+        type="button"
+        role="menuitem"
         disabled={compacting || session.messageCount === 0}
         title="Summarise the older turns so the next message costs less"
         onClick={(event) => runAction(event, onCompact)}
@@ -267,6 +279,7 @@ export function ChatSessionRow({
   attention,
   onSelect,
   onTogglePin,
+  onRename,
   onCompact,
   onShowContext,
   onDelete
@@ -280,15 +293,28 @@ export function ChatSessionRow({
   attention?: CoachAutomationSessionAttention;
   onSelect: () => void;
   onTogglePin: () => void;
+  /** Called with the trimmed new title, only when it actually changed. */
+  onRename: (title: string) => void;
   onCompact: () => void;
   onShowContext: () => void;
   onDelete: () => void;
 }) {
+  // The rename happens in place: the title turns into an input on this row
+  // rather than opening a dialog over a list the user is scanning.
+  const [draft, setDraft] = useState<string | null>(null);
+  const renaming = draft !== null;
   const pinned = Boolean(session.pinnedAt);
   // A run that has landed but not been read is worth marking even once the
   // binding is gone: the answer is still sitting in the conversation.
   const unread = attention?.unread ?? 0;
   const attached = attention?.attached ?? false;
+
+  const commitRename = () => {
+    if (draft === null) return;
+    const next = draft.trim();
+    setDraft(null);
+    if (next && next !== session.title) onRename(next);
+  };
 
   const handleDelete = () => {
     if (
@@ -313,11 +339,11 @@ export function ChatSessionRow({
         .filter(Boolean)
         .join(" ")}
       onClick={() => {
-        if (!disabled) onSelect();
+        if (!disabled && !renaming) onSelect();
       }}
       onKeyDown={(event) => {
         // Enter/Space on the actions trigger must not also open the chat.
-        if (disabled || event.target !== event.currentTarget) return;
+        if (disabled || renaming || event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect();
@@ -326,28 +352,57 @@ export function ChatSessionRow({
       title={session.preview || session.title}
     >
       <span className="chat-session-row-body">
-        <span className="chat-session-row-title">
-          {pinned ? (
-            <Pin
-              className="chat-session-row-pin-mark"
-              size={11}
-              aria-hidden="true"
-            />
-          ) : null}
-          {attached || unread > 0 ? (
-            <Zap
-              className="chat-session-row-automation-mark"
-              size={11}
-              role="img"
-              aria-label={
-                attached
-                  ? "An automation coach writes into this conversation"
-                  : "An automation coach wrote into this conversation"
+        {renaming ? (
+          <input
+            className="chat-session-row-title-input"
+            type="text"
+            value={draft ?? ""}
+            aria-label="Conversation title"
+            // The store truncates past 48 characters; stop short of that so a
+            // rename never comes back with an ellipsis the user did not type.
+            maxLength={48}
+            spellCheck={false}
+            autoFocus
+            onChange={(event) => setDraft(event.target.value)}
+            onFocus={(event) => event.currentTarget.select()}
+            // The row is a button: a click or a key here must stay local.
+            onClick={(event) => event.stopPropagation()}
+            onBlur={commitRename}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitRename();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setDraft(null);
               }
-            />
-          ) : null}
-          {session.title}
-        </span>
+            }}
+          />
+        ) : (
+          <span className="chat-session-row-title">
+            {pinned ? (
+              <Pin
+                className="chat-session-row-pin-mark"
+                size={11}
+                aria-hidden="true"
+              />
+            ) : null}
+            {attached || unread > 0 ? (
+              <Zap
+                className="chat-session-row-automation-mark"
+                size={11}
+                role="img"
+                aria-label={
+                  attached
+                    ? "An automation coach writes into this conversation"
+                    : "An automation coach wrote into this conversation"
+                }
+              />
+            ) : null}
+            {session.title}
+          </span>
+        )}
         {session.preview ? (
           <span className="chat-session-row-preview">{session.preview}</span>
         ) : null}
@@ -374,6 +429,7 @@ export function ChatSessionRow({
           disabled={disabled}
           compacting={compacting}
           onTogglePin={onTogglePin}
+          onRename={() => setDraft(session.title)}
           onCompact={onCompact}
           onShowContext={onShowContext}
           onDelete={handleDelete}

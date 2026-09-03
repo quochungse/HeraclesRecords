@@ -19,6 +19,7 @@ export function ChatSidebar({
   onNewChat,
   onSelectSession,
   onTogglePinSession,
+  onRenameSession,
   onCompactSession,
   onShowSessionContext,
   onDeleteSession
@@ -37,6 +38,7 @@ export function ChatSidebar({
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
   onTogglePinSession: (sessionId: string, pinned: boolean) => void;
+  onRenameSession: (sessionId: string, title: string) => void;
   onCompactSession: (sessionId: string) => void;
   /** Dev builds only: opens the context inspector for one conversation. */
   onShowSessionContext: (sessionId: string) => void;
@@ -106,6 +108,7 @@ export function ChatSidebar({
               onNewChat={onNewChat}
               onSelectSession={onSelectSession}
               onTogglePinSession={onTogglePinSession}
+              onRenameSession={onRenameSession}
               onCompactSession={onCompactSession}
               onShowSessionContext={onShowSessionContext}
               onDeleteSession={onDeleteSession}
