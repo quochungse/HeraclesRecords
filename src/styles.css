@@ -19256,14 +19256,22 @@ tr.data-intervals-row-missing {
     box-shadow 0.18s ease;
 }
 
+/*
+ * Hovering the row has to reveal three legible dots, not a blank 26px slot:
+ * at --text-muted the glyph is dim enough on the hovered background to read as
+ * an empty square, so the contrast comes up together with the opacity. The
+ * boxed treatment below stays reserved for a direct hover on the trigger.
+ */
 .chat-session-row:hover .chat-session-row-menu-trigger,
 .chat-session-row:focus-within .chat-session-row-menu-trigger,
 .chat-session-row-menu-trigger.is-open {
   opacity: 1;
+  color: var(--text-secondary);
 }
 
-.chat-session-row-menu-trigger:hover,
-.chat-session-row-menu-trigger.is-open {
+/* Matches the row-hover rule's specificity so the direct-hover contrast wins. */
+.chat-session-row .chat-session-row-menu-trigger:hover,
+.chat-session-row .chat-session-row-menu-trigger.is-open {
   color: var(--text-primary);
   border-color: var(--glass-border);
   background: var(--glass-bg-hover);
