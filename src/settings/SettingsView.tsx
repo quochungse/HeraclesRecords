@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Cloud,
   Code2,
-  Coffee,
   Dumbbell,
   Ellipsis,
   ExternalLink,
@@ -77,11 +76,6 @@ const ABOUT_LINKS = [
     label: "Report an issue",
     href: "https://github.com/quochungse/HeraclesRecords/issues",
     icon: Bug,
-  },
-  {
-    label: "Support the project",
-    href: "https://www.buymeacoffee.com/addridoa",
-    icon: Coffee,
   },
 ];
 
