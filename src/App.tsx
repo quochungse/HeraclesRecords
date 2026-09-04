@@ -2350,19 +2350,6 @@ export default function App() {
                 : "No watch"}
             </span>
           </div>
-          <button
-            className="icon-button"
-            type="button"
-            title="Refresh watch and library"
-            onClick={handleRefresh}
-            disabled={busy === "refresh" || !api}
-          >
-            <RefreshCw
-              size={18}
-              aria-hidden="true"
-              className={busy === "refresh" ? "spin" : ""}
-            />
-          </button>
         </div>
       </header>
 
@@ -2398,6 +2385,9 @@ export default function App() {
                 watchStatus={watchStatus}
                 storage={storage}
                 watchConnected={Boolean(watchStatus?.connected)}
+                onRefresh={() => void handleRefresh()}
+                refreshing={busy === "refresh"}
+                refreshDisabled={busy === "refresh" || !api}
                 onOpenLibrary={() => openMediaTab("library")}
               />
             ) : null}
@@ -2988,6 +2978,11 @@ interface CorosOverviewTabProps {
     capacityLabel: string;
   } | null;
   watchConnected: boolean;
+  /** Refreshes watch status plus the local, Spotify and YouTube Music media. */
+  onRefresh: () => void;
+  /** Drives the spinner; `refreshDisabled` also covers "api not ready yet". */
+  refreshing: boolean;
+  refreshDisabled: boolean;
   onOpenLibrary: () => void;
 }
 
@@ -2996,6 +2991,9 @@ function CorosOverviewTab({
   watchStatus,
   storage,
   watchConnected,
+  onRefresh,
+  refreshing,
+  refreshDisabled,
   onOpenLibrary,
 }: CorosOverviewTabProps) {
   const watchTracks = watchStatus?.tracks ?? [];
@@ -3071,10 +3069,26 @@ function CorosOverviewTab({
               </div>
             </div>
             <div
-              className={`connection-pill${watchConnected ? " connected" : ""}`}
+              className={`connection-pill connection-pill--with-action${
+                watchConnected ? " connected" : ""
+              }`}
             >
               <StatusDot connected={watchConnected} />
               <span>{watchConnected ? "Connected" : "Offline"}</span>
+              <button
+                className="connection-pill-action"
+                type="button"
+                title="Refresh watch and media"
+                aria-label="Refresh watch and media"
+                onClick={onRefresh}
+                disabled={refreshDisabled}
+              >
+                <RefreshCw
+                  size={14}
+                  aria-hidden="true"
+                  className={refreshing ? "spin" : ""}
+                />
+              </button>
             </div>
           </div>
 
