@@ -44,8 +44,11 @@ export function mergeTrainingDayLists(
   );
 }
 
-export function buildTrendPoints(dayList: TrainingHubDailyMetric[]): TrainingTrendPoint[] {
-  return dayList.slice(-7).map((day) => ({
+export function buildTrendPoints(
+  dayList: TrainingHubDailyMetric[],
+  days = 7
+): TrainingTrendPoint[] {
+  return dayList.slice(-days).map((day) => ({
     date: day.happenDay,
     label: formatHappenDayLabel(day.happenDay),
     trainingLoad: day.trainingLoad,

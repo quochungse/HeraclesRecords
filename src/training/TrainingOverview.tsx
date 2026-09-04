@@ -1,4 +1,4 @@
-import { type CSSProperties, useMemo, useState } from "react";
+import { Suspense, lazy, type CSSProperties, useMemo, useState } from "react";
 import {
   ArrowRightFromLine,
   ChartNoAxesColumnIncreasing,
@@ -15,24 +15,29 @@ import {
   Trophy,
   RefreshCw
 } from "lucide-react";
-import { FitnessScoresPanel } from "./components/FitnessScoresPanel";
 import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
-import { PersonalRecordsPanel } from "./components/PersonalRecordsPanel";
-import { RacePredictorCards } from "./components/RacePredictorCards";
 import { RecoveryRing } from "./components/RecoveryRing";
 import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
-import {
-  PerceivedEffortPanel,
-  TrainingZoneDistributionCharts
-} from "./components/TrainingZoneDistributionCharts";
+import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { Vo2MaxWidget } from "./components/Vo2MaxWidget";
 import type { TrainingOverviewProps } from "./types";
 import loginPageBackground from "../../public/assets/training-hub/Login-page-bg.png";
 
+// The body map drags in three.js and a GLTF mannequin. Overview is the default
+// startup view, so that weight stays out of its first chunk.
+const LazyStrengthDistributionSection = lazy(() =>
+  import("../strength/StrengthDistributionSection").then(
+    ({ StrengthDistributionSection }) => ({
+      default: StrengthDistributionSection
+    })
+  )
+);
+
 export function TrainingOverview({
+  api,
   status,
   email,
   password,
@@ -381,6 +386,8 @@ export function TrainingOverview({
             </div>
           </section>
 
+          <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
+
           <div className="training-heatmap-wrap">
             <TrainingHeatmapPanel
               snapshot={snapshot}
@@ -394,23 +401,9 @@ export function TrainingOverview({
             activities={activities}
             analytics={snapshot?.analytics ?? null}
           />
-
-          <div className="training-secondary-grid">
-            <FitnessScoresPanel
-              dashboard={snapshot?.dashboard ?? null}
-              racePredictor={snapshot?.racePredictor ?? null}
-            />
-            <RacePredictorCards racePredictor={snapshot?.racePredictor ?? null} />
-            <PerceivedEffortPanel
-              distribution={snapshot?.analytics?.rpeDistribution}
-            />
-          </div>
-
-          <div className="training-planning-grid">
-            <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
-            <PersonalRecordsPanel dashboard={snapshot?.dashboard ?? null} />
-          </div>
-
+          <Suspense fallback={null}>
+            <LazyStrengthDistributionSection api={api} status={status} />
+          </Suspense>
         </>
       ) : null}
     </div>

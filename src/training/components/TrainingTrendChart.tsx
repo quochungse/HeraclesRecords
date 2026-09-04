@@ -3,7 +3,6 @@ import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
-  Gauge,
   HeartPulse,
   MoonStar
 } from "lucide-react";
@@ -21,6 +20,8 @@ import {
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import {
+  TRAINING_LOAD_TREND_DAYS,
+  TRAINING_SHORT_TREND_DAYS,
   trainingChartMargin,
   trainingChartTooltipStyle
 } from "../chartConfig";
@@ -364,11 +365,14 @@ export function TrainingTrendCharts({ points }: TrainingTrendChartsProps) {
   });
 
   const loadPoints = points.filter((point) => point.trainingLoad !== undefined);
-  const rpePoints = points.filter((point) => point.rpeLoad !== undefined);
-  const hrvPoints = points.filter(
+  // The snapshot carries the load chart's window; the other two show its tail.
+  const shortPoints = points.slice(-TRAINING_SHORT_TREND_DAYS);
+  const hrvPoints = shortPoints.filter(
     (point) => point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined
   );
-  const sleepPoints = points.filter((point) => point.sleepMinutes !== undefined);
+  const sleepPoints = shortPoints.filter(
+    (point) => point.sleepMinutes !== undefined
+  );
 
   return (
     <div className="training-chart-grid">
@@ -376,7 +380,7 @@ export function TrainingTrendCharts({ points }: TrainingTrendChartsProps) {
         <div className="section-heading compact training-chart-heading">
           <div>
             <p className="eyebrow">Training Load</p>
-            <h2>Last 7 days</h2>
+            <h2>Last {TRAINING_LOAD_TREND_DAYS} days</h2>
           </div>
           {loadPoints.length > 0 ? (
             <ChartLatestStat
@@ -421,59 +425,6 @@ export function TrainingTrendCharts({ points }: TrainingTrendChartsProps) {
             title="No training load yet"
           >
             Complete a workout and sync from COROS to see your load trend.
-          </EmptyChartNotice>
-        )}
-      </section>
-
-      <section className="panel training-chart-panel" data-metric="rpe">
-        <div className="section-heading compact training-chart-heading">
-          <div>
-            <p className="eyebrow">RPE Load · AU</p>
-            <h2>Last 7 days</h2>
-          </div>
-          {rpePoints.length > 0 ? (
-            <ChartLatestStat
-              points={rpePoints}
-              dataKey="rpeLoad"
-              palette={metrics.rpe}
-              formatValue={(value) => `${formatRoundedValue(value)} AU`}
-              formatDelta={(delta) => `${formatRoundedValue(delta)} AU`}
-            />
-          ) : null}
-        </div>
-        {rpePoints.length > 0 ? (
-          <div className="training-chart-shell">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={rpePoints} margin={trainingChartMargin}>
-                <defs>
-                  <ChartAreaGradient id="rpeLoadFill" stops={metrics.rpe.stops} />
-                </defs>
-                <TrendChartAxes
-                  tooltipValueFormatter={(value) => `${formatRoundedValue(value)} AU`}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="rpeLoad"
-                  name="RPE load"
-                  stroke={metrics.rpe.stroke}
-                  fill="url(#rpeLoadFill)"
-                  strokeWidth={2.5}
-                  dot={metricDot(metrics.rpe)}
-                  activeDot={metricActiveDot(metrics.rpe)}
-                  connectNulls
-                  isAnimationActive={!reducedMotion}
-                  animationDuration={900}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <EmptyChartNotice
-            icon={Gauge}
-            palette={metrics.rpe}
-            title="No RPE data yet"
-          >
-            Rate your activities in COROS to track perceived effort.
           </EmptyChartNotice>
         )}
       </section>

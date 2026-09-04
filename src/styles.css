@@ -13015,6 +13015,17 @@ td span {
   gap: 18px;
 }
 
+/* Training load is the headline chart: it takes the full row on its own,
+   leaving HRV and sleep to share the one below. */
+.training-chart-grid > .training-chart-panel[data-metric="load"] {
+  grid-column: 1 / -1;
+}
+
+/* Any other odd trailing chart would leave half a row empty — let it span too. */
+.training-chart-grid > .training-chart-panel:last-child:nth-child(even) {
+  grid-column: 1 / -1;
+}
+
 .training-chart-panel {
   --chart-panel-tint: color-mix(in srgb, var(--accent-strong) 8%, transparent);
   --chart-curve-glow: color-mix(in srgb, var(--accent-strong) 30%, transparent);
@@ -13031,11 +13042,6 @@ td span {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-
-.training-chart-panel[data-metric="rpe"] {
-  --chart-panel-tint: rgba(167, 139, 250, 0.09);
-  --chart-curve-glow: rgba(183, 155, 255, 0.32);
 }
 
 .training-chart-panel[data-metric="hrv"] {
@@ -13319,13 +13325,6 @@ td span {
     rgba(255, 255, 255, 0.034);
 }
 
-.training-zone-panel-rpe {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 0% 100%, rgba(201, 216, 121, 0.09), transparent 58%),
-    rgba(255, 255, 255, 0.034);
-}
-
 .training-load-profile {
   display: flex;
   flex-direction: column;
@@ -13581,13 +13580,6 @@ td span {
   padding: clamp(16px, 2vw, 22px) clamp(18px, 2vw, 24px) clamp(18px, 2.2vw, 26px);
 }
 
-.training-zone-panel-rpe .training-zone-body {
-  grid-template-columns:
-    minmax(120px, 0.9fr)
-    minmax(118px, 0.8fr)
-    minmax(250px, 1.55fr);
-}
-
 .training-zone-body-empty {
   grid-template-columns: 1fr;
   min-height: clamp(240px, 28vh, 320px);
@@ -13632,10 +13624,6 @@ td span {
 
 .training-zone-panel-distance .training-zone-donut-icon {
   color: rgba(79, 195, 243, 0.95);
-}
-
-.training-zone-panel-rpe .training-zone-donut-icon {
-  color: rgba(201, 216, 121, 0.95);
 }
 
 .training-zone-empty-ring {
@@ -13740,53 +13728,6 @@ td span {
   animation: training-row-enter 0.55s ease both;
 }
 
-.training-zone-panel-rpe .training-zone-table-head {
-  grid-template-columns: minmax(0, 1fr) 52px minmax(72px, auto);
-  grid-template-areas: "name percent detail";
-}
-
-.training-zone-panel-rpe .training-zone-table-head span:nth-child(1) {
-  grid-area: name;
-}
-
-.training-zone-panel-rpe .training-zone-table-head span:nth-child(2) {
-  display: none;
-}
-
-.training-zone-panel-rpe .training-zone-table-head span:nth-child(3) {
-  grid-area: percent;
-  text-align: right;
-}
-
-.training-zone-panel-rpe .training-zone-table-head span:nth-child(4) {
-  grid-area: detail;
-  text-align: right;
-}
-
-.training-zone-panel-rpe .training-zone-row {
-  grid-template-columns: minmax(0, 1fr) 52px minmax(72px, auto);
-  grid-template-areas:
-    "name percent detail"
-    "track track track";
-  gap: 6px 8px;
-}
-
-.training-zone-panel-rpe .training-zone-name {
-  grid-area: name;
-}
-
-.training-zone-panel-rpe .training-zone-track {
-  grid-area: track;
-}
-
-.training-zone-panel-rpe .training-zone-percent {
-  grid-area: percent;
-}
-
-.training-zone-panel-rpe .training-zone-detail {
-  grid-area: detail;
-}
-
 .training-zone-percent,
 .training-zone-name,
 .training-zone-detail {
@@ -13860,26 +13801,6 @@ td span {
   font-size: 12px;
   font-style: normal;
   font-weight: 600;
-}
-
-.training-secondary-grid {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 0.9fr)
-    minmax(0, 1.1fr)
-    repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  align-items: stretch;
-  width: 100%;
-}
-
-.training-secondary-grid > .panel {
-  min-width: 0;
-  width: 100%;
-}
-
-.training-secondary-grid > .training-zone-panel-rpe {
-  grid-column: span 2;
 }
 
 .training-scores-panel,
@@ -14203,12 +14124,6 @@ td span {
   color: var(--text-muted);
   font-size: 14px;
   padding: 8px 0 16px;
-}
-
-.training-planning-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
 }
 
 .training-backup-panel {
@@ -14915,10 +14830,6 @@ tr.data-intervals-row-missing {
     animation: none;
     width: 10%;
   }
-}
-
-.training-planning-grid > .panel {
-  min-width: 0;
 }
 
 .training-upcoming-panel {
@@ -16992,7 +16903,6 @@ tr.data-intervals-row-missing {
   }
 
   .training-chart-grid,
-  .training-planning-grid,
   .training-intelligence-grid,
   .training-activities-split,
   .activity-detail-visuals {
@@ -17022,8 +16932,7 @@ tr.data-intervals-row-missing {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .training-zone-body,
-  .training-zone-panel-rpe .training-zone-body {
+  .training-zone-body {
     grid-template-columns: 1fr;
     gap: 18px;
   }
@@ -17095,19 +17004,6 @@ tr.data-intervals-row-missing {
 }
 
 @media (max-width: 980px) {
-  .training-secondary-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .training-secondary-grid > .training-zone-panel-rpe {
-    grid-column: auto;
-  }
-
-  .training-secondary-grid > .training-race-panel {
-    justify-self: center;
-    width: min(100%, 360px);
-  }
-
   .maps-grid {
     grid-template-columns: 1fr;
   }
@@ -17283,7 +17179,6 @@ tr.data-intervals-row-missing {
   .training-dashboard-grid,
   .training-chart-grid,
   .training-performance-grid,
-  .training-planning-grid,
   .training-intelligence-grid,
   .training-intelligence-main,
   .youtube-layout,
@@ -25505,11 +25400,6 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-chart-panel {
   --chart-curve-glow: color-mix(in srgb, var(--accent-2) 20%, transparent);
   box-shadow: var(--shadow-card);
-}
-
-:root[data-theme="paper"] .training-chart-panel[data-metric="rpe"] {
-  --chart-panel-tint: rgba(124, 92, 214, 0.08);
-  --chart-curve-glow: rgba(124, 92, 214, 0.2);
 }
 
 :root[data-theme="paper"] .training-chart-panel[data-metric="hrv"] {

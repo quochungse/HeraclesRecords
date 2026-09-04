@@ -133,7 +133,6 @@ export interface TrainingHubViewProps {
  */
 export type TrainingOverviewProps = Omit<
   TrainingHubViewProps,
-  | "api"
   | "sportTypes"
   | "activityDetail"
   | "selectedActivity"

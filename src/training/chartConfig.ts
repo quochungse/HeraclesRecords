@@ -2,6 +2,15 @@ import type { Theme } from "../theme/theme";
 
 export const TRAINING_HEATMAP_DAYS = 365;
 
+/**
+ * Days of trend the Overview snapshot carries — the training-load chart's
+ * window, and the longest of the trend charts. The rest draw a tail of it.
+ */
+export const TRAINING_LOAD_TREND_DAYS = 30;
+
+/** Days drawn by the trend charts that stay on a short window (HRV, sleep). */
+export const TRAINING_SHORT_TREND_DAYS = 7;
+
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
 

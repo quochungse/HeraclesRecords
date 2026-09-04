@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent
 } from "react";
@@ -30,14 +29,11 @@ import {
   LockKeyhole,
   Minus,
   RefreshCw,
-  RotateCw,
   Search,
   Settings2,
   X
 } from "lucide-react";
 import type {
-  HevyStatus,
-  StrengthDataSource,
   StrengthSession,
   TrainingHubStatus,
   UnitSystem
@@ -46,30 +42,25 @@ import type { CorosLinkApi } from "../coroslink-api";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useTheme } from "../theme/ThemeProvider";
-import { resolveMuscleView } from "./bodyFocus";
-import { BodyMapV2, type BodyView } from "./BodyMapV2";
-import { MusclePanel } from "./MusclePanel";
-import { MUSCLE_BY_ID, type MuscleId } from "./muscles";
-import { buildSampleStrengthSessions } from "./sampleSessions";
+import { StrengthHero } from "./StrengthHero";
 import { ExerciseExplorer } from "./ExerciseExplorer";
 import { explorerExerciseName } from "./exerciseExplorerData";
 import {
-  buildStrengthAnalytics,
   formatSets,
   startOfWeekMs,
   type ExerciseStat,
-  type HeatMetric,
   type WeekBucket
 } from "./strengthAnalytics";
+import {
+  WINDOW_OPTIONS,
+  activeStrengthWindow,
+  toErrorMessage,
+  useStrengthData
+} from "./useStrengthData";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { kilogramsToDisplayWeight, weightUnit } from "../units/units";
-import {
-  defineSelectionPreference,
-  selectionIsOneOf,
-  useSelectionPreference
-} from "../preferences/selectionPreferences";
 
 interface StrengthViewProps {
   api: CorosLinkApi;
@@ -78,47 +69,6 @@ interface StrengthViewProps {
   /** Dev view unlocks the generated sample history. */
   showDevelopmentTools?: boolean;
 }
-
-const WINDOW_OPTIONS = [
-  { days: 30, label: "30 days", phrase: "the last 30 days" },
-  { days: 90, label: "3 months", phrase: "the last 3 months" },
-  { days: 180, label: "6 months", phrase: "the last 6 months" },
-  { days: 365, label: "1 year", phrase: "the last year" }
-];
-
-const METRIC_OPTIONS: { id: HeatMetric; label: string }[] = [
-  { id: "sets", label: "Sets" },
-  { id: "volume", label: "Volume" },
-  { id: "time", label: "Time" }
-];
-
-const STRENGTH_DAYS_PREFERENCE = defineSelectionPreference<number>({
-  key: "strength.days",
-  defaultValue: 90,
-  validate: selectionIsOneOf([30, 90, 180, 365])
-});
-
-const STRENGTH_SOURCE_PREFERENCE =
-  defineSelectionPreference<StrengthDataSource>({
-    key: "strength.source",
-    defaultValue: "combined",
-    validate: selectionIsOneOf(["combined", "hevy", "coros"])
-  });
-
-const STRENGTH_BODY_VIEW_PREFERENCE = defineSelectionPreference<BodyView>({
-  key: "strength.bodyView",
-  defaultValue: "front",
-  validate: selectionIsOneOf(["front", "back"])
-});
-
-const STRENGTH_METRIC_PREFERENCE = defineSelectionPreference<HeatMetric>({
-  key: "strength.metric",
-  defaultValue: "sets",
-  validate: selectionIsOneOf(["sets", "volume", "time"])
-});
-
-/** Chunks are drained in a loop; this caps a runaway backfill. */
-const MAX_SYNC_ROUNDS = 60;
 
 const MS_PER_WEEK = 604_800_000;
 
@@ -158,10 +108,6 @@ const EMBER = {
     cursor: "rgba(207, 106, 42, 0.1)"
   }
 };
-
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function formatSessionDate(startTime?: number): string {
   if (!startTime) {
@@ -437,94 +383,34 @@ export function StrengthView({
   const { theme } = useTheme();
   const ember = theme === "paper" ? EMBER.paper : EMBER.dark;
 
-  const [days, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
-  const [source, setSource, sourcePreference] = useSelectionPreference(
-    STRENGTH_SOURCE_PREFERENCE
-  );
-  const [hevyStatus, setHevyStatus] = useState<HevyStatus | null>(null);
-  const [hevyStatusLoading, setHevyStatusLoading] = useState(true);
+  const {
+    days,
+    setDays,
+    source,
+    setSource,
+    hevyStatus,
+    hevyStatusLoading,
+    hevyConnected,
+    anyConnected,
+    sessions,
+    analytics,
+    loading,
+    pending,
+    error,
+    warnings,
+    sampleMode,
+    setSampleMode,
+    runSync,
+    connectHevy,
+    setHevyWarmups,
+    disconnectHevy
+  } = useStrengthData({ api, corosConnected, showDevelopmentTools });
+
   const [hevyDialogOpen, setHevyDialogOpen] = useState(false);
   const [hevyApiKey, setHevyApiKey] = useState("");
   const [hevyBusy, setHevyBusy] = useState(false);
   const [hevyDialogError, setHevyDialogError] = useState<string | null>(null);
-  const [loadedSessions, setLoadedSessions] = useState<StrengthSession[]>([]);
-  const [sampleMode, setSampleMode] = useState(false);
-  const [pending, setPending] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [view, setView] = useSelectionPreference(
-    STRENGTH_BODY_VIEW_PREFERENCE
-  );
-  const [viewRequest, setViewRequest] = useState(0);
-  const [metric, setMetric] = useSelectionPreference(
-    STRENGTH_METRIC_PREFERENCE
-  );
-  const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
-  // Hover remains a transient highlight on the mannequin. The right-hand
-  // panel changes only after an explicit click, so it never jumps while the
-  // pointer crosses muscle shells or ranking rows.
-  const [figureHover, setFigureHover] = useState<MuscleId | null>(null);
-  const [listHover, setListHover] = useState<MuscleId | null>(null);
-  const syncSequenceRef = useRef(0);
-  const sourceInitializedRef = useRef(sourcePreference.restored);
-  const hevyConnected = Boolean(hevyStatus?.connected);
-  const anyConnected = corosConnected || hevyConnected;
-
-  useEffect(() => {
-    let active = true;
-    setHevyStatusLoading(true);
-    api
-      .getHevyStatus()
-      .then((next) => {
-        if (!active) return;
-        setHevyStatus(next);
-        if (!sourceInitializedRef.current) {
-          sourceInitializedRef.current = true;
-          setSource(
-            corosConnected && next.connected
-              ? "combined"
-              : next.connected
-                ? "hevy"
-                : "coros"
-          );
-        }
-      })
-      .catch((caught) => {
-        if (!active) return;
-        setHevyStatus({ connected: false, includeWarmups: false });
-        sourceInitializedRef.current = true;
-        setSource("coros");
-        setError(toErrorMessage(caught));
-      })
-      .finally(() => {
-        if (active) setHevyStatusLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [api, corosConnected]);
-
-  useEffect(() => {
-    if (hevyStatus === null) return;
-    setSource((current) => {
-      if (current === "combined" && corosConnected && hevyConnected) return current;
-      if (current === "coros" && corosConnected) return current;
-      if (current === "hevy" && hevyConnected) return current;
-      return corosConnected && hevyConnected
-        ? "combined"
-        : hevyConnected
-          ? "hevy"
-          : "coros";
-    });
-  }, [corosConnected, hevyConnected, hevyStatus]);
-
-  useEffect(() => {
-    if (source !== "coros" && metric === "time") {
-      setMetric("sets");
-    }
-  }, [metric, source]);
 
   useEffect(() => {
     if (!hevyDialogOpen) return;
@@ -535,126 +421,21 @@ export function StrengthView({
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [hevyBusy, hevyDialogOpen]);
 
-  const requestView = useCallback((next: BodyView) => {
-    setSelectedMuscle(null);
-    setFigureHover(null);
-    setListHover(null);
-    setView(next);
-    setViewRequest((current) => current + 1);
-  }, []);
-
-  const selectMuscle = useCallback(
-    (muscle: MuscleId | null) => {
-      setFigureHover(null);
-      setListHover(null);
-
-      if (muscle === null || muscle === selectedMuscle) {
-        setSelectedMuscle(null);
-        return;
-      }
-
-      const nextView = resolveMuscleView(MUSCLE_BY_ID[muscle].view, view);
-      if (nextView !== view) {
-        setView(nextView);
-        setViewRequest((current) => current + 1);
-      }
-      setSelectedMuscle(muscle);
-    },
-    [selectedMuscle, view]
-  );
-
-  const runSync = useCallback(
-    async (force: boolean) => {
-      if (hevyStatusLoading || !anyConnected) {
-        return;
-      }
-
-      const sequence = ++syncSequenceRef.current;
-      setLoading(true);
-      setError(null);
-      setWarnings([]);
-
-      try {
-        let result = await api.syncStrengthHistory({ days, force, source });
-        if (syncSequenceRef.current !== sequence) {
-          return;
-        }
-        setLoadedSessions(result.sessions);
-        setPending(result.pending);
-        setWarnings(result.warnings ?? []);
-
-        // Keep draining while COROS still owes us breakdowns; each round
-        // repaints the body map so it fills in as the history arrives.
-        for (let round = 0; round < MAX_SYNC_ROUNDS; round += 1) {
-          if (result.pending <= 0) {
-            break;
-          }
-          const next = await api.syncStrengthHistory({
-            days,
-            force: false,
-            source
-          });
-          if (syncSequenceRef.current !== sequence) {
-            return;
-          }
-          setLoadedSessions(next.sessions);
-          setPending(next.pending);
-          setWarnings(next.warnings ?? []);
-          // A round that fetched nothing means the API is refusing; stop
-          // instead of spinning against it.
-          if (next.fetched === 0) {
-            break;
-          }
-          result = next;
-        }
-      } catch (caught) {
-        if (syncSequenceRef.current === sequence) {
-          setError(toErrorMessage(caught));
-        }
-      } finally {
-        if (syncSequenceRef.current === sequence) {
-          setLoading(false);
-          if (source !== "coros") {
-            void api.getHevyStatus().then(setHevyStatus).catch(() => undefined);
-          }
-        }
-      }
-    },
-    [api, anyConnected, days, hevyStatusLoading, source]
-  );
-
-  useEffect(() => {
-    void runSync(false);
-    return () => {
-      syncSequenceRef.current += 1;
-    };
-  }, [runSync]);
-
-  // Leaving dev view drops the preview, so generated data can never linger in
-  // the production view.
-  useEffect(() => {
-    if (!showDevelopmentTools) {
-      setSampleMode(false);
-    }
-  }, [showDevelopmentTools]);
-
   const connectHevyAccount = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
       setHevyBusy(true);
       setHevyDialogError(null);
       try {
-        const next = await api.connectHevy(hevyApiKey);
-        setHevyStatus(next);
+        await connectHevy(hevyApiKey);
         setHevyApiKey("");
-        setSource(corosConnected ? "combined" : "hevy");
       } catch (caught) {
         setHevyDialogError(toErrorMessage(caught));
       } finally {
         setHevyBusy(false);
       }
     },
-    [api, corosConnected, hevyApiKey]
+    [connectHevy, hevyApiKey]
   );
 
   const changeWarmupSetting = useCallback(
@@ -662,16 +443,14 @@ export function StrengthView({
       setHevyBusy(true);
       setHevyDialogError(null);
       try {
-        const next = await api.updateHevySettings({ includeWarmups });
-        setHevyStatus(next);
-        await runSync(false);
+        await setHevyWarmups(includeWarmups);
       } catch (caught) {
         setHevyDialogError(toErrorMessage(caught));
       } finally {
         setHevyBusy(false);
       }
     },
-    [api, runSync]
+    [setHevyWarmups]
   );
 
   const disconnectHevyAccount = useCallback(async () => {
@@ -685,32 +464,14 @@ export function StrengthView({
     setHevyBusy(true);
     setHevyDialogError(null);
     try {
-      syncSequenceRef.current += 1;
-      await api.disconnectHevy();
-      setHevyStatus({ connected: false, includeWarmups: false });
-      setLoadedSessions([]);
-      setWarnings([]);
-      setPending(0);
-      setSource(corosConnected ? "coros" : "hevy");
+      await disconnectHevy();
       if (!corosConnected) setHevyDialogOpen(false);
     } catch (caught) {
       setHevyDialogError(toErrorMessage(caught));
     } finally {
       setHevyBusy(false);
     }
-  }, [api, corosConnected]);
-
-  // Sample mode swaps in a generated history so the page can be worked on
-  // without a populated account; nothing about it touches the API or the cache.
-  const sessions = useMemo(
-    () => (sampleMode ? buildSampleStrengthSessions(days) : loadedSessions),
-    [sampleMode, days, loadedSessions]
-  );
-
-  const analytics = useMemo(
-    () => buildStrengthAnalytics(sessions, days),
-    [sessions, days]
-  );
+  }, [corosConnected, disconnectHevy]);
 
   const selectedExercise = selectedExerciseName
     ? analytics.exercises.find((exercise) => exercise.name === selectedExerciseName) ?? null
@@ -718,12 +479,7 @@ export function StrengthView({
   const openExercise = useCallback((name: string) => setSelectedExerciseName(name), []);
   const closeExercise = useCallback(() => setSelectedExerciseName(null), []);
 
-  const highlightedMuscle = figureHover ?? listHover ?? selectedMuscle;
-  const panelMuscle = selectedMuscle;
-  const heatMax = analytics.muscleMax[metric];
-
-  const activeWindow =
-    WINDOW_OPTIONS.find((option) => option.days === days) ?? WINDOW_OPTIONS[1];
+  const activeWindow = activeStrengthWindow(days);
   const summary = analytics.summary;
   const hasSessions = summary.sessions > 0;
   const attributedSetCount = Math.round(analytics.attributedSets);
@@ -1220,115 +976,11 @@ export function StrengthView({
         <div className="strength-sample-cta">{sampleButton}</div>
       ) : null}
 
-      <div
-        className="strength-hero"
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && selectedMuscle) {
-            event.preventDefault();
-            selectMuscle(null);
-          }
-        }}
-      >
-        <section className="panel strength-body-panel">
-          <div className="strength-body-controls">
-            <div className="strength-segmented" role="group" aria-label="Body view">
-              <button
-                type="button"
-                className={view === "front" ? "is-active" : ""}
-                aria-pressed={view === "front"}
-                onClick={() => requestView("front")}
-              >
-                Front
-              </button>
-              <button
-                type="button"
-                className={view === "back" ? "is-active" : ""}
-                aria-pressed={view === "back"}
-                onClick={() => requestView("back")}
-              >
-                Back
-              </button>
-            </div>
-            <button
-              type="button"
-              className="strength-flip"
-              aria-label="Flip the figure"
-              onClick={() => requestView(view === "front" ? "back" : "front")}
-            >
-              <RotateCw size={15} aria-hidden="true" />
-            </button>
-            <div className="strength-segmented is-quiet" role="group" aria-label="Heat metric">
-              {METRIC_OPTIONS.filter(
-                (option) => source === "coros" || option.id !== "time"
-              ).map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={metric === option.id ? "is-active" : ""}
-                  aria-pressed={metric === option.id}
-                  onClick={() => setMetric(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <BodyMapV2
-            view={view}
-            viewRequest={viewRequest}
-            metric={metric}
-            muscleById={analytics.muscleById}
-            max={heatMax}
-            selected={selectedMuscle}
-            hovered={highlightedMuscle}
-            onHover={setFigureHover}
-            onSelect={selectMuscle}
-            onViewChange={requestView}
-            showLayerControls={showDevelopmentTools}
-          />
-
-          <div className="strength-legend" aria-hidden="true">
-            <span>Light</span>
-            <span className="strength-legend-ramp">
-              {[1, 2, 3, 4, 5].map((level) => (
-                <i key={level} data-level={level} />
-              ))}
-            </span>
-            <span>Hammered</span>
-          </div>
-        </section>
-
-        <section className="panel strength-muscle-panel">
-          {hasSessions && workingSetCount > 0 && analytics.attributedSets <= 0 ? (
-            <div className="muscle-panel is-unattributed">
-              <span className="muscle-panel-unattributed-icon" aria-hidden="true">
-                <Info size={22} />
-              </span>
-              <p className="eyebrow">Muscle attribution</p>
-              <h3>No specific muscle data</h3>
-              <p>
-                {genericSetCount > 0
-                  ? `COROS recorded ${genericSetCount.toLocaleString()} working ${
-                      genericSetCount === 1 ? "set" : "sets"
-                    } only as Full Body. Session totals remain available, but the map stays neutral because no specific muscles were identified.`
-                  : "None of the exercises in this window could be matched to specific muscles. Session totals remain available, but the map stays neutral."}
-              </p>
-            </div>
-          ) : (
-            <MusclePanel
-              muscles={analytics.muscles}
-              muscleById={analytics.muscleById}
-              metric={metric}
-              max={heatMax}
-              active={panelMuscle}
-              onSelect={selectMuscle}
-              onHover={setListHover}
-              unitSystem={unitSystem}
-            />
-          )}
-        </section>
-      </div>
+      <StrengthHero
+        analytics={analytics}
+        source={source}
+        showDevelopmentTools={showDevelopmentTools}
+      />
 
       {!hasSessions ? (
         <section className="panel strength-card strength-blank">

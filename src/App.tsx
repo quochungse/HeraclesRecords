@@ -2396,6 +2396,7 @@ export default function App() {
                       fallback={<DeferredSurfaceFallback label="training" />}
                     >
                       <LazyTrainingOverview
+                        api={api}
                         status={trainingHubStatus}
                         email={trainingHubEmail}
                         password={trainingHubPassword}
