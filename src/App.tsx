@@ -2298,6 +2298,22 @@ export default function App() {
     error ?? watchStatus?.error ?? null,
   );
 
+  // The sidebar's Coros Connect row wears the watch's name while one is on USB.
+  const connectedWatchName = useMemo(() => {
+    if (!watchStatus?.connected) {
+      return null;
+    }
+
+    const presentation = getWatchPresentation(watchStatus);
+    if (presentation.state === "connected-known") {
+      return presentation.displayName;
+    }
+
+    // An unknown model still reports a name over USB; blanks fall back to the
+    // generic label rather than leaving the row unlabelled.
+    return watchStatus.name?.trim() || presentation.displayName;
+  }, [watchStatus]);
+
   return (
     <div className="app">
       {IS_DEVELOPMENT_BUILD ? (
@@ -2325,6 +2341,7 @@ export default function App() {
           onChange={setActiveView}
           coachBusy={coachBusy}
           showDevelopmentItems={showDevelopmentTools}
+          connectedWatchName={connectedWatchName}
           appLogo={appLogo}
           expanded={sidebarExpanded}
           onExpandedChange={setSidebarExpanded}

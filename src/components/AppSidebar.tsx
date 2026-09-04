@@ -171,6 +171,8 @@ export interface AppSidebarProps {
   onChange: (view: PrimaryView) => void;
   coachBusy?: boolean;
   showDevelopmentItems?: boolean;
+  /** Name of the watch on USB, replacing the Coros Connect group label. */
+  connectedWatchName?: string | null;
   appLogo: string;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
@@ -183,6 +185,7 @@ export function AppSidebar({
   onChange,
   coachBusy = false,
   showDevelopmentItems = false,
+  connectedWatchName = null,
   appLogo,
   expanded,
   onExpandedChange,
@@ -427,6 +430,11 @@ export function AppSidebar({
     const groupOpen = !collapsedGroups.includes(group.id);
     const headerKey = groupRowKey(group.id);
     const headerIndex = rowIndex++;
+    // A watch on USB takes over the Coros Connect row: its name for the label,
+    // a tinted icon for the connection itself.
+    const watchLabel =
+      group.id === "coros-connect" ? (connectedWatchName ?? null) : null;
+    const groupLabel = watchLabel ?? group.label;
 
     return [
       <div className="app-sidebar-nav-group" key={group.id}>
@@ -435,6 +443,7 @@ export function AppSidebar({
           className={[
             "app-sidebar-nav-item",
             "is-group",
+            watchLabel ? "is-watch-connected" : "",
             indicatorKey === headerKey ? "active" : "",
           ]
             .filter(Boolean)
@@ -448,7 +457,7 @@ export function AppSidebar({
           </span>
           {rowCopy(
             headerIndex,
-            group.label,
+            groupLabel,
             false,
             <ChevronDown
               className={[
@@ -467,7 +476,7 @@ export function AppSidebar({
           <div
             className="app-sidebar-nav-children"
             role="group"
-            aria-label={group.label}
+            aria-label={groupLabel}
           >
             {group.items.map((item) => renderNavItem(item, rowIndex++, true))}
           </div>

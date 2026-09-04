@@ -783,6 +783,13 @@ input::placeholder {
   color: var(--accent-strong);
 }
 
+/* A watch on USB tints the Coros Connect row's icon, even while that row is
+   the active one — the connection outranks the selection here. */
+.app-sidebar-nav-item.is-watch-connected .app-sidebar-nav-icon,
+.app-sidebar-nav-item.is-watch-connected.active .app-sidebar-nav-icon {
+  color: var(--success-dot);
+}
+
 /* --- Grouped navigation ------------------------------------------------- */
 
 .app-sidebar-nav-group {
@@ -24519,6 +24526,13 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .app-sidebar-nav-item.active .app-sidebar-nav-icon {
   color: var(--accent);
+}
+
+/* Paper's active tint is scoped to the theme, so the connected tint has to be
+   restated at the same specificity to keep outranking it. */
+:root[data-theme="paper"] .app-sidebar-nav-item.is-watch-connected .app-sidebar-nav-icon,
+:root[data-theme="paper"] .app-sidebar-nav-item.is-watch-connected.active .app-sidebar-nav-icon {
+  color: var(--success-dot);
 }
 
 :root[data-theme="paper"] .app-sidebar-footer {
