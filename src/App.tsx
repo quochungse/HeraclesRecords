@@ -91,7 +91,8 @@ import {
   AppSidebar,
   createInitialSidebarExpanded,
 } from "./components/AppSidebar";
-import { WatchConnectionSmokeControls } from "./components/WatchConnectionSmokeControls";
+import { DeveloperToolbar } from "./components/DeveloperToolbar";
+import { StatusDot } from "./components/StatusDot";
 import type { PrimaryView } from "./navigation/primaryNav";
 import {
   getPrimaryViewLabel,
@@ -2299,59 +2300,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header app-header--slim">
-        <div className="app-header-end">
-          {IS_DEVELOPMENT_BUILD ? (
-            <button
-              className="app-dev-view-toggle"
-              type="button"
-              aria-pressed={showDevelopmentTools}
-              title={
-                showDevelopmentTools
-                  ? "Switch to production view"
-                  : "Switch to developer view"
-              }
-              onClick={handleDevelopmentViewToggle}
-            >
-              {showDevelopmentTools ? "Dev view" : "Prod view"}
-            </button>
-          ) : null}
-          {IS_DEVELOPMENT_BUILD && showDevelopmentTools ? (
-            <button
-              className="app-dev-view-toggle app-dev-update-test"
-              type="button"
-              aria-pressed={devUpdateSimulation !== null}
-              title={
-                devUpdateSimulation
-                  ? "Clear the simulated update"
-                  : "Simulate an available update for this session"
-              }
-              onClick={toggleDevUpdateSimulation}
-            >
-              <Sparkles size={13} aria-hidden="true" />
-              {devUpdateSimulation ? "Clear test" : "Test update"}
-            </button>
-          ) : null}
-          {IS_DEVELOPMENT_BUILD && showDevelopmentTools ? (
-            <WatchConnectionSmokeControls
-              api={api}
-              onWatchStatusChange={setWatchStatus}
-              onError={setError}
-            />
-          ) : null}
-          <div
-            className={`watch-status-chip${watchStatus?.connected ? " connected" : ""}`}
-            title={watchStatus?.rootPath ?? "No watch volume found"}
-          >
-            <StatusDot connected={Boolean(watchStatus?.connected)} />
-            <span>
-              {watchStatus?.connected
-                ? (watchStatus.name ?? "Connected")
-                : "No watch"}
-            </span>
-          </div>
-        </div>
-      </header>
+      {IS_DEVELOPMENT_BUILD ? (
+        <DeveloperToolbar
+          api={api}
+          watchStatus={watchStatus}
+          developmentViewActive={showDevelopmentTools}
+          onDevelopmentViewToggle={handleDevelopmentViewToggle}
+          updateSimulationActive={devUpdateSimulation !== null}
+          onToggleUpdateSimulation={toggleDevUpdateSimulation}
+          onWatchStatusChange={setWatchStatus}
+          onError={setError}
+        />
+      ) : (
+        // Packaged builds have no toolbar, but macOS still floats its traffic
+        // lights over the window and the app owns its title bar, so a bare
+        // drag strip has to keep that corner clear and the window movable.
+        // The CSS hides it everywhere except darwin.
+        <div className="app-titlebar-drag" />
+      )}
 
       <div className="app-body">
         <AppSidebar
@@ -7653,10 +7619,6 @@ function formatTrackDuration(durationMs?: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function StatusDot({ connected }: { connected: boolean }) {
-  return <span className={connected ? "status-dot connected" : "status-dot"} />;
 }
 
 type YouTubeDownloadTarget = {

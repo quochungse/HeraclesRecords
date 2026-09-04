@@ -442,18 +442,22 @@ input::placeholder {
   background: var(--bg-base);
 }
 
-.app-header {
+/* The development/testing toolbar. It renders only in unpackaged builds, but
+   it also acts as the window's title bar there, so it keeps the drag region
+   and the macOS traffic-light gutter. Packaged builds get
+   `.app-titlebar-drag` below instead. */
+.dev-toolbar {
   position: sticky;
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   column-gap: 20px;
+  min-height: 52px;
   border-bottom: none;
   background: transparent;
-  padding: 12px 28px;
-  /* The header doubles as the window title bar; make the empty areas draggable. */
+  padding: 8px 20px;
   -webkit-app-region: drag;
 }
 
@@ -462,71 +466,55 @@ input::placeholder {
   --titlebar-traffic-gutter: 80px;
 }
 
-/* Keep room clear for the macOS traffic lights that overlay the header. */
-:root[data-platform="darwin"] .app-header {
-  padding: 14px 28px 12px calc(28px + var(--titlebar-traffic-gutter));
+:root[data-platform="darwin"] .dev-toolbar {
+  padding: 10px 20px 8px calc(20px + var(--titlebar-traffic-gutter));
 }
 
-/* Fullscreen auto-hides traffic lights until hover — align logo + nav with page content. */
+/* Fullscreen auto-hides traffic lights until hover — align with page content. */
 :root[data-platform="darwin"][data-window-fullscreen="true"] {
   --titlebar-traffic-gutter: 0px;
 }
 
-:root[data-platform="darwin"][data-window-fullscreen="true"] .app-header {
-  padding: 10px 28px;
+:root[data-platform="darwin"][data-window-fullscreen="true"] .dev-toolbar {
+  padding: 8px 20px;
 }
 
 /* Interactive controls must stay clickable, so opt them out of the drag region. */
-.app-header button,
-.app-header a,
-.app-header input,
-.app-header .primary-tabs,
-.app-header .primary-tabs-select,
-.app-header .watch-status-chip {
+.dev-toolbar button,
+.dev-toolbar a,
+.dev-toolbar input,
+.dev-toolbar .watch-status-chip {
   -webkit-app-region: no-drag;
 }
 
-.app-header-start {
+.dev-toolbar-end {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 20px;
-  min-width: 0;
-  flex-wrap: nowrap;
-}
-
-.app-header-start .primary-tabs,
-.app-header-start .primary-tabs-select {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.app-header-end {
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
   flex-shrink: 0;
 }
 
-.app-header--slim {
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 52px;
-  padding: 8px 20px;
+/* Packaged builds drop the toolbar entirely. On macOS the app still owns its
+   title bar (titleBarStyle: "hiddenInset"), so without this strip the traffic
+   lights would sit on top of the sidebar and the window could not be dragged.
+   Every other platform keeps its OS title bar, so the strip stays collapsed. */
+.app-titlebar-drag {
+  display: none;
 }
 
-:root[data-platform="darwin"] .app-header--slim {
-  padding: 10px 20px 8px calc(20px + var(--titlebar-traffic-gutter));
+:root[data-platform="darwin"] .app-titlebar-drag {
+  display: block;
+  flex-shrink: 0;
+  height: 40px;
+  -webkit-app-region: drag;
 }
 
-:root[data-platform="darwin"][data-window-fullscreen="true"] .app-header--slim {
-  padding: 8px 20px;
-}
-
-.app-header--slim .app-header-end {
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  min-width: 0;
+/* Fullscreen hides the traffic lights and the window cannot be dragged. */
+:root[data-platform="darwin"][data-window-fullscreen="true"] .app-titlebar-drag {
+  height: 0;
 }
 
 .app-dev-view-toggle {
@@ -1163,15 +1151,15 @@ input::placeholder {
 }
 
 @media (max-width: 560px) {
-  .app-header {
+  .dev-toolbar {
     padding: 8px 12px;
   }
 
-  :root[data-platform="darwin"] .app-header {
+  :root[data-platform="darwin"] .dev-toolbar {
     padding: 10px 12px 8px calc(12px + var(--titlebar-traffic-gutter));
   }
 
-  :root[data-platform="darwin"][data-window-fullscreen="true"] .app-header {
+  :root[data-platform="darwin"][data-window-fullscreen="true"] .dev-toolbar {
     padding: 8px 12px;
   }
 
@@ -1182,10 +1170,6 @@ input::placeholder {
   .brand-mark {
     width: 36px;
     height: 36px;
-  }
-
-  .app-header-start {
-    gap: 8px;
   }
 
   .watch-status-chip span {
@@ -17211,24 +17195,20 @@ tr.data-intervals-row-missing {
 }
 
 @media (max-width: 1024px) {
-  .app-header {
+  .dev-toolbar {
     column-gap: 12px;
     padding: 10px 16px;
   }
 
-  :root[data-platform="darwin"] .app-header {
+  :root[data-platform="darwin"] .dev-toolbar {
     padding: 12px 16px 10px calc(16px + var(--titlebar-traffic-gutter));
   }
 
-  :root[data-platform="darwin"][data-window-fullscreen="true"] .app-header {
+  :root[data-platform="darwin"][data-window-fullscreen="true"] .dev-toolbar {
     padding: 10px 16px;
   }
 
-  .app-header-start {
-    gap: 12px;
-  }
-
-  .app-header-end {
+  .dev-toolbar-end {
     gap: 8px;
   }
 
@@ -24496,8 +24476,7 @@ tr.data-intervals-row-missing {
     linear-gradient(180deg, rgba(38, 34, 28, 0.015), transparent 30%);
 }
 
-:root[data-theme="paper"] .app-header,
-:root[data-theme="paper"] .app-header--slim {
+:root[data-theme="paper"] .dev-toolbar {
   background: transparent;
 }
 
