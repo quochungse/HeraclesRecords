@@ -2328,10 +2328,10 @@ export default function App() {
           onError={setError}
         />
       ) : (
-        // Packaged builds have no toolbar, but macOS still floats its traffic
-        // lights over the window and the app owns its title bar, so a bare
-        // drag strip has to keep that corner clear and the window movable.
-        // The CSS hides it everywhere except darwin.
+        // Packaged builds have no toolbar. macOS still floats its traffic
+        // lights over the window and the app owns its title bar there, so a
+        // bare drag strip keeps that corner clear and the window movable; it
+        // renders on every platform so the layout stays uniform.
         <div className="app-titlebar-drag" />
       )}
 

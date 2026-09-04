@@ -444,8 +444,8 @@ input::placeholder {
 
 /* The development/testing toolbar. It renders only in unpackaged builds, but
    it also acts as the window's title bar there, so it keeps the drag region
-   and the macOS traffic-light gutter. Packaged builds get
-   `.app-titlebar-drag` below instead. */
+   and the macOS traffic-light gutter. Packaged builds get the bare
+   `.app-titlebar-drag` strip below instead. */
 .dev-toolbar {
   position: sticky;
   top: 0;
@@ -497,24 +497,15 @@ input::placeholder {
   flex-shrink: 0;
 }
 
-/* Packaged builds drop the toolbar entirely. On macOS the app still owns its
-   title bar (titleBarStyle: "hiddenInset"), so without this strip the traffic
-   lights would sit on top of the sidebar and the window could not be dragged.
-   Every other platform keeps its OS title bar, so the strip stays collapsed. */
+/* Packaged builds drop the toolbar entirely and get this strip instead: an
+   empty drag handle across the top of the window. macOS needs it — the app
+   owns its title bar there (titleBarStyle: "hiddenInset"), so without it the
+   traffic lights would sit on the sidebar and the window could not be moved.
+   It renders on every platform so there is one layout to reason about. */
 .app-titlebar-drag {
-  display: none;
-}
-
-:root[data-platform="darwin"] .app-titlebar-drag {
-  display: block;
   flex-shrink: 0;
   height: 40px;
   -webkit-app-region: drag;
-}
-
-/* Fullscreen hides the traffic lights and the window cannot be dragged. */
-:root[data-platform="darwin"][data-window-fullscreen="true"] .app-titlebar-drag {
-  height: 0;
 }
 
 .app-dev-view-toggle {
