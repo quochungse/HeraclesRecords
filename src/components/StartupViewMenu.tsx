@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Star } from "lucide-react";
+import { Check, ChevronDown, Star } from "lucide-react";
 import {
   type PrimaryView,
   visiblePrimaryNavItems,
@@ -10,12 +10,16 @@ interface StartupViewMenuProps {
   value: PrimaryView;
   onChange: (view: PrimaryView) => void;
   showDevelopmentItems?: boolean;
+  /** Settings renders the trigger with the current view spelled out; the
+      icon-only form is kept for compact placements. */
+  labeled?: boolean;
 }
 
 export function StartupViewMenu({
   value,
   onChange,
   showDevelopmentItems = false,
+  labeled = false,
 }: StartupViewMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,7 +52,9 @@ export function StartupViewMenu({
   return (
     <div className="startup-view-menu" ref={containerRef}>
       <button
-        className="update-settings-trigger startup-view-trigger"
+        className={`update-settings-trigger startup-view-trigger${
+          labeled ? " startup-view-trigger--labeled" : ""
+        }`}
         type="button"
         aria-label={`Startup view: ${activeLabel}`}
         aria-haspopup="menu"
@@ -57,6 +63,12 @@ export function StartupViewMenu({
         onClick={() => setOpen((current) => !current)}
       >
         <Star size={16} aria-hidden="true" />
+        {labeled ? (
+          <>
+            <span className="startup-view-trigger-label">{activeLabel}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </>
+        ) : null}
       </button>
 
       {open ? (

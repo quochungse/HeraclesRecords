@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { AppUpdateSnapshot } from "../../electron/types";
 
-interface AppUpdateControlsProps {
+interface AppUpdateControlProps {
   snapshot: AppUpdateSnapshot;
   busy: boolean;
   downloading: boolean;
@@ -21,7 +21,50 @@ interface AppUpdateControlsProps {
   }) => void;
 }
 
-function UpdatePreferencesMenu({
+/**
+ * The trigger has two looks. With nothing to install it is the plain grey
+ * "Updates" button the top bar used to carry; once an update is in flight it
+ * turns green and names the version, so the state is readable at a glance.
+ */
+function triggerContent(snapshot: AppUpdateSnapshot, busy: boolean) {
+  if (snapshot.status === "downloading") {
+    return {
+      ready: true,
+      icon: <Loader2 className="spin" size={15} aria-hidden="true" />,
+      label: `Downloading ${Math.round(snapshot.downloadPercent ?? 0)}%`,
+    };
+  }
+
+  if (
+    (snapshot.status === "downloaded" || snapshot.status === "available") &&
+    snapshot.availableVersion
+  ) {
+    return {
+      ready: true,
+      icon: <Sparkles size={15} aria-hidden="true" />,
+      label: `Update ${snapshot.availableVersion}`,
+    };
+  }
+
+  return {
+    ready: false,
+    icon:
+      busy || snapshot.status === "checking" ? (
+        <Loader2 className="spin" size={15} aria-hidden="true" />
+      ) : (
+        <Settings2 size={15} aria-hidden="true" />
+      ),
+    label: "Updates",
+  };
+}
+
+/**
+ * The app's single update surface, in Settings → App Info. The button reports
+ * status and opens everything else: the pending action, the auto-update
+ * preferences, and a manual check at the bottom. It is never disabled — an
+ * unpackaged build still opens the popover, which explains why it can't update.
+ */
+export function AppUpdateControl({
   snapshot,
   busy,
   downloading,
@@ -29,7 +72,7 @@ function UpdatePreferencesMenu({
   onDownload,
   onInstall,
   onPreferencesChange,
-}: AppUpdateControlsProps) {
+}: AppUpdateControlProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -57,27 +100,51 @@ function UpdatePreferencesMenu({
     };
   }, [open]);
 
+  const { ready, icon, label } = triggerContent(snapshot, busy);
+  const pendingAction = snapshot.supported
+    ? snapshot.status === "downloaded" && snapshot.availableVersion
+      ? "install"
+      : snapshot.status === "available" && !snapshot.autoDownload
+        ? "download"
+        : null
+    : null;
+
   return (
-    <div className="update-settings" ref={containerRef}>
+    <div className="settings-update-menu" ref={containerRef}>
       <button
-        className="update-settings-trigger update-settings-trigger--labeled"
+        className={
+          ready
+            ? "update-chip ready"
+            : "update-settings-trigger update-settings-trigger--labeled"
+        }
         type="button"
-        aria-label="Update settings"
+        aria-haspopup="menu"
         aria-expanded={open}
-        title="Update settings"
+        title={
+          snapshot.status === "error"
+            ? snapshot.error
+            : `Heracles Records ${snapshot.currentVersion}`
+        }
         onClick={() => setOpen((value) => !value)}
       >
-        <Settings2 size={14} aria-hidden="true" />
-        <span className="update-settings-trigger-label">Updates</span>
+        {icon}
+        <span className="update-settings-trigger-label">{label}</span>
       </button>
 
       {open ? (
         <div className="update-settings-popover" role="menu">
           <p className="update-settings-heading">Updates</p>
 
-          {snapshot.supported ? (
+          {snapshot.supported ? null : (
+            <p className="update-settings-note">
+              Auto-updates run in installed builds. Preferences below apply
+              when you install Heracles Records.
+            </p>
+          )}
+
+          {pendingAction ? (
             <div className="update-settings-actions">
-              {snapshot.status === "downloaded" && snapshot.availableVersion ? (
+              {pendingAction === "install" ? (
                 <button
                   className="update-settings-action"
                   type="button"
@@ -91,7 +158,7 @@ function UpdatePreferencesMenu({
                     ? `Download ${snapshot.availableVersion}`
                     : "Restart to update"}
                 </button>
-              ) : snapshot.status === "available" && !snapshot.autoDownload ? (
+              ) : (
                 <button
                   className="update-settings-action"
                   type="button"
@@ -110,31 +177,9 @@ function UpdatePreferencesMenu({
                     ? "Starting…"
                     : `Download ${snapshot.availableVersion}`}
                 </button>
-              ) : (
-                <button
-                  className="update-settings-action"
-                  type="button"
-                  disabled={busy || snapshot.status === "checking"}
-                  onClick={() => {
-                    onCheck();
-                    setOpen(false);
-                  }}
-                >
-                  {busy || snapshot.status === "checking" ? (
-                    <Loader2 className="spin" size={14} aria-hidden="true" />
-                  ) : (
-                    <RefreshCw size={14} aria-hidden="true" />
-                  )}
-                  Check for updates
-                </button>
               )}
             </div>
-          ) : (
-            <p className="update-settings-note">
-              Auto-updates run in installed builds. Preferences below apply
-              when you install Heracles Records.
-            </p>
-          )}
+          ) : null}
 
           <label className="update-settings-option">
             <input
@@ -170,145 +215,27 @@ function UpdatePreferencesMenu({
               </span>
             </span>
           </label>
+
+          <div className="update-settings-actions">
+            <button
+              className="update-settings-action"
+              type="button"
+              disabled={busy || snapshot.status === "checking"}
+              onClick={() => {
+                onCheck();
+                setOpen(false);
+              }}
+            >
+              {busy || snapshot.status === "checking" ? (
+                <Loader2 className="spin" size={14} aria-hidden="true" />
+              ) : (
+                <RefreshCw size={14} aria-hidden="true" />
+              )}
+              Check for updates
+            </button>
+          </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-export function AppUpdateControls({
-  snapshot,
-  busy,
-  downloading,
-  onCheck,
-  onDownload,
-  onInstall,
-  onPreferencesChange,
-}: AppUpdateControlsProps) {
-  const settings = (
-    <UpdatePreferencesMenu
-      snapshot={snapshot}
-      busy={busy}
-      downloading={downloading}
-      onCheck={onCheck}
-      onDownload={onDownload}
-      onInstall={onInstall}
-      onPreferencesChange={onPreferencesChange}
-    />
-  );
-
-  if (!snapshot.supported) {
-    return (
-      <div className="app-update-controls">
-        <span className="app-version-chip" title="Development build">
-          v{snapshot.currentVersion}
-        </span>
-        {settings}
-      </div>
-    );
-  }
-
-  if (snapshot.status === "downloaded" && snapshot.availableVersion) {
-    const manual = snapshot.installMethod === "manual";
-
-    return (
-      <div className="app-update-controls">
-        <button
-          className="update-chip ready"
-          type="button"
-          onClick={onInstall}
-          title={
-            manual
-              ? `Download Heracles Records ${snapshot.availableVersion} from GitHub (required for this macOS build)`
-              : `Install Heracles Records ${snapshot.availableVersion}`
-          }
-        >
-          <Sparkles size={15} aria-hidden="true" />
-          {manual
-            ? `Download ${snapshot.availableVersion}`
-            : "Restart to update"}
-        </button>
-        {settings}
-      </div>
-    );
-  }
-
-  // An update was found but auto-download is off: let the user start it.
-  if (snapshot.status === "available" && !snapshot.autoDownload) {
-    return (
-      <div className="app-update-controls">
-        <button
-          className="update-chip ready"
-          type="button"
-          onClick={onDownload}
-          disabled={downloading}
-          title={
-            snapshot.releaseNotes ??
-            `Download Heracles Records ${snapshot.availableVersion}`
-          }
-        >
-          {downloading ? (
-            <Loader2 className="spin" size={15} aria-hidden="true" />
-          ) : (
-            <Download size={15} aria-hidden="true" />
-          )}
-          {downloading
-            ? "Starting…"
-            : `Download ${snapshot.availableVersion}`}
-        </button>
-        {settings}
-      </div>
-    );
-  }
-
-  if (snapshot.status === "available" || snapshot.status === "downloading") {
-    const label =
-      snapshot.status === "downloading"
-        ? `Downloading ${Math.round(snapshot.downloadPercent ?? 0)}%`
-        : `Update ${snapshot.availableVersion}`;
-
-    return (
-      <div className="app-update-controls">
-        <div
-          className="update-chip downloading"
-          title={
-            snapshot.releaseNotes ??
-            `Heracles Records ${snapshot.availableVersion} is available`
-          }
-        >
-          {snapshot.status === "downloading" ? (
-            <Loader2 className="spin" size={15} aria-hidden="true" />
-          ) : (
-            <Download size={15} aria-hidden="true" />
-          )}
-          <span>{label}</span>
-        </div>
-        {settings}
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-update-controls">
-      <button
-        className="app-version-chip button"
-        type="button"
-        onClick={onCheck}
-        disabled={busy || snapshot.status === "checking"}
-        title={
-          snapshot.status === "error"
-            ? snapshot.error
-            : `Heracles Records ${snapshot.currentVersion}`
-        }
-      >
-        {busy || snapshot.status === "checking" ? (
-          <Loader2 className="spin" size={14} aria-hidden="true" />
-        ) : (
-          <RefreshCw size={14} aria-hidden="true" />
-        )}
-        v{snapshot.currentVersion}
-      </button>
-      {settings}
     </div>
   );
 }

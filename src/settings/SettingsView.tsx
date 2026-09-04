@@ -33,6 +33,11 @@ import type {
   AppUpdateSnapshot,
   TrainingHubStatus,
 } from "../../electron/types";
+import { AppUpdateControl } from "../components/AppUpdateControls";
+import { ResourcesMenu } from "../components/ResourcesMenu";
+import { StartupViewMenu } from "../components/StartupViewMenu";
+import type { PrimaryView } from "../navigation/primaryNav";
+import { getPrimaryViewIcon } from "../navigation/startupView";
 import {
   coachModelsSummaryLine,
   summarizeCoachModels,
@@ -159,8 +164,20 @@ interface SettingsViewProps {
   api: CorosLinkApi;
   updateSnapshot: AppUpdateSnapshot;
   updateBusy: boolean;
+  updateDownloading: boolean;
   onCheckForUpdates: () => void;
+  onDownloadUpdate: () => void;
+  onInstallUpdate: () => void;
+  onUpdatePreferencesChange: (prefs: {
+    autoCheck?: boolean;
+    autoDownload?: boolean;
+  }) => void;
   onError: (message: string) => void;
+  /** Startup view lives here now; App owns the state so the toast it raises
+      stays with the rest of the app-level messaging. */
+  startupView: PrimaryView;
+  onStartupViewChange: (view: PrimaryView) => void;
+  showDevelopmentTools: boolean;
   /** COROS Training Hub session, shown as the connected-account card up top. */
   trainingStatus: TrainingHubStatus | null;
   trainingBusy: string | null;
@@ -177,8 +194,15 @@ export function SettingsView({
   api,
   updateSnapshot,
   updateBusy,
+  updateDownloading,
   onCheckForUpdates,
+  onDownloadUpdate,
+  onInstallUpdate,
+  onUpdatePreferencesChange,
   onError,
+  startupView,
+  onStartupViewChange,
+  showDevelopmentTools,
   trainingStatus,
   trainingBusy,
   onTrainingRefresh,
@@ -305,6 +329,9 @@ export function SettingsView({
     }
   }
 
+  // Capitalised so JSX renders it as a component, not an element name.
+  const StartupViewIcon = getPrimaryViewIcon(startupView);
+
   const updateStatusText =
     updateSnapshot.status === "available" ||
     updateSnapshot.status === "downloading"
@@ -422,19 +449,15 @@ export function SettingsView({
               <p className="settings-update-status">{updateStatusText}</p>
             ) : null}
           </div>
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={onCheckForUpdates}
-            disabled={updateBusy}
-          >
-            <RefreshCw
-              size={15}
-              aria-hidden="true"
-              className={updateBusy ? "spin" : ""}
-            />
-            Check for updates
-          </button>
+          <AppUpdateControl
+            snapshot={updateSnapshot}
+            busy={updateBusy}
+            downloading={updateDownloading}
+            onCheck={onCheckForUpdates}
+            onDownload={onDownloadUpdate}
+            onInstall={onInstallUpdate}
+            onPreferencesChange={onUpdatePreferencesChange}
+          />
         </div>
 
         <dl className="settings-version-grid">
@@ -474,6 +497,23 @@ export function SettingsView({
               <ExternalLink size={12} aria-hidden="true" />
             </a>
           ))}
+          <ResourcesMenu />
+        </div>
+
+        <div className="settings-startup-row">
+          <span className="settings-startup-icon" aria-hidden="true">
+            <StartupViewIcon size={22} strokeWidth={1.9} />
+          </span>
+          <span className="settings-startup-copy">
+            <strong>Startup view</strong>
+            <span>The screen Heracles Records opens on next launch.</span>
+          </span>
+          <StartupViewMenu
+            labeled
+            value={startupView}
+            onChange={onStartupViewChange}
+            showDevelopmentItems={showDevelopmentTools}
+          />
         </div>
       </div>
 

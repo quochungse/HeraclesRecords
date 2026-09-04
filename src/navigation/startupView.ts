@@ -1,3 +1,4 @@
+import { LayoutGrid, type LucideIcon } from "lucide-react";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./primaryNav";
 
 const DEFAULT_STARTUP_VIEW: PrimaryView = "overview";
@@ -13,6 +14,13 @@ export function getPrimaryViewLabel(view: PrimaryView): string {
   return (
     PRIMARY_NAV_ITEMS.find((item) => item.id === view)?.label ??
     "Overview"
+  );
+}
+
+/** The selected destination's own icon, so the row shows what will open. */
+export function getPrimaryViewIcon(view: PrimaryView): LucideIcon {
+  return (
+    PRIMARY_NAV_ITEMS.find((item) => item.id === view)?.icon ?? LayoutGrid
   );
 }
 

@@ -1709,6 +1709,22 @@ input::placeholder {
   color: #fbbf24;
 }
 
+.startup-view-trigger--labeled {
+  gap: 7px;
+  width: auto;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.startup-view-trigger--labeled svg:last-child {
+  color: var(--text-muted);
+}
+
+.startup-view-trigger-label {
+  white-space: nowrap;
+}
+
 .startup-view-popover {
   position: absolute;
   top: calc(100% + 8px);
@@ -31862,10 +31878,16 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* `.panel` carries a backdrop-filter, which makes every panel its own stacking
+   context — so the COROS Help and Startup view popovers cannot escape this one
+   on z-index alone, and the panels below would paint over them in DOM order.
+   Lifting the whole panel above its siblings is what actually frees them. The
+   panels never overlap geometrically, so nothing else changes. */
 .settings-about-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  z-index: 3;
 }
 
 .settings-about-header {
@@ -31902,9 +31924,29 @@ tr.data-intervals-row-missing {
   font-weight: 700;
 }
 
-.settings-about-header .secondary-button {
+.settings-about-header .secondary-button,
+.settings-about-header .update-chip {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* The Update button is a popover trigger, so it anchors its own menu. The
+   popover opens leftward because the button sits at the header's right edge.
+   `white-space` stays off this wrapper on purpose: the chip inside sets its
+   own nowrap, and inheriting it here would reach the popover and stop the
+   preference hints from wrapping, overflowing the 260px menu. */
+.settings-update-menu {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.settings-update-menu .update-settings-popover {
+  white-space: normal;
+}
+
+.settings-update-menu > button[aria-expanded="true"] {
+  border-color: var(--accent);
 }
 
 .settings-version-grid {
@@ -31958,6 +32000,60 @@ tr.data-intervals-row-missing {
 .settings-about-link:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+button.settings-about-link {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.settings-about-links .resources-popover {
+  right: auto;
+  left: 0;
+}
+
+.settings-about-links .resources-menu-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Startup view: a static row under the About links, shaped like the navigable
+   settings rows but ending in a menu trigger instead of a chevron. */
+.settings-startup-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+}
+
+.settings-startup-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--glass-border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+.settings-startup-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-startup-copy strong {
+  font-size: 15px;
+}
+
+.settings-startup-copy > span {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .settings-storage-panel {

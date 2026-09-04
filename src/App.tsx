@@ -86,14 +86,11 @@ import { recentTrainingHubDateList } from "./training/formatters";
 import type { TrainingHubSnapshot } from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
 import { subscribeToToasts } from "./toast";
-import { AppUpdateControls } from "./components/AppUpdateControls";
 import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
 import {
   AppSidebar,
   createInitialSidebarExpanded,
 } from "./components/AppSidebar";
-import { ResourcesMenu } from "./components/ResourcesMenu";
-import { StartupViewMenu } from "./components/StartupViewMenu";
 import { WatchConnectionSmokeControls } from "./components/WatchConnectionSmokeControls";
 import type { PrimaryView } from "./navigation/primaryNav";
 import {
@@ -331,6 +328,14 @@ export default function App() {
     number | undefined
   >(undefined);
   const devUpdatePreviewSequenceRef = useRef(0);
+  /**
+   * A fake "update available" snapshot for the dev-only Test update button.
+   * It shadows the real snapshot rather than overwriting it, so main can keep
+   * pushing real status underneath and clearing the simulation needs no
+   * refetch. Renderer state only — a restart drops it.
+   */
+  const [devUpdateSimulation, setDevUpdateSimulation] =
+    useState<AppUpdateSnapshot | null>(null);
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -461,6 +466,7 @@ export default function App() {
     },
   );
   const installAcceptedVersionRef = useRef<string | null>(null);
+  const effectiveUpdateSnapshot = devUpdateSimulation ?? appUpdateSnapshot;
 
   useEffect(() => {
     if (!api) {
@@ -1124,13 +1130,25 @@ export default function App() {
       return;
     }
 
+    if (devUpdateSimulation) {
+      setMessage(
+        `Test update ${devUpdateSimulation.availableVersion} is available.`,
+      );
+      return;
+    }
+
     setBusy("update-check");
     setError(null);
     try {
       const snapshot = await api.checkForAppUpdates();
       setAppUpdateSnapshot(snapshot);
 
-      if (snapshot.status === "not-available") {
+      if (!snapshot.supported) {
+        // checkForAppUpdates() returns the snapshot untouched when the updater
+        // is disabled, so nothing below would fire and the click would look
+        // broken.
+        setMessage("Updates are only available in installed builds.");
+      } else if (snapshot.status === "not-available") {
         setMessage("You're on the latest version.");
       } else if (snapshot.status === "error") {
         setError(snapshot.error ?? "Could not check for updates.");
@@ -1143,6 +1161,13 @@ export default function App() {
   }
 
   function handleInstallUpdate() {
+    if (devUpdateSimulation) {
+      setMessage(
+        "Test update install skipped — the development build has no updater.",
+      );
+      return;
+    }
+
     void api
       ?.quitAndInstallUpdate()
       .then((result) => {
@@ -1158,6 +1183,16 @@ export default function App() {
   }
 
   async function handleDownloadUpdate() {
+    if (devUpdateSimulation) {
+      // Jump straight to "ready to install" so the downloaded-state UI is
+      // reachable; nothing is fetched.
+      setDevUpdateSimulation({ ...devUpdateSimulation, status: "downloaded" });
+      setMessage(
+        `Test update ${devUpdateSimulation.availableVersion} is ready to install. Nothing was downloaded.`,
+      );
+      return;
+    }
+
     if (!api) {
       return;
     }
@@ -1179,8 +1214,8 @@ export default function App() {
   }
 
   function handleAcceptAvailableUpdate(version: string) {
-    if (IS_DEVELOPMENT_BUILD && devUpdatePreviewKey !== undefined) {
-      restoreUpdateSnapshotAfterPreview();
+    if (devUpdateSimulation) {
+      setDevUpdatePreviewKey(undefined);
       setMessage(
         `Test update ${version} accepted. No files were downloaded in the development build.`,
       );
@@ -1211,34 +1246,42 @@ export default function App() {
     }
   }
 
-  function showDevUpdatePreview() {
+  /**
+   * Turns the simulated update on and off. It holds for the session so the
+   * Settings update button, its popover and the prompt can all be exercised
+   * in a dev build; a restart clears it because nothing is persisted.
+   */
+  function toggleDevUpdateSimulation() {
     if (!IS_DEVELOPMENT_BUILD) {
+      return;
+    }
+
+    if (devUpdateSimulation) {
+      setDevUpdateSimulation(null);
+      setDevUpdatePreviewKey(undefined);
+      setMessage("Test update cleared. Showing the real update status again.");
       return;
     }
 
     devUpdatePreviewSequenceRef.current += 1;
     setDevUpdatePreviewKey(devUpdatePreviewSequenceRef.current);
-    setAppUpdateSnapshot((current) => ({
+    setDevUpdateSimulation({
       supported: true,
       currentVersion:
-        current.currentVersion === "0.0.0"
+        appUpdateSnapshot.currentVersion === "0.0.0"
           ? DEV_UPDATE_PREVIEW.previousVersion
-          : current.currentVersion,
+          : appUpdateSnapshot.currentVersion,
       status: "available",
       availableVersion: DEV_UPDATE_PREVIEW.version,
       releaseNotes: DEV_UPDATE_PREVIEW.releaseNotes,
-      autoCheck: current.autoCheck,
+      autoCheck: appUpdateSnapshot.autoCheck,
       autoDownload: false,
-    }));
+    });
   }
 
-  function restoreUpdateSnapshotAfterPreview() {
+  /** Dismissing the prompt closes it but leaves the simulation running. */
+  function dismissDevUpdatePreview() {
     setDevUpdatePreviewKey(undefined);
-    if (api) {
-      void api.getAppUpdateStatus().then(setAppUpdateSnapshot).catch((caught) => {
-        setError(toErrorMessage(caught));
-      });
-    }
   }
 
   async function handleUpdatePreferencesChange(prefs: {
@@ -1252,6 +1295,15 @@ export default function App() {
     try {
       const snapshot = await api.setUpdatePreferences(prefs);
       setAppUpdateSnapshot(snapshot);
+      setDevUpdateSimulation((current) =>
+        current
+          ? {
+              ...current,
+              autoCheck: snapshot.autoCheck,
+              autoDownload: snapshot.autoDownload,
+            }
+          : current,
+      );
     } catch (caught) {
       setError(toErrorMessage(caught));
     }
@@ -2249,21 +2301,6 @@ export default function App() {
     <div className="app">
       <header className="app-header app-header--slim">
         <div className="app-header-end">
-          <StartupViewMenu
-            value={startupView}
-            onChange={handleStartupViewChange}
-            showDevelopmentItems={showDevelopmentTools}
-          />
-          <ResourcesMenu />
-          <AppUpdateControls
-            snapshot={appUpdateSnapshot}
-            busy={busy === "update-check"}
-            downloading={busy === "update-download"}
-            onCheck={() => void handleCheckForUpdates()}
-            onDownload={() => void handleDownloadUpdate()}
-            onInstall={handleInstallUpdate}
-            onPreferencesChange={handleUpdatePreferencesChange}
-          />
           {IS_DEVELOPMENT_BUILD ? (
             <button
               className="app-dev-view-toggle"
@@ -2283,11 +2320,16 @@ export default function App() {
             <button
               className="app-dev-view-toggle app-dev-update-test"
               type="button"
-              title="Preview the update changelog prompt"
-              onClick={showDevUpdatePreview}
+              aria-pressed={devUpdateSimulation !== null}
+              title={
+                devUpdateSimulation
+                  ? "Clear the simulated update"
+                  : "Simulate an available update for this session"
+              }
+              onClick={toggleDevUpdateSimulation}
             >
               <Sparkles size={13} aria-hidden="true" />
-              Test update
+              {devUpdateSimulation ? "Clear test" : "Test update"}
             </button>
           ) : null}
           {IS_DEVELOPMENT_BUILD && showDevelopmentTools ? (
@@ -2595,10 +2637,17 @@ export default function App() {
             {activeView === "settings" ? (
               <SettingsView
                 api={api}
-                updateSnapshot={appUpdateSnapshot}
+                updateSnapshot={effectiveUpdateSnapshot}
                 updateBusy={busy === "update-check"}
+                updateDownloading={busy === "update-download"}
                 onCheckForUpdates={() => void handleCheckForUpdates()}
+                onDownloadUpdate={() => void handleDownloadUpdate()}
+                onInstallUpdate={handleInstallUpdate}
+                onUpdatePreferencesChange={handleUpdatePreferencesChange}
                 onError={setError}
+                startupView={startupView}
+                onStartupViewChange={handleStartupViewChange}
+                showDevelopmentTools={showDevelopmentTools}
                 trainingStatus={trainingHubStatus}
                 trainingBusy={busy}
                 onTrainingRefresh={handleTrainingHubRefresh}
@@ -2660,12 +2709,12 @@ export default function App() {
       </div>
 
       <UpdateAvailablePrompt
-        snapshot={appUpdateSnapshot}
+        snapshot={effectiveUpdateSnapshot}
         onAccept={handleAcceptAvailableUpdate}
         onDecline={
           devUpdatePreviewKey === undefined
             ? undefined
-            : restoreUpdateSnapshotAfterPreview
+            : dismissDevUpdatePreview
         }
         previewKey={devUpdatePreviewKey}
       />
