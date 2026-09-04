@@ -81,6 +81,7 @@
     "verify:coach-workout-api": "npm run build:electron && node scripts/verify-coach-workout-api.mjs",
     "test:training-hub-write": "npm run build:electron && node scripts/test-training-hub-write.mjs",
     "test:coros-login": "npm run build:electron && node scripts/test-coros-login.mjs",
+    "test:coros-profile": "npm run build:electron && node scripts/test-coros-profile.mjs",
     "test:activity-backup": "npm run build:electron && node scripts/test-activity-backup.mjs",
     "test:aws-sigv4": "npm run build:electron && node scripts/test-aws-sigv4.mjs",
     "test:zip-store": "npm run build:electron && node scripts/test-zip-store.mjs",

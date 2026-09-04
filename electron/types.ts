@@ -1781,6 +1781,118 @@ export interface TrainingHubLoginResult {
   email?: string;
 }
 
+// The account profile behind `/account/query` on teamapi.coros.com. Everything
+// here is read back from that one response; `unit` only switches display, so
+// the stored numbers stay metric (cm / kg) regardless of it.
+export interface CorosProfile {
+  userId: string;
+  nickname?: string;
+  email?: string;
+  /** Absolute https URL of the COROS-hosted avatar. */
+  avatarUrl?: string;
+  countryCode?: string;
+  language?: string;
+  /** COROS packs the birthday as a YYYYMMDD integer, e.g. 19940626. */
+  birthday?: number;
+  /** 0 = male, 1 = female, as COROS encodes it in `sex`. */
+  sex?: number;
+  statureCm?: number;
+  weightKg?: number;
+  /** 0 = metric, 1 = imperial. */
+  unit?: number;
+  /** 0 = Celsius, 1 = Fahrenheit. */
+  temperatureUnit?: number;
+  /**
+   * Which heart-rate model the zones are built on: 1 = max heart rate,
+   * 2 = heart-rate reserve, 3 = lactate threshold. Read off the COROS web
+   * client, whose picker maps these three codes to "Max Heart Rate Zone",
+   * "Heart Rate Reserve Zone" and "Lactate Threshold HR Zone".
+   */
+  hrZoneType?: number;
+  /** Server-side timestamp of the last max-HR write, "YYYY-MM-DD HH:mm:ss". */
+  maxHrUpdatedAt?: string;
+  twoFactorRequired?: boolean;
+  /** Activities COROS has on file (`sportDataSummary.count`). */
+  activityCount?: number;
+  thresholds: CorosProfileThresholds;
+}
+
+/** One zone row; which metric is filled depends on the family it belongs to. */
+export interface CorosProfileZone {
+  index: number;
+  /** Percent of the family's reference value. */
+  ratio?: number;
+  bpm?: number;
+  paceSecondsPerKm?: number;
+  watts?: number;
+}
+
+export type CorosProfileZoneFamily =
+  | "maxHr"
+  | "restingHr"
+  | "lthr"
+  | "thresholdPace"
+  | "cyclePower";
+
+/** Inclusive bounds COROS accepts for an editable threshold. */
+export interface CorosProfileRange {
+  min: number;
+  max: number;
+}
+
+export interface CorosProfileThresholds {
+  maxHr?: number;
+  restingHr?: number;
+  /** Lactate-threshold heart rate. */
+  lthr?: number;
+  /** Lactate-threshold pace, in seconds per kilometre. */
+  thresholdPaceSecondsPerKm?: number;
+  /** Functional threshold power, watts. */
+  ftp?: number;
+  zones: Record<CorosProfileZoneFamily, CorosProfileZone[]>;
+  /** Server-declared valid ranges, used to validate before writing. */
+  ranges: Partial<Record<CorosProfileZoneFamily | "ftp" | "weightKg", CorosProfileRange>>;
+}
+
+/**
+ * Everything the Personal screen needs, in one payload: the account
+ * profile plus the dashboard the fitness-score and race-predictor panels read.
+ * The dashboard is null when only that half of the fetch failed — the screen
+ * still has a profile to show.
+ */
+export interface CorosProfileSnapshot {
+  profile: CorosProfile;
+  dashboard: TrainingHubDashboard | null;
+  /** ISO timestamp of the fetch this snapshot came from, cache hits included. */
+  cachedAt: string;
+}
+
+// Fields `/account/update` actually persists. Verified field by field against
+// the live endpoint on 2026-09-04 by writing a changed value, reading it back
+// and restoring the original: every key below took effect, `sex` did not (the
+// server ignores it — the gender write is named `gender`), and the request must
+// be multipart/form-data. A JSON body answers `0000` and silently saves nothing.
+export interface CorosProfilePatch {
+  nickname?: string;
+  /** YYYYMMDD, e.g. 19940626. */
+  birthday?: number;
+  /** 0 = male, 1 = female. Sent to COROS as `gender`. */
+  sex?: number;
+  statureCm?: number;
+  weightKg?: number;
+  maxHr?: number;
+  restingHr?: number;
+  unit?: number;
+  temperatureUnit?: number;
+  /**
+   * 1 = max heart rate, 2 = heart-rate reserve, 3 = lactate threshold.
+   * Switching models makes COROS rebuild the zones, so the write carries the
+   * anchor value and zone table that model runs on, the way the web client
+   * sends them.
+   */
+  hrZoneType?: number;
+}
+
 // COROS `/activity/detail/download` file-type codes. Verified against the live
 // teamapi.coros.com endpoint: 0=CSV, 1=GPX, 2=KML, 3=TCX, 4=FIT (5/6 are rejected).
 export type TrainingHubActivityFileType = 0 | 1 | 2 | 3 | 4;

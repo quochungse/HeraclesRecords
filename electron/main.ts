@@ -57,6 +57,7 @@ import {
   getTrainingDashboard,
   fetchTrainingHubActivityFile,
   getTrainingHubActivityDetail,
+  getCorosProfileSnapshot,
   getTrainingHubStatus,
   getUpcomingWorkouts,
   listTrainingHubActivities,
@@ -79,6 +80,7 @@ import {
   cancelTrainingHubTwoFactor,
   logoutTrainingHub,
   reconnectTrainingHub,
+  updateCorosProfile,
   uploadActivityFitToCoros,
   uploadTrainingPlan
 } from "./trainingHubService";
@@ -90,6 +92,7 @@ import {
   updateHevySettings
 } from "./hevyService";
 import type {
+  CorosProfilePatch,
   HevySettingsInput,
   SaveChatSessionOptions,
   StrengthHistoryRequest,
@@ -1841,6 +1844,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle("trainingHub:logout", () => logoutTrainingHub());
 
   ipcMain.handle("trainingHub:reconnect", () => reconnectTrainingHub());
+
+  ipcMain.handle(
+    "trainingHub:getProfileSnapshot",
+    (_event, options?: { refresh?: boolean }) =>
+      getCorosProfileSnapshot(options)
+  );
+
+  ipcMain.handle(
+    "trainingHub:updateProfile",
+    (_event, patch: CorosProfilePatch) => updateCorosProfile(patch)
+  );
 
   ipcMain.handle(
     "trainingHub:listActivities",

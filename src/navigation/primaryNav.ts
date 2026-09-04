@@ -13,12 +13,14 @@ import {
   MessageCircle,
   Music,
   Settings,
+  User,
   Watch,
   type LucideIcon,
 } from "lucide-react";
 
 export type PrimaryView =
   | "overview"
+  | "profile"
   | "coros-overview"
   | "media"
   | "training"
@@ -71,6 +73,7 @@ function group(entry: PrimaryNavGroup): PrimaryNavEntry {
 
 export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
   item({ id: "overview", label: "Overview", icon: LayoutGrid }),
+  item({ id: "profile", label: "Personal", icon: User }),
   item({ id: "calendar", label: "Calendar", icon: CalendarDays }),
   item({
     id: "coach",

@@ -7,6 +7,9 @@ import type {
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
   CorosMapDownloadJob,
+  CorosProfile,
+  CorosProfilePatch,
+  CorosProfileSnapshot,
   CorosMapInstallResult,
   CorosMapInstallProgress,
   CorosMapLocalSelection,
@@ -540,6 +543,12 @@ const api = {
     ipcRenderer.invoke("trainingHub:logout"),
   reconnectTrainingHub: (): Promise<TrainingHubLoginResult> =>
     ipcRenderer.invoke("trainingHub:reconnect"),
+  getCorosProfileSnapshot: (options?: {
+    refresh?: boolean;
+  }): Promise<CorosProfileSnapshot> =>
+    ipcRenderer.invoke("trainingHub:getProfileSnapshot", options),
+  updateCorosProfile: (patch: CorosProfilePatch): Promise<CorosProfile> =>
+    ipcRenderer.invoke("trainingHub:updateProfile", patch),
   listTrainingHubActivities: (
     page: number,
     size: number,

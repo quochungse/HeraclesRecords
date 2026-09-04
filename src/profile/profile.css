@@ -1,0 +1,433 @@
+.profile-view {
+  display: grid;
+  gap: 20px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+/* Every section here is a grid item, and a grid item's min-width defaults to
+   auto — enough for one wide panel (the record cards, a long table) to push the
+   whole screen sideways. */
+.profile-view > *,
+.profile-grid > * {
+  min-width: 0;
+}
+
+.profile-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 2px 2px;
+}
+
+.profile-header h2 {
+  margin: 3px 0 5px;
+  font-size: clamp(28px, 3.6vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.profile-header p:last-child {
+  max-width: 620px;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.profile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-cached-at {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.profile-connect,
+.profile-loading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.profile-connect h3,
+.profile-loading p {
+  margin: 0 0 4px;
+}
+
+.profile-connect p {
+  margin: 0;
+  max-width: 52ch;
+}
+
+.profile-connect button {
+  margin-left: auto;
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.profile-avatar {
+  width: 74px;
+  height: 74px;
+  flex: none;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--glass-bg);
+}
+
+.profile-avatar-empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.profile-identity-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.profile-identity-copy h3 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.profile-identity-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.profile-identity > button {
+  margin-left: auto;
+  flex: none;
+}
+
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  padding: 4px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-badge.is-strong {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 20px;
+}
+
+.profile-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.profile-card-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.profile-fields {
+  display: grid;
+  gap: 13px;
+}
+
+.profile-fields select {
+  min-height: 44px;
+}
+
+.profile-list {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+}
+
+.profile-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.profile-list dt {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-list dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.profile-list dd small {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.profile-account-id {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.profile-mono {
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", monospace);
+  font-size: 13px;
+}
+
+.profile-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* The save row spans the whole form grid so it never squeezes into a column. */
+.profile-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Same shape as the coach dialogs: a click on the backdrop closes, the panel
+   itself swallows the click. */
+.profile-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+/* Sized so the tallest zone family fits without scrolling; the max-height is
+   only a guard for very short windows. */
+.profile-dialog {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  width: min(540px, 100%);
+  max-height: 90vh;
+  /* `overflow-y: auto` alone would promote the x axis to auto as well, which is
+     where the stray horizontal scrollbar came from. Nothing here is ever wider
+     than the dialog, so the x axis is clipped outright. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Grid children default to min-width: auto, which lets a wide word or a long
+   boundary push past the dialog instead of shrinking. */
+.profile-dialog > * {
+  min-width: 0;
+}
+
+/* One row of equal tabs that never wraps, so the dialog keeps its height as
+   the user moves between families. */
+.profile-dialog .profile-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.profile-dialog .profile-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-tab-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.profile-dialog-footnote {
+  margin-top: -2px;
+}
+
+.profile-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Reads as the value it replaces, not as a button, until it is hovered. */
+.profile-zone-model-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 1px dashed var(--glass-border);
+  border-radius: 0;
+  background: none;
+  padding: 0 0 1px;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.profile-zone-model-button:hover,
+.profile-zone-model-button:focus-visible {
+  border-bottom-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.profile-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profile-tabs button {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  padding: 6px 13px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-tabs button.is-active {
+  border-color: color-mix(in srgb, var(--accent-gold) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-gold) 14%, transparent);
+  color: var(--accent-gold);
+}
+
+.profile-zone-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* Fixed layout keeps the columns still whatever the boundary reads —
+     "171 bpm", "5:15 /km" or "216 W". */
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-zone-col-name {
+  width: 20%;
+}
+
+.profile-zone-col-share {
+  width: 30%;
+}
+
+.profile-zone-col-value {
+  width: 50%;
+}
+
+.profile-zone-table th {
+  padding: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.profile-zone-table th:not(:first-child),
+.profile-zone-table td:not(:first-child) {
+  text-align: right;
+}
+
+/* With table-layout: fixed a long cell overflows its column rather than widening
+   it, so cells clip instead of spilling out of the dialog. */
+.profile-zone-table th,
+.profile-zone-table td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.profile-zone-table td {
+  /* A height, not padding, so the blank padding rows that keep every family the
+     same size are exactly as tall as a filled one. */
+  height: 34px;
+  border-top: 1px solid var(--glass-border);
+  padding: 0;
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .profile-header,
+  .profile-identity {
+    flex-wrap: wrap;
+  }
+
+  .profile-identity > button {
+    margin-left: 0;
+  }
+}
+
+
+/* Holds the two Overview panels (fitness scores, race predictor) side by side.
+   Equal columns and a stretch alignment keep both cards the same size however
+   much each one has to show. */
+.profile-fitness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.profile-fitness-grid > .panel {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .profile-fitness-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

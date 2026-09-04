@@ -201,6 +201,11 @@ const LazyCalendarView = lazy(() =>
 const LazyChatView = lazy(() =>
   import("./chat/ChatView").then(({ ChatView }) => ({ default: ChatView })),
 );
+const LazyProfileView = lazy(() =>
+  import("./profile/ProfileView").then(({ ProfileView }) => ({
+    default: ProfileView,
+  })),
+);
 const LazyActivityGlobeCard = lazy(() =>
   import("./overview/ActivityGlobeCard").then(({ ActivityGlobeCard }) => ({
     default: ActivityGlobeCard,
@@ -2607,6 +2612,17 @@ export default function App() {
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
                   onOpenTraining={() => setActiveView("overview")}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "profile" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="Personal" />}>
+                <LazyProfileView
+                  api={api}
+                  status={trainingHubStatus}
+                  onOpenOverview={() => setActiveView("overview")}
+                  onMessage={setMessage}
+                  onError={setError}
                 />
               </Suspense>
             ) : null}

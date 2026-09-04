@@ -36,6 +36,13 @@ import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
   ActivityPaceBaseline,
   ActivityPaceBaselines,
+  CorosProfile,
+  CorosProfilePatch,
+  CorosProfileRange,
+  CorosProfileSnapshot,
+  CorosProfileThresholds,
+  CorosProfileZone,
+  CorosProfileZoneFamily,
   RouteActivityType,
   StrengthHistory,
   TrainingHubActivity,
@@ -759,6 +766,515 @@ async function queryTrainingHubAccount(
   } catch {
     return null;
   }
+}
+
+// Bounds for the two editable numbers COROS does not declare in `zoneData`.
+const COROS_STATURE_RANGE_CM: CorosProfileRange = { min: 50, max: 280 };
+const COROS_WEIGHT_RANGE_KG: CorosProfileRange = { min: 10, max: 300 };
+
+// `zoneData` arrives either as a nested object or as a JSON string, depending
+// on the account.
+function corosProfileZoneData(
+  account: Record<string, unknown>
+): Record<string, unknown> {
+  const raw = account.zoneData;
+  if (typeof raw === "string") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+}
+
+// COROS publishes each editable threshold's bounds as a `[min, max]` pair.
+function corosProfileRange(value: unknown): CorosProfileRange | undefined {
+  if (!Array.isArray(value) || value.length < 2) {
+    return undefined;
+  }
+
+  const min = toOptionalNumber(value[0]);
+  const max = toOptionalNumber(value[1]);
+  return min !== undefined && max !== undefined && min <= max
+    ? { min, max }
+    : undefined;
+}
+
+function corosProfileZones(raw: unknown): CorosProfileZone[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.flatMap((entry, position) => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+
+    const zone = entry as Record<string, unknown>;
+    const ratio = toOptionalNumber(zone.ratio);
+    const bpm = toOptionalNumber(zone.hr);
+    const pace = toOptionalNumber(zone.pace);
+    const watts = toOptionalNumber(zone.power);
+    return [
+      {
+        index: Math.round(toOptionalNumber(zone.index) ?? position),
+        ...(ratio !== undefined ? { ratio } : {}),
+        ...(bpm !== undefined ? { bpm } : {}),
+        ...(pace !== undefined ? { paceSecondsPerKm: pace } : {}),
+        ...(watts !== undefined ? { watts } : {})
+      }
+    ];
+  });
+}
+
+function corosProfileThresholds(
+  account: Record<string, unknown>,
+  zoneData: Record<string, unknown>
+): CorosProfileThresholds {
+  const ranges: CorosProfileThresholds["ranges"] = {};
+  const addRange = (
+    key: CorosProfileZoneFamily | "ftp" | "weightKg",
+    value: unknown
+  ): void => {
+    const range = corosProfileRange(value);
+    if (range) {
+      ranges[key] = range;
+    }
+  };
+
+  addRange("maxHr", zoneData.maxHrRange);
+  addRange("restingHr", zoneData.rhrRange);
+  addRange("lthr", zoneData.lthrRange);
+  addRange("thresholdPace", zoneData.ltspRange);
+  addRange("ftp", zoneData.ftpRange);
+  addRange("weightKg", zoneData.weightMetricRange);
+
+  const maxHr = toOptionalNumber(account.maxHr) ?? toOptionalNumber(zoneData.maxHr);
+  const restingHr = toOptionalNumber(account.rhr) ?? toOptionalNumber(zoneData.rhr);
+  const lthr = toOptionalNumber(zoneData.lthr) ?? toOptionalNumber(account.lthr);
+  const thresholdPace = toOptionalNumber(zoneData.ltsp);
+  const ftp = toOptionalNumber(zoneData.ftp);
+
+  return {
+    ...(maxHr !== undefined ? { maxHr } : {}),
+    ...(restingHr !== undefined ? { restingHr } : {}),
+    ...(lthr !== undefined ? { lthr } : {}),
+    ...(thresholdPace !== undefined
+      ? { thresholdPaceSecondsPerKm: thresholdPace }
+      : {}),
+    ...(ftp !== undefined ? { ftp } : {}),
+    zones: {
+      maxHr: corosProfileZones(zoneData.maxHrZone),
+      restingHr: corosProfileZones(zoneData.rhrZone),
+      lthr: corosProfileZones(zoneData.lthrZone),
+      thresholdPace: corosProfileZones(zoneData.ltspZone),
+      cyclePower: corosProfileZones(zoneData.cyclePowerZone)
+    },
+    ranges
+  };
+}
+
+export function normalizeCorosProfile(
+  account: Record<string, unknown>
+): CorosProfile {
+  const zoneData = corosProfileZoneData(account);
+  const userProfile =
+    account.userProfile && typeof account.userProfile === "object"
+      ? (account.userProfile as Record<string, unknown>)
+      : {};
+  const summary =
+    account.sportDataSummary && typeof account.sportDataSummary === "object"
+      ? (account.sportDataSummary as Record<string, unknown>)
+      : {};
+  const text = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+
+  const avatarUrl = text(account.headPic);
+  const nickname = text(account.nickname);
+  const email = text(account.email);
+  const countryCode = text(account.countryCode);
+  const language = text(userProfile.language);
+  const birthday = toOptionalNumber(account.birthday);
+  const sex = toOptionalNumber(account.sex);
+  const statureCm = toOptionalNumber(account.stature);
+  const weightKg = toOptionalNumber(account.weight);
+  const unit = toOptionalNumber(account.unit);
+  const temperatureUnit = toOptionalNumber(account.temperatureUnit);
+  const hrZoneType = toOptionalNumber(account.hrZoneType);
+  const maxHrUpdatedAt = text(account.maxHrUpdateTime);
+  const activityCount = toOptionalNumber(summary.count);
+
+  return {
+    userId: String(account.userId ?? "").trim(),
+    ...(nickname !== undefined ? { nickname } : {}),
+    ...(email !== undefined ? { email } : {}),
+    // Only an absolute COROS URL is worth handing the renderer; anything else
+    // would just render as a broken image.
+    ...(avatarUrl && avatarUrl.startsWith("https://") ? { avatarUrl } : {}),
+    ...(countryCode !== undefined ? { countryCode } : {}),
+    ...(language !== undefined ? { language } : {}),
+    ...(birthday !== undefined ? { birthday: Math.round(birthday) } : {}),
+    ...(sex !== undefined ? { sex: Math.round(sex) } : {}),
+    ...(statureCm !== undefined ? { statureCm } : {}),
+    ...(weightKg !== undefined ? { weightKg } : {}),
+    ...(unit !== undefined ? { unit: Math.round(unit) } : {}),
+    ...(temperatureUnit !== undefined
+      ? { temperatureUnit: Math.round(temperatureUnit) }
+      : {}),
+    ...(hrZoneType !== undefined ? { hrZoneType: Math.round(hrZoneType) } : {}),
+    ...(maxHrUpdatedAt !== undefined ? { maxHrUpdatedAt } : {}),
+    ...(typeof account.twoFactorRequired === "boolean"
+      ? { twoFactorRequired: account.twoFactorRequired }
+      : {}),
+    ...(activityCount !== undefined
+      ? { activityCount: Math.round(activityCount) }
+      : {}),
+    thresholds: corosProfileThresholds(account, zoneData)
+  };
+}
+
+// The COROS form field each patch key is written as. `sex` is the odd one out:
+// the server reads the write as `gender` and ignores a field named `sex`.
+const COROS_PROFILE_FORM_FIELDS: Record<keyof CorosProfilePatch, string> = {
+  nickname: "nickname",
+  birthday: "birthday",
+  sex: "gender",
+  statureCm: "stature",
+  weightKg: "weight",
+  maxHr: "maxHr",
+  restingHr: "rhr",
+  unit: "unit",
+  temperatureUnit: "temperatureUnit",
+  hrZoneType: "hrZoneType"
+};
+
+/**
+ * Switching heart-rate zone models is not a one-field write: COROS rebuilds
+ * the zones from the model's own anchor, so the request carries that anchor
+ * and the zone table with it. These are the exact fields the COROS web client
+ * sends per model, `hasHrCalibrated` included.
+ */
+function appendHrZoneModelFields(
+  fields: Map<string, string>,
+  model: number,
+  current: CorosProfile
+): void {
+  if (model !== 1 && model !== 2 && model !== 3) {
+    throw new Error(
+      "HR zone model must be 1 (max heart rate), 2 (heart-rate reserve) or 3 (lactate threshold)."
+    );
+  }
+
+  const { thresholds } = current;
+  // A value edited in the same patch wins over what the account holds today.
+  const anchor = (
+    field: string,
+    label: string,
+    stored: number | undefined
+  ): string => {
+    const patched = fields.get(field);
+    if (patched !== undefined) {
+      return patched;
+    }
+    if (stored === undefined) {
+      throw new Error(`COROS needs a ${label} before it can use this zone model.`);
+    }
+    return String(stored);
+  };
+  const zoneTable = (family: CorosProfileZoneFamily, label: string): string => {
+    const rows = thresholds.zones[family];
+    if (rows.length === 0) {
+      throw new Error(`COROS has no ${label} zones to carry into this model.`);
+    }
+    return JSON.stringify(
+      rows.map((zone) => ({ index: zone.index, ratio: zone.ratio }))
+    );
+  };
+
+  fields.set(COROS_PROFILE_FORM_FIELDS.hrZoneType, String(model));
+
+  if (model === 1) {
+    fields.set("maxHr", anchor("maxHr", "max heart rate", thresholds.maxHr));
+    fields.set("maxHrZone", zoneTable("maxHr", "max heart rate"));
+  } else if (model === 2) {
+    fields.set("maxHr", anchor("maxHr", "max heart rate", thresholds.maxHr));
+    fields.set("rhr", anchor("rhr", "resting heart rate", thresholds.restingHr));
+    fields.set("rhrZone", zoneTable("restingHr", "heart-rate reserve"));
+  } else {
+    fields.set(
+      "lthr",
+      anchor("lthr", "lactate threshold heart rate", thresholds.lthr)
+    );
+    fields.set("lthrZone", zoneTable("lthr", "lactate threshold"));
+  }
+
+  // COROS treats a max-HR or LTHR model as a hand-calibrated one; the reserve
+  // model is left alone.
+  if (model === 1 || model === 3) {
+    fields.set("hasHrCalibrated", "1");
+  }
+}
+
+function assertCorosBirthday(value: number): number {
+  const packed = Math.round(value);
+  const year = Math.floor(packed / 10_000);
+  const month = Math.floor(packed / 100) % 100;
+  const day = packed % 100;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const thisYear = new Date().getUTCFullYear();
+
+  if (
+    year < 1900 ||
+    year > thisYear ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error("Enter the birthday as a real date in YYYYMMDD form.");
+  }
+
+  return packed;
+}
+
+function corosProfileNumberField(
+  label: string,
+  value: number,
+  range: CorosProfileRange,
+  decimals = 0
+): string {
+  if (!Number.isFinite(value)) {
+    throw new Error(`Enter a number for ${label}.`);
+  }
+
+  const factor = 10 ** decimals;
+  const rounded = Math.round(value * factor) / factor;
+  if (rounded < range.min || rounded > range.max) {
+    throw new Error(`${label} must be between ${range.min} and ${range.max}.`);
+  }
+
+  return String(rounded);
+}
+
+function corosProfileFlagField(label: string, value: number): string {
+  if (value !== 0 && value !== 1) {
+    throw new Error(`${label} must be 0 or 1.`);
+  }
+
+  return String(value);
+}
+
+/**
+ * Turn a patch into the multipart fields COROS accepts, rejecting anything the
+ * server would refuse before a request goes out. The bounds come from the
+ * account's own `zoneData` ranges, so they follow whatever COROS allows.
+ */
+export function buildCorosProfileUpdateFields(
+  patch: CorosProfilePatch,
+  current: CorosProfile
+): Map<string, string> {
+  const { ranges } = current.thresholds;
+  const fields = new Map<string, string>();
+
+  if (patch.nickname !== undefined) {
+    const nickname = patch.nickname.trim();
+    if (!nickname || nickname.length > 64) {
+      throw new Error("Nickname must be 1-64 characters.");
+    }
+    fields.set(COROS_PROFILE_FORM_FIELDS.nickname, nickname);
+  }
+
+  if (patch.birthday !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.birthday,
+      String(assertCorosBirthday(patch.birthday))
+    );
+  }
+
+  if (patch.sex !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.sex,
+      corosProfileFlagField("Sex", patch.sex)
+    );
+  }
+
+  if (patch.statureCm !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.statureCm,
+      corosProfileNumberField("Height", patch.statureCm, COROS_STATURE_RANGE_CM)
+    );
+  }
+
+  if (patch.weightKg !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.weightKg,
+      corosProfileNumberField(
+        "Weight",
+        patch.weightKg,
+        ranges.weightKg ?? COROS_WEIGHT_RANGE_KG,
+        1
+      )
+    );
+  }
+
+  if (patch.maxHr !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.maxHr,
+      corosProfileNumberField(
+        "Max heart rate",
+        patch.maxHr,
+        ranges.maxHr ?? { min: 120, max: 240 }
+      )
+    );
+  }
+
+  if (patch.restingHr !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.restingHr,
+      corosProfileNumberField(
+        "Resting heart rate",
+        patch.restingHr,
+        ranges.restingHr ?? { min: 30, max: 120 }
+      )
+    );
+  }
+
+  if (patch.unit !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.unit,
+      corosProfileFlagField("Unit", patch.unit)
+    );
+  }
+
+  if (patch.temperatureUnit !== undefined) {
+    fields.set(
+      COROS_PROFILE_FORM_FIELDS.temperatureUnit,
+      corosProfileFlagField("Temperature unit", patch.temperatureUnit)
+    );
+  }
+
+  // Last, so a max-HR or resting-HR edit in the same patch is the anchor the
+  // rebuilt zones are pinned to.
+  if (patch.hrZoneType !== undefined) {
+    appendHrZoneModelFields(fields, patch.hrZoneType, current);
+  }
+
+  return fields;
+}
+
+/**
+ * Read the signed-in account's profile: identity, body metrics, the thresholds
+ * COROS trains from and the zone tables it derives from them.
+ */
+export async function getCorosProfile(): Promise<CorosProfile> {
+  return normalizeCorosProfile(
+    await trainingHubGet<Record<string, unknown>>("/account/query")
+  );
+}
+
+// A profile changes when the user edits it — which goes through this service —
+// so re-reading it on every visit to the screen is pure noise. An hour is well
+// inside how often COROS itself recalculates the derived numbers.
+const COROS_PROFILE_CACHE_TTL_MS = 60 * 60_000;
+
+let corosProfileCache:
+  | { snapshot: CorosProfileSnapshot; expiresAt: number }
+  | null = null;
+
+function cachedCorosProfile(): CorosProfile | null {
+  return corosProfileCache && Date.now() < corosProfileCache.expiresAt
+    ? corosProfileCache.snapshot.profile
+    : null;
+}
+
+function storeCorosProfileSnapshot(
+  profile: CorosProfile,
+  dashboard: TrainingHubDashboard | null
+): CorosProfileSnapshot {
+  const snapshot: CorosProfileSnapshot = {
+    profile,
+    dashboard,
+    cachedAt: new Date().toISOString()
+  };
+  corosProfileCache = {
+    snapshot,
+    expiresAt: Date.now() + COROS_PROFILE_CACHE_TTL_MS
+  };
+  return snapshot;
+}
+
+export function invalidateCorosProfileCache(): void {
+  corosProfileCache = null;
+}
+
+/**
+ * The Personal screen's single read. Served from an hour-long cache so
+ * revisiting the screen costs nothing; `refresh` forces a fresh pair of
+ * requests for the explicit Refresh action.
+ */
+export async function getCorosProfileSnapshot(
+  options?: { refresh?: boolean }
+): Promise<CorosProfileSnapshot> {
+  if (
+    !options?.refresh &&
+    corosProfileCache &&
+    Date.now() < corosProfileCache.expiresAt
+  ) {
+    return corosProfileCache.snapshot;
+  }
+
+  // A failed dashboard only empties two panels, so it must not cost the user
+  // the profile as well.
+  const [profile, dashboard] = await Promise.all([
+    getCorosProfile(),
+    getTrainingDashboard().catch(() => null)
+  ]);
+
+  return storeCorosProfileSnapshot(profile, dashboard);
+}
+
+/**
+ * Write the editable subset of the profile and return the account as COROS
+ * left it. Verified against the live endpoint on 2026-09-04: the request must
+ * be multipart/form-data (a JSON body answers `0000` and saves nothing), and
+ * COROS merges the fields it receives without disturbing the rest.
+ */
+export async function updateCorosProfile(
+  patch: CorosProfilePatch
+): Promise<CorosProfile> {
+  // The cached copy carries the same zone ranges the validation needs, so an
+  // edit does not have to re-read the account first.
+  const current = cachedCorosProfile() ?? (await getCorosProfile());
+  const fields = buildCorosProfileUpdateFields(patch, current);
+  if (fields.size === 0) {
+    return current;
+  }
+
+  const form = new FormData();
+  for (const [name, value] of fields) {
+    form.append(name, value);
+  }
+
+  const updated = await trainingHubFetch<Record<string, unknown>>(
+    "/account/update",
+    { method: "POST", body: form }
+  );
+
+  // The update echoes the whole account back, but fall back to a fresh read if
+  // a future response ever trims it.
+  const profile =
+    updated && typeof updated === "object" && updated.userId !== undefined
+      ? normalizeCorosProfile(updated)
+      : await getCorosProfile();
+
+  // The write is the newest truth there is, so it seeds the cache rather than
+  // invalidating it — and the dashboard alongside it is still good.
+  storeCorosProfileSnapshot(profile, corosProfileCache?.snapshot.dashboard ?? null);
+  return profile;
 }
 
 export function logoutTrainingHub(): TrainingHubStatus {
@@ -6659,7 +7175,10 @@ async function executeTrainingHubRequest<T>(
     ...(requestOptions.headers as Record<string, string> | undefined)
   };
 
-  if (requestOptions.body && !headers["Content-Type"]) {
+  // Only JSON callers get the JSON content type. `/account/update` sends a
+  // FormData body, and setting the header by hand would clobber the multipart
+  // boundary fetch generates for it.
+  if (typeof requestOptions.body === "string" && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -6841,6 +7360,7 @@ function buildTrainingHubHeaders(
 
 function clearTrainingHubAuth(): void {
   workoutExerciseCatalogCache.clear();
+  invalidateCorosProfileCache();
   deleteSettings([
     SETTINGS.accessToken,
     SETTINGS.userId,

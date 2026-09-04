@@ -6,6 +6,9 @@ import type {
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
   CorosMapDownloadJob,
+  CorosProfile,
+  CorosProfilePatch,
+  CorosProfileSnapshot,
   CorosMapInstallResult,
   CorosMapInstallProgress,
   CorosMapLocalSelection,
@@ -376,6 +379,10 @@ export interface CorosLinkApi {
   cancelTrainingHubTwoFactor: () => Promise<void>;
   logoutTrainingHub: () => Promise<TrainingHubStatus>;
   reconnectTrainingHub: () => Promise<TrainingHubLoginResult>;
+  getCorosProfileSnapshot: (options?: {
+    refresh?: boolean;
+  }) => Promise<CorosProfileSnapshot>;
+  updateCorosProfile: (patch: CorosProfilePatch) => Promise<CorosProfile>;
   listTrainingHubActivities: (
     page: number,
     size: number,
