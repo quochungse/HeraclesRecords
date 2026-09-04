@@ -6,7 +6,14 @@ const STARTUP_VIEW_STORAGE_KEY = "coroslink.startupView";
 
 function isPrimaryView(value: string | null): value is PrimaryView {
   return PRIMARY_NAV_ITEMS.some(
-    (item) => item.id === value && !item.excludeFromStartup,
+    (item) =>
+      item.id === value &&
+      !item.excludeFromStartup &&
+      // A destination that has since become development-only may still be
+      // stored here -- from an earlier build, or from a dev run sharing this
+      // localStorage. Restoring it in a production build opens a view that
+      // renders nothing, so fall back to the default instead.
+      (!item.developmentOnly || import.meta.env.DEV),
   );
 }
 

@@ -96,7 +96,13 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       { id: "coros-overview", label: "Coros Overview", icon: Gauge },
       { id: "media", label: "Media", icon: Music },
       { id: "maps", label: "Maps", icon: MapIcon, beta: true },
-      { id: "watchfaces", label: "Watch Faces", icon: Watch, beta: true },
+      {
+        id: "watchfaces",
+        label: "Watch Faces",
+        icon: Watch,
+        beta: true,
+        developmentOnly: true,
+      },
       { id: "data", label: "Data", icon: Database },
       {
         id: "gear",

@@ -93,7 +93,7 @@ import {
 } from "./components/AppSidebar";
 import { DeveloperToolbar } from "./components/DeveloperToolbar";
 import { StatusDot } from "./components/StatusDot";
-import type { PrimaryView } from "./navigation/primaryNav";
+import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./navigation/primaryNav";
 import {
   getPrimaryViewLabel,
   readStartupView,
@@ -159,11 +159,13 @@ const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
 const LazyMapsView = lazy(() =>
   import("./maps/MapsView").then(({ MapsView }) => ({ default: MapsView })),
 );
-const LazyWatchfacesView = lazy(() =>
-  import("./watchfaces/WatchfacesView").then(({ WatchfacesView }) => ({
-    default: WatchfacesView,
-  })),
-);
+const LazyWatchfacesView = IS_DEVELOPMENT_BUILD
+  ? lazy(() =>
+      import("./watchfaces/WatchfacesView").then(({ WatchfacesView }) => ({
+        default: WatchfacesView,
+      })),
+    )
+  : null;
 const LazyTrainingOverview = lazy(() =>
   import("./training/TrainingOverview").then(({ TrainingOverview }) => ({
     default: TrainingOverview,
@@ -479,7 +481,9 @@ export default function App() {
   }, [api]);
 
   useEffect(() => {
-    if (!api) return;
+    // Watch Faces is the only destination that can handle a community deep
+    // link, so a production build has nowhere to send one.
+    if (!api || !IS_DEVELOPMENT_BUILD) return;
     let active = true;
     const openCommunityWatchface = (request: CommunityWatchfaceOpenRequest) => {
       if (!active) return;
@@ -2283,10 +2287,15 @@ export default function App() {
     const nextVisible = !showDevelopmentTools;
     setShowDevelopmentTools(nextVisible);
     if (!nextVisible) {
-      if (activeView === "gear") {
+      const developmentOnlyViews = new Set(
+        PRIMARY_NAV_ITEMS.filter((item) => item.developmentOnly).map(
+          (item) => item.id,
+        ),
+      );
+      if (developmentOnlyViews.has(activeView)) {
         setActiveView("overview");
       }
-      if (startupView === "gear") {
+      if (developmentOnlyViews.has(startupView)) {
         setStartupView("overview");
         saveStartupView("overview");
       }
@@ -2530,7 +2539,8 @@ export default function App() {
                 />
               </Suspense>
             ) : null}
-            {watchfacesMounted || activeView === "watchfaces" ? (
+            {LazyWatchfacesView &&
+            (watchfacesMounted || activeView === "watchfaces") ? (
               <Suspense
                 fallback={<DeferredSurfaceFallback label="Watch Studio" />}
               >
