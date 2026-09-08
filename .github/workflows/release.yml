@@ -49,6 +49,8 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
+          HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
         run: npm run dist:mac
 
       - name: Verify macOS update artifacts
@@ -95,6 +97,8 @@ jobs:
       - name: Build AppImage
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
+          HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
         run: npm run dist:linux
 
       - name: Verify Linux update artifacts
@@ -138,6 +142,8 @@ jobs:
       - name: Build NSIS installer
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
+          HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
         run: npm run dist:win
 
       - name: Verify Windows update artifacts
