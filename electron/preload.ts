@@ -260,6 +260,8 @@ const api = {
     ipcRenderer.invoke("watchfaces:getCommunity", slug),
   importCommunityWatchface: (slug: string): Promise<CommunityWatchfaceImport> =>
     ipcRenderer.invoke("watchfaces:importCommunity", slug),
+  notifyRendererReady: (): Promise<void> =>
+    ipcRenderer.invoke("app:rendererReady"),
   consumeCommunityWatchfaceOpenRequest:
     (): Promise<CommunityWatchfaceOpenRequest | null> =>
       ipcRenderer.invoke("watchfaces:consumeCommunityOpenRequest"),

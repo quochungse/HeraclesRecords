@@ -238,6 +238,14 @@ export interface CorosLinkApi {
   ) => Promise<CommunityWatchfaceCatalogPage>;
   getCommunityWatchface: (slug: string) => Promise<CommunityWatchface>;
   importCommunityWatchface: (slug: string) => Promise<CommunityWatchfaceImport>;
+  /**
+   * Tell the main process this window has its IPC listeners attached.
+   *
+   * Call it once, and from every build — anything main pushes unasked (merged
+   * sync writes, a COROS session restored at start-up) is held until it
+   * arrives, and dropped forever if it never does.
+   */
+  notifyRendererReady: () => Promise<void>;
   consumeCommunityWatchfaceOpenRequest: () =>
     Promise<CommunityWatchfaceOpenRequest | null>;
   onCommunityWatchfaceOpenRequest: (

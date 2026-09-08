@@ -1524,7 +1524,6 @@ function registerIpcHandlers(): void {
     importCommunityWatchface(slug)
   );
   ipcMain.handle("watchfaces:consumeCommunityOpenRequest", () => {
-    markRendererReady();
     const request = pendingCommunityWatchfaceOpen ?? null;
     pendingCommunityWatchfaceOpen = undefined;
     return request;
@@ -2938,6 +2937,27 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle("app:quitAndInstallUpdate", () => quitAndInstallUpdate());
+
+  /**
+   * The renderer saying it has attached its IPC listeners.
+   *
+   * Everything main pushes without being asked — merged sync writes, a COROS
+   * session that came back on its own — waits for this, because `send` before
+   * the listeners exist reaches nobody and there is only one copy of what it
+   * carries. `did-finish-load` cannot stand in: the page having loaded says
+   * nothing about whether React has subscribed yet.
+   *
+   * This used to be announced from `watchfaces:consumeCommunityOpenRequest`,
+   * which the renderer only calls on a development build — so no packaged build
+   * ever set the flag, and every one of those pushes was dropped for the life of
+   * the process. A start-up re-login would mint a session the renderer never
+   * heard about, leaving it on whatever it read at mount: no data, no sign-in
+   * form, and nothing to do but restart. Keep this on a channel of its own, and
+   * keep it out of any build-conditional code path.
+   */
+  ipcMain.handle("app:rendererReady", () => {
+    markRendererReady();
+  });
 
   ipcMain.handle("app:getInfo", () => getAppInfo());
 

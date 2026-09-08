@@ -8067,6 +8067,28 @@ td span {
   text-align: center;
 }
 
+/* Start-up signing the athlete back in. Deliberately the one variant of this
+   panel with no control on it at all: the state resolves on its own, so
+   offering a button would invite them to race it. See
+   `TrainingHubStatus.restoring`. */
+.training-login-restoring .training-login-panel-header strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+}
+
+.training-login-restoring .training-login-footer {
+  align-items: flex-start;
+  margin-inline: auto;
+  max-width: 46ch;
+}
+
+.training-login-restoring .training-login-footer > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .training-login-2fa-actions {
   display: flex;
   align-items: center;

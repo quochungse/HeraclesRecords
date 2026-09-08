@@ -131,6 +131,23 @@ electron/main.ts        →  ~254 ipcMain.handle registrations + app lifecycle
 electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 ```
 
+### `rendererReady` gates everything main pushes unasked
+
+`webContents.send` before React has subscribed reaches nobody, and the two things main pushes
+without being asked — sync writes merged from another machine, a COROS session restored at
+start-up — each carry the only copy of what they say. So both wait on `rendererReady`, which
+the renderer raises itself through **`app:rendererReady`**; `did-finish-load` cannot stand in,
+because the page having loaded says nothing about whether listeners exist.
+
+This flag was raised from inside `watchfaces:consumeCommunityOpenRequest`, which App.tsx only
+calls on a development build — so **no packaged build ever raised it**, and every such push was
+dropped for the life of the process. It typechecks, throws nothing, and never shows up in a dev
+run. What it did show up as: a start-up re-login minting a session the window never heard about,
+leaving it with no data, no sign-in form, and nothing to do but restart. Keep the flag on its
+own channel, keep the renderer's call out of any build-conditional path, and keep it deferred a
+tick past mount so subscriptions declared below it are attached first.
+`npm run test:renderer-ready` asserts all four and fails in four places against the old shape.
+
 ### The IPC contract is a three-file invariant
 
 A channel name is a bare string in `electron/main.ts`, `electron/preload.ts`, and
@@ -165,9 +182,56 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   each other for as long as both stayed open. So `restoreTrainingHubSessionAtStartup()`
   is the only silent login: it fires from `app.whenReady`, only when the session is *gone*
   and saved credentials remain, and cannot prompt (a 2FA account reports
-  `two-factor-required` and waits for the Reconnect button). Mid-session, a dead token
-  calls `endExpiredTrainingHubSession()` — clear the session, keep the credentials, throw.
-  Do not put a re-login back on the request path. Both paths announce the new status
+  `two-factor-required` and waits for the Reconnect button).
+  **"Gone" is asked of COROS, not of the settings table.** A force-logout happens on
+  their side and never touches this machine, so the four `trainingHub.*` keys survive it
+  intact — a start-up that only read them answered `already-signed-in`, skipped the one
+  login it exists for, and left the athlete on a signed-in screen until some request
+  failed and dropped the session with no way back until the *next* launch. So start-up
+  probes the stored token first (`checkStoredTrainingHubToken`, a read against
+  `/activity/query` — it mints nothing, which is what makes it safe here where a login
+  is not). Only `dead` clears and re-mints; `live` and `unknown` are left alone, and
+  an unreachable COROS must stay `unknown` or every offline launch throws away a working
+  session. `1019` is the code a token killed elsewhere comes back as — it is in
+  `AUTH_ERROR_CODES` so detection does not rest on COROS's English message.
+  Two things about COROS's own envelope, both verified against the live API and both
+  previously wrong: **`apiCode` is not always a status field** (on `/account/query` it is a
+  request trace id, so a successful read arrives as `{apiCode: "420BE2BB", data: {…}}` with
+  no `result` at all), and **`/account/query` has no "current account" form** — without
+  `accountid` it answers `1019` to everyone, a live token included, which left a region
+  probe candidate and a `userId` fallback silently dead. So `getTrainingHubResultCode` takes
+  only a four-digit `apiCode` for a status; `parseTrainingHubApiResponse` and
+  `isTrainingHubSuccess` read an *unstated* status as success when data arrived and failure
+  when nothing did (that is what stops `allowEmptyData` waving through a `{}`); and every
+  account read goes through `corosAccountQueryUrl`. `npm run test:coros-api-envelope` holds
+  this down — it fails in four places against the pre-fix code.
+  Mid-session, a dead token
+  calls `endExpiredTrainingHubSession(deadToken)` — clear the session, keep the credentials,
+  throw. Do not put a re-login back on the request path.
+  **It takes the token that failed, and only a session still holding it may be dropped.**
+  Requests are in flight across a whole launch and the token under them gets replaced while
+  they fly: the renderer starts loading the instant it mounts, with whatever is on disk,
+  while start-up is finding that same token dead and minting a replacement. Those loads
+  then fail — they were always going to — and clearing unconditionally wiped the *new*
+  session on the way past, so a launch that had just signed itself back in landed on the
+  sign-in screen anyway. Measured on a real kicked session: login completed at 1983ms, the
+  stale reply landed at 5564ms and took the fresh token with it. That is what made closing
+  and reopening two or three times look like a fix — sometimes the stale replies got home
+  first, when the session was already cleared and nothing was left to clobber.
+  **`TrainingHubStatus.restoring` is how the renderer tells the two signed-out states
+  apart**, and the pair of fields is what decides, never `restoring` alone. The flag goes up
+  before the token is probed — the probe is a round trip and the renderer mounts inside it —
+  so `restoring` is also true on every ordinary launch's check. `authenticated && restoring`
+  means "only double-checking, load normally", so a good token costs the launch nothing;
+  `!authenticated && restoring` means "signing back in, sit tight" and is the only state
+  that shows the restore panel and holds back the load. `finishStartupRestore` lowers the
+  flag *before* announcing, a `finally` lowers it on any escape (a flag left standing leaves
+  the surface waiting forever), and the `already-signed-in` exit deliberately announces
+  nothing — the flag coming down changes no screen, and an announcement there would cost
+  every launch a second full reload. In the renderer, `reportTrainingHubError` re-reads the
+  status before surfacing a COROS failure: the optimistic first load can still go out on a
+  doomed token, and "COROS session expired. Log in again." is worse than noise while the app
+  is logging itself back in. Both paths announce the new status
   through `setTrainingHubSessionListener` → `trainingHub:sessionChanged`, because the
   renderer asked for neither and would otherwise keep showing the status it last read.
   `npm run test:coros-session-restore` holds all of this down. The vault's owner is the

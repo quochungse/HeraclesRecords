@@ -61,8 +61,15 @@ export function TrainingOverview({
   onReconnect
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
+  // Signed out because a start-up re-login is still in the air, which is a very
+  // different thing to say than "sign in": nobody has to do anything, and it
+  // resolves on its own in a second or two.
+  const restoring = Boolean(status?.restoring);
   const canReconnect =
-    !connected && Boolean(status?.rememberCredentials) && Boolean(status?.email);
+    !connected &&
+    !restoring &&
+    Boolean(status?.rememberCredentials) &&
+    Boolean(status?.email);
   const reconnecting = busy === "training-reconnect";
   const awaitingTwoFactor = Boolean(twoFactorEmail);
   const verifying = busy === "training-verify";
@@ -152,7 +159,27 @@ export function TrainingOverview({
             </div>
           </div>
 
-          {awaitingTwoFactor ? (
+          {restoring ? (
+            <div className="training-login-panel training-login-restoring">
+              <div className="training-login-panel-header">
+                <strong>
+                  <Loader2 className="spin" size={18} aria-hidden="true" />
+                  Restoring your session
+                </strong>
+                <p>
+                  {status?.email
+                    ? `Signing ${status.email} back in to COROS.`
+                    : "Signing back in to COROS."}
+                </p>
+              </div>
+
+              <p className="training-login-footer">
+                <ShieldCheck size={16} aria-hidden="true" />
+                Signing in on another device ends this one&apos;s session, so
+                this happens once each time the app starts. Nothing to do.
+              </p>
+            </div>
+          ) : awaitingTwoFactor ? (
             <form
               className="training-login-panel"
               onSubmit={onVerifyTwoFactor}

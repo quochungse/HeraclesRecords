@@ -151,7 +151,12 @@ interface LoginResult {
 const GLOBAL_BASE_URL = "https://teamapi.coros.com";
 const LOGIN_URL = `${GLOBAL_BASE_URL}/account/login`;
 const RESULT_SUCCESS = "0000";
-const AUTH_ERROR_CODES = new Set(["0101", "0102", "1006"]);
+// Every code COROS answers a request with when the access token it carries is
+// not the live one for that account. `1019` is what a token that has been
+// killed by a sign-in elsewhere comes back as; it belongs here rather than
+// being left to the "access token is invalid" message check below, which is
+// English text COROS is free to change or localize.
+const AUTH_ERROR_CODES = new Set(["0101", "0102", "1006", "1019"]);
 
 // Thrown by the non-interactive login path when COROS answers the password
 // step with a 2FA challenge instead of a token. A sentinel rather than a
@@ -371,6 +376,16 @@ function announceTrainingHubSession(): void {
   sessionListener?.(getTrainingHubStatus());
 }
 
+/**
+ * True from the moment start-up commits to a re-login until it has an answer.
+ *
+ * Reported as `TrainingHubStatus.restoring` so the renderer can tell "signed
+ * out, waiting for you" from "signed out for the next second or two, waiting
+ * for nobody" — see the field's own note for why that distinction is load
+ * bearing. Module-level because there is only ever one of these per launch.
+ */
+let restoringSessionAtStartup = false;
+
 export function getTrainingHubStatus(): TrainingHubStatus {
   const auth = getStoredAuth();
   const credentials = getStoredCorosCredentials();
@@ -381,7 +396,8 @@ export function getTrainingHubStatus(): TrainingHubStatus {
     regionId: auth?.regionId,
     baseUrl: auth?.baseUrl,
     rememberCredentials: Boolean(credentials),
-    email: credentials?.account
+    email: credentials?.account,
+    restoring: restoringSessionAtStartup
   };
 }
 
@@ -555,16 +571,25 @@ async function completeSessionFromLogin(
     throw new Error("COROS login response did not include a usable token.");
   }
 
-  const baseUrl = await resolveTrainingHubBaseUrl(accessToken, loginBaseUrl);
-
+  // The id first, then the region: both probes read the athlete's own data, so
+  // they want the id, and the login is where it comes from. Neither the login
+  // nor the fallback having one is fatal on its own — the account read is the
+  // only other source, and it needs an id to ask with — so say so here rather
+  // than issuing requests that cannot come back with anything.
   let userId = String(loginData.userId ?? fallbackUserId).trim();
-  const accountData = await queryTrainingHubAccount(accessToken, baseUrl);
-  if (accountData?.userId !== undefined) {
-    userId = String(accountData.userId).trim();
-  }
-
   if (!userId) {
     throw new Error("COROS login response did not include a user ID.");
+  }
+
+  const baseUrl = await resolveTrainingHubBaseUrl(
+    accessToken,
+    loginBaseUrl,
+    userId
+  );
+
+  const accountData = await queryTrainingHubAccount(accessToken, baseUrl, userId);
+  if (accountData?.userId !== undefined) {
+    userId = String(accountData.userId).trim();
   }
 
   return { accessToken, userId, regionId, baseUrl };
@@ -710,9 +735,8 @@ async function loginAtBase(
   }
 
   const payload = (await response.json()) as TrainingHubApiResponse<TrainingHubLoginData>;
-  const result = String(payload.result ?? payload.apiCode ?? "");
 
-  if (result !== RESULT_SUCCESS) {
+  if (!isTrainingHubSuccess(payload)) {
     throw new Error(payload.message || "COROS login failed.");
   }
 
@@ -743,8 +767,7 @@ async function requestTwoFactorCode(
   }
 
   const payload = (await response.json()) as TrainingHubApiResponse<unknown>;
-  const result = String(payload.result ?? payload.apiCode ?? "");
-  if (result !== RESULT_SUCCESS) {
+  if (!isTrainingHubSuccess(payload)) {
     throw new Error(
       payload.message || "COROS could not send a verification code."
     );
@@ -778,8 +801,7 @@ async function verifyTwoFactorCode(
   }
 
   const payload = (await response.json()) as TrainingHubApiResponse<TrainingHubLoginData>;
-  const result = String(payload.result ?? payload.apiCode ?? "");
-  if (result !== RESULT_SUCCESS) {
+  if (!isTrainingHubSuccess(payload)) {
     throw new Error(payload.message || "That verification code didn't work.");
   }
   if (!payload.data?.accessToken) {
@@ -788,13 +810,22 @@ async function verifyTwoFactorCode(
   return payload.data;
 }
 
+/**
+ * Read the account back from COROS, to normalize the id the login handed over.
+ *
+ * Needs the id it is confirming: `/account/query` has no "whoever this token
+ * belongs to" form (`corosAccountQueryUrl`). So this cannot discover a `userId`
+ * the login withheld — it can only settle the shape of one already in hand,
+ * which is what the caller uses it for.
+ */
 async function queryTrainingHubAccount(
   accessToken: string,
-  baseUrl: string
+  baseUrl: string,
+  userId: string
 ): Promise<TrainingHubAccountData | null> {
   try {
-    const response = await fetch(`${baseUrl}/account/query`, {
-      headers: buildTrainingHubHeaders(accessToken)
+    const response = await fetch(corosAccountQueryUrl(baseUrl, userId), {
+      headers: buildTrainingHubHeaders(accessToken, userId)
     });
 
     if (!response.ok) {
@@ -803,9 +834,8 @@ async function queryTrainingHubAccount(
 
     const payload =
       (await response.json()) as TrainingHubApiResponse<TrainingHubAccountData>;
-    const result = String(payload.result ?? payload.apiCode ?? "");
 
-    if (result !== RESULT_SUCCESS || !payload.data) {
+    if (!isTrainingHubSuccess(payload) || !payload.data) {
       return null;
     }
 
@@ -7154,11 +7184,12 @@ async function trainingHubRequest<T>(
 
     const resolvedBaseUrl = await resolveTrainingHubBaseUrl(
       auth.accessToken,
-      auth.baseUrl
+      auth.baseUrl,
+      auth.userId
     );
     if (resolvedBaseUrl === auth.baseUrl) {
       if (retryReason === "token") {
-        endExpiredTrainingHubSession();
+        endExpiredTrainingHubSession(auth.accessToken);
       }
 
       throw error;
@@ -7174,7 +7205,7 @@ async function trainingHubRequest<T>(
       );
     } catch (retryError) {
       if (retryReason === "token") {
-        endExpiredTrainingHubSession();
+        endExpiredTrainingHubSession(auth.accessToken);
       }
 
       throw retryError;
@@ -7195,11 +7226,42 @@ async function trainingHubRequest<T>(
  * where they are, which leaves two ways back: the Reconnect button on Overview,
  * right now and on purpose, or `restoreTrainingHubSessionAtStartup` at the next
  * launch — credentials present, session gone, exactly what it looks for.
+ *
+ * **Which session, though.** `deadToken` is the token the failed request went
+ * out with, and only a session still holding it may be dropped. Requests are
+ * in flight across the whole launch and the token underneath them can be
+ * replaced while they fly: the renderer starts loading the moment it mounts,
+ * with whatever token is on disk, while start-up is discovering that same
+ * token is dead and minting a replacement. Those loads then fail — they were
+ * always going to — and a version of this that cleared unconditionally wiped
+ * the *new* session on the way past, so a launch that had just signed itself
+ * back in landed on the sign-in screen anyway. It came down to whether the
+ * stale replies beat the login home, which is why closing and reopening two
+ * or three times eventually "worked".
  */
-function endExpiredTrainingHubSession(): never {
+function endExpiredTrainingHubSession(deadToken: string): never {
+  const expired = new Error("COROS session expired. Log in again.");
+  const current = getStoredAuth();
+
+  if (!current) {
+    // Already gone — start-up cleared it, or an earlier reply from this same
+    // batch did. Announcing it a second time would tell the renderer nothing.
+    throw expired;
+  }
+
+  if (current.accessToken !== deadToken) {
+    // A newer session arrived while this request was in the air. The request
+    // still failed, and the caller still needs to hear so, but the session it
+    // failed against is not the one on disk any more.
+    throw new Error(
+      "That COROS request was made with a session that has since been " +
+        "replaced. Try again."
+    );
+  }
+
   clearTrainingHubAuth();
   announceTrainingHubSession();
-  throw new Error("COROS session expired. Log in again.");
+  throw expired;
 }
 
 async function executeTrainingHubRequest<T>(
@@ -7236,9 +7298,10 @@ async function executeTrainingHubRequest<T>(
 
 async function resolveTrainingHubBaseUrl(
   accessToken: string,
-  loginBaseUrl: string
+  loginBaseUrl: string,
+  userId?: string
 ): Promise<string> {
-  if (await probeTrainingHubBaseUrl(accessToken, loginBaseUrl)) {
+  if (await probeTrainingHubBaseUrl(accessToken, loginBaseUrl, userId)) {
     return loginBaseUrl;
   }
 
@@ -7247,7 +7310,7 @@ async function resolveTrainingHubBaseUrl(
       continue;
     }
 
-    if (await probeTrainingHubBaseUrl(accessToken, baseUrl)) {
+    if (await probeTrainingHubBaseUrl(accessToken, baseUrl, userId)) {
       return baseUrl;
     }
   }
@@ -7259,19 +7322,29 @@ async function resolveTrainingHubBaseUrl(
   );
 }
 
+/**
+ * Whether this token can read the athlete's data at this region's base URL.
+ *
+ * The second candidate exists so one endpoint being unhappy for a reason of
+ * its own does not get a perfectly good region ruled out. It needs the
+ * account's id to ask anything at all (`corosAccountQueryUrl`), so a caller
+ * that has not resolved a `userId` yet gets the activity read alone rather
+ * than a request that is certain to come back a failure.
+ */
 async function probeTrainingHubBaseUrl(
   accessToken: string,
-  baseUrl: string
+  baseUrl: string,
+  userId?: string
 ): Promise<boolean> {
-  const candidates = [
-    `${baseUrl}/activity/query?size=1&pageNumber=1`,
-    `${baseUrl}/account/query`
-  ];
+  const candidates = [`${baseUrl}/activity/query?size=1&pageNumber=1`];
+  if (userId) {
+    candidates.push(corosAccountQueryUrl(baseUrl, userId));
+  }
 
   for (const url of candidates) {
     try {
       const response = await fetch(url, {
-        headers: buildTrainingHubHeaders(accessToken)
+        headers: buildTrainingHubHeaders(accessToken, userId)
       });
 
       if (!response.ok) {
@@ -7279,9 +7352,8 @@ async function probeTrainingHubBaseUrl(
       }
 
       const payload = (await response.json()) as TrainingHubApiResponse<unknown>;
-      const result = String(payload.result ?? payload.apiCode ?? "");
 
-      if (result === RESULT_SUCCESS) {
+      if (isTrainingHubSuccess(payload)) {
         return true;
       }
     } catch {
@@ -7290,6 +7362,24 @@ async function probeTrainingHubBaseUrl(
   }
 
   return false;
+}
+
+/**
+ * A success as COROS reports it, for the probes that must not throw.
+ *
+ * Same rule as `parseTrainingHubApiResponse`: a stated `0000`, or a status
+ * COROS never stated arriving alongside data.
+ */
+function isTrainingHubSuccess(
+  payload: TrainingHubApiResponse<unknown>
+): boolean {
+  const result = getTrainingHubResultCode(payload);
+  if (result === RESULT_SUCCESS) {
+    return true;
+  }
+  return (
+    result === "" && payload.data !== undefined && payload.data !== null
+  );
 }
 
 function getTrainingHubRetryReason(
@@ -7324,11 +7414,53 @@ function isInvalidTokenMessage(message: string): boolean {
   );
 }
 
+/**
+ * The account read, which is only usable with the account's own id.
+ *
+ * `/account/query` with no `accountid` is not a "current account" endpoint: it
+ * answers `1019 "Access token is invalid"` for *every* caller, a live token
+ * included, so code that used the bare form could only ever read a failure.
+ * Two places did, and both were silently dead — a region probe candidate that
+ * never matched, and a `userId` fallback that always returned null.
+ */
+function corosAccountQueryUrl(baseUrl: string, userId: string): string {
+  return `${baseUrl}/account/query?accountid=${encodeURIComponent(userId)}`;
+}
+
+/**
+ * The status code COROS stated for a response, or `""` when it stated none.
+ *
+ * `result` is the status field. `apiCode` is not: on some endpoints it carries
+ * a status, but on others it is a request trace id — `/account/query` answers a
+ * *successful* read with `{apiCode: "420BE2BB", data: {…}}` and no `result` at
+ * all. Reading that hex as a status made every success look like an unknown
+ * failure, so only a four-digit `apiCode` is taken for one.
+ *
+ * `""` therefore means "COROS did not say", which is not the same as failure —
+ * see `parseTrainingHubApiResponse` for what stands in for it.
+ */
+function getTrainingHubResultCode(
+  payload: TrainingHubApiResponse<unknown>
+): string {
+  if (payload.result !== undefined && payload.result !== null) {
+    return String(payload.result);
+  }
+  const apiCode = payload.apiCode;
+  if (apiCode !== undefined && apiCode !== null) {
+    const code = String(apiCode);
+    if (/^\d{4}$/.test(code)) {
+      return code;
+    }
+  }
+  return "";
+}
+
 export function parseTrainingHubApiResponse<T>(
   payload: TrainingHubApiResponse<T>,
   options?: { allowEmptyData?: boolean; contextPath?: string }
 ): T | undefined {
-  const result = String(payload.result ?? payload.apiCode ?? "");
+  const result = getTrainingHubResultCode(payload);
+  const hasData = payload.data !== undefined && payload.data !== null;
 
   if (AUTH_ERROR_CODES.has(result)) {
     throw new InvalidTrainingHubTokenError(
@@ -7336,7 +7468,13 @@ export function parseTrainingHubApiResponse<T>(
     );
   }
 
-  if (result !== RESULT_SUCCESS) {
+  // Only a stated status can fail. When COROS states none, the payload having
+  // data is what stands in for it: a failure always names itself
+  // (`{result, tlogId, message}`), so an unstated status arriving with data is
+  // a success — and one arriving with nothing is still a failure, exactly as
+  // before, which is what keeps `allowEmptyData` from waving through a `{}`.
+  const failed = result === "" ? !hasData : result !== RESULT_SUCCESS;
+  if (failed) {
     const message = payload.message || "COROS API request failed.";
     if (isInvalidTokenMessage(message)) {
       throw new InvalidTrainingHubTokenError(message);
@@ -7344,7 +7482,7 @@ export function parseTrainingHubApiResponse<T>(
     throw new Error(message);
   }
 
-  if (payload.data === undefined || payload.data === null) {
+  if (!hasData) {
     if (options?.allowEmptyData) {
       return undefined;
     }
@@ -7426,33 +7564,94 @@ function clearTrainingHubAuth(): void {
  * token while this one is starting, and it has no way to answer until it is
  * itself restarted.
  *
- * Only a session that is *gone* is restored. A token that is still on disk but
- * dead on COROS's side is not this function's business: the request that finds
- * out drops the session (`endExpiredTrainingHubSession`), which is precisely
- * the state the next launch looks for.
+ * Only a session that is *gone* is restored, and "gone" is asked of COROS, not
+ * of the settings table: a force-logout happens on their side and leaves this
+ * machine's token sitting on disk, so start-up probes it before deciding. A
+ * token COROS names invalid is dropped here and re-minted; one it serves, or
+ * one it cannot be reached to judge, is left exactly alone.
  *
  * Nothing here can prompt. An account with two-factor enabled needs an emailed
  * code, so it reports `two-factor-required` and leaves the athlete the
  * Reconnect button that already exists on Overview.
  */
 export async function restoreTrainingHubSessionAtStartup(): Promise<TrainingHubSessionRestore> {
-  if (getStoredAuth()) {
-    return { restored: false, reason: "already-signed-in" };
-  }
-
+  // A token on disk is not a session. A sign-in elsewhere kills this one's
+  // token on COROS's side and never touches this machine, so the four settings
+  // keys survive a force-logout intact — and a start-up that only looked at
+  // them would skip the one login it is here to perform, leave the athlete
+  // looking at a signed-in screen, and hand the discovery to whichever request
+  // failed first. That request is required not to log back in, so the session
+  // stayed gone for the whole run and only the *next* launch recovered it.
+  //
+  // So ask, once, before deciding. The probe is a read: it mints nothing and
+  // cannot take the session off the athlete's other machines, which is what
+  // makes it safe here where a login would not be.
+  // Whether the renderer is owed a status it did not ask for by the time this
+  // returns. Two things put us in its debt: dropping a session it may already
+  // have read as live, and announcing a restore it now has to see the end of.
+  let owesRendererAnUpdate = false;
+  const existing = getStoredAuth();
   const credentials = getStoredCorosCredentials();
-  if (!credentials) {
+
+  if (!existing && !credentials) {
     // Either "remember me" was off or the OS keychain is unavailable. Both are
     // the athlete's own configuration, not a fault worth a log line.
     return { restored: false, reason: "no-credentials" };
   }
 
+  // There is work: a token to check, or a login to make, or both. Raise the
+  // flag now rather than once the probe has answered — the probe is a network
+  // round trip and the renderer mounts inside it, so waiting would have it read
+  // a plain "signed in" and start loading against a token this function is
+  // about to find dead. Those loads fail, and their failures are noise the
+  // athlete should not be shown.
+  //
+  // Note it does *not* say "signed out": `authenticated` stays whatever the
+  // disk says, so a launch whose token turns out to be fine loads immediately
+  // and pays nothing for the check. Only once the token is known dead do the
+  // two together mean "signing back in, sit tight".
+  restoringSessionAtStartup = true;
+
   try {
+    if (existing) {
+      const state = await checkStoredTrainingHubToken(existing);
+      if (state !== "dead") {
+        // Live, or COROS could not be reached to say otherwise. An unreachable
+        // COROS reads as `unknown` on purpose: a launch with no network must
+        // leave a working session alone rather than sign the athlete out of it.
+        //
+        // Nothing to announce: `authenticated` never changed, and the flag
+        // coming down changes no screen — the restore panel only ever shows
+        // alongside a session that is gone. Announcing here would cost every
+        // ordinary launch a second full reload for no visible difference.
+        return finishStartupRestore(
+          { restored: false, reason: "already-signed-in" },
+          false
+        );
+      }
+
+      // Now it is the state the rest of this function was written for. Drop it
+      // before minting, so a login that fails leaves nothing half-valid behind,
+      // and say so: this is the moment the sign-in surface has to stop showing
+      // a connection and start showing the restore.
+      clearTrainingHubAuth();
+      announceTrainingHubSession();
+      owesRendererAnUpdate = true;
+    }
+
+    if (!credentials) {
+      return finishStartupRestore(
+        { restored: false, reason: "no-credentials" },
+        owesRendererAnUpdate
+      );
+    }
+
     const session = await establishTrainingHubSession(
       credentials.account,
       credentials.pwdHash
     );
     persistTrainingHubSession(session);
+    restoringSessionAtStartup = false;
     announceTrainingHubSession();
     return { restored: true, status: getTrainingHubStatus() };
   } catch (error) {
@@ -7461,13 +7660,100 @@ export async function restoreTrainingHubSessionAtStartup(): Promise<TrainingHubS
         "[trainingHub] saved COROS credentials cannot sign in on their own: " +
           "the account asks for a two-factor code."
       );
-      return { restored: false, reason: "two-factor-required" };
+      return finishStartupRestore(
+        { restored: false, reason: "two-factor-required" },
+        owesRendererAnUpdate
+      );
     }
     console.warn(
       "[trainingHub] automatic COROS re-login at startup failed; the athlete " +
         "has to sign in again.",
       error
     );
-    return { restored: false, reason: "failed" };
+    return finishStartupRestore(
+      { restored: false, reason: "failed" },
+      owesRendererAnUpdate
+    );
+  } finally {
+    // Every path above lowers the flag before it announces, so this catches
+    // only an escape none of them foresaw. It has to be caught: a flag left
+    // standing leaves the sign-in surface waiting on a login that already
+    // gave up, and nothing else in the launch will ever lower it.
+    if (restoringSessionAtStartup) {
+      restoringSessionAtStartup = false;
+      announceTrainingHubSession();
+    }
   }
+}
+
+/**
+ * Tell the renderer when start-up ended somewhere it cannot have guessed.
+ *
+ * Two things earn an announcement: a session dropped that the renderer may
+ * already have read as live, and a restore announced that it now has to see
+ * the end of — a `restoring` flag left standing would have the sign-in surface
+ * waiting on a login that is no longer coming. Everywhere else the session was
+ * already missing before start-up ran, so there is nothing to report and this
+ * would only push the status the renderer is about to read for itself.
+ */
+function finishStartupRestore(
+  outcome: TrainingHubSessionRestore,
+  owesRendererAnUpdate: boolean
+): TrainingHubSessionRestore {
+  // Before the announcement, never after: the status this pushes has to be the
+  // one that is true from here on, and a `restoring` still set in it would tell
+  // the renderer to keep waiting on the attempt that just ended.
+  restoringSessionAtStartup = false;
+  if (owesRendererAnUpdate) {
+    announceTrainingHubSession();
+  }
+  return outcome;
+}
+
+/**
+ * Ask COROS whether the token on disk is still the account's live one.
+ *
+ * `/activity/query` is a read — it mints no token, so unlike a login it cannot
+ * take the session off another of the athlete's machines. That is the whole
+ * reason this can run on every launch.
+ *
+ * Three answers, and the third carries as much weight as the other two:
+ *
+ *   * `live`    — COROS served the request.
+ *   * `dead`    — COROS named the token invalid. Someone signed in elsewhere.
+ *   * `unknown` — no network, an HTTP error, a stale `baseUrl`, any other
+ *                 result code. Deliberately not `dead`: reading an unreachable
+ *                 COROS as a killed token would sign the athlete out of a
+ *                 perfectly good session every time they opened the app
+ *                 offline, and would spend the launch's one login doing it.
+ */
+async function checkStoredTrainingHubToken(
+  auth: TrainingHubAuthState
+): Promise<"live" | "dead" | "unknown"> {
+  let payload: TrainingHubApiResponse<unknown>;
+  try {
+    const response = await fetch(
+      `${auth.baseUrl}/activity/query?size=1&pageNumber=1`,
+      { headers: buildTrainingHubHeaders(auth.accessToken, auth.userId) }
+    );
+    if (!response.ok) {
+      return "unknown";
+    }
+    payload = (await response.json()) as TrainingHubApiResponse<unknown>;
+  } catch {
+    return "unknown";
+  }
+
+  if (isTrainingHubSuccess(payload)) {
+    return "live";
+  }
+  const result = getTrainingHubResultCode(payload);
+  if (AUTH_ERROR_CODES.has(result) || isInvalidTokenMessage(payload.message ?? "")) {
+    console.info(
+      "[trainingHub] the saved COROS token is no longer live — the account " +
+        "signed in somewhere else. Restoring the session for this launch."
+    );
+    return "dead";
+  }
+  return "unknown";
 }

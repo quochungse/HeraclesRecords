@@ -1768,6 +1768,17 @@ export interface TrainingHubStatus {
   baseUrl?: string;
   rememberCredentials?: boolean;
   email?: string;
+  /**
+   * A start-up re-login is in flight right now.
+   *
+   * `authenticated` is false while this is true, and the two mean very
+   * different things to a screen: signed out is a state that waits for the
+   * athlete, whereas this one resolves on its own in a second or two. Anything
+   * that offers a sign-in form or empties itself on `!authenticated` has to
+   * check this first, or a launch that is busy signing itself back in shows the
+   * athlete a login screen and throws away the data it is about to refill.
+   */
+  restoring?: boolean;
 }
 
 // Result of a login/reconnect attempt. When the COROS account has two-factor

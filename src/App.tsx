@@ -534,6 +534,24 @@ export default function App() {
     };
   }, [api]);
 
+  // Tell the main process this window is listening — and only once every effect
+  // above has run, which is what `setTimeout` buys: mount effects all fire
+  // inside the same commit, so a call made from within one of them could beat a
+  // subscription declared below it, and the push it unblocks would arrive
+  // before there was anything to receive it.
+  //
+  // Unconditional on purpose. This used to ride along on a watchfaces call that
+  // only development builds make, so no packaged build ever announced itself
+  // and every unasked-for push — merged sync writes, a COROS session restored
+  // at start-up — was dropped for the whole run.
+  useEffect(() => {
+    if (!api) return;
+    const timer = window.setTimeout(() => {
+      void api.notifyRendererReady().catch(() => undefined);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [api]);
+
   useEffect(() => {
     const acceptedVersion = installAcceptedVersionRef.current;
     if (!acceptedVersion) {
@@ -876,6 +894,30 @@ export default function App() {
     }
   }, [api, ensureTrainingHubMcp]);
 
+  // A COROS failure the athlete should see, or the wreckage of a load that was
+  // doomed before it started.
+  //
+  // Start-up checks the stored token while the renderer is already mounting, so
+  // the first load can go out against a token COROS has disowned and come back
+  // as a fistful of errors. The restore that discovers this reloads everything
+  // a second or two later, which makes those failures noise — and "COROS
+  // session expired. Log in again." is worse than noise when the app is at that
+  // moment logging back in by itself. So ask whether one is under way, from the
+  // main process rather than from the status in state, which was read before
+  // any of this began.
+  const reportTrainingHubError = useCallback(
+    async (caught: unknown) => {
+      if (api) {
+        const status = await api.getTrainingHubStatus().catch(() => null);
+        if (status?.restoring) {
+          return;
+        }
+      }
+      setError(toErrorMessage(caught));
+    },
+    [api],
+  );
+
   const refreshTrainingHub = useCallback(async () => {
     if (!api) {
       return;
@@ -883,6 +925,21 @@ export default function App() {
 
     const status = await api.getTrainingHubStatus();
     applyTrainingHubStatus(status);
+
+    // Signed out *and* restoring is neither state this branch handles: there is
+    // no session to load from, and emptying the screens would blank data the
+    // re-login is seconds from refilling — while showing a sign-in form for a
+    // session nobody has to sign into. Wait instead;
+    // `onTrainingHubSessionChanged` calls this again the moment it lands.
+    //
+    // Restoring while still signed in is a different thing and deliberately
+    // not caught here: start-up is only *checking* a token that is probably
+    // fine, and holding back would tax every ordinary launch with the round
+    // trip. Load optimistically — `reportTrainingHubError` is what keeps a
+    // check that goes the other way from putting its wreckage on screen.
+    if (status.restoring && !status.authenticated) {
+      return;
+    }
 
     if (status.authenticated) {
       void loadTrainingHubWellnessData();
@@ -909,6 +966,7 @@ export default function App() {
       .catch((caught) => setError(toErrorMessage(caught)));
   }, [activeView, api, applyTrainingHubStatus]);
 
+
   // A COROS session that came or went without anyone here asking: the main
   // process re-logged in from saved credentials at start-up, or a login on
   // another of the athlete's machines invalidated this one's token mid-session.
@@ -923,10 +981,15 @@ export default function App() {
     return api.onTrainingHubSessionChanged((status) => {
       applyTrainingHubStatus(status);
       void refreshTrainingHub().catch((caught) =>
-        setError(toErrorMessage(caught)),
+        reportTrainingHubError(caught),
       );
     });
-  }, [api, applyTrainingHubStatus, refreshTrainingHub]);
+  }, [
+    api,
+    applyTrainingHubStatus,
+    refreshTrainingHub,
+    reportTrainingHubError,
+  ]);
 
   const handleTrainingHubActivityDetail = useCallback(
     async (activity: TrainingHubActivity) => {
@@ -1012,7 +1075,7 @@ export default function App() {
       setError(toErrorMessage(caught));
     });
     void refreshTrainingHub().catch((caught) => {
-      setError(toErrorMessage(caught));
+      void reportTrainingHubError(caught);
     });
 
     const interval = window.setInterval(() => {
