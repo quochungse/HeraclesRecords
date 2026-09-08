@@ -17,6 +17,7 @@ Read against `feature/auto_coach` at the end of phase 3, after the five fixes in
 |---|---|---|---|
 | P1 | Pause, `two-factor-required` | gate, [coachAutomationService.ts:1823](../electron/coachAutomationService.ts#L1823) | clears itself when COROS is signed in |
 | P2 | Pause, `budget` | gate, same | clears itself when no longer over |
+| L1 | `another-device` | runner, before the guards | — (the run happens elsewhere) |
 | G1 | `disabled` | runner | — |
 | G2 | `missing-session` | runner | `enabled = 0` for an `existing` binding |
 | G2b | `no-activity` | runner | — |

@@ -576,8 +576,25 @@ const chatSettingsStore: ChatSettingsStore = {
   delete: deleteSettings
 };
 
+/**
+ * Whether a stored key is actually usable, rather than merely present.
+ *
+ * These are `safeStorage` ciphertexts, and a stored value that does not open
+ * with this machine's keychain is worth nothing: it was written by a different
+ * computer, or the keychain has changed. Reporting presence made those look
+ * like connected providers — "2 of 5 connected" on a machine with one account —
+ * and then every request with them failed at the provider instead of at the
+ * setting.
+ *
+ * `readEncryptedSecret` is a settings read plus one decrypt, on a path that
+ * runs when Settings is drawn, not per request.
+ */
+function hasUsableSecret(key: string): boolean {
+  return Boolean(readEncryptedSecret(key));
+}
+
 const localApiKeyStore: ChatApiKeyStore = {
-  hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.localApiKey)),
+  hasApiKey: () => hasUsableSecret(CHAT_SETTINGS_KEYS.localApiKey),
   saveApiKey: (apiKey) =>
     storeEncryptedSecret(
       CHAT_SETTINGS_KEYS.localApiKey,
@@ -588,7 +605,7 @@ const localApiKeyStore: ChatApiKeyStore = {
 };
 
 const anthropicApiKeyStore: ChatApiKeyStore = {
-  hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.anthropicApiKey)),
+  hasApiKey: () => hasUsableSecret(CHAT_SETTINGS_KEYS.anthropicApiKey),
   saveApiKey: (apiKey) =>
     storeEncryptedSecret(
       CHAT_SETTINGS_KEYS.anthropicApiKey,
@@ -599,7 +616,7 @@ const anthropicApiKeyStore: ChatApiKeyStore = {
 };
 
 const openRouterApiKeyStore: ChatApiKeyStore = {
-  hasApiKey: () => Boolean(getSetting(CHAT_SETTINGS_KEYS.openRouterApiKey)),
+  hasApiKey: () => hasUsableSecret(CHAT_SETTINGS_KEYS.openRouterApiKey),
   saveApiKey: (apiKey) =>
     storeEncryptedSecret(
       CHAT_SETTINGS_KEYS.openRouterApiKey,

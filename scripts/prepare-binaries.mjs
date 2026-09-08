@@ -1,9 +1,27 @@
+// Fetches the binaries the app ships with: yt-dlp, ffmpeg, a self-contained
+// CPython, and the ytmusicapi package.
+//
+// **This runs on every `npm run dev`**, through `dev:electron`, which is why it
+// has to be cheap and has to be robust. It used to be neither: every start
+// re-downloaded ~120 MB from GitHub, and because `concurrently -k` kills the
+// whole dev command when one half exits non-zero, a single flaky connection
+// took the Vite server down with it. One transient
+// `ConnectTimeoutError: github.com:443` was enough to make the app
+// unstartable.
+//
+// So each step now records what it produced in `.prepared.json` beside the
+// binaries and skips itself when disk and manifest already agree — a warm run
+// touches the network not at all. What still has to download retries a few
+// times before giving up, and honours a proxy if one is configured, because
+// Node's fetch does not do that on its own.
+
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 
 const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
@@ -19,6 +37,20 @@ const BUNDLED_PYTHON_VERSION = "310";
 const BUNDLED_PYTHON_RUNTIME_VERSION = "3.11.13";
 const PINNED_PYTHON_STANDALONE_TAG = "20250612";
 
+/** How many times a download is attempted before the step fails. The failure
+ *  that prompted all this was a 10-second connect timeout that worked on the
+ *  next try. */
+const DOWNLOAD_ATTEMPTS = 3;
+const RETRY_BASE_MS = 1_000;
+
+/** Records what is already on disk, so a warm run can skip every step. Written
+ *  per step rather than once at the end: a run that fails halfway keeps credit
+ *  for what it did finish, which matters precisely because the thing that fails
+ *  here is the network. */
+const MANIFEST_NAME = ".prepared.json";
+
+ensureProxyAwareRuntime();
+
 const options = parseArgs(process.argv.slice(2));
 const targetPlatform = options.platform ?? process.platform;
 const targetArch = options.arch ?? process.arch;
@@ -31,6 +63,10 @@ const ffmpegOutput = targetPlatform === "win32" ? "ffmpeg.exe" : "ffmpeg";
 
 await fs.promises.mkdir(outputDir, { recursive: true });
 
+const manifestPath = path.join(outputDir, MANIFEST_NAME);
+const manifest = await readManifest(manifestPath);
+let skipped = 0;
+
 await downloadYtDlp(path.join(outputDir, ytDlpOutput), ytDlpAsset);
 await copyFfmpeg(path.join(outputDir, ffmpegOutput), targetPlatform, targetArch);
 await installPythonRuntime(
@@ -40,7 +76,109 @@ await installPythonRuntime(
 );
 await installPythonPackages(path.join(outputDir, "python"));
 
-console.log(`Prepared bundled binaries in ${path.relative(repoRoot, outputDir)}`);
+console.log(
+  `Prepared bundled binaries in ${path.relative(repoRoot, outputDir)}` +
+    (skipped > 0 ? ` (${skipped} already up to date)` : "")
+);
+
+// --- Caching -----------------------------------------------------------------
+
+/**
+ * Whether a step can be skipped.
+ *
+ * Both halves are needed. The manifest says what was produced; `artifacts` are
+ * checked because a manifest can outlive the files it describes — someone
+ * deletes `python-runtime/`, or a half-extracted archive leaves the directory
+ * empty — and a stale claim of readiness is worse than re-downloading.
+ */
+async function isCurrent(step, want, artifacts) {
+  if (options.force) return false;
+  if (JSON.stringify(manifest[step]) !== JSON.stringify(want)) return false;
+
+  for (const artifact of artifacts) {
+    if (!(await exists(artifact))) return false;
+  }
+  return true;
+}
+
+/** Record a finished step. Read back from disk first so two runs for different
+ *  platforms cannot clobber each other's entries. */
+async function recordStep(step, want) {
+  manifest[step] = want;
+  const onDisk = await readManifest(manifestPath);
+  await fs.promises.writeFile(
+    manifestPath,
+    `${JSON.stringify({ ...onDisk, [step]: want }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+async function readManifest(file) {
+  try {
+    const parsed = JSON.parse(await fs.promises.readFile(file, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    // Absent, or written by something else. Either way: prepare everything.
+    return {};
+  }
+}
+
+async function exists(target) {
+  try {
+    const stat = await fs.promises.stat(target);
+    // An empty directory is not a prepared one — pip and tar both leave one
+    // behind when they fail partway.
+    if (stat.isDirectory()) {
+      return (await fs.promises.readdir(target)).length > 0;
+    }
+    return stat.size > 0;
+  } catch {
+    return false;
+  }
+}
+
+function skip(step, detail) {
+  skipped += 1;
+  if (options.verbose) console.log(`Up to date: ${step} (${detail})`);
+}
+
+/**
+ * Re-exec with `--use-env-proxy` when a proxy is configured and Node is not
+ * using it.
+ *
+ * Node's `fetch` ignores `HTTPS_PROXY`/`HTTP_PROXY` unless told otherwise, and
+ * the flag is read at bootstrap, so setting the variable from inside the
+ * process is too late — the only way from here is to start again. Behind a
+ * corporate proxy the alternative is a connect timeout to github.com that looks
+ * exactly like the network being down.
+ *
+ * Guarded on `allowedNodeEnvironmentFlags` so an older Node that has never
+ * heard of the flag is left alone rather than failing to start, and on an own
+ * marker variable so a re-exec cannot re-exec.
+ */
+function ensureProxyAwareRuntime() {
+  const proxy =
+    process.env.HTTPS_PROXY ??
+    process.env.https_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.http_proxy;
+  if (!proxy) return;
+  if (process.env.NODE_USE_ENV_PROXY || process.env.HERACLES_PROXY_REEXEC) {
+    return;
+  }
+  if (process.execArgv.includes("--use-env-proxy")) return;
+  if (!process.allowedNodeEnvironmentFlags.has("--use-env-proxy")) return;
+
+  const result = spawnSync(
+    process.execPath,
+    ["--use-env-proxy", process.argv[1], ...process.argv.slice(2)],
+    {
+      stdio: "inherit",
+      env: { ...process.env, HERACLES_PROXY_REEXEC: "1" }
+    }
+  );
+  process.exit(result.status ?? 1);
+}
 
 function parseArgs(args) {
   return args.reduce((parsed, arg) => {
@@ -48,6 +186,12 @@ function parseArgs(args) {
       parsed.platform = arg.slice("--platform=".length);
     } else if (arg.startsWith("--arch=")) {
       parsed.arch = arg.slice("--arch=".length);
+    } else if (arg === "--force") {
+      // Re-fetch everything, manifest or not. For pulling a moved release tag,
+      // or repairing a directory that looks intact but is not.
+      parsed.force = true;
+    } else if (arg === "--verbose") {
+      parsed.verbose = true;
     }
 
     return parsed;
@@ -83,11 +227,28 @@ function resolveYtDlpAsset(platform, arch) {
 }
 
 async function downloadYtDlp(destination, assetName) {
+  // `latest` resolves through the GitHub API, so it must not be cached — asking
+  // for the newest release and being handed last week's would be a lie.
+  const pinned = (process.env.YT_DLP_VERSION?.trim() || PINNED_YT_DLP_VERSION) !== "latest";
+  // Resolved before the cache is consulted, so the manifest is compared against
+  // the version actually wanted. Comparing against the constant instead made
+  // `YT_DLP_VERSION=<other>` a no-op once the manifest held the default, and
+  // made every run re-download ~30 MB once it held anything else. For a pinned
+  // version this touches no network.
   const version = await resolveYtDlpVersion();
+  if (pinned) {
+    const want = { version, asset: assetName };
+    if (await isCurrent("ytDlp", want, [destination])) {
+      skip("yt-dlp", `${want.version} (${assetName})`);
+      return;
+    }
+  }
+
   const url = `https://github.com/yt-dlp/yt-dlp/releases/download/${version}/${assetName}`;
 
   await downloadFile(url, destination);
   await fs.promises.chmod(destination, 0o755);
+  if (pinned) await recordStep("ytDlp", { version, asset: assetName });
   console.log(`Downloaded yt-dlp ${version} (${assetName})`);
 }
 
@@ -133,8 +294,20 @@ function githubApiHeaders() {
 }
 
 async function copyFfmpeg(destination, platform, arch) {
-  if (platform !== process.platform || arch !== process.arch) {
+  const { version } = require("ffmpeg-static/package.json");
+  const cross = platform !== process.platform || arch !== process.arch;
+  const want = { package: version, platform, arch, source: cross ? "release" : "node_modules" };
+
+  // Even the local copy is worth skipping: it is an 80 MB file copy, and it ran
+  // on every single dev start.
+  if (await isCurrent("ffmpeg", want, [destination])) {
+    skip("ffmpeg", `ffmpeg-static ${version}`);
+    return;
+  }
+
+  if (cross) {
     await downloadFfmpegStatic(destination, platform, arch);
+    await recordStep("ffmpeg", want);
     return;
   }
 
@@ -145,10 +318,25 @@ async function copyFfmpeg(destination, platform, arch) {
 
   await fs.promises.copyFile(ffmpegPath, destination);
   await fs.promises.chmod(destination, 0o755);
+  await recordStep("ffmpeg", want);
   console.log(`Copied ffmpeg-static binary from ${path.relative(repoRoot, ffmpegPath)}`);
 }
 
 async function installPythonPackages(destination) {
+  const want = {
+    ytmusicapi: PINNED_YTMUSICAPI_VERSION,
+    pythonVersion: BUNDLED_PYTHON_VERSION
+  };
+  if (
+    await isCurrent("pythonPackages", want, [
+      destination,
+      path.join(destination, "ytmusicapi")
+    ])
+  ) {
+    skip("python packages", `ytmusicapi ${want.ytmusicapi}`);
+    return;
+  }
+
   const python = await findPythonCommand();
   if (!python) {
     throw new Error(
@@ -196,6 +384,7 @@ async function installPythonPackages(destination) {
       .filter(Boolean)
       .slice(-3)
       .join(" ");
+    await recordStep("pythonPackages", want);
     console.log(
       `Vendored ytmusicapi ${PINNED_YTMUSICAPI_VERSION} in ${path.relative(repoRoot, destination)}${summary ? ` (${summary})` : ""}`
     );
@@ -218,6 +407,21 @@ async function installPythonRuntime(destination, platform, arch) {
   const assetName = `cpython-${BUNDLED_PYTHON_RUNTIME_VERSION}+${tag}-${triple}-install_only.tar.gz`;
   const url = `https://github.com/astral-sh/python-build-standalone/releases/download/${tag}/${assetName}`;
 
+  const want = { version: BUNDLED_PYTHON_RUNTIME_VERSION, tag, triple };
+  // The interpreter itself, not just the directory: a torn extraction leaves a
+  // tree that exists and does not run.
+  const interpreter = path.join(
+    destination,
+    platform === "win32" ? "python.exe" : "bin/python3"
+  );
+  if (await isCurrent("pythonRuntime", want, [destination, interpreter])) {
+    skip("python-runtime", `CPython ${want.version} (${triple})`);
+    return;
+  }
+
+  // Downloaded before anything is removed, so a failure here leaves the working
+  // runtime from last time in place. This is what saved the vault the day the
+  // connect timeout struck.
   const archive = await downloadBuffer(url);
   const parentDir = path.dirname(destination);
   const extractRoot = path.join(parentDir, ".python-runtime-tmp");
@@ -239,6 +443,7 @@ async function installPythonRuntime(destination, platform, arch) {
     await fs.promises.rm(extractRoot, { recursive: true, force: true });
   }
 
+  await recordStep("pythonRuntime", want);
   console.log(
     `Vendored CPython ${BUNDLED_PYTHON_RUNTIME_VERSION} (${triple}) in ${path.relative(
       repoRoot,
@@ -312,15 +517,60 @@ async function downloadFile(url, destination) {
   await fs.promises.rename(tempFile, destination);
 }
 
-async function downloadBuffer(url) {
-  const response = await fetch(url, {
-    redirect: "follow",
-    headers: { "User-Agent": userAgent }
-  });
+/**
+ * Fetch with retries.
+ *
+ * A connect timeout to github.com is usually gone a second later, and treating
+ * the first one as fatal is what let a blip stop the whole dev command. A 4xx
+ * is not retried: a missing release asset will still be missing.
+ */
+class HttpStatusError extends Error {
+  constructor(url, response) {
+    super(`Could not download ${url}: ${response.status} ${response.statusText}`);
+    this.name = "HttpStatusError";
+    this.status = response.status;
+  }
+}
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Could not download ${url}: ${response.status} ${response.statusText}`);
+async function downloadBuffer(url) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        redirect: "follow",
+        headers: { "User-Agent": userAgent }
+      });
+
+      if (!response.ok || !response.body) {
+        const failure = new HttpStatusError(url, response);
+        // A missing asset will still be missing in a second. Only a server-side
+        // or transport failure is worth another attempt.
+        if (failure.status < 500) throw failure;
+        lastError = failure;
+      } else {
+        return Buffer.from(await response.arrayBuffer());
+      }
+    } catch (error) {
+      // Carried by type rather than sniffed out of the message: a 4xx that
+      // slipped through would cost three ten-second timeouts on every run, and
+      // nothing would say why.
+      if (error instanceof HttpStatusError && error.status < 500) throw error;
+      lastError = error;
+    }
+
+    if (attempt < DOWNLOAD_ATTEMPTS) {
+      const wait = RETRY_BASE_MS * 2 ** (attempt - 1);
+      const reason =
+        lastError instanceof Error
+          ? (lastError.cause?.code ?? lastError.message)
+          : String(lastError);
+      console.warn(
+        `Download attempt ${attempt}/${DOWNLOAD_ATTEMPTS} failed (${reason}); retrying in ${wait}ms`
+      );
+      await delay(wait);
+    }
   }
 
-  return Buffer.from(await response.arrayBuffer());
+  throw lastError;
 }

@@ -88,6 +88,26 @@ for (const channel of emitted) {
   );
 }
 
+// main.ts pushes too, and those channels have exactly the same problem: two
+// plain strings in two files that never run together. A typo leaves the send
+// going nowhere with nothing to say so — a sync pull's results, an update's
+// status, and a COROS session that changed without anyone clicking for it all
+// travel this way.
+const pushedFromMain = new Set(
+  [...mainSource.matchAll(/webContents\.send\(\s*\n?\s*"([^"]+)"/g)].map(
+    (match) => match[1]
+  )
+);
+assert.ok(
+  pushedFromMain.size > 5,
+  "main.ts push scrape found too little; the regex has drifted"
+);
+assert.deepEqual(
+  [...pushedFromMain].filter((channel) => !listened.has(channel)).sort(),
+  [],
+  "main.ts sends a channel preload never subscribes to"
+);
+
 // And the other direction: a listener whose emitter was renamed away is a
 // subscription that can never fire.
 for (const channel of listened) {

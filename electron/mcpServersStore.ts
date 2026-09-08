@@ -5,6 +5,7 @@ import {
   deleteSettings
 } from "./database";
 import { isValidServerId } from "./mcpToolNames";
+import { notifyRowChanged, notifyRowDeleted } from "./sync/syncBridge";
 import type { McpServerConfig, McpServerInput } from "./types";
 
 const MCP_TRANSPORTS = new Set(["streamable-http"]);
@@ -108,6 +109,15 @@ function normalizeEnabled(enabled: unknown, fallback: boolean): boolean {
   return enabled;
 }
 
+/** Hand a written server row to the sync loop, read back so the entry carries
+ *  the columns the caller never set — `builtin` and `sort_order` among them. */
+function notifyMcpServerRow(id: string, db = requireDatabase()): void {
+  const row = db
+    .prepare("SELECT * FROM mcp_servers WHERE id = ?")
+    .get(id) as Record<string, unknown> | undefined;
+  if (row) notifyRowChanged("mcp_servers", id, row);
+}
+
 export function mcpSecretKey(
   id: string,
   kind: "tokens" | "clientInfo" | "bearer"
@@ -169,6 +179,7 @@ export function addMcpServer(
     enabled: enabled ? 1 : 0,
     sort_order: maxOrder + 1
   });
+  notifyMcpServerRow(id, db);
   return getMcpServer(id, db)!;
 }
 
@@ -217,6 +228,7 @@ export function updateMcpServer(
     scope,
     enabled: enabled ? 1 : 0
   });
+  notifyMcpServerRow(id, db);
   return getMcpServer(id, db)!;
 }
 
@@ -233,6 +245,7 @@ export function removeMcpServer(
     throw new Error(`Built-in MCP server "${id}" cannot be removed.`);
   }
   db.prepare("DELETE FROM mcp_servers WHERE id = ?").run(id);
+  notifyRowDeleted("mcp_servers", id);
   deleteStoredSettings([
     mcpSecretKey(id, "tokens"),
     mcpSecretKey(id, "clientInfo"),

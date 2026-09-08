@@ -153,6 +153,12 @@ const LOGIN_URL = `${GLOBAL_BASE_URL}/account/login`;
 const RESULT_SUCCESS = "0000";
 const AUTH_ERROR_CODES = new Set(["0101", "0102", "1006"]);
 
+// Thrown by the non-interactive login path when COROS answers the password
+// step with a 2FA challenge instead of a token. A sentinel rather than a
+// message because callers branch on it: an automatic login cannot ask for an
+// emailed code, so it has to tell that apart from a wrong password.
+const TWO_FACTOR_REQUIRED_CODE = "COROS_TWO_FACTOR_REQUIRED";
+
 // Email verification code for the 2FA login challenge: codeType 20, 6 digits.
 const TWO_FACTOR_CODE_TYPE = 20;
 const TWO_FACTOR_CODE_LENGTH = 2;
@@ -233,6 +239,20 @@ type BeginLoginOutcome =
   | { kind: "twoFactor"; account: string };
 
 let pendingTwoFactor: PendingTwoFactorLogin | null = null;
+
+/** What the one startup login attempt did. The reasons are for the log, not
+ *  for the renderer: nothing in the UI branches on them, and a failure leaves
+ *  the same signed-out state a fresh install has. */
+export type TrainingHubSessionRestore =
+  | { restored: true; status: TrainingHubStatus }
+  | {
+      restored: false;
+      reason:
+        | "already-signed-in"
+        | "no-credentials"
+        | "two-factor-required"
+        | "failed";
+    };
 
 interface TrainingHubAccountData {
   userId?: string | number;
@@ -324,6 +344,31 @@ interface RawRaceScore {
 
 interface TrainingHubFileUrlData {
   fileUrl?: string;
+}
+
+/**
+ * Told when the session appears or disappears behind the renderer's back.
+ *
+ * There are exactly two such moments, and both are somebody else's decision:
+ * the start-up re-login, and a token another of the athlete's machines
+ * invalidated by signing in. Every other change of session answers a click, and
+ * the click already carries the new status back through its own IPC reply.
+ *
+ * Without this the sign-in surface keeps whatever it last read: "connected" over
+ * a session that is gone and screens that quietly fail to load, or "not
+ * connected" over one that was just restored, until the athlete happens to
+ * change view.
+ */
+let sessionListener: ((status: TrainingHubStatus) => void) | null = null;
+
+export function setTrainingHubSessionListener(
+  listener: ((status: TrainingHubStatus) => void) | null
+): void {
+  sessionListener = listener;
+}
+
+function announceTrainingHubSession(): void {
+  sessionListener?.(getTrainingHubStatus());
 }
 
 export function getTrainingHubStatus(): TrainingHubStatus {
@@ -431,6 +476,8 @@ function finalizeTrainingHubLogin(
   }
 }
 
+/** The one place a session is written. Stays on this machine: the four keys are
+ *  `device` in syncPolicy, so no backup and no oplog entry carries them. */
 function persistTrainingHubSession(session: TrainingHubAuthState): void {
   setSetting(SETTINGS.accessToken, session.accessToken);
   setSetting(SETTINGS.userId, session.userId);
@@ -472,7 +519,7 @@ async function beginTrainingHubLogin(
   }
 
   if (!options.interactive) {
-    throw new Error("COROS_TWO_FACTOR_REQUIRED");
+    throw new Error(TWO_FACTOR_REQUIRED_CODE);
   }
 
   const challengeAccount = String(loginData.account ?? "").trim() || account;
@@ -534,7 +581,7 @@ async function establishTrainingHubSession(
     interactive: false
   });
   if (outcome.kind !== "authenticated") {
-    throw new Error("COROS_TWO_FACTOR_REQUIRED");
+    throw new Error(TWO_FACTOR_REQUIRED_CODE);
   }
   return outcome.session;
 }
@@ -7111,7 +7158,7 @@ async function trainingHubRequest<T>(
     );
     if (resolvedBaseUrl === auth.baseUrl) {
       if (retryReason === "token") {
-        return recoverExpiredTrainingHubSession<T>(path, options);
+        endExpiredTrainingHubSession();
       }
 
       throw error;
@@ -7127,7 +7174,7 @@ async function trainingHubRequest<T>(
       );
     } catch (retryError) {
       if (retryReason === "token") {
-        return recoverExpiredTrainingHubSession<T>(path, options);
+        endExpiredTrainingHubSession();
       }
 
       throw retryError;
@@ -7135,25 +7182,24 @@ async function trainingHubRequest<T>(
   }
 }
 
-async function recoverExpiredTrainingHubSession<T>(
-  path: string,
-  options: TrainingHubRequestOptions
-): Promise<T> {
-  const refreshed = await reauthenticateFromStoredCredentials();
-  if (!refreshed) {
-    clearTrainingHubAuth();
-    throw new Error("COROS session expired. Log in again.");
-  }
-
-  try {
-    return await executeTrainingHubRequest<T>(refreshed, path, options);
-  } catch (error) {
-    if (getTrainingHubRetryReason(error) === "token") {
-      clearTrainingHubAuth();
-      throw new Error("COROS session expired. Log in again.");
-    }
-    throw error;
-  }
+/**
+ * Drop the session a dead token belongs to, and say so.
+ *
+ * Deliberately no re-login here. COROS mints one live token per account, so a
+ * silent login mid-session takes the session off whichever of the athlete's
+ * machines is holding it — and that machine's next request would find its own
+ * token dead and log back in, taking it straight back. Two computers left open
+ * traded the session between them for as long as both ran.
+ *
+ * So a dead token ends the session and nothing else. The saved credentials stay
+ * where they are, which leaves two ways back: the Reconnect button on Overview,
+ * right now and on purpose, or `restoreTrainingHubSessionAtStartup` at the next
+ * launch — credentials present, session gone, exactly what it looks for.
+ */
+function endExpiredTrainingHubSession(): never {
+  clearTrainingHubAuth();
+  announceTrainingHubSession();
+  throw new Error("COROS session expired. Log in again.");
 }
 
 async function executeTrainingHubRequest<T>(
@@ -7369,32 +7415,36 @@ function clearTrainingHubAuth(): void {
   ]);
 }
 
-// A single in-flight re-authentication shared by all concurrent callers.
-// When a token expires, every parallel request would otherwise trigger its own
-// full COROS login; because COROS invalidates the previous token each time a new
-// one is minted, those concurrent logins cannibalise each other and the retried
-// requests end up using an already-stale token. De-duplicating re-auth here means
-// all callers await the same login and reuse the same fresh token.
-let pendingReauth: Promise<TrainingHubAuthState | null> | null = null;
-
-function reauthenticateFromStoredCredentials(): Promise<TrainingHubAuthState | null> {
-  if (!pendingReauth) {
-    pendingReauth = performReauthentication().finally(() => {
-      pendingReauth = null;
-    });
+/**
+ * Re-establish the COROS session once, at app start, from saved credentials.
+ *
+ * This is the only automatic login the app performs. COROS invalidates the
+ * previous access token whenever a new one is minted, so every re-login takes
+ * the session away from the athlete's other computers; doing it on each expired
+ * request had two machines pulling the session back and forth for as long as
+ * both were open. Once per launch cannot loop — the other machine loses its
+ * token while this one is starting, and it has no way to answer until it is
+ * itself restarted.
+ *
+ * Only a session that is *gone* is restored. A token that is still on disk but
+ * dead on COROS's side is not this function's business: the request that finds
+ * out drops the session (`endExpiredTrainingHubSession`), which is precisely
+ * the state the next launch looks for.
+ *
+ * Nothing here can prompt. An account with two-factor enabled needs an emailed
+ * code, so it reports `two-factor-required` and leaves the athlete the
+ * Reconnect button that already exists on Overview.
+ */
+export async function restoreTrainingHubSessionAtStartup(): Promise<TrainingHubSessionRestore> {
+  if (getStoredAuth()) {
+    return { restored: false, reason: "already-signed-in" };
   }
-  return pendingReauth;
-}
 
-async function performReauthentication(): Promise<TrainingHubAuthState | null> {
   const credentials = getStoredCorosCredentials();
   if (!credentials) {
-    console.warn(
-      "[trainingHub] COROS access token expired but no stored credentials " +
-        "are available to refresh it (was 'Remember me' enabled and is secure " +
-        "storage available?). The user must log in again."
-    );
-    return null;
+    // Either "remember me" was off or the OS keychain is unavailable. Both are
+    // the athlete's own configuration, not a fault worth a log line.
+    return { restored: false, reason: "no-credentials" };
   }
 
   try {
@@ -7403,13 +7453,21 @@ async function performReauthentication(): Promise<TrainingHubAuthState | null> {
       credentials.pwdHash
     );
     persistTrainingHubSession(session);
-    return session;
+    announceTrainingHubSession();
+    return { restored: true, status: getTrainingHubStatus() };
   } catch (error) {
+    if (error instanceof Error && error.message === TWO_FACTOR_REQUIRED_CODE) {
+      console.info(
+        "[trainingHub] saved COROS credentials cannot sign in on their own: " +
+          "the account asks for a two-factor code."
+      );
+      return { restored: false, reason: "two-factor-required" };
+    }
     console.warn(
-      "[trainingHub] Automatic re-login with stored COROS credentials failed; " +
-        "the user must log in again.",
+      "[trainingHub] automatic COROS re-login at startup failed; the athlete " +
+        "has to sign in again.",
       error
     );
-    return null;
+    return { restored: false, reason: "failed" };
   }
 }

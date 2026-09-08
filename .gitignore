@@ -18,3 +18,11 @@ bin/*/
 /.agents/skills
 /.claude
 /video
+
+# OAuth client credentials downloaded from Google Cloud Console. This repo is
+# public: the id and key belong in environment variables, never in a commit.
+client_secret*.json
+
+# Generated before every compile by scripts/prepare-google-client.mjs. Holds the
+# app's Google OAuth client, so it must never be committed to a public repo.
+electron/sync/googleClientCredentials.ts

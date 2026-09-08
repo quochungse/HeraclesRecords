@@ -764,6 +764,33 @@ async function ensureMcpConnected(server: McpServerConfig): Promise<void> {
   }
 }
 
+/**
+ * Drop every live connection and reconnect from what is stored now.
+ *
+ * For a restore, which rewrites the server list underneath a running app. The
+ * rows are `personal` and travel; the OAuth tokens under `mcp.<id>.*` are
+ * `device` and do not, so what a restore brings back is the list of servers and
+ * this machine authorises them itself. A server the restore removed would
+ * otherwise keep a live client with no row behind it, leaving the panel showing
+ * connections that no longer match what the app would use on its next start.
+ *
+ * Authorization is deliberately *not* cleared: a server that survived the
+ * restore keeps the tokens this machine already holds for it, so an account
+ * signed in here stays signed in. Every runtime is walked, not just the current
+ * rows, so a client whose server the restore deleted is closed rather than left
+ * running.
+ */
+export async function reconnectAllMcpServers(): Promise<void> {
+  await Promise.all(
+    [...runtimes.keys()].map((id) =>
+      disconnectMcpServer(id, { clearAuthorization: false }).catch(
+        () => undefined
+      )
+    )
+  );
+  await ensureAllMcpConnected();
+}
+
 /** Connect every enabled server silently. Per-server failures are swallowed. */
 export async function ensureAllMcpConnected(): Promise<void> {
   await Promise.all(

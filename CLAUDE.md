@@ -78,7 +78,7 @@ npm run build            # tsc electron (emits dist-electron) + tsc --noEmit ren
 npm start                # build, then run the packaged-style app
 ```
 
-There is **no linter and no test runner**. Tests are ~84 standalone `scripts/test-*.mjs`
+There is **no linter and no test runner**. Tests are ~91 standalone `scripts/test-*.mjs`
 files using `node:assert/strict`, each wired to its own npm script. `npm run build` is the
 only typecheck. CI (`.github/workflows/build.yml`, `release.yml`) **builds installers but
 runs no tests** — nothing catches a broken test except running it.
@@ -105,7 +105,7 @@ defeat the ESM module cache between fixtures. Keep that when adding tests.
 > opens a window from a tool call. Prefix GUI launches with `env -u ELECTRON_RUN_AS_NODE`.
 > Leave scripts that set or clear the variable themselves alone.
 
-> **This machine's Node cannot run 26 of the 84 tests.** `/usr/bin/node` v22.22.1 is a distro
+> **This machine's Node cannot run 26 of the tests.** `/usr/bin/node` v22.22.1 is a distro
 > build compiled without Amaro (`node_use_amaro: false`), so every
 > `--experimental-strip-types` script fails with `ERR_NO_TYPESCRIPT` — including
 > `test:sport-colors`, `test:strength-*`, `test:watchface-studio`, and `test:mcp-*`. The
@@ -159,6 +159,20 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.
   The only component that sends credentials off-machine.
+  **There is exactly one automatic login, and it runs once per launch.** COROS keeps a
+  single live access token per account, so minting one kills the token every other machine
+  holds — two computers that each re-logged in on an expired request took the session off
+  each other for as long as both stayed open. So `restoreTrainingHubSessionAtStartup()`
+  is the only silent login: it fires from `app.whenReady`, only when the session is *gone*
+  and saved credentials remain, and cannot prompt (a 2FA account reports
+  `two-factor-required` and waits for the Reconnect button). Mid-session, a dead token
+  calls `endExpiredTrainingHubSession()` — clear the session, keep the credentials, throw.
+  Do not put a re-login back on the request path. Both paths announce the new status
+  through `setTrainingHubSessionListener` → `trainingHub:sessionChanged`, because the
+  renderer asked for neither and would otherwise keep showing the status it last read.
+  `npm run test:coros-session-restore` holds all of this down. The vault's owner is the
+  COROS account, so startup sequences the re-login *before* `prepareSync()` and resumes
+  the loop after one — see the block in `main.ts`.
 - **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) — workouts,
   plans, templates, plan↔activity adherence matching. React never calls COROS directly;
   it requests one `TrainingLibrarySnapshot`. See [docs/training-library-architecture.md](docs/training-library-architecture.md).
@@ -183,6 +197,87 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
   status, so results are cached (`invalidateWatchStatusCache`).
+- **Sync** (`electron/sync/`) — continuous two-way sync to a local folder or Google Drive,
+  so two machines hold the same user data. `syncService` owns the destination and nothing
+  else; `syncLoop` owns the oplog (append-only per-device change log, merged by HLC
+  last-writer-wins); `fullState.ts` republishes everything at once, which is what seeds a
+  vault on first join and what makes a restore visible to the other machines.
+  `syncableStore.ts` is the shared floor both this and backup read rows through, so a record
+  is identified the same way on every path. Six rules the rest of the app depends on:
+  - **Sync carries user data. No credential leaves the machine, down any path.** Every
+    token, API key and account sign-in is `device` tier, there is no opt-in that changes it,
+    and nothing unwraps a credential for transport. An earlier design did carry a few
+    (`portableSecrets.ts`, and `corosSessionShare.ts` shared one COROS session between
+    machines behind a lease); both were removed in September 2026 because the session story
+    needs designing on its own rather than riding on a backup checkbox. Do not reintroduce
+    either without that design — `test-sync-policy.mjs` fails if a `secret` tier or an
+    `includeSecrets` flag reappears, and `test-backup-restore.mjs` asserts the payload has no
+    field one could travel in.
+  - **`syncPolicy.ts` is the only place that decides what may leave the machine.** Every
+    setting, table and localStorage key is classified `preference` | `personal` | `derived` |
+    `device`. An unclassified key syncs nowhere. Both the backup path and the oplog path
+    gate on it, and the renderer imports the same registry rather than copying it.
+  - **Inbound changes must not echo back out.** `SqliteSyncTarget` and `applyBackup` write
+    through `requireDatabase().prepare(...)`, never through `setSetting`, so merged entries
+    skip the `syncBridge` hooks and cannot bounce between two devices forever. localStorage
+    cannot use that trick — the write happens in the renderer — so `localStorageSync.ts`
+    folds inbound values into the published snapshot instead.
+  - **The vault is obfuscated, not encrypted.** Every write goes through
+    `ObfuscatedProvider`; reads open what arrives sealed and pass anything else through, so
+    a folder written before sealing became unconditional still reads. The AES-256-GCM key is
+    derived from a constant in `syncObfuscation.ts` and ships in every build. It keeps a
+    training diary out of Drive's content indexing and folder previews and does nothing
+    else — read that file's header before describing it in any UI copy, and never treat it
+    as a reason to store something you would otherwise refuse to.
+  - **A vault belongs to one COROS account, and that is checked before anything else.**
+    `dataOwner.ts` fingerprints `trainingHub.userId` with an HMAC — the id itself is `device`
+    tier and never travels; only the fingerprint does. `vault/id.json` carries it, and doubles
+    as the reachability probe so one read answers reachability, identity and ownership
+    together. The states are in `SyncVaultState`: `signed-out` (no account, reported ahead of
+    the destination — sync needs to know whose records it is merging before it needs to know
+    where they go), `wrong-owner` (left completely alone; two accounts merged into one log
+    cannot be separated, there being no owner on each record), plus an unclaimed vault that
+    the first signed-in machine to `prepare()` takes. `claimVault()` is the deliberate
+    override, and it clears `sync.seededVaultId` — same vault id, so without that the machine
+    would think it had already published and the account taking the vault would have none of
+    its data in it. `prepare()` is the only path that starts a loop, and signing out of COROS
+    calls it so the loop stops. **This is a guard between machines and files, not a data
+    partition**: the tables have no owner column, so switching accounts on one machine leaves
+    the previous account's records in place. Closing that means giving every row an owner.
+  - **A device only ever writes inside its own `oplog/<deviceId>/` directory**, which is why
+    the storage layer needs no locking. Exclusivity is needed for two things only, and each
+    takes a `Lease`: running a scheduled automation (`automationLease`) and compacting the
+    log (`syncLoop.compactIfDue`).
+
+- **Backup / Restore** (`electron/backup/`) — a separate feature from sync, deliberately.
+  One file the person saves where they like (`backup:export` opens a save dialog) and reads
+  back when they want it (`backup:choose` then `backup:restore`). No list of backups, no
+  "latest", no lineage: that bookkeeping belonged to the vault model, where backups lived
+  inside the sync folder, and it answered a question a file does not raise. Plain JSON, not
+  obfuscated — the vault seals what it writes; a file the person chose the home of should
+  open in any editor. A restore is `replace` (the file decides in full) or `merge`
+  (additive, `INSERT OR IGNORE`, nothing removed), and the choice is only put to the person
+  when `hasSyncableData()` says there is something to lose — the built-in MCP server row
+  every fresh install writes does not count. Restoring publishes the result to the oplog
+  through `republishAfterRestore`, or the other machines would never learn of it.
+  The file is sealed with the same envelope as the vault (`.hrbackup`), for the same single
+  reason and with the same caveat — read `syncObfuscation.ts` before calling it encrypted
+  anywhere. Its AAD is a constant, **not** the path: a backup is meant to be renamed and
+  moved, and binding it to where it was written would make renaming it lose the data.
+  `readBackupFile` opens what arrives sealed and passes anything else through, so the plain
+  JSON that earlier builds wrote still restores.
+  Ownership works the same way as the vault's and is enforced in the service, not the dialog:
+  no account signed in refuses both directions (`BackupSignedOutError`, asked *before* the
+  file dialog opens rather than after), a file from another account refuses with
+  `BackupOwnerMismatchError` unless `allowOtherOwner` is passed from a second confirmation,
+  and a file with no owner at all reads as `unknown` and restores — refusing every older
+  backup would be a data-loss decision taken on the user's behalf.
+
+  A packaged build needs `HERACLES_GOOGLE_OAUTH_ID` / `_KEY` for Drive to be offered at all.
+  `scripts/prepare-google-client.mjs` bakes them into a git-ignored generated module before
+  every `tsc` run, reading a repo-root `.env` when the environment is empty; a build from
+  source gets empty values and the UI disables the Drive option. Both CI workflows pass them
+  to every platform job — keep it that way, or one platform ships without Drive.
 
 ### Testability convention in the main process
 

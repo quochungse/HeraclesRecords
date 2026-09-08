@@ -1,4 +1,19 @@
 import type {
+  GoogleAccountInfo,
+  LocalStoragePublishResult,
+  SyncBackend,
+  SyncChangedEvent,
+  SyncPresenceClaim,
+  SyncStatus,
+  SyncVaultState
+} from "../electron/sync/syncTypes";
+import type {
+  BackupExportResult,
+  BackupImportCandidate,
+  RestoreMode,
+  RestoreResult as BackupRestoreResult
+} from "../electron/backup/backupTypes";
+import type {
   ActivityBackupProgress,
   BinaryStatus,
   CachedCorosMapPackage,
@@ -505,6 +520,13 @@ export interface CorosLinkApi {
   onActivityBackupProgress: (
     callback: (progress: ActivityBackupProgress) => void
   ) => () => void;
+  /** The COROS session changed without anyone clicking for it: a start-up
+   *  re-login from saved credentials, or a token another of the athlete's
+   *  machines invalidated by signing in. Every click-driven change comes back
+   *  through its own call instead. */
+  onTrainingHubSessionChanged: (
+    callback: (status: TrainingHubStatus) => void
+  ) => () => void;
   getTrainingAnalytics: () => Promise<TrainingHubAnalytics>;
   getRacePredictor: () => Promise<TrainingHubRacePredictor>;
   getTrainingDashboard: () => Promise<TrainingHubDashboard>;
@@ -770,6 +792,58 @@ export interface CorosLinkApi {
     scheduleDate?: string
   ) => Promise<UploadPlanResult>;
   confirmWorkoutDelete: (requestId: string) => Promise<DeleteWorkoutResult>;
+  // ----- Sync -----
+  chooseSyncFolder: () => Promise<string | null>;
+  getSyncStatus: () => Promise<SyncStatus>;
+  /** Open the vault, creating it in the chosen destination if it is not there.
+   *  This is the whole of setting sync up; nothing is asked of the user. */
+  prepareSyncVault: () => Promise<SyncVaultState>;
+  /** Take a vault belonging to another account. Clears the seed flag, so this
+   *  machine republishes its whole state into it. */
+  claimSyncVault: () => Promise<SyncVaultState>;
+  setSyncBackend: (backend: SyncBackend) => Promise<void>;
+  /** Who the connected Google account belongs to, and how much room it has
+   *  left. Null when nothing is connected, or when Drive would not say — it is
+   *  decoration, so it never fails the panel. */
+  googleDriveAccount: () => Promise<GoogleAccountInfo | null>;
+  connectGoogleDrive: () => Promise<void>;
+  disconnectGoogleDrive: () => Promise<void>;
+  setGoogleClient: (
+    clientId: string | null,
+    clientKey: string | null
+  ) => Promise<void>;
+  syncNow: () => Promise<{ pushed: number; applied: number }>;
+  /** Hand the main process every localStorage entry policy allows, so it can
+   *  publish the ones that moved. `syncing: false` means nothing was listening,
+   *  which the caller must not mistake for delivery. */
+  publishSyncedLocalStorage: (
+    entries: Record<string, string>
+  ) => Promise<LocalStoragePublishResult>;
+  announceSyncPresence: (sessionId: string | null) => Promise<void>;
+  listSyncPresence: () => Promise<SyncPresenceClaim[]>;
+  onSyncChanged: (callback: (change: SyncChangedEvent) => void) => () => void;
+
+  // ----- Backup & Restore -----
+  //
+  // A file the person owns, not a copy this app keeps track of. Export opens a
+  // save dialog and writes one; restoring is two calls, because between them
+  // the person answers what should happen to the data already here.
+  /** Null when the save dialog was dismissed. */
+  exportBackup: (
+    localStorage: Record<string, string>
+  ) => Promise<BackupExportResult | null>;
+  /** Open a backup and describe what restoring it would do, without writing
+   *  anything. Null when the dialog was dismissed. */
+  chooseBackupFile: () => Promise<BackupImportCandidate | null>;
+  /** `allowOtherOwner` is the deliberate override for a file belonging to a
+   *  different COROS account, and must only be set from a second confirmation
+   *  the person gave. */
+  restoreBackup: (
+    filePath: string,
+    mode: RestoreMode,
+    allowOtherOwner?: boolean
+  ) => Promise<BackupRestoreResult>;
+
   setWindowBackground: (color: string) => Promise<void>;
   isWindowFullscreen: () => Promise<boolean>;
   onWindowFullscreenChange: (callback: (fullscreen: boolean) => void) => () => void;
