@@ -4,6 +4,13 @@ import path from "node:path";
 import { enrichActivitiesWithSportNames } from "./corosSportTypes";
 import { musicFileNamesMatch } from "./musicFileNames";
 import Database from "better-sqlite3";
+import {
+  notifyRowChanged,
+  notifyRowDeleted,
+  notifySettingChanged,
+  notifySettingsDeleted
+} from "./sync/syncBridge";
+import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
   CachedCorosMapPackage,
   CoachAutomationRunQuery,
@@ -950,6 +957,34 @@ export function getSetting(key: string): string | undefined {
   return row?.value;
 }
 
+/**
+ * Hand a written row to the sync loop.
+ *
+ * The row is read back rather than taken from the caller, so the queued entry
+ * carries exactly what the database now holds — including columns with
+ * defaults the caller never set, which another machine would otherwise receive
+ * as missing.
+ *
+ * Table and column names here are literals from this file, never remote data.
+ */
+function notifySyncedRow(
+  table: string,
+  keyColumns: readonly string[],
+  values: readonly string[]
+): void {
+  const where = keyColumns.map((column) => `${column} = ?`).join(" AND ");
+  const row = requireDatabase()
+    .prepare(`SELECT * FROM ${table} WHERE ${where}`)
+    .get(values) as Record<string, unknown> | undefined;
+  if (row) {
+    notifyRowChanged(table, values.join(RECORD_ID_SEPARATOR), row);
+  }
+}
+
+function notifySyncedDelete(table: string, ...values: string[]): void {
+  notifyRowDeleted(table, values.join(RECORD_ID_SEPARATOR));
+}
+
 export function setSetting(key: string, value: string): void {
   requireDatabase()
     .prepare(
@@ -958,6 +993,11 @@ export function setSetting(key: string, value: string): void {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     )
     .run(key, value);
+  // The single choke point every settings write in the app passes through, so
+  // the sync loop learns about all of them from one hook. A no-op until sync
+  // is attached, and it swallows its own errors — a sync problem must never
+  // fail an ordinary settings write.
+  notifySettingChanged(key, value);
 }
 
 export function deleteSettings(keys: string[]): void {
@@ -970,6 +1010,7 @@ export function deleteSettings(keys: string[]): void {
   });
 
   transaction(keys);
+  notifySettingsDeleted(keys);
 }
 
 export interface ChatSessionRow {
@@ -1039,6 +1080,21 @@ export function getChatSessionRow(id: string): ChatSessionRow | undefined {
     .get(id) as ChatSessionRow | undefined;
 }
 
+/**
+ * Hand a written conversation to the sync loop.
+ *
+ * Every write site goes through here rather than building a payload of its own.
+ * `notifySyncedRow` reads the row back with `SELECT *`, which is not a detail:
+ * `SqliteSyncTarget.upsertRow` uses `INSERT OR REPLACE`, and SQLite's REPLACE
+ * deletes the conflicting row before inserting — so a payload that lists only
+ * the columns the caller happened to set wipes the rest to NULL. A hand-built
+ * seven-column payload here erased `coach_summary` and `coach_summary_through`
+ * on the local machine, measurably, within seconds of every save.
+ */
+function notifyChatSessionRow(id: string): void {
+  notifySyncedRow("chat_sessions", ["id"], [id]);
+}
+
 export function insertChatSessionRow(
   id: string,
   provider: string,
@@ -1053,6 +1109,10 @@ export function insertChatSessionRow(
        VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run(id, provider, title, messagesJson, createdAt, updatedAt);
+  // Deliberately not notified. A conversation is created empty, the moment the
+  // composer opens, and syncing that would put a stranger's blank "New chat" in
+  // everyone's sidebar. It travels on its first real save — or on a rename, if
+  // that comes first — and carries the whole row either way.
 }
 
 export function updateChatSessionRow(
@@ -1068,6 +1128,7 @@ export function updateChatSessionRow(
        WHERE id = ?`
     )
     .run(title, messagesJson, updatedAt, id);
+  notifyChatSessionRow(id);
 }
 
 /**
@@ -1078,6 +1139,7 @@ export function setChatSessionTitleRow(id: string, title: string): void {
   requireDatabase()
     .prepare("UPDATE chat_sessions SET title = ? WHERE id = ?")
     .run(title, id);
+  notifyChatSessionRow(id);
 }
 
 export function setChatSessionPinnedRow(
@@ -1087,12 +1149,16 @@ export function setChatSessionPinnedRow(
   requireDatabase()
     .prepare("UPDATE chat_sessions SET pinned_at = ? WHERE id = ?")
     .run(pinnedAt, id);
+  notifyChatSessionRow(id);
 }
 
 export function deleteChatSessionRow(id: string): void {
   requireDatabase()
     .prepare("DELETE FROM chat_sessions WHERE id = ?")
     .run(id);
+  // A tombstone, so the conversation stays deleted instead of being restored
+  // by a device that still holds the original row.
+  notifySyncedDelete("chat_sessions", id);
 }
 
 export interface CoachAutomationRow {
@@ -1145,6 +1211,7 @@ export function insertCoachAutomationRow(row: CoachAutomationRow): void {
           @conditions_json, @runtime_json, @created_at, @updated_at)`
     )
     .run(row);
+  notifySyncedRow("coach_automations", ["id"], [row.id]);
 }
 
 export function updateCoachAutomationRow(row: CoachAutomationRow): void {
@@ -1158,12 +1225,14 @@ export function updateCoachAutomationRow(row: CoachAutomationRow): void {
        WHERE id = @id`
     )
     .run(row);
+  notifySyncedRow("coach_automations", ["id"], [row.id]);
 }
 
 export function deleteCoachAutomationRow(id: string): void {
   requireDatabase()
     .prepare("DELETE FROM coach_automations WHERE id = ?")
     .run(id);
+  notifySyncedDelete("coach_automations", id);
 }
 
 /**
@@ -1174,9 +1243,21 @@ export function deleteCoachAutomationRow(id: string): void {
 export function deleteCoachAutomationBindingRowsForAutomation(
   automationId: string
 ): void {
+  // Collected before the delete: a tombstone needs the id, and after the row is
+  // gone there is nothing left to read it from.
+  const bindingIds = (
+    requireDatabase()
+      .prepare(
+        "SELECT id FROM coach_automation_bindings WHERE automation_id = ?"
+      )
+      .all(automationId) as Array<{ id: string }>
+  ).map((row) => row.id);
   requireDatabase()
     .prepare("DELETE FROM coach_automation_bindings WHERE automation_id = ?")
     .run(automationId);
+  for (const id of bindingIds) {
+    notifySyncedDelete("coach_automation_bindings", id);
+  }
 }
 
 export function countCoachAutomationBindingRows(automationId: string): number {
@@ -1263,6 +1344,7 @@ export function insertCoachAutomationBindingRow(
           @backoff_until, @backoff_level, @threshold_firing, @created_at)`
     )
     .run(row);
+  notifySyncedRow("coach_automation_bindings", ["id"], [row.id]);
 }
 
 export function updateCoachAutomationBindingRow(
@@ -1280,12 +1362,14 @@ export function updateCoachAutomationBindingRow(
        WHERE id = @id`
     )
     .run(row);
+  notifySyncedRow("coach_automation_bindings", ["id"], [row.id]);
 }
 
 export function deleteCoachAutomationBindingRow(id: string): void {
   requireDatabase()
     .prepare("DELETE FROM coach_automation_bindings WHERE id = ?")
     .run(id);
+  notifySyncedDelete("coach_automation_bindings", id);
 }
 
 export interface CoachDailySampleRow {
@@ -1904,6 +1988,7 @@ export function addGeneratedRoute(route: GeneratedRoute): GeneratedRoute {
       gpxPath: route.gpxPath ?? null
     });
 
+  notifySyncedRow("generated_routes", ["id"], [route.id]);
   return route;
 }
 
@@ -1911,6 +1996,7 @@ export function deleteGeneratedRoute(id: string): boolean {
   const result = requireDatabase()
     .prepare(`DELETE FROM generated_routes WHERE id = ?`)
     .run(id);
+  if (result.changes > 0) notifySyncedDelete("generated_routes", id);
   return result.changes > 0;
 }
 
@@ -2524,6 +2610,7 @@ export function saveChatPlanDraft(record: StoredChatPlanDraftRecord): void {
       record.createdAt,
       record.uploadedAt ?? null
     );
+  notifySyncedRow("chat_plan_drafts", ["draft_id"], [record.draftId]);
 }
 
 export function getChatPlanDraft(
@@ -2579,12 +2666,28 @@ export function markChatPlanDraftUploaded(
        WHERE draft_id = ?`
     )
     .run(uploadedAt, draftId);
+  notifySyncedRow("chat_plan_drafts", ["draft_id"], [draftId]);
 }
 
 export function pruneChatPlanDrafts(cutoffMs: number): number {
-  const result = requireDatabase()
+  const database = requireDatabase();
+  // Ids first: a tombstone needs them, and after the delete there is nothing
+  // left to read them from.
+  const doomed = (
+    database
+      .prepare(
+        "SELECT draft_id FROM chat_plan_drafts " +
+          "WHERE created_at < ? AND uploaded_at IS NULL"
+      )
+      .all(cutoffMs) as Array<{ draft_id: string }>
+  ).map((row) => row.draft_id);
+
+  const result = database
     .prepare("DELETE FROM chat_plan_drafts WHERE created_at < ? AND uploaded_at IS NULL")
     .run(cutoffMs);
+  for (const draftId of doomed) {
+    notifySyncedDelete("chat_plan_drafts", draftId);
+  }
   return result.changes;
 }
 
@@ -2592,6 +2695,7 @@ export function deleteChatPlanDraft(draftId: string): void {
   requireDatabase()
     .prepare("DELETE FROM chat_plan_drafts WHERE draft_id = ?")
     .run(draftId);
+  notifySyncedDelete("chat_plan_drafts", draftId);
 }
 
 interface TrainingPlanRow {
@@ -2667,6 +2771,17 @@ export function saveTrainingPlanDocument(
     );
   }
   const database = requireDatabase();
+  // The links this plan had before the save. Read first, because the write
+  // below deletes them all and rebuilds from `document.entries` — so after it
+  // there is nothing left to say which entries the person removed, and a
+  // removal with no tombstone is a session that comes back on their other
+  // machine.
+  const previousEntryIds = (
+    database
+      .prepare("SELECT entry_id FROM training_plan_workout_links WHERE plan_id = ?")
+      .all(document.id) as Array<{ entry_id: string }>
+  ).map((row) => row.entry_id);
+
   database.transaction(() => {
     database
       .prepare(
@@ -2722,6 +2837,27 @@ export function saveTrainingPlanDocument(
       );
     }
   })();
+
+  // The plan and every link it owns. Links are rewritten wholesale on each
+  // save, so the surviving ones are announced the same way rather than diffed.
+  notifySyncedRow("training_plans", ["id"], [document.id]);
+  const keptEntryIds = new Set<string>();
+  for (const entry of document.entries) {
+    keptEntryIds.add(entry.id);
+    notifySyncedRow(
+      "training_plan_workout_links",
+      ["plan_id", "entry_id"],
+      [document.id, entry.id]
+    );
+  }
+
+  // Removals do have to be diffed. A `set` for what remains says nothing about
+  // what went: the other machine holds the old link and, with no tombstone to
+  // outrank it, keeps the session this save deleted.
+  for (const entryId of previousEntryIds) {
+    if (keptEntryIds.has(entryId)) continue;
+    notifySyncedDelete("training_plan_workout_links", document.id, entryId);
+  }
 }
 
 export function listTrainingPlanDocuments(): TrainingPlanDocument[] {
@@ -2769,10 +2905,23 @@ export function getNativePlanRawPayload(
 
 export function deleteTrainingPlanDocument(id: string): void {
   const database = requireDatabase();
+  // Link ids before the delete: a tombstone needs them, and afterwards there is
+  // nothing left to read them from.
+  const linkEntryIds = (
+    database
+      .prepare("SELECT entry_id FROM training_plan_workout_links WHERE plan_id = ?")
+      .all(id) as Array<{ entry_id: string }>
+  ).map((row) => row.entry_id);
+
   database.transaction(() => {
     database.prepare("DELETE FROM training_plan_workout_links WHERE plan_id = ?").run(id);
     database.prepare("DELETE FROM training_plans WHERE id = ?").run(id);
   })();
+
+  for (const entryId of linkEntryIds) {
+    notifySyncedDelete("training_plan_workout_links", id, entryId);
+  }
+  notifySyncedDelete("training_plans", id);
 }
 
 export function listTrainingWorkoutMetadata(): TrainingWorkoutMetadata[] {
@@ -2847,6 +2996,11 @@ export function saveTrainingWorkoutMetadata(
       metadata.cachedVersion ?? null,
       cachedPayload ? JSON.stringify(cachedPayload) : null
     );
+  notifySyncedRow(
+    "training_workout_metadata",
+    ["program_id"],
+    [metadata.programId]
+  );
 }
 
 export function listTrainingCollections(): TrainingCollection[] {
@@ -2887,16 +3041,32 @@ export function saveTrainingCollection(collection: TrainingCollection): void {
       collection.createdAt,
       collection.updatedAt
     );
+  notifySyncedRow("training_collections", ["id"], [collection.id]);
 }
 
 export function deleteTrainingCollection(id: string): void {
   const database = requireDatabase();
+  // The workouts that lose their collection change too, and another machine has
+  // to be told about both halves or it keeps them in a collection that is gone.
+  const orphaned = (
+    database
+      .prepare(
+        "SELECT program_id FROM training_workout_metadata WHERE collection_id = ?"
+      )
+      .all(id) as Array<{ program_id: string }>
+  ).map((row) => row.program_id);
+
   database.transaction(() => {
     database
       .prepare("UPDATE training_workout_metadata SET collection_id = NULL WHERE collection_id = ?")
       .run(id);
     database.prepare("DELETE FROM training_collections WHERE id = ?").run(id);
   })();
+
+  for (const programId of orphaned) {
+    notifySyncedRow("training_workout_metadata", ["program_id"], [programId]);
+  }
+  notifySyncedDelete("training_collections", id);
 }
 
 function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivityMatch {

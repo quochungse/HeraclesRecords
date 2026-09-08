@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Cloud,
   Code2,
   Dumbbell,
   Ellipsis,
@@ -65,6 +64,8 @@ import {
 } from "../training/sportColors";
 import appLogo from "../../build/icon.png";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { SyncPanel } from "./SyncPanel";
+import { BackupPanel } from "./BackupPanel";
 
 const ABOUT_LINKS = [
   {
@@ -81,25 +82,6 @@ const ABOUT_LINKS = [
     label: "Report an issue",
     href: "https://github.com/quochungse/HeraclesRecords/issues",
     icon: Bug,
-  },
-];
-
-/**
- * The Connections rows that have no behaviour yet. They are laid out now so the
- * section is complete and wiring one up later is a matter of swapping the
- * disabled button for a real handler — the row markup does not change.
- */
-const PENDING_CONNECTIONS: {
-  id: string;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-}[] = [
-  {
-    id: "cloud-sync",
-    label: "Cloud Sync",
-    description: "Back up training data and settings across devices.",
-    icon: Cloud,
   },
 ];
 
@@ -183,6 +165,9 @@ interface SettingsViewProps {
   trainingBusy: string | null;
   onTrainingRefresh: () => void;
   onTrainingLogout: () => void;
+  /** Opens the COROS sign-in screen. App owns view routing, so the row here
+      only asks for it. */
+  onTrainingSignIn: () => void;
 }
 
 const THEME_MODES = [
@@ -207,6 +192,7 @@ export function SettingsView({
   trainingBusy,
   onTrainingRefresh,
   onTrainingLogout,
+  onTrainingSignIn,
 }: SettingsViewProps) {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -541,18 +527,29 @@ export function SettingsView({
               onLogout={onTrainingLogout}
             />
           ) : (
-            <div className="settings-nav-row is-static">
+            <button
+              className="settings-nav-row"
+              type="button"
+              onClick={onTrainingSignIn}
+            >
               <span className="settings-nav-row-icon" aria-hidden="true">
                 <Watch size={22} strokeWidth={1.9} />
               </span>
               <span className="settings-nav-row-copy">
                 <strong>COROS account</strong>
                 <span>
-                  Not connected. Sign in from Overview to sync activities and
-                  workouts.
+                  {trainingStatus?.rememberCredentials && trainingStatus?.email
+                    ? `Not connected. Sign in as ${trainingStatus.email} to sync activities and workouts.`
+                    : "Not connected. Sign in to sync activities and workouts."}
                 </span>
               </span>
-            </div>
+              <ChevronRight
+                className="settings-storage-link-chevron"
+                size={20}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            </button>
           )}
 
           <button
@@ -594,21 +591,11 @@ export function SettingsView({
               aria-hidden="true"
             />
           </button>
-
-          {PENDING_CONNECTIONS.map(({ id, label, description, icon: Icon }) => (
-            <button className="settings-nav-row" type="button" key={id} disabled>
-              <span className="settings-nav-row-icon" aria-hidden="true">
-                <Icon size={22} strokeWidth={1.9} />
-              </span>
-              <span className="settings-nav-row-copy">
-                <strong>{label}</strong>
-                <span>{description}</span>
-              </span>
-              <span className="badge">Soon</span>
-            </button>
-          ))}
         </div>
       </div>
+
+      <SyncPanel api={api} />
+      <BackupPanel api={api} />
 
       <div className="panel settings-units-panel">
         <div className="settings-units-heading">

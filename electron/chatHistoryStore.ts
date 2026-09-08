@@ -1119,6 +1119,8 @@ export function saveChatSession(
 
   const updatedAt = new Date().toISOString();
   database.updateSession(id, title, messagesJson, updatedAt);
+  // The row writer tells the sync loop; the guard above is what keeps that to
+  // one entry per finished turn rather than one per streamed token.
   const nextRow = database.getSession(id);
   return nextRow ? toSessionSummary(nextRow) : null;
 }

@@ -50,6 +50,7 @@ import {
 import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
+import { runExclusively } from "./sync/automationLease";
 import { AUTOMATION_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
   AnthropicEffort,
@@ -336,7 +337,11 @@ export type AutomationSkipReason =
   /** Activity-driven, but nothing new to analyse since this binding's watermark. */
   | "no-activity"
   /** Schedule-driven: the slot came due more than a day ago (3.1). */
-  | "stale-slot";
+  | "stale-slot"
+  /** Another device holds the lease for this automation and is running it.
+   *  Normal for two machines out of three once automations sync, and not a
+   *  failure — the run happens, just not here. */
+  | "another-device";
 
 /** 2.3: at most this many automation messages land in one conversation per hour. */
 export const SESSION_BURST_PER_HOUR = 5;
@@ -1800,7 +1805,29 @@ export async function runAutomationTrigger(
       for (const step of plan) {
         let run: CoachAutomationRun | null;
         try {
-          run = await enqueue(() => runOneBinding(step, deps, cancellation));
+          // The lease is taken inside `enqueue`, not around it: acquiring it
+          // before the step reaches the front of the queue would hold the lock
+          // across the wait and keep the other machines idle for no reason.
+          const outcome = await enqueue(() =>
+            runExclusively(step.automation.id, () =>
+              runOneBinding(step, deps, cancellation)
+            )
+          );
+          if (!outcome.ran) {
+            // Another machine is running it. Recorded so the log says where the
+            // work went rather than showing an unexplained gap.
+            runs.push(
+              skip(
+                queued,
+                "another-device",
+                resolved,
+                queued.binding.sessionId ?? undefined,
+                `Running on ${outcome.holder ?? "another device"}.`
+              )
+            );
+            continue;
+          }
+          run = outcome.result;
         } catch (error) {
           // One binding blowing up must not starve the rest of the fan-out, and
           // the failure still has to be visible in the run log — and count

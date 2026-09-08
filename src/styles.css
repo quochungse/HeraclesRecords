@@ -18452,6 +18452,115 @@ tr.data-intervals-row-missing {
   line-height: 1.55;
 }
 
+/* Actions for a dialog that asks something, rather than one that just shows a
+   panel. Right-aligned with the safe answer first, and allowed to wrap because
+   the backup fork offers three. */
+.app-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.app-modal-footer .primary-button,
+.app-modal-footer .secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* The restore question is a few sentences and two choices, not a panel, so it
+   should not open at the width Coach's provider cards need. */
+.backup-restore-modal {
+  width: min(560px, 94vw);
+}
+
+.backup-restore-modal .app-modal-copy:last-child {
+  margin-bottom: 0;
+}
+
+/* The two answers, as cards rather than buttons in a row. Each carries a
+   sentence about what it does to the data already here, which is the part that
+   cannot be undone — and which two words in a button bar cannot carry. */
+.backup-restore-options {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.backup-restore-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.backup-restore-option:hover:not(:disabled) {
+  border-color: var(--accent-soft-border);
+  background: var(--surface-hover);
+}
+
+.backup-restore-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.backup-restore-option-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.backup-restore-option.is-destructive .backup-restore-option-icon {
+  color: var(--danger);
+}
+
+.backup-restore-option-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.backup-restore-option-copy strong {
+  font-size: 14px;
+}
+
+.backup-restore-option-copy > span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.backup-restore-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.backup-restore-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* Coach models stacks five provider cards, each with its own fields; the
    narrower dialog width crams them. */
 .app-modal.is-wide {
@@ -24664,6 +24773,11 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .route-distance-presets button,
 :root[data-theme="paper"] .route-cta-hint,
 :root[data-theme="paper"] .route-sketch-text {
+  background: rgba(38, 34, 28, 0.04);
+  border-color: var(--glass-border);
+}
+
+:root[data-theme="paper"] .sync-backend-switch {
   background: rgba(38, 34, 28, 0.04);
   border-color: var(--glass-border);
 }
@@ -32063,6 +32177,196 @@ button.settings-about-link {
    The global `button:disabled` fades to 0.55 and shows a not-allowed cursor,
    which reads as "you did something wrong" rather than "not built yet" — these
    rows dim through their own muted colors instead, so the badge stays legible. */
+/*
+ * The Sync panel deliberately opts out of the glass blur.
+ *
+ * Settings already stacks five `.panel` elements, each with its own
+ * `backdrop-filter`, inside one scrolling column. Every one of those is a
+ * separate render surface that Chromium has to re-sample as the column moves,
+ * and adding a sixth pushed it past the point where it keeps up: scrolling made
+ * the seam under the first card shimmer continuously. Dropping the blur here
+ * takes the chain back to five and costs nothing visually — a panel this far
+ * down the page has app chrome behind it, not content worth blurring.
+ *
+ * `contain: paint` keeps the panel's own repaints from escaping into that seam.
+ */
+.settings-sync-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  contain: paint;
+}
+
+/* The 520px measure the other panel headings share is set for two or three
+   lines of explanation. This one is a single sentence and the panel is 980px
+   wide, so capping it there broke it across two lines with half the row empty
+   beside it. Let it use the width it has; the panel is what limits it. */
+.settings-sync-panel .settings-connections-heading p:not(.eyebrow) {
+  max-width: none;
+}
+
+.settings-nav-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Sync panel controls ---------------------------------------------------
+ *
+ * The rows in this panel used to carry bare `<button>` elements, which inherit
+ * nothing but a pointer cursor — so they rendered as OS default buttons in the
+ * middle of a glass panel. They use the app's own `.primary-button` /
+ * `.secondary-button` / `.danger-button` now, compacted here: those are sized
+ * for panel footers at 44px tall, which is chunky inside a 12px-padded row.
+ */
+.settings-sync-panel .settings-nav-row .primary-button,
+.settings-sync-panel .settings-nav-row .secondary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.settings-sync-panel .settings-nav-row .icon-button {
+  width: 34px;
+  height: 34px;
+}
+
+/* Rows that carry a second line. The three-column grid stays as it is — icon,
+   copy, controls — and the extra line takes a grid row beneath it, starting at
+   the copy column so it reads as part of the same answer rather than as a row
+   of its own. `row-gap` matches the footer's padding so the separator sits
+   centred between the two lines. */
+.settings-sync-panel .sync-row-stacked {
+  row-gap: 12px;
+}
+
+.sync-row-footer {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+}
+
+/* The concrete answer — a filesystem path or an account address. Louder than
+   the sentence above it, because it is the part worth checking at a glance,
+   and free to break mid-token: a vault path is long and has no spaces to
+   break at, and left alone it pushes the row wider than the panel. */
+.sync-destination-detail {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A button in the footer keeps its size: the text beside it shrinks, not the
+   control. */
+.settings-sync-panel .sync-row-footer > .primary-button,
+.settings-sync-panel .sync-row-footer > .secondary-button {
+  flex: 0 0 auto;
+}
+
+/* The destination toggle. Same segmented shape as `.route-mode-switch` and
+   `.chat-auth-scope-switch`, sized for a row's third column rather than a full
+   panel width: it sits beside body copy, so it must not stretch. */
+.sync-backend-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+}
+
+.sync-backend-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 11px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.sync-backend-switch button:hover:not(:disabled):not(.is-active) {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.sync-backend-switch button.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* The selected side is `disabled` only while a switch is in flight, and the
+   global `button:disabled` fade would make the whole control look broken for
+   the second that takes. Hold the active colours instead and let the spinner
+   inside it carry the "working" signal. */
+.sync-backend-switch button:disabled {
+  cursor: default;
+}
+
+.sync-backend-switch button.is-active:disabled {
+  opacity: 1;
+}
+
+/* The destination row while a switch is in flight. Dashed rather than replaced
+   by a placeholder: the row keeps its size, so nothing below it jumps. */
+.settings-sync-panel .sync-row-pending {
+  border-style: dashed;
+  background: transparent;
+}
+
+.settings-sync-panel .sync-row-pending .settings-nav-row-copy strong {
+  color: var(--text-secondary);
+}
+
+/* Rows that need attention: an unreachable destination, a restore about to
+   overwrite, a backup about to be deleted. */
+.settings-sync-panel .sync-row-alert {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.settings-sync-panel .sync-row-alert .settings-nav-row-icon {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+  color: var(--error-text);
+}
+
+.sync-panel-loading,
+.sync-panel-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sync-panel-note svg,
+.sync-panel-loading svg {
+  flex-shrink: 0;
+}
+
+.sync-panel-note.is-error {
+  color: var(--error-text);
+}
+
 .settings-nav-row:disabled,
 .settings-nav-row.is-static {
   cursor: default;

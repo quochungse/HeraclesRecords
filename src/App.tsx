@@ -85,6 +85,8 @@ import { TRAINING_HEATMAP_DAYS } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type { TrainingHubSnapshot } from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
+import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
+import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
 import { subscribeToToasts } from "./toast";
 import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
 import {
@@ -483,6 +485,26 @@ export default function App() {
 
     void api.getAppUpdateStatus().then(setAppUpdateSnapshot);
     return api.onAppUpdateStatus(setAppUpdateSnapshot);
+  }, [api]);
+
+  // Applying a pull's localStorage half belongs here rather than in the Sync
+  // panel, which is where it used to live: the main process drains the queue
+  // when it sends this event and keeps no second copy, so a change that arrived
+  // with any other view on screen was discarded. The panel still renders the
+  // notice — it just no longer owns the only chance to act on one.
+  useEffect(() => {
+    if (!api) return;
+    return api.onSyncChanged((change) => {
+      applySyncedLocalStorageOps(change.localStorage);
+    });
+  }, [api]);
+
+  // The same half on its way out. Theme, units, sport colours and every view
+  // preference live only in the renderer, so without this they arrive from the
+  // other machine but never leave this one.
+  useEffect(() => {
+    if (!api) return;
+    return startLocalStoragePublisher(api);
   }, [api]);
 
   useEffect(() => {
@@ -886,6 +908,25 @@ export default function App() {
       .then(applyTrainingHubStatus)
       .catch((caught) => setError(toErrorMessage(caught)));
   }, [activeView, api, applyTrainingHubStatus]);
+
+  // A COROS session that came or went without anyone here asking: the main
+  // process re-logged in from saved credentials at start-up, or a login on
+  // another of the athlete's machines invalidated this one's token mid-session.
+  //
+  // The status arrives with the event, so the sign-in surface is right
+  // immediately; the reload behind it fills the screens a restore just made
+  // possible, and empties the ones an expiry just invalidated. Without this the
+  // effect above is the only refresh there is, and it waits for a change of
+  // view — leaving Overview claiming a connection that no longer exists.
+  useEffect(() => {
+    if (!api) return;
+    return api.onTrainingHubSessionChanged((status) => {
+      applyTrainingHubStatus(status);
+      void refreshTrainingHub().catch((caught) =>
+        setError(toErrorMessage(caught)),
+      );
+    });
+  }, [api, applyTrainingHubStatus, refreshTrainingHub]);
 
   const handleTrainingHubActivityDetail = useCallback(
     async (activity: TrainingHubActivity) => {
@@ -2652,6 +2693,7 @@ export default function App() {
                 trainingBusy={busy}
                 onTrainingRefresh={handleTrainingHubRefresh}
                 onTrainingLogout={handleTrainingHubLogout}
+                onTrainingSignIn={() => setActiveView("overview")}
               />
             ) : null}
             {activeView === "calendar" ? (

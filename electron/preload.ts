@@ -1,5 +1,20 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  GoogleAccountInfo,
+  LocalStoragePublishResult,
+  SyncBackend,
+  SyncChangedEvent,
+  SyncPresenceClaim,
+  SyncStatus,
+  SyncVaultState
+} from "./sync/syncTypes";
+import type {
+  BackupExportResult,
+  BackupImportCandidate,
+  RestoreMode,
+  RestoreResult as BackupRestoreResult
+} from "./backup/backupTypes";
+import type {
   ActivityBackupProgress,
   BinaryStatus,
   CachedCorosMapPackage,
@@ -726,6 +741,19 @@ const api = {
     ipcRenderer.invoke("trainingHub:cancelActivityBackup"),
   getActivityBackupProgress: (): Promise<ActivityBackupProgress | null> =>
     ipcRenderer.invoke("trainingHub:getActivityBackupProgress"),
+  onTrainingHubSessionChanged: (
+    callback: (status: TrainingHubStatus) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      status: TrainingHubStatus
+    ) => {
+      callback(status);
+    };
+    ipcRenderer.on("trainingHub:sessionChanged", listener);
+    return () =>
+      ipcRenderer.removeListener("trainingHub:sessionChanged", listener);
+  },
   onActivityBackupProgress: (
     callback: (progress: ActivityBackupProgress) => void
   ): (() => void) => {
@@ -1213,6 +1241,60 @@ const api = {
     ),
   confirmWorkoutDelete: (requestId: string): Promise<DeleteWorkoutResult> =>
     ipcRenderer.invoke("chat:confirmWorkoutDelete", requestId),
+  // ----- Sync -----
+  chooseSyncFolder: (): Promise<string | null> =>
+    ipcRenderer.invoke("sync:chooseFolder"),
+  getSyncStatus: (): Promise<SyncStatus> => ipcRenderer.invoke("sync:getStatus"),
+  prepareSyncVault: (): Promise<SyncVaultState> =>
+    ipcRenderer.invoke("sync:prepare"),
+  exportBackup: (
+    localStorage: Record<string, string>
+  ): Promise<BackupExportResult | null> =>
+    ipcRenderer.invoke("backup:export", localStorage),
+  chooseBackupFile: (): Promise<BackupImportCandidate | null> =>
+    ipcRenderer.invoke("backup:choose"),
+  restoreBackup: (
+    filePath: string,
+    mode: RestoreMode,
+    allowOtherOwner?: boolean
+  ): Promise<BackupRestoreResult> =>
+    ipcRenderer.invoke("backup:restore", filePath, mode, allowOtherOwner),
+  claimSyncVault: (): Promise<SyncVaultState> =>
+    ipcRenderer.invoke("sync:claimVault"),
+  setSyncBackend: (backend: SyncBackend): Promise<void> =>
+    ipcRenderer.invoke("sync:setBackend", backend),
+  googleDriveAccount: (): Promise<GoogleAccountInfo | null> =>
+    ipcRenderer.invoke("sync:googleAccount"),
+  connectGoogleDrive: (): Promise<void> =>
+    ipcRenderer.invoke("sync:connectGoogle"),
+  disconnectGoogleDrive: (): Promise<void> =>
+    ipcRenderer.invoke("sync:disconnectGoogle"),
+  setGoogleClient: (
+    clientId: string | null,
+    clientKey: string | null
+  ): Promise<void> =>
+    ipcRenderer.invoke("sync:setGoogleClient", clientId, clientKey),
+  syncNow: (): Promise<{ pushed: number; applied: number }> =>
+    ipcRenderer.invoke("sync:syncNow"),
+  publishSyncedLocalStorage: (
+    entries: Record<string, string>
+  ): Promise<LocalStoragePublishResult> =>
+    ipcRenderer.invoke("sync:publishLocalStorage", entries),
+  announceSyncPresence: (sessionId: string | null): Promise<void> =>
+    ipcRenderer.invoke("sync:announcePresence", sessionId),
+  listSyncPresence: (): Promise<SyncPresenceClaim[]> =>
+    ipcRenderer.invoke("sync:listPresence"),
+  onSyncChanged: (
+    callback: (change: SyncChangedEvent) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      change: SyncChangedEvent
+    ) => callback(change);
+    ipcRenderer.on("sync:changed", listener);
+    return () => ipcRenderer.removeListener("sync:changed", listener);
+  },
+
   setWindowBackground: (color: string): Promise<void> =>
     ipcRenderer.invoke("window:setBackground", color),
   isWindowFullscreen: (): Promise<boolean> =>

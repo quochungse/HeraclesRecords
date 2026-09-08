@@ -1,17 +1,69 @@
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  net,
+  powerMonitor,
+  safeStorage,
+  session,
+  shell
+} from "electron";
 import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { listLocalFontFamilies } from "./fontService";
 import {
+  createDefaultSyncDeps,
+  SyncService
+} from "./sync/syncService";
+import { GoogleOAuth } from "./sync/googleOAuth";
+import { GoogleDriveProvider } from "./sync/googleDriveProvider";
+import { SyncLoop } from "./sync/syncLoop";
+import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
+import { attachSyncSink } from "./sync/syncBridge";
+import { attachAutomationLeases } from "./sync/automationLease";
+import {
+  captureSyncableState,
+  collectFullStateEntries,
+  publishFullState
+} from "./sync/fullState";
+import type { SyncableStateCapture } from "./sync/fullState";
+import {
+  commitPublishedLocalStorage,
+  diffLocalStorage,
+  noteAppliedLocalStorage
+} from "./sync/localStorageSync";
+import type {
+  LocalStoragePublishResult,
+  SyncLoopStatus,
+  SyncSeedStatus,
+  SyncVaultState
+} from "./sync/syncTypes";
+import { SYNC_LOOP_SETTINGS } from "./sync/syncLoop";
+import {
+  BACKUP_EXTENSION,
+  BACKUP_OPEN_EXTENSIONS,
+  defaultBackupFileName,
+  inspectBackupFile,
+  requireBackupAccount,
+  restoreBackupFile,
+  writeBackupFile
+} from "./backup/backupService";
+import type { RestoreMode } from "./backup/backupTypes";
+import { deviceId as syncDeviceId } from "./sync/deviceIdentity";
+import {
   clearDownloadTransferredByFileName,
   deleteDownload,
   getDownloadById,
   hasAvailableDownloadForUrl,
+  deleteSettings,
+  getSetting,
   initializeDatabase,
   listDownloads,
-  markDownloadTransferred
+  markDownloadTransferred,
+  setSetting
 } from "./database";
 import {
   downloadAudio,
@@ -80,6 +132,8 @@ import {
   cancelTrainingHubTwoFactor,
   logoutTrainingHub,
   reconnectTrainingHub,
+  restoreTrainingHubSessionAtStartup,
+  setTrainingHubSessionListener,
   updateCorosProfile,
   uploadActivityFitToCoros,
   uploadTrainingPlan
@@ -96,6 +150,7 @@ import type {
   HevySettingsInput,
   SaveChatSessionOptions,
   StrengthHistoryRequest,
+  TrainingHubStatus,
   UnitSystem,
   WorkoutSport
 } from "./types";
@@ -390,7 +445,8 @@ import {
   connectMcpServer,
   disconnectMcpServer,
   ensureAllMcpConnected,
-  getMcpStatuses
+  getMcpStatuses,
+  reconnectAllMcpServers
 } from "./mcpClientManager";
 import {
   addMcpServer,
@@ -716,6 +772,18 @@ function createWindow(): void {
   mainWindow.webContents.on("did-start-loading", () => {
     rendererReady = false;
   });
+  mainWindow.webContents.on("did-finish-load", () => {
+    // A window is what the sync loop's `appActive` condition is asking about,
+    // so its arrival is what un-pauses polling — nothing else calls `resume()`,
+    // and without this a Mac whose window was closed once never pulled again
+    // for the rest of the process's life.
+    //
+    // Anything queued for the renderer is delivered from `markRendererReady`
+    // instead: the page having loaded does not mean React has attached its
+    // listeners, and a send into nothing would drop writes there is only one
+    // copy of.
+    syncLoopInstance?.resume();
+  });
   mainWindow.on("closed", () => {
     rendererReady = false;
     mainWindow = undefined;
@@ -855,6 +923,9 @@ app.whenReady().then(() => {
       mainWindow.webContents.send("maps:installProgressUpdate", progress);
     }
   });
+  setTrainingHubSessionListener((status) => {
+    announceTrainingHubSessionChanged(status);
+  });
   setActivityBackupProgressListener((progress) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("trainingHub:backupProgress", progress);
@@ -872,6 +943,50 @@ app.whenReady().then(() => {
   // Silently restore previously-authorized MCP sessions (COROS + any other
   // configured servers), no browser popup.
   void ensureAllMcpConnected();
+
+  // Sync follows the app process too. A folder vault opens without anyone
+  // typing anything, so waiting for the Settings screen to be visited would
+  // mean a machine left on the Overview never synced at all — and the
+  // automation lease below would never attach.
+  //
+  // The COROS re-login goes first, and the vault waits on it, because the
+  // vault's owner *is* the COROS account: a `prepare()` that ran while the
+  // session was still missing answers `signed-out`, stops the loop, and nothing
+  // starts it again for the rest of the run. With nothing to restore — the
+  // usual case — the restore returns without touching the network, so this
+  // costs the launch nothing.
+  void (async () => {
+    // The status itself needs no forwarding from here: the service announces it
+    // through `setTrainingHubSessionListener` above, which is the same path a
+    // mid-session expiry takes. What this wants is only whether it happened.
+    let restored = false;
+    try {
+      const result = await restoreTrainingHubSessionAtStartup();
+      restored = result.restored;
+    } catch (error) {
+      console.warn("[trainingHub] startup COROS re-login could not run", error);
+    }
+
+    try {
+      await prepareSync();
+    } catch (error) {
+      console.warn("[sync] could not open the vault at startup", error);
+      return;
+    }
+
+    // Signed out, this machine published nothing and pulled nothing, so the
+    // other one has been the only writer. Ask for its changes now instead of
+    // waiting out the idle interval. Only after a restore: an ordinary launch
+    // already polls from `start()`, and a second pass would buy nothing.
+    if (restored) {
+      syncLoopInstance?.resume();
+    }
+  })();
+
+  // Waking from sleep is the one moment worth polling immediately rather than
+  // waiting out the idle interval: the machine has been away, so there is very
+  // likely something to pull, and its network came back a moment ago.
+  powerMonitor.on("resume", () => syncLoopInstance?.resume());
 
   // Coach automations follow the app process, not the window: with the window
   // closed on macOS they keep running, and the athlete sees the results as
@@ -920,6 +1035,399 @@ function describeBindings(automationId: string): CoachAutomationBindingView[] {
     ...binding,
     ...describeSession(binding.sessionId)
   }));
+}
+
+// Built on first use, because it reads settings and so needs the database to be
+// open. One instance for the life of the process; it caches nothing itself, so
+// there is no state to reset when the destination changes.
+let syncServiceInstance: SyncService | null = null;
+let googleOAuthInstance: GoogleOAuth | null = null;
+
+const electronSecretStorage = {
+  isAvailable: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (plaintext: string) =>
+    safeStorage.encryptString(plaintext).toString("base64"),
+  decrypt: (encoded: string) =>
+    safeStorage.decryptString(Buffer.from(encoded, "base64"))
+};
+
+function googleOAuth(): GoogleOAuth {
+  googleOAuthInstance ??= new GoogleOAuth({
+    fetch: globalThis.fetch,
+    // The system browser, not a BrowserWindow: Google refuses embedded webviews.
+    openExternal: (url) => shell.openExternal(url),
+    getSetting,
+    setSetting,
+    deleteSettings,
+    secretStorage: electronSecretStorage,
+    now: () => Date.now()
+  });
+  return googleOAuthInstance;
+}
+
+function syncService(): SyncService {
+  syncServiceInstance ??= new SyncService(
+    createDefaultSyncDeps(
+      { getSetting, setSetting },
+      {
+        isConnected: () => googleOAuth().isConnected(),
+        isClientConfigured: () => googleOAuth().client() !== null,
+        makeProvider: () =>
+          new GoogleDriveProvider({
+            fetch: globalThis.fetch,
+            accessToken: () => googleOAuth().accessToken()
+          })
+      }
+    )
+  );
+  return syncServiceInstance;
+}
+
+// The two-way loop. Built only once a destination is configured, because there
+// is nowhere for it to write before then. Tied to the app lifecycle rather than
+// to a window: a backup in flight should finish even if the user closes the
+// last one.
+let syncLoopInstance: SyncLoop | null = null;
+
+/**
+ * How the one-off publish of this machine's existing data went, this session.
+ *
+ * In memory rather than persisted, and that is the right scope: the durable
+ * fact is `sync.seededVaultId`, which says the vault has been seeded. This says
+ * what happened *since this app started*, which is what the panel needs in
+ * order to show a failure while the person is still looking at it.
+ */
+let syncSeedStatus: SyncSeedStatus = {
+  state: "pending",
+  entries: 0,
+  error: null
+};
+const syncTarget = new SqliteSyncTarget();
+
+/**
+ * Hand a pull's results to the renderer, localStorage writes included.
+ *
+ * Nothing is drained without a renderer to drain it into. `SqliteSyncTarget`
+ * queues localStorage operations because the main process cannot reach
+ * `window.localStorage`, and it is the only copy — so taking them while nobody
+ * is listening loses them outright. That is not hypothetical: the loop is tied
+ * to the app, not to a window, so a Mac with its window closed keeps pulling.
+ *
+ * `rendererReady`, not merely a live `mainWindow`. A `BrowserWindow` exists from
+ * `createWindow()` onward, but `webContents.send` before `did-finish-load`
+ * reaches no listener — so a pull landing during startup or a reload used to
+ * drain the queue into nothing and lose exactly what this guard is here to
+ * protect.
+ *
+ * Called again from `did-finish-load`, which is what delivers anything that
+ * accumulated while there was nowhere to send it.
+ */
+function sendSyncChanged(applied = 0, deleted = 0): void {
+  if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) return;
+  const localStorage = syncTarget.drainLocalStorage();
+  if (localStorage.length === 0 && applied === 0 && deleted === 0) return;
+
+  // Fold these into the published snapshot before the renderer writes them.
+  // The renderer publishes by comparing its localStorage against what this
+  // machine last sent, so a merged value left out of that snapshot would read
+  // as a local edit on the next pass and be published straight back — the
+  // bounce `syncBridge` avoids for rows by writing them through the raw
+  // database. That trick is unavailable here: the write happens in the
+  // renderer, so the snapshot is corrected instead.
+  if (localStorage.length > 0 && syncLoopInstance) {
+    noteAppliedLocalStorage(localStorage, {
+      getSetting,
+      setSetting,
+      nextHlc: syncLoopInstance.nextHlc
+    });
+  }
+
+  mainWindow.webContents.send("sync:changed", { applied, deleted, localStorage });
+}
+
+/**
+ * Publish the renderer's preferences, if any of them moved.
+ *
+ * The renderer sends the whole of what policy allows rather than individual
+ * edits; the diff against the last published snapshot is what turns that into
+ * changes. An unchanged set produces nothing, which is the point — see
+ * `localStorageSync.ts` for why republishing everything would have the machine
+ * that launched most recently win every preference.
+ */
+function publishRendererLocalStorage(
+  entries: Readonly<Record<string, string>>
+): LocalStoragePublishResult {
+  const loop = syncLoopInstance;
+  // Sync is off, or the vault is unreachable. Not an error — most machines are
+  // in this state — but the renderer must not read it as delivery. It remembers
+  // what it last sent to avoid pointless work, and a `syncing: false` answer
+  // recorded as sent would mean the preferences of a machine that switched sync
+  // on mid-session never went out at all, because nothing about them had
+  // changed since.
+  if (!loop) return { syncing: false, published: 0 };
+
+  const deps = { getSetting, setSetting, nextHlc: loop.nextHlc };
+  const changes = diffLocalStorage(entries, deps);
+  if (changes.entries.length === 0) return { syncing: true, published: 0 };
+
+  loop.enqueue(changes.entries);
+  // Recorded as published as soon as it is queued, not once it is uploaded: a
+  // failed flush puts the batch back on the queue rather than dropping it, so
+  // the entries are not lost, and re-diffing them would only mint a second set
+  // of timestamps for the same values.
+  commitPublishedLocalStorage(entries, deps);
+  return { syncing: true, published: changes.entries.length };
+}
+
+/**
+ * The renderer has mounted and is listening.
+ *
+ * Announced by the renderer rather than inferred from `did-finish-load`, which
+ * fires when the page loaded and says nothing about whether React has attached
+ * its IPC listeners yet. One flag serves both callers: the deep link that was
+ * waiting for a window, and the inbound sync writes that were waiting for
+ * somewhere to be applied.
+ */
+function markRendererReady(): void {
+  rendererReady = true;
+  sendSyncChanged();
+  flushTrainingHubSessionChanged();
+}
+
+/**
+ * A change of COROS session nobody clicked for, waiting for someone to tell.
+ *
+ * Held rather than sent for the reason `sendSyncChanged` holds its queue: a
+ * `webContents.send` before the renderer's listeners exist reaches nobody. Only
+ * the newest one is kept, which is all the renderer wants — this carries a whole
+ * status, not a delta, so an older one has nothing left to say.
+ *
+ * Losing it costs no data, only accuracy: the sign-in surface would keep
+ * whatever it last read until the athlete changed view. That is exactly the
+ * wrongness this push exists to remove, so it is worth queueing.
+ */
+let pendingTrainingHubSessionChange: TrainingHubStatus | null = null;
+
+function announceTrainingHubSessionChanged(status: TrainingHubStatus): void {
+  pendingTrainingHubSessionChange = status;
+  flushTrainingHubSessionChanged();
+}
+
+function flushTrainingHubSessionChanged(): void {
+  const status = pendingTrainingHubSessionChange;
+  if (!status) return;
+  if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) return;
+  pendingTrainingHubSessionChange = null;
+  mainWindow.webContents.send("trainingHub:sessionChanged", status);
+}
+
+function stopSyncLoop(): void {
+  syncSeedStatus = { state: "pending", entries: 0, error: null };
+  attachSyncSink(null);
+  attachAutomationLeases(null);
+  syncLoopInstance?.stop();
+  syncLoopInstance = null;
+}
+
+/**
+ * Check the destination and start the loop.
+ *
+ * This is the whole of "turn sync on": it runs at launch and again whenever the
+ * folder or the backend changes. Nothing is asked of the user, so the only
+ * reason it comes back short of "ready" is a destination that did not answer.
+ */
+async function prepareSync(): Promise<SyncVaultState> {
+  const state = await syncService().prepare();
+  if (state === "ready") {
+    startSyncLoop();
+  } else if (state === "signed-out" || state === "wrong-owner") {
+    // The two states where carrying on is not merely unproductive but wrong:
+    // nobody is signed in, or the vault holds another account's data. A loop
+    // left running would keep publishing into it. `unreachable` is deliberately
+    // not here — the loop already handles a destination that comes and goes,
+    // and tearing it down would drop the queue's reason to exist.
+    stopSyncLoop();
+  }
+  return state;
+}
+
+function startSyncLoop(): SyncLoop | null {
+  const service = syncService();
+  if (syncLoopInstance) return syncLoopInstance;
+  if (!service.isReady) return null;
+
+  const loop = new SyncLoop({
+    provider: () => service.dataProvider(),
+    target: syncTarget,
+    deviceId: syncDeviceId,
+    deviceName: () => os.hostname(),
+    getSetting,
+    setSetting,
+    now: () => Date.now(),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
+    conditions: () => ({
+      // A hidden window means nobody is looking, so there is nothing to poll
+      // for; `resume()` picks it up again when the window comes back.
+      appActive: Boolean(mainWindow && !mainWindow.isDestroyed()),
+      online: net.isOnline()
+    }),
+    onApplied: (result) => {
+      // Tell the renderer to reload, and hand it the localStorage writes the
+      // main process cannot perform itself.
+      //
+      // Draining only when a window is there to receive them is the point: the
+      // loop follows the app lifecycle, so on macOS it keeps pulling with every
+      // window closed, and a drain into `mainWindow?.send` would have thrown
+      // those writes away with no second copy anywhere. Left queued, they go
+      // out on `did-finish-load` when a window next exists.
+      sendSyncChanged(result.applied, result.deleted);
+    },
+    onError: (error) => console.warn("[sync] loop error", error)
+  });
+
+  // Changes made anywhere in the app now flow into this loop.
+  attachSyncSink({
+    enqueue: (entries) => loop.enqueue(entries),
+    nextHlc: loop.nextHlc
+  });
+
+  // Automations sync, so the same 6am job now exists on every machine. Without
+  // a lease all of them would run it.
+  attachAutomationLeases({
+    enabled: () => service.isReady,
+    provider: () => service.dataProvider(),
+    deviceId: syncDeviceId,
+    now: () => Date.now(),
+    onSkipped: (automationId, holder) =>
+      console.info(`[sync] automation ${automationId} is running on ${holder}`),
+    onLeaseLost: (automationId) =>
+      console.warn(
+        `[sync] lost the lease for automation ${automationId} mid-run; ` +
+          `another device may have taken it over`
+      )
+  });
+
+  loop.start();
+  syncLoopInstance = loop;
+
+  // The oplog only ever learned about records written while it was running, so
+  // on a machine that has been in use for months it starts out describing
+  // almost nothing. Publish what is already here, once per vault.
+  void seedVaultIfNeeded(loop, service);
+
+  return loop;
+}
+
+/**
+ * Put this machine's existing data into the vault the first time it joins one.
+ *
+ * Keyed on the vault's id rather than on "have we ever seeded": pointing at a
+ * different vault is a different account's worth of history, and it needs the
+ * same publish. Moving a vault — renaming the folder, swapping to Drive — keeps
+ * its id and so does not seed again.
+ *
+ * The flag is set only after every batch is up. A run that dies halfway
+ * republishes everything next time, which costs bandwidth and nothing else:
+ * entries are addressed by primary key, so the second attempt supersedes what
+ * the first managed to write rather than duplicating it.
+ */
+async function seedVaultIfNeeded(
+  loop: SyncLoop,
+  service: ReturnType<typeof syncService>
+): Promise<void> {
+  try {
+    const vaultId = await service.vaultId();
+    if (service.hasSeeded(vaultId)) {
+      syncSeedStatus = { state: "done", entries: 0, error: null };
+      return;
+    }
+
+    syncSeedStatus = { state: "publishing", entries: 0, error: null };
+    const entries = collectFullStateEntries(loop.nextHlc);
+    const published = await publishFullState(loop, entries);
+    service.markSeeded(vaultId);
+    syncSeedStatus = {
+      state: "done",
+      entries: published.entries,
+      error: null
+    };
+    console.info(
+      `[sync] published ${published.entries} existing records into vault ` +
+        `${vaultId} across ${published.batches} batches`
+    );
+  } catch (error) {
+    // Never fatal: the app works offline and the next launch tries again. What
+    // must not happen is marking the vault seeded when it is not — or letting
+    // the failure pass unseen, which is how months of history quietly stay put
+    // on a machine whose panel says everything is fine.
+    const reason = error instanceof Error ? error.message : String(error);
+    syncSeedStatus = { state: "failed", entries: 0, error: reason };
+    console.warn("[sync] could not publish this machine's existing data", error);
+  }
+}
+
+/**
+ * Re-check the vault now that an account has signed in.
+ *
+ * Sync is owned by an account, so it cannot start until one exists — and the
+ * alternative to this is telling the person to restart the app, which they
+ * would have no way of knowing to do.
+ *
+ * Never allowed to fail a sign-in: an unreachable vault is a sync problem, and
+ * the person is signed in either way.
+ */
+async function resumeSyncForAccount(): Promise<void> {
+  try {
+    await prepareSync();
+  } catch (error) {
+    console.warn("[sync] could not re-check the vault after signing in", error);
+  }
+}
+
+/** What the change loop is doing, or null when none is running. */
+function syncLoopStatus(): SyncLoopStatus | null {
+  const loop = syncLoopInstance;
+  if (!loop) return null;
+  return {
+    pendingChanges: loop.pendingCount,
+    lastPulledAt: getSetting(SYNC_LOOP_SETTINGS.lastPulledAt) ?? null,
+    seed: syncSeedStatus
+  };
+}
+
+/**
+ * Announce a restore to the other machines.
+ *
+ * `applySnapshot` writes through the raw database so a merge cannot echo back
+ * out — which also means it mints no timestamps, and to the merge rules the
+ * restore never happened. Left alone, the next pull would replay the log over
+ * the top of it and quietly undo the whole thing.
+ *
+ * So the restored state is republished with fresh timestamps: it now outranks
+ * everything already in the log, and the other machines follow. `before` is
+ * what this computer held a moment ago, which is the only way to know what the
+ * restore *removed* — a set for what remains says nothing about what went.
+ */
+async function republishAfterRestore(
+  before: SyncableStateCapture
+): Promise<void> {
+  const loop = syncLoopInstance;
+  if (!loop) return;
+
+  try {
+    const entries = collectFullStateEntries(loop.nextHlc, { before });
+    const published = await publishFullState(loop, entries);
+    // A restore states the whole of this machine's data, so whatever the seed
+    // would have said has just been said.
+    const service = syncService();
+    service.markSeeded(await service.vaultId());
+    console.info(
+      `[sync] republished ${published.entries} records after a restore`
+    );
+  } catch (error) {
+    console.warn("[sync] could not republish after a restore", error);
+  }
 }
 
 function registerIpcHandlers(): void {
@@ -1016,7 +1524,7 @@ function registerIpcHandlers(): void {
     importCommunityWatchface(slug)
   );
   ipcMain.handle("watchfaces:consumeCommunityOpenRequest", () => {
-    rendererReady = true;
+    markRendererReady();
     const request = pendingCommunityWatchfaceOpen ?? null;
     pendingCommunityWatchfaceOpen = undefined;
     return request;
@@ -1825,13 +2333,21 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:login",
-    (_event, email: string, password: string, remember?: boolean) =>
-      loginTrainingHub(email, password, remember)
+    async (_event, email: string, password: string, remember?: boolean) => {
+      const result = await loginTrainingHub(email, password, remember);
+      // Sync waits for an account. Re-checking here is what starts it the
+      // moment there is one, instead of on the next launch. A login awaiting a
+      // 2FA code is not signed in yet, so `verify2fa` carries the same call.
+      if (result.status.authenticated) await resumeSyncForAccount();
+      return result;
+    }
   );
 
-  ipcMain.handle("trainingHub:verify2fa", (_event, code: string) =>
-    verifyTrainingHubTwoFactor(code)
-  );
+  ipcMain.handle("trainingHub:verify2fa", async (_event, code: string) => {
+    const status = await verifyTrainingHubTwoFactor(code);
+    if (status.authenticated) await resumeSyncForAccount();
+    return status;
+  });
 
   ipcMain.handle("trainingHub:resend2fa", () =>
     resendTrainingHubTwoFactorCode()
@@ -1841,7 +2357,16 @@ function registerIpcHandlers(): void {
     cancelTrainingHubTwoFactor()
   );
 
-  ipcMain.handle("trainingHub:logout", () => logoutTrainingHub());
+  ipcMain.handle("trainingHub:logout", async () => {
+    const status = logoutTrainingHub();
+    // Sync belongs to an account, so signing out has to stop it. Without this
+    // the loop keeps publishing into the vault of the account that just left —
+    // and anything done on this machine afterwards would land in their data.
+    await prepareSync().catch((error) => {
+      console.warn("[sync] could not re-check the vault after sign-out", error);
+    });
+    return status;
+  });
 
   ipcMain.handle("trainingHub:reconnect", () => reconnectTrainingHub());
 
@@ -2418,5 +2943,229 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("app:openStorageLocation", (_event, id: string) =>
     openAppStorageLocation(id)
+  );
+
+  // ----- Sync -----
+  //
+  // localStorage lives in the renderer, so it travels as an argument on the way
+  // out and as a return value on the way back: the main process never reaches
+  // into the window to read it.
+
+  ipcMain.handle("sync:chooseFolder", async () => {
+    const options: OpenDialogOptions = {
+      title: "Choose a folder for your sync vault",
+      properties: ["openDirectory", "createDirectory"]
+    };
+    const result =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options);
+    if (result.canceled) return null;
+    const folder = result.filePaths[0] ?? null;
+    if (folder) {
+      syncService().setFolder(folder);
+      // Choosing the folder is the whole setup for a folder vault, so it is
+      // ready by the time this returns rather than after a second click.
+      await prepareSync();
+    }
+    return folder;
+  });
+
+  // Two halves, joined here: the destination is the service's to answer, the
+  // change loop is this file's. Neither knows about the other, which is why
+  // `SyncService` can be exercised without one running.
+  ipcMain.handle("sync:getStatus", async () => ({
+    ...(await syncService().status()),
+    loop: syncLoopStatus()
+  }));
+
+  ipcMain.handle("sync:prepare", () => prepareSync());
+
+  // --- Backup and restore ----------------------------------------------------
+  //
+  // A file, not a vault. The dialogs live here rather than in the service so
+  // that `electron/backup/` stays testable without an Electron window: the
+  // service takes a path and does the work, and choosing the path is the one
+  // part that needs a window.
+
+  ipcMain.handle(
+    "backup:export",
+    async (_event, localStorage: Record<string, string>) => {
+      // Asked before the dialog opens. A backup belongs to an account, and
+      // bouncing someone out of a save dialog they have already navigated is a
+      // worse way to say so than not opening it.
+      requireBackupAccount("saving a backup");
+
+      const saveOptions = {
+        title: "Save a backup of your data",
+        defaultPath: defaultBackupFileName(),
+        filters: [
+          { name: "Heracles Records backup", extensions: [BACKUP_EXTENSION] }
+        ]
+      };
+      const chosen =
+        mainWindow && !mainWindow.isDestroyed()
+          ? await dialog.showSaveDialog(mainWindow, saveOptions)
+          : await dialog.showSaveDialog(saveOptions);
+      if (chosen.canceled || !chosen.filePath) return null;
+
+      return writeBackupFile(chosen.filePath, {
+        deviceId: syncDeviceId(),
+        localStorage: localStorage ?? {}
+      });
+    }
+  );
+
+  // Choosing a file and restoring it are two calls on purpose. Between them the
+  // person is answering a question about what to do with the data already here,
+  // and a single call would have to either ask on their behalf or write before
+  // they had answered.
+  ipcMain.handle("backup:choose", async () => {
+    requireBackupAccount("restoring a backup");
+
+    const options: OpenDialogOptions = {
+      title: "Choose a backup to restore",
+      properties: ["openFile"],
+      // `.json` too: backups written before the file was sealed are plain JSON,
+      // and they still restore.
+      filters: [
+        {
+          name: "Heracles Records backup",
+          extensions: [...BACKUP_OPEN_EXTENSIONS]
+        }
+      ]
+    };
+    const chosen =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options);
+    const filePath = chosen.filePaths[0];
+    if (chosen.canceled || !filePath) return null;
+    return inspectBackupFile(filePath);
+  });
+
+  ipcMain.handle(
+    "backup:restore",
+    async (
+      _event,
+      filePath: string,
+      mode: RestoreMode,
+      allowOtherOwner?: boolean
+    ) => {
+      // Taken before the write, because it is the only record of what this
+      // machine held: a `replace` restore removes rows, so afterwards there is
+      // nothing left to say which ones went. `republishAfterRestore` turns the
+      // difference into tombstones for the other machines.
+      const before = captureSyncableState();
+      const result = await restoreBackupFile(filePath, mode, {
+        allowOtherOwner
+      });
+
+      // A restore rewrites the MCP server list under a running app, and the
+      // clients held open are for the rows it just replaced. The panel still
+      // says to restart — plenty of state is read once at startup — but a
+      // server that the restore removed would otherwise keep a live connection
+      // with no row behind it, which reads as a restore that did not work.
+      //
+      // Nothing is done about the COROS session on purpose: a backup carries no
+      // credential, so a restore cannot have changed it.
+      void reconnectAllMcpServers().catch((error) => {
+        console.warn(
+          "[backup] could not reconnect MCP servers after a restore",
+          error
+        );
+      });
+
+      // Tell the other machines, when this one is syncing. Without it the
+      // restore is invisible to them, and the log they still hold would be
+      // replayed back over it here.
+      void republishAfterRestore(before);
+      return result;
+    }
+  );
+
+  ipcMain.handle("sync:setBackend", async (_event, backend: "local" | "google") => {
+    // A different backend is a different vault, so the loop must not keep
+    // writing into the old one.
+    stopSyncLoop();
+    syncService().setBackend(backend);
+    // Not returned: the renderer reads the new state from `sync:getStatus` like
+    // every other row, and this channel stays void on all three sides.
+    await prepareSync();
+  });
+
+  // The deliberate answer to `wrong-owner`. Claiming clears the seed flag, so
+  // the loop that starts afterwards publishes this account's whole state into
+  // the vault rather than assuming it is already there.
+  ipcMain.handle("sync:claimVault", async () => {
+    stopSyncLoop();
+    await syncService().claimVault();
+    return prepareSync();
+  });
+
+  ipcMain.handle("sync:googleAccount", () => googleOAuth().account());
+
+  ipcMain.handle("sync:connectGoogle", async () => {
+    await googleOAuth().connect();
+    // Signing in is the whole setup, so the Drive folder is there by the time
+    // the browser tab closes rather than after another click.
+    await prepareSync();
+  });
+
+  ipcMain.handle("sync:disconnectGoogle", () => {
+    // The loop would otherwise keep writing through a provider whose token has
+    // just been thrown away.
+    stopSyncLoop();
+    googleOAuth().disconnect();
+  });
+
+  ipcMain.handle("sync:syncNow", async () => {
+    // Through `prepareSync`, not `startSyncLoop` directly: only `prepare()`
+    // reads whose vault this is, and starting a loop that skipped that check
+    // would merge two accounts' records into one log — which nothing can
+    // separate again.
+    await prepareSync();
+    const loop = syncLoopInstance;
+    if (!loop) return { pushed: 0, applied: 0 };
+
+    // A seed that failed at launch gets another go here. "Sync now" is what a
+    // person reaches for when something looks wrong, and the panel points them
+    // at it — retrying only the incremental half would leave the machine's
+    // history behind while reporting success.
+    if (syncSeedStatus.state === "failed") {
+      await seedVaultIfNeeded(loop, syncService());
+    }
+
+    const flushed = await loop.flush();
+    const pulled = await loop.pull();
+    return { pushed: flushed.pushed, applied: pulled.applied };
+  });
+
+  // The renderer's preferences on their way out. It hands over everything
+  // policy allows and the main process works out what moved; see
+  // `localStorageSync.ts` for why the comparison lives here rather than a hook
+  // on each of the dozen places that write one.
+  ipcMain.handle(
+    "sync:publishLocalStorage",
+    (_event, entries: Record<string, string>) =>
+      publishRendererLocalStorage(entries ?? {})
+  );
+
+  ipcMain.handle("sync:announcePresence", (_event, sessionId: string | null) =>
+    // Whatever loop is already running. Presence must not be the thing that
+    // starts one, because starting one here would bypass the ownership check.
+    syncLoopInstance?.announce(sessionId) ?? Promise.resolve()
+  );
+
+  ipcMain.handle("sync:listPresence", () =>
+    syncLoopInstance?.otherDevices() ?? Promise.resolve([])
+  );
+
+  ipcMain.handle(
+    "sync:setGoogleClient",
+    (_event, clientId: string | null, clientKey: string | null) =>
+      googleOAuth().setOwnClient(
+        clientId && clientKey ? { clientId, clientKey } : null
+      )
   );
 }
