@@ -12633,24 +12633,49 @@ td span {
 
 /* --- Load heatmap: Last 30 days --------------------------------------------
    A year of squares carries no room for words, so the short range trades the
-   weekday grid for three full-width bands of ten day cards. Each band titles
-   its own columns with d/M dates and each card names what was trained, which
-   is why these rules sit after every base cell rule: `.is-card` has to win the
-   size, hover and level-fill declarations above. */
+   squares for full-width day cards — but it keeps the weekday columns, laid
+   out as calendar weeks under one Mon-to-Sun title row. Each week row still
+   titles its own columns with d/M dates and each card names what was trained,
+   which is why these rules sit after every base cell rule: `.is-card` has to
+   win the size, hover and level-fill declarations above. */
 .training-heatmap-strip {
   display: grid;
-  gap: clamp(12px, 1.4vw, 18px);
+  gap: clamp(10px, 1.1vw, 14px);
   width: 100%;
   min-width: 0;
   padding: 2px 2px 6px;
 }
 
-.training-heatmap-band {
+.training-heatmap-band,
+.training-heatmap-week-titles {
   display: grid;
-  grid-template-columns: repeat(var(--heatmap-strip-columns, 10), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--heatmap-strip-columns, 7), minmax(0, 1fr));
   gap: 6px clamp(4px, 0.55vw, 8px);
   width: 100%;
   min-width: 0;
+}
+
+/* The weekday row is a header, not a band: it sits tight above the first week
+   and carries a rule under it so the calendar reads as one block. */
+.training-heatmap-week-titles {
+  align-items: end;
+  margin-bottom: -2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.training-heatmap-week-title {
+  color: var(--text-secondary);
+  font-size: clamp(10px, 0.85vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.training-heatmap-week-title.is-weekend {
+  opacity: 0.6;
 }
 
 .training-heatmap-band-date {
