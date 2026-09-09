@@ -20,12 +20,23 @@ import {
   DirectionalLight,
   HemisphereLight,
   MeshStandardMaterial,
+  type Light,
   NormalBlending,
   Points,
   ShaderMaterial,
   SRGBColorSpace,
 } from "three";
 import type { GeoHeatBucket, GlobePoint } from "./activityVisitHeatmap";
+import {
+  FIT_MIN_ALTITUDE,
+  SINGLE_PLACE_ALTITUDE,
+  clampLatitude,
+  computeFitView,
+  focusLatitudeOffset,
+  labelSeparationDegrees,
+  pickSpacedPlaces,
+  type GlobeCameraView,
+} from "./globeFraming";
 
 /** #rrggbb -> rgba(), for the globe point colours which need an alpha. */
 function withAlpha(hex: string, alpha: number): string {
@@ -42,7 +53,8 @@ interface ActivityGlobeRendererProps {
   locations: GeoHeatBucket[];
   routePoints: GlobePoint[];
   selectedLocation: GeoHeatBucket | null;
-  selectedLabel: string;
+  /** City name per location key, for the labels pinned on the globe. */
+  labels: Record<string, string>;
   streetMode: boolean;
   onError: (error: boolean) => void;
   onHoverChange: (hovering: boolean) => void;
@@ -59,11 +71,7 @@ export interface ActivityGlobeRendererHandle {
   ) => number;
 }
 
-interface GlobeView {
-  lat: number;
-  lng: number;
-  altitude: number;
-}
+type GlobeView = GlobeCameraView;
 
 interface ActivityPoint extends GeoHeatBucket {
   intensity: number;
@@ -90,14 +98,19 @@ interface RouteLayerData {
 
 const GLOBE_RADIUS = 100;
 const DEFAULT_VIEW: GlobeView = { lat: 18, lng: -20, altitude: 2.2 };
-const SELECTED_VIEW_ALTITUDE = 2.2;
-const FRAMING_VERSION = "full-panel-v3";
-const SELECTED_LATITUDE_OFFSET = 6.5;
+const FRAMING_VERSION = "fit-all-places-v1";
 const CAMERA_FOCUS_MS = 600;
 const STREET_VIEW_ALTITUDE = 0.42;
 const STREET_TRANSITION_ALTITUDE = 0.36;
 const IDLE_DELAY_MS = 4_200;
 const IDLE_ROTATION_SPEED = 0.08;
+/** Above this the globe reads as a globe and an idle spin is decorative;
+ *  below it the spin would slide the framed places out of view. */
+const IDLE_ROTATION_MIN_ALTITUDE = 1.6;
+/** Rings animate per datum, so the pulsing highlight is capped. */
+const MAX_HIGHLIGHT_RINGS = 18;
+/** More than a handful of pinned names turns the globe into a word cloud. */
+const MAX_HIGHLIGHT_LABELS = 6;
 
 let landGeometryCache: LandGeometryData | null = null;
 let landGeometryPromise: Promise<LandGeometryData> | null = null;
@@ -208,10 +221,6 @@ function viewChanged(current: GlobeView, baseline: GlobeView): boolean {
   );
 }
 
-function clampLatitude(lat: number): number {
-  return Math.max(-78, Math.min(78, lat));
-}
-
 const ActivityGlobeRendererComponent = forwardRef<
   ActivityGlobeRendererHandle,
   ActivityGlobeRendererProps
@@ -221,7 +230,7 @@ const ActivityGlobeRendererComponent = forwardRef<
     locations,
     routePoints,
     selectedLocation,
-    selectedLabel,
+    labels,
     streetMode,
     onError,
     onHoverChange,
@@ -235,7 +244,9 @@ const ActivityGlobeRendererComponent = forwardRef<
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const baselineRef = useRef<GlobeView>(DEFAULT_VIEW);
   const framedKeyRef = useRef<string | null>(null);
+  const framedViewRef = useRef<GlobeView | null>(null);
   const interactionRef = useRef(false);
+  const userAdjustedRef = useRef(false);
   const streetRequestedRef = useRef(false);
   const idleTimerRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
@@ -254,6 +265,8 @@ const ActivityGlobeRendererComponent = forwardRef<
   const [landGeometry, setLandGeometry] = useState<LandGeometryData | null>(
     landGeometryCache,
   );
+  /** Read by the mount effect, which must not re-run when the theme changes. */
+  const lightsRef = useRef<Light[]>([]);
 
   const globeMaterial = useMemo(
     () =>
@@ -306,14 +319,62 @@ const ActivityGlobeRendererComponent = forwardRef<
     () => (routePoints.length >= 2 ? [{ points: routePoints }] : []),
     [routePoints],
   );
-  const selectedData = useMemo(
-    () => (selectedLocation ? [selectedLocation] : []),
-    [selectedLocation],
+  /**
+   * With nothing picked yet, every place is the highlight — the globe should
+   * arrive showing where the training happened, not waiting to be clicked.
+   */
+  const highlightAll = !selectedLocation && !streetMode;
+
+  /**
+   * The view that holds every place at once. Falls back to the latest GPS track
+   * before visit centroids have been bucketed, and to the whole globe when
+   * there is nothing to frame at all.
+   */
+  const baselineView = useMemo<GlobeView>(
+    () =>
+      computeFitView(
+        locations.length > 0 ? locations : routePoints,
+        size.width / size.height,
+        DEFAULT_VIEW.altitude,
+      ) ?? DEFAULT_VIEW,
+    [locations, routePoints, size.height, size.width],
   );
-  const ringData = useMemo(
-    () => (!reducedMotion && selectedLocation ? [selectedLocation] : []),
-    [reducedMotion, selectedLocation],
-  );
+
+  const ringData = useMemo(() => {
+    if (reducedMotion) {
+      return [];
+    }
+    if (selectedLocation) {
+      return [selectedLocation];
+    }
+    return highlightAll ? locations.slice(0, MAX_HIGHLIGHT_RINGS) : [];
+  }, [highlightAll, locations, reducedMotion, selectedLocation]);
+
+  /**
+   * Markers and rings are sized in degrees of globe surface, and a degree covers
+   * roughly `10 / altitude` pixels of the panel — so a fixed degree size shrinks
+   * to nothing as the framing widens. Scaling by altitude holds them at a
+   * constant size on screen; the constants below are the sizes at the tightest
+   * framing (`FIT_MIN_ALTITUDE`), where a place fills a handful of pixels.
+   */
+  const frameAltitude = selectedLocation
+    ? Math.min(baselineView.altitude, SINGLE_PLACE_ALTITUDE)
+    : baselineView.altitude;
+  const markerScale = frameAltitude / FIT_MIN_ALTITUDE;
+
+  const labelData = useMemo(() => {
+    if (selectedLocation) {
+      return [selectedLocation];
+    }
+    if (!highlightAll) {
+      return [];
+    }
+    return pickSpacedPlaces(
+      locations.filter((location) => Boolean(labels[location.key])),
+      MAX_HIGHLIGHT_LABELS,
+      labelSeparationDegrees(baselineView.altitude),
+    );
+  }, [baselineView.altitude, highlightAll, labels, locations, selectedLocation]);
 
   const stopIdleRotation = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -328,7 +389,12 @@ const ActivityGlobeRendererComponent = forwardRef<
 
   const scheduleIdleRotation = useCallback(() => {
     stopIdleRotation();
-    if (reducedMotion || selectedLocation || streetMode) {
+    if (
+      reducedMotion ||
+      selectedLocation ||
+      streetMode ||
+      baselineRef.current.altitude < IDLE_ROTATION_MIN_ALTITUDE
+    ) {
       return;
     }
     idleTimerRef.current = window.setTimeout(() => {
@@ -343,6 +409,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   const resetView = useCallback(
     (duration = 600) => {
       streetRequestedRef.current = false;
+      userAdjustedRef.current = false;
       stopIdleRotation();
       globeRef.current?.pointOfView(
         baselineRef.current,
@@ -445,39 +512,83 @@ const ActivityGlobeRendererComponent = forwardRef<
     };
   }, [landGeometry]);
 
+  /**
+   * globe.gl fires `onGlobeReady` from inside react-kapsule's mount, before its
+   * `useImperativeHandle` has filled `globeRef` — so that callback arrives with
+   * no instance to configure and readiness never lands (which left the camera
+   * parked at globe.gl's own default view, framing code and all). A child's
+   * layout effects commit before the parent's, so this is the first moment the
+   * instance is guaranteed to exist.
+   */
   useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) {
+      onError(true);
+      return;
+    }
+    const renderer = globe.renderer();
+    renderer.outputColorSpace = SRGBColorSpace;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearAlpha(0);
+    globe.lights(lightsRef.current);
+    // The framing effect owns the camera, first view included: pointing it here
+    // would fight it, and StrictMode's second mount pass would snap a framed
+    // globe back to the default view mid-animation.
+    framedKeyRef.current = null;
+    framedViewRef.current = null;
+    onError(false);
+    setReady(true);
+    // Mount only: the theme's lights and the framing have their own effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    lightsRef.current = lights;
     if (!ready || !globeRef.current) {
       return;
     }
     globeRef.current.lights(lights);
   }, [lights, ready]);
 
+  // Frames every place at once. Visit centroids stream in after mount, so this
+  // re-frames as they land — until the person moves the camera themselves.
   useEffect(() => {
-    const framingKey = `${frameKey}:${FRAMING_VERSION}`;
-    if (!ready || framedKeyRef.current === framingKey) {
+    if (!ready) {
       return;
     }
-    framedKeyRef.current = framingKey;
-    const peak = locations.reduce<GeoHeatBucket | null>(
-      (current, location) =>
-        !current || location.count > current.count ? location : current,
-      null,
-    );
-    baselineRef.current = peak
-      ? {
-          lat: clampLatitude(peak.lat + 2.5),
-          lng: peak.lon,
-          altitude: DEFAULT_VIEW.altitude,
-        }
-      : DEFAULT_VIEW;
-    if (!selectedLocation) {
-      globeRef.current?.pointOfView(
-        baselineRef.current,
-        reducedMotion ? 0 : 720,
-      );
-      onViewChange(false);
+    const framingKey = `${frameKey}:${FRAMING_VERSION}`;
+    const newFraming = framedKeyRef.current !== framingKey;
+    if (newFraming) {
+      framedKeyRef.current = framingKey;
+      userAdjustedRef.current = false;
     }
-  }, [frameKey, locations, onViewChange, ready, reducedMotion, selectedLocation]);
+    const previous = framedViewRef.current;
+    baselineRef.current = baselineView;
+    if (selectedLocation || streetMode) {
+      return;
+    }
+    if (
+      !newFraming &&
+      previous &&
+      (userAdjustedRef.current || !viewChanged(baselineView, previous))
+    ) {
+      return;
+    }
+    framedViewRef.current = baselineView;
+    globeRef.current?.pointOfView(
+      baselineView,
+      reducedMotion ? 0 : newFraming ? 720 : 420,
+    );
+    onViewChange(false);
+  }, [
+    baselineView,
+    frameKey,
+    onViewChange,
+    ready,
+    reducedMotion,
+    selectedLocation,
+    streetMode,
+  ]);
 
   useEffect(() => {
     if (!ready) {
@@ -489,11 +600,20 @@ const ActivityGlobeRendererComponent = forwardRef<
     }
 
     stopIdleRotation();
+    // Never further out than the overview: picking a place should close in on
+    // it, and the fitted overview can already be closer than globe scale.
+    // `baselineRef` is current here — the framing effect above runs first.
+    const altitude = Math.min(
+      baselineRef.current.altitude,
+      SINGLE_PLACE_ALTITUDE,
+    );
     globeRef.current?.pointOfView(
       {
-        lat: clampLatitude(selectedLocation.lat + SELECTED_LATITUDE_OFFSET),
+        lat: clampLatitude(
+          selectedLocation.lat + focusLatitudeOffset(altitude),
+        ),
         lng: selectedLocation.lon,
-        altitude: SELECTED_VIEW_ALTITUDE,
+        altitude,
       },
       reducedMotion ? 0 : CAMERA_FOCUS_MS,
     );
@@ -526,6 +646,7 @@ const ActivityGlobeRendererComponent = forwardRef<
 
     const handleStart = () => {
       interactionRef.current = true;
+      userAdjustedRef.current = true;
       stopIdleRotation();
     };
     const handleEnd = () => {
@@ -576,22 +697,6 @@ const ActivityGlobeRendererComponent = forwardRef<
     [stopIdleRotation],
   );
 
-  const handleReady = useCallback(() => {
-    const globe = globeRef.current;
-    if (!globe) {
-      onError(true);
-      return;
-    }
-    const renderer = globe.renderer();
-    renderer.outputColorSpace = SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearAlpha(0);
-    globe.lights(lights);
-    globe.pointOfView(DEFAULT_VIEW, 0);
-    setReady(true);
-    onError(false);
-  }, [lights, onError]);
-
   const handleZoom = useCallback(
     (view: GlobeView) => {
       onViewChange(viewChanged(view, baselineRef.current));
@@ -627,17 +732,23 @@ const ActivityGlobeRendererComponent = forwardRef<
     [onHoverChange],
   );
 
-  const makeHtmlLabel = useCallback((datum: object) => {
-    const location = datum as GeoHeatBucket;
-    const anchor = document.createElement("div");
-    anchor.className = "training-map-globe-label-anchor";
-    anchor.dataset.locationKey = location.key;
-    const label = document.createElement("span");
-    label.className = "training-map-globe-label";
-    label.textContent = selectedLabel;
-    anchor.append(label);
-    return anchor;
-  }, [selectedLabel]);
+  const makeHtmlLabel = useCallback(
+    (datum: object) => {
+      const location = datum as GeoHeatBucket;
+      const anchor = document.createElement("div");
+      anchor.className = "training-map-globe-label-anchor";
+      anchor.dataset.locationKey = location.key;
+      const label = document.createElement("span");
+      const selected = location.key === selectedLocation?.key;
+      label.className = selected
+        ? "training-map-globe-label"
+        : "training-map-globe-label is-secondary";
+      label.textContent = labels[location.key] ?? "";
+      anchor.append(label);
+      return anchor;
+    },
+    [labels, selectedLocation?.key],
+  );
 
   const modifyHtmlLabelVisibility = useCallback(
     (element: HTMLElement, visible: boolean) => {
@@ -684,23 +795,41 @@ const ActivityGlobeRendererComponent = forwardRef<
         pointsData={activityPoints}
         pointLat={(point) => (point as ActivityPoint).lat}
         pointLng={(point) => (point as ActivityPoint).lon}
-        pointAltitude={(point) =>
-          (point as ActivityPoint).key === selectedLocation?.key ? 0.008 : 0.0035
-        }
+        pointAltitude={(point) => {
+          const activity = point as ActivityPoint;
+          const base =
+            activity.key === selectedLocation?.key
+              ? 0.008
+              : highlightAll
+                ? 0.006
+                : 0.0035;
+          // Scaled like the radius, but never below the land dots (0.0025) —
+          // a pin that sinks under the geography stops reading as a marker.
+          return Math.max(0.003, base * markerScale);
+        }}
         pointRadius={(point) => {
           const activity = point as ActivityPoint;
-          return activity.key === selectedLocation?.key
-            ? 0.28
-            : 0.1 + activity.intensity * 0.1;
+          if (activity.key === selectedLocation?.key) {
+            return 0.28 * markerScale;
+          }
+          return (
+            (highlightAll
+              ? 0.17 + activity.intensity * 0.11
+              : 0.1 + activity.intensity * 0.1) * markerScale
+          );
         }}
         pointColor={(point) => {
           const activity = point as ActivityPoint;
           const tone = ACCENT_PALETTE_DETAILS[accent][
             paperTheme ? "paper" : "dark"
           ];
-          return activity.key === selectedLocation?.key
-            ? tone.strong
-            : withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
+          if (activity.key === selectedLocation?.key) {
+            return tone.strong;
+          }
+          if (highlightAll) {
+            return withAlpha(tone.strong, paperTheme ? 0.94 : 0.88);
+          }
+          return withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
         }}
         pointResolution={12}
         pointsMerge={false}
@@ -736,11 +865,11 @@ const ActivityGlobeRendererComponent = forwardRef<
                 "rgba(73, 207, 163, 0)",
               ]
         }
-        ringMaxRadius={2.8}
-        ringPropagationSpeed={2.3}
-        ringRepeatPeriod={820}
-        ringResolution={64}
-        htmlElementsData={selectedData}
+        ringMaxRadius={frameAltitude * (selectedLocation ? 4 : 2.4)}
+        ringPropagationSpeed={frameAltitude * (selectedLocation ? 3.3 : 1.9)}
+        ringRepeatPeriod={selectedLocation ? 820 : 1_500}
+        ringResolution={selectedLocation ? 64 : 48}
+        htmlElementsData={labelData}
         htmlLat={(point) => (point as GeoHeatBucket).lat}
         htmlLng={(point) => (point as GeoHeatBucket).lon}
         htmlAltitude={0.012}
@@ -751,7 +880,6 @@ const ActivityGlobeRendererComponent = forwardRef<
         pointerEventsFilter={pointerEventsFilter}
         showPointerCursor={(type) => type === "point"}
         onZoom={handleZoom}
-        onGlobeReady={handleReady}
       />
     </div>
   );

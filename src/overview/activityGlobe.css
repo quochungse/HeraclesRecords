@@ -928,6 +928,21 @@
   white-space: nowrap;
 }
 
+/* Every place is pinned before one is picked, so those names sit back. */
+.training-map-globe-label.is-secondary {
+  min-height: 21px;
+  max-width: 132px;
+  background: color-mix(
+    in srgb,
+    var(--map-globe-label-bg) 78%,
+    transparent
+  );
+  color: color-mix(in srgb, var(--map-globe-label-text) 86%, transparent);
+  padding: 0 8px;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
 .training-map-globe-stage .activity-globe-street-map {
   inset: 0;
   border-radius: 15px;
