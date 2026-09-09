@@ -639,14 +639,5 @@
   flex-direction: column;
 }
 
-.sleep-trend-chart {
-  width: 100%;
-  min-width: 0;
-}
-
-.sleep-trend-caption,
-.sleep-trend-empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
+/* The chart's own rules moved to src/styles.css: Overview draws it too, and
+   this stylesheet only loads with the Sleep screen's chunk. */

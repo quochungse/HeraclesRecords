@@ -81,7 +81,10 @@ import type {
 import { TRAINING_HUB_EXPORT_FORMATS } from "../electron/types";
 import { buildTrainingHubSnapshot } from "./training/parsers";
 import { fetchTrainingDashboard, fetchUpcomingWorkouts } from "./training/api";
-import { TRAINING_HEATMAP_DAYS } from "./training/chartConfig";
+import {
+  TRAINING_HEATMAP_DAYS,
+  TRAINING_TREND_MAX_DAYS
+} from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type { TrainingHubSnapshot } from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
@@ -875,8 +878,11 @@ export default function App() {
         return;
       }
 
+      // One MCP call whatever the window, so ask for the whole span the trend
+      // charts can be switched to — Overview's sleep chart offers a 30-day
+      // chip, and a shorter fetch would leave its second half empty.
       const [sleepResult, dailyHealthResult] = await Promise.allSettled([
-        api.getTrainingSleepData(14),
+        api.getTrainingSleepData(TRAINING_TREND_MAX_DAYS),
         api.getTrainingDailyHealthData(1),
       ]);
 
@@ -2731,6 +2737,7 @@ export default function App() {
                 <LazySleepDetailsView
                   api={api}
                   connected={Boolean(trainingHubStatus?.authenticated)}
+                  trendPoints={trainingHubSnapshot?.trendPoints ?? []}
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>

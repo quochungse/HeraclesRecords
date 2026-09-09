@@ -5,12 +5,20 @@ import { SleepNightList } from "./components/SleepNightList";
 import { SleepTrendChart } from "./components/SleepTrendChart";
 import { useSleepHistory } from "./useSleepHistory";
 import { useSleepNightSeries } from "./useSleepNightSeries";
+import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
 import type { CorosLinkApi } from "../coroslink-api";
+import type { TrainingTrendPoint } from "../training/types";
 import "./sleep.css";
 
 interface SleepDetailsViewProps {
   api: CorosLinkApi | null;
   connected: boolean;
+  /**
+   * Nightly HRV and its baseline, from the training snapshot App.tsx already
+   * holds. They arrive as a prop rather than through `useSleepHistory` because
+   * COROS sends no HRV with a sleep record at all — it lives in daily metrics.
+   */
+  trendPoints: TrainingTrendPoint[];
   onOpenOverview: () => void;
 }
 
@@ -30,6 +38,7 @@ function formatFetchedAt(fetchedAt?: number): string | null {
 export function SleepDetailsView({
   api,
   connected,
+  trendPoints,
   onOpenOverview
 }: SleepDetailsViewProps) {
   const { snapshot, loading, refreshing, error, refresh } = useSleepHistory(
@@ -181,6 +190,8 @@ export function SleepDetailsView({
           onSelectDay={setSelectedDay}
         />
       </section>
+
+      <HrvBaselineChart points={trendPoints} />
     </div>
   );
 }

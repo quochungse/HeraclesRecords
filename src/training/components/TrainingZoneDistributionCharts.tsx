@@ -35,6 +35,7 @@ import {
   type DistanceZoneBucket,
   type DistanceZoneTotal
 } from "../distanceZones";
+import { usePrefersReducedMotion } from "./trendChartParts";
 
 interface TrainingZoneDistributionChartsProps {
   /**
@@ -142,22 +143,6 @@ const DISTANCE_METRIC_PREFERENCE =
     defaultValue: "frequency",
     validate: selectionIsOneOf(["frequency", "trainingLoad", "time"])
   });
-
-function usePrefersReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return reducedMotion;
-}
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 10) / 10}%`;

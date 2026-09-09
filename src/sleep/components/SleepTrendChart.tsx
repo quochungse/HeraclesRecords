@@ -9,6 +9,7 @@ import {
   YAxis
 } from "recharts";
 import { trainingChartMargin, trainingChartTooltipStyle } from "../../training/chartConfig";
+import { TrendChartTooltip } from "../../training/components/trendChartParts";
 import {
   formatHappenDayLabel,
   formatSleepDurationMinutes
@@ -20,7 +21,16 @@ interface SleepTrendChartProps {
   records: TrainingHubSleepRecord[];
   /** Highlighted so the night open on the right is findable in the run. */
   selectedDay?: string;
+  /**
+   * Set only where clicking through to a night means something. It is also
+   * what puts the caption on screen — the Overview copy has nowhere to open.
+   */
   onSelectDay?: (happenDay: string) => void;
+  /**
+   * Passed as-is to Recharts. `"100%"` lets a panel that already has a height
+   * of its own decide, which is how Overview drops this into a chart shell.
+   */
+  height?: number | `${number}%`;
 }
 
 interface TrendPoint {
@@ -42,11 +52,16 @@ function finite(value?: number): number | undefined {
 export function SleepTrendChart({
   records,
   selectedDay,
-  onSelectDay
+  onSelectDay,
+  height = 200
 }: SleepTrendChartProps) {
   const { colors } = useChartColors();
 
-  const points: TrendPoint[] = [...records]
+  // Naps carry the happenDay of the night they belong to, so a feed that has
+  // not folded them in yet would draw two bars under one label. The Sleep
+  // screen hands over main sleeps only; Overview's source is looser.
+  const points: TrendPoint[] = records
+    .filter((record) => record.kind !== "nap")
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay))
     .map((record) => {
       const minutes = finite(record.totalMinutes);
@@ -68,7 +83,7 @@ export function SleepTrendChart({
 
   return (
     <div className="sleep-trend-chart">
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={height}>
         <ComposedChart
           data={points}
           margin={trainingChartMargin}
@@ -110,19 +125,22 @@ export function SleepTrendChart({
             domain={[0, 100]}
             fontSize={11}
           />
+          {/* The shared tooltip body, so this chart's hover card matches the
+              training panels'. `trainingChartTooltipStyle` strips Recharts'
+              own frame — the card it wraps brings its own. */}
           <Tooltip
+            content={(props) => (
+              <TrendChartTooltip
+                {...props}
+                valueFormatter={(value, name) =>
+                  name === "Asleep"
+                    ? formatSleepDurationMinutes(value * 60)
+                    : String(Math.round(value))
+                }
+              />
+            )}
             contentStyle={trainingChartTooltipStyle}
             cursor={{ fill: colors.cursorBand }}
-            formatter={(value, name) => {
-              const numeric = typeof value === "number" ? value : Number(value);
-              const label = String(name);
-              if (!Number.isFinite(numeric)) {
-                return ["–", label];
-              }
-              return label === "Asleep"
-                ? [formatSleepDurationMinutes(numeric * 60), label]
-                : [String(Math.round(numeric)), label];
-            }}
           />
           <Bar
             yAxisId="hours"
@@ -146,10 +164,12 @@ export function SleepTrendChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      <p className="sleep-trend-caption">
-        Click a bar to open that night
-        {selectedDay ? ` · showing ${formatHappenDayLabel(selectedDay)}` : ""}
-      </p>
+      {onSelectDay ? (
+        <p className="sleep-trend-caption">
+          Click a bar to open that night
+          {selectedDay ? ` · showing ${formatHappenDayLabel(selectedDay)}` : ""}
+        </p>
+      ) : null}
     </div>
   );
 }

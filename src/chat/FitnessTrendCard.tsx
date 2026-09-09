@@ -15,7 +15,7 @@ import {
   trainingChartTooltipStyle
 } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
-import { ChartAreaGradient } from "../training/components/TrainingTrendChart";
+import { ChartAreaGradient } from "../training/components/trendChartParts";
 
 interface FitnessTrendCardProps {
   preview: FitnessTrendPreview;

@@ -13137,38 +13137,6 @@ td span {
   gap: 8px;
 }
 
-.training-chart-stat {
-  display: grid;
-  justify-items: end;
-  gap: 5px;
-}
-
-.training-chart-stat-value {
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  font-size: clamp(20px, 1.9vw, 24px);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1;
-}
-
-.training-chart-stat-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.training-chart-stat-delta svg {
-  flex-shrink: 0;
-}
-
 /* The load panel stacks its chart and its sport legend, so the panel itself
    keeps the two children its grid was written for. */
 .training-chart-body {
@@ -13207,6 +13175,27 @@ td span {
   display: none;
 }
 
+/* The Sleep screen's length-and-score chart. Its rules live here rather than in
+   sleep.css because Overview's Sleep Trend panel draws the same component, and
+   that stylesheet only loads with the Sleep screen's chunk. */
+.sleep-trend-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Dropped into a training panel the shell owns the height and the chart fills
+   it; on its own screen the chart keeps the fixed height it hands Recharts. */
+.training-chart-shell > .sleep-trend-chart {
+  height: 100%;
+}
+
+.sleep-trend-caption,
+.sleep-trend-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .training-chart-legend {
   display: flex;
   align-items: center;
@@ -13239,6 +13228,24 @@ td span {
   width: 16px;
   height: 0;
   border-top: 2px dashed var(--accent-gold);
+}
+
+/* A baseline is drawn dashed; a scored series is not. */
+.training-chart-legend-line.is-solid {
+  border-top-style: solid;
+}
+
+/* `is-series` takes its color from the chart palette, handed in inline — the
+   theme's `--accent` is switchable from Settings and says nothing about what a
+   chart drew. The swatch mirrors a bar: `--swatch-fill` inside a hairline of
+   `--swatch-color`, which is left set so the base glow still resolves. */
+.training-chart-legend-swatch.is-series {
+  border-color: var(--swatch-color);
+  background: var(--swatch-fill);
+}
+
+.training-chart-legend-line.is-series {
+  border-top-color: var(--swatch-color);
 }
 
 .training-chart-tooltip {

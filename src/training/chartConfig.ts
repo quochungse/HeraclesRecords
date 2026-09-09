@@ -8,8 +8,17 @@ export const TRAINING_HEATMAP_DAYS = 365;
  */
 export const TRAINING_LOAD_TREND_DAYS = 30;
 
-/** Days drawn by the trend charts that stay on a short window (HRV, sleep). */
+/** Days the HRV and sleep trend charts open on before the athlete picks. */
 export const TRAINING_SHORT_TREND_DAYS = 7;
+
+/**
+ * Windows the HRV and sleep trend charts can be switched between, in render
+ * order. Bounded by TRAINING_LOAD_TREND_DAYS for the same reason the load
+ * chart's list is: the snapshot carries no more than that.
+ */
+export const TRAINING_TREND_WINDOWS = [7, 30] as const;
+
+export type TrainingTrendWindow = (typeof TRAINING_TREND_WINDOWS)[number];
 
 /**
  * Windows the training-load bar chart can be switched between, in render order.
@@ -19,6 +28,16 @@ export const TRAINING_SHORT_TREND_DAYS = 7;
 export const TRAINING_LOAD_WINDOWS = [7, 14, 30] as const;
 
 export type TrainingLoadWindow = (typeof TRAINING_LOAD_WINDOWS)[number];
+
+/**
+ * The furthest back any trend chip can be switched to, and so the span a fetch
+ * has to cover to fill every one of them. Derived from the window lists rather
+ * than written out, so widening a chip's options cannot leave the fetch behind.
+ */
+export const TRAINING_TREND_MAX_DAYS = Math.max(
+  ...TRAINING_TREND_WINDOWS,
+  ...TRAINING_LOAD_WINDOWS
+);
 
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
