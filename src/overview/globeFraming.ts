@@ -14,7 +14,7 @@ export interface GlobeCameraView {
 }
 
 /** globe.gl renders through a three.js PerspectiveCamera at its 50° default. */
-export const GLOBE_FOV_DEGREES = 50;
+const GLOBE_FOV_DEGREES = 50;
 /** Keeps the outermost place off the panel edge and clear of `globeOffset`. */
 const FIT_PADDING = 0.78;
 /**
@@ -209,4 +209,66 @@ export function focusLatitudeOffset(altitude: number): number {
  */
 export function labelSeparationDegrees(altitude: number): number {
   return Math.max(0.5, altitude * 3.5);
+}
+
+/**
+ * Screen pixels one degree of globe surface covers under the camera.
+ *
+ * Half the panel height spans `tan(halfFOV)·R·altitude` world units at that
+ * distance, and a degree of surface is `R·π/180` of them — the globe radius
+ * cancels, so only the panel and the altitude matter.
+ */
+export function surfacePixelsPerDegree(
+  panelHeight: number,
+  altitude: number,
+): number {
+  const halfVertical = (GLOBE_FOV_DEGREES / 2) * DEG_TO_RAD;
+  return (
+    (panelHeight * Math.PI) /
+    (360 * Math.tan(halfVertical) * Math.max(altitude, 1e-3))
+  );
+}
+
+/** Below this the dots are dense enough; a finer tier would only crowd them. */
+const LAND_DETAIL_MIN_SPACING_PX = 7;
+/** Past this the lattice reads as scattered dots, so the next tier is needed. */
+const LAND_DETAIL_MAX_SPACING_PX = 12;
+
+/** Smoothstep: how far a tier has faded in at this on-screen dot spacing. */
+export function landDetailOpacity(spacingPx: number): number {
+  const t =
+    (spacingPx - LAND_DETAIL_MIN_SPACING_PX) /
+    (LAND_DETAIL_MAX_SPACING_PX - LAND_DETAIL_MIN_SPACING_PX);
+  const clamped = Math.max(0, Math.min(1, t));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+export interface LandDetailLevels {
+  /** Opacity of the half-spacing tier. */
+  tier1: number;
+  /** Opacity of the quarter-spacing tier. */
+  tier2: number;
+  /**
+   * How many times more dots are visible than the coarse lattice alone. The
+   * tiers hold 1 : 3 : 12 of the points, and dot size divides by its square
+   * root so the pattern keeps the same ink-to-gap ratio as it gets finer.
+   */
+  density: number;
+}
+
+/**
+ * How much land detail to show at this framing. Each tier fades in once the one
+ * below it has spread past `LAND_DETAIL_MAX_SPACING_PX` on screen, so the dot
+ * texture stays put while the coastline it traces gets finer.
+ */
+export function landDetailLevels(
+  panelHeight: number,
+  altitude: number,
+  coarseStepDegrees = 1,
+): LandDetailLevels {
+  const perDegree = surfacePixelsPerDegree(panelHeight, altitude);
+  const tier1 = landDetailOpacity(perDegree * coarseStepDegrees);
+  const tier2 =
+    tier1 >= 1 ? landDetailOpacity(perDegree * coarseStepDegrees * 0.5) : 0;
+  return { tier1, tier2, density: 1 + 3 * tier1 + 12 * tier2 };
 }

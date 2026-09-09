@@ -25,6 +25,7 @@ import {
   Points,
   ShaderMaterial,
   SRGBColorSpace,
+  Vector2,
 } from "three";
 import type { GeoHeatBucket, GlobePoint } from "./activityVisitHeatmap";
 import {
@@ -34,6 +35,7 @@ import {
   computeFitView,
   focusLatitudeOffset,
   labelSeparationDegrees,
+  landDetailLevels,
   pickSpacedPlaces,
   type GlobeCameraView,
 } from "./globeFraming";
@@ -85,11 +87,14 @@ interface LandLayerData {
 interface LandGeometryData {
   positions: Float32Array;
   strengths: Float32Array;
+  /** 0 = coarse lattice, 1 = half spacing, 2 = quarter spacing. */
+  tiers: Float32Array;
 }
 
 interface LandGeometryMessage {
   positions: ArrayBuffer;
   strengths: ArrayBuffer;
+  tiers: ArrayBuffer;
 }
 
 interface RouteLayerData {
@@ -132,6 +137,7 @@ function loadLandGeometry(): Promise<LandGeometryData> {
       landGeometryCache = {
         positions: new Float32Array(event.data.positions),
         strengths: new Float32Array(event.data.strengths),
+        tiers: new Float32Array(event.data.tiers),
       };
       worker.terminate();
       resolve(landGeometryCache);
@@ -143,6 +149,11 @@ function loadLandGeometry(): Promise<LandGeometryData> {
     };
   });
   return landGeometryPromise;
+}
+
+/** Dot size at the coarse lattice; finer tiers divide it by √density. */
+function basePointSize(paperTheme: boolean): number {
+  return paperTheme ? 1.9 : 1.78;
 }
 
 function createGeographyPoints(
@@ -159,6 +170,7 @@ function createGeographyPoints(
     "aStrength",
     new BufferAttribute(landGeometry.strengths, 1),
   );
+  geometry.setAttribute("aTier", new BufferAttribute(landGeometry.tiers, 1));
 
   const material = new ShaderMaterial({
     transparent: true,
@@ -170,23 +182,33 @@ function createGeographyPoints(
         value: new Color(paperTheme ? "#667179" : "#c4d5e1"),
       },
       uOpacity: { value: paperTheme ? 0.5 : 0.32 },
-      uPointSize: { value: paperTheme ? 1.9 : 1.78 },
+      uPointSize: { value: basePointSize(paperTheme) },
       uPixelRatio: {
         value: Math.min(window.devicePixelRatio || 1, 2),
       },
+      // x: half-spacing tier, y: quarter-spacing tier. Driven by the camera.
+      uTierOpacity: { value: new Vector2(0, 0) },
     },
     vertexShader: `
       attribute float aStrength;
+      attribute float aTier;
       uniform float uPointSize;
       uniform float uPixelRatio;
+      uniform vec2 uTierOpacity;
       varying float vAlpha;
 
       void main() {
+        float tierAlpha = aTier < 0.5
+          ? 1.0
+          : (aTier < 1.5 ? uTierOpacity.x : uTierOpacity.y);
         vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
         vec3 viewNormal = normalize(normalMatrix * normalize(position));
         float facing = clamp(viewNormal.z, 0.0, 1.0);
-        vAlpha = aStrength * smoothstep(0.03, 0.72, facing);
-        gl_PointSize = uPointSize * uPixelRatio * (220.0 / max(1.0, -viewPosition.z));
+        vAlpha = aStrength * smoothstep(0.03, 0.72, facing) * tierAlpha;
+        // A tier still fading out costs nothing once it has no size to raster.
+        gl_PointSize = tierAlpha <= 0.0
+          ? 0.0
+          : uPointSize * uPixelRatio * (220.0 / max(1.0, -viewPosition.z));
         gl_Position = projectionMatrix * viewPosition;
       }
     `,
@@ -245,6 +267,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   const baselineRef = useRef<GlobeView>(DEFAULT_VIEW);
   const framedKeyRef = useRef<string | null>(null);
   const framedViewRef = useRef<GlobeView | null>(null);
+  const landLayerRef = useRef<LandLayerData | null>(null);
   const interactionRef = useRef(false);
   const userAdjustedRef = useRef(false);
   const streetRequestedRef = useRef(false);
@@ -306,6 +329,31 @@ const ActivityGlobeRendererComponent = forwardRef<
     () => (landLayer ? [landLayer] : []),
     [landLayer],
   );
+
+  /**
+   * Fades the finer land lattices in as the camera closes, and shrinks the dots
+   * to match so the geography gains detail instead of filling in solid.
+   */
+  const applyLandDetail = useCallback(
+    (altitude: number) => {
+      const material = landLayerRef.current?.object.material;
+      if (!material) {
+        return;
+      }
+      const { tier1, tier2, density } = landDetailLevels(size.height, altitude);
+      (material.uniforms.uTierOpacity!.value as Vector2).set(tier1, tier2);
+      material.uniforms.uPointSize!.value =
+        basePointSize(paperTheme) / Math.sqrt(density);
+    },
+    [paperTheme, size.height],
+  );
+
+  useEffect(() => {
+    landLayerRef.current = landLayer;
+    applyLandDetail(
+      globeRef.current?.pointOfView().altitude ?? baselineRef.current.altitude,
+    );
+  }, [applyLandDetail, landLayer]);
 
   const activityPoints = useMemo<ActivityPoint[]>(() => {
     const maxCount = Math.max(1, ...locations.map((location) => location.count));
@@ -699,6 +747,7 @@ const ActivityGlobeRendererComponent = forwardRef<
 
   const handleZoom = useCallback(
     (view: GlobeView) => {
+      applyLandDetail(view.altitude);
       onViewChange(viewChanged(view, baselineRef.current));
       if (
         interactionRef.current &&
@@ -713,6 +762,7 @@ const ActivityGlobeRendererComponent = forwardRef<
       }
     },
     [
+      applyLandDetail,
       locations.length,
       onRequestStreet,
       onViewChange,

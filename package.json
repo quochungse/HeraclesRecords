@@ -30,7 +30,7 @@
     "test:training-load-bars": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-training-load-bars.mjs",
     "test:overview-greeting": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-overview-greeting.mjs",
     "test:distance-zones": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-distance-zones.mjs",
-    "test:globe-framing": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-globe-framing.mjs",
+    "test:globe-framing": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-globe-framing.mjs",
     "test:sport-colors": "node --experimental-strip-types scripts/test-sport-colors.mjs",
     "test:hr-zone-model": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-hr-zone-model.mjs",
     "test:selection-preferences": "node --experimental-strip-types scripts/test-selection-preferences.mjs",

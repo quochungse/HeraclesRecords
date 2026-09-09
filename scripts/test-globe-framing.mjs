@@ -1,3 +1,5 @@
+// Runs under Electron because this repo's Node is built without Amaro and
+// cannot strip types. Nothing here touches SQLite.
 import assert from "node:assert/strict";
 
 import {
@@ -10,6 +12,9 @@ import {
   clampLatitude,
   computeFitView,
   labelSeparationDegrees,
+  landDetailLevels,
+  landDetailOpacity,
+  surfacePixelsPerDegree,
   pickSpacedPlaces,
   sphericalCenter
 } from "../src/overview/globeFraming.ts";
@@ -210,6 +215,72 @@ function place(lat, lon, key = `${lat}:${lon}`) {
     "the cap is respected even when everything is far enough apart"
   );
   assert.deepEqual(pickSpacedPlaces([], 6, 3), [], "no places, no labels");
+}
+
+// --- land detail: the far view keeps the single coarse lattice ---
+{
+  const PANEL = 440;
+  const far = landDetailLevels(PANEL, FIT_MAX_ALTITUDE);
+  assert.equal(far.tier1, 0, "the full-globe view must look exactly as it did");
+  assert.equal(far.tier2, 0, "...and must not pay for a lattice it cannot show");
+  assert.equal(far.density, 1, "density multiplier is 1 when only tier 0 shows");
+
+  // At 2.2 the coarse dots sit ~3.7px apart — already dense enough.
+  assert.ok(
+    surfacePixelsPerDegree(PANEL, FIT_MAX_ALTITUDE) < 5,
+    "a degree is only a few pixels at full-globe zoom"
+  );
+}
+
+// --- closing in brings the finer lattices in, in order ---
+{
+  const PANEL = 440;
+  const fitted = landDetailLevels(PANEL, FIT_MIN_ALTITUDE);
+  assert.equal(fitted.tier1, 1, "the default fitted framing shows the half-spacing tier");
+  assert.equal(fitted.tier2, 0, "but not yet the quarter-spacing one");
+  assert.equal(fitted.density, 4, "tier 0 + tier 1 is four times the dots");
+
+  const closer = landDetailLevels(PANEL, 0.3);
+  assert.equal(closer.tier2, 1, "a hard zoom brings in the finest lattice");
+  assert.equal(closer.density, 16, "all three tiers is sixteen times the dots");
+
+  // Tiers must arrive in order: no tier 2 while tier 1 is still fading.
+  for (let altitude = 2.5; altitude > 0.2; altitude -= 0.05) {
+    const level = landDetailLevels(PANEL, altitude);
+    if (level.tier2 > 0) {
+      assert.equal(
+        level.tier1,
+        1,
+        `tier 2 appeared at altitude ${altitude.toFixed(2)} while tier 1 was ${level.tier1}`
+      );
+    }
+  }
+}
+
+// --- detail follows the panel, not just the altitude ---
+{
+  const short = landDetailLevels(360, 1.2);
+  const tall = landDetailLevels(900, 1.2);
+  assert.ok(
+    tall.tier1 > short.tier1,
+    "the same altitude spreads dots further apart on a taller panel"
+  );
+}
+
+// --- the fade is a smoothstep between the spacing thresholds ---
+{
+  assert.equal(landDetailOpacity(6), 0, "dense enough already");
+  assert.equal(landDetailOpacity(13), 1, "well past the sparse threshold");
+  assert.ok(
+    landDetailOpacity(9.5) > 0.4 && landDetailOpacity(9.5) < 0.6,
+    "half way across the band is half faded in"
+  );
+  let previous = -1;
+  for (let px = 0; px <= 20; px += 0.5) {
+    const value = landDetailOpacity(px);
+    assert.ok(value >= previous, `opacity must not dip at ${px}px`);
+    previous = value;
+  }
 }
 
 // --- the poles cannot be centred ---
