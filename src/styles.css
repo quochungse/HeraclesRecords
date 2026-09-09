@@ -13327,12 +13327,21 @@ td span {
   list-style: none;
 }
 
+/* A miniature of one column block, so the key and the chart are visibly the
+   same object: same gradient, same hairline, same rounded top. */
 .training-chart-legend-swatch {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 14px;
   flex-shrink: 0;
-  border-radius: 3px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset;
+  border: 1px solid color-mix(in srgb, var(--swatch-color) 55%, transparent);
+  border-radius: 3px 3px 1px 1px;
+  background:
+    linear-gradient(
+      180deg,
+      var(--swatch-color),
+      color-mix(in srgb, var(--swatch-color) 62%, transparent)
+    );
+  box-shadow: 0 0 6px color-mix(in srgb, var(--swatch-color) 30%, transparent);
 }
 
 /* Activity names are free text and run long; the tooltip truncates rather than
@@ -25676,7 +25685,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-chart-legend-swatch {
-  box-shadow: 0 0 0 1px rgba(38, 34, 28, 0.16) inset;
+  box-shadow: 0 0 5px color-mix(in srgb, var(--swatch-color) 22%, transparent);
 }
 
 :root[data-theme="paper"] .training-chart-tooltip-total {
