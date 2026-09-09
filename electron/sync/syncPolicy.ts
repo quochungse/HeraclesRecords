@@ -64,6 +64,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   coach_automation_runs: "derived",
   // Metric snapshots sampled from COROS on a schedule.
   coach_daily_samples: "derived",
+  // The Sleep screen's night cache. Every row can be fetched again from COROS,
+  // and syncing it would carry a large, self-rebuilding blob between machines.
+  sleep_nights: "derived",
 
   // --- Training library: user intent, worth carrying between machines ------
   training_plans: "personal",

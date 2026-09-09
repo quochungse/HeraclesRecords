@@ -2486,6 +2486,22 @@ export interface TrainingHubSleepSummary {
   mcpConnected: boolean;
 }
 
+/** Where the records in a snapshot came from, for the "last updated" line. */
+export type SleepHistorySource = "cache" | "network" | "mixed";
+
+export interface SleepHistorySnapshot {
+  /** Nights newest first, main sleeps only — naps are folded into their night. */
+  records: TrainingHubSleepRecord[];
+  /** Last night, by the rule in `src/training/sleepFreshness.ts`. */
+  latest?: TrainingHubSleepRecord;
+  mcpConnected: boolean;
+  /** Epoch ms the newest record in this snapshot was fetched from COROS. */
+  fetchedAt?: number;
+  source: SleepHistorySource;
+  /** Set when a network fill was attempted and failed; the cache still stands. */
+  error?: string;
+}
+
 export interface TrainingHubDailyHealthRecord {
   happenDay: string;
   steps?: number;

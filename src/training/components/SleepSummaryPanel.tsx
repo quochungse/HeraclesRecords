@@ -1,10 +1,15 @@
 import {
+  ChevronRight,
   Loader2,
   Moon,
   MoonStar,
   Sunrise
 } from "lucide-react";
-import { formatSleepClockRange, formatSleepNightLabel } from "../formatters";
+import {
+  formatSleepClockRange,
+  formatSleepDurationMinutes,
+  formatSleepNightLabel
+} from "../formatters";
 import { pickLastNightSleep } from "../sleepFreshness";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
 
@@ -12,25 +17,8 @@ interface SleepSummaryPanelProps {
   sleep?: TrainingHubSleepSummary | null;
   connecting?: boolean;
   refreshing?: boolean;
-}
-
-function formatSleepDuration(minutes?: number): string {
-  if (minutes === undefined || !Number.isFinite(minutes)) {
-    return "–";
-  }
-
-  if (minutes <= 0) {
-    return "0m";
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainder = Math.round(minutes % 60);
-
-  if (hours <= 0) {
-    return `${remainder}m`;
-  }
-
-  return `${hours}h ${String(remainder).padStart(2, "0")}m`;
+  /** Opens the Sleep screen. Omitted, the panel stays a plain card. */
+  onOpenDetails?: () => void;
 }
 
 function sleepScoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" {
@@ -99,7 +87,7 @@ function formatNapSummary(record: TrainingHubSleepRecord): string {
     return "No data";
   }
 
-  return formatSleepDuration(record.napMinutes);
+  return formatSleepDurationMinutes(record.napMinutes);
 }
 
 function formatSleepWindow(
@@ -115,7 +103,7 @@ function formatSleepWindow(
 }
 
 function formatSleepMetricDuration(minutes?: number): string {
-  const duration = formatSleepDuration(minutes);
+  const duration = formatSleepDurationMinutes(minutes);
   return duration === "–" ? "No data" : duration;
 }
 
@@ -187,7 +175,7 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
       value: record.deepPercent ?? record.deepMinutes ?? 0,
       detail: record.deepPercent !== undefined
         ? formatPercent(record.deepPercent)
-        : formatSleepDuration(record.deepMinutes),
+        : formatSleepDurationMinutes(record.deepMinutes),
       className: "is-deep"
     },
     {
@@ -196,7 +184,7 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
       value: record.lightPercent ?? record.lightMinutes ?? 0,
       detail: record.lightPercent !== undefined
         ? formatPercent(record.lightPercent)
-        : formatSleepDuration(record.lightMinutes),
+        : formatSleepDurationMinutes(record.lightMinutes),
       className: "is-light"
     },
     {
@@ -205,7 +193,7 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
       value: record.remPercent ?? record.remMinutes ?? 0,
       detail: record.remPercent !== undefined
         ? formatPercent(record.remPercent)
-        : formatSleepDuration(record.remMinutes),
+        : formatSleepDurationMinutes(record.remMinutes),
       className: "is-rem"
     },
     {
@@ -214,7 +202,7 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
       value: record.awakePercent ?? record.awakeMinutes ?? 0,
       detail: record.awakePercent !== undefined
         ? formatPercent(record.awakePercent)
-        : formatSleepDuration(record.awakeMinutes),
+        : formatSleepDurationMinutes(record.awakeMinutes),
       className: "is-awake"
     }
   ].filter((segment) => segment.value > 0);
@@ -255,7 +243,7 @@ function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
   const parts = [formatSleepNightLabel(record)];
 
   if (record.totalMinutes !== undefined && Number.isFinite(record.totalMinutes)) {
-    parts.push(formatSleepDuration(record.totalMinutes));
+    parts.push(formatSleepDurationMinutes(record.totalMinutes));
   }
 
   if (record.score !== undefined && Number.isFinite(record.score)) {
@@ -268,7 +256,8 @@ function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
 export function SleepSummaryPanel({
   sleep,
   connecting = false,
-  refreshing = false
+  refreshing = false,
+  onOpenDetails
 }: SleepSummaryPanelProps) {
   // Only last night's record may be shown here. `sleep.latest` is the newest
   // night COROS returned, which on an unsynced watch is days old — and read
@@ -281,15 +270,40 @@ export function SleepSummaryPanel({
   const isLoading = connecting || refreshing;
 
   return (
-    <section className={`panel sleep-panel tone-${tone}`}>
+    <section
+      className={`panel sleep-panel tone-${tone}${onOpenDetails ? " is-openable" : ""}`}
+      // The whole card is the target — a person reaching for "more sleep detail"
+      // aims at the score, not at a link under it. Keyboard users get the real
+      // button in the header, so the card itself stays out of the tab order.
+      onClick={onOpenDetails}
+    >
       <div className="sleep-panel-header">
         <div>
           <p className="eyebrow">Sleep</p>
           <h2>{lastNight ? formatSleepNightLabel(lastNight) : "Last night"}</h2>
         </div>
-        <span className="sleep-panel-icon" aria-hidden="true">
-          {isLoading ? <Loader2 className="spin" size={16} /> : <MoonStar size={16} />}
-        </span>
+        {onOpenDetails ? (
+          <button
+            type="button"
+            className="sleep-panel-open"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDetails();
+            }}
+            aria-label="Open sleep details"
+          >
+            {isLoading ? (
+              <Loader2 className="spin" size={16} aria-hidden="true" />
+            ) : (
+              <MoonStar size={16} aria-hidden="true" />
+            )}
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+        ) : (
+          <span className="sleep-panel-icon" aria-hidden="true">
+            {isLoading ? <Loader2 className="spin" size={16} /> : <MoonStar size={16} />}
+          </span>
+        )}
       </div>
 
       {connecting ? (
@@ -309,7 +323,7 @@ export function SleepSummaryPanel({
             </div>
             <div className="sleep-panel-duration">
               <span>Main sleep</span>
-              <strong>{formatSleepDuration(lastNight.totalMinutes)}</strong>
+              <strong>{formatSleepDurationMinutes(lastNight.totalMinutes)}</strong>
             </div>
           </div>
 

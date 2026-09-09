@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
+  Moon,
   Music,
   Settings,
   User,
@@ -27,6 +28,7 @@ export type PrimaryView =
   | "gear"
   | "library"
   | "strength"
+  | "sleep"
   | "data"
   | "calendar"
   | "maps"
@@ -89,6 +91,7 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       { id: "training", label: "Activities", icon: Activity },
       { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
       { id: "library", label: "Training Library", icon: BookOpen },
+      { id: "sleep", label: "Sleep", icon: Moon },
     ],
   }),
   group({

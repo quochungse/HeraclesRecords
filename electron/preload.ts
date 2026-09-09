@@ -65,6 +65,7 @@ import type {
   TrainingHubDailyHealthSummary,
   TrainingHubDailyMetrics,
   TrainingHubDashboard,
+  SleepHistorySnapshot,
   TrainingHubSleepSummary,
   TrainingHubRacePredictor,
   TrainingHubSportType,
@@ -801,6 +802,11 @@ const api = {
     ipcRenderer.invoke("trainingHub:getUpcomingWorkouts", days),
   getTrainingSleepData: (days?: number): Promise<TrainingHubSleepSummary> =>
     ipcRenderer.invoke("trainingHub:getSleepData", days),
+  getSleepHistory: (request?: {
+    days?: number;
+    refresh?: boolean;
+  }): Promise<SleepHistorySnapshot> =>
+    ipcRenderer.invoke("sleep:getHistory", request),
   getTrainingDailyHealthData: (
     days?: number
   ): Promise<TrainingHubDailyHealthSummary> =>

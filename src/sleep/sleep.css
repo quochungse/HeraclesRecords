@@ -1,0 +1,500 @@
+/*
+ * Sleep details. The stage hues match the Overview panel's stacked bar
+ * (src/styles.css) so one night reads the same in both places; awake is the
+ * exception, defined against the text colour rather than white so it survives
+ * the paper theme.
+ */
+.sleep-details-view {
+  --sleep-deep: #4a63ff;
+  --sleep-light: #6f89ff;
+  --sleep-rem: #9b7bff;
+  --sleep-awake: color-mix(in srgb, var(--text-primary) 34%, transparent);
+  gap: 20px;
+}
+
+.sleep-details-panel {
+  overflow: hidden;
+}
+
+.sleep-details-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sleep-details-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sleep-details-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sleep-details-updated {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sleep-details-error {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--danger, #e0574a) 34%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--danger, #e0574a) 10%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sleep-details-split {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
+  gap: 18px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+@media (max-width: 940px) {
+  .sleep-details-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sleep-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* --- Left: the nights on file ------------------------------------------- */
+
+.sleep-night-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  max-height: clamp(360px, 52vh, 640px);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.sleep-night-list-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.sleep-night-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.sleep-night-row:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.sleep-night-row.is-selected {
+  border-color: color-mix(in srgb, var(--sleep-light) 60%, transparent);
+  background: color-mix(in srgb, var(--sleep-light) 14%, transparent);
+}
+
+.sleep-night-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sleep-night-row-date {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.sleep-night-row-score {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-night-row-score.tone-low {
+  color: #e0574a;
+}
+.sleep-night-row-score.tone-mid {
+  color: #d89b22;
+}
+.sleep-night-row-score.tone-good {
+  color: var(--sleep-light);
+}
+.sleep-night-row-score.tone-high {
+  color: #3fb984;
+}
+.sleep-night-row-score.tone-neutral {
+  color: var(--text-muted);
+}
+
+.sleep-night-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sleep-night-row-partial {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #d89b22;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sleep-night-row-bar {
+  display: flex;
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+/* The Overview panel's segments carry a hover tooltip these rows do not want. */
+.sleep-night-row-bar .sleep-stage-segment::after,
+.sleep-night-row-bar .sleep-stage-segment::before {
+  content: none;
+}
+
+.sleep-night-row-bar .sleep-stage-segment.is-deep {
+  --sleep-stage-color: var(--sleep-deep);
+}
+.sleep-night-row-bar .sleep-stage-segment.is-light {
+  --sleep-stage-color: var(--sleep-light);
+}
+.sleep-night-row-bar .sleep-stage-segment.is-rem {
+  --sleep-stage-color: var(--sleep-rem);
+}
+.sleep-night-row-bar .sleep-stage-segment.is-awake {
+  --sleep-stage-color: var(--sleep-awake);
+}
+
+/* --- Right: the night itself -------------------------------------------- */
+
+.sleep-details-main {
+  min-width: 0;
+}
+
+.sleep-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 260px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.sleep-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sleep-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sleep-detail-header h2 {
+  margin: 2px 0 0;
+  font-size: clamp(30px, 3.4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sleep-detail-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-detail-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.sleep-detail-score strong {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-detail-score span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sleep-detail.tone-low .sleep-detail-score strong {
+  color: #e0574a;
+}
+.sleep-detail.tone-mid .sleep-detail-score strong {
+  color: #d89b22;
+}
+.sleep-detail.tone-good .sleep-detail-score strong {
+  color: var(--sleep-light);
+}
+.sleep-detail.tone-high .sleep-detail-score strong {
+  color: #3fb984;
+}
+
+.sleep-detail-partial {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, #d89b22 36%, transparent);
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, #d89b22 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sleep-detail-stages {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(16px, 3vw, 40px);
+}
+
+@media (max-width: 620px) {
+  .sleep-detail-stages {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+
+/* --- Donut --------------------------------------------------------------- */
+
+.sleep-donut {
+  position: relative;
+  width: 168px;
+  height: 168px;
+}
+
+.sleep-donut.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.sleep-donut svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sleep-donut-track {
+  stroke: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.sleep-donut-slice.is-deep {
+  stroke: var(--sleep-deep);
+}
+.sleep-donut-slice.is-light {
+  stroke: var(--sleep-light);
+}
+.sleep-donut-slice.is-rem {
+  stroke: var(--sleep-rem);
+}
+.sleep-donut-slice.is-awake {
+  stroke: var(--sleep-awake);
+}
+
+.sleep-donut-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.sleep-donut-centre span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sleep-donut-centre strong {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Stage table --------------------------------------------------------- */
+
+.sleep-stage-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  min-width: 0;
+}
+
+.sleep-stage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sleep-stage-row dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.sleep-stage-row dd {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-stage-row dd strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sleep-stage-row dd span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.sleep-stage-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.sleep-stage-dot.is-deep {
+  background: var(--sleep-deep);
+}
+.sleep-stage-dot.is-light {
+  background: var(--sleep-light);
+}
+.sleep-stage-dot.is-rem {
+  background: var(--sleep-rem);
+}
+.sleep-stage-dot.is-awake {
+  background: var(--sleep-awake);
+}
+
+/* --- Notes and metrics --------------------------------------------------- */
+
+.sleep-detail-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sleep-detail-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.sleep-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.sleep-detail-metric {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+.sleep-detail-metric dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sleep-detail-metric dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Trend --------------------------------------------------------------- */
+
+.sleep-trend-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sleep-trend-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.sleep-trend-caption,
+.sleep-trend-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

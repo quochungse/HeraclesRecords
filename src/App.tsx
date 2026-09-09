@@ -195,6 +195,11 @@ const LazyStrengthView = lazy(() =>
     default: StrengthView,
   })),
 );
+const LazySleepDetailsView = lazy(() =>
+  import("./sleep/SleepDetailsView").then(({ SleepDetailsView }) => ({
+    default: SleepDetailsView,
+  })),
+);
 const LazyCalendarView = lazy(() =>
   import("./calendar/CalendarView").then(({ CalendarView }) => ({
     default: CalendarView,
@@ -2517,6 +2522,7 @@ export default function App() {
                         rpeBackfill={rpeBackfill}
                         busy={busy}
                         sleepConnecting={sleepConnecting}
+                        onOpenSleepDetails={() => setActiveView("sleep")}
                         onEmailChange={setTrainingHubEmail}
                         onPasswordChange={setTrainingHubPassword}
                         onRememberChange={setTrainingHubRemember}
@@ -2717,6 +2723,15 @@ export default function App() {
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
                   onOpenTraining={() => setActiveView("overview")}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "sleep" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="sleep" />}>
+                <LazySleepDetailsView
+                  api={api}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>
             ) : null}

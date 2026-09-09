@@ -50,6 +50,7 @@ export function TrainingOverview({
   rpeBackfill,
   busy,
   sleepConnecting,
+  onOpenSleepDetails,
   onEmailChange,
   onPasswordChange,
   onRememberChange,
@@ -408,6 +409,7 @@ export function TrainingOverview({
                 sleep={snapshot?.sleep}
                 connecting={sleepConnecting}
                 refreshing={busy === "training-refresh"}
+                onOpenDetails={onOpenSleepDetails}
               />
               <Vo2MaxWidget snapshot={snapshot} />
             </div>

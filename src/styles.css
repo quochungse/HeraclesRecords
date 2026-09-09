@@ -11483,6 +11483,40 @@ td span {
   line-height: 1.5;
 }
 
+.sleep-panel.is-openable {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.sleep-panel.is-openable:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.sleep-panel-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 5px 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.sleep-panel.is-openable:hover .sleep-panel-open,
+.sleep-panel-open:hover,
+.sleep-panel-open:focus-visible {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+
 .sleep-panel-empty {
   display: grid;
   align-content: start;

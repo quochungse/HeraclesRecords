@@ -458,6 +458,11 @@ import {
 } from "./mcpServersStore";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
+import {
+  clearSleepHistoryCache,
+  getCachedSleepSummary,
+  getSleepHistory
+} from "./sleepHistoryService";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -2358,6 +2363,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:logout", async () => {
     const status = logoutTrainingHub();
+    // The cached nights belong to the account that just left.
+    clearSleepHistoryCache();
     // Sync belongs to an account, so signing out has to stop it. Without this
     // the loop keeps publishing into the vault of the account that just left —
     // and anything done on this machine afterwards would land in their data.
@@ -2663,8 +2670,16 @@ function registerIpcHandlers(): void {
     getUpcomingWorkouts(days)
   );
 
+  // Through the cache, not straight at COROS: one sleep fetch is ~20 sequential
+  // MCP round trips, and the Overview asks on every launch.
   ipcMain.handle("trainingHub:getSleepData", (_event, days?: number) =>
-    getTrainingSleepData(days ?? 7)
+    getCachedSleepSummary(days ?? 7)
+  );
+
+  ipcMain.handle(
+    "sleep:getHistory",
+    (_event, request?: { days?: number; refresh?: boolean }) =>
+      getSleepHistory(request ?? {})
   );
 
   ipcMain.handle("trainingHub:getDailyHealthData", (_event, days?: number) =>
