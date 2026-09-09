@@ -1197,7 +1197,10 @@ function extractJsonPayload(text: string): unknown {
   return null;
 }
 
-function parseProseSleepRecords(text: string): TrainingHubSleepRecord[] {
+function parseProseSleepRecords(
+  text: string,
+  fallbackHappenDay?: string
+): TrainingHubSleepRecord[] {
   const sectionsWithIsoDate = text
     .split(/\n(?=20\d{2}-\d{2}-\d{2}\b)/i)
     .map((section) => section.trim())
@@ -1225,7 +1228,7 @@ function parseProseSleepRecords(text: string): TrainingHubSleepRecord[] {
   const records: TrainingHubSleepRecord[] = [];
 
   for (const section of candidates) {
-    const record = parseProseSleepSection(section);
+    const record = parseProseSleepSection(section, fallbackHappenDay);
     if (record) {
       records.push(record);
     }
@@ -1234,7 +1237,10 @@ function parseProseSleepRecords(text: string): TrainingHubSleepRecord[] {
   return records;
 }
 
-function parseProseSleepSection(section: string): TrainingHubSleepRecord | undefined {
+function parseProseSleepSection(
+  section: string,
+  fallbackHappenDay?: string
+): TrainingHubSleepRecord | undefined {
   const dateMatch = section.match(
     /(?:Sleep for\s+)?(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+([A-Za-z]{3})\s+(\d{1,2})/i
   );
@@ -1313,8 +1319,17 @@ function parseProseSleepSection(section: string): TrainingHubSleepRecord | undef
     happenDay = compactDateMatch[1];
   }
 
+  // A prose block that names no date used to be stamped with today's, which is
+  // how a night from days ago came to sit on the dashboard as last night's
+  // sleep: the record claimed a day it had never been told. The only day it may
+  // borrow is the one the caller asked COROS about; a range query pins nothing,
+  // so an undated answer to one is dropped rather than dated by guess.
   if (!happenDay) {
-    happenDay = recentTrainingHubDateList(1)[0];
+    if (!fallbackHappenDay) {
+      return undefined;
+    }
+
+    happenDay = fallbackHappenDay;
   }
 
   const totalMinutes = mainSleepMatch
@@ -1521,13 +1536,38 @@ function mergeCollectedSleepRecords(
   );
 }
 
-export function parseSleepDataResponse(text: string): TrainingHubSleepRecord[] {
+/**
+ * `fallbackHappenDay` is the day the caller asked COROS about, and it is the
+ * only day an undated prose answer may be filed under. Omit it and an undated
+ * answer is dropped — see the note in `parseProseSleepSection`.
+ *
+ * It is also a last resort. A response that dates anything at all — in its JSON
+ * or in one of its prose blocks — is answering with days of its own, so an
+ * undated block beside them is a leftover, not a night; borrowing the requested
+ * day for it would file whatever COROS actually sent under the day we asked
+ * for, which is the same lie in a politer form.
+ */
+export function parseSleepDataResponse(
+  text: string,
+  fallbackHappenDay?: string
+): TrainingHubSleepRecord[] {
   const jsonPayload = extractJsonPayload(text);
   const jsonRecords = collectSleepRecords(jsonPayload);
-  const proseRecords = [text, ...collectProseTexts(jsonPayload)]
-    .flatMap((candidate) => parseProseSleepRecords(unwrapProseText(candidate)));
+  const proseTexts = [text, ...collectProseTexts(jsonPayload)].map(unwrapProseText);
+  const dated = mergeCollectedSleepRecords([
+    ...jsonRecords,
+    ...proseTexts.flatMap((candidate) => parseProseSleepRecords(candidate))
+  ]);
 
-  return mergeCollectedSleepRecords([...jsonRecords, ...proseRecords]);
+  if (dated.length > 0 || !fallbackHappenDay) {
+    return dated;
+  }
+
+  return mergeCollectedSleepRecords(
+    proseTexts.flatMap((candidate) =>
+      parseProseSleepRecords(candidate, fallbackHappenDay)
+    )
+  );
 }
 
 function resolveSleepTool(tools: CorosMcpTool[]): CorosMcpTool | undefined {
@@ -1747,6 +1787,57 @@ export function sleepResponseQuality(records: TrainingHubSleepRecord[]): number 
   );
 }
 
+/** The keys that name one day outright, in the order the args builder uses. */
+const EXACT_DAY_ARG_KEYS = [
+  "happenDay",
+  "happen_day",
+  "date",
+  "sleepDate",
+  "sleep_date",
+  "day"
+];
+
+/** The keys carrying a natural-language ask, which spells the day out in text. */
+const QUERY_ARG_KEYS = ["query", "question", "prompt", "input"];
+
+/**
+ * The single day a set of tool args asks about, or nothing when it asks about a
+ * span. An undated answer may be filed under the former and never the latter.
+ */
+function pinnedHappenDay(args: Record<string, unknown>): string | undefined {
+  for (const key of EXACT_DAY_ARG_KEYS) {
+    const day = normalizeHappenDay(args[key]);
+    if (day) {
+      return day;
+    }
+  }
+
+  const start = normalizeHappenDay(args.startDate ?? args.startDay ?? args.start_day);
+  const end = normalizeHappenDay(args.endDate ?? args.endDay ?? args.end_day);
+  if (start && start === end) {
+    return start;
+  }
+
+  for (const key of QUERY_ARG_KEYS) {
+    const value = args[key];
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const compact = value.match(/\b(20\d{6})\b/);
+    if (compact) {
+      return compact[1];
+    }
+
+    const iso = value.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+    if (iso) {
+      return `${iso[1]}${iso[2]}${iso[3]}`;
+    }
+  }
+
+  return undefined;
+}
+
 async function fetchSleepRecords(
   sleepTool: CorosMcpTool,
   days: number
@@ -1759,7 +1850,7 @@ async function fetchSleepRecords(
   for (const args of argCandidates) {
     try {
       const response = await callCorosMcpTool(sleepTool.name, args);
-      const records = parseSleepDataResponse(response);
+      const records = parseSleepDataResponse(response, pinnedHappenDay(args));
       const score = sleepResponseQuality(records);
       collectedRecords.push(...records);
 

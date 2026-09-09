@@ -11483,6 +11483,19 @@ td span {
   line-height: 1.5;
 }
 
+.sleep-panel-empty {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.sleep-panel-stale {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .sleep-panel-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -5,6 +5,7 @@ import {
   Sunrise
 } from "lucide-react";
 import { formatSleepClockRange, formatSleepNightLabel } from "../formatters";
+import { pickLastNightSleep } from "../sleepFreshness";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
 
 interface SleepSummaryPanelProps {
@@ -250,14 +251,33 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
   );
 }
 
+function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
+  const parts = [formatSleepNightLabel(record)];
+
+  if (record.totalMinutes !== undefined && Number.isFinite(record.totalMinutes)) {
+    parts.push(formatSleepDuration(record.totalMinutes));
+  }
+
+  if (record.score !== undefined && Number.isFinite(record.score)) {
+    parts.push(`score ${Math.round(record.score)}`);
+  }
+
+  return parts.join(" · ");
+}
+
 export function SleepSummaryPanel({
   sleep,
   connecting = false,
   refreshing = false
 }: SleepSummaryPanelProps) {
-  const latest = sleep?.latest;
-  const tone = sleepScoreTone(latest?.score);
-  const label = sleepScoreLabel(latest?.score);
+  // Only last night's record may be shown here. `sleep.latest` is the newest
+  // night COROS returned, which on an unsynced watch is days old — and read
+  // under this panel's heading it becomes a score for a night that never
+  // happened.
+  const lastNight = pickLastNightSleep(sleep);
+  const staleNight = !lastNight ? sleep?.latest : undefined;
+  const tone = sleepScoreTone(lastNight?.score);
+  const label = sleepScoreLabel(lastNight?.score);
   const isLoading = connecting || refreshing;
 
   return (
@@ -265,7 +285,7 @@ export function SleepSummaryPanel({
       <div className="sleep-panel-header">
         <div>
           <p className="eyebrow">Sleep</p>
-          <h2>{latest ? formatSleepNightLabel(latest) : "Last night"}</h2>
+          <h2>{lastNight ? formatSleepNightLabel(lastNight) : "Last night"}</h2>
         </div>
         <span className="sleep-panel-icon" aria-hidden="true">
           {isLoading ? <Loader2 className="spin" size={16} /> : <MoonStar size={16} />}
@@ -280,51 +300,58 @@ export function SleepSummaryPanel({
         <p className="sleep-panel-message">Syncing sleep data…</p>
       ) : null}
 
-      {!isLoading && latest ? (
+      {!isLoading && lastNight ? (
         <>
           <div className="sleep-panel-hero">
             <div className="sleep-panel-score">
-              <strong>{latest.score !== undefined ? Math.round(latest.score) : "–"}</strong>
+              <strong>{lastNight.score !== undefined ? Math.round(lastNight.score) : "–"}</strong>
               <span>{label}</span>
             </div>
             <div className="sleep-panel-duration">
               <span>Main sleep</span>
-              <strong>{formatSleepDuration(latest.totalMinutes)}</strong>
+              <strong>{formatSleepDuration(lastNight.totalMinutes)}</strong>
             </div>
           </div>
 
-          <SleepStageBar record={latest} />
+          <SleepStageBar record={lastNight} />
 
-          {latest.completeness === "partial" ? (
+          {lastNight.completeness === "partial" ? (
             <p className="sleep-panel-partial">
-              Partial data: {latest.partialReason ?? "COROS is still syncing this sleep."}
+              Partial data: {lastNight.partialReason ?? "COROS is still syncing this sleep."}
             </p>
           ) : null}
 
           <dl className="sleep-panel-metrics" aria-label="Sleep details">
-            <SleepWindowMetric record={latest} />
+            <SleepWindowMetric record={lastNight} />
             <SleepMetric
               label="Awake"
-              value={formatSleepMetricDuration(latest.awakeMinutes)}
+              value={formatSleepMetricDuration(lastNight.awakeMinutes)}
             />
             <SleepMetric
               label="Wake-ups > 5m"
-              value={latest.awakeCountOverFiveMinutes ?? "No data"}
+              value={lastNight.awakeCountOverFiveMinutes ?? "No data"}
             />
             <SleepMetric
               label="Naps"
-              value={formatNapSummary(latest)}
+              value={formatNapSummary(lastNight)}
             />
           </dl>
         </>
       ) : null}
 
-      {!isLoading && !latest ? (
-        <p className="sleep-panel-message">
-          {sleep?.mcpConnected
-            ? "No sleep data for this period."
-            : "Connect COROS data access to view sleep metrics."}
-        </p>
+      {!isLoading && !lastNight ? (
+        <div className="sleep-panel-empty">
+          <p className="sleep-panel-message">
+            {sleep?.mcpConnected
+              ? "No sleep recorded for last night yet. Sync your watch to see it here."
+              : "Connect COROS data access to view sleep metrics."}
+          </p>
+          {staleNight ? (
+            <p className="sleep-panel-stale">
+              Most recent night on record: {formatStaleNightSummary(staleNight)}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

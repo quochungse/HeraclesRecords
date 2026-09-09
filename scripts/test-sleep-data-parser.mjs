@@ -501,4 +501,76 @@ assert.equal(combinedLatest?.score, 71);
 assert.equal(combinedLatest?.totalMinutes, 316);
 assert.equal(combinedLatest?.completeness, "partial");
 
+// --- An undated answer must never be dated by guess ------------------------
+//
+// The prose parser used to stamp a dateless block with today's key, so a night
+// COROS answered with days ago arrived claiming to be last night — the one way
+// stale sleep could pass every freshness check downstream.
+const undatedProse = [
+  "Sleep Data",
+  "========================",
+  "",
+  "Sleep Score: 78",
+  "Main Sleep: 7h 12min",
+  "Deep Sleep Ratio: 21%",
+  "Light Sleep Ratio: 58%",
+  "REM Ratio: 14%",
+  "Awake Ratio: 7%",
+  "Main Sleep Window: 23:05 - 06:41"
+].join("\n");
+
+assert.deepEqual(
+  parseSleepDataResponse(undatedProse),
+  [],
+  "an undated prose answer is dropped, not stamped with today"
+);
+
+const undatedRecords = parseSleepDataResponse(undatedProse, "20260905");
+assert.equal(undatedRecords.length, 1);
+assert.equal(
+  undatedRecords[0].happenDay,
+  "20260905",
+  "an undated answer takes the day the caller asked COROS about"
+);
+assert.equal(undatedRecords[0].score, 78);
+
+const datedOverFallback = parseSleepDataResponse(
+  [
+    "Sleep for 2026-07-07",
+    "Sleep score: 34 — poor",
+    "Main sleep: 6h 28min",
+    "Sleep window: 23:23–08:01"
+  ].join("\n"),
+  "20260905"
+);
+assert.equal(datedOverFallback.length, 1);
+assert.equal(
+  datedOverFallback[0].happenDay,
+  "20260707",
+  "a date in the answer beats the day that was asked for"
+);
+
+// The requested day is a last resort: a response that dates anything at all is
+// answering with days of its own, and an undated block beside them must not
+// take the day we asked for.
+const mixedDatedAndUndated = [
+  "Sleep Data",
+  "========================",
+  "",
+  "2026-09-06",
+  "Sleep Score: 61",
+  "Main Sleep: 6h 05min",
+  "",
+  "Summary",
+  "Sleep Score: 78",
+  "Main Sleep: 7h 12min"
+].join("\n");
+
+const mixedRecords = parseSleepDataResponse(mixedDatedAndUndated, "20260909");
+assert.deepEqual(
+  mixedRecords.map((record) => record.happenDay),
+  ["20260906"],
+  "a dated answer keeps its own days and the undated leftover is dropped"
+);
+
 console.log("test-sleep-data-parser: ok");
