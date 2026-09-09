@@ -43,11 +43,19 @@ function night(offsetDays, extra = {}) {
 }
 
 /** A fake main process: an in-memory table plus a counted COROS. */
-function harness({ now = NOW, records = [], rows = [], fail = false } = {}) {
+function harness({
+  now = NOW,
+  records = [],
+  rows = [],
+  fail = false,
+  heartRate = [],
+  heartRateFails = false
+} = {}) {
   const state = {
     now,
     table: new Map(rows.map((row) => [`${row.happen_day}:${row.kind}`, row])),
     fetches: 0,
+    heartRateFetches: 0,
     writes: 0,
     records
   };
@@ -60,6 +68,13 @@ function harness({ now = NOW, records = [], rows = [], fail = false } = {}) {
         throw new Error("COROS is unreachable");
       }
       return { records: state.records, mcpConnected: true };
+    },
+    fetchHeartRate: async () => {
+      state.heartRateFetches += 1;
+      if (heartRateFails) {
+        throw new Error("daily health is down");
+      }
+      return heartRate;
     },
     readCache: (fromDay) =>
       [...state.table.values()]
@@ -268,6 +283,58 @@ clearSleepHistoryCache();
     ["main"],
     "a nap is not a night in the list"
   );
+}
+
+// --- The night's heart rate rides in from the daily-health feed -------------
+//
+// querySleepData sends no heart rate at all. COROS puts the night's average and
+// range in queryDailyHealthData instead, dated by the same wake-up day, which
+// is what makes folding it onto the night safe.
+
+clearSleepHistoryCache();
+{
+  const { state, deps } = harness({
+    records: [night(0), night(-1)],
+    heartRate: [
+      { happenDay: dayKey(0), sleepAvgHr: 50, sleepMinHr: 44, sleepMaxHr: 71 },
+      { happenDay: dayKey(-5), sleepAvgHr: 61 }
+    ]
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.heartRateFetches, 1, "asked once, alongside the nights");
+
+  const lastNight = snapshot.records.find((record) => record.happenDay === dayKey(0));
+  assert.equal(lastNight?.avgHr, 50);
+  assert.equal(lastNight?.minHr, 44);
+  assert.equal(lastNight?.maxHr, 71);
+
+  const older = snapshot.records.find((record) => record.happenDay === dayKey(-1));
+  assert.equal(older?.avgHr, undefined, "a night with no heart rate keeps none");
+
+  // Cached with the night, so the second visit still has it.
+  clearSleepHistoryCache();
+  const reread = await getSleepHistory({ days: 30 }, deps);
+  assert.equal(
+    reread.records.find((record) => record.happenDay === dayKey(0))?.avgHr,
+    50,
+    "the heart rate was written down with the night, not held in memory only"
+  );
+}
+
+clearSleepHistoryCache();
+{
+  // Heart rate is one line on a card; the nights are the card.
+  const { state, deps } = harness({
+    records: [night(0)],
+    heartRateFails: true
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.heartRateFetches, 1);
+  assert.equal(snapshot.records.length, 1, "a failed heart-rate call costs no nights");
+  assert.equal(snapshot.records[0].avgHr, undefined);
+  assert.equal(snapshot.error, undefined, "and is not reported as a failure of the screen");
 }
 
 console.log("sleep history cache: all assertions passed");

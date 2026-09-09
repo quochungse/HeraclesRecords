@@ -46,6 +46,29 @@ function scoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" 
   return "high";
 }
 
+/**
+ * The night's heart rate as COROS reports it: an average, and the range it
+ * moved through. The range is the half worth having — an average of 50 over a
+ * night that touched 44 and 71 is a different night to a flat 50.
+ */
+function formatSleepHeartRate(record: TrainingHubSleepRecord): string {
+  const avg = record.avgHr;
+  const low = record.minHr;
+  const high = record.maxHr;
+
+  if (avg === undefined && low === undefined && high === undefined) {
+    return "No data";
+  }
+
+  const average = avg !== undefined ? `${Math.round(avg)} bpm` : "–";
+  const range =
+    low !== undefined && high !== undefined
+      ? ` · ${Math.round(low)}–${Math.round(high)}`
+      : "";
+
+  return `${average}${range}`;
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="sleep-detail-metric">
@@ -162,10 +185,7 @@ export function SleepNightDetail({
               : "No data"
           }
         />
-        <Metric
-          label="Avg HR"
-          value={record.avgHr !== undefined ? `${Math.round(record.avgHr)} bpm` : "No data"}
-        />
+        <Metric label="Sleep HR" value={formatSleepHeartRate(record)} />
       </dl>
     </div>
   );

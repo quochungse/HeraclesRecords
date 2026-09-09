@@ -2476,6 +2476,9 @@ export interface TrainingHubSleepRecord {
   napStart?: string;
   napEnd?: string;
   avgHr?: number;
+  /** The night's heart-rate range, folded in from the daily health feed. */
+  minHr?: number;
+  maxHr?: number;
   sleepStart?: string;
   sleepEnd?: string;
   /**
@@ -2560,6 +2563,15 @@ export interface TrainingHubDailyHealthRecord {
   happenDay: string;
   steps?: number;
   calories?: number;
+  /**
+   * Heart rate through the night, which arrives here and nowhere else:
+   * `querySleepData` sends no heart rate at all, and every other COROS surface
+   * averages over the whole day. Dated by wake-up day, like the sleep it
+   * belongs to.
+   */
+  sleepAvgHr?: number;
+  sleepMinHr?: number;
+  sleepMaxHr?: number;
 }
 
 export interface TrainingHubDailyHealthSummary {

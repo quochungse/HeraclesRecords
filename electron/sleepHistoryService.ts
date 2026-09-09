@@ -4,10 +4,12 @@ import {
   upsertSleepNights,
   type SleepNightRow
 } from "./database";
+import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
 import type {
   SleepHistorySnapshot,
   SleepHistorySource,
+  TrainingHubDailyHealthRecord,
   TrainingHubSleepRecord
 } from "./types";
 
@@ -68,6 +70,12 @@ export interface SleepHistoryDeps {
     records: TrainingHubSleepRecord[];
     mcpConnected: boolean;
   }>;
+  /**
+   * The night's heart rate, which `querySleepData` does not carry. COROS puts
+   * it in the daily-health feed instead — "Sleep HR: Avg 50 bpm | Min 44 | Max
+   * 71" — dated by wake-up day, so it folds straight onto the night.
+   */
+  fetchHeartRate: (days: number) => Promise<TrainingHubDailyHealthRecord[]>;
   readCache: (fromDay: string) => SleepNightRow[];
   writeCache: (rows: SleepNightRow[]) => void;
   pruneCache: (beforeDay: string) => void;
@@ -79,6 +87,10 @@ export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
     fetchFromCoros: async (days) => {
       const summary = await getTrainingSleepData(days);
       return { records: summary.records, mcpConnected: summary.mcpConnected };
+    },
+    fetchHeartRate: async (days) => {
+      const summary = await getTrainingDailyHealthData(days);
+      return summary.records;
     },
     readCache: listSleepNights,
     writeCache: upsertSleepNights,
@@ -158,6 +170,48 @@ function store(deps: SleepHistoryDeps, records: TrainingHubSleepRecord[], now: n
 
   deps.writeCache(rows);
   deps.pruneCache(dayKeyOffset(now, -HISTORY_RETENTION_DAYS));
+}
+
+/**
+ * The heart rate for each night in the window, or nothing.
+ *
+ * A failure here must not cost the nights themselves: heart rate is one line on
+ * a card, the sleep totals are the card.
+ */
+async function readHeartRate(
+  deps: SleepHistoryDeps,
+  days: number
+): Promise<Map<string, TrainingHubDailyHealthRecord>> {
+  try {
+    const records = await deps.fetchHeartRate(days);
+    return new Map(records.map((record) => [record.happenDay, record]));
+  } catch (caught) {
+    console.warn("[sleepHistoryService] sleep heart rate unavailable:", caught);
+    return new Map();
+  }
+}
+
+function withHeartRate(
+  records: TrainingHubSleepRecord[],
+  byDay: Map<string, TrainingHubDailyHealthRecord>
+): TrainingHubSleepRecord[] {
+  if (byDay.size === 0) {
+    return records;
+  }
+
+  return records.map((record) => {
+    const health = byDay.get(record.happenDay);
+    if (!health) {
+      return record;
+    }
+
+    return {
+      ...record,
+      avgHr: record.avgHr ?? health.sleepAvgHr,
+      minHr: record.minHr ?? health.sleepMinHr,
+      maxHr: record.maxHr ?? health.sleepMaxHr
+    };
+  });
 }
 
 /**
@@ -257,7 +311,7 @@ export async function getSleepHistory(
       // of the stamp is "we asked", not "we got something".
       cache.lastNetworkAt = now;
       if (answer.records.length > 0) {
-        store(deps, answer.records, now);
+        store(deps, withHeartRate(answer.records, await readHeartRate(deps, days)), now);
         filled = true;
       }
     } catch (caught) {
