@@ -20,6 +20,11 @@ interface SleepNightDetailProps {
   record: TrainingHubSleepRecord | null;
   series: SleepNightSeries | null;
   seriesLoading: boolean;
+  /** The night list is still loading, so there is nothing to pick yet. */
+  pending?: boolean;
+  /** False when COROS returned no nights at all — a different empty to a
+   *  night simply not being picked. */
+  hasNights?: boolean;
 }
 
 function formatPercent(value?: number): string {
@@ -81,13 +86,21 @@ function Metric({ label, value }: { label: string; value: string }) {
 export function SleepNightDetail({
   record,
   series,
-  seriesLoading
+  seriesLoading,
+  pending = false,
+  hasNights = true
 }: SleepNightDetailProps) {
   if (!record) {
     return (
       <div className="sleep-detail-empty">
         <Moon size={28} aria-hidden="true" />
-        <p>Pick a night on the left to see how it broke down.</p>
+        <p>
+          {pending
+            ? "Loading your nights…"
+            : hasNights
+              ? "Pick a night on the left to see how it broke down."
+              : "Once a night syncs from your watch it shows up here."}
+        </p>
       </div>
     );
   }

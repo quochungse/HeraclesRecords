@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, LockKeyhole, MoonStar, RefreshCw } from "lucide-react";
+import { LockKeyhole, RefreshCw } from "lucide-react";
 import { SleepNightDetail } from "./components/SleepNightDetail";
 import { SleepNightList } from "./components/SleepNightList";
 import { SleepTrendChart } from "./components/SleepTrendChart";
@@ -78,78 +78,75 @@ export function SleepDetailsView({
     );
   }
 
-  return (
-    <div className="stack stack-fill training-dashboard sleep-details-view">
-      <section className="panel panel-flex sleep-details-panel">
-        <div className="sleep-details-toolbar">
-          <div className="sleep-details-title">
-            <button
-              type="button"
-              className="ghost-button sleep-back-button"
-              onClick={onOpenOverview}
-            >
-              <ArrowLeft size={15} aria-hidden="true" />
-              Overview
-            </button>
-            <div>
-              <p className="eyebrow">Sleep</p>
-              <h2>
-                {records.length} {records.length === 1 ? "night" : "nights"} on file
-              </h2>
-            </div>
-          </div>
+  const countLabel =
+    records.length === 0
+      ? loading
+        ? "Loading nights…"
+        : "No nights on file"
+      : `${records.length} ${records.length === 1 ? "night" : "nights"} on file`;
 
-          <div className="sleep-details-actions">
+  return (
+    // Deliberately not `stack-fill`: this screen is a document that grows past
+    // the window — a list, a night, a month of trend — and the fill variant
+    // pins it to the viewport, which is what was clipping the detail pane.
+    <div className="stack sleep-details-view">
+      <header className="sleep-page-header">
+        <div className="sleep-page-heading">
+          <p className="eyebrow">COROS</p>
+          <h1>Sleep</h1>
+          <p className="sleep-page-subtitle">
+            {countLabel}
             {fetchedAtLabel ? (
-              <span className="sleep-details-updated">
-                {snapshot?.source === "cache" ? "From cache · " : ""}
-                Updated {fetchedAtLabel}
-              </span>
+              <>
+                <span aria-hidden="true"> · </span>
+                {snapshot?.source === "cache" ? "cached " : "updated "}
+                {fetchedAtLabel}
+              </>
             ) : null}
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={refresh}
-              disabled={refreshing || loading}
-            >
-              <RefreshCw
-                size={15}
-                className={refreshing ? "spin" : undefined}
-                aria-hidden="true"
-              />
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
-          </div>
+          </p>
         </div>
 
-        {error ? (
-          <p className="sleep-details-error">
-            COROS did not answer: {error}. Showing what is already on this machine.
-          </p>
-        ) : null}
+        <button
+          type="button"
+          className="icon-button sleep-refresh-button"
+          onClick={refresh}
+          disabled={refreshing || loading}
+          aria-label={refreshing ? "Refreshing sleep data" : "Refresh sleep data"}
+          title="Refresh"
+        >
+          <RefreshCw
+            size={16}
+            className={refreshing ? "spin" : undefined}
+            aria-hidden="true"
+          />
+        </button>
+      </header>
 
-        {snapshot && !snapshot.mcpConnected ? (
-          <p className="sleep-details-error">
-            COROS data access is not connected, so no new nights can arrive.
-            Connect it from Coach settings.
-          </p>
-        ) : null}
+      {error ? (
+        <p className="sleep-details-error">
+          COROS did not answer: {error}. Showing what is already on this machine.
+        </p>
+      ) : null}
 
+      {snapshot && !snapshot.mcpConnected ? (
+        <p className="sleep-details-error">
+          COROS data access is not connected, so no new nights can arrive.
+          Connect it from Coach settings.
+        </p>
+      ) : null}
+
+      <section className="panel sleep-details-panel">
         <div className="sleep-details-split">
           <div className="sleep-details-list">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Recent sleeps</p>
-                <h3>Last {records.length > 0 ? records.length : ""} nights</h3>
-              </div>
-              <MoonStar size={20} aria-hidden="true" />
+            <h2 className="sleep-pane-title">Recent sleeps</h2>
+            <div className="sleep-night-list-scroll">
+              <SleepNightList
+                records={records}
+                selectedDay={selectedDay}
+                onSelect={setSelectedDay}
+                loading={loading}
+              />
             </div>
-            <SleepNightList
-              records={records}
-              selectedDay={selectedDay}
-              onSelect={setSelectedDay}
-              loading={loading}
-            />
           </div>
 
           <div className="sleep-details-main">
@@ -157,18 +154,15 @@ export function SleepDetailsView({
               record={selected}
               series={series}
               seriesLoading={seriesLoading}
+              pending={loading && records.length === 0}
+              hasNights={records.length > 0}
             />
           </div>
         </div>
       </section>
 
       <section className="panel sleep-trend-panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Trend</p>
-            <h3>Sleep length and score</h3>
-          </div>
-        </div>
+        <h2 className="sleep-pane-title">Sleep length and score</h2>
         <SleepTrendChart
           records={records}
           selectedDay={selectedDay ?? undefined}

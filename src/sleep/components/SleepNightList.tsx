@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { AlertCircle } from "lucide-react";
 import {
   formatHappenDayLabel,
@@ -34,6 +35,15 @@ export function SleepNightList({
   onSelect,
   loading
 }: SleepNightListProps) {
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+
+  // The trend chart selects nights too, and the one it picks is usually below
+  // the fold of this list. Without this the detail pane changes and the list
+  // appears not to have noticed.
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedDay]);
+
   if (records.length === 0) {
     return (
       <p className="sleep-night-list-empty">
@@ -45,7 +55,10 @@ export function SleepNightList({
   }
 
   return (
-    <ul className="sleep-night-list" role="listbox" aria-label="Recent nights">
+    // Plain list, plain buttons: a listbox would need its options to be the
+    // listbox's own children, and `aria-current` says "this is the one on
+    // screen" more accurately than a selection role does here anyway.
+    <ul className="sleep-night-list" aria-label="Recent nights">
       {records.map((record) => {
         const selected = record.happenDay === selectedDay;
         const stages = drawableStages(record);
@@ -55,10 +68,10 @@ export function SleepNightList({
           <li key={`${record.happenDay}:${record.kind ?? "main"}`}>
             <button
               type="button"
+              ref={selected ? selectedRef : undefined}
               className={`sleep-night-row${selected ? " is-selected" : ""}`}
               onClick={() => onSelect(record.happenDay)}
-              role="option"
-              aria-selected={selected}
+              aria-current={selected ? "true" : undefined}
             >
               <div className="sleep-night-row-head">
                 <span className="sleep-night-row-date">

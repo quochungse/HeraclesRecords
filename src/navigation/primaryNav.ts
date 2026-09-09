@@ -91,9 +91,12 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       { id: "training", label: "Activities", icon: Activity },
       { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
       { id: "library", label: "Training Library", icon: BookOpen },
-      { id: "sleep", label: "Sleep", icon: Moon },
     ],
   }),
+  // Sleep sits beside Training rather than inside it: it is recovery, it is
+  // reached from the Overview card, and burying it a level down made the one
+  // screen an athlete opens every morning the hardest one to find.
+  item({ id: "sleep", label: "Sleep", icon: Moon }),
   group({
     id: "coros-connect",
     label: "Coros Connect",

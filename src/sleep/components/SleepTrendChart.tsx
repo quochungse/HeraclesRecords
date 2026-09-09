@@ -146,11 +146,10 @@ export function SleepTrendChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      {selectedDay ? (
-        <p className="sleep-trend-caption">
-          Showing {points.length} nights · selected {formatHappenDayLabel(selectedDay)}
-        </p>
-      ) : null}
+      <p className="sleep-trend-caption">
+        Click a bar to open that night
+        {selectedDay ? ` · showing ${formatHappenDayLabel(selectedDay)}` : ""}
+      </p>
     </div>
   );
 }

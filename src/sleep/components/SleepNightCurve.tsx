@@ -10,9 +10,9 @@ import {
   YAxis
 } from "recharts";
 import { Loader2 } from "lucide-react";
-import { trainingChartMargin, trainingChartTooltipStyle } from "../../training/chartConfig";
+import { trainingChartMargin } from "../../training/chartConfig";
 import { useChartColors } from "../../training/useChartColors";
-import type { SleepNightSeries } from "../../../electron/types";
+import type { SleepNightSeries, SleepSeriesPoint } from "../../../electron/types";
 
 interface SleepNightCurveProps {
   series: SleepNightSeries | null;
@@ -46,6 +46,104 @@ function hourTicks(start: number, end: number): number[] {
   }
 
   return ticks;
+}
+
+/**
+ * The sample nearest a hovered instant, and how far off it was.
+ *
+ * The two series are not sampled together: stress lands on a five-minute grid,
+ * HRV every ten to fifteen minutes and irregularly. Only about a third of
+ * stress readings share a timestamp with an HRV one, so a tooltip that reported
+ * only what sits exactly under the cursor said "stress 12" and nothing else on
+ * most of the night — while the line above it was drawn straight through, which
+ * read as a broken chart rather than as a gap in the data.
+ *
+ * So the tooltip quotes the nearest real reading and says what time it was
+ * taken. Nothing is interpolated; a gap wider than the tolerance is reported as
+ * a gap.
+ */
+function nearestSample(
+  points: SleepSeriesPoint[],
+  at: number,
+  toleranceMs: number
+): { point: SleepSeriesPoint; offsetMs: number } | undefined {
+  let best: SleepSeriesPoint | undefined;
+  let bestGap = Number.POSITIVE_INFINITY;
+
+  for (const point of points) {
+    const gap = Math.abs(point.localAt - at);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = point;
+    }
+  }
+
+  return best && bestGap <= toleranceMs
+    ? { point: best, offsetMs: bestGap }
+    : undefined;
+}
+
+/** Wide enough to reach the next HRV sample, narrow enough not to span a gap. */
+const NEAREST_TOLERANCE_MS = 8 * 60 * 1000;
+
+function CurveTooltip({
+  active,
+  label,
+  series,
+  hrvColor,
+  stressColor
+}: {
+  active?: boolean;
+  label?: unknown;
+  series: SleepNightSeries;
+  hrvColor: string;
+  stressColor: string;
+}) {
+  const at = Number(label);
+  if (!active || !Number.isFinite(at)) {
+    return null;
+  }
+
+  const rows: Array<{ key: string; color: string; value: string; taken?: string }> = [];
+  const hrv = nearestSample(series.hrv, at, NEAREST_TOLERANCE_MS);
+  const stress = nearestSample(series.stress, at, NEAREST_TOLERANCE_MS);
+
+  rows.push({
+    key: "HRV",
+    color: hrvColor,
+    value: hrv ? `${Math.round(hrv.point.value)} ms` : "no sample",
+    taken: hrv && hrv.offsetMs >= 60_000 ? hrv.point.clock : undefined
+  });
+  rows.push({
+    key: "Stress",
+    color: stressColor,
+    value: stress ? String(Math.round(stress.point.value)) : "no sample",
+    taken: stress && stress.offsetMs >= 60_000 ? stress.point.clock : undefined
+  });
+
+  return (
+    <div className="training-chart-tooltip">
+      <span
+        className="training-chart-tooltip-accent"
+        style={{ background: `linear-gradient(90deg, ${hrvColor}, ${stressColor})` }}
+      />
+      <p className="training-chart-tooltip-label">{formatClock(at)}</p>
+      <ul className="training-chart-tooltip-rows">
+        {rows.map((row) => (
+          <li key={row.key} className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">
+              <i style={{ background: row.color }} />
+              {row.key}
+              {row.taken ? (
+                <em className="sleep-curve-tooltip-taken">at {row.taken}</em>
+              ) : null}
+            </span>
+            <strong>{row.value}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function merge(series: SleepNightSeries): CurveRow[] {
@@ -181,19 +279,14 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
             fontSize={11}
           />
           <Tooltip
-            contentStyle={trainingChartTooltipStyle}
             cursor={{ stroke: colors.cursor }}
-            labelFormatter={(value) => formatClock(Number(value))}
-            formatter={(value, name) => {
-              const numeric = typeof value === "number" ? value : Number(value);
-              const label = String(name);
-              if (!Number.isFinite(numeric)) {
-                return ["–", label];
-              }
-              return label === "HRV"
-                ? [`${Math.round(numeric)} ms`, label]
-                : [String(Math.round(numeric)), label];
-            }}
+            content={
+              <CurveTooltip
+                series={series}
+                hrvColor={colors.accentBright}
+                stressColor={colors.gold}
+              />
+            }
           />
 
           {hasStress ? (

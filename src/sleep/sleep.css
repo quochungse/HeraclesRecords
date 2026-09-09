@@ -9,50 +9,76 @@
   --sleep-light: #6f89ff;
   --sleep-rem: #9b7bff;
   --sleep-awake: color-mix(in srgb, var(--text-primary) 34%, transparent);
-  gap: 20px;
+  gap: 18px;
+  /* No `overflow: hidden` anywhere on this screen: the panel it was set on is
+     a flex child of a fill container, so hiding overflow cut the detail pane
+     off at whatever height the window happened to leave. */
 }
 
 .sleep-details-panel {
-  overflow: hidden;
+  /* Tall enough that one short night does not collapse the pane into a strip.
+     No max, and no hidden overflow: the pane grows and the page scrolls. */
+  min-height: 420px;
 }
 
-.sleep-details-toolbar {
+/* --- Page header ---------------------------------------------------------- */
+
+.sleep-page-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  padding: 4px 2px 0;
 }
 
-.sleep-details-title {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+.sleep-page-heading .eyebrow {
+  margin: 0;
 }
 
-.sleep-back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.sleep-page-heading h1 {
+  margin: 2px 0 0;
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  background: linear-gradient(
+    100deg,
+    var(--text-primary),
+    color-mix(in srgb, var(--sleep-rem) 62%, var(--text-primary))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-.sleep-details-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sleep-details-updated {
+.sleep-page-subtitle {
+  margin: 6px 0 0;
   color: var(--text-muted);
+  font-size: 13px;
+}
+
+.sleep-refresh-button {
+  flex: none;
+}
+
+/* The heading of a pane inside a panel: quieter than the page title, louder
+   than body text, and without the eyebrow-plus-icon furniture the old header
+   carried for no reason. */
+.sleep-pane-title {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
   font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .sleep-details-error {
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--danger, #e0574a) 34%, transparent);
+  border: 1px solid var(--error-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--danger, #e0574a) 10%, transparent);
+  background: var(--error-bg);
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.45;
@@ -60,10 +86,9 @@
 
 .sleep-details-split {
   display: grid;
-  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
-  gap: 18px;
+  grid-template-columns: minmax(230px, 0.58fr) minmax(0, 1.42fr);
+  gap: clamp(16px, 2vw, 28px);
   align-items: stretch;
-  min-height: 0;
 }
 
 @media (max-width: 940px) {
@@ -75,25 +100,73 @@
 .sleep-details-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-width: 0;
+  /* Sits against the detail pane's height and scrolls inside it, so a month of
+     nights never stretches the panel past the night it is describing. */
+  border-right: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding-right: clamp(12px, 1.4vw, 20px);
+}
+
+@media (max-width: 940px) {
+  .sleep-details-list {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+    padding-bottom: 16px;
+  }
 }
 
 /* --- Left: the nights on file ------------------------------------------- */
 
+/*
+ * The list has to fill the pane the detail sets the height of, and no more.
+ *
+ * A `max-height` did neither: a tall night left a gap of dead panel under the
+ * list, and a short one let thirty nights stretch the panel to nothing but
+ * list. Grid rows size to their tallest item, so the fix is to keep the list
+ * out of that measurement — the wrapper stretches with the row and the list is
+ * taken out of flow inside it, which leaves the detail pane as the only thing
+ * deciding how tall the row is.
+ */
+.sleep-night-list-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+}
+
 .sleep-night-list {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  padding: 0;
-  max-height: clamp(360px, 52vh, 640px);
+  padding: 0 4px 0 0;
   overflow-y: auto;
   list-style: none;
+  scrollbar-width: thin;
+}
+
+/*
+ * Stacked layout — a portrait window, or a narrow one. There is no sibling to
+ * borrow a height from any more, so the list goes back into normal flow and
+ * caps itself against the viewport instead.
+ */
+@media (max-width: 940px) {
+  .sleep-night-list-scroll {
+    flex: none;
+    min-height: 0;
+  }
+
+  .sleep-night-list {
+    position: static;
+    max-height: min(48vh, 420px);
+  }
 }
 
 .sleep-night-list-empty {
   margin: 0;
+  padding-top: 2px;
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -117,6 +190,11 @@
 
 .sleep-night-row:hover {
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.sleep-night-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .sleep-night-row.is-selected {
@@ -144,16 +222,16 @@
 }
 
 .sleep-night-row-score.tone-low {
-  color: #e0574a;
+  color: var(--error-text);
 }
 .sleep-night-row-score.tone-mid {
-  color: #d89b22;
+  color: var(--warning-text);
 }
 .sleep-night-row-score.tone-good {
   color: var(--sleep-light);
 }
 .sleep-night-row-score.tone-high {
-  color: #3fb984;
+  color: var(--success-text);
 }
 .sleep-night-row-score.tone-neutral {
   color: var(--text-muted);
@@ -171,7 +249,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #d89b22;
+  color: var(--warning-text);
   font-size: 11px;
   font-weight: 600;
 }
@@ -279,24 +357,24 @@
 }
 
 .sleep-detail.tone-low .sleep-detail-score strong {
-  color: #e0574a;
+  color: var(--error-text);
 }
 .sleep-detail.tone-mid .sleep-detail-score strong {
-  color: #d89b22;
+  color: var(--warning-text);
 }
 .sleep-detail.tone-good .sleep-detail-score strong {
   color: var(--sleep-light);
 }
 .sleep-detail.tone-high .sleep-detail-score strong {
-  color: #3fb984;
+  color: var(--success-text);
 }
 
 .sleep-detail-partial {
   margin: 0;
-  border: 1px solid color-mix(in srgb, #d89b22 36%, transparent);
+  border: 1px solid var(--warning-border);
   border-radius: 9px;
   padding: 9px 11px;
-  background: color-mix(in srgb, #d89b22 12%, transparent);
+  background: var(--warning-bg);
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
@@ -506,6 +584,13 @@
   color: var(--text-primary);
 }
 
+.sleep-curve-tooltip-taken {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 500;
+}
+
 .sleep-curve-note {
   margin: 0;
   color: var(--text-muted);
@@ -514,21 +599,6 @@
 }
 
 /* --- Notes and metrics --------------------------------------------------- */
-
-.sleep-detail-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.sleep-detail-note svg {
-  flex: none;
-  margin-top: 2px;
-}
 
 .sleep-detail-metrics {
   display: grid;
@@ -567,7 +637,6 @@
 .sleep-trend-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .sleep-trend-chart {
