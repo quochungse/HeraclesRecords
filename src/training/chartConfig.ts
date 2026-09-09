@@ -11,6 +11,15 @@ export const TRAINING_LOAD_TREND_DAYS = 30;
 /** Days drawn by the trend charts that stay on a short window (HRV, sleep). */
 export const TRAINING_SHORT_TREND_DAYS = 7;
 
+/**
+ * Windows the training-load bar chart can be switched between, in render order.
+ * The widest must stay <= TRAINING_LOAD_TREND_DAYS, which is all the snapshot
+ * carries — a wider option would draw empty columns for days it has no load for.
+ */
+export const TRAINING_LOAD_WINDOWS = [7, 14, 30] as const;
+
+export type TrainingLoadWindow = (typeof TRAINING_LOAD_WINDOWS)[number];
+
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
 
@@ -34,6 +43,8 @@ export interface TrainingChartColors {
   dotStroke: string;
   tooltipBg: string;
   tooltipBorder: string;
+  /** Hue-free fill for a bar block that stands for no sport in particular. */
+  neutralFill: string;
 }
 
 export type TrainingMetricKey = "load" | "rpe" | "hrv" | "sleep";
@@ -63,7 +74,8 @@ const DARK_CHART_COLORS: TrainingChartColors = {
   cursorBand: "rgba(255, 255, 255, 0.05)",
   dotStroke: "rgba(12, 14, 13, 0.85)",
   tooltipBg: "rgba(18, 18, 20, 0.96)",
-  tooltipBorder: "rgba(255, 255, 255, 0.12)"
+  tooltipBorder: "rgba(255, 255, 255, 0.12)",
+  neutralFill: "rgba(255, 255, 255, 0.18)"
 };
 
 const PAPER_CHART_COLORS: TrainingChartColors = {
@@ -78,7 +90,8 @@ const PAPER_CHART_COLORS: TrainingChartColors = {
   cursorBand: "rgba(38, 34, 28, 0.06)",
   dotStroke: "rgba(255, 255, 255, 0.9)",
   tooltipBg: "rgba(255, 255, 255, 0.98)",
-  tooltipBorder: "rgba(38, 34, 28, 0.12)"
+  tooltipBorder: "rgba(38, 34, 28, 0.12)",
+  neutralFill: "rgba(38, 34, 28, 0.16)"
 };
 
 export function getTrainingChartColors(theme: Theme): TrainingChartColors {

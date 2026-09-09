@@ -424,7 +424,10 @@ export function TrainingOverview({
               rpeBackfill={rpeBackfill}
             />
           </div>
-          <TrainingTrendCharts points={snapshot?.trendPoints ?? []} />
+          <TrainingTrendCharts
+            points={snapshot?.trendPoints ?? []}
+            activities={activities}
+          />
           <TrainingZoneDistributionCharts
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             activities={activities}

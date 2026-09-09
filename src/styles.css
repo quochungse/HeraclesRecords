@@ -13169,6 +13169,17 @@ td span {
   flex-shrink: 0;
 }
 
+/* The load panel stacks its chart and its sport legend, so the panel itself
+   keeps the two children its grid was written for. */
+.training-chart-body {
+  display: grid;
+  /* The panel's min-height leaves slack; without this the grid hands it to the
+     row above and the legend drifts away from the chart it labels. */
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
 .training-chart-shell {
   height: clamp(220px, 25vh, 360px);
   border: none;
@@ -13300,6 +13311,65 @@ td span {
 }
 
 .training-chart-tooltip-row strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.training-chart-sport-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-chart-legend-swatch {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset;
+}
+
+/* Activity names are free text and run long; the tooltip truncates rather than
+   growing wide enough to cover the columns beside the one being read. */
+.training-chart-tooltip.is-blocks {
+  max-width: 300px;
+}
+
+.training-chart-tooltip.is-blocks .training-chart-tooltip-key {
+  min-width: 0;
+}
+
+.training-chart-tooltip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-chart-tooltip-empty {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.training-chart-tooltip-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.training-chart-tooltip-total strong {
   color: var(--text-primary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -25603,6 +25673,14 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-chart-legend-dot.is-accent {
   box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:root[data-theme="paper"] .training-chart-legend-swatch {
+  box-shadow: 0 0 0 1px rgba(38, 34, 28, 0.16) inset;
+}
+
+:root[data-theme="paper"] .training-chart-tooltip-total {
+  border-top-color: rgba(38, 34, 28, 0.12);
 }
 
 /* --- Training Hub: tooltips ------------------------------------------------ */
