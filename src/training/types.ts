@@ -104,6 +104,8 @@ export interface TrainingHubViewProps {
   selectedActivity: TrainingHubActivity | null;
   busy: string | null;
   sleepConnecting?: boolean;
+  /** Opens the Sleep screen from the Overview's sleep card. */
+  onOpenSleepDetails?: () => void;
   // Two-factor: non-null email means a verification code is being awaited.
   twoFactorEmail: string | null;
   twoFactorCode: string;

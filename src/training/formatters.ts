@@ -219,6 +219,39 @@ export function formatHappenDayLabel(value: string): string {
   }).format(new Date(year, month, day));
 }
 
+/**
+ * A sleep length, as COROS writes it: "7h 12m", "48m", "0m". Shared so the
+ * Overview panel and the Sleep screen cannot drift into two house styles.
+ */
+export function formatSleepDurationMinutes(minutes?: number): string {
+  if (minutes === undefined || !Number.isFinite(minutes)) {
+    return "–";
+  }
+
+  if (minutes <= 0) {
+    return "0m";
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.round(minutes % 60);
+
+  if (hours <= 0) {
+    return `${remainder}m`;
+  }
+
+  return `${hours}h ${String(remainder).padStart(2, "0")}m`;
+}
+
+/** A stage share, as COROS writes it: "18%", "5.5%", "–" when unknown. */
+export function formatSleepPercent(value?: number): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return "–";
+  }
+
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
+}
+
 export function formatSleepNightLabel(record: {
   happenDay: string;
   sleepStart?: string;

@@ -2476,8 +2476,19 @@ export interface TrainingHubSleepRecord {
   napStart?: string;
   napEnd?: string;
   avgHr?: number;
+  /** The night's heart-rate range, folded in from the daily health feed. */
+  minHr?: number;
+  maxHr?: number;
   sleepStart?: string;
   sleepEnd?: string;
+  /**
+   * The calendar days the window's two ends fall on, as `yyyyMMdd`, when COROS
+   * dated them. It writes `Main Sleep Window: 2026-09-08 00:40 - 2026-09-08
+   * 06:00`, so a night that began before midnight says so outright instead of
+   * leaving the clock times to be guessed at.
+   */
+  sleepStartDay?: string;
+  sleepEndDay?: string;
 }
 
 export interface TrainingHubSleepSummary {
@@ -2486,10 +2497,84 @@ export interface TrainingHubSleepSummary {
   mcpConnected: boolean;
 }
 
+/**
+ * One reading inside a night. `at` is the true instant; `clock` is what the
+ * watch showed at the time, carried alongside because COROS sends its own UTC
+ * offset per point and the machine reading this may sit in another timezone.
+ */
+export interface SleepSeriesPoint {
+  /** The true instant, UTC. */
+  at: number;
+  /**
+   * The same instant in the athlete's own timezone, expressed as if it were
+   * UTC. Charts plot against this and the sleep window's bounds, which share
+   * the frame — so a night reads the same on a machine in another timezone.
+   */
+  localAt: number;
+  clock: string;
+  value: number;
+}
+
+/** COROS's own verdict on a night's HRV — never recomputed from the points. */
+export interface SleepHrvAssessment {
+  happenDay: string;
+  avg?: number;
+  normalLow?: number;
+  normalHigh?: number;
+  baseline?: number;
+  evaluation?: string;
+}
+
+/**
+ * What happened across one night, sample by sample. Not sleep stages — COROS
+ * sends none — but the two series it does send inside the sleep window.
+ */
+export interface SleepNightSeries {
+  happenDay: string;
+  hrv: SleepSeriesPoint[];
+  stress: SleepSeriesPoint[];
+  assessment?: SleepHrvAssessment;
+  /** The sleep window the series were clipped to, as epoch ms. */
+  windowStart?: number;
+  windowEnd?: number;
+  fetchedAt?: number;
+  source: "cache" | "network";
+  mcpConnected: boolean;
+  error?: string;
+}
+
+/**
+ * Whether a snapshot cost a request. `"cache"` means it did not — the line the
+ * screen shows says "cached" rather than "updated" on the strength of it.
+ */
+export type SleepHistorySource = "cache" | "network";
+
+export interface SleepHistorySnapshot {
+  /** Nights newest first, main sleeps only — naps are folded into their night. */
+  records: TrainingHubSleepRecord[];
+  /** Last night, by the rule in `src/training/sleepFreshness.ts`. */
+  latest?: TrainingHubSleepRecord;
+  mcpConnected: boolean;
+  /** Epoch ms the newest record in this snapshot was fetched from COROS. */
+  fetchedAt?: number;
+  source: SleepHistorySource;
+  /** Set when a network fill was attempted and failed; the cache still stands. */
+  error?: string;
+}
+
 export interface TrainingHubDailyHealthRecord {
   happenDay: string;
   steps?: number;
   calories?: number;
+  /**
+   * Heart rate through the night, which arrives here and nowhere else:
+   * `querySleepData` sends no heart rate at all, and every other COROS surface
+   * averages over the whole day. Dated by wake-up day, like the sleep it
+   * belongs to.
+   */
+  sleepAvgHr?: number;
+  sleepMinHr?: number;
+  sleepMaxHr?: number;
 }
 
 export interface TrainingHubDailyHealthSummary {

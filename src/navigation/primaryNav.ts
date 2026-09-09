@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
+  Moon,
   Music,
   Settings,
   User,
@@ -27,6 +28,7 @@ export type PrimaryView =
   | "gear"
   | "library"
   | "strength"
+  | "sleep"
   | "data"
   | "calendar"
   | "maps"
@@ -91,6 +93,10 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       { id: "library", label: "Training Library", icon: BookOpen },
     ],
   }),
+  // Sleep sits beside Training rather than inside it: it is recovery, it is
+  // reached from the Overview card, and burying it a level down made the one
+  // screen an athlete opens every morning the hardest one to find.
+  item({ id: "sleep", label: "Sleep", icon: Moon }),
   group({
     id: "coros-connect",
     label: "Coros Connect",

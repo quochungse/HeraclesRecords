@@ -64,6 +64,8 @@ import type {
   TrainingHubDailyHealthSummary,
   TrainingHubDailyMetrics,
   TrainingHubDashboard,
+  SleepHistorySnapshot,
+  SleepNightSeries,
   TrainingHubSleepSummary,
   TrainingHubRacePredictor,
   TrainingHubSportType,
@@ -551,6 +553,14 @@ export interface CorosLinkApi {
   getActivityPaceBaselines: () => Promise<ActivityPaceBaselines>;
   getUpcomingWorkouts: (days?: number) => Promise<TrainingHubUpcomingWorkout[]>;
   getTrainingSleepData: (days?: number) => Promise<TrainingHubSleepSummary>;
+  getSleepHistory: (request?: {
+    days?: number;
+    refresh?: boolean;
+  }) => Promise<SleepHistorySnapshot>;
+  getSleepNightSeries: (request: {
+    happenDay: string;
+    refresh?: boolean;
+  }) => Promise<SleepNightSeries>;
   getTrainingDailyHealthData: (
     days?: number
   ) => Promise<TrainingHubDailyHealthSummary>;

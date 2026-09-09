@@ -15,6 +15,7 @@ import {
   isUpcomingWorkoutScheduled,
   isUpcomingWorkoutToday
 } from "./training/formatters";
+import { pickLastNightSleep } from "./sleep/sleepFreshness";
 import { resolveSportName } from "./training/sportTypes";
 import type { TrainingSummaryMetrics } from "./training/types";
 
@@ -113,22 +114,7 @@ function findLastNight(
   sleep: TrainingHubSleepSummary | null | undefined,
   now: Date
 ): TrainingHubSleepRecord | undefined {
-  if (!sleep) {
-    return undefined;
-  }
-
-  const acceptable = new Set([getLocalHappenDayKey(now), dayKeyOffset(now, -1)]);
-  const candidates = [
-    ...(sleep.latest ? [sleep.latest] : []),
-    ...(sleep.records ?? [])
-  ];
-
-  return candidates.find(
-    (record) =>
-      record.kind !== "nap" &&
-      record.completeness !== "partial" &&
-      acceptable.has(record.happenDay)
-  );
+  return pickLastNightSleep(sleep, { now, excludePartial: true });
 }
 
 const TODAY_WORKOUT_COPY: Record<string, string> = {

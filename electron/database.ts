@@ -466,6 +466,33 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       sleep_minutes REAL,
       captured_at   TEXT NOT NULL
     );
+
+    -- The Sleep details screen's cache. One COROS sleep fetch costs ~20
+    -- sequential MCP round trips (sleepDataService brute-forces the tool's
+    -- argument shapes), so a screen that refetched on every visit would be
+    -- unusable; a night that has already been slept never changes, so it is
+    -- kept here and re-read instead. The payload column holds the whole
+    -- TrainingHubSleepRecord as JSON, which keeps the table additive as the
+    -- record grows fields.
+    CREATE TABLE IF NOT EXISTS sleep_nights (
+      happen_day TEXT NOT NULL,        -- local "YYYYMMDD", as COROS keys it
+      kind       TEXT NOT NULL DEFAULT 'main',
+      payload    TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL      -- epoch ms this row last came off COROS
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sleep_nights_day_kind
+      ON sleep_nights (happen_day, kind);
+
+    -- The samples inside one night: HRV during sleep and stress, already
+    -- clipped to the sleep window. Kept for the same reason as the totals and
+    -- one more: COROS caps both series at a 7-day query window, so a night is
+    -- only reachable for a week after it happened.
+    CREATE TABLE IF NOT EXISTS sleep_night_series (
+      happen_day TEXT PRIMARY KEY,
+      payload    TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
   `);
 
   ensureColumn(db, "generated_routes", "activity_type", "TEXT");
@@ -1406,6 +1433,94 @@ export function upsertCoachDailySamples(
     }
   });
   transaction(rows);
+}
+
+export interface SleepNightRow {
+  happen_day: string;
+  kind: string;
+  payload: string;
+  fetched_at: number;
+}
+
+/**
+ * Upserts fetched nights. A row is replaced wholesale rather than merged
+ * column by column: unlike the daily samples above, one COROS answer carries a
+ * whole night or none of it, so there is no half-row to protect.
+ */
+export function upsertSleepNights(rows: SleepNightRow[]): void {
+  if (!rows.length) {
+    return;
+  }
+
+  const database = requireDatabase();
+  const statement = database.prepare(
+    `INSERT INTO sleep_nights (happen_day, kind, payload, fetched_at)
+     VALUES (@happen_day, @kind, @payload, @fetched_at)
+     ON CONFLICT(happen_day, kind) DO UPDATE SET
+       payload = excluded.payload,
+       fetched_at = excluded.fetched_at`
+  );
+  const transaction = database.transaction((batch: SleepNightRow[]) => {
+    for (const row of batch) {
+      statement.run(row);
+    }
+  });
+  transaction(rows);
+}
+
+/** Cached nights from `fromDay` (inclusive) onward, newest first. */
+export function listSleepNights(fromDay: string): SleepNightRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT happen_day, kind, payload, fetched_at
+       FROM sleep_nights
+       WHERE happen_day >= ?
+       ORDER BY happen_day DESC`
+    )
+    .all(fromDay) as SleepNightRow[];
+}
+
+/** Drops cached nights older than `beforeDay`, so the table cannot grow forever. */
+export function pruneSleepNights(beforeDay: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM sleep_nights WHERE happen_day < ?")
+    .run(beforeDay);
+}
+
+export interface SleepNightSeriesRow {
+  happen_day: string;
+  payload: string;
+  fetched_at: number;
+}
+
+export function upsertSleepNightSeries(row: SleepNightSeriesRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO sleep_night_series (happen_day, payload, fetched_at)
+       VALUES (@happen_day, @payload, @fetched_at)
+       ON CONFLICT(happen_day) DO UPDATE SET
+         payload = excluded.payload,
+         fetched_at = excluded.fetched_at`
+    )
+    .run(row);
+}
+
+/** Every cached night series, newest first. */
+export function listSleepNightSeries(): SleepNightSeriesRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT happen_day, payload, fetched_at
+       FROM sleep_night_series
+       ORDER BY happen_day DESC`
+    )
+    .all() as SleepNightSeriesRow[];
+}
+
+/** Drops cached night series older than `beforeDay`. */
+export function pruneSleepNightSeries(beforeDay: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM sleep_night_series WHERE happen_day < ?")
+    .run(beforeDay);
 }
 
 /** Samples from `fromDay` (inclusive) onward, ascending. */

@@ -1,96 +1,27 @@
 import {
+  ChevronRight,
   Loader2,
   Moon,
   MoonStar,
   Sunrise
 } from "lucide-react";
-import { formatSleepClockRange, formatSleepNightLabel } from "../formatters";
+import {
+  formatSleepClockRange,
+  formatSleepDurationMinutes,
+  formatSleepNightLabel,
+  formatSleepPercent
+} from "../formatters";
+import { pickLastNightSleep } from "../../sleep/sleepFreshness";
+import { sleepScoreLabel, sleepScoreTone } from "../../sleep/sleepScore";
+import { drawableStages } from "../../sleep/sleepStages";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
 
 interface SleepSummaryPanelProps {
   sleep?: TrainingHubSleepSummary | null;
   connecting?: boolean;
   refreshing?: boolean;
-}
-
-function formatSleepDuration(minutes?: number): string {
-  if (minutes === undefined || !Number.isFinite(minutes)) {
-    return "–";
-  }
-
-  if (minutes <= 0) {
-    return "0m";
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainder = Math.round(minutes % 60);
-
-  if (hours <= 0) {
-    return `${remainder}m`;
-  }
-
-  return `${hours}h ${String(remainder).padStart(2, "0")}m`;
-}
-
-function sleepScoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" {
-  if (score === undefined || !Number.isFinite(score)) {
-    return "neutral";
-  }
-
-  if (score < 60) {
-    return "low";
-  }
-
-  if (score < 75) {
-    return "mid";
-  }
-
-  if (score < 90) {
-    return "good";
-  }
-
-  return "high";
-}
-
-function sleepScoreLabel(score?: number): string {
-  const tone = sleepScoreTone(score);
-
-  switch (tone) {
-    case "low":
-      return "Poor";
-    case "mid":
-      return "Fair";
-    case "good":
-      return "Good";
-    case "high":
-      return "Excellent";
-    default:
-      return "Waiting";
-  }
-}
-
-function stageTotal(record: TrainingHubSleepRecord): number {
-  const stagedPercent =
-    (record.deepPercent ?? 0) +
-    (record.lightPercent ?? 0) +
-    (record.remPercent ?? 0) +
-    (record.awakePercent ?? 0);
-
-  if (stagedPercent > 0) {
-    return stagedPercent;
-  }
-
-  const staged =
-    (record.deepMinutes ?? 0) +
-    (record.lightMinutes ?? 0) +
-    (record.remMinutes ?? 0) +
-    (record.awakeMinutes ?? 0);
-
-  if (staged > 0) {
-    return staged;
-  }
-
-  return record.totalMinutes ?? 0;
+  /** Opens the Sleep screen. Omitted, the panel stays a plain card. */
+  onOpenDetails?: () => void;
 }
 
 function formatNapSummary(record: TrainingHubSleepRecord): string {
@@ -98,7 +29,7 @@ function formatNapSummary(record: TrainingHubSleepRecord): string {
     return "No data";
   }
 
-  return formatSleepDuration(record.napMinutes);
+  return formatSleepDurationMinutes(record.napMinutes);
 }
 
 function formatSleepWindow(
@@ -114,7 +45,7 @@ function formatSleepWindow(
 }
 
 function formatSleepMetricDuration(minutes?: number): string {
-  const duration = formatSleepDuration(minutes);
+  const duration = formatSleepDurationMinutes(minutes);
   return duration === "–" ? "No data" : duration;
 }
 
@@ -163,60 +94,23 @@ function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
   );
 }
 
-function formatPercent(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) {
-    return "–";
-  }
-
-  const rounded = Math.round(value * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
-}
-
 function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
-  const total = stageTotal(record);
+  // The same breakdown the Sleep screen draws, so one night cannot read as two
+  // different splits depending on which surface you are looking at.
+  const segments = drawableStages(record).map((stage) => ({
+    key: stage.key,
+    label: stage.label,
+    className: stage.className,
+    value: stage.weight,
+    detail:
+      stage.percent !== undefined
+        ? formatSleepPercent(stage.percent)
+        : formatSleepDurationMinutes(stage.minutes)
+  }));
 
-  if (total <= 0) {
+  if (segments.length === 0) {
     return <p className="sleep-panel-empty-stages">Stage breakdown unavailable.</p>;
   }
-
-  const segments = [
-    {
-      key: "deep",
-      label: "Deep",
-      value: record.deepPercent ?? record.deepMinutes ?? 0,
-      detail: record.deepPercent !== undefined
-        ? formatPercent(record.deepPercent)
-        : formatSleepDuration(record.deepMinutes),
-      className: "is-deep"
-    },
-    {
-      key: "light",
-      label: "Light",
-      value: record.lightPercent ?? record.lightMinutes ?? 0,
-      detail: record.lightPercent !== undefined
-        ? formatPercent(record.lightPercent)
-        : formatSleepDuration(record.lightMinutes),
-      className: "is-light"
-    },
-    {
-      key: "rem",
-      label: "REM",
-      value: record.remPercent ?? record.remMinutes ?? 0,
-      detail: record.remPercent !== undefined
-        ? formatPercent(record.remPercent)
-        : formatSleepDuration(record.remMinutes),
-      className: "is-rem"
-    },
-    {
-      key: "awake",
-      label: "Awake",
-      value: record.awakePercent ?? record.awakeMinutes ?? 0,
-      detail: record.awakePercent !== undefined
-        ? formatPercent(record.awakePercent)
-        : formatSleepDuration(record.awakeMinutes),
-      className: "is-awake"
-    }
-  ].filter((segment) => segment.value > 0);
 
   return (
     <div className="sleep-stage-stack">
@@ -250,26 +144,71 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
   );
 }
 
+function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
+  const parts = [formatSleepNightLabel(record)];
+
+  if (record.totalMinutes !== undefined && Number.isFinite(record.totalMinutes)) {
+    parts.push(formatSleepDurationMinutes(record.totalMinutes));
+  }
+
+  if (record.score !== undefined && Number.isFinite(record.score)) {
+    parts.push(`score ${Math.round(record.score)}`);
+  }
+
+  return parts.join(" · ");
+}
+
 export function SleepSummaryPanel({
   sleep,
   connecting = false,
-  refreshing = false
+  refreshing = false,
+  onOpenDetails
 }: SleepSummaryPanelProps) {
-  const latest = sleep?.latest;
-  const tone = sleepScoreTone(latest?.score);
-  const label = sleepScoreLabel(latest?.score);
+  // Only last night's record may be shown here. `sleep.latest` is the newest
+  // night COROS returned, which on an unsynced watch is days old — and read
+  // under this panel's heading it becomes a score for a night that never
+  // happened.
+  const lastNight = pickLastNightSleep(sleep);
+  const staleNight = !lastNight ? sleep?.latest : undefined;
+  const tone = sleepScoreTone(lastNight?.score);
+  const label = sleepScoreLabel(lastNight?.score, "Waiting");
   const isLoading = connecting || refreshing;
 
   return (
-    <section className={`panel sleep-panel tone-${tone}`}>
+    <section
+      className={`panel sleep-panel tone-${tone}${onOpenDetails ? " is-openable" : ""}`}
+      // The whole card is the target — a person reaching for "more sleep detail"
+      // aims at the score, not at a link under it. Keyboard users get the real
+      // button in the header, so the card itself stays out of the tab order.
+      onClick={onOpenDetails}
+    >
       <div className="sleep-panel-header">
         <div>
           <p className="eyebrow">Sleep</p>
-          <h2>{latest ? formatSleepNightLabel(latest) : "Last night"}</h2>
+          <h2>{lastNight ? formatSleepNightLabel(lastNight) : "Last night"}</h2>
         </div>
-        <span className="sleep-panel-icon" aria-hidden="true">
-          {isLoading ? <Loader2 className="spin" size={16} /> : <MoonStar size={16} />}
-        </span>
+        {onOpenDetails ? (
+          <button
+            type="button"
+            className="sleep-panel-open"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDetails();
+            }}
+            aria-label="Open sleep details"
+          >
+            {isLoading ? (
+              <Loader2 className="spin" size={16} aria-hidden="true" />
+            ) : (
+              <MoonStar size={16} aria-hidden="true" />
+            )}
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+        ) : (
+          <span className="sleep-panel-icon" aria-hidden="true">
+            {isLoading ? <Loader2 className="spin" size={16} /> : <MoonStar size={16} />}
+          </span>
+        )}
       </div>
 
       {connecting ? (
@@ -280,51 +219,58 @@ export function SleepSummaryPanel({
         <p className="sleep-panel-message">Syncing sleep data…</p>
       ) : null}
 
-      {!isLoading && latest ? (
+      {!isLoading && lastNight ? (
         <>
           <div className="sleep-panel-hero">
             <div className="sleep-panel-score">
-              <strong>{latest.score !== undefined ? Math.round(latest.score) : "–"}</strong>
+              <strong>{lastNight.score !== undefined ? Math.round(lastNight.score) : "–"}</strong>
               <span>{label}</span>
             </div>
             <div className="sleep-panel-duration">
               <span>Main sleep</span>
-              <strong>{formatSleepDuration(latest.totalMinutes)}</strong>
+              <strong>{formatSleepDurationMinutes(lastNight.totalMinutes)}</strong>
             </div>
           </div>
 
-          <SleepStageBar record={latest} />
+          <SleepStageBar record={lastNight} />
 
-          {latest.completeness === "partial" ? (
+          {lastNight.completeness === "partial" ? (
             <p className="sleep-panel-partial">
-              Partial data: {latest.partialReason ?? "COROS is still syncing this sleep."}
+              Partial data: {lastNight.partialReason ?? "COROS is still syncing this sleep."}
             </p>
           ) : null}
 
           <dl className="sleep-panel-metrics" aria-label="Sleep details">
-            <SleepWindowMetric record={latest} />
+            <SleepWindowMetric record={lastNight} />
             <SleepMetric
               label="Awake"
-              value={formatSleepMetricDuration(latest.awakeMinutes)}
+              value={formatSleepMetricDuration(lastNight.awakeMinutes)}
             />
             <SleepMetric
               label="Wake-ups > 5m"
-              value={latest.awakeCountOverFiveMinutes ?? "No data"}
+              value={lastNight.awakeCountOverFiveMinutes ?? "No data"}
             />
             <SleepMetric
               label="Naps"
-              value={formatNapSummary(latest)}
+              value={formatNapSummary(lastNight)}
             />
           </dl>
         </>
       ) : null}
 
-      {!isLoading && !latest ? (
-        <p className="sleep-panel-message">
-          {sleep?.mcpConnected
-            ? "No sleep data for this period."
-            : "Connect COROS data access to view sleep metrics."}
-        </p>
+      {!isLoading && !lastNight ? (
+        <div className="sleep-panel-empty">
+          <p className="sleep-panel-message">
+            {sleep?.mcpConnected
+              ? "No sleep recorded for last night yet. Sync your watch to see it here."
+              : "Connect COROS data access to view sleep metrics."}
+          </p>
+          {staleNight ? (
+            <p className="sleep-panel-stale">
+              Most recent night on record: {formatStaleNightSummary(staleNight)}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

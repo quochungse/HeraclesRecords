@@ -166,7 +166,15 @@ assert.deepEqual(
 const staleSleep = context({
   sleep: { records: [], mcpConnected: true, latest: { happenDay: dayKey(-3), score: 41 } }
 });
-assert.deepEqual(ids(staleSleep), [], "sleep older than yesterday is dropped");
+assert.deepEqual(ids(staleSleep), [], "sleep from days ago is dropped");
+
+// COROS stamps a night with the morning it ended, so yesterday's key is the
+// night before last — a watch that has not synced since yesterday morning must
+// not put words about "last night" on the dashboard.
+const nightBeforeLast = context({
+  sleep: { records: [], mcpConnected: true, latest: { happenDay: dayKey(-1), score: 41 } }
+});
+assert.deepEqual(ids(nightBeforeLast), [], "the night before last is dropped");
 
 // --- Recovery and resting heart rate ---------------------------------------
 

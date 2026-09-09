@@ -249,7 +249,10 @@ function mergeDailyHealthRecord(
   return {
     happenDay: incoming.happenDay,
     steps: incoming.steps ?? existing.steps,
-    calories: incoming.calories ?? existing.calories
+    calories: incoming.calories ?? existing.calories,
+    sleepAvgHr: incoming.sleepAvgHr ?? existing.sleepAvgHr,
+    sleepMinHr: incoming.sleepMinHr ?? existing.sleepMinHr,
+    sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr
   };
 }
 
@@ -346,14 +349,38 @@ function parseProseDailyHealthSection(
     /\b(?:calories(?: burned)?|total calories|daily calories|calorie|kcal)\b\s*[:=-]\s*([\d,.]+)/i
   ]);
 
-  if (steps === undefined && calories === undefined) {
+  // "Sleep HR: Avg 50 bpm | Min 44 bpm | Max 71 bpm" — the only heart rate
+  // COROS reports for a night rather than for a day.
+  const sleepHrLine = section.match(/\bSleep\s*HR\b\s*:\s*([^\n]+)/i)?.[1];
+  const sleepAvgHr = sleepHrLine
+    ? parseLabeledNumber(sleepHrLine, [/\bavg(?:erage)?\b\s*[:=]?\s*([\d,.]+)/i])
+    : undefined;
+  const sleepMinHr = sleepHrLine
+    ? parseLabeledNumber(sleepHrLine, [/\bmin(?:imum)?\b\s*[:=]?\s*([\d,.]+)/i])
+    : undefined;
+  const sleepMaxHr = sleepHrLine
+    ? parseLabeledNumber(sleepHrLine, [/\bmax(?:imum)?\b\s*[:=]?\s*([\d,.]+)/i])
+    : undefined;
+
+  // A day whose only news is the night's heart rate is still news: the Sleep
+  // screen reads this feed for that line and nothing else.
+  if (
+    steps === undefined &&
+    calories === undefined &&
+    sleepAvgHr === undefined &&
+    sleepMinHr === undefined &&
+    sleepMaxHr === undefined
+  ) {
     return undefined;
   }
 
   return {
     happenDay,
     steps,
-    calories
+    calories,
+    sleepAvgHr,
+    sleepMinHr,
+    sleepMaxHr
   };
 }
 
@@ -430,7 +457,9 @@ function dailyHealthRecordScore(record: TrainingHubDailyHealthRecord): number {
     ? Number(record.happenDay) - 20_000_000
     : 0;
   const completeness =
-    (record.steps !== undefined ? 1 : 0) + (record.calories !== undefined ? 1 : 0);
+    (record.steps !== undefined ? 1 : 0) +
+    (record.calories !== undefined ? 1 : 0) +
+    (record.sleepAvgHr !== undefined ? 1 : 0);
 
   return happenDayScore * 10 + completeness;
 }
@@ -441,15 +470,6 @@ export function pickLatestDailyHealthRecord(
   return [...records].sort(
     (left, right) => dailyHealthRecordScore(right) - dailyHealthRecordScore(left)
   )[0];
-}
-
-function dailyHealthResponseQuality(records: TrainingHubDailyHealthRecord[]): number {
-  const latest = pickLatestDailyHealthRecord(records);
-  if (!latest) {
-    return 0;
-  }
-
-  return dailyHealthRecordScore(latest) * 100 + Math.min(records.length, 30);
 }
 
 function resolveDailyHealthTool(tools: CorosMcpTool[]): CorosMcpTool | undefined {
@@ -475,92 +495,15 @@ function schemaPropertyNames(schema: Record<string, unknown>): string[] {
   return Object.keys(properties as Record<string, unknown>);
 }
 
-function addExactDailyHealthDateArgs(
-  candidates: Record<string, unknown>[],
-  propertyNames: string[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const keyedArgs: Array<[string, unknown][]> = [];
-
-  if (propertyNames.includes("date")) {
-    keyedArgs.push([["date", iso]], [["date", happenDay]]);
-  }
-  if (propertyNames.includes("happenDay")) {
-    keyedArgs.push([["happenDay", happenDay]]);
-  }
-  if (propertyNames.includes("happen_day")) {
-    keyedArgs.push([["happen_day", happenDay]]);
-  }
-  if (propertyNames.includes("day")) {
-    keyedArgs.push([["day", happenDay]], [["day", iso]]);
-  }
-
-  for (const entries of keyedArgs) {
-    candidates.push(Object.fromEntries(entries));
-  }
-}
-
-function addGenericExactDailyHealthDateArgs(
-  candidates: Record<string, unknown>[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const timezone = getLocalTimeZone();
-
-  candidates.push(
-    ...(timezone
-      ? [
-          { startDate: happenDay, endDate: happenDay, days: 1, timezone },
-          { startDate: iso, endDate: iso, days: 1, timezone }
-        ]
-      : []),
-    { startDate: happenDay, endDate: happenDay, days: 1 },
-    { startDate: iso, endDate: iso, days: 1 },
-    { date: iso },
-    { date: happenDay },
-    { happenDay },
-    { happen_day: happenDay },
-    { day: happenDay },
-    { day: iso }
-  );
-}
-
-function addDailyHealthQueryArgs(
-  candidates: Record<string, unknown>[],
-  propertyNames: string[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const query =
-    `Return COROS daily health data for ${iso} (${happenDay}). ` +
-    "Include steps and total calories.";
-  const keys = ["query", "question", "prompt", "input", "text"];
-
-  for (const key of keys) {
-    if (propertyNames.includes(key)) {
-      candidates.push({ [key]: query });
-    }
-  }
-}
-
-function addGenericDailyHealthQueryArgs(
-  candidates: Record<string, unknown>[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const query =
-    `Return COROS daily health data for ${iso} (${happenDay}). ` +
-    "Include steps and total calories.";
-
-  candidates.push(
-    { query },
-    { question: query },
-    { prompt: query },
-    { input: query }
-  );
-}
-
+/**
+ * The arguments for one daily-health query, built from the schema the tool
+ * publishes rather than from twenty guesses.
+ *
+ * The live COROS tool declares exactly one property — `days` — with
+ * `additionalProperties: false`, and ignores a date range if one is sent. The
+ * old builder fired every spelling of a date at it and paid a round trip for
+ * each, which is the same bill `sleepDataService` used to run up.
+ */
 function buildDailyHealthToolArgs(
   tool: CorosMcpTool,
   days: number
@@ -568,53 +511,38 @@ function buildDailyHealthToolArgs(
   const dateList = recentTrainingHubDateList(days);
   const startDay = dateList[dateList.length - 1];
   const endDay = dateList[0];
-  const startIso = happenDayToIso(startDay);
-  const endIso = happenDayToIso(endDay);
-  const timezone = getLocalTimeZone();
   const propertyNames = schemaPropertyNames(tool.inputSchema);
   const candidates: Record<string, unknown>[] = [];
 
-  addExactDailyHealthDateArgs(candidates, propertyNames, endDay);
-  addGenericExactDailyHealthDateArgs(candidates, endDay);
-  addDailyHealthQueryArgs(candidates, propertyNames, endDay);
-  addGenericDailyHealthQueryArgs(candidates, endDay);
+  if (propertyNames.length > 0) {
+    const declared: Record<string, unknown> = {};
+    const set = (name: string, value: unknown) => {
+      if (propertyNames.includes(name)) {
+        declared[name] = value;
+      }
+    };
 
-  const rangedArgs: Record<string, unknown> = {};
-  if (propertyNames.includes("startDate")) {
-    rangedArgs.startDate = startIso;
-  }
-  if (propertyNames.includes("endDate")) {
-    rangedArgs.endDate = endIso;
-  }
-  if (propertyNames.includes("startDay")) {
-    rangedArgs.startDay = startDay;
-  }
-  if (propertyNames.includes("endDay")) {
-    rangedArgs.endDay = endDay;
-  }
-  if (propertyNames.includes("start_day")) {
-    rangedArgs.start_day = startDay;
-  }
-  if (propertyNames.includes("end_day")) {
-    rangedArgs.end_day = endDay;
-  }
-  if (propertyNames.includes("days")) {
-    rangedArgs.days = days;
-  }
-  if (timezone && propertyNames.includes("timezone")) {
-    rangedArgs.timezone = timezone;
-  }
-  if (Object.keys(rangedArgs).length > 0) {
-    candidates.push(rangedArgs);
+    set("days", days);
+    set("startDate", happenDayToIso(startDay));
+    set("endDate", happenDayToIso(endDay));
+    set("startDay", startDay);
+    set("endDay", endDay);
+    set("start_day", startDay);
+    set("end_day", endDay);
+
+    const timezone = getLocalTimeZone();
+    if (timezone) {
+      set("timezone", timezone);
+    }
+
+    if (Object.keys(declared).length > 0) {
+      candidates.push(declared);
+    }
+  } else {
+    candidates.push({ days });
   }
 
-  candidates.push(
-    { startDate: startIso, endDate: endIso },
-    { startDate: startDay, endDate: endDay },
-    { startDay, endDay },
-    { days },
-    {}
-  );
+  candidates.push({});
 
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
@@ -627,26 +555,22 @@ function buildDailyHealthToolArgs(
   });
 }
 
+
 async function fetchDailyHealthRecords(
   dailyHealthTool: CorosMcpTool,
   days: number
 ): Promise<TrainingHubDailyHealthRecord[]> {
   const fallbackDay = recentTrainingHubDateList(1)[0];
-  const argCandidates = buildDailyHealthToolArgs(dailyHealthTool, days);
-  let bestRecords: TrainingHubDailyHealthRecord[] = [];
-  let bestScore = -1;
-  const collectedRecords: TrainingHubDailyHealthRecord[] = [];
 
-  for (const args of argCandidates) {
+  // Built from the schema, so the first answer with days in it is the answer;
+  // the rest of the list exists for a server that refused it.
+  for (const args of buildDailyHealthToolArgs(dailyHealthTool, days)) {
     try {
       const response = await callCorosMcpTool(dailyHealthTool.name, args);
       const records = parseDailyHealthDataResponse(response, fallbackDay);
-      const score = dailyHealthResponseQuality(records);
-      collectedRecords.push(...records);
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestRecords = records;
+      if (records.length > 0) {
+        return records;
       }
     } catch (error) {
       console.warn(
@@ -656,8 +580,7 @@ async function fetchDailyHealthRecords(
     }
   }
 
-  const mergedRecords = mergeDailyHealthRecords(collectedRecords);
-  return mergedRecords.length > 0 ? mergedRecords : bestRecords;
+  return [];
 }
 
 export async function getTrainingDailyHealthData(
