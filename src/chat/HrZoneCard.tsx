@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import { Heart } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { TooltipContentProps } from "recharts";
-import type { HrZonePreview, TrainingHubThresholdZone } from "../../electron/types";
+import type { HrZonePreview } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds
 } from "../training/formatters";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
+import { formatHeartRateZoneRange } from "../training/heartRateZoneModel";
 import { HEART_RATE_ZONE_COLORS } from "./charts/zoneChartConfig";
 import type { UnitSystem } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -58,33 +59,6 @@ function heartRateZoneCaption(zoneIndex: number): string {
     default:
       return "Training intensity zone";
   }
-}
-
-function formatHrZoneRange(
-  zoneIndex: number,
-  lthrZones: TrainingHubThresholdZone[]
-): string {
-  const sorted = [...lthrZones].sort((left, right) => left.index - right.index);
-  if (sorted.length === 0) {
-    return "—";
-  }
-
-  const zone =
-    sorted.find((entry) => entry.index === zoneIndex) ??
-    sorted[zoneIndex] ??
-    sorted[sorted.length - 1];
-  const zonePosition = sorted.findIndex((entry) => entry.index === zone.index);
-  const previous = zonePosition > 0 ? sorted[zonePosition - 1] : undefined;
-
-  if (zone.hr !== undefined && previous?.hr !== undefined) {
-    return `${previous.hr + 1}–${zone.hr} bpm`;
-  }
-
-  if (zone.hr !== undefined) {
-    return `≤ ${zone.hr} bpm`;
-  }
-
-  return "—";
 }
 
 function formatZoneMetricValue(
@@ -141,7 +115,7 @@ export function HrZoneCard({ preview }: HrZoneCardProps) {
       value: zone.value,
       detail: formatZoneMetricValue(zone.value, preview.metric, unitSystem),
       caption: heartRateZoneCaption(zone.index),
-      hrRange: formatHrZoneRange(zone.index, preview.lthrZones),
+      hrRange: formatHeartRateZoneRange(preview.lthrZones, zone.index),
       color: HEART_RATE_ZONE_COLORS[index % HEART_RATE_ZONE_COLORS.length]
     }));
   }, [preview, unitSystem]);

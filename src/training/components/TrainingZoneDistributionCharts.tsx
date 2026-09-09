@@ -24,8 +24,19 @@ import {
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+import {
+  formatHeartRateZoneRange,
+  type HeartRateZoneModel
+} from "../heartRateZoneModel";
 
 interface TrainingZoneDistributionChartsProps {
+  /**
+   * The zone model picked on the Personal screen. COROS aggregates the
+   * distribution against that model, so it is what the buckets must be
+   * labelled with; null until the profile lands, or when it names no zones.
+   */
+  hrZoneModel: HeartRateZoneModel | null;
+  /** Dashboard LTHR zones, the fallback for a profile that never arrived. */
   lthrZones: TrainingHubThresholdZone[];
   activities: TrainingHubActivity[];
   analytics: TrainingHubAnalytics | null;
@@ -50,6 +61,8 @@ interface ZoneDistributionDatum {
   percent: number;
   color: string;
   zoneIndex: number;
+  /** Bpm span of the zone, when the account's zones are known. */
+  range?: string;
 }
 
 type ActivityMetric = "trainingLoad" | "distance" | "time";
@@ -254,7 +267,9 @@ function buildAreaDistributionData(
   entries: TrainingHubZoneDistributionEntry[],
   labels: string[],
   colors: string[],
-  formatValue: (value: number) => string
+  formatValue: (value: number) => string,
+  /** Indexed the same way `labels` is: by position in the sorted list. */
+  ranges?: (string | undefined)[]
 ): ZoneDistributionDatum[] {
   const sortedEntries = [...entries].sort(
     (left, right) => left.index - right.index
@@ -286,7 +301,8 @@ function buildAreaDistributionData(
       detail: formatValue(value),
       percent,
       color: colors[index % colors.length],
-      zoneIndex: index + 1
+      zoneIndex: index + 1,
+      ...(ranges?.[index] ? { range: ranges[index] } : {})
     };
   });
 }
@@ -301,11 +317,17 @@ function buildHeartRateData(
   const areaList = getHeartRateAreaList(analytics, metric);
 
   if (areaList.length > 0) {
+    // COROS numbers both its zones and these buckets from zero, so the nth
+    // bucket is the nth zone — which is what lets the bpm bounds be read
+    // straight off the account's own zone list.
     return buildAreaDistributionData(
       areaList,
       areaList.map((_entry, index) => `Zone ${index + 1}`),
       HEART_RATE_ZONE_COLORS,
-      (value) => formatActivityMetricValue(value, metric, unitSystem)
+      (value) => formatActivityMetricValue(value, metric, unitSystem),
+      areaList.map((_entry, index) =>
+        zones.length > 0 ? formatHeartRateZoneRange(zones, index) : undefined
+      )
     );
   }
 
@@ -343,7 +365,8 @@ function buildHeartRateData(
     detail: formatActivityMetricValue(item.value, metric, unitSystem),
     percent: (item.value / total) * 100,
     color: HEART_RATE_ZONE_COLORS[index % HEART_RATE_ZONE_COLORS.length],
-    zoneIndex: index + 1
+    zoneIndex: index + 1,
+    range: formatHeartRateZoneRange(sortedZones, index)
   }));
 }
 
@@ -559,7 +582,10 @@ function ZoneDistributionTooltip({
 
   return (
     <div className="training-zone-tooltip">
-      <span>{datum.label}</span>
+      <span>
+        {datum.label}
+        {datum.range ? ` · ${datum.range}` : ""}
+      </span>
       <strong>{formatPercent(datum.percent)}</strong>
       <em>{datum.detail}</em>
     </div>
@@ -653,6 +679,7 @@ function ZoneDistributionPanel({
               </p>
               <p className="training-zone-hero-detail">{topZone.detail}</p>
               <p className="training-zone-hero-caption">
+                {topZone.range ? `${topZone.range} · ` : ""}
                 {getCaption(topZone)}
               </p>
             </div>
@@ -680,6 +707,9 @@ function ZoneDistributionPanel({
                 >
                   <span className="training-zone-name">
                     {formatDisplayLabel(datum.label)}
+                    {datum.range ? (
+                      <em className="training-zone-range">{datum.range}</em>
+                    ) : null}
                   </span>
                   <span className="training-zone-track" aria-hidden="true">
                     <span
@@ -863,6 +893,7 @@ function MetricDropdown<TValue extends string>({
 }
 
 export function TrainingZoneDistributionCharts({
+  hrZoneModel,
   lthrZones,
   activities,
   analytics
@@ -875,6 +906,20 @@ export function TrainingZoneDistributionCharts({
     DISTANCE_METRIC_PREFERENCE
   );
 
+  // Without the profile there is nothing to say about which model these are,
+  // so the panel keeps the heading it has always had and the LTHR zones behind
+  // it rather than claiming a model it has not read.
+  const heartRateZones =
+    hrZoneModel && hrZoneModel.zones.length > 0 ? hrZoneModel.zones : lthrZones;
+  const heartRateTitle = hrZoneModel?.title ?? "Threshold Heart Rate";
+  // The title already names the model, so the note says where it is set and
+  // what the percentages are taken of.
+  const heartRateCoverage = hrZoneModel
+    ? ["Zone model from Personal", hrZoneModel.anchorNote]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+
   return (
     <section className="training-load-profile">
       <div className="training-load-profile-header">
@@ -885,14 +930,15 @@ export function TrainingZoneDistributionCharts({
       </div>
       <div className="training-zone-grid">
         <ZoneDistributionPanel
-          title="Threshold Heart Rate"
+          title={heartRateTitle}
           subtitle="Training Load"
-          emptyMessage="No threshold heart rate zone distribution data loaded."
+          emptyMessage="No heart rate zone distribution data loaded."
           variant="heart"
           heroKicker="Primary zone"
           metricColumnLabel={HEART_RATE_METRIC_LABELS[heartRateMetric]}
+          {...(heartRateCoverage ? { coverageNote: heartRateCoverage } : {})}
           data={buildHeartRateData(
-            lthrZones,
+            heartRateZones,
             activities,
             heartRateMetric,
             analytics,

@@ -13862,6 +13862,15 @@ td span {
   visibility: hidden;
 }
 
+/* The last two columns hold right-aligned numbers, so their headings have to
+   sit on the same edge — the uppercase letter-spacing is trailing space on the
+   final letter, which is what the negative margin takes back off. */
+.training-zone-table-head span:nth-child(3),
+.training-zone-table-head span:nth-child(4) {
+  margin-right: -0.08em;
+  text-align: right;
+}
+
 .training-zone-list {
   display: grid;
   gap: 10px;
@@ -13884,9 +13893,20 @@ td span {
 }
 
 .training-zone-name {
+  display: grid;
+  gap: 1px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 650;
+}
+
+/* The zone's bpm span, sitting under its name so the column stays narrow. */
+.training-zone-range {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .training-zone-percent {

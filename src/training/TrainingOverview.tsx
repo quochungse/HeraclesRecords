@@ -24,6 +24,7 @@ import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistrib
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { Vo2MaxWidget } from "./components/Vo2MaxWidget";
 import type { TrainingOverviewProps } from "./types";
+import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../../public/assets/training-hub/Login-page-bg.png";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
@@ -62,6 +63,9 @@ export function TrainingOverview({
   onReconnect
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
+  // The zone distribution is labelled with whichever heart-rate model the
+  // Personal screen has selected, not LTHR by default.
+  const hrZoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
   // Signed out because a start-up re-login is still in the air, which is a very
   // different thing to say than "sign in": nobody has to do anything, and it
   // resolves on its own in a second or two.
@@ -429,6 +433,7 @@ export function TrainingOverview({
             activities={activities}
           />
           <TrainingZoneDistributionCharts
+            hrZoneModel={hrZoneModel}
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             activities={activities}
             analytics={snapshot?.analytics ?? null}

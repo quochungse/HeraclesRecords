@@ -24,6 +24,10 @@ import { FitnessScoresPanel } from "../training/components/FitnessScoresPanel";
 import { PersonalRecordsPanel } from "../training/components/PersonalRecordsPanel";
 import { RacePredictorCards } from "../training/components/RacePredictorCards";
 import { formatPaceSecondsPerKm } from "../training/formatters";
+import {
+  HR_ZONE_MODELS,
+  hrZoneModelDefinition
+} from "../training/heartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import "./profile.css";
 
@@ -50,17 +54,6 @@ interface ProfileDraft {
   hrZoneType: string;
 }
 
-// COROS `hrZoneType`, labelled as its own web client labels the picker.
-const HR_ZONE_MODELS: ReadonlyArray<{
-  value: number;
-  label: string;
-  family: CorosProfileZoneFamily;
-}> = [
-  { value: 1, label: "Max heart rate", family: "maxHr" },
-  { value: 2, label: "Heart rate reserve", family: "restingHr" },
-  { value: 3, label: "Lactate threshold", family: "lthr" }
-];
-
 const ZONE_TABS: ReadonlyArray<{
   family: CorosProfileZoneFamily;
   label: string;
@@ -81,10 +74,6 @@ function formatCachedAt(value: string): string {
         hour: "2-digit",
         minute: "2-digit"
       });
-}
-
-function hrZoneModel(value?: number) {
-  return HR_ZONE_MODELS.find((model) => model.value === value);
 }
 
 function messageFrom(error: unknown): string {
@@ -285,7 +274,7 @@ export function ProfileView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [zonesOpen]);
 
-  const activeModel = hrZoneModel(profile?.hrZoneType);
+  const activeModel = hrZoneModelDefinition(profile?.hrZoneType);
   const zoneTabs = useMemo(
     () =>
       profile
