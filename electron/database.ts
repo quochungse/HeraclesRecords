@@ -1516,6 +1516,13 @@ export function listSleepNightSeries(): SleepNightSeriesRow[] {
     .all() as SleepNightSeriesRow[];
 }
 
+/** Drops cached night series older than `beforeDay`. */
+export function pruneSleepNightSeries(beforeDay: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM sleep_night_series WHERE happen_day < ?")
+    .run(beforeDay);
+}
+
 /** Samples from `fromDay` (inclusive) onward, ascending. */
 export function listCoachDailySamples(fromDay: string): CoachDailySampleRow[] {
   return requireDatabase()

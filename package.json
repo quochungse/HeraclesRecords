@@ -76,6 +76,7 @@
     "test:sleep-freshness": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-sleep-freshness.mjs",
     "test:sleep-history-cache": "npm run build:electron && node scripts/test-sleep-history-cache.mjs",
     "test:sleep-series": "npm run build:electron && node scripts/test-sleep-series.mjs",
+    "test:sleep-series-cache": "npm run build:electron && node scripts/test-sleep-series-cache.mjs",
     "test:daily-health-data-parser": "npm run build:electron && node scripts/test-daily-health-data-parser.mjs",
     "test:training-formatters": "npm run build:electron && node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-training-formatters.mjs",
     "test:weekly-activity": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-weekly-activity.mjs",

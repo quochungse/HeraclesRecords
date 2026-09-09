@@ -2,7 +2,7 @@ import type {
   TrainingHubSleepRecord,
   TrainingHubSleepSummary
 } from "../../electron/types";
-import { getLocalHappenDayKey } from "./formatters";
+import { getLocalHappenDayKey } from "../training/formatters";
 
 /**
  * The sleep summary's `latest` is the newest record COROS returned, which is

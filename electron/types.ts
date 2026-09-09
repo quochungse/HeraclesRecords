@@ -2543,8 +2543,11 @@ export interface SleepNightSeries {
   error?: string;
 }
 
-/** Where the records in a snapshot came from, for the "last updated" line. */
-export type SleepHistorySource = "cache" | "network" | "mixed";
+/**
+ * Whether a snapshot cost a request. `"cache"` means it did not — the line the
+ * screen shows says "cached" rather than "updated" on the strength of it.
+ */
+export type SleepHistorySource = "cache" | "network";
 
 export interface SleepHistorySnapshot {
   /** Nights newest first, main sleeps only — naps are folded into their night. */

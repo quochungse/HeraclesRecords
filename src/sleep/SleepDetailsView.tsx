@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LockKeyhole, RefreshCw } from "lucide-react";
 import { SleepNightDetail } from "./components/SleepNightDetail";
 import { SleepNightList } from "./components/SleepNightList";
@@ -57,7 +57,19 @@ export function SleepDetailsView({
 
   const selected =
     records.find((record) => record.happenDay === selectedDay) ?? null;
-  const { series, loading: seriesLoading } = useSleepNightSeries(api, selectedDay);
+  const {
+    series,
+    loading: seriesLoading,
+    refresh: refreshSeries
+  } = useSleepNightSeries(api, selectedDay);
+
+  // One button, the whole screen: refreshing the nights but leaving the curve
+  // on a cached copy would have the two halves of the panel describing
+  // different fetches.
+  const refreshAll = useCallback(() => {
+    refresh();
+    refreshSeries();
+  }, [refresh, refreshSeries]);
   const fetchedAtLabel = formatFetchedAt(snapshot?.fetchedAt);
 
   if (!connected) {
@@ -109,7 +121,7 @@ export function SleepDetailsView({
         <button
           type="button"
           className="icon-button sleep-refresh-button"
-          onClick={refresh}
+          onClick={refreshAll}
           disabled={refreshing || loading}
           aria-label={refreshing ? "Refreshing sleep data" : "Refresh sleep data"}
           title="Refresh"

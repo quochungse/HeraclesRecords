@@ -472,15 +472,6 @@ export function pickLatestDailyHealthRecord(
   )[0];
 }
 
-function dailyHealthResponseQuality(records: TrainingHubDailyHealthRecord[]): number {
-  const latest = pickLatestDailyHealthRecord(records);
-  if (!latest) {
-    return 0;
-  }
-
-  return dailyHealthRecordScore(latest) * 100 + Math.min(records.length, 30);
-}
-
 function resolveDailyHealthTool(tools: CorosMcpTool[]): CorosMcpTool | undefined {
   const preferred = tools.find((tool) => tool.name === PREFERRED_DAILY_HEALTH_TOOL);
   if (preferred) {
@@ -570,27 +561,16 @@ async function fetchDailyHealthRecords(
   days: number
 ): Promise<TrainingHubDailyHealthRecord[]> {
   const fallbackDay = recentTrainingHubDateList(1)[0];
-  const argCandidates = buildDailyHealthToolArgs(dailyHealthTool, days);
-  let bestRecords: TrainingHubDailyHealthRecord[] = [];
-  let bestScore = -1;
-  const collectedRecords: TrainingHubDailyHealthRecord[] = [];
 
-  for (const args of argCandidates) {
+  // Built from the schema, so the first answer with days in it is the answer;
+  // the rest of the list exists for a server that refused it.
+  for (const args of buildDailyHealthToolArgs(dailyHealthTool, days)) {
     try {
       const response = await callCorosMcpTool(dailyHealthTool.name, args);
       const records = parseDailyHealthDataResponse(response, fallbackDay);
-      const score = dailyHealthResponseQuality(records);
-      collectedRecords.push(...records);
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestRecords = records;
-      }
-
-      // Built from the schema, so the first answer with days in it is the
-      // answer; the rest of the list exists for a server that refused it.
       if (records.length > 0) {
-        break;
+        return records;
       }
     } catch (error) {
       console.warn(
@@ -600,8 +580,7 @@ async function fetchDailyHealthRecords(
     }
   }
 
-  const mergedRecords = mergeDailyHealthRecords(collectedRecords);
-  return mergedRecords.length > 0 ? mergedRecords : bestRecords;
+  return [];
 }
 
 export async function getTrainingDailyHealthData(

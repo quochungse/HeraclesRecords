@@ -8,7 +8,6 @@ import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
 import type {
   SleepHistorySnapshot,
-  SleepHistorySource,
   TrainingHubDailyHealthRecord,
   TrainingHubSleepRecord
 } from "./types";
@@ -296,7 +295,6 @@ export async function getSleepHistory(
 
   hydrate(deps, retentionFrom);
 
-  const cachedBefore = cache.entries.size;
   const wantsNetwork = request.refresh === true || needsNetwork(days, now);
 
   let mcpConnected = true;
@@ -322,18 +320,13 @@ export async function getSleepHistory(
   }
 
   const { records, fetchedAt } = selectWindow(days, now);
-  const source: SleepHistorySource = !filled
-    ? "cache"
-    : cachedBefore === 0
-      ? "network"
-      : "mixed";
 
   return {
     records,
     latest: records.find((record) => record.happenDay === dayKeyOffset(now, 0)),
     mcpConnected,
     fetchedAt,
-    source,
+    source: filled ? "network" : "cache",
     error
   };
 }
@@ -370,11 +363,3 @@ export function clearSleepHistoryCache(): void {
   cache.hydrated = false;
   cache.lastNetworkAt = undefined;
 }
-
-/** Exported for the same reason: the freshness rule is the bit worth pinning. */
-export const sleepHistoryInternals = {
-  dayKeyOffset,
-  isUnsettled,
-  isStale,
-  needsNetwork
-};

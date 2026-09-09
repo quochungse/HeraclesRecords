@@ -1,16 +1,18 @@
 import { callCorosMcpTool, ensureCorosMcpConnected, getCorosMcpTools, listCorosMcpTools } from "./corosMcpService";
 import {
   listSleepNightSeries,
+  pruneSleepNightSeries,
   upsertSleepNightSeries,
   type SleepNightSeriesRow
 } from "./database";
-import { getSleepHistory } from "./sleepHistoryService";
+import { DEFAULT_HISTORY_DAYS, getSleepHistory } from "./sleepHistoryService";
 import {
   clipToSleepWindow,
   parseSleepHrvAssessment,
   parseSleepHrvSeries,
   parseStressSeries,
-  sleepWindowBounds
+  sleepWindowBounds,
+  sleepWindowDays
 } from "./sleepSeriesParser";
 import type {
   SleepHrvAssessment,
@@ -40,6 +42,13 @@ const STRESS_TOOL = "queryStressTimeSeries";
 /** How long the still-arriving night may be served from cache. */
 export const UNSETTLED_SERIES_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * How far back the samples are kept. A night holds around two hundred points,
+ * so this table grows far faster than the totals do — and `hydrate` reads all
+ * of it on the first call, which is the other half of why it needs a bound.
+ */
+export const SERIES_RETENTION_DAYS = 400;
+
 interface CacheEntry {
   series: SleepNightSeries;
   fetchedAt: number;
@@ -57,6 +66,7 @@ export interface SleepSeriesDeps {
   findNight: (happenDay: string) => Promise<TrainingHubSleepRecord | undefined>;
   readCache: () => SleepNightSeriesRow[];
   writeCache: (row: SleepNightSeriesRow) => void;
+  pruneCache: (beforeDay: string) => void;
 }
 
 export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
@@ -73,25 +83,34 @@ export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
     toolNames: () => getCorosMcpTools().map((tool) => tool.name),
     callTool: callCorosMcpTool,
     findNight: async (happenDay) => {
-      const snapshot = await getSleepHistory({ days: 60 });
+      // The same window the screen lists, so a night it can select is a night
+      // this can find, and no wider — the lookup pays for the window it asks.
+      const snapshot = await getSleepHistory({ days: DEFAULT_HISTORY_DAYS });
       return snapshot.records.find((record) => record.happenDay === happenDay);
     },
     readCache: listSleepNightSeries,
-    writeCache: upsertSleepNightSeries
+    writeCache: upsertSleepNightSeries,
+    pruneCache: pruneSleepNightSeries
   };
 }
 
-function todayKey(now: number): string {
+function dayKeyOffset(now: number, days: number): string {
   const date = new Date(now);
+  date.setDate(date.getDate() + days);
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}${month}${day}`;
 }
 
-function hydrate(deps: SleepSeriesDeps): void {
+function hydrate(deps: SleepSeriesDeps, now: number): void {
   if (hydrated) {
     return;
   }
+
+  // Pruned before reading rather than after writing: the first read of a table
+  // left behind by an older install would otherwise pull every night it holds
+  // into memory before anything trimmed it.
+  deps.pruneCache(dayKeyOffset(now, -SERIES_RETENTION_DAYS));
 
   for (const row of deps.readCache()) {
     try {
@@ -108,17 +127,24 @@ function hydrate(deps: SleepSeriesDeps): void {
 }
 
 function isSettled(happenDay: string, now: number): boolean {
-  return happenDay < todayKey(now);
+  return happenDay < dayKeyOffset(now, 0);
 }
 
 /**
  * The days a night's stress samples are filed under. Stress is stamped by
- * calendar day, so a night beginning before midnight lives in two of them.
+ * calendar day, so a night beginning before midnight lives in two of them —
+ * and which two is decided by `sleepWindowDays`, the same function the clipping
+ * bounds come from.
  */
 function stressDaysFor(record: TrainingHubSleepRecord): string[] {
-  const start = record.sleepStartDay;
-  const end = record.sleepEndDay ?? record.happenDay;
-  return start && start !== end ? [start, end] : [end];
+  const days = sleepWindowDays(record) ?? {
+    startDay: record.happenDay,
+    endDay: record.happenDay
+  };
+
+  return days.startDay !== days.endDay
+    ? [days.startDay, days.endDay]
+    : [days.endDay];
 }
 
 async function fetchSeries(
@@ -185,7 +211,7 @@ export async function getSleepNightSeries(
   const { happenDay } = request;
   const now = deps.now();
 
-  hydrate(deps);
+  hydrate(deps, now);
 
   const cached = memory.get(happenDay);
   const cacheUsable =
@@ -193,28 +219,34 @@ export async function getSleepNightSeries(
     request.refresh !== true &&
     (isSettled(happenDay, now) || now - cached.fetchedAt < UNSETTLED_SERIES_TTL_MS);
 
-  if (cacheUsable && cached) {
+  if (cached && cacheUsable) {
     return { ...cached.series, source: "cache", fetchedAt: cached.fetchedAt };
   }
 
-  const empty: SleepNightSeries = {
-    happenDay,
-    hrv: [],
-    stress: [],
-    source: "network",
-    mcpConnected: false
-  };
-
   const connected = await deps.ensureConnected();
   if (!connected) {
-    return cached ? { ...cached.series, source: "cache", mcpConnected: false } : empty;
+    return cached
+      ? {
+          ...cached.series,
+          source: "cache",
+          fetchedAt: cached.fetchedAt,
+          mcpConnected: false
+        }
+      : { happenDay, hrv: [], stress: [], source: "cache", mcpConnected: false };
   }
 
   await deps.listTools();
 
   const record = await deps.findNight(happenDay);
   if (!record) {
-    return { ...empty, mcpConnected: true, error: "No sleep record for this night." };
+    return {
+      happenDay,
+      hrv: [],
+      stress: [],
+      source: "network",
+      mcpConnected: true,
+      error: "No sleep record for this night."
+    };
   }
 
   const bounds = sleepWindowBounds(record);
@@ -239,15 +271,24 @@ export async function getSleepNightSeries(
       (bounds ? undefined : "This night has no sleep window, so nothing can be placed on a clock.")
   };
 
-  // Only a night that actually produced samples is worth remembering; an empty
-  // answer for last night is a night still arriving, not a night with no data.
-  if (hrv.length > 0 || stress.length > 0) {
+  // An empty answer is worth remembering too, as long as the night is over.
+  //
+  // COROS only keeps these samples for about a week, so most nights in the list
+  // legitimately have none — and not caching that emptiness meant every click
+  // on an old night spent two MCP calls to be told nothing again. Last night is
+  // the exception: empty there means "not synced yet", which the TTL should
+  // keep asking about.
+  const worthKeeping =
+    hrv.length > 0 || stress.length > 0 || isSettled(happenDay, now);
+
+  if (worthKeeping) {
     memory.set(happenDay, { series, fetchedAt: now });
     deps.writeCache({
       happen_day: happenDay,
       payload: JSON.stringify(series),
       fetched_at: now
     });
+    deps.pruneCache(dayKeyOffset(now, -SERIES_RETENTION_DAYS));
   }
 
   return { ...series, fetchedAt: now };

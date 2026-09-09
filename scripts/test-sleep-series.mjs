@@ -15,6 +15,7 @@ const {
   parseSleepHrvAssessment,
   parseStressSeries,
   sleepWindowBounds,
+  sleepWindowDays,
   clipToSleepWindow
 } = await import(`${distUrl("sleepSeriesParser.js")}?cacheBust=${Date.now()}`);
 
@@ -160,6 +161,32 @@ assert.equal(
   sleepWindowBounds({ happenDay: "20260908", sleepStart: "00:40" }),
   undefined,
   "half a window is no window"
+);
+
+// The two calendar days a night touches, which the stress query needs and the
+// clipping bounds are built from — one function, so they cannot disagree.
+assert.deepEqual(sleepWindowDays(datedNight), {
+  startDay: "20260908",
+  endDay: "20260908"
+});
+assert.deepEqual(sleepWindowDays(overnight), {
+  startDay: "20260906",
+  endDay: "20260907"
+});
+assert.deepEqual(
+  sleepWindowDays(undated),
+  { startDay: "20260906", endDay: "20260907" },
+  "without the dates, a start clock past the end clock means the day before"
+);
+assert.deepEqual(
+  sleepWindowDays({ happenDay: "20260908", sleepStart: "00:40", sleepEnd: "06:00" }),
+  { startDay: "20260908", endDay: "20260908" },
+  "a night entirely after midnight stays on one day"
+);
+assert.equal(
+  sleepWindowDays({ happenDay: "not-a-day" }),
+  undefined,
+  "a record with no usable day has no window days"
 );
 
 // Clipping keeps the night and drops the day around it. The live HRV block for

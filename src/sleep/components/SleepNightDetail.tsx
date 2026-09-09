@@ -2,8 +2,10 @@ import { AlarmClock, Moon } from "lucide-react";
 import {
   formatHappenDayLabel,
   formatSleepClockRange,
-  formatSleepDurationMinutes
+  formatSleepDurationMinutes,
+  formatSleepPercent
 } from "../../training/formatters";
+import { sleepScoreLabel, sleepScoreTone } from "../sleepScore";
 import {
   sleepEfficiencyPercent,
   stageBreakdown,
@@ -25,30 +27,6 @@ interface SleepNightDetailProps {
   /** False when COROS returned no nights at all — a different empty to a
    *  night simply not being picked. */
   hasNights?: boolean;
-}
-
-function formatPercent(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) {
-    return "–";
-  }
-  const rounded = Math.round(value * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
-}
-
-function scoreLabel(score?: number): string {
-  if (score === undefined || !Number.isFinite(score)) return "No score";
-  if (score < 60) return "Poor";
-  if (score < 75) return "Fair";
-  if (score < 90) return "Good";
-  return "Excellent";
-}
-
-function scoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" {
-  if (score === undefined || !Number.isFinite(score)) return "neutral";
-  if (score < 60) return "low";
-  if (score < 75) return "mid";
-  if (score < 90) return "good";
-  return "high";
 }
 
 /**
@@ -117,7 +95,7 @@ export function SleepNightDetail({
   const efficiency = sleepEfficiencyPercent(record);
 
   return (
-    <div className={`sleep-detail tone-${scoreTone(record.score)}`}>
+    <div className={`sleep-detail tone-${sleepScoreTone(record.score)}`}>
       <header className="sleep-detail-header">
         <div>
           <p className="eyebrow">{formatHappenDayLabel(record.happenDay)}</p>
@@ -141,7 +119,7 @@ export function SleepNightDetail({
         </div>
         <div className="sleep-detail-score">
           <strong>{record.score !== undefined ? Math.round(record.score) : "–"}</strong>
-          <span>{scoreLabel(record.score)}</span>
+          <span>{sleepScoreLabel(record.score)}</span>
         </div>
       </header>
 
@@ -162,7 +140,7 @@ export function SleepNightDetail({
               </dt>
               <dd>
                 <strong>{formatSleepDurationMinutes(stage.minutes)}</strong>
-                <span>({formatPercent(stage.percent)})</span>
+                <span>({formatSleepPercent(stage.percent)})</span>
               </dd>
             </div>
           ))}
@@ -180,7 +158,7 @@ export function SleepNightDetail({
         <Metric label="Time in bed" value={formatSleepDurationMinutes(inBed)} />
         <Metric
           label="Efficiency"
-          value={efficiency !== undefined ? formatPercent(efficiency) : "–"}
+          value={efficiency !== undefined ? formatSleepPercent(efficiency) : "–"}
         />
         <Metric
           label="Wake-ups > 5m"

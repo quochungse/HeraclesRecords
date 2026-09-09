@@ -15,7 +15,7 @@ import {
   isUpcomingWorkoutScheduled,
   isUpcomingWorkoutToday
 } from "./training/formatters";
-import { pickLastNightSleep } from "./training/sleepFreshness";
+import { pickLastNightSleep } from "./sleep/sleepFreshness";
 import { resolveSportName } from "./training/sportTypes";
 import type { TrainingSummaryMetrics } from "./training/types";
 

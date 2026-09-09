@@ -8,9 +8,12 @@ import {
 import {
   formatSleepClockRange,
   formatSleepDurationMinutes,
-  formatSleepNightLabel
+  formatSleepNightLabel,
+  formatSleepPercent
 } from "../formatters";
-import { pickLastNightSleep } from "../sleepFreshness";
+import { pickLastNightSleep } from "../../sleep/sleepFreshness";
+import { sleepScoreLabel, sleepScoreTone } from "../../sleep/sleepScore";
+import { drawableStages } from "../../sleep/sleepStages";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
 
 interface SleepSummaryPanelProps {
@@ -19,67 +22,6 @@ interface SleepSummaryPanelProps {
   refreshing?: boolean;
   /** Opens the Sleep screen. Omitted, the panel stays a plain card. */
   onOpenDetails?: () => void;
-}
-
-function sleepScoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" {
-  if (score === undefined || !Number.isFinite(score)) {
-    return "neutral";
-  }
-
-  if (score < 60) {
-    return "low";
-  }
-
-  if (score < 75) {
-    return "mid";
-  }
-
-  if (score < 90) {
-    return "good";
-  }
-
-  return "high";
-}
-
-function sleepScoreLabel(score?: number): string {
-  const tone = sleepScoreTone(score);
-
-  switch (tone) {
-    case "low":
-      return "Poor";
-    case "mid":
-      return "Fair";
-    case "good":
-      return "Good";
-    case "high":
-      return "Excellent";
-    default:
-      return "Waiting";
-  }
-}
-
-function stageTotal(record: TrainingHubSleepRecord): number {
-  const stagedPercent =
-    (record.deepPercent ?? 0) +
-    (record.lightPercent ?? 0) +
-    (record.remPercent ?? 0) +
-    (record.awakePercent ?? 0);
-
-  if (stagedPercent > 0) {
-    return stagedPercent;
-  }
-
-  const staged =
-    (record.deepMinutes ?? 0) +
-    (record.lightMinutes ?? 0) +
-    (record.remMinutes ?? 0) +
-    (record.awakeMinutes ?? 0);
-
-  if (staged > 0) {
-    return staged;
-  }
-
-  return record.totalMinutes ?? 0;
 }
 
 function formatNapSummary(record: TrainingHubSleepRecord): string {
@@ -152,60 +94,23 @@ function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
   );
 }
 
-function formatPercent(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) {
-    return "–";
-  }
-
-  const rounded = Math.round(value * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
-}
-
 function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
-  const total = stageTotal(record);
+  // The same breakdown the Sleep screen draws, so one night cannot read as two
+  // different splits depending on which surface you are looking at.
+  const segments = drawableStages(record).map((stage) => ({
+    key: stage.key,
+    label: stage.label,
+    className: stage.className,
+    value: stage.weight,
+    detail:
+      stage.percent !== undefined
+        ? formatSleepPercent(stage.percent)
+        : formatSleepDurationMinutes(stage.minutes)
+  }));
 
-  if (total <= 0) {
+  if (segments.length === 0) {
     return <p className="sleep-panel-empty-stages">Stage breakdown unavailable.</p>;
   }
-
-  const segments = [
-    {
-      key: "deep",
-      label: "Deep",
-      value: record.deepPercent ?? record.deepMinutes ?? 0,
-      detail: record.deepPercent !== undefined
-        ? formatPercent(record.deepPercent)
-        : formatSleepDurationMinutes(record.deepMinutes),
-      className: "is-deep"
-    },
-    {
-      key: "light",
-      label: "Light",
-      value: record.lightPercent ?? record.lightMinutes ?? 0,
-      detail: record.lightPercent !== undefined
-        ? formatPercent(record.lightPercent)
-        : formatSleepDurationMinutes(record.lightMinutes),
-      className: "is-light"
-    },
-    {
-      key: "rem",
-      label: "REM",
-      value: record.remPercent ?? record.remMinutes ?? 0,
-      detail: record.remPercent !== undefined
-        ? formatPercent(record.remPercent)
-        : formatSleepDurationMinutes(record.remMinutes),
-      className: "is-rem"
-    },
-    {
-      key: "awake",
-      label: "Awake",
-      value: record.awakePercent ?? record.awakeMinutes ?? 0,
-      detail: record.awakePercent !== undefined
-        ? formatPercent(record.awakePercent)
-        : formatSleepDurationMinutes(record.awakeMinutes),
-      className: "is-awake"
-    }
-  ].filter((segment) => segment.value > 0);
 
   return (
     <div className="sleep-stage-stack">
@@ -266,7 +171,7 @@ export function SleepSummaryPanel({
   const lastNight = pickLastNightSleep(sleep);
   const staleNight = !lastNight ? sleep?.latest : undefined;
   const tone = sleepScoreTone(lastNight?.score);
-  const label = sleepScoreLabel(lastNight?.score);
+  const label = sleepScoreLabel(lastNight?.score, "Waiting");
   const isLoading = connecting || refreshing;
 
   return (

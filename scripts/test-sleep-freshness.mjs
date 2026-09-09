@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const moduleUrl = pathToFileURL(
-  path.join(repoRoot, "src", "training", "sleepFreshness.ts")
+  path.join(repoRoot, "src", "sleep", "sleepFreshness.ts")
 );
 
 const { isLastNightHappenDay, pickLastNightSleep } = await import(

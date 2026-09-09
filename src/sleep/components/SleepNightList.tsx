@@ -4,6 +4,7 @@ import {
   formatHappenDayLabel,
   formatSleepDurationMinutes
 } from "../../training/formatters";
+import { sleepScoreTone } from "../sleepScore";
 import { drawableStages } from "../sleepStages";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
@@ -12,16 +13,6 @@ interface SleepNightListProps {
   selectedDay: string | null;
   onSelect: (happenDay: string) => void;
   loading: boolean;
-}
-
-function scoreTone(score?: number): "low" | "mid" | "good" | "high" | "neutral" {
-  if (score === undefined || !Number.isFinite(score)) {
-    return "neutral";
-  }
-  if (score < 60) return "low";
-  if (score < 75) return "mid";
-  if (score < 90) return "good";
-  return "high";
 }
 
 /**
@@ -77,7 +68,7 @@ export function SleepNightList({
                 <span className="sleep-night-row-date">
                   {formatHappenDayLabel(record.happenDay)}
                 </span>
-                <span className={`sleep-night-row-score tone-${scoreTone(record.score)}`}>
+                <span className={`sleep-night-row-score tone-${sleepScoreTone(record.score)}`}>
                   {record.score !== undefined ? Math.round(record.score) : "–"}
                 </span>
               </div>

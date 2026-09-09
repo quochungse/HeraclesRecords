@@ -1862,29 +1862,18 @@ async function fetchSleepRecords(
   sleepTool: CorosMcpTool,
   days: number
 ): Promise<TrainingHubSleepRecord[]> {
-  const argCandidates = buildSleepToolArgs(sleepTool, days);
-  let bestRecords: TrainingHubSleepRecord[] = [];
-  let bestScore = -1;
-  const collectedRecords: TrainingHubSleepRecord[] = [];
-
-  for (const args of argCandidates) {
+  // The candidates are ordered best-first now that they are built from the
+  // tool's own schema, so the first answer carrying nights is *the* answer and
+  // the rest of the list exists only for a server that refused it. Scoring the
+  // responses against each other made sense while twenty of them were fired
+  // blind; ranking a list of one does not.
+  for (const args of buildSleepToolArgs(sleepTool, days)) {
     try {
       const response = await callCorosMcpTool(sleepTool.name, args);
       const records = parseSleepDataResponse(response, pinnedHappenDay(args));
-      const score = sleepResponseQuality(records);
-      collectedRecords.push(...records);
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestRecords = records;
-      }
-
-      // The candidates are ordered best-first now that they are built from the
-      // tool's own schema, so an answer with nights in it is *the* answer. The
-      // rest of the list is there for a server that refused this one, and
-      // asking it anyway was the other half of what made a refresh expensive.
       if (records.length > 0) {
-        break;
+        return records;
       }
     } catch (error) {
       console.warn(
@@ -1894,8 +1883,7 @@ async function fetchSleepRecords(
     }
   }
 
-  const mergedRecords = mergeCollectedSleepRecords(collectedRecords);
-  return mergedRecords.length > 0 ? mergedRecords : bestRecords;
+  return [];
 }
 
 export async function getTrainingSleepData(

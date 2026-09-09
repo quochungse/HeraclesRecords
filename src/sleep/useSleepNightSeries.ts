@@ -6,6 +6,8 @@ export interface SleepNightSeriesState {
   series: SleepNightSeries | null;
   loading: boolean;
   error: string | null;
+  /** Re-asks COROS for this night, past every freshness check. */
+  refresh: () => void;
 }
 
 /**
@@ -22,39 +24,49 @@ export function useSleepNightSeries(
   const [error, setError] = useState<string | null>(null);
   const requestSequence = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!api || !happenDay) {
-      setSeries(null);
-      return;
-    }
-
-    const sequence = ++requestSequence.current;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const next = await api.getSleepNightSeries({ happenDay });
-      if (requestSequence.current !== sequence) {
+  const load = useCallback(
+    async (forceRefresh: boolean) => {
+      if (!api || !happenDay) {
+        setSeries(null);
         return;
       }
-      setSeries(next);
-      setError(next.error ?? null);
-    } catch (caught) {
-      if (requestSequence.current !== sequence) {
-        return;
+
+      const sequence = ++requestSequence.current;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const next = await api.getSleepNightSeries({
+          happenDay,
+          refresh: forceRefresh
+        });
+        if (requestSequence.current !== sequence) {
+          return;
+        }
+        setSeries(next);
+        setError(next.error ?? null);
+      } catch (caught) {
+        if (requestSequence.current !== sequence) {
+          return;
+        }
+        setSeries(null);
+        setError(caught instanceof Error ? caught.message : String(caught));
+      } finally {
+        if (requestSequence.current === sequence) {
+          setLoading(false);
+        }
       }
-      setSeries(null);
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      if (requestSequence.current === sequence) {
-        setLoading(false);
-      }
-    }
-  }, [api, happenDay]);
+    },
+    [api, happenDay]
+  );
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
-  return { series, loading, error };
+  const refresh = useCallback(() => {
+    void load(true);
+  }, [load]);
+
+  return { series, loading, error, refresh };
 }

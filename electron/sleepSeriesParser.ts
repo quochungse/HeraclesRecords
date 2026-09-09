@@ -198,13 +198,63 @@ export interface SleepWindowBounds {
   endLocal: number;
 }
 
+export interface SleepWindowDays {
+  startDay: string;
+  endDay: string;
+}
+
 /**
- * The night's two ends as local instants.
+ * The two calendar days a night's window falls on.
  *
- * Prefers the days COROS dated the window with. Without them — an older cached
- * record — the start day is inferred the only way left: a start clock at or
- * after the end clock means the night began the day before the wake-up day.
+ * Prefers the days COROS dated the window with. Without them — a record cached
+ * before the parser read those dates — the start day is inferred the only way
+ * left: a start clock at or after the end clock means the night began the day
+ * before the wake-up day.
+ *
+ * Kept as its own function because two callers need the answer and they used to
+ * disagree. `sleepWindowBounds` inferred the missing start day; the stress
+ * query, which has to ask for both days a night touches, read the raw field and
+ * so asked for one day only — losing every pre-midnight sample on exactly the
+ * records the inference exists for.
  */
+export function sleepWindowDays(
+  record: Pick<
+    TrainingHubSleepRecord,
+    "happenDay" | "sleepStart" | "sleepEnd" | "sleepStartDay" | "sleepEndDay"
+  >
+): SleepWindowDays | undefined {
+  const endDay = record.sleepEndDay ?? record.happenDay;
+  if (!/^\d{8}$/.test(endDay)) {
+    return undefined;
+  }
+
+  if (record.sleepStartDay) {
+    return { startDay: record.sleepStartDay, endDay };
+  }
+
+  if (!record.sleepStart || !record.sleepEnd) {
+    return { startDay: endDay, endDay };
+  }
+
+  const start = dayClockToLocalMillis("20000101", record.sleepStart);
+  const end = dayClockToLocalMillis("20000101", record.sleepEnd);
+
+  if (start === undefined || end === undefined || start < end) {
+    return { startDay: endDay, endDay };
+  }
+
+  const previous = new Date(dayClockToLocalMillis(endDay, "00:00") ?? 0);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+
+  return {
+    startDay: `${previous.getUTCFullYear()}${pad(previous.getUTCMonth() + 1)}${pad(
+      previous.getUTCDate()
+    )}`,
+    endDay
+  };
+}
+
+/** The night's two ends as local instants, or nothing when it has no window. */
 export function sleepWindowBounds(
   record: Pick<
     TrainingHubSleepRecord,
@@ -215,29 +265,13 @@ export function sleepWindowBounds(
     return undefined;
   }
 
-  const endDay = record.sleepEndDay ?? record.happenDay;
-  let startDay = record.sleepStartDay;
-
-  if (!startDay) {
-    const startMinutes = dayClockToLocalMillis("20000101", record.sleepStart);
-    const endMinutes = dayClockToLocalMillis("20000101", record.sleepEnd);
-    if (startMinutes === undefined || endMinutes === undefined) {
-      return undefined;
-    }
-
-    if (startMinutes >= endMinutes) {
-      const previous = new Date(dayClockToLocalMillis(endDay, "00:00") ?? 0);
-      previous.setUTCDate(previous.getUTCDate() - 1);
-      startDay = `${previous.getUTCFullYear()}${pad(previous.getUTCMonth() + 1)}${pad(
-        previous.getUTCDate()
-      )}`;
-    } else {
-      startDay = endDay;
-    }
+  const days = sleepWindowDays(record);
+  if (!days) {
+    return undefined;
   }
 
-  const startLocal = dayClockToLocalMillis(startDay, record.sleepStart);
-  const endLocal = dayClockToLocalMillis(endDay, record.sleepEnd);
+  const startLocal = dayClockToLocalMillis(days.startDay, record.sleepStart);
+  const endLocal = dayClockToLocalMillis(days.endDay, record.sleepEnd);
 
   if (startLocal === undefined || endLocal === undefined || endLocal <= startLocal) {
     return undefined;
@@ -268,5 +302,3 @@ export function clipToSleepWindow(
       point.localAt <= bounds.endLocal + slack
   );
 }
-
-export const sleepSeriesInternals = { dayClockToLocalMillis };
