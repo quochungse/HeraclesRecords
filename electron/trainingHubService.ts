@@ -3901,20 +3901,33 @@ function parseAnalytics(raw: Record<string, unknown>): TrainingHubAnalytics {
   };
 }
 
+/**
+ * The heart-rate area lists, and deliberately only those.
+ *
+ * COROS numbers its HR zones and these buckets from zero alike, so the nth
+ * bucket is the nth zone and the account's own zone list supplies the bpm
+ * bounds. Its **distance** area lists — `distanceCountAreaList`,
+ * `distanceTlAreaList`, `distanceTimeAreaList` — carry no boundaries at all,
+ * and the renderer used to paste 10 km labels onto them by array position.
+ * Probed against the live API on 2026-09-09, they are **5 km** buckets
+ * (0–5, 5–10, 10–15, 15–20, 20–25, 25+): an athlete with eight runs of
+ * 10–11 km and three of 15–17 km got `[8, 1, 8, 3, 0, 0]`, which the panel
+ * drew as eight runs in "20–30 km" and three in "30–40 km". They also count
+ * every session, so seven distance-less strength workouts sat in the first
+ * bucket, reading 8 where the honest answer was 1.
+ *
+ * The panel now uses those same 5 km boundaries, but tallies the activity
+ * list itself so distance-less sessions stay out — see
+ * `src/training/distanceZones.ts`. Parsing these again would only invite the
+ * unstated boundaries and the padded first bucket back.
+ */
 function parseZoneDistributions(
   summary: Record<string, unknown>
 ): TrainingHubZoneDistributions {
   return {
     hrTrainingLoad: parseZoneDistributionEntries(summary.hrTlAreaList),
     hrDistance: parseZoneDistributionEntries(summary.hrDisAreaList),
-    hrTime: parseZoneDistributionEntries(summary.hrTimeAreaList),
-    distanceFrequency: parseZoneDistributionEntries(
-      summary.distanceCountAreaList
-    ),
-    distanceTrainingLoad: parseZoneDistributionEntries(
-      summary.distanceTlAreaList
-    ),
-    distanceTime: parseZoneDistributionEntries(summary.distanceTimeAreaList)
+    hrTime: parseZoneDistributionEntries(summary.hrTimeAreaList)
   };
 }
 

@@ -13839,18 +13839,26 @@ td span {
   line-height: 1.35;
 }
 
+/* The head and every row are subgrids of this one track list, so the column
+   widths are resolved once against all of their content together. They used to
+   be separate grids sharing a copy of the template, which only lines up while
+   the `fr` and `auto` tracks happen to resolve the same in both — they stop
+   agreeing the moment a heading and the numbers under it have different
+   max-content widths ("Training Load" over "1623", "Sessions" over
+   "11 sessions"), and the headings then sit off their own columns. */
 .training-zone-table {
   display: grid;
+  grid-template-columns:
+    minmax(64px, 0.9fr) minmax(0, 1.4fr) minmax(46px, auto) minmax(56px, auto);
   gap: 8px;
   min-width: 0;
 }
 
 .training-zone-table-head {
   display: grid;
-  grid-template-columns: minmax(64px, 0.9fr) minmax(0, 1.4fr) 52px minmax(52px, auto);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 8px;
-  padding: 0 2px;
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 800;
@@ -13862,25 +13870,31 @@ td span {
   visibility: hidden;
 }
 
-/* The last two columns hold right-aligned numbers, so their headings have to
-   sit on the same edge — the uppercase letter-spacing is trailing space on the
-   final letter, which is what the negative margin takes back off. */
-.training-zone-table-head span:nth-child(3),
-.training-zone-table-head span:nth-child(4) {
+/* Column 3 is a right-aligned number, so its heading has to sit on the same
+   edge — the uppercase letter-spacing is trailing space on the final letter,
+   which is what the negative margin takes back off. The head carries no
+   horizontal padding of its own for the same reason: 2px of inset here put
+   every heading 2px off the column it labels. Column 4 reads left, so it needs
+   neither. */
+.training-zone-table-head span:nth-child(3) {
   margin-right: -0.08em;
   text-align: right;
 }
 
+/* Subgrid passes the table's columns through the list to the rows; only the
+   row gap is the list's own, the column gutter comes from the parent. */
 .training-zone-list {
   display: grid;
-  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: 10px;
 }
 
 .training-zone-row {
   display: grid;
-  grid-template-columns: minmax(64px, 0.9fr) minmax(0, 1.4fr) 52px minmax(52px, auto);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 8px;
   min-width: 0;
   animation: training-row-enter 0.55s ease both;
 }
@@ -13936,7 +13950,7 @@ td span {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 650;
-  text-align: right;
+  text-align: left;
 }
 
 .training-zone-tooltip {
@@ -17437,9 +17451,9 @@ tr.data-intervals-row-missing {
     padding-left: 20px;
   }
 
-  .training-zone-table-head,
-  .training-zone-row {
-    grid-template-columns: minmax(56px, 0.85fr) minmax(0, 1.2fr) 48px auto;
+  .training-zone-table {
+    grid-template-columns:
+      minmax(56px, 0.85fr) minmax(0, 1.2fr) minmax(42px, auto) minmax(52px, auto);
     gap: 6px;
   }
 

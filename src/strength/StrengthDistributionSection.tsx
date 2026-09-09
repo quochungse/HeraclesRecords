@@ -10,7 +10,7 @@ interface StrengthDistributionSectionProps {
 }
 
 /**
- * Overview's strength counterpart to Running Distribution: the body heat map
+ * Overview's strength counterpart to Training Distribution: the body heat map
  * and its muscle breakdown, read over whatever window the Strength screen is
  * set to. The preference is shared, so the two screens never disagree.
  */
