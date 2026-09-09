@@ -4,6 +4,7 @@ import { SleepNightDetail } from "./components/SleepNightDetail";
 import { SleepNightList } from "./components/SleepNightList";
 import { SleepTrendChart } from "./components/SleepTrendChart";
 import { useSleepHistory } from "./useSleepHistory";
+import { useSleepNightSeries } from "./useSleepNightSeries";
 import type { CorosLinkApi } from "../coroslink-api";
 import "./sleep.css";
 
@@ -56,6 +57,7 @@ export function SleepDetailsView({
 
   const selected =
     records.find((record) => record.happenDay === selectedDay) ?? null;
+  const { series, loading: seriesLoading } = useSleepNightSeries(api, selectedDay);
   const fetchedAtLabel = formatFetchedAt(snapshot?.fetchedAt);
 
   if (!connected) {
@@ -151,7 +153,11 @@ export function SleepDetailsView({
           </div>
 
           <div className="sleep-details-main">
-            <SleepNightDetail record={selected} />
+            <SleepNightDetail
+              record={selected}
+              series={series}
+              seriesLoading={seriesLoading}
+            />
           </div>
         </div>
       </section>

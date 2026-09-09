@@ -483,6 +483,16 @@ export function initializeDatabase(userDataPath: string): Database.Database {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_sleep_nights_day_kind
       ON sleep_nights (happen_day, kind);
+
+    -- The samples inside one night: HRV during sleep and stress, already
+    -- clipped to the sleep window. Kept for the same reason as the totals and
+    -- one more: COROS caps both series at a 7-day query window, so a night is
+    -- only reachable for a week after it happened.
+    CREATE TABLE IF NOT EXISTS sleep_night_series (
+      happen_day TEXT PRIMARY KEY,
+      payload    TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
   `);
 
   ensureColumn(db, "generated_routes", "activity_type", "TEXT");
@@ -1475,6 +1485,35 @@ export function pruneSleepNights(beforeDay: string): void {
   requireDatabase()
     .prepare("DELETE FROM sleep_nights WHERE happen_day < ?")
     .run(beforeDay);
+}
+
+export interface SleepNightSeriesRow {
+  happen_day: string;
+  payload: string;
+  fetched_at: number;
+}
+
+export function upsertSleepNightSeries(row: SleepNightSeriesRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO sleep_night_series (happen_day, payload, fetched_at)
+       VALUES (@happen_day, @payload, @fetched_at)
+       ON CONFLICT(happen_day) DO UPDATE SET
+         payload = excluded.payload,
+         fetched_at = excluded.fetched_at`
+    )
+    .run(row);
+}
+
+/** Every cached night series, newest first. */
+export function listSleepNightSeries(): SleepNightSeriesRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT happen_day, payload, fetched_at
+       FROM sleep_night_series
+       ORDER BY happen_day DESC`
+    )
+    .all() as SleepNightSeriesRow[];
 }
 
 /** Samples from `fromDay` (inclusive) onward, ascending. */

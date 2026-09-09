@@ -67,6 +67,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // The Sleep screen's night cache. Every row can be fetched again from COROS,
   // and syncing it would carry a large, self-rebuilding blob between machines.
   sleep_nights: "derived",
+  // Per-night HRV and stress samples. Rebuildable while COROS still holds them,
+  // and far too bulky to carry between machines.
+  sleep_night_series: "derived",
 
   // --- Training library: user intent, worth carrying between machines ------
   training_plans: "personal",

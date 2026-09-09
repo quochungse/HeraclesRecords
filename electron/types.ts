@@ -2494,6 +2494,52 @@ export interface TrainingHubSleepSummary {
   mcpConnected: boolean;
 }
 
+/**
+ * One reading inside a night. `at` is the true instant; `clock` is what the
+ * watch showed at the time, carried alongside because COROS sends its own UTC
+ * offset per point and the machine reading this may sit in another timezone.
+ */
+export interface SleepSeriesPoint {
+  /** The true instant, UTC. */
+  at: number;
+  /**
+   * The same instant in the athlete's own timezone, expressed as if it were
+   * UTC. Charts plot against this and the sleep window's bounds, which share
+   * the frame — so a night reads the same on a machine in another timezone.
+   */
+  localAt: number;
+  clock: string;
+  value: number;
+}
+
+/** COROS's own verdict on a night's HRV — never recomputed from the points. */
+export interface SleepHrvAssessment {
+  happenDay: string;
+  avg?: number;
+  normalLow?: number;
+  normalHigh?: number;
+  baseline?: number;
+  evaluation?: string;
+}
+
+/**
+ * What happened across one night, sample by sample. Not sleep stages — COROS
+ * sends none — but the two series it does send inside the sleep window.
+ */
+export interface SleepNightSeries {
+  happenDay: string;
+  hrv: SleepSeriesPoint[];
+  stress: SleepSeriesPoint[];
+  assessment?: SleepHrvAssessment;
+  /** The sleep window the series were clipped to, as epoch ms. */
+  windowStart?: number;
+  windowEnd?: number;
+  fetchedAt?: number;
+  source: "cache" | "network";
+  mcpConnected: boolean;
+  error?: string;
+}
+
 /** Where the records in a snapshot came from, for the "last updated" line. */
 export type SleepHistorySource = "cache" | "network" | "mixed";
 

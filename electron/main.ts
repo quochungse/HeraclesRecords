@@ -463,6 +463,7 @@ import {
   getCachedSleepSummary,
   getSleepHistory
 } from "./sleepHistoryService";
+import { clearSleepSeriesCache, getSleepNightSeries } from "./sleepSeriesService";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -2365,6 +2366,7 @@ function registerIpcHandlers(): void {
     const status = logoutTrainingHub();
     // The cached nights belong to the account that just left.
     clearSleepHistoryCache();
+    clearSleepSeriesCache();
     // Sync belongs to an account, so signing out has to stop it. Without this
     // the loop keeps publishing into the vault of the account that just left —
     // and anything done on this machine afterwards would land in their data.
@@ -2680,6 +2682,14 @@ function registerIpcHandlers(): void {
     "sleep:getHistory",
     (_event, request?: { days?: number; refresh?: boolean }) =>
       getSleepHistory(request ?? {})
+  );
+
+  // Both series for one night arrive together: they are drawn on one pair of
+  // axes, clipped to one window, and cached as one row.
+  ipcMain.handle(
+    "sleep:getNightSeries",
+    (_event, request: { happenDay: string; refresh?: boolean }) =>
+      getSleepNightSeries(request)
   );
 
   ipcMain.handle("trainingHub:getDailyHealthData", (_event, days?: number) =>

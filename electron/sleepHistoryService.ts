@@ -202,7 +202,14 @@ function needsNetwork(days: number, now: number): boolean {
   const lastNight = cache.entries.get(`${today}:main`);
 
   if (!lastNight) {
-    return true;
+    // A night COROS does not have yet is the ordinary state of a morning, and
+    // asking again the moment the answer comes back empty turns every caller
+    // into a poller. The TTL governs the absence exactly as it governs a
+    // partial night: ask again when it might have changed, not before.
+    return (
+      cache.lastNetworkAt === undefined ||
+      now - cache.lastNetworkAt >= UNSETTLED_NIGHT_TTL_MS
+    );
   }
 
   const fromDay = dayKeyOffset(now, -(Math.max(1, days) - 1));
@@ -246,9 +253,11 @@ export async function getSleepHistory(
     try {
       const answer = await deps.fetchFromCoros(days);
       mcpConnected = answer.mcpConnected;
+      // Stamped on every answer COROS gives, including an empty one: the point
+      // of the stamp is "we asked", not "we got something".
+      cache.lastNetworkAt = now;
       if (answer.records.length > 0) {
         store(deps, answer.records, now);
-        cache.lastNetworkAt = now;
         filled = true;
       }
     } catch (caught) {

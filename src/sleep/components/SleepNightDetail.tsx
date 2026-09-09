@@ -1,4 +1,4 @@
-import { AlarmClock, Info, Moon } from "lucide-react";
+import { AlarmClock, Moon } from "lucide-react";
 import {
   formatHappenDayLabel,
   formatSleepClockRange,
@@ -9,11 +9,17 @@ import {
   stageBreakdown,
   timeInBedMinutes
 } from "../sleepStages";
+import { SleepNightCurve } from "./SleepNightCurve";
 import { SleepStageDonut } from "./SleepStageDonut";
-import type { TrainingHubSleepRecord } from "../../../electron/types";
+import type {
+  SleepNightSeries,
+  TrainingHubSleepRecord
+} from "../../../electron/types";
 
 interface SleepNightDetailProps {
   record: TrainingHubSleepRecord | null;
+  series: SleepNightSeries | null;
+  seriesLoading: boolean;
 }
 
 function formatPercent(value?: number): string {
@@ -49,7 +55,11 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function SleepNightDetail({ record }: SleepNightDetailProps) {
+export function SleepNightDetail({
+  record,
+  series,
+  seriesLoading
+}: SleepNightDetailProps) {
   if (!record) {
     return (
       <div className="sleep-detail-empty">
@@ -124,17 +134,11 @@ export function SleepNightDetail({ record }: SleepNightDetailProps) {
       </section>
 
       {/*
-        COROS's own card draws a hypnogram here — the stage-by-stage line across
-        the night. The MCP feed this app reads sends per-night totals only: no
-        segment list, no per-epoch stages, nothing with a time on it beyond the
-        window's two ends. Drawing a shape from the totals would be inventing
-        the order the stages came in, so the space says what is missing instead.
+        COROS's own card draws a hypnogram here. Its feed carries no stages, so
+        what stands in this space is the pair of series it does send inside the
+        window — measured, not inferred from the totals above.
       */}
-      <p className="sleep-detail-note">
-        <Info size={13} aria-hidden="true" />
-        COROS sends per-night totals, not a stage-by-stage timeline, so the
-        hypnogram from the watch app cannot be drawn here yet.
-      </p>
+      <SleepNightCurve series={series} loading={seriesLoading} />
 
       <dl className="sleep-detail-metrics" aria-label="Night details">
         <Metric label="Time in bed" value={formatSleepDurationMinutes(inBed)} />

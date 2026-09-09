@@ -158,6 +158,28 @@ clearSleepHistoryCache();
   assert.equal(state.fetches, 1, "a missing last night is always worth asking");
 }
 
+// --- An empty answer for last night is not a reason to keep asking ----------
+//
+// COROS has nothing for last night until the watch syncs, which is most of a
+// morning. Treating the gap as "always worth a fetch" turned every caller —
+// the Overview panel, the Sleep screen, the night-series lookup — into a
+// poller that re-spent the whole fetch on each call.
+
+clearSleepHistoryCache();
+{
+  const { state, deps } = harness({ records: [night(-1), night(-2)] });
+
+  await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.fetches, 1, "the first ask goes out");
+
+  await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.fetches, 1, "the second does not, though last night is still missing");
+
+  state.now = NOW + UNSETTLED_NIGHT_TTL_MS + 1;
+  await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.fetches, 2, "past the TTL it is worth asking again");
+}
+
 // --- A partial night keeps asking until it fills in -------------------------
 
 clearSleepHistoryCache();

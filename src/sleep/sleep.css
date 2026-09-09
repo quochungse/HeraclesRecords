@@ -439,6 +439,80 @@
   background: var(--sleep-awake);
 }
 
+/* --- The night's curve ---------------------------------------------------- */
+
+.sleep-curve {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sleep-curve.is-empty {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 120px;
+  border: 1px dashed color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.sleep-curve.is-empty p {
+  margin: 0;
+  max-width: 46ch;
+}
+
+.sleep-curve-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sleep-curve-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sleep-curve-title span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sleep-curve-assessment {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sleep-curve-assessment strong {
+  color: var(--text-primary);
+}
+
+.sleep-curve-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 /* --- Notes and metrics --------------------------------------------------- */
 
 .sleep-detail-note {
