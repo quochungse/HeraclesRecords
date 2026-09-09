@@ -60,6 +60,12 @@ export function SleepNightDetail({ record }: SleepNightDetailProps) {
   }
 
   const window = formatSleepClockRange(record.sleepStart, record.sleepEnd);
+  // COROS dates both ends of the window, so a night that began the evening
+  // before can say so instead of leaving "23:48 – 05:30" to be worked out.
+  const startedYesterday =
+    record.sleepStartDay !== undefined &&
+    record.sleepEndDay !== undefined &&
+    record.sleepStartDay !== record.sleepEndDay;
   const stages = stageBreakdown(record);
   const inBed = timeInBedMinutes(record);
   const efficiency = sleepEfficiencyPercent(record);
@@ -74,6 +80,11 @@ export function SleepNightDetail({ record }: SleepNightDetailProps) {
             {window ? (
               <>
                 <Moon size={13} aria-hidden="true" />
+                {startedYesterday ? (
+                  <span className="sleep-detail-window-day">
+                    {formatHappenDayLabel(record.sleepStartDay ?? "")}
+                  </span>
+                ) : null}
                 {window}
                 <AlarmClock size={13} aria-hidden="true" />
               </>

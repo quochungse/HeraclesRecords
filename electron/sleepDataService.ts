@@ -94,12 +94,36 @@ function parseClockMinutes(value?: string): number | undefined {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+function dayKeyToUtcMillis(happenDay?: string): number | undefined {
+  if (!happenDay || !/^\d{8}$/.test(happenDay)) {
+    return undefined;
+  }
+
+  return Date.UTC(
+    Number(happenDay.slice(0, 4)),
+    Number(happenDay.slice(4, 6)) - 1,
+    Number(happenDay.slice(6, 8))
+  );
+}
+
 function sleepWindowDurationMinutes(record: TrainingHubSleepRecord): number | undefined {
   const startMinutes = parseClockMinutes(record.sleepStart);
   const endMinutes = parseClockMinutes(record.sleepEnd);
 
   if (startMinutes === undefined || endMinutes === undefined) {
     return undefined;
+  }
+
+  // When COROS dated both ends, the length is arithmetic rather than inference.
+  const startDayMs = dayKeyToUtcMillis(record.sleepStartDay);
+  const endDayMs = dayKeyToUtcMillis(record.sleepEndDay);
+
+  if (startDayMs !== undefined && endDayMs !== undefined) {
+    const dayGapMinutes = Math.round((endDayMs - startDayMs) / 60_000);
+    const span = dayGapMinutes + endMinutes - startMinutes;
+    if (span >= 0) {
+      return span;
+    }
   }
 
   let adjustedEnd = endMinutes;
@@ -265,6 +289,52 @@ function parseSleepClockRange(value?: string): [string?, string?] {
   const clocks = extractSleepClocks(value);
 
   return [clocks[0], clocks[1]];
+}
+
+export interface SleepWindowRange {
+  start?: string;
+  end?: string;
+  startDay?: string;
+  endDay?: string;
+}
+
+/**
+ * A window line, with the days kept when COROS put them there.
+ *
+ * It writes `Main Sleep Window: 2026-09-08 00:40 - 2026-09-08 06:00`, and the
+ * dates are the only thing that says outright whether a night began before
+ * midnight. Reading the clocks alone left that to be inferred from which end
+ * was smaller, which is right for an ordinary night and wrong for the ones
+ * worth being right about: a nap window and a 25-hour gap infer the same way.
+ *
+ * Falls back to the clock-only reading, because the JSON shapes and older
+ * responses give exactly that.
+ */
+function parseSleepWindowRange(value?: string): SleepWindowRange {
+  if (!value) {
+    return {};
+  }
+
+  // The time half has to be captured whole — seconds and any AM/PM included —
+  // or "2026-07-20 10:58:00 PM" reads as ten in the morning.
+  const dated = [
+    ...value.matchAll(
+      /\b(20\d{2})-(\d{2})-(\d{2})[T\s]+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)/gi
+    )
+  ];
+
+  if (dated.length >= 2) {
+    const [first, second] = dated;
+    return {
+      startDay: `${first[1]}${first[2]}${first[3]}`,
+      start: normalizeSleepClock(first[4]),
+      endDay: `${second[1]}${second[2]}${second[3]}`,
+      end: normalizeSleepClock(second[4])
+    };
+  }
+
+  const [start, end] = parseSleepClockRange(value);
+  return { start, end };
 }
 
 function readAwakeCountOverFiveMinutes(
@@ -581,6 +651,8 @@ function looksLikeSleepRecord(raw: Record<string, unknown>): boolean {
 function readSleepWindow(raw: Record<string, unknown>): {
   sleepStart?: string;
   sleepEnd?: string;
+  sleepStartDay?: string;
+  sleepEndDay?: string;
 } {
   const sleepWindowValue =
     raw.sleepWindow ??
@@ -628,9 +700,18 @@ function readSleepWindow(raw: Record<string, unknown>): {
     readNestedString(sleepWindow ?? {}, ["end", "endTime", "finish", "to"]) ??
     rangeEnd;
 
+  // A single dated string ("2026-09-08 00:40 - 2026-09-08 06:00") carries both
+  // ends; separate fields each carry one, and may be dated on their own.
+  const rangeText = typeof sleepWindowValue === "string" ? sleepWindowValue : undefined;
+  const range = parseSleepWindowRange(rangeText);
+  const startDated = parseSleepWindowRange(sleepStart);
+  const endDated = parseSleepWindowRange(sleepEnd);
+
   return {
-    sleepStart: normalizeSleepClock(sleepStart),
-    sleepEnd: normalizeSleepClock(sleepEnd)
+    sleepStart: normalizeSleepClock(sleepStart) ?? range.start,
+    sleepEnd: normalizeSleepClock(sleepEnd) ?? range.end,
+    sleepStartDay: startDated.startDay ?? range.startDay,
+    sleepEndDay: endDated.startDay ?? range.endDay
   };
 }
 
@@ -708,7 +789,9 @@ function parseSleepRecord(
   const windowMinutes = sleepWindowDurationMinutes({
     happenDay,
     sleepStart: defaults.sleepStart ?? window.sleepStart,
-    sleepEnd: defaults.sleepEnd ?? window.sleepEnd
+    sleepEnd: defaults.sleepEnd ?? window.sleepEnd,
+    sleepStartDay: defaults.sleepStartDay ?? window.sleepStartDay,
+    sleepEndDay: defaults.sleepEndDay ?? window.sleepEndDay
   });
 
   const deepPhaseKeys = [
@@ -876,7 +959,9 @@ function parseSleepRecord(
       "averageHeartRate"
     ]),
     sleepStart: defaults.sleepStart ?? window.sleepStart,
-    sleepEnd: defaults.sleepEnd ?? window.sleepEnd
+    sleepEnd: defaults.sleepEnd ?? window.sleepEnd,
+    sleepStartDay: defaults.sleepStartDay ?? window.sleepStartDay,
+    sleepEndDay: defaults.sleepEndDay ?? window.sleepEndDay
   });
 }
 
@@ -912,7 +997,9 @@ function parseSleepDayBundle(raw: Record<string, unknown>): TrainingHubSleepReco
       score: dayScore,
       awakeCountOverFiveMinutes: readAwakeCountOverFiveMinutes(raw),
       sleepStart: window.sleepStart,
-      sleepEnd: window.sleepEnd
+      sleepEnd: window.sleepEnd,
+      sleepStartDay: window.sleepStartDay,
+      sleepEndDay: window.sleepEndDay
     });
     if (main) {
       records.push(main);
@@ -1260,10 +1347,17 @@ function parseProseSleepSection(
   );
   const napLineMatch = section.match(/\bNaps?(?:\s+Total)?:\s*([^\n]+)/i);
   const napText = napLineMatch?.[1]?.trim();
+  // COROS puts the nap's clock on a line of its own — "Nap Window: 2026-08-12
+  // 07:24 - 2026-08-12 08:00" — while "Naps Total" carries only a duration.
+  // Reading the duration line for a window found none, so every nap arrived
+  // without the hours it happened at.
+  const napWindowLineMatch = section.match(/\bNap\s+(?:window|period|range)\s*:\s*([^\n]+)/i);
   const napDurationMatch = napText?.match(
     /\b(?:none|no|zero)\b|(?:(?:\d+(?:\.\d+)?\s*h(?:ours?)?)(?:\s*\d+(?:\.\d+)?\s*m(?:in(?:utes?)?)?)?|\d+(?:\.\d+)?\s*m(?:in(?:utes?)?)?)/i
   );
-  const [napStart, napEnd] = parseSleepClockRange(napText);
+  const napWindow = parseSleepWindowRange(napWindowLineMatch?.[1] ?? napText);
+  const napStart = napWindow.start;
+  const napEnd = napWindow.end;
 
   if (!scoreMatch && !mainSleepMatch) {
     return undefined;
@@ -1338,8 +1432,16 @@ function parseProseSleepSection(
   const awakeMinutes = awakeMatch
     ? parseDurationMinutes(awakeMatch[1].trim())
     : undefined;
-  const [sleepStart, sleepEnd] = parseSleepClockRange(windowLineMatch?.[1]);
-  const windowMinutes = sleepWindowDurationMinutes({ happenDay, sleepStart, sleepEnd });
+  const window = parseSleepWindowRange(windowLineMatch?.[1]);
+  const sleepStart = window.start;
+  const sleepEnd = window.end;
+  const windowMinutes = sleepWindowDurationMinutes({
+    happenDay,
+    sleepStart,
+    sleepEnd,
+    sleepStartDay: window.startDay,
+    sleepEndDay: window.endDay
+  });
   const percentDenominator = windowMinutes ?? totalMinutes;
   const deepPercent = deepMatch ? Number(deepMatch[1]) : undefined;
   const lightPercent = lightMatch ? Number(lightMatch[1]) : undefined;
@@ -1380,6 +1482,8 @@ function parseProseSleepSection(
       windowMinutes,
       sleepStart,
       sleepEnd,
+      sleepStartDay: window.startDay,
+      sleepEndDay: window.endDay,
       napMinutes: napDurationText ? parseNapDurationText(napDurationText) : undefined,
       napStart,
       napEnd
@@ -1597,162 +1701,97 @@ function schemaPropertyNames(schema: Record<string, unknown>): string[] {
   return Object.keys(properties as Record<string, unknown>);
 }
 
-function addExactSleepDateArgs(
-  candidates: Record<string, unknown>[],
-  propertyNames: string[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const keyedArgs: Array<[string, unknown][]> = [];
+/**
+ * The date format a tool wants, read from the schema it publishes rather than
+ * guessed at. COROS documents `yyyyMMdd` on every date property; a server that
+ * says `yyyy-MM-dd` gets that instead.
+ */
+function schemaDateFormat(schema: Record<string, unknown>): "compact" | "iso" {
+  const properties = schema.properties;
+  if (properties && typeof properties === "object") {
+    const described = Object.values(properties as Record<string, unknown>)
+      .map((property) =>
+        property && typeof property === "object"
+          ? String((property as Record<string, unknown>).description ?? "")
+          : ""
+      )
+      .join(" ");
 
-  if (propertyNames.includes("date")) {
-    keyedArgs.push([["date", iso]], [["date", happenDay]]);
-  }
-  if (propertyNames.includes("sleepDate")) {
-    keyedArgs.push([["sleepDate", iso]], [["sleepDate", happenDay]]);
-  }
-  if (propertyNames.includes("happenDay")) {
-    keyedArgs.push([["happenDay", happenDay]]);
-  }
-  if (propertyNames.includes("happen_day")) {
-    keyedArgs.push([["happen_day", happenDay]]);
-  }
-  if (propertyNames.includes("day")) {
-    keyedArgs.push([["day", happenDay]], [["day", iso]]);
-  }
-
-  for (const entries of keyedArgs) {
-    candidates.push(Object.fromEntries(entries));
-  }
-}
-
-function addGenericExactSleepDateArgs(
-  candidates: Record<string, unknown>[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const timezone = getLocalTimeZone();
-
-  candidates.push(
-    ...(timezone
-      ? [
-          { startDate: happenDay, endDate: happenDay, days: 1, timezone },
-          { startDate: iso, endDate: iso, days: 1, timezone }
-        ]
-      : []),
-    { startDate: happenDay, endDate: happenDay, days: 1 },
-    { startDate: iso, endDate: iso, days: 1 }
-  );
-
-  candidates.push(
-    { date: iso },
-    { date: happenDay },
-    { sleepDate: iso },
-    { sleepDate: happenDay },
-    { happenDay },
-    { happen_day: happenDay },
-    { day: happenDay },
-    { day: iso }
-  );
-}
-
-function addSleepQueryArgs(
-  candidates: Record<string, unknown>[],
-  propertyNames: string[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const query =
-    `Return detailed sleep data for ${iso} (${happenDay}): sleep score, ` +
-    "main sleep duration, sleep window, awake time, deep sleep, REM sleep, and naps.";
-  const keys = ["query", "question", "prompt", "input", "text"];
-
-  for (const key of keys) {
-    if (propertyNames.includes(key)) {
-      candidates.push({ [key]: query });
+    if (/yyyy-?MM-?dd/i.test(described)) {
+      return /yyyy-MM-dd/i.test(described) ? "iso" : "compact";
     }
   }
+
+  return "compact";
 }
 
-function addGenericSleepQueryArgs(
-  candidates: Record<string, unknown>[],
-  happenDay: string
-): void {
-  const iso = happenDayToIso(happenDay);
-  const query =
-    `Return detailed sleep data for ${iso} (${happenDay}): sleep score, ` +
-    "main sleep duration, sleep window, awake time, deep sleep, REM sleep, and naps.";
-
-  candidates.push(
-    { query },
-    { question: query },
-    { prompt: query },
-    { input: query }
-  );
-}
-
-function buildSleepToolArgs(
+/**
+ * The arguments for one sleep query.
+ *
+ * This used to be roughly twenty candidates fired in sequence — every spelling
+ * of a date range anyone could think of — because nobody knew what the tool
+ * accepted. It does say, and what it says is narrow: `startDate` and `endDate`
+ * in `yyyyMMdd`, `days`, all three required, `additionalProperties: false`.
+ * Nineteen of those twenty were rejected outright ("Tool call anomalies
+ * detected"), each one still costing a round trip, which is what made a sleep
+ * refresh cost twenty of them.
+ *
+ * So: one call built from the declared property names, and a short tail of
+ * fallbacks for a server that publishes no schema at all. Anything the schema
+ * does not name is never sent, because a schema that closes
+ * `additionalProperties` will refuse the whole call over one stray key.
+ */
+export function buildSleepToolArgs(
   tool: CorosMcpTool,
   days: number
 ): Record<string, unknown>[] {
   const dateList = recentTrainingHubDateList(days);
   const startDay = dateList[dateList.length - 1];
   const endDay = dateList[0];
-  const startIso = happenDayToIso(startDay);
-  const endIso = happenDayToIso(endDay);
-  const timezone = getLocalTimeZone();
   const propertyNames = schemaPropertyNames(tool.inputSchema);
+  const format = schemaDateFormat(tool.inputSchema);
+  const asDate = (happenDay: string) =>
+    format === "iso" ? happenDayToIso(happenDay) : happenDay;
+
   const candidates: Record<string, unknown>[] = [];
 
-  addExactSleepDateArgs(candidates, propertyNames, endDay);
-  addGenericExactSleepDateArgs(candidates, endDay);
-  addSleepQueryArgs(candidates, propertyNames, endDay);
-  addGenericSleepQueryArgs(candidates, endDay);
+  if (propertyNames.length > 0) {
+    const declared: Record<string, unknown> = {};
+    const set = (name: string, value: unknown) => {
+      if (propertyNames.includes(name)) {
+        declared[name] = value;
+      }
+    };
 
-  const rangedArgs: Record<string, unknown> = {};
-  if (propertyNames.includes("startDate")) {
-    rangedArgs.startDate = startIso;
-  }
-  if (propertyNames.includes("endDate")) {
-    rangedArgs.endDate = endIso;
-  }
-  if (propertyNames.includes("startDay")) {
-    rangedArgs.startDay = startDay;
-  }
-  if (propertyNames.includes("endDay")) {
-    rangedArgs.endDay = endDay;
-  }
-  if (propertyNames.includes("start_day")) {
-    rangedArgs.start_day = startDay;
-  }
-  if (propertyNames.includes("end_day")) {
-    rangedArgs.end_day = endDay;
-  }
-  if (propertyNames.includes("days")) {
-    rangedArgs.days = days;
-  }
-  if (timezone && propertyNames.includes("timezone")) {
-    rangedArgs.timezone = timezone;
-  }
-  if (Object.keys(rangedArgs).length > 0) {
-    candidates.push(rangedArgs);
-  }
+    set("startDate", asDate(startDay));
+    set("endDate", asDate(endDay));
+    set("startDay", startDay);
+    set("endDay", endDay);
+    set("start_day", startDay);
+    set("end_day", endDay);
+    set("days", days);
+    set("weeks", Math.max(1, Math.ceil(days / 7)));
 
-  candidates.push(
-    { startDate: startIso, endDate: endIso },
-    { startDate: startDay, endDate: endDay },
-    { startDay, endDay }
-  );
+    const timezone = getLocalTimeZone();
+    if (timezone) {
+      set("timezone", timezone);
+    }
 
-  if (propertyNames.includes("weeks")) {
-    candidates.push({ weeks: Math.max(1, Math.ceil(days / 7)) });
+    if (Object.keys(declared).length > 0) {
+      candidates.push(declared);
+    }
+
+  } else {
+    // No schema to read. Two shapes, not twenty.
+    candidates.push(
+      { startDate: startDay, endDate: endDay, days },
+      { startDate: happenDayToIso(startDay), endDate: happenDayToIso(endDay) }
+    );
   }
 
+  // COROS answers a bare call with its default window, which is a useful last
+  // resort and the one call that cannot be rejected for its arguments.
   candidates.push({});
-
-  if (tool.name === FALLBACK_SLEEP_TOOL) {
-    candidates.push({ weeks: Math.max(1, Math.ceil(days / 7)) });
-  }
 
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
@@ -1764,6 +1803,7 @@ function buildSleepToolArgs(
     return true;
   });
 }
+
 
 export function sleepResponseQuality(records: TrainingHubSleepRecord[]): number {
   const latest = pickLatestSleepRecord(records);
@@ -1797,9 +1837,6 @@ const EXACT_DAY_ARG_KEYS = [
   "day"
 ];
 
-/** The keys carrying a natural-language ask, which spells the day out in text. */
-const QUERY_ARG_KEYS = ["query", "question", "prompt", "input"];
-
 /**
  * The single day a set of tool args asks about, or nothing when it asks about a
  * span. An undated answer may be filed under the former and never the latter.
@@ -1816,23 +1853,6 @@ function pinnedHappenDay(args: Record<string, unknown>): string | undefined {
   const end = normalizeHappenDay(args.endDate ?? args.endDay ?? args.end_day);
   if (start && start === end) {
     return start;
-  }
-
-  for (const key of QUERY_ARG_KEYS) {
-    const value = args[key];
-    if (typeof value !== "string") {
-      continue;
-    }
-
-    const compact = value.match(/\b(20\d{6})\b/);
-    if (compact) {
-      return compact[1];
-    }
-
-    const iso = value.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
-    if (iso) {
-      return `${iso[1]}${iso[2]}${iso[3]}`;
-    }
   }
 
   return undefined;
@@ -1857,6 +1877,14 @@ async function fetchSleepRecords(
       if (score > bestScore) {
         bestScore = score;
         bestRecords = records;
+      }
+
+      // The candidates are ordered best-first now that they are built from the
+      // tool's own schema, so an answer with nights in it is *the* answer. The
+      // rest of the list is there for a server that refused this one, and
+      // asking it anyway was the other half of what made a refresh expensive.
+      if (records.length > 0) {
+        break;
       }
     } catch (error) {
       console.warn(

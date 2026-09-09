@@ -2478,6 +2478,14 @@ export interface TrainingHubSleepRecord {
   avgHr?: number;
   sleepStart?: string;
   sleepEnd?: string;
+  /**
+   * The calendar days the window's two ends fall on, as `yyyyMMdd`, when COROS
+   * dated them. It writes `Main Sleep Window: 2026-09-08 00:40 - 2026-09-08
+   * 06:00`, so a night that began before midnight says so outright instead of
+   * leaving the clock times to be guessed at.
+   */
+  sleepStartDay?: string;
+  sleepEndDay?: string;
 }
 
 export interface TrainingHubSleepSummary {

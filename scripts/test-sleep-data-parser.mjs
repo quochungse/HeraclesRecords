@@ -6,9 +6,12 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const distUrl = (file) =>
   pathToFileURL(path.join(repoRoot, "dist-electron", file)).href;
 
-const { parseSleepDataResponse, pickLatestSleepRecord, sleepResponseQuality } = await import(
-  `${distUrl("sleepDataService.js")}?cacheBust=${Date.now()}`
-);
+const {
+  buildSleepToolArgs,
+  parseSleepDataResponse,
+  pickLatestSleepRecord,
+  sleepResponseQuality
+} = await import(`${distUrl("sleepDataService.js")}?cacheBust=${Date.now()}`);
 
 const officialPayload = JSON.stringify({
   records: [
@@ -572,5 +575,134 @@ assert.deepEqual(
   ["20260906"],
   "a dated answer keeps its own days and the undated leftover is dropped"
 );
+
+// --- The window COROS actually sends, dates and all ------------------------
+//
+// Captured from querySleepData on 2026-09-09. The dates on both ends are the
+// only thing that states outright whether a night began before midnight.
+const datedWindowPayload = [
+  "Sleep Data",
+  "========================",
+  "Note: each record below is dated by its wake-up day.",
+  "",
+  "2026-09-08",
+  "Sleep Score: 38",
+  "Main Sleep: 4h 54min",
+  "Deep Sleep Ratio: 8%",
+  "Light Sleep Ratio: 63%",
+  "REM Ratio: 21%",
+  "Awake Ratio: 8%",
+  "Awake Time: 26 min",
+  "Awake Count (>5 min): 1",
+  "Main Sleep Window: 2026-09-08 00:40 - 2026-09-08 06:00",
+  "Naps Total: 0 min"
+].join("\n");
+
+const datedWindow = parseSleepDataResponse(datedWindowPayload);
+assert.equal(datedWindow.length, 1);
+assert.equal(datedWindow[0].happenDay, "20260908");
+assert.equal(datedWindow[0].sleepStart, "00:40");
+assert.equal(datedWindow[0].sleepEnd, "06:00");
+assert.equal(datedWindow[0].sleepStartDay, "20260908", "the window's own start date is kept");
+assert.equal(datedWindow[0].sleepEndDay, "20260908");
+assert.equal(datedWindow[0].windowMinutes, 320, "00:40 to 06:00 on one day is 5h20m");
+
+// A night that began before midnight: the clocks alone would infer the same
+// span here, but the dates say it rather than guessing it.
+const overnightPayload = [
+  "2026-09-07",
+  "Sleep Score: 71",
+  "Main Sleep: 5h 34min",
+  "Main Sleep Window: 2026-09-06 23:48 - 2026-09-07 05:30",
+  "Naps Total: 0 min"
+].join("\n");
+const overnight = parseSleepDataResponse(overnightPayload);
+assert.equal(overnight[0].sleepStartDay, "20260906");
+assert.equal(overnight[0].sleepEndDay, "20260907");
+assert.equal(overnight[0].windowMinutes, 342, "23:48 to 05:30 across midnight is 5h42m");
+
+// A nap window is dated the same way and must not be read as a night.
+const napWindowPayload = [
+  "2026-08-12",
+  "Sleep Score: 31",
+  "Main Sleep: 4h 13min",
+  "Main Sleep Window: 2026-08-12 00:20 - 2026-08-12 06:19",
+  "Naps Total: 36 min",
+  "Nap Window: 2026-08-12 07:24 - 2026-08-12 08:00"
+].join("\n");
+const napWindow = parseSleepDataResponse(napWindowPayload);
+const napNight = napWindow.find((record) => record.kind !== "nap");
+assert.equal(napNight?.napStart, "07:24", "the nap window keeps its clock");
+assert.equal(napNight?.napEnd, "08:00");
+assert.equal(napNight?.sleepStart, "00:20", "and does not overwrite the night's");
+
+// --- One call, built from the schema the tool publishes --------------------
+//
+// The real querySleepData schema, read off the live server on 2026-09-09. All
+// three properties are required and additionalProperties is false, so a stray
+// key fails the whole call — which is why the old builder's twenty guesses
+// mostly came back as "Tool call anomalies detected", each one a round trip.
+const liveSleepTool = {
+  name: "querySleepData",
+  description: "Query the user's COROS sleep data from the legacy daily data API.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      startDate: {
+        type: "string",
+        description: "Optional start date in yyyyMMdd format; dates are wake-up days"
+      },
+      endDate: {
+        type: "string",
+        description: "Optional end date in yyyyMMdd format; dates are wake-up days"
+      },
+      days: {
+        type: "integer",
+        description: "Number of recent days to query when no explicit date range is given, default 7"
+      }
+    },
+    required: ["startDate", "endDate", "days"],
+    additionalProperties: false
+  }
+};
+
+const liveArgs = buildSleepToolArgs(liveSleepTool, 30);
+assert.ok(liveArgs.length <= 2, `one call plus the bare fallback, got ${liveArgs.length}`);
+
+const [primary] = liveArgs;
+assert.deepEqual(
+  Object.keys(primary).sort(),
+  ["days", "endDate", "startDate"],
+  "only the declared properties are sent"
+);
+assert.match(String(primary.startDate), /^\d{8}$/, "yyyyMMdd, as the schema asks");
+assert.match(String(primary.endDate), /^\d{8}$/);
+assert.equal(primary.days, 30);
+assert.ok(
+  String(primary.startDate) < String(primary.endDate),
+  "the window runs from the older day to today"
+);
+assert.deepEqual(liveArgs[liveArgs.length - 1], {}, "the bare call stays as a last resort");
+
+// A schema that spells its dates out the other way gets them that way.
+const isoTool = {
+  name: "querySleepData",
+  inputSchema: {
+    type: "object",
+    properties: {
+      startDate: { type: "string", description: "Start date in yyyy-MM-dd format" },
+      endDate: { type: "string", description: "End date in yyyy-MM-dd format" }
+    }
+  }
+};
+assert.match(
+  String(buildSleepToolArgs(isoTool, 7)[0].startDate),
+  /^\d{4}-\d{2}-\d{2}$/,
+  "a server that documents ISO dates is sent ISO dates"
+);
+
+// No schema at all: a short tail of guesses, not twenty.
+const blindArgs = buildSleepToolArgs({ name: "get_sleep_data", inputSchema: {} }, 7);
+assert.ok(blindArgs.length <= 3, `at most three blind attempts, got ${blindArgs.length}`);
 
 console.log("test-sleep-data-parser: ok");
