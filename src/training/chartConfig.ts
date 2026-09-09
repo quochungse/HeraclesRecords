@@ -8,8 +8,36 @@ export const TRAINING_HEATMAP_DAYS = 365;
  */
 export const TRAINING_LOAD_TREND_DAYS = 30;
 
-/** Days drawn by the trend charts that stay on a short window (HRV, sleep). */
+/** Days the HRV and sleep trend charts open on before the athlete picks. */
 export const TRAINING_SHORT_TREND_DAYS = 7;
+
+/**
+ * Windows the HRV and sleep trend charts can be switched between, in render
+ * order. Bounded by TRAINING_LOAD_TREND_DAYS for the same reason the load
+ * chart's list is: the snapshot carries no more than that.
+ */
+export const TRAINING_TREND_WINDOWS = [7, 30] as const;
+
+export type TrainingTrendWindow = (typeof TRAINING_TREND_WINDOWS)[number];
+
+/**
+ * Windows the training-load bar chart can be switched between, in render order.
+ * The widest must stay <= TRAINING_LOAD_TREND_DAYS, which is all the snapshot
+ * carries — a wider option would draw empty columns for days it has no load for.
+ */
+export const TRAINING_LOAD_WINDOWS = [7, 14, 30] as const;
+
+export type TrainingLoadWindow = (typeof TRAINING_LOAD_WINDOWS)[number];
+
+/**
+ * The furthest back any trend chip can be switched to, and so the span a fetch
+ * has to cover to fill every one of them. Derived from the window lists rather
+ * than written out, so widening a chip's options cannot leave the fetch behind.
+ */
+export const TRAINING_TREND_MAX_DAYS = Math.max(
+  ...TRAINING_TREND_WINDOWS,
+  ...TRAINING_LOAD_WINDOWS
+);
 
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
@@ -34,6 +62,8 @@ export interface TrainingChartColors {
   dotStroke: string;
   tooltipBg: string;
   tooltipBorder: string;
+  /** Hue-free color for a bar block that stands for no sport in particular. */
+  neutralFill: string;
 }
 
 export type TrainingMetricKey = "load" | "rpe" | "hrv" | "sleep";
@@ -63,7 +93,8 @@ const DARK_CHART_COLORS: TrainingChartColors = {
   cursorBand: "rgba(255, 255, 255, 0.05)",
   dotStroke: "rgba(12, 14, 13, 0.85)",
   tooltipBg: "rgba(18, 18, 20, 0.96)",
-  tooltipBorder: "rgba(255, 255, 255, 0.12)"
+  tooltipBorder: "rgba(255, 255, 255, 0.12)",
+  neutralFill: "#5c6167"
 };
 
 const PAPER_CHART_COLORS: TrainingChartColors = {
@@ -78,7 +109,8 @@ const PAPER_CHART_COLORS: TrainingChartColors = {
   cursorBand: "rgba(38, 34, 28, 0.06)",
   dotStroke: "rgba(255, 255, 255, 0.9)",
   tooltipBg: "rgba(255, 255, 255, 0.98)",
-  tooltipBorder: "rgba(38, 34, 28, 0.12)"
+  tooltipBorder: "rgba(38, 34, 28, 0.12)",
+  neutralFill: "#a5a097"
 };
 
 export function getTrainingChartColors(theme: Theme): TrainingChartColors {
@@ -165,6 +197,85 @@ const PAPER_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = 
     stops: { top: "#4a80e0", mid: "#3d6fd6", bottom: "#3d6fd6" }
   }
 };
+
+/**
+ * How one block of a training-load column is painted. Every value is expressed
+ * against the block's own sport color, so the recipe holds for all five sports
+ * and the neutral one without naming any of them.
+ */
+export interface TrainingLoadBlockStyle {
+  /** Vertical gradient, as opacity of the block color at top and bottom. */
+  fill: { top: number; bottom: number };
+  /** White highlight over the block's upper part — what makes it read as lit. */
+  sheenOpacity: number;
+  /** Hairline in the block color, separating the slab from the track behind. */
+  strokeOpacity: number;
+  strokeWidth: number;
+  /** Lit edge along the block's top. Height in px; 0 leaves it off. */
+  capHeight: number;
+  capOpacity: number;
+  /** Soft bloom in the block's own color, so a column reads as lit glass. */
+  glowOpacity: number;
+  glowBlur: number;
+  /**
+   * Corner radius. `topRadius` rounds the column's own two top corners and is
+   * kept in step with `trackRadius` so the slab and its slot agree; the edges
+   * where two blocks of one day meet get the much smaller `innerRadius`, which
+   * softens the seam without making each block look like a separate pill.
+   */
+  topRadius: number;
+  innerRadius: number;
+  /**
+   * The faint slot every day sits in, drawn whether the day has load or not.
+   * It gives the columns something to stand in and is what makes a rest day
+   * read as a day with nothing on it rather than as missing data.
+   */
+  trackFill: string;
+  /** The same slot under the pointer — the chart's only hover affordance. */
+  trackHoverFill: string;
+  trackRadius: number;
+}
+
+const DARK_LOAD_BLOCK_STYLE: TrainingLoadBlockStyle = {
+  fill: { top: 1, bottom: 0.62 },
+  sheenOpacity: 0.2,
+  strokeOpacity: 0.35,
+  strokeWidth: 1,
+  capHeight: 2.5,
+  capOpacity: 1,
+  glowOpacity: 0.4,
+  glowBlur: 9,
+  topRadius: 6,
+  innerRadius: 2,
+  trackFill: "rgba(255, 255, 255, 0.045)",
+  trackHoverFill: "rgba(255, 255, 255, 0.1)",
+  trackRadius: 6
+};
+
+/**
+ * Paper needs more ink than dark: the same translucency that reads as glass on
+ * a near-black panel reads as washed-out on white, and a light ground gives a
+ * colored bloom almost nothing to bloom against.
+ */
+const PAPER_LOAD_BLOCK_STYLE: TrainingLoadBlockStyle = {
+  fill: { top: 1, bottom: 0.7 },
+  sheenOpacity: 0.3,
+  strokeOpacity: 0.22,
+  strokeWidth: 1,
+  capHeight: 2.5,
+  capOpacity: 1,
+  glowOpacity: 0.2,
+  glowBlur: 6,
+  topRadius: 6,
+  innerRadius: 2,
+  trackFill: "rgba(38, 34, 28, 0.05)",
+  trackHoverFill: "rgba(38, 34, 28, 0.1)",
+  trackRadius: 6
+};
+
+export function getTrainingLoadBlockStyle(theme: Theme): TrainingLoadBlockStyle {
+  return theme === "paper" ? PAPER_LOAD_BLOCK_STYLE : DARK_LOAD_BLOCK_STYLE;
+}
 
 /** Per-metric series palette — gives each trend chart its own color identity. */
 export function getTrainingMetricPalettes(

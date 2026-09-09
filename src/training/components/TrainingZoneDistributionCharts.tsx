@@ -24,8 +24,27 @@ import {
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+import {
+  formatHeartRateZoneRange,
+  type HeartRateZoneModel
+} from "../heartRateZoneModel";
+import { isActivityInLastFourWeeks } from "../activityWindow";
+import {
+  DISTANCE_ZONE_BUCKETS,
+  buildDistanceZoneTotals,
+  type DistanceZoneBucket,
+  type DistanceZoneTotal
+} from "../distanceZones";
+import { usePrefersReducedMotion } from "./trendChartParts";
 
 interface TrainingZoneDistributionChartsProps {
+  /**
+   * The zone model picked on the Personal screen. COROS aggregates the
+   * distribution against that model, so it is what the buckets must be
+   * labelled with; null until the profile lands, or when it names no zones.
+   */
+  hrZoneModel: HeartRateZoneModel | null;
+  /** Dashboard LTHR zones, the fallback for a profile that never arrived. */
   lthrZones: TrainingHubThresholdZone[];
   activities: TrainingHubActivity[];
   analytics: TrainingHubAnalytics | null;
@@ -50,6 +69,8 @@ interface ZoneDistributionDatum {
   percent: number;
   color: string;
   zoneIndex: number;
+  /** Bpm span of the zone, when the account's zones are known. */
+  range?: string;
 }
 
 type ActivityMetric = "trainingLoad" | "distance" | "time";
@@ -65,18 +86,6 @@ interface MetricDropdownProps<TValue extends string> {
   value: TValue;
   options: MetricDropdownOption<TValue>[];
   onChange: (value: TValue) => void;
-}
-
-interface DistanceBucket {
-  label: string;
-  minMeters: number;
-  maxMeters?: number;
-}
-
-interface DistanceBucketTotal extends DistanceBucket {
-  count: number;
-  trainingLoad: number;
-  duration: number;
 }
 
 const HEART_RATE_ZONE_COLORS = [
@@ -95,15 +104,6 @@ const DISTANCE_ZONE_COLORS = [
   "#1f9cc9",
   "#1684ad",
   "#6f7487"
-];
-
-const DISTANCE_BUCKETS: DistanceBucket[] = [
-  { label: "0–10 km", minMeters: 0, maxMeters: 10_000 },
-  { label: "10–20 km", minMeters: 10_000, maxMeters: 20_000 },
-  { label: "20–30 km", minMeters: 20_000, maxMeters: 30_000 },
-  { label: "30–40 km", minMeters: 30_000, maxMeters: 40_000 },
-  { label: "40–50 km", minMeters: 40_000, maxMeters: 50_000 },
-  { label: "50+ km", minMeters: 50_000 }
 ];
 
 const DISTANCE_METRIC_LABELS: Record<DistanceMetric, string> = {
@@ -144,24 +144,6 @@ const DISTANCE_METRIC_PREFERENCE =
     validate: selectionIsOneOf(["frequency", "trainingLoad", "time"])
   });
 
-const FOUR_WEEKS_MS = 28 * 24 * 60 * 60 * 1000;
-
-function usePrefersReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return reducedMotion;
-}
-
 function formatPercent(value: number): string {
   return `${Math.round(value * 10) / 10}%`;
 }
@@ -201,16 +183,19 @@ function heartRateZoneCaption(zoneIndex: number): string {
 
 function distanceZoneCaption(zoneIndex: number): string {
   if (zoneIndex === 1) {
-    return "Easy & recovery runs";
+    return "Short & recovery sessions";
   }
   if (zoneIndex === 2) {
-    return "Moderate distance sessions";
+    return "Easy aerobic distance";
   }
   if (zoneIndex === 3) {
-    return "Long run territory";
+    return "Steady distance work";
   }
-  if (zoneIndex >= 4) {
-    return "Ultra & marathon prep";
+  if (zoneIndex === 4) {
+    return "Long session territory";
+  }
+  if (zoneIndex >= 5) {
+    return "Endurance & race distance";
   }
 
   return "Distance distribution bucket";
@@ -235,26 +220,13 @@ function getHeartRateAreaList(
   return analytics?.zoneDistributions.hrTrainingLoad ?? [];
 }
 
-function getDistanceAreaList(
-  analytics: TrainingHubAnalytics | null,
-  metric: DistanceMetric
-): TrainingHubZoneDistributionEntry[] {
-  if (metric === "trainingLoad") {
-    return analytics?.zoneDistributions.distanceTrainingLoad ?? [];
-  }
-
-  if (metric === "time") {
-    return analytics?.zoneDistributions.distanceTime ?? [];
-  }
-
-  return analytics?.zoneDistributions.distanceFrequency ?? [];
-}
-
 function buildAreaDistributionData(
   entries: TrainingHubZoneDistributionEntry[],
   labels: string[],
   colors: string[],
-  formatValue: (value: number) => string
+  formatValue: (value: number) => string,
+  /** Indexed the same way `labels` is: by position in the sorted list. */
+  ranges?: (string | undefined)[]
 ): ZoneDistributionDatum[] {
   const sortedEntries = [...entries].sort(
     (left, right) => left.index - right.index
@@ -286,7 +258,8 @@ function buildAreaDistributionData(
       detail: formatValue(value),
       percent,
       color: colors[index % colors.length],
-      zoneIndex: index + 1
+      zoneIndex: index + 1,
+      ...(ranges?.[index] ? { range: ranges[index] } : {})
     };
   });
 }
@@ -301,11 +274,17 @@ function buildHeartRateData(
   const areaList = getHeartRateAreaList(analytics, metric);
 
   if (areaList.length > 0) {
+    // COROS numbers both its zones and these buckets from zero, so the nth
+    // bucket is the nth zone — which is what lets the bpm bounds be read
+    // straight off the account's own zone list.
     return buildAreaDistributionData(
       areaList,
       areaList.map((_entry, index) => `Zone ${index + 1}`),
       HEART_RATE_ZONE_COLORS,
-      (value) => formatActivityMetricValue(value, metric, unitSystem)
+      (value) => formatActivityMetricValue(value, metric, unitSystem),
+      areaList.map((_entry, index) =>
+        zones.length > 0 ? formatHeartRateZoneRange(zones, index) : undefined
+      )
     );
   }
 
@@ -343,7 +322,8 @@ function buildHeartRateData(
     detail: formatActivityMetricValue(item.value, metric, unitSystem),
     percent: (item.value / total) * 100,
     color: HEART_RATE_ZONE_COLORS[index % HEART_RATE_ZONE_COLORS.length],
-    zoneIndex: index + 1
+    zoneIndex: index + 1,
+    range: formatHeartRateZoneRange(sortedZones, index)
   }));
 }
 
@@ -362,71 +342,8 @@ function resolveHeartRateZoneIndex(
   return zones.length - 1;
 }
 
-function buildDistanceBucketTotals(
-  activities: TrainingHubActivity[]
-): DistanceBucketTotal[] {
-  const buckets = DISTANCE_BUCKETS.map((bucket) => ({
-    ...bucket,
-    count: 0,
-    trainingLoad: 0,
-    duration: 0
-  }));
-
-  for (const activity of activities) {
-    if (!isActivityInLastFourWeeks(activity)) {
-      continue;
-    }
-
-    if (!Number.isFinite(activity.distance) || !activity.distance) {
-      continue;
-    }
-
-    const bucket = buckets.find(
-      (candidate) =>
-        activity.distance !== undefined &&
-        activity.distance >= candidate.minMeters &&
-        (candidate.maxMeters === undefined ||
-          activity.distance < candidate.maxMeters)
-    );
-
-    if (!bucket) {
-      continue;
-    }
-
-    bucket.count += 1;
-    bucket.trainingLoad += Number.isFinite(activity.trainingLoad)
-      ? activity.trainingLoad ?? 0
-      : 0;
-    bucket.duration += Number.isFinite(activity.duration)
-      ? activity.duration ?? 0
-      : 0;
-  }
-
-  return buckets;
-}
-
-function activityStartTimeMs(activity: TrainingHubActivity): number | undefined {
-  if (!Number.isFinite(activity.startTime) || !activity.startTime) {
-    return undefined;
-  }
-
-  return activity.startTime < 10_000_000_000
-    ? activity.startTime * 1000
-    : activity.startTime;
-}
-
-function isActivityInLastFourWeeks(activity: TrainingHubActivity): boolean {
-  const startTime = activityStartTimeMs(activity);
-
-  if (startTime === undefined) {
-    return true;
-  }
-
-  return Date.now() - startTime <= FOUR_WEEKS_MS;
-}
-
 function distanceMetricValue(
-  bucket: DistanceBucketTotal,
+  bucket: DistanceZoneTotal,
   metric: DistanceMetric
 ): number {
   if (metric === "trainingLoad") {
@@ -492,37 +409,35 @@ function formatDistanceMetricValue(
   }
 
   const count = Math.round(value);
-  return count === 1 ? "1 run" : `${count} runs`;
+  return count === 1 ? "1 session" : `${count} sessions`;
+}
+
+function formatDistanceBucketLabel(
+  bucket: DistanceZoneBucket,
+  unitSystem: UnitSystem
+): string {
+  const format = (value: number) =>
+    value.toFixed(unitSystem === "imperial" ? 1 : 0);
+  const lower = format(metersToDisplayDistance(bucket.minMeters, unitSystem));
+  const unit = distanceUnit(unitSystem);
+
+  if (bucket.maxMeters === undefined) {
+    return `${lower}+ ${unit}`;
+  }
+
+  const upper = format(metersToDisplayDistance(bucket.maxMeters, unitSystem));
+  return `${lower}–${upper} ${unit}`;
 }
 
 function buildDistanceData(
   activities: TrainingHubActivity[],
   metric: DistanceMetric,
-  analytics: TrainingHubAnalytics | null,
   unitSystem: UnitSystem
 ): ZoneDistributionDatum[] {
-  const labels = DISTANCE_BUCKETS.map((bucket) => {
-    const lower = metersToDisplayDistance(bucket.minMeters, unitSystem);
-    const upper = bucket.maxMeters === undefined
-      ? undefined
-      : metersToDisplayDistance(bucket.maxMeters, unitSystem);
-    const format = (value: number) => value.toFixed(unitSystem === "imperial" ? 1 : 0);
-    return upper === undefined
-      ? `${format(lower)}+ ${distanceUnit(unitSystem)}`
-      : `${format(lower)}–${format(upper)} ${distanceUnit(unitSystem)}`;
-  });
-  const areaList = getDistanceAreaList(analytics, metric);
-
-  if (areaList.length > 0) {
-    return buildAreaDistributionData(
-      areaList,
-      labels,
-      DISTANCE_ZONE_COLORS,
-      (value) => formatDistanceMetricValue(value, metric)
-    );
-  }
-
-  const buckets = buildDistanceBucketTotals(activities);
+  const labels = DISTANCE_ZONE_BUCKETS.map((bucket) =>
+    formatDistanceBucketLabel(bucket, unitSystem)
+  );
+  const buckets = buildDistanceZoneTotals(activities);
   const values = buckets.map((bucket) => distanceMetricValue(bucket, metric));
   const total = values.reduce((sum, value) => sum + value, 0);
 
@@ -559,7 +474,10 @@ function ZoneDistributionTooltip({
 
   return (
     <div className="training-zone-tooltip">
-      <span>{datum.label}</span>
+      <span>
+        {datum.label}
+        {datum.range ? ` · ${datum.range}` : ""}
+      </span>
       <strong>{formatPercent(datum.percent)}</strong>
       <em>{datum.detail}</em>
     </div>
@@ -579,7 +497,12 @@ function ZoneDistributionPanel({
   getCaption
 }: ZoneDistributionPanelProps) {
   const reducedMotion = usePrefersReducedMotion();
-  const chartData = data.filter((datum) => datum.percent > 0);
+  // Kept stable for the same reason `data` is: Recharts replays the sweep
+  // whenever the array it was handed is a different one.
+  const chartData = useMemo(
+    () => data.filter((datum) => datum.percent > 0),
+    [data]
+  );
   const topZone = useMemo(() => {
     if (data.length === 0) {
       return null;
@@ -653,6 +576,7 @@ function ZoneDistributionPanel({
               </p>
               <p className="training-zone-hero-detail">{topZone.detail}</p>
               <p className="training-zone-hero-caption">
+                {topZone.range ? `${topZone.range} · ` : ""}
                 {getCaption(topZone)}
               </p>
             </div>
@@ -680,6 +604,9 @@ function ZoneDistributionPanel({
                 >
                   <span className="training-zone-name">
                     {formatDisplayLabel(datum.label)}
+                    {datum.range ? (
+                      <em className="training-zone-range">{datum.range}</em>
+                    ) : null}
                   </span>
                   <span className="training-zone-track" aria-hidden="true">
                     <span
@@ -863,6 +790,7 @@ function MetricDropdown<TValue extends string>({
 }
 
 export function TrainingZoneDistributionCharts({
+  hrZoneModel,
   lthrZones,
   activities,
   analytics
@@ -875,29 +803,57 @@ export function TrainingZoneDistributionCharts({
     DISTANCE_METRIC_PREFERENCE
   );
 
+  // Without the profile there is nothing to say about which model these are,
+  // so the panel keeps the heading it has always had and the LTHR zones behind
+  // it rather than claiming a model it has not read.
+  const heartRateZones =
+    hrZoneModel && hrZoneModel.zones.length > 0 ? hrZoneModel.zones : lthrZones;
+  const heartRateTitle = hrZoneModel?.title ?? "Threshold Heart Rate";
+  // The title already names the model, so the note says where it is set and
+  // what the percentages are taken of.
+  const heartRateCoverage = hrZoneModel
+    ? ["Zone model from Personal", hrZoneModel.anchorNote]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+
+  // Both sets are walked out of the raw activity list, and both are handed to
+  // Recharts as the `data` prop — which restarts the donut's grow animation
+  // whenever its identity changes. Overview re-renders for reasons that have
+  // nothing to do with these panels, so building them inline left the rings
+  // sweeping in again on every one of them.
+  const heartRateData = useMemo(
+    () =>
+      buildHeartRateData(
+        heartRateZones,
+        activities,
+        heartRateMetric,
+        analytics,
+        unitSystem
+      ),
+    [activities, analytics, heartRateMetric, heartRateZones, unitSystem]
+  );
+  const distanceData = useMemo(
+    () => buildDistanceData(activities, distanceMetric, unitSystem),
+    [activities, distanceMetric, unitSystem]
+  );
+
   return (
     <section className="training-load-profile">
       <div className="training-load-profile-header">
         <p className="eyebrow">Load Profile</p>
-        <h2>
-          Running Distribution <span>(4 Weeks)</span>
-        </h2>
+        <h2>Training Distribution</h2>
       </div>
       <div className="training-zone-grid">
         <ZoneDistributionPanel
-          title="Threshold Heart Rate"
+          title={heartRateTitle}
           subtitle="Training Load"
-          emptyMessage="No threshold heart rate zone distribution data loaded."
+          emptyMessage="No heart rate zone distribution data loaded."
           variant="heart"
           heroKicker="Primary zone"
           metricColumnLabel={HEART_RATE_METRIC_LABELS[heartRateMetric]}
-          data={buildHeartRateData(
-            lthrZones,
-            activities,
-            heartRateMetric,
-            analytics,
-            unitSystem
-          )}
+          {...(heartRateCoverage ? { coverageNote: heartRateCoverage } : {})}
+          data={heartRateData}
           getCaption={(datum) => heartRateZoneCaption(datum.zoneIndex)}
           metricControl={
             <MetricDropdown
@@ -911,15 +867,16 @@ export function TrainingZoneDistributionCharts({
         <ZoneDistributionPanel
           title="Distance Zones"
           subtitle="Distribution"
-          emptyMessage="No distance zone distribution data loaded."
+          emptyMessage="No activities with a recorded distance in the last four weeks."
           variant="distance"
-          heroKicker="Most runs"
+          heroKicker="Most sessions"
+          coverageNote="Sports that record distance — running, cycling, swimming…"
           metricColumnLabel={
             distanceMetric === "frequency"
-              ? "Runs"
+              ? "Sessions"
               : DISTANCE_METRIC_LABELS[distanceMetric]
           }
-          data={buildDistanceData(activities, distanceMetric, analytics, unitSystem)}
+          data={distanceData}
           getCaption={(datum) => distanceZoneCaption(datum.zoneIndex)}
           metricControl={
             <MetricDropdown

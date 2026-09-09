@@ -15,7 +15,7 @@ import {
   trainingChartMargin,
   trainingChartTooltipStyle
 } from "../chartConfig";
-import { ChartAreaGradient } from "./TrainingTrendChart";
+import { ChartAreaGradient } from "./trendChartParts";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   distanceUnit,

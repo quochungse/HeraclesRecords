@@ -95,7 +95,7 @@ The mode is not cosmetic — picking the wrong one fails confusingly.
 | `npm run build:electron && node scripts/test-X.mjs` | Test imports compiled main-process code from `dist-electron/*.js`. Most main-process tests. |
 | `node --experimental-strip-types scripts/test-X.mjs` | Test imports renderer/shared `.ts` **with explicit extensions**. No build step needed. |
 | `node --experimental-strip-types --import ./scripts/register-ts-ext.mjs ...` | Same, but the module graph has **extensionless** `.ts` imports; the hook resolves them. |
-| `cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-X.mjs` | Test touches SQLite. `better-sqlite3` is rebuilt for Electron's ABI, so plain `node` cannot load it. |
+| `cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-X.mjs` | Test touches SQLite. `better-sqlite3` is rebuilt for Electron's ABI, so plain `node` cannot load it. **Also the fallback for a strip-types test on a Node without Amaro** — Electron ships one that has it, so `--experimental-strip-types` (and the resolver hook, where the graph needs it) can ride along. A test taking this route for that second reason says so in its header, or it reads as a SQLite test. |
 | `electron scripts/test-X.cjs` / `ELECTRON_RUN_AS_NODE=` (empty) | Test needs a real Electron window — canvas rendering, or the React renderer harness. |
 
 Tests import compiled modules through `pathToFileURL(...) + "?cacheBust=" + Date.now()` to
@@ -105,12 +105,17 @@ defeat the ESM module cache between fixtures. Keep that when adding tests.
 > opens a window from a tool call. Prefix GUI launches with `env -u ELECTRON_RUN_AS_NODE`.
 > Leave scripts that set or clear the variable themselves alone.
 
-> **This machine's Node cannot run 26 of the tests.** `/usr/bin/node` v22.22.1 is a distro
-> build compiled without Amaro (`node_use_amaro: false`), so every
-> `--experimental-strip-types` script fails with `ERR_NO_TYPESCRIPT` — including
-> `test:sport-colors`, `test:strength-*`, `test:watchface-studio`, and `test:mcp-*`. The
-> `dist-electron` and Electron-runtime modes are unaffected. Fix by installing an official
-> Node 22+ build (nodejs.org tarball or nvm), which ships Amaro; the distro package does not.
+> **This machine's Node cannot run the 28 tests launched by plain `node
+> --experimental-strip-types`.** (Recount with `grep -c '"test:[a-z0-9-]*": "node
+> --experimental-strip-types' package.json` rather than trusting this number.)
+> `/usr/bin/node` v22.22.1 is a distro build compiled without Amaro
+> (`node_use_amaro: false`), so every one of them fails with `ERR_NO_TYPESCRIPT` —
+> including `test:sport-colors`, `test:strength-*`, `test:watchface-studio`, and
+> `test:mcp-*`. The `dist-electron` and Electron-runtime modes are unaffected, which is
+> why a handful of strip-types suites are launched through Electron instead
+> (`test:sync-preferences`, `test:training-load-bars`, `test:distance-zones`,
+> `test:globe-framing`, `test:hr-zone-model`). Fix by installing an official Node 22+
+> build (nodejs.org tarball or nvm), which ships Amaro; the distro package does not.
 
 Hardware-free watch detection: set `COROS_WATCH_PATH=/path/to/mock-watch` (containing a
 `Music` folder), or run `npm run smoke:watch`.

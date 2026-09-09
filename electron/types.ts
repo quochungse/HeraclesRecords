@@ -2066,13 +2066,16 @@ export interface TrainingHubZoneDistributionEntry {
   value?: number;
 }
 
+/**
+ * Heart-rate buckets only. COROS also ships distance buckets in the same
+ * payload, on 5 km boundaries it never states and padded with sessions that
+ * recorded no distance — see the note on `parseZoneDistributions`; the
+ * Distance Zones panel tallies its own.
+ */
 export interface TrainingHubZoneDistributions {
   hrTrainingLoad: TrainingHubZoneDistributionEntry[];
   hrDistance: TrainingHubZoneDistributionEntry[];
   hrTime: TrainingHubZoneDistributionEntry[];
-  distanceFrequency: TrainingHubZoneDistributionEntry[];
-  distanceTrainingLoad: TrainingHubZoneDistributionEntry[];
-  distanceTime: TrainingHubZoneDistributionEntry[];
 }
 
 export interface TrainingHubAnalytics {

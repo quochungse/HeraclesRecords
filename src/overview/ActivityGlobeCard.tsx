@@ -529,6 +529,24 @@ export function ActivityGlobeCard({
     () => locationSummaries.map((summary) => summary.bucket),
     [locationSummaries],
   );
+  // Names for the places pinned on the globe. Only resolved labels go in, so an
+  // unnamed place stays a dot rather than becoming a pair of coordinates —
+  // except the selected one, which always says something.
+  const globeLabels = useMemo(() => {
+    const entries: Record<string, string> = {};
+    for (const summary of locationSummaries) {
+      const label = placeLabels[summary.key];
+      if (label) {
+        entries[summary.key] = label.city;
+      }
+    }
+    if (selectedLocation && !entries[selectedLocation.key]) {
+      entries[selectedLocation.key] = coordinateLabel(
+        selectedLocation.bucket,
+      ).city;
+    }
+    return entries;
+  }, [locationSummaries, placeLabels, selectedLocation]);
 
   useEffect(() => {
     setRecentStart((current) =>
@@ -1139,7 +1157,10 @@ export function ActivityGlobeCard({
                   <>
                     <header>
                       <h3>Your training world</h3>
-                      <p>Select a location on the globe to explore your training history.</p>
+                      <p>
+                        Every place you’ve trained is pinned on the globe.
+                        Select one to explore its history.
+                      </p>
                     </header>
                     <dl className="training-map-overview-values">
                       {mostVisited ? (
@@ -1210,7 +1231,7 @@ export function ActivityGlobeCard({
               locations={globeLocations}
               routePoints={routePoints}
               selectedLocation={selectedLocation?.bucket ?? null}
-              selectedLabel={selectedPlaceLabel?.city ?? ""}
+              labels={globeLabels}
               streetMode={streetMode}
               onError={setGlobeError}
               onHoverChange={setHoveringCluster}

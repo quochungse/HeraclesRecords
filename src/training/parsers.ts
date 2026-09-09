@@ -26,7 +26,7 @@ import type {
 
 export { mergeTrainingDayLists } from "../../electron/trainingTrendUtils";
 
-function happenDayToDate(happenDay: string): Date | null {
+export function happenDayToDate(happenDay: string): Date | null {
   if (!/^\d{8}$/.test(happenDay)) {
     return null;
   }
@@ -37,7 +37,11 @@ function happenDayToDate(happenDay: string): Date | null {
   return new Date(year, month, day);
 }
 
-function mondayRowIndex(date: Date): number {
+/**
+ * Offset of a date inside a Monday-first week — the row of the year grid, and
+ * the column of the Last-30-days calendar.
+ */
+export function mondayWeekIndex(date: Date): number {
   return (date.getDay() + 6) % 7;
 }
 
@@ -144,7 +148,7 @@ export function buildHeatmapGrid(cells: HeatmapCell[]): HeatmapGrid {
   }
 
   const firstDate = happenDayToDate(cells[0].happenDay);
-  const leadingPadding = firstDate ? mondayRowIndex(firstDate) : 0;
+  const leadingPadding = firstDate ? mondayWeekIndex(firstDate) : 0;
   const totalSlots = leadingPadding + cells.length;
   const trailingPadding = (7 - (totalSlots % 7)) % 7;
   const paddedCells: (HeatmapCell | null)[] = [

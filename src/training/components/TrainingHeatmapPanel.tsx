@@ -34,11 +34,14 @@ import {
   buildHeatmapCells,
   buildHeatmapGrid,
   buildHeatmapSummary,
-  mergeTrainingDayLists
+  happenDayToDate,
+  mergeTrainingDayLists,
+  mondayWeekIndex
 } from "../parsers";
 import {
   enrichDayListWithActivityTotals
 } from "../weeklyActivity";
+import { usePrefersReducedMotion } from "./trendChartParts";
 import {
   buildDominantSportByDay,
   buildSportCategoriesByDay,
@@ -78,8 +81,21 @@ interface TrainingHeatmapPanelProps {
 }
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
-/** Days per band in the Last-30-days strip. Mirrored by --heatmap-strip-columns. */
-const HEATMAP_STRIP_COLUMNS = 10;
+/**
+ * Weekday headers for the Last-30-days calendar, Monday first so the short
+ * range reads in the same direction as the year grid's rows.
+ */
+const HEATMAP_WEEK_LABELS = [
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+  "Sun"
+];
+/** Columns per week row in the Last-30-days strip. Mirrored by --heatmap-strip-columns. */
+const HEATMAP_STRIP_COLUMNS = HEATMAP_WEEK_LABELS.length;
 /** Entries a card lists before the rest collapse into a "+N more" line. */
 const HEATMAP_CARD_MAX_ENTRIES = 3;
 const LEGEND_LEVELS = [0, 1, 2, 3, 4] as const;
@@ -126,22 +142,6 @@ function pieBackground(
   return `conic-gradient(${stops.join(", ")})`;
 }
 
-function usePrefersReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return reducedMotion;
-}
-
 function formatCellAriaLabel(
   cell: HeatmapCell,
   metric: HeatmapMetric,
@@ -180,8 +180,9 @@ export function TrainingHeatmapPanel({
   const heatmapWaveHasPlayedRef = useRef(false);
   const isRpe = metric === "rpeLoad";
   const rangeDays = TRAINING_HEATMAP_RANGE_DAYS[range];
-  // The short range drops the weekday grid entirely: thirty days fit as bands
-  // of ten dated cards, each naming what was actually trained that day.
+  // The short range keeps the weekday columns but trades squares for cards:
+  // thirty days fit as calendar weeks of dated cards, each naming what was
+  // actually trained that day.
   const isCompactRange = range === "month";
 
   const dayList = useMemo(
@@ -275,16 +276,30 @@ export function TrainingHeatmapPanel({
     () => (isCompactRange ? buildSportSharesByDay(activities) : new Map()),
     [isCompactRange, activities]
   );
-  // The strip reads left to right, oldest first, in bands of ten days.
-  const bands = useMemo(() => {
-    if (!isCompactRange) {
+  // The strip reads oldest first, one row per calendar week. Every card sits in
+  // its own weekday column, so the leading slots of the first week and the
+  // trailing slots of the last are padded with nulls and rendered as gaps —
+  // that alignment is the whole point of the weekday header row above it.
+  const weeks = useMemo(() => {
+    if (!isCompactRange || cells.length === 0) {
       return [];
     }
-    const chunks: HeatmapCell[][] = [];
-    for (let index = 0; index < cells.length; index += HEATMAP_STRIP_COLUMNS) {
-      chunks.push(cells.slice(index, index + HEATMAP_STRIP_COLUMNS));
+    const firstDate = happenDayToDate(cells[0].happenDay);
+    const leadingPadding = firstDate ? mondayWeekIndex(firstDate) : 0;
+    const slots: (HeatmapCell | null)[] = [
+      ...Array.from({ length: leadingPadding }, () => null),
+      ...cells
+    ];
+    const trailingPadding =
+      (HEATMAP_STRIP_COLUMNS - (slots.length % HEATMAP_STRIP_COLUMNS)) %
+      HEATMAP_STRIP_COLUMNS;
+    slots.push(...Array.from({ length: trailingPadding }, () => null));
+
+    const rows: (HeatmapCell | null)[][] = [];
+    for (let index = 0; index < slots.length; index += HEATMAP_STRIP_COLUMNS) {
+      rows.push(slots.slice(index, index + HEATMAP_STRIP_COLUMNS));
     }
-    return chunks;
+    return rows;
   }, [isCompactRange, cells]);
 
   useLayoutEffect(() => {
@@ -647,19 +662,37 @@ export function TrainingHeatmapPanel({
                 } as CSSProperties
               }
             >
-              {bands.map((band, bandIndex) => (
-                <div className="training-heatmap-band" key={`band-${bandIndex}`}>
-                  {band.map((cell, index) => (
-                    <span
-                      key={`date-${cell.happenDay}`}
-                      className="training-heatmap-band-date"
-                      style={{ gridColumn: index + 1, gridRow: 1 }}
-                      aria-hidden="true"
-                    >
-                      {formatHappenDayShort(cell.happenDay)}
-                    </span>
-                  ))}
-                  {band.map((cell, index) => {
+              <div className="training-heatmap-week-titles" aria-hidden="true">
+                {HEATMAP_WEEK_LABELS.map((label, index) => (
+                  <span
+                    key={label}
+                    className={`training-heatmap-week-title${
+                      index >= 5 ? " is-weekend" : ""
+                    }`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+
+              {weeks.map((week, weekIndex) => (
+                <div className="training-heatmap-band" key={`week-${weekIndex}`}>
+                  {week.map((cell, index) =>
+                    cell ? (
+                      <span
+                        key={`date-${cell.happenDay}`}
+                        className="training-heatmap-band-date"
+                        style={{ gridColumn: index + 1, gridRow: 1 }}
+                        aria-hidden="true"
+                      >
+                        {formatHappenDayShort(cell.happenDay)}
+                      </span>
+                    ) : null
+                  )}
+                  {week.map((cell, index) => {
+                    if (!cell) {
+                      return null;
+                    }
                     const entries = dayEntries.get(cell.happenDay) ?? [];
                     const dominantSport =
                       cell.level > 0 ? sportByDay.get(cell.happenDay) : undefined;
