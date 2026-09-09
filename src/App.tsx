@@ -3383,16 +3383,27 @@ function MediaOverviewTab({
         </section>
       ) : null}
 
-      <div className="overview-globe-section dashboard-block">
-        <Suspense fallback={<DeferredSurfaceFallback label="activity globe" />}>
-          <LazyActivityGlobeCard
-            activities={trainingActivities}
-            connected={trainingConnected}
-            detail={trainingActivityDetail}
-            onSelectActivity={onSelectTrainingActivity}
-          />
-        </Suspense>
-      </div>
+      {/* Signed out, the map has nothing to draw and stands there saying so —
+          next to the sign-in panel Training already shows, which says it
+          better. So it waits for a session, the way every other training
+          panel does, and its chunk stays unfetched until there is one. A
+          start-up restore reads as signed out here on purpose: the panel
+          above is telling the athlete to sit tight, and a map is not what
+          they are waiting on. */}
+      {trainingConnected ? (
+        <div className="overview-globe-section dashboard-block">
+          <Suspense
+            fallback={<DeferredSurfaceFallback label="activity globe" />}
+          >
+            <LazyActivityGlobeCard
+              activities={trainingActivities}
+              connected={trainingConnected}
+              detail={trainingActivityDetail}
+              onSelectActivity={onSelectTrainingActivity}
+            />
+          </Suspense>
+        </div>
+      ) : null}
     </div>
   );
 }
