@@ -181,8 +181,8 @@ export function TrainingHeatmapPanel({
   const isRpe = metric === "rpeLoad";
   const rangeDays = TRAINING_HEATMAP_RANGE_DAYS[range];
   // The short range keeps the weekday columns but trades squares for cards:
-  // thirty days fit as calendar weeks of dated cards, each naming what was
-  // actually trained that day.
+  // thirty days fit as calendar weeks of cards, each carrying its own date in
+  // the top-right corner and naming what was actually trained that day.
   const isCompactRange = range === "month";
 
   const dayList = useMemo(
@@ -677,18 +677,6 @@ export function TrainingHeatmapPanel({
 
               {weeks.map((week, weekIndex) => (
                 <div className="training-heatmap-band" key={`week-${weekIndex}`}>
-                  {week.map((cell, index) =>
-                    cell ? (
-                      <span
-                        key={`date-${cell.happenDay}`}
-                        className="training-heatmap-band-date"
-                        style={{ gridColumn: index + 1, gridRow: 1 }}
-                        aria-hidden="true"
-                      >
-                        {formatHappenDayShort(cell.happenDay)}
-                      </span>
-                    ) : null
-                  )}
                   {week.map((cell, index) => {
                     if (!cell) {
                       return null;
@@ -697,8 +685,7 @@ export function TrainingHeatmapPanel({
                     const dominantSport =
                       cell.level > 0 ? sportByDay.get(cell.happenDay) : undefined;
                     const cardStyle: Record<string, string | number> = {
-                      gridColumn: index + 1,
-                      gridRow: 2
+                      gridColumn: index + 1
                     };
                     if (dominantSport) {
                       cardStyle["--cell-color"] = `var(--sport-${dominantSport})`;
@@ -729,6 +716,13 @@ export function TrainingHeatmapPanel({
                         )}${spoken ? `, ${spoken}` : ""}`}
                         style={cardStyle as CSSProperties}
                       >
+                        <span
+                          className="training-heatmap-card-date"
+                          aria-hidden="true"
+                        >
+                          {formatHappenDayShort(cell.happenDay)}
+                        </span>
+
                         {entries.length > 0 ? (
                           <ul className="training-heatmap-card-entries">
                             {entries

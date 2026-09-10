@@ -12644,10 +12644,10 @@ td span {
 /* --- Load heatmap: Last 30 days --------------------------------------------
    A year of squares carries no room for words, so the short range trades the
    squares for full-width day cards — but it keeps the weekday columns, laid
-   out as calendar weeks under one Mon-to-Sun title row. Each week row still
-   titles its own columns with d/M dates and each card names what was trained,
-   which is why these rules sit after every base cell rule: `.is-card` has to
-   win the size, hover and level-fill declarations above. */
+   out as calendar weeks under one Mon-to-Sun title row. Each card carries its
+   own d/M date in its top-right corner and names what was trained, which is
+   why these rules sit after every base cell rule: `.is-card` has to win the
+   size, hover and level-fill declarations above. */
 .training-heatmap-strip {
   display: grid;
   gap: clamp(10px, 1.1vw, 14px);
@@ -12688,13 +12688,33 @@ td span {
   opacity: 0.6;
 }
 
-.training-heatmap-band-date {
+/* The date rides in the card's own top-right corner rather than in a row of
+   its own above the week, so it reads as part of the day it labels and the week
+   band drops to a single row of cards. Out of flow, deliberately: given a row
+   of its own it would push the entries down half its height, and a card whose
+   one line no longer sits on the card's centre line reads as misaligned against
+   the six cards beside it. What it costs instead is handled below — only the
+   line that can actually reach the corner steps aside for it. */
+.training-heatmap-card-date {
+  position: absolute;
+  top: 5px;
+  right: 7px;
   color: var(--text-secondary);
-  font-size: clamp(10px, 0.85vw, 12px);
+  font-size: clamp(8px, 0.62vw, 9.5px);
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
-  text-align: center;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Only the first title can reach the corner, so only it steps aside — a
+   padding-right on the card would charge every line of a ~100px card for a
+   collision none of the others can have. It is not conditional on the card
+   being full: one entry whose title wraps to two lines already starts high
+   enough to run under the date. */
+.training-heatmap-card-entry:first-child .training-heatmap-card-title {
+  padding-right: 22px;
 }
 
 .training-heatmap-cell.is-card {
