@@ -8,13 +8,13 @@
  *
  * This page mounts the **real** components against a stubbed `CorosLinkApi`
  * and exposes a small command surface on `window.__harness`. The driver
- * (`scripts/test-coach-automation-renderer.mjs`) runs in Electron's main
+ * (`scripts/test-coach-analysis-renderer.mjs`) runs in Electron's main
  * process, loads this page into a hidden window, and asserts in node. Nothing
  * here asserts anything: keeping the assertions on the node side is what lets
  * the suite read like every other `test-*.mjs` and fail with the same output.
  *
  * It runs under Electron rather than a DOM emulation because Electron is
- * already a dev dependency and already hosts a suite (`coach-automation-sql`),
+ * already a dev dependency and already hosts a suite (`coach-analysis-sql`),
  * so this costs no new dependency — and because the bugs being chased are the
  * kind a real browser has: effects, event order, and a console nobody read.
  */
@@ -22,9 +22,9 @@ import { StrictMode, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
 import { ChatView } from "../../src/chat/ChatView";
-import { CoachAutomationsPanel } from "../../src/chat/automations/CoachAutomationsPanel";
-import { ConversationCoaches } from "../../src/chat/automations/ConversationCoaches";
-import { CoachAutomationDetail } from "../../src/chat/automations/CoachAutomationDetail";
+import { ConversationAnalyses } from "../../src/chat/analyses/ConversationAnalyses";
+import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
+import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -138,32 +138,45 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       onActivityChange={spy("onActivityChange") as (active: boolean) => void}
     />
   ),
-  CoachAutomationsPanel: () => (
-    <CoachAutomationsPanel
+  AnalysisDetailView: (options) => (
+    <AnalysisDetailView
       api={api}
-      provider="claude-code"
-      onChanged={spy("onChanged")}
-    />
-  ),
-  CoachAutomationDetail: (options) => (
-    <CoachAutomationDetail
-      api={api}
-      automationId={(options.automationId as string | undefined) ?? "a1"}
+      analysisId={(options.analysisId as string | undefined) ?? "a1"}
       provider="claude-code"
       initialTab={
-        (options.tab as "definition" | "bindings" | "runs" | undefined) ??
-        "bindings"
+        (options.tab as "settings" | "runs" | undefined) ?? "settings"
       }
       onBack={spy("onBack")}
       onChanged={spy("onChanged")}
     />
   ),
-  ConversationCoaches: (options) => (
-    <ConversationCoaches
+  // The feature-wide analysis controls — the pause and the monthly ceiling —
+  // live in Settings now that there is no analyses screen to host them.
+  ChatSettingsPanel: () => (
+    <ChatSettingsPanel
+      api={api}
+      chatSettings={{
+        provider: "claude-code",
+        chatgpt: {} as never,
+        anthropic: {} as never,
+        claudeCode: {} as never,
+        openRouter: {} as never,
+        local: {} as never,
+        customInstructions: "",
+        compactContext: { enabled: true, limit: 60, keep: 20 }
+      }}
+      coachModelsSummary=""
+      onOpenCoachModels={spy("onOpenCoachModels")}
+      onUpdateChatSettings={spy("onUpdateChatSettings")}
+    />
+  ),
+  ConversationAnalyses: (options) => (
+    <ConversationAnalyses
       api={api}
       sessionId={(options.sessionId as string | null) ?? "s1"}
       onChanged={spy("onChanged")}
-      onManageAutomations={spy("onManageAutomations")}
+      onCreateAnalysis={spy("onCreateAnalysis")}
+      onOpenAnalysis={spy("onOpenAnalysis")}
     />
   )
 };

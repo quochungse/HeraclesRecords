@@ -122,7 +122,7 @@ export function buildCoachInputPrompt(
 }
 
 /**
- * An automation run has nobody watching, so the question cannot block the turn.
+ * An analysis run has nobody watching, so the question cannot block the turn.
  * The prompt is still emitted and persisted — the athlete can answer it later
  * from the transcript — but the model is told to assume and carry on.
  */

@@ -65,10 +65,10 @@ import type {
   ChatProvider,
   ChatSessionSummary,
   ChatSettings,
-  ChatEntryAutomationMarker,
+  ChatEntryAnalysisMarker,
   ClaudeCodeStatus,
-  CoachAutomationRun,
-  CoachAutomationSessionAttention,
+  CoachAnalysisRun,
+  CoachAnalysisSessionAttention,
   CoachInputChoice,
   CoachInputPrompt,
   LocalChatConnectionTest,
@@ -99,8 +99,9 @@ import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
-import { ConversationCoaches } from "./automations/ConversationCoaches";
-import { CoachAutomationsModal } from "./automations/CoachAutomationsModal";
+import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
+import { AnalysesModal } from "./analyses/AnalysesModal";
+import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -287,12 +288,12 @@ function CoachInputCard({
 }
 
 /**
- * An automation run streaming into the conversation that is open. Deliberately
+ * An analysis run streaming into the conversation that is open. Deliberately
  * separate from the athlete's own streaming state: theirs is persisted as their
  * turn when it ends, while a run's text is already being written to disk by the
  * main process, and merging the two would save it twice.
  */
-interface LiveAutomationRun {
+interface LiveAnalysisRun {
   runId: string;
   name: string;
   text: string;
@@ -1794,8 +1795,10 @@ export function ChatView({
   const [checkingClaude, setCheckingClaude] = useState(false);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [automationsOpen, setAutomationsOpen] = useState(false);
-  const [automationsVersion, setAutomationsVersion] = useState(0);
+  /** Which analysis screen the modal is showing, if any. */
+  const [analysisTarget, setAnalysisTarget] =
+    useState<AnalysesModalTarget | null>(null);
+  const [analysesVersion, setAnalysesVersion] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState<ChatEntry[]>([]);
   /**
@@ -1812,7 +1815,7 @@ export function ChatView({
    * something the athlete has not read. Keyed by session id.
    */
   const [sessionAttention, setSessionAttention] = useState<
-    Map<string, CoachAutomationSessionAttention>
+    Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
   /** A summariser turn is running ahead of the athlete's own. */
@@ -1862,17 +1865,17 @@ export function ChatView({
   const [deletedWorkouts, setDeletedWorkouts] = useState<
     Record<string, DeleteWorkoutResult>
   >({});
-  // An automation run writing into the conversation that is open right now.
-  const [liveAutomation, setLiveAutomation] = useState<LiveAutomationRun | null>(
+  // An analysis run writing into the conversation that is open right now.
+  const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
   );
   // House rule 1 asks a run with nothing to say to answer with the marker and
   // nothing else, so a run heading for silence has no other text in flight.
   // What has arrived is held back while it could still be that marker: it is a
   // control token, and the athlete watching the bubble must never read it.
-  const liveAutomationText =
-    liveAutomation && !NOTHING_TO_REPORT.startsWith(liveAutomation.text.trim())
-      ? liveAutomation.text
+  const liveAnalysisText =
+    liveAnalysis && !NOTHING_TO_REPORT.startsWith(liveAnalysis.text.trim())
+      ? liveAnalysis.text
       : "";
 
   // Ref so the push-event handlers filter on the current request without
@@ -1898,8 +1901,8 @@ export function ChatView({
   // request can restore the question instead of silently losing it.
   const resumedCoachPromptRef = useRef<CoachInputPrompt | null>(null);
   // Same reason as activeRequestIdRef: the push handlers have to recognise the
-  // automation's stream without re-subscribing.
-  const liveAutomationRef = useRef<LiveAutomationRun | null>(null);
+  // analysis's stream without re-subscribing.
+  const liveAnalysisRef = useRef<LiveAnalysisRun | null>(null);
   // Whether the Coach panel is the view on screen. The panel stays mounted once
   // it has been opened, so "the conversation is open" is not the same question
   // as "the athlete can see it" -- and only the second one means read.
@@ -1990,7 +1993,7 @@ export function ChatView({
   const refreshSessionAttention = useCallback(async () => {
     if (!api) return;
     try {
-      const rows = await api.listCoachAutomationSessionAttention();
+      const rows = await api.listCoachAnalysisSessionAttention();
       setSessionAttention(new Map(rows.map((row) => [row.sessionId, row])));
     } catch {
       // A conversation list without its marks is still a conversation list.
@@ -2006,7 +2009,7 @@ export function ChatView({
     async (sessionId: string) => {
       if (!api) return;
       try {
-        if ((await api.markCoachAutomationSessionSeen(sessionId)) > 0) {
+        if ((await api.markCoachAnalysisSessionSeen(sessionId)) > 0) {
           await refreshSessionAttention();
         }
       } catch {
@@ -2035,7 +2038,7 @@ export function ChatView({
   };
 
   /**
-   * Re-reads the open conversation from disk. An automation run persists in the
+   * Re-reads the open conversation from disk. An analysis run persists in the
    * main process, behind this window's back, so the transcript on screen is the
    * only copy that does not know about it — and the next thing the athlete
    * types would save that stale copy straight over the coach's answer.
@@ -2080,8 +2083,8 @@ export function ChatView({
       return;
     }
     onError(null);
-    setAutomationsOpen(false);
-    setAutomationsVersion((value) => value + 1);
+    setAnalysisTarget(null);
+    setAnalysesVersion((value) => value + 1);
     await loadSession(sessionId);
   };
 
@@ -2119,27 +2122,25 @@ export function ChatView({
   // so the list re-reads on the same version counter the header chips use.
   useEffect(() => {
     void refreshSessionAttention();
-  }, [refreshSessionAttention, automationsVersion]);
+  }, [refreshSessionAttention, analysesVersion]);
 
   /**
-   * The ⚡ mark is "a live coach speaks here", and a coach's master switch is
-   * half of what makes it live — `listCoachAutomationSessionAttention` skips
-   * every binding of a disabled automation. Switching a coach off therefore
-   * moves the mark on conversations this window never touched, with no binding
-   * and no run to say so.
+   * The ⚡ mark is "an analysis speaks here", and its switch is what makes it
+   * live — `listCoachAnalysisSessionAttention` skips a disabled one. Switching
+   * one off therefore moves the mark on a conversation this window may not
+   * even have open, with no run to say so.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationUpdate) return;
-    return api.onCoachAutomationUpdate(() => {
+    if (!api?.onCoachAnalysisUpdate) return;
+    return api.onCoachAnalysisUpdate(() => {
       void refreshSessionAttention();
     });
   }, [api, refreshSessionAttention]);
 
   /**
-   * A run reaches into the conversation list from outside this window. A
-   * `per-run` binding brings a conversation into existence every time it fires
-   * (2.2), a `dedicated` one rebuilds its own when it has been deleted, and
-   * every run bumps whatever it wrote into to the top (9.3).
+   * A run reaches into the conversation list from outside this window: every
+   * run bumps whatever it wrote into to the top (9.3), and the conversation it
+   * wrote into may be one this window has never opened.
    *
    * The sidebar renders from a list this window read once, on mount and on a
    * provider change, so none of that was visible until the app was restarted:
@@ -2150,12 +2151,12 @@ export function ChatView({
    * only way the athlete can open it and watch the answer arrive.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    // The provider on screen, not the run's: an automation may run on one of
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    // The provider on screen, not the run's: an analysis may run on one of
     // its own (decision 2), and that conversation belongs to that provider's
     // list rather than this one.
     const provider = chatSettings.provider;
-    return api.onCoachAutomationRunUpdate((run) => {
+    return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId) return;
       void refreshSessions(provider).catch(() => undefined);
     });
@@ -2167,8 +2168,8 @@ export function ChatView({
    * so this one watches every run.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    return api.onCoachAutomationRunUpdate((run) => {
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    return api.onCoachAnalysisRunUpdate((run) => {
       // Still working: nothing has landed in any conversation yet.
       if (run.status === "running") return;
       if (
@@ -2189,8 +2190,8 @@ export function ChatView({
   }, [api, markSessionRead, refreshSessionAttention]);
 
   useEffect(() => {
-    liveAutomationRef.current = liveAutomation;
-  }, [liveAutomation]);
+    liveAnalysisRef.current = liveAnalysis;
+  }, [liveAnalysis]);
 
   /**
    * Coming back to the Coach view is reading whatever landed while it was
@@ -2209,16 +2210,16 @@ export function ChatView({
    * lookup: an athlete watching a bubble needs to know which of their coaches
    * is speaking.
    */
-  const showLiveAutomation = useCallback(
-    (run: CoachAutomationRun) => {
-      setLiveAutomation({ runId: run.id, name: "Automation coach", text: "" });
+  const showLiveAnalysis = useCallback(
+    (run: CoachAnalysisRun) => {
+      setLiveAnalysis({ runId: run.id, name: "Analysis coach", text: "" });
       void api
-        ?.getCoachAutomation(run.automationId)
-        .then((detail) => {
-          if (!detail) return;
-          setLiveAutomation((current) =>
+        ?.getCoachAnalysis(run.analysisId)
+        .then((analysis) => {
+          if (!analysis) return;
+          setLiveAnalysis((current) =>
             current?.runId === run.id
-              ? { ...current, name: detail.automation.name }
+              ? { ...current, name: analysis.name }
               : current
           );
         })
@@ -2233,49 +2234,49 @@ export function ChatView({
    *
    * And it picks up whatever is streaming into the new one. The subscription
    * below only ever hears about a run while its conversation is already open,
-   * so opening one mid-run — which is exactly what a `per-run` binding invites
-   * the athlete to do, its conversation appearing in the sidebar the moment the
-   * run starts — showed an empty transcript with nothing to say why. The text
+   * so opening one mid-run — a conversation jumping to the top of the sidebar
+   * is exactly what invites the athlete to do that — showed an empty
+   * transcript with nothing to say why. The text
    * already streamed is gone, but the bubble says who is working and the tokens
    * from here on land in it.
    */
   useEffect(() => {
-    setLiveAutomation(null);
+    setLiveAnalysis(null);
     if (!api || !activeSessionId) return;
     let cancelled = false;
     void api
-      .listCoachAutomationRuns({
+      .listCoachAnalysisRuns({
         sessionId: activeSessionId,
         statuses: ["running"],
         limit: 1
       })
       .then((runs) => {
         if (cancelled || !runs.length) return;
-        showLiveAutomation(runs[0]);
+        showLiveAnalysis(runs[0]);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [api, activeSessionId, showLiveAutomation]);
+  }, [api, activeSessionId, showLiveAnalysis]);
 
   /**
    * A run that targets the conversation on screen has to show up in it as it
-   * happens — an automation the athlete triggered and then cannot see reads as
+   * happens — an analysis the athlete triggered and then cannot see reads as
    * a button that did nothing.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    return api.onCoachAutomationRunUpdate((run) => {
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId || run.sessionId !== activeSessionIdRef.current) return;
 
       if (run.status === "running") {
-        showLiveAutomation(run);
+        showLiveAnalysis(run);
         return;
       }
 
-      if (liveAutomationRef.current?.runId === run.id) {
-        setLiveAutomation(null);
+      if (liveAnalysisRef.current?.runId === run.id) {
+        setLiveAnalysis(null);
       }
 
       // A skip never reached the model and adds nothing. A silent run does add
@@ -2289,13 +2290,13 @@ export function ChatView({
       // coach's answer before the deferred reload ever got to see it.
       void reloadTranscript(run.sessionId);
     });
-  }, [api, showLiveAutomation]);
+  }, [api, showLiveAnalysis]);
 
   /**
    * A conversation written on another machine.
    *
    * Sync merges `chat_sessions` rows straight into SQLite, behind this window's
-   * back — the same shape of change an automation run makes, arriving from a
+   * back — the same shape of change an analysis run makes, arriving from a
    * different direction. Nothing here noticed: the sidebar rendered the list it
    * read on mount and the transcript its copy from `loadSession`, so a
    * conversation held or extended on the other computer only appeared after a
@@ -2318,9 +2319,9 @@ export function ChatView({
         change.tables.includes("coach_automation_bindings")
       ) {
         // Which conversations carry the ⚡ mark is a fact about the coaches, so
-        // a merged automation moves it on conversations this window never
+        // a merged analysis moves it on conversations this window never
         // touched. Same counter the attach/detach path bumps.
-        setAutomationsVersion((value) => value + 1);
+        setAnalysesVersion((value) => value + 1);
       }
 
       if (!change.tables.includes("chat_sessions")) return;
@@ -2664,8 +2665,8 @@ export function ChatView({
 
     const unsubscribers = [
       api.onChatStreamStart((payload) => {
-        if (payload.requestId === liveAutomationRef.current?.runId) {
-          setLiveAutomation((current) =>
+        if (payload.requestId === liveAnalysisRef.current?.runId) {
+          setLiveAnalysis((current) =>
             current?.runId === payload.requestId ? { ...current, text: "" } : current
           );
           return;
@@ -2681,8 +2682,8 @@ export function ChatView({
         // A run's tokens must never touch the athlete's own streaming state:
         // that state gets persisted as their turn when the stream ends, and the
         // runner has already written the same text from the main process.
-        if (payload.requestId === liveAutomationRef.current?.runId) {
-          setLiveAutomation((current) =>
+        if (payload.requestId === liveAnalysisRef.current?.runId) {
+          setLiveAnalysis((current) =>
             current?.runId === payload.requestId
               ? { ...current, text: current.text + payload.delta }
               : current
@@ -2695,8 +2696,8 @@ export function ChatView({
       }),
       api.onChatStreamInfo((payload) => {
         // Cards (plan drafts, charts) belong to whoever asked for them; an
-        // automation's transcript is reloaded from disk when its run ends.
-        if (payload.requestId === liveAutomationRef.current?.runId) return;
+        // analysis's transcript is reloaded from disk when its run ends.
+        if (payload.requestId === liveAnalysisRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
         if (payload.kind === "context") {
           sourceRef.current = {
@@ -2813,7 +2814,7 @@ export function ChatView({
     timeline,
     streamingText,
     thinkingText,
-    liveAutomation,
+    liveAnalysis,
     exportingLatestActivity
   ]);
 
@@ -4097,18 +4098,18 @@ export function ChatView({
 
 /**
  * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
- * automations, so every entry a run produced says which coach spoke.
+ * analyses, so every entry a run produced says which coach spoke.
  */
-function AutomationAttribution({
+function AnalysisAttribution({
   marker
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
 }) {
   return (
-    <span className="chat-automation-attribution">
+    <span className="chat-analysis-attribution">
       <Zap size={12} aria-hidden="true" />
       {marker.name}
-      <span className="chat-automation-attribution-trigger">
+      <span className="chat-analysis-attribution-trigger">
         · {marker.triggerLabel}
       </span>
     </span>
@@ -4118,15 +4119,15 @@ function AutomationAttribution({
 /**
  * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
  * default — it is machinery, not conversation — but openable, because an
- * athlete judging an automation's answer needs to see what it was asked.
+ * athlete judging an analysis's answer needs to see what it was asked.
  */
-function AutomationPromptChip({
+function AnalysisPromptChip({
   marker,
   prompt,
   index,
   highlighted
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
   prompt: string;
   index: number;
   highlighted: boolean;
@@ -4134,22 +4135,22 @@ function AutomationPromptChip({
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className={`chat-row chat-row-automation${
+      className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
       data-chat-entry-index={index}
     >
       <button
         type="button"
-        className="chat-automation-chip"
+        className="chat-analysis-chip"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
         <Zap size={12} aria-hidden="true" />
         {marker.name}
-        <span className="chat-automation-chip-trigger">· {marker.triggerLabel}</span>
+        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
       </button>
-      {expanded ? <pre className="chat-automation-prompt">{prompt}</pre> : null}
+      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
     </div>
   );
 }
@@ -4179,32 +4180,32 @@ function formatLookedAt(at: number): string {
 }
 
 /**
- * 5.5: an automation looked and had nothing to say. One line, the same pill as
+ * 5.5: an analysis looked and had nothing to say. One line, the same pill as
  * the playbook chip, but nothing to open — the whole point is that there is no
  * content behind it.
  */
-function AutomationSilentChip({
+function AnalysisSilentChip({
   marker,
   at,
   index,
   highlighted
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
   at: number;
   index: number;
   highlighted: boolean;
 }) {
   return (
     <div
-      className={`chat-row chat-row-automation${
+      className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
       data-chat-entry-index={index}
     >
-      <span className="chat-automation-chip chat-automation-chip-static">
+      <span className="chat-analysis-chip chat-analysis-chip-static">
         <Zap size={12} aria-hidden="true" />
         {marker.name} looked, nothing new
-        <span className="chat-automation-chip-trigger">
+        <span className="chat-analysis-chip-trigger">
           · {formatLookedAt(at)}
         </span>
       </span>
@@ -4228,12 +4229,18 @@ function AutomationSilentChip({
             <Settings2 size={16} aria-hidden="true" />
             Settings
           </button>
-          <ConversationCoaches
+          <ConversationAnalyses
             api={api}
             sessionId={activeSessionId}
-            refreshVersion={automationsVersion}
-            onChanged={() => setAutomationsVersion((value) => value + 1)}
-            onManageAutomations={() => setAutomationsOpen(true)}
+            refreshVersion={analysesVersion}
+            onChanged={() => setAnalysesVersion((value) => value + 1)}
+            onCreateAnalysis={() => {
+              if (!activeSessionId) return;
+              setAnalysisTarget({ kind: "create", sessionId: activeSessionId });
+            }}
+            onOpenAnalysis={(analysisId) =>
+              setAnalysisTarget({ kind: "detail", analysisId })
+            }
           />
           <div className="chat-mcp" ref={mcpRef}>
             {(() => {
@@ -4507,8 +4514,8 @@ function AutomationSilentChip({
 
             if (entry.kind === "automationSilent") {
               return (
-                <AutomationSilentChip
-                  key={`automation-silent-${index}`}
+                <AnalysisSilentChip
+                  key={`analysis-silent-${index}`}
                   marker={entry.automation}
                   at={entry.at}
                   index={index}
@@ -4517,12 +4524,12 @@ function AutomationSilentChip({
               );
             }
 
-            // 5.6: the synthetic user turn an automation sends is stored with
+            // 5.6: the synthetic user turn an analysis sends is stored with
             // role "user", but it was never typed by the athlete — showing it as
             // their bubble would misattribute the playbook to them.
             if (entry.automation && entry.role === "user") {
               return (
-                <AutomationPromptChip
+                <AnalysisPromptChip
                   key={`message-${index}`}
                   marker={entry.automation}
                   prompt={entry.content}
@@ -4551,7 +4558,7 @@ function AutomationSilentChip({
                 </div>
                 <div className="chat-bubble">
                   {entry.automation ? (
-                    <AutomationAttribution marker={entry.automation} />
+                    <AnalysisAttribution marker={entry.automation} />
                   ) : null}
                   {entry.role === "assistant" ? (
                     <>
@@ -4609,21 +4616,21 @@ function AutomationSilentChip({
 
           {/* Same avatar and bubble as the persisted answer this becomes, so
               the reload at the end of the run does not make the row jump. */}
-          {liveAutomation ? (
+          {liveAnalysis ? (
             <div className="chat-row chat-row-assistant">
               <div className="chat-avatar chat-avatar-assistant">
                 <Sparkles size={16} aria-hidden="true" />
               </div>
               <div className="chat-bubble chat-bubble-streaming">
-                <span className="chat-automation-attribution">
+                <span className="chat-analysis-attribution">
                   <Zap size={12} aria-hidden="true" />
-                  {liveAutomation.name}
-                  <span className="chat-automation-attribution-trigger">
+                  {liveAnalysis.name}
+                  <span className="chat-analysis-attribution-trigger">
                     · running now
                   </span>
                 </span>
-                {liveAutomationText ? (
-                  <AssistantMarkdown content={liveAutomationText} streaming />
+                {liveAnalysisText ? (
+                  <AssistantMarkdown content={liveAnalysisText} streaming />
                 ) : (
                   <div className="chat-stream-pending">
                     <span className="chat-stream-status">
@@ -4846,16 +4853,16 @@ function AutomationSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
-      <CoachAutomationsModal
+      <AnalysesModal
         api={api}
-        open={automationsOpen}
+        target={analysisTarget}
         provider={chatSettings.provider}
-        onChanged={() => setAutomationsVersion((value) => value + 1)}
+        onChanged={() => setAnalysesVersion((value) => value + 1)}
         onClose={() => {
-          setAutomationsOpen(false);
+          setAnalysisTarget(null);
           // Catch-all: anything the modal changed is reflected on close, even
           // a path that forgot to report itself.
-          setAutomationsVersion((value) => value + 1);
+          setAnalysesVersion((value) => value + 1);
         }}
         onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
       />

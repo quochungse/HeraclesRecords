@@ -20,7 +20,7 @@ import {
 import { createPortal } from "react-dom";
 import type {
   ChatSessionSummary,
-  CoachAutomationSessionAttention
+  CoachAnalysisSessionAttention
 } from "../../electron/types";
 import { formatSessionRelativeTime } from "./chatSessionGroups";
 
@@ -290,7 +290,7 @@ export function ChatSessionRow({
   /** A summariser turn is running for this conversation. */
   compacting?: boolean;
   /** 9.3: whether a coach speaks here, and whether it has said something new. */
-  attention?: CoachAutomationSessionAttention;
+  attention?: CoachAnalysisSessionAttention;
   onSelect: () => void;
   onTogglePin: () => void;
   /** Called with the trimmed new title, only when it actually changed. */
@@ -390,13 +390,13 @@ export function ChatSessionRow({
             ) : null}
             {attached || unread > 0 ? (
               <Zap
-                className="chat-session-row-automation-mark"
+                className="chat-session-row-analysis-mark"
                 size={11}
                 role="img"
                 aria-label={
                   attached
-                    ? "An automation coach writes into this conversation"
-                    : "An automation coach wrote into this conversation"
+                    ? "An analysis coach writes into this conversation"
+                    : "An analysis coach wrote into this conversation"
                 }
               />
             ) : null}

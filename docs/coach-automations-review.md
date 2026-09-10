@@ -1,5 +1,19 @@
 # Coach Automations — review plan
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: it is the plan the seven review rounds followed, and a record of what they found.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 Status: **proposed**, written 2026-08-26 against the code at the end of phase 3.
 
 Companion to [coach-automations.md](./coach-automations.md), which is the feature's spec *and* its record. This file is neither: it is the plan for going back over 21 build sessions and finding what they left.

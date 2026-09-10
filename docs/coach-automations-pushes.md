@@ -1,5 +1,19 @@
 # The main↔renderer contract — what the window is told, and what it is not
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: every push it traces still exists under an `analysis:` name, and one was added — `analysis:updateAttachment`'s announcement of a changed trigger.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 R3 step 5 of [coach-automations-review.md](./coach-automations-review.md).
 Sections 9.1, 9.3 and 10 of [coach-automations.md](./coach-automations.md).
 

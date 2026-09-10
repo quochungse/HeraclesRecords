@@ -18,7 +18,7 @@ import type {
   ActivityBackupProgress,
   BinaryStatus,
   CachedCorosMapPackage,
-  CoachAutomationSessionAttention,
+  CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
   CorosMapDownloadJob,
@@ -117,19 +117,16 @@ import type {
   ChatMessage,
   ChatProvider,
   ChatSessionSummary,
-  CoachAutomation,
-  CoachAutomationAttachResult,
-  CoachAutomationBinding,
-  CoachAutomationBindingInput,
-  CoachAutomationBindingView,
-  CoachAutomationDetail,
-  CoachAutomationInput,
-  CoachAutomationRun,
-  CoachAutomationPause,
-  CoachAutomationSpend,
-  CoachAutomationRunQuery,
-  CoachAutomationSummary,
-  CoachAutomationUpdate,
+  CoachAnalysis,
+  CoachAnalysisCreateResult,
+  CoachAnalysisInput,
+  CoachAnalysisPatch,
+  CoachAnalysisRun,
+  CoachAnalysisPause,
+  CoachAnalysisSpend,
+  CoachAnalysisRunQuery,
+  CoachAnalysisSummary,
+  CoachAnalysisUpdate,
   ChatSettings,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
@@ -1062,114 +1059,86 @@ const api = {
     title: string
   ): Promise<ChatSessionSummary | null> =>
     ipcRenderer.invoke("chat:renameSession", sessionId, title),
-  listCoachAutomations: (): Promise<CoachAutomationSummary[]> =>
-    ipcRenderer.invoke("coachAutomation:list"),
-  getCoachAutomation: (automationId: string): Promise<CoachAutomationDetail | null> =>
-    ipcRenderer.invoke("coachAutomation:get", automationId),
-  saveCoachAutomation: (
-    input: CoachAutomationInput,
-    automationId?: string
-  ): Promise<CoachAutomation | null> =>
-    ipcRenderer.invoke("coachAutomation:save", input, automationId),
-  setCoachAutomationEnabled: (
-    automationId: string,
-    enabled: boolean
-  ): Promise<CoachAutomation | null> =>
-    ipcRenderer.invoke("coachAutomation:setEnabled", automationId, enabled),
-  deleteCoachAutomation: (automationId: string): Promise<void> =>
-    ipcRenderer.invoke("coachAutomation:delete", automationId),
-  listCoachAutomationBindings: (
-    automationId: string
-  ): Promise<CoachAutomationBindingView[]> =>
-    ipcRenderer.invoke("coachAutomation:listBindings", automationId),
-  attachCoachAutomation: (
-    input: CoachAutomationBindingInput
-  ): Promise<CoachAutomationAttachResult> =>
-    ipcRenderer.invoke("coachAutomation:attach", input),
-  detachCoachAutomation: (bindingId: string): Promise<void> =>
-    ipcRenderer.invoke("coachAutomation:detach", bindingId),
-  setCoachAutomationBindingEnabled: (
-    bindingId: string,
-    enabled: boolean
-  ): Promise<CoachAutomationBinding | null> =>
-    ipcRenderer.invoke("coachAutomation:setBindingEnabled", bindingId, enabled),
-  reorderCoachAutomationBindings: (
-    sessionId: string,
-    bindingIds: string[]
-  ): Promise<CoachAutomationBinding[]> =>
-    ipcRenderer.invoke("coachAutomation:reorderBindings", sessionId, bindingIds),
-  listCoachAutomationsForSession: (
+  listCoachAnalysesForSession: (
     sessionId: string
-  ): Promise<CoachAutomationBindingView[]> =>
-    ipcRenderer.invoke("coachAutomation:listForSession", sessionId),
-  runCoachAutomationNow: (
-    automationId: string,
-    bindingIds?: string[]
-  ): Promise<CoachAutomationRun[]> =>
-    ipcRenderer.invoke("coachAutomation:runNow", automationId, bindingIds),
-  listCoachAutomationRuns: (
-    filter?: CoachAutomationRunQuery
-  ): Promise<CoachAutomationRun[]> =>
-    ipcRenderer.invoke("coachAutomation:listRuns", filter),
-  cancelCoachAutomationRun: (runId: string): Promise<void> =>
-    ipcRenderer.invoke("coachAutomation:cancelRun", runId),
-  getCoachAutomationPause: (): Promise<CoachAutomationPause | null> =>
-    ipcRenderer.invoke("coachAutomation:getPause"),
-  resumeCoachAutomations: (): Promise<CoachAutomationPause | null> =>
-    ipcRenderer.invoke("coachAutomation:resume"),
-  getCoachAutomationSpend: (): Promise<CoachAutomationSpend> =>
-    ipcRenderer.invoke("coachAutomation:getSpend"),
-  setCoachAutomationBudget: (budget: number | null): Promise<CoachAutomationSpend> =>
-    ipcRenderer.invoke("coachAutomation:setBudget", budget),
-  markCoachAutomationRunsSeen: (runIds: string[]): Promise<number> =>
-    ipcRenderer.invoke("coachAutomation:markSeen", runIds),
-  listCoachAutomationSessionAttention: (): Promise<
-    CoachAutomationSessionAttention[]
-  > => ipcRenderer.invoke("coachAutomation:sessionAttention"),
-  markCoachAutomationSessionSeen: (sessionId: string): Promise<number> =>
-    ipcRenderer.invoke("coachAutomation:markSessionSeen", sessionId),
-  onCoachAutomationRunUpdate: (
-    callback: (run: CoachAutomationRun) => void
+  ): Promise<CoachAnalysisSummary[]> =>
+    ipcRenderer.invoke("analysis:listForSession", sessionId),
+  getCoachAnalysis: (analysisId: string): Promise<CoachAnalysis | null> =>
+    ipcRenderer.invoke("analysis:get", analysisId),
+  createCoachAnalysis: (
+    input: CoachAnalysisInput
+  ): Promise<CoachAnalysisCreateResult> =>
+    ipcRenderer.invoke("analysis:create", input),
+  updateCoachAnalysis: (
+    analysisId: string,
+    patch: CoachAnalysisPatch
+  ): Promise<CoachAnalysis | null> =>
+    ipcRenderer.invoke("analysis:update", analysisId, patch),
+  setCoachAnalysisEnabled: (
+    analysisId: string,
+    enabled: boolean
+  ): Promise<CoachAnalysis | null> =>
+    ipcRenderer.invoke("analysis:setEnabled", analysisId, enabled),
+  deleteCoachAnalysis: (analysisId: string): Promise<void> =>
+    ipcRenderer.invoke("analysis:delete", analysisId),
+  reorderCoachAnalyses: (
+    sessionId: string,
+    analysisIds: string[]
+  ): Promise<CoachAnalysis[]> =>
+    ipcRenderer.invoke("analysis:reorder", sessionId, analysisIds),
+  runCoachAnalysisNow: (analysisId: string): Promise<CoachAnalysisRun[]> =>
+    ipcRenderer.invoke("analysis:runNow", analysisId),
+  listCoachAnalysisRuns: (
+    filter?: CoachAnalysisRunQuery
+  ): Promise<CoachAnalysisRun[]> =>
+    ipcRenderer.invoke("analysis:listRuns", filter),
+  cancelCoachAnalysisRun: (runId: string): Promise<void> =>
+    ipcRenderer.invoke("analysis:cancelRun", runId),
+  getCoachAnalysisPause: (): Promise<CoachAnalysisPause | null> =>
+    ipcRenderer.invoke("analysis:getPause"),
+  resumeCoachAnalyses: (): Promise<CoachAnalysisPause | null> =>
+    ipcRenderer.invoke("analysis:resume"),
+  getCoachAnalysisSpend: (): Promise<CoachAnalysisSpend> =>
+    ipcRenderer.invoke("analysis:getSpend"),
+  setCoachAnalysisBudget: (budget: number | null): Promise<CoachAnalysisSpend> =>
+    ipcRenderer.invoke("analysis:setBudget", budget),
+  markCoachAnalysisRunsSeen: (runIds: string[]): Promise<number> =>
+    ipcRenderer.invoke("analysis:markSeen", runIds),
+  listCoachAnalysisSessionAttention: (): Promise<
+    CoachAnalysisSessionAttention[]
+  > => ipcRenderer.invoke("analysis:sessionAttention"),
+  markCoachAnalysisSessionSeen: (sessionId: string): Promise<number> =>
+    ipcRenderer.invoke("analysis:markSessionSeen", sessionId),
+  onCoachAnalysisRunUpdate: (
+    callback: (run: CoachAnalysisRun) => void
   ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      run: CoachAutomationRun
+      run: CoachAnalysisRun
     ) => callback(run);
-    ipcRenderer.on("coachAutomation:runUpdate", listener);
-    return () => ipcRenderer.removeListener("coachAutomation:runUpdate", listener);
+    ipcRenderer.on("analysis:runUpdate", listener);
+    return () => ipcRenderer.removeListener("analysis:runUpdate", listener);
   },
-  onCoachAutomationBindingUpdate: (
-    callback: (binding: CoachAutomationBinding) => void
+  onCoachAnalysisUpdate: (
+    callback: (update: CoachAnalysisUpdate) => void
   ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      binding: CoachAutomationBinding
-    ) => callback(binding);
-    ipcRenderer.on("coachAutomation:bindingUpdate", listener);
-    return () =>
-      ipcRenderer.removeListener("coachAutomation:bindingUpdate", listener);
-  },
-  onCoachAutomationUpdate: (
-    callback: (update: CoachAutomationUpdate) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      update: CoachAutomationUpdate
+      update: CoachAnalysisUpdate
     ) => callback(update);
-    ipcRenderer.on("coachAutomation:automationUpdate", listener);
-    return () =>
-      ipcRenderer.removeListener("coachAutomation:automationUpdate", listener);
+    ipcRenderer.on("analysis:changed", listener);
+    return () => ipcRenderer.removeListener("analysis:changed", listener);
   },
-  onCoachAutomationPauseUpdate: (
-    callback: (pause: CoachAutomationPause | null) => void
+  onCoachAnalysisPauseUpdate: (
+    callback: (pause: CoachAnalysisPause | null) => void
   ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      pause: CoachAutomationPause | null
+      pause: CoachAnalysisPause | null
     ) => callback(pause);
-    ipcRenderer.on("coachAutomation:pauseUpdate", listener);
+    ipcRenderer.on("analysis:pauseUpdate", listener);
     return () =>
-      ipcRenderer.removeListener("coachAutomation:pauseUpdate", listener);
+      ipcRenderer.removeListener("analysis:pauseUpdate", listener);
   },
   onChatStreamStart: (
     callback: (payload: ChatStreamStart) => void

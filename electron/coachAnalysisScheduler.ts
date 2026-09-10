@@ -1,16 +1,15 @@
 import {
-  emitAutomationBindingUpdate,
-  emitAutomationRunUpdate,
+  emitAnalysisChanged,
+  emitAnalysisRunUpdate,
   isWithinQuietHours,
   parseTimeOfDay,
-  runAutomationTrigger
-} from "./coachAutomationService";
+  runAnalysisTrigger
+} from "./coachAnalysisService";
 import {
-  listActiveCoachAutomationBindings,
-  listCoachAutomations,
-  recordCoachAutomationRun,
-  setCoachAutomationBindingSchedule
-} from "./coachAutomationStore";
+  listTriggeredCoachAnalyses,
+  recordCoachAnalysisRun,
+  setCoachAnalysisSchedule
+} from "./coachAnalysisStore";
 import {
   PLAN_ADHERENCE_LOOKBACK_DAYS,
   THRESHOLD_LOOKBACK_DAYS,
@@ -24,10 +23,9 @@ import {
   listCoachThresholdSlots
 } from "./database";
 import type {
-  AutomationTrigger,
-  CoachAutomation,
-  CoachAutomationBinding,
-  CoachAutomationRun
+  AnalysisTrigger,
+  CoachAnalysis,
+  CoachAnalysisRun
 } from "./types";
 
 /** 3.1: the tick is a minute, not a cron — a desktop app is not always up. */
@@ -40,80 +38,77 @@ export const SCHEDULER_TICK_INTERVAL_MS = 60_000;
 export const STALE_SLOT_MS = 24 * 60 * 60_000;
 
 /**
- * 3.3: how long a threshold binding waits before re-offering a crossing the
+ * 3.3: how long a threshold analysis waits before re-offering a crossing the
  * runner refused.
  *
- * The transition is not consumed by a refusal (see `evaluateThresholdBinding`),
+ * The transition is not consumed by a refusal (see `evaluateThresholdAnalysis`),
  * so without a hold the tick would re-offer it every sixty seconds and the run
  * log would fill with one identical skip a minute — the shape section 10 built
  * the pause to stop. Fifteen minutes is the activity watcher's own poll, which
  * is the rhythm section 4 already describes for a refused trigger coming round
  * again.
  *
- * In memory rather than on the binding: it is a rate limit on retries, not a
+ * In memory rather than on the analysis: it is a rate limit on retries, not a
  * fact about the athlete's coach. A restart costs one extra skip row and then
- * re-establishes it, and `next_run_at` is not free to borrow — the automation
+ * re-establishes it, and `next_run_at` is not free to borrow — the analysis
  * card reads it as "next fires at", which a threshold rule cannot promise.
  */
 export const THRESHOLD_RETRY_INTERVAL_MS = 15 * 60_000;
 
-type ScheduleTrigger = Extract<AutomationTrigger, { kind: "schedule" }>;
-type ThresholdTrigger = Extract<AutomationTrigger, { kind: "threshold" }>;
+type ScheduleTrigger = Extract<AnalysisTrigger, { kind: "schedule" }>;
+type ThresholdTrigger = Extract<AnalysisTrigger, { kind: "threshold" }>;
 
-export interface CoachAutomationSchedulerDeps {
+export interface CoachAnalysisSchedulerDeps {
   now(): Date;
-  listAutomations(): CoachAutomation[];
-  /** Enabled bindings of an enabled automation, per 2.4. */
-  listActiveBindings(automationId: string): CoachAutomationBinding[];
+  /** Every enabled analysis carrying a real trigger, in one read. */
+  listTriggeredAnalyses(): CoachAnalysis[];
   /** Only ever a real slot: see `bookNextSlot`. */
-  setBindingNextRun(bindingId: string, nextRunAt: string): void;
+  setAnalysisNextRun(analysisId: string, nextRunAt: string): void;
   recordStaleSlot(input: {
-    automationId: string;
-    bindingId: string;
+    analysisId: string;
     sessionId?: string;
-  }): CoachAutomationRun;
+  }): CoachAnalysisRun;
+  /**
+   * A trigger names one analysis, because an analysis is one place. The event
+   * used to carry a list of ids to narrow a fan-out to; there is
+   * nothing to narrow any more.
+   */
   runTrigger(event: {
-    automationId: string;
+    analysisId: string;
     kind: "schedule" | "threshold";
-    bindingIds: string[];
-  }): Promise<CoachAutomationRun[]>;
+  }): Promise<CoachAnalysisRun[]>;
   /** 3.3: every local row the four metrics read, fetched once per tick. */
   readThresholdSnapshot(now: Date): ThresholdSnapshot;
-  /** 3.3: the transition state, beside the binding's other clocks. */
-  setBindingThresholdFiring(bindingId: string, firing: boolean): void;
+  /** 3.3: the transition state, beside the analysis's other clocks. */
+  setAnalysisThresholdFiring(analysisId: string, firing: boolean): void;
   onError(error: unknown): void;
 }
 
-function createDefaultDeps(): CoachAutomationSchedulerDeps {
+function createDefaultDeps(): CoachAnalysisSchedulerDeps {
   return {
     now: () => new Date(),
-    listAutomations: () => listCoachAutomations(),
-    listActiveBindings: (automationId) =>
-      listActiveCoachAutomationBindings(automationId),
-    setBindingNextRun: (bindingId, nextRunAt) => {
+    listTriggeredAnalyses: () => listTriggeredCoachAnalyses(),
+    setAnalysisNextRun: (analysisId, nextRunAt) => {
       // 9.1's next-run line, which is booked on a timer with nobody watching
       // and rendered by a card that was listening for runs. Booking is rare —
-      // seeding a new binding, firing a slot, writing one off as stale, or
+      // seeding a new analysis, firing a slot, writing one off as stale, or
       // deferring one out of quiet hours — so this is not chatter.
-      emitAutomationBindingUpdate(
-        setCoachAutomationBindingSchedule(bindingId, { nextRunAt })
-      );
+      emitAnalysisChanged(setCoachAnalysisSchedule(analysisId, { nextRunAt }));
     },
-    recordStaleSlot: ({ automationId, bindingId, sessionId }) => {
+    recordStaleSlot: ({ analysisId, sessionId }) => {
       const finishedAt = new Date().toISOString();
-      const run = recordCoachAutomationRun({
-        automationId,
-        bindingId,
+      const run = recordCoachAnalysisRun({
+        analysisId,
         status: "skipped",
         triggerKind: "schedule",
         skipReason: "stale-slot",
         finishedAt,
         ...(sessionId ? { sessionId } : {})
       });
-      emitAutomationRunUpdate(run);
+      emitAnalysisRunUpdate(run);
       return run;
     },
-    runTrigger: (event) => runAutomationTrigger(event),
+    runTrigger: (event) => runAnalysisTrigger(event),
     readThresholdSnapshot: (now) => {
       const since = new Date(now);
       since.setDate(since.getDate() - THRESHOLD_LOOKBACK_DAYS);
@@ -136,11 +131,11 @@ function createDefaultDeps(): CoachAutomationSchedulerDeps {
         }))
       };
     },
-    setBindingThresholdFiring: (bindingId, firing) => {
-      setCoachAutomationBindingSchedule(bindingId, { thresholdFiring: firing });
+    setAnalysisThresholdFiring: (analysisId, firing) => {
+      setCoachAnalysisSchedule(analysisId, { thresholdFiring: firing });
     },
     onError: (error) => {
-      console.error("[coach-automation] scheduler tick failed:", error);
+      console.error("[coach-analysis] scheduler tick failed:", error);
     }
   };
 }
@@ -214,18 +209,18 @@ function parseSlot(value: string | undefined): Date | null {
 // The ticker
 // ---------------------------------------------------------------------------
 
-export class CoachAutomationScheduler {
-  private readonly deps: CoachAutomationSchedulerDeps;
+export class CoachAnalysisScheduler {
+  private readonly deps: CoachAnalysisSchedulerDeps;
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
   /**
-   * 3.3: binding id -> the wall clock a refused crossing may be re-offered at.
+   * 3.3: analysis id -> the wall clock a refused crossing may be re-offered at.
    * See `THRESHOLD_RETRY_INTERVAL_MS` for why this is in memory rather than a
-   * seventh column on the binding.
+   * seventh column on the analysis.
    */
   private readonly retryAfter = new Map<string, number>();
 
-  constructor(deps: Partial<CoachAutomationSchedulerDeps> = {}) {
+  constructor(deps: Partial<CoachAnalysisSchedulerDeps> = {}) {
     this.deps = { ...createDefaultDeps(), ...deps };
   }
 
@@ -263,61 +258,54 @@ export class CoachAutomationScheduler {
     }
     this.ticking = true;
     try {
-      const automations = this.deps.listAutomations();
-      // Every binding this tick considered, so a hold left behind by one that
-      // has since been detached does not sit in the map for the life of the
-      // process. A re-attached binding is a new row with a new id (2.4), which
-      // is also why its hold cannot be inherited by the place that replaced it.
+      const triggered = this.deps.listTriggeredAnalyses();
+      // Every analysis this tick considered, so a hold left behind by one that
+      // has since been deleted does not sit in the map for the life of the
+      // process. A re-created analysis is a new row with a new id, which is
+      // also why its hold cannot be inherited by the one that replaced it.
       const seen = new Set<string>();
       // Read once per tick and only when something asks for it: the four
-      // metrics of 3.3 read the same local rows, and a snapshot per binding
+      // metrics of 3.3 read the same local rows, and a snapshot per analysis
       // would scan a month of activities five times to get one answer.
       let snapshot: ThresholdSnapshot | null = null;
       const thresholdSnapshot = (now: Date): ThresholdSnapshot =>
         (snapshot ??= this.deps.readThresholdSnapshot(now));
 
-      for (const automation of automations) {
-        if (!automation.enabled) {
+      for (const analysis of triggered) {
+        const trigger = analysis.trigger;
+        if (
+          !trigger ||
+          (trigger.kind !== "schedule" && trigger.kind !== "threshold")
+        ) {
           continue;
         }
-        const trigger = automation.trigger;
-        if (trigger.kind !== "schedule" && trigger.kind !== "threshold") {
-          continue;
-        }
-        const bindings = this.deps.listActiveBindings(automation.id);
-        if (!bindings.length) {
-          continue;
-        }
-
-        // The condition is a fact about the athlete, not about a binding, so it
-        // is answered once for the automation and compared per binding. One
-        // `now` for both halves: two reads can straddle a midnight and answer
-        // about different days.
-        const now = this.deps.now();
-        const firing =
-          trigger.kind === "threshold"
-            ? evaluateThresholdTrigger(trigger, now, thresholdSnapshot(now))
-            : false;
-
-        for (const binding of bindings) {
-          seen.add(binding.id);
-          // Each binding keeps its own slot and its own firing state, so one
-          // that is broken, deferred or brand new cannot hold up the others
-          // (3.1, per-binding independence).
-          try {
-            if (trigger.kind === "threshold") {
-              await this.evaluateThresholdBinding(automation, firing, binding);
-            } else {
-              await this.evaluateBinding(automation, trigger, binding);
-            }
-          } catch (error) {
-            this.deps.onError(error);
+        seen.add(analysis.id);
+        // Each analysis keeps its own slot and its own firing state, so one
+        // that is broken, deferred or brand new cannot hold up the others
+        // (3.1, per-analysis independence).
+        try {
+          if (trigger.kind === "threshold") {
+            // The condition is a fact about the athlete and the snapshot
+            // behind it is read once per tick, but the *question* is this
+            // analysis's — two analyses watching the same metric at different
+            // values are answered separately.
+            const now = this.deps.now();
+            const firing = evaluateThresholdTrigger(
+              trigger,
+              now,
+              thresholdSnapshot(now)
+            );
+            await this.evaluateThresholdAnalysis(analysis, firing);
+          } else {
+            await this.evaluateAnalysis(analysis, trigger);
           }
+        } catch (error) {
+          this.deps.onError(error);
         }
       }
-      for (const bindingId of this.retryAfter.keys()) {
-        if (!seen.has(bindingId)) {
-          this.retryAfter.delete(bindingId);
+      for (const analysisId of this.retryAfter.keys()) {
+        if (!seen.has(analysisId)) {
+          this.retryAfter.delete(analysisId);
         }
       }
     } catch (error) {
@@ -332,7 +320,7 @@ export class CoachAutomationScheduler {
    * stays true.
    *
    * Three states, and the third is the one that matters. `undefined` means this
-   * binding has never been evaluated — a coach attached this morning — and its
+   * analysis has never been evaluated — a coach attached this morning — and its
    * first look records the answer and says nothing. Without it, attaching a
    * "tell me when my ramp is steep" rule during a steep block would fire
    * immediately on history the athlete already knows about.
@@ -342,20 +330,19 @@ export class CoachAutomationScheduler {
    * app may be closed mid-flight, so the worst case has to be one missed
    * announcement rather than the same one re-announced on every tick.
    */
-  private async evaluateThresholdBinding(
-    automation: CoachAutomation,
-    firing: boolean,
-    binding: CoachAutomationBinding
+  private async evaluateThresholdAnalysis(
+    analysis: CoachAnalysis,
+    firing: boolean
   ): Promise<void> {
     const now = this.deps.now();
-    const previous = binding.thresholdFiring;
+    const previous = analysis.thresholdFiring;
 
     if (previous === undefined) {
       // Never evaluated — a coach attached this morning, or one whose trigger
       // was just edited (the store resets both together). Either way there is
       // no crossing owed, so any hold from the old question goes with it.
-      this.retryAfter.delete(binding.id);
-      this.deps.setBindingThresholdFiring(binding.id, firing);
+      this.retryAfter.delete(analysis.id);
+      this.deps.setAnalysisThresholdFiring(analysis.id, firing);
       return;
     }
 
@@ -371,28 +358,28 @@ export class CoachAutomationScheduler {
     // inside quiet hours and even while a retry is held off: it announces
     // nothing, and it is what re-arms the rule.
     if (!firing) {
-      this.deps.setBindingThresholdFiring(binding.id, firing);
-      this.retryAfter.delete(binding.id);
+      this.deps.setAnalysisThresholdFiring(analysis.id, firing);
+      this.retryAfter.delete(analysis.id);
       return;
     }
 
     // Quiet hours defer a crossing, they do not swallow it — the same rule
-    // `evaluateBinding` follows for a slot (3.1), and for the same reason. The
+    // `evaluateAnalysis` follows for a slot (3.1), and for the same reason. The
     // state is deliberately left unwritten: the condition is still true, so the
     // first tick after the window closes sees the identical transition and
     // announces it then. Writing it here and skipping in the runner would spend
     // the crossing on a night the athlete asked not to be spoken to, and the
     // rule would never fire again until the metric recovered and re-crossed.
-    const quietHours = automation.conditions.quietHours;
+    const quietHours = analysis.conditions.quietHours;
     if (quietHours && isWithinQuietHours(now, quietHours)) {
       return;
     }
 
     // A crossing the runner refused is still owed. It is re-offered on this
-    // binding's own retry rhythm rather than on the tick, so a backed-off,
-    // capped or burst-guarded binding does not write one skip a minute for as
+    // analysis's own retry rhythm rather than on the tick, so a backed-off,
+    // capped or burst-guarded analysis does not write one skip a minute for as
     // long as the refusal lasts.
-    const holdUntil = this.retryAfter.get(binding.id);
+    const holdUntil = this.retryAfter.get(analysis.id);
     if (holdUntil !== undefined && now.getTime() < holdUntil) {
       return;
     }
@@ -401,14 +388,13 @@ export class CoachAutomationScheduler {
     // the next slot before firing: a run takes as long as the provider does and
     // the app may be closed mid-flight, so the worst case is one missed
     // announcement rather than the same one re-announced on every tick.
-    this.deps.setBindingThresholdFiring(binding.id, firing);
+    this.deps.setAnalysisThresholdFiring(analysis.id, firing);
 
     // Guard rails 1-8 belong to the runner (section 4), exactly as they do for
     // a schedule: this decides *when*, and whether it may is the runner's call.
     const runs = await this.deps.runTrigger({
-      automationId: automation.id,
-      kind: "threshold",
-      bindingIds: [binding.id]
+      analysisId: analysis.id,
+      kind: "threshold"
     });
 
     // ...and if the runner's answer was "not now", the crossing was never
@@ -423,30 +409,29 @@ export class CoachAutomationScheduler {
     // A run that reached the provider is not a refusal, whatever it concluded:
     // `success` and `silent` are the coach having looked, `cancelled` is the
     // athlete deciding they did not want to hear it, and `failed` already has
-    // the backoff holding its binding off — re-offering there would loop
+    // the backoff holding its analysis off — re-offering there would loop
     // against a dead provider.
     const announced = runs.some((run) => run.status !== "skipped");
     if (announced) {
-      this.retryAfter.delete(binding.id);
+      this.retryAfter.delete(analysis.id);
       return;
     }
-    this.deps.setBindingThresholdFiring(binding.id, previous);
-    this.retryAfter.set(binding.id, now.getTime() + THRESHOLD_RETRY_INTERVAL_MS);
+    this.deps.setAnalysisThresholdFiring(analysis.id, previous);
+    this.retryAfter.set(analysis.id, now.getTime() + THRESHOLD_RETRY_INTERVAL_MS);
   }
 
-  private async evaluateBinding(
-    automation: CoachAutomation,
-    trigger: ScheduleTrigger,
-    binding: CoachAutomationBinding
+  private async evaluateAnalysis(
+    analysis: CoachAnalysis,
+    trigger: ScheduleTrigger
   ): Promise<void> {
     const now = this.deps.now();
-    const slot = parseSlot(binding.nextRunAt);
+    const slot = parseSlot(analysis.nextRunAt);
 
-    // No slot booked yet — a binding attached moments ago, or one whose
-    // automation had its trigger edited. Book the next one and wait for it:
+    // No slot booked yet — a analysis attached moments ago, or one whose
+    // analysis had its trigger edited. Book the next one and wait for it:
     // creating a "daily at 07:00" rule at lunchtime must not fire on the spot.
     if (!slot) {
-      this.bookNextSlot(binding, nextScheduleSlot(trigger, now));
+      this.bookNextSlot(analysis, nextScheduleSlot(trigger, now));
       return;
     }
 
@@ -459,11 +444,10 @@ export class CoachAutomationScheduler {
       // computed from *now*, so a fortnight with the app closed logs one skip
       // rather than fourteen runs nobody asked for.
       this.deps.recordStaleSlot({
-        automationId: automation.id,
-        bindingId: binding.id,
-        ...(binding.sessionId ? { sessionId: binding.sessionId } : {})
+        analysisId: analysis.id,
+        sessionId: analysis.sessionId
       });
-      this.bookNextSlot(binding, nextScheduleSlot(trigger, now));
+      this.bookNextSlot(analysis, nextScheduleSlot(trigger, now));
       return;
     }
 
@@ -471,11 +455,11 @@ export class CoachAutomationScheduler {
     // has nowhere to wait. Moving it to the end of the window is the deferral,
     // and the window's end is by definition outside the window, so this
     // happens once rather than every tick.
-    const quietHours = automation.conditions.quietHours;
+    const quietHours = analysis.conditions.quietHours;
     if (quietHours && isWithinQuietHours(now, quietHours)) {
       const end = quietHoursEnd(now, quietHours);
       if (end) {
-        this.deps.setBindingNextRun(binding.id, end.toISOString());
+        this.deps.setAnalysisNextRun(analysis.id, end.toISOString());
         return;
       }
     }
@@ -489,41 +473,40 @@ export class CoachAutomationScheduler {
     // one fewer edge: a slot is only reached here once it is already due, so
     // "the first slot after now" can never land in the past the way
     // "slot + one cadence" can for a slot that is a whole day late.
-    this.bookNextSlot(binding, nextScheduleSlot(trigger, now));
+    this.bookNextSlot(analysis, nextScheduleSlot(trigger, now));
 
     // Guard rails 1-8 belong to the runner (section 4) and are not repeated
     // here. The scheduler decides *when*; whether it may is the runner's call.
     await this.deps.runTrigger({
-      automationId: automation.id,
-      kind: "schedule",
-      bindingIds: [binding.id]
+      analysisId: analysis.id,
+      kind: "schedule"
     });
   }
 
-  private bookNextSlot(binding: CoachAutomationBinding, slot: Date | null): void {
+  private bookNextSlot(analysis: CoachAnalysis, slot: Date | null): void {
     // Only a malformed `timeOfDay` has no next slot, and the store rejects
     // those on the way in. Writing null anyway would re-book nothing on every
     // tick for the life of the process, so nothing is written at all.
     if (!slot) {
       return;
     }
-    this.deps.setBindingNextRun(binding.id, slot.toISOString());
+    this.deps.setAnalysisNextRun(analysis.id, slot.toISOString());
   }
 }
 
-let scheduler: CoachAutomationScheduler | null = null;
+let scheduler: CoachAnalysisScheduler | null = null;
 
 /** Started from `app.whenReady()`, never from `createWindow`. */
-export function startCoachAutomationScheduler(
+export function startCoachAnalysisScheduler(
   intervalMs = SCHEDULER_TICK_INTERVAL_MS
-): CoachAutomationScheduler {
-  scheduler ??= new CoachAutomationScheduler();
+): CoachAnalysisScheduler {
+  scheduler ??= new CoachAnalysisScheduler();
   scheduler.start(intervalMs);
   return scheduler;
 }
 
 /** Stopped from `before-quit`, never from the window's "closed". */
-export function stopCoachAutomationScheduler(): void {
+export function stopCoachAnalysisScheduler(): void {
   scheduler?.stop();
   scheduler = null;
 }

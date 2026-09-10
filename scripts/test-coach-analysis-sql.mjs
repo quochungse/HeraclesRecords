@@ -1,4 +1,4 @@
-// The SQL the in-memory fakes stand in for. Every other coach-automation suite
+// The SQL the in-memory fakes stand in for. Every other coach-analysis suite
 // injects a hand-written database so it can run under plain node; that means a
 // WHERE clause can be wrong in database.ts and every one of them still passes.
 // This one opens a real SQLite file, which is why it runs under Electron:
@@ -19,8 +19,7 @@ database.initializeDatabase(tempRoot);
 
 const run = (patch) => ({
   id: patch.id,
-  automation_id: patch.automation_id ?? "auto-1",
-  binding_id: patch.binding_id ?? "bind-1",
+  analysis_id: patch.analysis_id ?? "auto-1",
   status: patch.status ?? "success",
   trigger_kind: patch.trigger_kind ?? "activity",
   trigger_payload_json: null,
@@ -69,10 +68,10 @@ const rows = [
     finished_at: "2026-08-01T07:00:04.000Z"
   })
 ];
-for (const row of rows) database.insertCoachAutomationRunRow(row);
+for (const row of rows) database.insertCoachAnalysisRunRow(row);
 
 const ids = (filter) =>
-  database.listCoachAutomationRunRows(filter).map((row) => row.id).sort();
+  database.listCoachAnalysisRunRows(filter).map((row) => row.id).sort();
 
 // --- the filters, one at a time -------------------------------------------
 assert.deepEqual(ids({ sessionId: "s-b" }), ["r-other"]);
@@ -103,8 +102,8 @@ assert.deepEqual(
 );
 
 // Stamping one clears it from that answer and leaves the rest alone.
-const stamped = database.getCoachAutomationRunRow("r-unread");
-database.updateCoachAutomationRunRow({
+const stamped = database.getCoachAnalysisRunRow("r-unread");
+database.updateCoachAnalysisRunRow({
   ...stamped,
   seen_at: "2026-08-25T09:00:00.000Z"
 });
@@ -114,7 +113,7 @@ assert.deepEqual(
   "seen_at is what removes a run from the unread answer"
 );
 assert.equal(
-  database.listCoachAutomationRunRows({ sessionId: "s-a" }).length,
+  database.listCoachAnalysisRunRows({ sessionId: "s-a" }).length,
   5,
   "and nothing was deleted along the way"
 );
@@ -122,15 +121,15 @@ assert.equal(
 // --- ordering and the cap -------------------------------------------------
 assert.deepEqual(
   database
-    .listCoachAutomationRunRows({ sessionId: "s-a", limit: 2 })
+    .listCoachAnalysisRunRows({ sessionId: "s-a", limit: 2 })
     .map((row) => row.id),
   ["r-skip", "r-silent"],
   "newest first, so a limit keeps the most recent"
 );
 
 // --- the index the activity scan leans on (3.2) ---------------------------
-// A per-binding watermark asks "what landed after this timestamp" on every
-// trigger, once per binding. Without the index that is a full scan of the
+// A per-attachment watermark asks "what landed after this timestamp" on every
+// trigger, once per attachment. Without the index that is a full scan of the
 // athlete's whole history.
 const plan = database
   .requireDatabase()
@@ -150,7 +149,7 @@ assert.match(
 );
 
 // --- and the index the monthly spend leans on (13) ------------------------
-// The budget guard rail asks "what did every automation cost since the 1st" on
+// The budget guard rail asks "what did every analysis cost since the 1st" on
 // every run. It narrows by nothing but the date, so neither of the run log's
 // other two indexes — both prefixed by an id — can serve it.
 {
@@ -158,7 +157,7 @@ assert.match(
     .requireDatabase()
     .prepare(
       `EXPLAIN QUERY PLAN
-       SELECT COALESCE(SUM(input_tokens), 0) FROM coach_automation_runs
+       SELECT COALESCE(SUM(input_tokens), 0) FROM coach_analysis_runs
        WHERE started_at >= ?
          AND status IN ('success', 'silent', 'failed', 'cancelled')`
     )
@@ -167,42 +166,28 @@ assert.match(
     .join(" | ");
   assert.match(
     spendPlan,
-    /idx_automation_runs_started/,
+    /idx_analysis_runs_started/,
     `the monthly spend must use its index, got: ${spendPlan}`
   );
 }
 
-// --- the binding's three clocks are really columns (10) -------------------
+// --- the analysis's three clocks are really columns (10) -------------------
 // The runner suite drives the backoff against a hand-written world, and the
 // store suite against a fake row, so both would stay green with the columns
-// missing from the real table — `ensureColumn` is the only thing that adds
-// them, and it runs once, on a database that already exists.
+// missing from the real table.
 {
-  // The binding's foreign key is a real constraint here, unlike in the fakes.
-  database.insertCoachAutomationRow({
-    id: "auto-1",
+  const analysisRow = (id, patch = {}) => ({
+    id,
+    session_id: "s-backoff",
     name: "Post-run debrief",
     role: null,
     playbook: "Summarise the run.",
     enabled: 1,
     preset_id: null,
-    trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
-    conditions_json: JSON.stringify({
-      cooldownMin: 0,
-      maxRunsPerDay: 3
-    }),
     runtime_json: null,
-    created_at: "2026-08-25T07:00:00.000Z",
-    updated_at: "2026-08-25T07:00:00.000Z"
-  });
-
-  database.insertCoachAutomationBindingRow({
-    id: "bind-backoff",
-    automation_id: "auto-1",
-    mode: "existing",
-    session_id: "s-backoff",
-    title_template: null,
-    enabled: 1,
+    trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
+    conditions_json: JSON.stringify({ cooldownMin: 0, maxRunsPerDay: 3 }),
+    device_only: 0,
     sort_order: 0,
     last_run_at: null,
     next_run_at: null,
@@ -210,50 +195,84 @@ assert.match(
     backoff_until: null,
     backoff_level: null,
     threshold_firing: null,
-    created_at: "2026-08-25T07:00:00.000Z"
+    created_at: "2026-08-25T07:00:00.000Z",
+    updated_at: "2026-08-25T07:00:00.000Z",
+    ...patch
   });
+  database.insertCoachAnalysisRow(analysisRow("auto-1"));
 
-  const stored = database.getCoachAutomationBindingRow("bind-backoff");
-  assert.equal(stored.backoff_until, null, "a fresh binding is not backing off");
+  const stored = database.getCoachAnalysisRow("auto-1");
+  assert.equal(stored.backoff_until, null, "a fresh analysis is not backing off");
   assert.equal(stored.backoff_level, null);
+  assert.equal(stored.session_id, "s-backoff", "and it knows its conversation");
 
-  database.updateCoachAutomationBindingRow({
+  database.updateCoachAnalysisRow({
     ...stored,
     backoff_until: "2026-08-25T07:05:00.000Z",
     backoff_level: 1
   });
-  const failing = database.getCoachAutomationBindingRow("bind-backoff");
+  const failing = database.getCoachAnalysisRow("auto-1");
   assert.equal(failing.backoff_until, "2026-08-25T07:05:00.000Z");
   assert.equal(failing.backoff_level, 1);
   assert.equal(
     failing.last_activity_at,
     null,
-    "and the column it was added next to still reads back"
+    "and the column beside it still reads back"
   );
 
   // 3.3's transition state is the same kind of column and the same kind of
   // risk: the threshold suite drives it against a hand-written world, so
-  // nothing else would notice it missing from the real table. Its three values
-  // all have to survive, NULL most of all — that is "never evaluated", and it
-  // is what stops a binding attached today firing on history.
+  // nothing else would notice it missing from the real table. Its three
+  // values all have to survive, NULL most of all — that is "never evaluated",
+  // and it is what stops a trigger set today firing on history.
   assert.equal(
     failing.threshold_firing,
     null,
-    "a binding that has never been evaluated says so"
+    "an analysis that has never been evaluated says so"
   );
   for (const value of [0, 1]) {
-    database.updateCoachAutomationBindingRow({ ...failing, threshold_firing: value });
+    database.updateCoachAnalysisRow({ ...failing, threshold_firing: value });
     assert.equal(
-      database.getCoachAutomationBindingRow("bind-backoff").threshold_firing,
+      database.getCoachAnalysisRow("auto-1").threshold_firing,
       value
     );
   }
-  database.updateCoachAutomationBindingRow({ ...failing, threshold_firing: null });
+  database.updateCoachAnalysisRow({ ...failing, threshold_firing: null });
   assert.equal(
-    database.getCoachAutomationBindingRow("bind-backoff").threshold_firing,
+    database.getCoachAnalysisRow("auto-1").threshold_firing,
     null,
     "and it can be put back to never-evaluated, which a trigger edit does"
   );
+
+  // Reading one conversation's analyses is the only listing the app does, and
+  // it has to be in run order.
+  database.insertCoachAnalysisRow(
+    analysisRow("auto-2", { sort_order: 1, name: "Second" })
+  );
+  database.insertCoachAnalysisRow(
+    analysisRow("auto-elsewhere", { session_id: "s-other" })
+  );
+  assert.deepEqual(
+    database
+      .listCoachAnalysisRowsForSession("s-backoff")
+      .map((row) => row.id),
+    ["auto-1", "auto-2"],
+    "one conversation's analyses, in sort order"
+  );
+  assert.equal(database.countCoachAnalysisRowsForSession("s-backoff"), 2);
+  assert.equal(
+    database.listCoachAnalysisRowsForSession("s-other").length,
+    1,
+    "and another conversation's are its own"
+  );
+
+  // Deleting the conversation takes them, and returns what it took so the
+  // caller can say which analyses stopped.
+  assert.deepEqual(
+    database.deleteCoachAnalysisRowsForSession("s-other"),
+    ["auto-elsewhere"]
+  );
+  assert.equal(database.listCoachAnalysisRowsForSession("s-other").length, 0);
 }
 
 // --- 3.3's local sample cache, against the real table ----------------------
@@ -346,11 +365,10 @@ assert.match(
 // the wrong rows pauses the athlete's coaches for the wrong reason.
 {
   const spent = (patch) =>
-    database.insertCoachAutomationRunRow(
+    database.insertCoachAnalysisRunRow(
       run({
-        automation_id: "auto-spend",
-        binding_id: "bind-spend",
-        started_at: patch.started_at,
+        analysis_id: "auto-spend",
+                started_at: patch.started_at,
         status: patch.status ?? "success",
         skip_reason: patch.skip_reason ?? null,
         input_tokens: patch.input_tokens ?? null,
@@ -371,7 +389,7 @@ assert.match(
   // Reached the provider, which said nothing about what it cost.
   spent({ id: "t-quiet", started_at: "2026-09-17T09:00:00.000Z" });
 
-  const totals = database.sumCoachAutomationTokensSince("2026-09-01T00:00:00.000Z");
+  const totals = database.sumCoachAnalysisTokensSince("2026-09-01T00:00:00.000Z");
   assert.equal(totals.inputTokens, 100 + 300 + 50 + 10);
   assert.equal(totals.outputTokens, 20 + 40 + 5 + 1);
   assert.equal(totals.providerRuns, 5, "the cooldown skip is not a run that spent anything");
@@ -381,7 +399,7 @@ assert.match(
     "and the one whose provider said nothing is reported as uncounted, not as free"
   );
 
-  const empty = database.sumCoachAutomationTokensSince("2027-01-01T00:00:00.000Z");
+  const empty = database.sumCoachAnalysisTokensSince("2027-01-01T00:00:00.000Z");
   assert.deepEqual(empty, {
     inputTokens: 0,
     outputTokens: 0,
@@ -403,35 +421,22 @@ assert.match(
 //
 // Read through the real store rather than the raw row, because the reading is
 // the thing under test — `database.js` hands back what SQLite holds, and
-// `toBinding`/`toRun` are what decide what that means.
-const store = await import(distUrl("coachAutomationStore.js"));
+// `toAnalysis`/`toRun` are what decide what that means.
+const store = await import(distUrl("coachAnalysisStore.js"));
 
-const corruptAutomationId = "auto-corrupt";
-database.insertCoachAutomationRow({
-  id: corruptAutomationId,
-  name: "Hand-edited",
-  role: null,
-  playbook: "Say something.",
-  enabled: 1,
-  preset_id: null,
-  trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
-  conditions_json: JSON.stringify({
-    cooldownMin: 0,
-    maxRunsPerDay: 3
-  }),
-  runtime_json: null,
-  created_at: "2026-08-25T07:00:00.000Z",
-  updated_at: "2026-08-25T07:00:00.000Z"
-});
-
-const corruptBinding = (id, patch) => {
-  database.insertCoachAutomationBindingRow({
+const corruptAnalysis = (id, patch) => {
+  database.insertCoachAnalysisRow({
     id,
-    automation_id: corruptAutomationId,
-    mode: "existing",
     session_id: `sess-${id}`,
-    title_template: null,
+    name: "Hand-edited",
+    role: null,
+    playbook: "Say something.",
     enabled: 1,
+    preset_id: null,
+    runtime_json: null,
+    trigger_json: JSON.stringify({ kind: "activity", sportTypes: [] }),
+    conditions_json: JSON.stringify({ cooldownMin: 0, maxRunsPerDay: 3 }),
+    device_only: 0,
     sort_order: 0,
     last_run_at: null,
     next_run_at: null,
@@ -440,28 +445,31 @@ const corruptBinding = (id, patch) => {
     backoff_level: null,
     threshold_firing: null,
     created_at: "2026-08-25T07:00:00.000Z",
+    updated_at: "2026-08-25T07:00:00.000Z",
     ...patch
   });
-  return store.getCoachAutomationBinding(id);
+  return store.getCoachAnalysis(id);
 };
+const corruptAnalysisId = "auto-corrupt";
+corruptAnalysis(corruptAnalysisId, {});
 
 // --- last_activity_at: a watermark is a start_time, so zero is not one ------
 {
   // Trusting a zero would put the floor at the epoch instead of at the attach
-  // time, and the binding would replay every activity the athlete has — up to
+  // time, and the attachment would replay every activity the athlete has — up to
   // the 200-row scan cap — which is the one thing 3.2's floor exists to stop.
   assert.equal(
-    corruptBinding("b-wm-zero", { last_activity_at: 0 }).lastActivityAt,
+    corruptAnalysis("b-wm-zero", { last_activity_at: 0 }).lastActivityAt,
     undefined,
     "a zero watermark reads as never analysed"
   );
   assert.equal(
-    corruptBinding("b-wm-neg", { last_activity_at: -1 }).lastActivityAt,
+    corruptAnalysis("b-wm-neg", { last_activity_at: -1 }).lastActivityAt,
     undefined,
     "and so does a negative one"
   );
   assert.equal(
-    corruptBinding("b-wm-real", { last_activity_at: 1_756_000_000 }).lastActivityAt,
+    corruptAnalysis("b-wm-real", { last_activity_at: 1_756_000_000 }).lastActivityAt,
     1_756_000_000,
     "a real one is untouched"
   );
@@ -474,31 +482,31 @@ const corruptBinding = (id, patch) => {
   // announces a condition that may have been true all week. That is the exact
   // announcement the NULL is there to prevent.
   assert.equal(
-    corruptBinding("b-tf-two", { threshold_firing: 2 }).thresholdFiring,
+    corruptAnalysis("b-tf-two", { threshold_firing: 2 }).thresholdFiring,
     undefined,
     "a value that is neither 0 nor 1 reads as never evaluated"
   );
   assert.equal(
-    corruptBinding("b-tf-neg", { threshold_firing: -1 }).thresholdFiring,
+    corruptAnalysis("b-tf-neg", { threshold_firing: -1 }).thresholdFiring,
     undefined
   );
   assert.equal(
-    corruptBinding("b-tf-zero", { threshold_firing: 0 }).thresholdFiring,
+    corruptAnalysis("b-tf-zero", { threshold_firing: 0 }).thresholdFiring,
     false,
     "and the two real values still mean what they say"
   );
   assert.equal(
-    corruptBinding("b-tf-one", { threshold_firing: 1 }).thresholdFiring,
+    corruptAnalysis("b-tf-one", { threshold_firing: 1 }).thresholdFiring,
     true
   );
 }
 
 // --- backoff: garbage holds nobody off -------------------------------------
 {
-  // The safe direction for a clock nobody can parse is *not held*: a binding
-  // frozen by a string somebody typed is the failure mode, not a binding that
+  // The safe direction for a clock nobody can parse is *not held*: a attachment
+  // frozen by a string somebody typed is the failure mode, not a attachment that
   // tries once too often.
-  const garbage = corruptBinding("b-bo-junk", {
+  const garbage = corruptAnalysis("b-bo-junk", {
     backoff_until: "soon",
     backoff_level: -3
   });
@@ -511,21 +519,54 @@ const corruptBinding = (id, patch) => {
   assert.equal(garbage.backoffLevel, undefined, "a negative level is no level");
 }
 
-// --- a `per-run` binding owns no conversation, whatever the row says --------
+// --- the device-only trigger table is a real table -------------------------
+// The store suite drives this against a fake, so nothing else would notice the
+// table missing. And it is the one table in this feature whose whole purpose
+// is that its rows never leave the machine.
 {
-  // The attach path refuses this combination, so it can only arrive by hand or
-  // by a migration. Every reader already behaves as though the id were absent —
-  // `checkSessionTarget` branches on the mode before it looks — so reading it
-  // as null is what stops the row and the behaviour disagreeing.
-  const contradictory = corruptBinding("b-perrun", {
-    mode: "per-run",
-    session_id: "sess-should-not-be-here"
-  });
-  assert.equal(contradictory.mode, "per-run");
+  const analysis = corruptAnalysis("b-private", {});
+  assert.ok(analysis, "fixture sanity");
+
   assert.equal(
-    contradictory.sessionId,
-    null,
-    "a per-run binding reads as owning no conversation"
+    database.getAnalysisLocalTriggerRow("b-private"),
+    undefined,
+    "nothing is private until it is made private"
+  );
+
+  const trigger = { kind: "schedule", cadence: "daily", timeOfDay: "07:00" };
+  database.upsertAnalysisLocalTriggerRow({
+    analysis_id: "b-private",
+    trigger_json: JSON.stringify(trigger),
+    conditions_json: JSON.stringify({ cooldownMin: 0, maxRunsPerDay: 1 }),
+    updated_at: "2026-08-25T07:00:00.000Z"
+  });
+  assert.deepEqual(
+    JSON.parse(database.getAnalysisLocalTriggerRow("b-private").trigger_json),
+    trigger
+  );
+
+  // Upsert, not insert: changing a private trigger must not need a delete
+  // first, and a second write with the same id is an edit rather than a
+  // constraint violation.
+  database.upsertAnalysisLocalTriggerRow({
+    analysis_id: "b-private",
+    trigger_json: JSON.stringify({ ...trigger, timeOfDay: "21:00" }),
+    conditions_json: JSON.stringify({ cooldownMin: 0, maxRunsPerDay: 1 }),
+    updated_at: "2026-08-25T08:00:00.000Z"
+  });
+  assert.equal(
+    JSON.parse(database.getAnalysisLocalTriggerRow("b-private").trigger_json)
+      .timeOfDay,
+    "21:00"
+  );
+  assert.equal(database.listAnalysisLocalTriggerRows().length, 1);
+
+  // And deleting the attachment takes it, since no foreign key will.
+  database.deleteCoachAnalysisRow("b-private");
+  assert.equal(
+    database.getAnalysisLocalTriggerRow("b-private"),
+    undefined,
+    "a private trigger must not outlive the analysis it belongs to"
   );
 }
 
@@ -533,10 +574,10 @@ const corruptBinding = (id, patch) => {
 {
   // It would subtract from the month's SUM, and a budget reading *under* the
   // truth is what 13 calls worse than no budget: a number the athlete trusts.
-  database.insertCoachAutomationRunRow(
+  database.insertCoachAnalysisRunRow(
     run({ id: "r-neg", input_tokens: -5_000, output_tokens: -10 })
   );
-  const negative = store.listCoachAutomationRuns({ automationId: "auto-1" }).find(
+  const negative = store.listCoachAnalysisRuns({ analysisId: "auto-1" }).find(
     (entry) => entry.id === "r-neg"
   );
   assert.ok(negative, "fixture sanity: the row is there");
@@ -545,10 +586,10 @@ const corruptBinding = (id, patch) => {
 
   // Zero stays a real answer: a cancelled run that never reached the model
   // genuinely cost nothing, and that is different from nobody counting.
-  database.insertCoachAutomationRunRow(
+  database.insertCoachAnalysisRunRow(
     run({ id: "r-zero", input_tokens: 0, output_tokens: 0 })
   );
-  const free = store.listCoachAutomationRuns({ automationId: "auto-1" }).find(
+  const free = store.listCoachAnalysisRuns({ analysisId: "auto-1" }).find(
     (entry) => entry.id === "r-zero"
   );
   assert.equal(free.inputTokens, 0, "zero is a cost, not an absence");
@@ -556,4 +597,4 @@ const corruptBinding = (id, patch) => {
 }
 
 fs.rmSync(tempRoot, { recursive: true, force: true });
-console.log("coach automation sql tests passed");
+console.log("coach analysis sql tests passed");

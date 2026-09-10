@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Loader2, PanelLeftClose, Pin, Plus, Search } from "lucide-react";
 import type {
   ChatSessionSummary,
-  CoachAutomationSessionAttention
+  CoachAnalysisSessionAttention
 } from "../../electron/types";
 import { ChatSessionRow } from "./ChatSessionRow";
 import { groupChatSessions } from "./chatSessionGroups";
@@ -26,7 +26,7 @@ export function ChatHistoryPanel({
   activeSessionId: string | null;
   busy?: boolean;
   /** Coach attention per conversation, keyed by session id (9.3). */
-  attention?: Map<string, CoachAutomationSessionAttention>;
+  attention?: Map<string, CoachAnalysisSessionAttention>;
   /** The conversation a summariser turn is running for, if any. */
   compactingSessionId?: string | null;
   onCollapse: () => void;

@@ -2669,15 +2669,29 @@ export interface PersistedChatSource {
 }
 
 /**
- * Marks a transcript entry as written by an automation rather than by the
- * athlete or an interactive turn. A conversation can host up to five
- * automations, so the marker carries the name: the UI renders
- * `\u26a1 <name> \u00b7 <triggerLabel>` so the athlete can tell which coach spoke.
+ * Marks a transcript entry as written by an analysis rather than by the athlete
+ * or an interactive turn. A conversation can host up to five analyses, so the
+ * marker carries the name: the UI renders `\u26a1 <name> \u00b7 <triggerLabel>` so the
+ * athlete can tell which one spoke.
+ *
+ * **`automationId` is a stored JSON key, not a name anyone chose again.** This
+ * marker is written into `chat_sessions` transcripts, and every entry an
+ * athlete already has spells it that way. Renaming it would cost every
+ * historical run its attribution — the chip would render nameless — for no
+ * gain a person can see. Chat transcripts are the athlete's own record and
+ * outlive any number of refactors on the side that writes into them.
  */
-export interface ChatEntryAutomationMarker {
+export interface ChatEntryAnalysisMarker {
   runId: string;
+  /** The analysis id. Stored under its pre-rename key; see above. */
   automationId: string;
-  bindingId: string;
+  /**
+   * The attachment id, on entries written while attachments existed. Nothing
+   * writes it any more — an analysis is its own place now — and it is optional
+   * rather than deleted so that transcripts holding one still parse and still
+   * render their chip.
+   */
+  bindingId?: string;
   name: string;
   triggerLabel: string;
 }
@@ -2690,23 +2704,26 @@ export interface PersistedChatMessageEntry {
   /** Display-safe provider reasoning summary, never raw chain-of-thought. */
   reasoningSummary?: string;
   /**
-   * Set when an automation produced this entry. The synthetic user turn that
+   * Set when an analysis produced this entry. The synthetic user turn that
    * carries the playbook is stored with `role: "user"` and the same marker,
    * rendered as a chip rather than an athlete bubble.
    */
-  automation?: ChatEntryAutomationMarker;
+  automation?: ChatEntryAnalysisMarker;
 }
 
 /**
- * An automation looked and had nothing to say (5.5). A silent run writes no
+ * An analysis looked and had nothing to say (5.5). A silent run writes no
  * answer, so without this entry the athlete watching sees the live bubble
- * vanish mid-sentence and the conversation keeps no record that the coach ever
- * ran — which reads as a bug rather than as a verdict.
+ * vanish mid-sentence and the conversation keeps no record that it ever ran —
+ * which reads as a bug rather than as a verdict.
+ *
+ * `kind` and the `automation` field are stored discriminators; see
+ * `ChatEntryAnalysisMarker` for why they keep their pre-rename spelling.
  */
-export interface PersistedChatAutomationSilentEntry {
+export interface PersistedChatAnalysisSilentEntry {
   kind: "automationSilent";
-  automation: ChatEntryAutomationMarker;
-  /** Epoch milliseconds. The chip shows when the coach looked. */
+  automation: ChatEntryAnalysisMarker;
+  /** Epoch milliseconds. The chip shows when it looked. */
   at: number;
 }
 
@@ -2719,7 +2736,7 @@ export interface SaveChatSessionOptions {
   /**
    * How many of the stored entries the caller's array accounts for. Anything
    * the row holds beyond that arrived from somewhere else — in practice a coach
-   * automation writing from the main process while the window held a copy from
+   * analysis writing from the main process while the window held a copy from
    * before the run — and is kept instead of being overwritten.
    *
    * Omitting it replaces the row outright, which is what the runner wants: it
@@ -2909,7 +2926,7 @@ export const NOTHING_TO_REPORT = "NOTHING_TO_REPORT";
 export const MAX_CUSTOM_COACH_INSTRUCTIONS = 4000;
 
 /**
- * The rolling-summary window, shared by the interactive chat and by automation
+ * The rolling-summary window, shared by the interactive chat and by analysis
  * runs. One pair of numbers rather than two: the summary lives on the
  * conversation, so a chat and a coach talking in the same thread that disagreed
  * about where the tail starts would roll each other's work forward.
@@ -2941,7 +2958,7 @@ export interface ChatSettings {
   visualizationsEnabled?: boolean;
   /** Free-form athlete preferences appended to the coach system prompt. */
   customInstructions?: string;
-  /** The rolling-summary window for chat and automations alike. */
+  /** The rolling-summary window for chat and analyses alike. */
   compactContext: CompactContextSettings;
 }
 
@@ -3025,7 +3042,7 @@ export interface ChatSessionSummary {
 }
 
 /**
- * What a turn is allowed to do. Automation runs are `read-only` (decision 3):
+ * What a turn is allowed to do. Analysis runs are `read-only` (decision 3):
  * they may read, analyse and draft, but never write to COROS.
  */
 /**
@@ -3043,20 +3060,32 @@ export interface ChatTokenUsage {
 }
 
 /**
- * What a turn may reach for. `read-only` is decision 3's automation set; `none`
+ * What a turn may reach for. `read-only` is decision 3's analysis set; `none`
  * is for a turn that works on text it was handed and has no business calling
  * anything — the rolling summariser of 5.7, where a tool round-trip would be
  * both slower and a chance to wander off the one job it has.
  */
 export type ChatToolPolicy = "interactive" | "read-only" | "none";
 
-export type AutomationTriggerKind =
+/**
+ * A trigger is what turns an analysis into an *auto* analysis.
+ *
+ * It lives on the analysis, and so does everything else — because an analysis
+ * lives in exactly one conversation. Two earlier shapes put it elsewhere: on a
+ * reusable definition that declared a cadence before it had anywhere to speak,
+ * and then on an *attachment* joining one definition to several conversations.
+ * Both are gone. An athlete writing "tell me when my ramp is steep" is writing
+ * it about one conversation's history, and the indirection bought reuse nobody
+ * asked for at the price of two objects, two screens and two ways for them to
+ * disagree.
+ */
+export type AnalysisTriggerKind =
   | "schedule"
   | "activity"
   | "threshold"
   | "manual";
 
-export type AutomationTrigger =
+export type AnalysisTrigger =
   | {
       kind: "schedule";
       cadence: "daily" | "weekly";
@@ -3089,167 +3118,173 @@ export type AutomationTrigger =
     }
   | { kind: "manual" };
 
-export type AutomationThresholdMetric = Extract<
-  AutomationTrigger,
+export type AnalysisThresholdMetric = Extract<
+  AnalysisTrigger,
   { kind: "threshold" }
 >["metric"];
 
-export interface AutomationConditions {
-  /** Minimum gap between two runs of the same binding. */
+/** The guard rails around an automatic trigger. */
+export interface AnalysisConditions {
+  /** Minimum gap between two runs of the same analysis. */
   cooldownMin: number;
-  /** Per binding, per local day. */
+  /** Per analysis, per local day. */
   maxRunsPerDay: number;
   /** Local "HH:mm" range where runs are deferred, not dropped. */
   quietHours?: { start: string; end: string };
 }
 
 /**
- * Section 7, decided. An automation with no effort of its own runs at `low`,
+ * Lives here, not beside the store, because the trigger editor is a renderer
+ * screen: creating an analysis is where a person picks a cadence, and the form
+ * has to show what it will get if they touch nothing. A renderer must not
+ * import a main-process module to learn that.
+ */
+export const DEFAULT_ANALYSIS_CONDITIONS: AnalysisConditions = {
+  cooldownMin: 120,
+  maxRunsPerDay: 3
+};
+
+/**
+ * Section 7, decided. An analysis with no effort of its own runs at `low`,
  * whatever its trigger and whatever the interactive chat is set to.
  *
- * Three reasons this is a flat default rather than the trigger-kind carve-out
- * the first draft proposed (`activity` and daily `schedule` only):
+ * Two reasons this is a flat default rather than a trigger-kind carve-out:
  *
  * 1. **The editor already promises it.** `EffortSwitch` renders
- *    `runtime.effort ?? "low"`, so a definition saved without touching that
- *    control showed `low` and then ran at the chat's effort. The divergence was
- *    the real problem behind the deferred paragraph.
- * 2. **A default keyed on the trigger is invisible.** The same automation moved
- *    from daily to weekly would silently get more expensive, with nothing on
- *    screen to explain it. One rule the athlete can hold in their head beats a
- *    table they cannot see.
- * 3. **Effort is cost, not capability.** Provider and model still inherit from
+ *    `runtime.effort ?? "low"`, so an analysis saved without touching that
+ *    control showed `low` and then ran at the chat's effort.
+ * 2. **Effort is cost, not capability.** Provider and model still inherit from
  *    chat settings — those are the coach the athlete chose. How hard it thinks
  *    on a run nobody is watching is a different question, and a preset that
  *    wants more says so out loud.
  *
- * The cost: "inherit the chat's effort" is no longer expressible. It never was
- * visible anywhere, so nothing that was legible is lost.
- *
- * Lives here rather than beside the runner because the Automations panel shows
- * the resolved value on every card, and the renderer must not import a
- * main-process module to learn it.
+ * Lives here rather than beside the runner because the renderer shows the
+ * resolved value, and must not import a main-process module to learn it.
  */
-export const AUTOMATION_DEFAULT_EFFORT: AnthropicEffort = "low";
+export const ANALYSIS_DEFAULT_EFFORT: AnthropicEffort = "low";
 
-export interface AutomationRuntime {
+export interface AnalysisRuntime {
   /** Defaults to the interactive chat provider when unset. */
   provider?: ChatProvider;
   model?: string;
   effort?: AnthropicEffort;
 }
 
-/** The definition. Owns no conversation. */
-export interface CoachAutomation {
+/**
+ * One analysis, in one conversation.
+ *
+ * `trigger === null` is a manual analysis: it sits in the conversation and
+ * runs when the athlete presses Run now. Anything else makes it automatic, and
+ * "auto analysis" means exactly that and nothing more.
+ */
+export interface CoachAnalysis {
   id: string;
+  /**
+   * The conversation it belongs to, and the only one. An analysis is created
+   * inside a conversation and cannot be moved; deleting the conversation
+   * deletes it.
+   */
+  sessionId: string;
   name: string;
   /** Persona and remit, injected into the run's system instructions. */
   role?: string;
   playbook: string;
   enabled: boolean;
   presetId?: string;
-  trigger: AutomationTrigger;
-  conditions: AutomationConditions;
-  runtime: AutomationRuntime;
+  runtime: AnalysisRuntime;
+  /** null = manual only. Present = an auto analysis. */
+  trigger: AnalysisTrigger | null;
+  /** Meaningless without a trigger; kept at its defaults until one is set. */
+  conditions: AnalysisConditions;
+  /**
+   * The trigger stays on this machine: not published to the sync vault, not
+   * written into a backup. The analysis itself still travels, so the other
+   * machine shows it in this conversation — as a manual one, because the
+   * schedule that fires it belongs to this desk.
+   *
+   * Stored apart rather than filtered on the way out. `syncPolicy` classifies
+   * whole tables, the oplog carries whole rows (`SELECT *`), and a merge is an
+   * `INSERT OR REPLACE` — so a column dropped from a payload comes back as
+   * NULL on the other side rather than as "unchanged". A device-only trigger
+   * therefore lives in `coach_analysis_local_triggers`, which is `device` tier
+   * and has no way out of this machine at all.
+   */
+  deviceOnly: boolean;
+  /** Run order within the conversation: they execute in turn (2.3). */
+  sortOrder: number;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  /**
+   * `start_time` (epoch seconds) of the newest activity this analysis has
+   * already looked at. Absent means it never has, and the creation time
+   * (`createdAt`) becomes the floor instead.
+   */
+  lastActivityAt?: number;
+  /**
+   * Section 10's backoff. A `failed` run deliberately leaves `lastRunAt` and
+   * the watermark where they were, so without this a dead provider is
+   * re-offered the same activity on every 15-minute poll for as long as it
+   * stays dead.
+   *
+   * `backoffUntil` is the wall clock it is held off until; absent means it is
+   * not. `backoffLevel` counts consecutive failures and picks the step (5m,
+   * 15m, 60m); 0 or absent means healthy.
+   */
+  backoffUntil?: string;
+  backoffLevel?: number;
+  /**
+   * 3.3's transition state: whether this analysis's threshold condition held
+   * the last time the scheduler looked. **Absent means never evaluated**,
+   * which is the state that matters most — an analysis written today must not
+   * fire on a condition that has been true all week, so its first look records
+   * the answer and says nothing.
+   */
+  thresholdFiring?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Create/update payload for a definition; the store fills in the rest. */
-export interface CoachAutomationInput {
+/** Create payload; the store assigns id, order, clocks and timestamps. */
+export interface CoachAnalysisInput {
+  sessionId: string;
   name: string;
   role?: string;
   playbook: string;
   enabled?: boolean;
   presetId?: string;
-  trigger: AutomationTrigger;
-  /**
-   * Merged over the defaults; omitted keys keep their default. An explicit
-   * `quietHours: null` is the one way to clear a stored window — leaving the
-   * key out means "unchanged", so it could not also mean "remove".
-   */
-  conditions?: Partial<Omit<AutomationConditions, "quietHours">> & {
-    quietHours?: AutomationConditions["quietHours"] | null;
+  runtime?: AnalysisRuntime;
+  /** Omitted or null creates a manual analysis. */
+  trigger?: AnalysisTrigger | null;
+  /** Merged over the defaults; `quietHours: null` is how a window is cleared. */
+  conditions?: Partial<Omit<AnalysisConditions, "quietHours">> & {
+    quietHours?: AnalysisConditions["quietHours"] | null;
   };
-  runtime?: AutomationRuntime;
+  deviceOnly?: boolean;
 }
-
-export type AutomationBindingMode = "per-run" | "dedicated" | "existing";
-
-/** Where the definition is active. */
-export interface CoachAutomationBinding {
-  id: string;
-  automationId: string;
-  mode: AutomationBindingMode;
-  /** null for "per-run". */
-  sessionId: string | null;
-  /** "per-run" only: "{{rule.name}} · {{activity.name}} · {{date}}". */
-  titleTemplate?: string;
-  enabled: boolean;
-  sortOrder: number;
-  lastRunAt?: string;
-  nextRunAt?: string;
-  /**
-   * `start_time` (epoch seconds) of the newest activity this binding has
-   * already analysed. Absent means it never has, and the attach time
-   * (`createdAt`) becomes the floor instead.
-   */
-  lastActivityAt?: number;
-  /**
-   * Section 10's per-binding backoff, beside the other clocks because it is one
-   * of them. A `failed` run deliberately leaves `lastRunAt` and the watermark
-   * where they were, so without this a dead provider is re-offered the same
-   * activity on every 15-minute poll for as long as it stays dead.
-   *
-   * `backoffUntil` is the wall clock the binding is held off until; absent
-   * means it is not. `backoffLevel` counts consecutive failures and picks the
-   * step (5m, 15m, 60m); 0 or absent means healthy.
-   */
-  backoffUntil?: string;
-  backoffLevel?: number;
-  /**
-   * 3.3's transition state: whether this binding's threshold condition held the
-   * last time the scheduler looked. **Absent means never evaluated**, which is
-   * the state that matters most — a binding attached today must not fire on a
-   * condition that has been true all week, so its first look records the answer
-   * and says nothing.
-   */
-  thresholdFiring?: boolean;
-  createdAt: string;
-}
-
-/** Create payload for a binding; the store assigns id, order and timestamps. */
-export interface CoachAutomationBindingInput {
-  automationId: string;
-  mode: AutomationBindingMode;
-  /** Required for "dedicated" and "existing"; must be absent for "per-run". */
-  sessionId?: string | null;
-  /** "per-run" only. */
-  titleTemplate?: string;
-  enabled?: boolean;
-}
-
-/** Why an attach was refused, so the UI can explain rather than just fail. */
-export type CoachAutomationBindingErrorCode =
-  | "AUTOMATION_NOT_FOUND"
-  | "BINDING_LIMIT_REACHED"
-  | "BINDING_DUPLICATE"
-  | "BINDING_PER_RUN_EXISTS"
-  | "BINDING_SESSION_REQUIRED"
-  | "BINDING_SESSION_NOT_ALLOWED";
 
 /**
- * What a conversation deletion did to the bindings pointing at it (2.4).
- * `disabled` are "existing" bindings the athlete must re-point; `needsSession`
- * are "dedicated" bindings that stay enabled and rebuild their conversation on
- * the next run.
+ * Edit payload. Every field is optional and an omitted one is unchanged;
+ * `trigger: null` is how an auto analysis is turned back into a manual one.
+ * `sessionId` is absent on purpose — an analysis cannot change conversation.
  */
-export interface CoachAutomationSessionDeletionReport {
-  disabled: CoachAutomationBinding[];
-  needsSession: CoachAutomationBinding[];
-}
+export type CoachAnalysisPatch = Partial<Omit<CoachAnalysisInput, "sessionId">>;
 
-export type CoachAutomationRunStatus =
+/** Why a create was refused, so the UI can explain rather than just fail. */
+export type CoachAnalysisErrorCode =
+  | "ANALYSIS_SESSION_REQUIRED"
+  | "ANALYSIS_LIMIT_REACHED"
+  | "ANALYSIS_NOT_FOUND";
+
+/**
+ * Refusals are expected — the per-conversation cap, mostly — and the UI has to
+ * explain each one. An Error crossing IPC loses its `code`, so create answers
+ * with a result instead of throwing.
+ */
+export type CoachAnalysisCreateResult =
+  | { ok: true; analysis: CoachAnalysis }
+  | { ok: false; code: CoachAnalysisErrorCode; message: string };
+
+export type CoachAnalysisRunStatus =
   | "running"
   | "success"
   | "silent"
@@ -3257,16 +3292,15 @@ export type CoachAutomationRunStatus =
   | "failed"
   | "cancelled";
 
-export interface CoachAutomationRun {
+export interface CoachAnalysisRun {
   id: string;
-  automationId: string;
-  bindingId: string;
-  status: CoachAutomationRunStatus;
-  triggerKind: AutomationTriggerKind;
+  analysisId: string;
+  status: CoachAnalysisRunStatus;
+  triggerKind: AnalysisTriggerKind;
   triggerPayload?: Record<string, unknown>;
   /** Conversation actually written into. */
   sessionId?: string;
-  /** One-line TLDR for the badge/notification. */
+  /** The opening line, kept for the run-log row. */
   summary?: string;
   model?: string;
   effort?: string;
@@ -3274,7 +3308,10 @@ export interface CoachAutomationRun {
   inputTokens?: number;
   outputTokens?: number;
   error?: string;
-  /** cooldown | quiet-hours | no-auth | offline | budget | stale-slot */
+  /**
+   * disabled | missing-session | cooldown | quiet-hours | no-auth | offline |
+   * budget | stale-slot | no-activity | two-factor-required | backoff | burst
+   */
   skipReason?: string;
   /** Set once the unread badge is cleared. */
   seenAt?: string;
@@ -3283,35 +3320,29 @@ export interface CoachAutomationRun {
 }
 
 /** Run-log query, mirrored by the renderer so it never imports the db layer. */
-export interface CoachAutomationRunQuery {
-  automationId?: string;
-  bindingId?: string;
+export interface CoachAnalysisRunQuery {
+  analysisId?: string;
   sessionId?: string;
   /** Inclusive lower bound on `startedAt`, ISO. */
   since?: string;
-  statuses?: CoachAutomationRunStatus[];
+  statuses?: CoachAnalysisRunStatus[];
   /** Only runs the athlete has not looked at yet (`seen_at IS NULL`). */
   unseenOnly?: boolean;
   limit?: number;
 }
 
 /**
- * A definition that changed, on the wire.
+ * An analysis that changed, on the wire.
  *
- * The definition is the one thing every automation surface renders and no
- * channel carried: the name on a chip, the trigger under it, and the master
- * switch that decides whether a binding is live at all. Editing a coach reached
- * the other surfaces only through `automationsVersion`, a renderer-local
- * counter — so an edit was invisible to anything that counter does not reach,
- * and the athlete's way out was to detach and re-attach, because *that* emits a
- * binding update and a binding update forces a re-read.
- *
- * `automation` is null when the definition was deleted, which is the one change
- * a surface cannot re-read for itself.
+ * Every surface that renders one — the row in the conversation header, the
+ * detail screen — has to follow an edit made somewhere else, and none of them
+ * asked. `analysis` is null when it was deleted, which is the one change a
+ * surface cannot re-read for itself.
  */
-export interface CoachAutomationUpdate {
-  automationId: string;
-  automation: CoachAutomation | null;
+export interface CoachAnalysisUpdate {
+  analysisId: string;
+  sessionId: string;
+  analysis: CoachAnalysis | null;
 }
 
 /**
@@ -3319,48 +3350,25 @@ export interface CoachAutomationUpdate {
  * run changes the transcript and so bumps the row to the top; without this the
  * row reorders for no visible reason.
  */
-export interface CoachAutomationSessionAttention {
+export interface CoachAnalysisSessionAttention {
   sessionId: string;
-  /** A live binding writes here, whether or not it ever has. */
+  /** A live analysis writes here, whether or not it ever has. */
   attached: boolean;
   /** Runs that landed in it and have not been looked at yet. */
   unread: number;
 }
 
-/** One binding plus the conversation it points at, for the "where it runs" UI. */
-export interface CoachAutomationBindingView extends CoachAutomationBinding {
-  sessionTitle?: string;
-  /** True when the conversation this binding targets no longer exists (2.4). */
-  sessionMissing?: boolean;
-}
-
-/** One automation with every place it runs. */
-export interface CoachAutomationDetail {
-  automation: CoachAutomation;
-  bindings: CoachAutomationBindingView[];
-}
-
 /**
- * Attach refusals are expected — the cap, a duplicate, a second per-run
- * binding — and the UI has to explain each one. An Error crossing IPC loses its
- * `code`, so attach answers with a result instead of throwing.
- */
-export type CoachAutomationAttachResult =
-  | { ok: true; binding: CoachAutomationBinding }
-  | { ok: false; code: CoachAutomationBindingErrorCode; message: string };
-
-/** List-screen projection. */
-/**
- * Section 10: why every automation is held, and since when.
+ * Section 10: why every analysis is held, and since when.
  *
- * One flag for the whole feature rather than a column per binding, because the
- * cause is one thing the athlete has to fix once — COROS is asking for a login
- * code, and no amount of retrying anywhere will answer it. Persisted, so a
- * restart does not quietly resume a paused world.
+ * One flag for the whole feature rather than a column per analysis, because
+ * the cause is one thing the athlete has to fix once — COROS is asking for a
+ * login code, and no amount of retrying anywhere will answer it. Persisted, so
+ * a restart does not quietly resume a paused world.
  */
-export interface CoachAutomationPause {
+export interface CoachAnalysisPause {
   /**
-   * `two-factor-required` — COROS wants a login code and no automation can
+   * `two-factor-required` — COROS wants a login code and no analysis can
    * supply one. `budget` — this month's token spend reached the athlete's
    * ceiling. Both are one fact about the whole feature that the athlete fixes
    * once, which is why they share one flag.
@@ -3381,28 +3389,25 @@ export interface ProviderAuthVerdict {
 }
 
 /** 13: what the athlete has spent this month, and their ceiling. */
-export interface CoachAutomationSpend {
+export interface CoachAnalysisSpend {
   monthStart: string;
   inputTokens: number;
   outputTokens: number;
   /** Null when no ceiling is set, which is the default. */
   budget: number | null;
   /**
-   * Runs that reported a cost, out of those that reached a provider. When these
-   * differ the total is short of the truth, and a budget that did not say so
-   * would read as comfortably under when nobody knows.
+   * Runs that reported a cost, out of those that reached a provider. When
+   * these differ the total is short of the truth, and a budget that did not
+   * say so would read as comfortably under when nobody knows.
    */
   countedRuns: number;
   providerRuns: number;
 }
 
-export interface CoachAutomationSummary {
-  automation: CoachAutomation;
-  bindingCount: number;
-  enabledBindingCount: number;
-  lastRun?: CoachAutomationRun;
-  /** Earliest across bindings. */
-  nextRunAt?: string;
+/** One analysis plus what it last did, for the conversation's list. */
+export interface CoachAnalysisSummary {
+  analysis: CoachAnalysis;
+  lastRun?: CoachAnalysisRun;
 }
 
 export interface LocalChatConnectionTest {
@@ -4502,7 +4507,7 @@ export interface WorkoutDeletePreview {
 /** Persisted coach timeline entry (messages plus inline action cards). */
 export type PersistedChatEntry =
   | PersistedChatMessageEntry
-  | PersistedChatAutomationSilentEntry
+  | PersistedChatAnalysisSilentEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }

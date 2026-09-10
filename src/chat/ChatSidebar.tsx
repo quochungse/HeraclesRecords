@@ -3,7 +3,7 @@ import { PanelLeft } from "lucide-react";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import type {
   ChatSessionSummary,
-  CoachAutomationSessionAttention
+  CoachAnalysisSessionAttention
 } from "../../electron/types";
 
 export function ChatSidebar({
@@ -30,7 +30,7 @@ export function ChatSidebar({
   activeSessionId: string | null;
   busy?: boolean;
   /** Coach attention per conversation, keyed by session id (9.3). */
-  attention?: Map<string, CoachAutomationSessionAttention>;
+  attention?: Map<string, CoachAnalysisSessionAttention>;
   /** The conversation a summariser turn is running for, if any. */
   compactingSessionId?: string | null;
   onClose: () => void;

@@ -68,6 +68,9 @@ const preview = {
   warnings: []
 };
 
+// `automationId` / `bindingId` are the marker's stored key names, kept so that
+// every transcript entry an athlete already has keeps its attribution. See
+// `ChatEntryAnalysisMarker`.
 const marker = {
   runId: "run-1",
   automationId: "auto-1",
@@ -188,4 +191,4 @@ assert.doesNotMatch(
 assert.deepEqual(reloaded[2].automation, marker);
 
 Module._load = originalLoad;
-console.log("coach automation plan draft tests passed");
+console.log("coach analysis plan draft tests passed");

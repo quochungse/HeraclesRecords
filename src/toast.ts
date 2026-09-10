@@ -4,7 +4,7 @@
  *
  * The toast stack is driven by App's `message`/`error` state, which suits the
  * screens App itself owns. Views nested several levels down — the coach
- * automation panels, for instance — have no path to that state and should not
+ * analysis panels, for instance — have no path to that state and should not
  * have to thread a callback through every layer to say one sentence. A module
  * scoped emitter keeps the single `Toaster` as the only renderer.
  */

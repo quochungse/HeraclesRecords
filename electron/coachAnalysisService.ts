@@ -29,45 +29,42 @@ import {
   setChatSessionTitle
 } from "./chatHistoryStore";
 import {
-  getCoachAutomation,
-  getCoachAutomationBinding,
-  listCoachAutomationBindings,
-  listCoachAutomationRuns,
-  recordCoachAutomationRun,
-  setCoachAutomationBindingEnabled,
-  setCoachAutomationBindingSchedule,
-  setCoachAutomationBindingSession,
-  getCoachAutomationBudget,
-  getCoachAutomationPause,
-  setCoachAutomationBudget,
-  setCoachAutomationPause,
-  updateCoachAutomationRun
-} from "./coachAutomationStore";
+  getCoachAnalysis,
+  listCoachAnalysisRuns,
+  recordCoachAnalysisRun,
+  setCoachAnalysisEnabled,
+  setCoachAnalysisSchedule,
+  getCoachAnalysisBudget,
+  getCoachAnalysisPause,
+  setCoachAnalysisBudget,
+  setCoachAnalysisPause,
+  updateCoachAnalysisRun
+} from "./coachAnalysisStore";
 import {
   listCoachActivityRowsAfter,
-  sumCoachAutomationTokensSince
+  sumCoachAnalysisTokensSince
 } from "./database";
 import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
-import { AUTOMATION_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
+import { ANALYSIS_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
   AnthropicEffort,
-  AutomationRuntime,
+  AnalysisRuntime,
   ClaudeCodeConnectionState,
-  AutomationTriggerKind,
-  ChatEntryAutomationMarker,
+  AnalysisTriggerKind,
+  ChatEntryAnalysisMarker,
   ChatMessage,
   ChatProvider,
   ChatTokenUsage,
-  CoachAutomation,
-  CoachAutomationBinding,
-  CoachAutomationPause,
-  CoachAutomationRun,
-  CoachAutomationRunQuery,
-  CoachAutomationSpend,
-  CoachAutomationUpdate,
+  CoachAnalysis,
+  AnalysisTrigger,
+  CoachAnalysisPause,
+  CoachAnalysisRun,
+  CoachAnalysisRunQuery,
+  CoachAnalysisSpend,
+  CoachAnalysisUpdate,
   PersistedChatEntry,
   ProviderAuthVerdict
 } from "./types";
@@ -79,7 +76,7 @@ import type {
 const SUMMARY_MAX = 140;
 
 /**
- * Appended to every playbook by the runner, not editable per automation.
+ * Appended to every playbook by the runner, not editable per analysis.
  *
  * It asks for the two things the app cannot work without — an opening sentence
  * to put in the run log, and a way to say "nothing happened" — and nothing
@@ -105,7 +102,7 @@ export const AUTOMATION_OUTPUT_CONTRACT = [
 
 export { NOTHING_TO_REPORT };
 
-export interface AutomationOutput {
+export interface AnalysisOutput {
   /** The model found nothing worth reporting; the run is logged, not shown. */
   silent: boolean;
   /** The headline, for the badge and (phase 2) the notification body. */
@@ -117,7 +114,7 @@ function trimMarkup(line: string): string {
   return line.replace(/^[\s>#*_`+-]+/, "").replace(/[\s*_`]+$/, "");
 }
 
-export function parseAutomationOutput(text: string): AutomationOutput {
+export function parseAnalysisOutput(text: string): AnalysisOutput {
   const trimmed = (text ?? "").trim();
   if (!trimmed) {
     return { silent: true };
@@ -148,22 +145,22 @@ export function parseAutomationOutput(text: string): AutomationOutput {
 
 // Re-exported so callers that already talk to the runner do not need a second
 // import for the one constant behind its decision.
-export { AUTOMATION_DEFAULT_EFFORT };
+export { ANALYSIS_DEFAULT_EFFORT };
 
 /** The runtime a run actually uses, with section 7's default filled in. */
-export function resolveAutomationRuntime(
-  automation: CoachAutomation
-): AutomationRuntime {
-  return automation.runtime.effort
-    ? automation.runtime
-    : { ...automation.runtime, effort: AUTOMATION_DEFAULT_EFFORT };
+export function resolveAnalysisRuntime(
+  analysis: CoachAnalysis
+): AnalysisRuntime {
+  return analysis.runtime.effort
+    ? analysis.runtime
+    : { ...analysis.runtime, effort: ANALYSIS_DEFAULT_EFFORT };
 }
 
 // ---------------------------------------------------------------------------
 // Template rendering (2.5)
 // ---------------------------------------------------------------------------
 
-export interface AutomationTemplateVars {
+export interface AnalysisTemplateVars {
   rule?: { name?: string };
   date?: string;
   activity?: { name?: string; sport?: string };
@@ -171,9 +168,9 @@ export interface AutomationTemplateVars {
 }
 
 /** Renders `{{rule.name}}`-style variables; unknown ones collapse to "". */
-export function renderAutomationTemplate(
+export function renderAnalysisTemplate(
   template: string,
-  vars: AutomationTemplateVars
+  vars: AnalysisTemplateVars
 ): string {
   const lookup: Record<string, string | undefined> = {
     "rule.name": vars.rule?.name,
@@ -200,8 +197,15 @@ function weekRange(now: Date): string {
   return `${isoDate(start)}..${isoDate(end)}`;
 }
 
-function triggerLabel(automation: CoachAutomation): string {
-  const trigger = automation.trigger;
+/**
+ * The chip under an analysis's name in a transcript. Takes the trigger rather
+ * than the analysis, because the analysis no longer has one — the analysis
+ * does, and a manual analysis has none at all.
+ */
+function triggerLabel(trigger: AnalysisTrigger | null): string {
+  if (!trigger) {
+    return "Manual";
+  }
   if (trigger.kind === "schedule") {
     return trigger.cadence === "weekly"
       ? `Weekly at ${trigger.timeOfDay}`
@@ -219,7 +223,7 @@ function triggerLabel(automation: CoachAutomation): string {
 }
 
 // ---------------------------------------------------------------------------
-// Which activities a binding still owes an opinion on
+// Which activities a analysis still owes an opinion on
 // ---------------------------------------------------------------------------
 
 /**
@@ -238,16 +242,14 @@ const ACTIVITY_SCAN_LIMIT = 200;
 export const MULTI_ACTIVITY_MAX_PER_TRIGGER = 10;
 
 /**
- * 3.2 step 3: an activity automation fires only for the sports it names, and
- * only above its duration/distance floors. An empty `sportTypes` means every
- * sport.
+ * 3.2 step 3: an activity trigger fires only for the sports it names, and only
+ * above its duration/distance floors. An empty `sportTypes` means every sport.
  */
-export function activityMatchesAutomation(
+export function activityMatchesTrigger(
   activity: CoachActivityRow,
-  automation: CoachAutomation
+  trigger: AnalysisTrigger | null
 ): boolean {
-  const trigger = automation.trigger;
-  if (trigger.kind !== "activity") {
+  if (!trigger || trigger.kind !== "activity") {
     return false;
   }
   if (trigger.sportTypes.length && !trigger.sportTypes.includes(activity.sport_type)) {
@@ -269,46 +271,47 @@ export function activityMatchesAutomation(
 }
 
 /** The attach moment, in the epoch seconds `start_time` is stored in. */
-function attachEpochSeconds(binding: CoachAutomationBinding): number {
-  const parsed = Date.parse(binding.createdAt);
+function createdEpochSeconds(analysis: CoachAnalysis): number {
+  const parsed = Date.parse(analysis.createdAt);
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
 }
 
 /**
- * What an activity-driven binding should analyse on this trigger, oldest
+ * What an activity-driven analysis should analyse on this trigger, oldest
  * first.
  *
- * The watermark is per binding, not per automation: two conversations attached
- * a week apart legitimately owe answers on different activities, and the
- * automation-wide `coach_seen_at` stamp only decides *when* the watcher fires.
+ * The watermark is per analysis, and now so is the trigger: two
+ * conversations attached a week apart legitimately owe answers on different
+ * activities, and may not even be watching the same sports. The
+ * analysis-wide `coach_seen_at` stamp only decides *when* the watcher fires.
  *
- * - Never analysed anything → the attach time is the floor, so attaching a
- *   coach today does not replay the athlete's back catalogue.
- * - "Run now" on a binding that never analysed anything → the newest matching
- *   activity, ignoring that floor. The athlete asked for an answer now, and a
- *   coach attached five minutes ago would otherwise have nothing to say.
+ * - Never analysed anything → the attach time is the floor, so attaching an
+ *   analysis today does not replay the athlete's back catalogue.
+ * - "Run now" on an analysis that never analysed anything → the newest
+ *   matching activity, ignoring that floor. The athlete asked for an answer
+ *   now, and an analysis attached five minutes ago would otherwise have
+ *   nothing to say.
  * - `multiActivity` off → only the newest match, however many piled up.
  */
-function selectActivitiesForBinding(
-  automation: CoachAutomation,
-  binding: CoachAutomationBinding,
-  event: AutomationTriggerEvent,
-  deps: CoachAutomationRunnerDeps
+function selectActivitiesForAnalysis(
+  analysis: CoachAnalysis,
+  event: AnalysisTriggerEvent,
+  deps: CoachAnalysisRunnerDeps
 ): CoachActivityRow[] {
-  const trigger = automation.trigger;
-  if (trigger.kind !== "activity") {
+  const trigger = analysis.trigger;
+  if (!trigger || trigger.kind !== "activity") {
     return [];
   }
 
   const manualFirstRun =
-    event.kind === "manual" && binding.lastActivityAt === undefined;
+    event.kind === "manual" && analysis.lastActivityAt === undefined;
   const floor = manualFirstRun
     ? undefined
-    : binding.lastActivityAt ?? attachEpochSeconds(binding);
+    : analysis.lastActivityAt ?? createdEpochSeconds(analysis);
 
   const matched = deps
     .listActivitiesAfter(floor, ACTIVITY_SCAN_LIMIT)
-    .filter((activity) => activityMatchesAutomation(activity, automation));
+    .filter((activity) => activityMatchesTrigger(activity, trigger));
   if (!matched.length) {
     return [];
   }
@@ -322,7 +325,7 @@ function selectActivitiesForBinding(
 // Guard rails (4)
 // ---------------------------------------------------------------------------
 
-export type AutomationSkipReason =
+export type AnalysisSkipReason =
   | "disabled"
   | "missing-session"
   | "no-auth"
@@ -332,22 +335,22 @@ export type AutomationSkipReason =
   | "cooldown"
   | "budget"
   | "burst"
-  /** Held off after a failed run, until this binding's backoff expires (10). */
+  /** Held off after a failed run, until this analysis's backoff expires (10). */
   | "backoff"
-  /** Activity-driven, but nothing new to analyse since this binding's watermark. */
+  /** Activity-driven, but nothing new to analyse since this analysis's watermark. */
   | "no-activity"
   /** Schedule-driven: the slot came due more than a day ago (3.1). */
   | "stale-slot"
-  /** Another device holds the lease for this automation and is running it.
-   *  Normal for two machines out of three once automations sync, and not a
+  /** Another device holds the lease for this analysis and is running it.
+   *  Normal for two machines out of three once analyses sync, and not a
    *  failure — the run happens, just not here. */
   | "another-device";
 
-/** 2.3: at most this many automation messages land in one conversation per hour. */
+/** 2.3: at most this many analysis messages land in one conversation per hour. */
 export const SESSION_BURST_PER_HOUR = 5;
 
 /**
- * Section 10's per-binding backoff: how long a binding is held off after its
+ * Section 10's per-analysis backoff: how long a analysis is held off after its
  * first, second and third consecutive failure. The last step is also the
  * ceiling — a provider that has been dead for three hours is not more dead at
  * four, and an hour is already long enough that the athlete notices the silence
@@ -413,7 +416,7 @@ export function startOfLocalMonth(now: Date): string {
 }
 
 /**
- * 13: whether the automations have spent their month's allowance.
+ * 13: whether the analyses have spent their month's allowance.
  *
  * `>=` rather than `>`: a budget of 500k means five hundred thousand tokens are
  * what the athlete agreed to, and the run that would take them past it has not
@@ -451,7 +454,7 @@ function addTokenUsage(
   };
 }
 
-function overBudget(deps: CoachAutomationRunnerDeps): boolean {
+function overBudget(deps: CoachAnalysisRunnerDeps): boolean {
   const budget = deps.getBudget();
   if (budget === null || budget <= 0) {
     return false;
@@ -491,7 +494,7 @@ export interface ProviderAuthInputs {
  * flight, `connection-failed` may be a network that has since come back, and a
  * `claude-code` state the app has *never* recorded is the shape of a fresh
  * install whose Coach view nobody has opened yet. Declining on unknown would
- * hold every automation on a machine where nothing is actually wrong.
+ * hold every analysis on a machine where nothing is actually wrong.
  */
 export function checkProviderAuth(
   provider: ChatProvider,
@@ -528,14 +531,12 @@ export function checkProviderAuth(
 // Injectable dependencies
 // ---------------------------------------------------------------------------
 
-export interface CoachAutomationRunnerDeps {
+export interface CoachAnalysisRunnerDeps {
   now(): Date;
-  getAutomation(id: string): CoachAutomation | null;
-  listBindings(automationId: string): CoachAutomationBinding[];
-  /** Re-read at run time: a queued binding's snapshot goes stale behind it. */
-  getBinding(id: string): CoachAutomationBinding | null;
-  setBindingSchedule(
-    bindingId: string,
+  /** Re-read at run time: a queued analysis's snapshot goes stale behind it. */
+  getAnalysis(id: string): CoachAnalysis | null;
+  setAnalysisSchedule(
+    analysisId: string,
     schedule: {
       lastRunAt?: string | null;
       nextRunAt?: string | null;
@@ -544,19 +545,18 @@ export interface CoachAutomationRunnerDeps {
       backoffLevel?: number | null;
     }
   ): void;
-  setBindingSession(bindingId: string, sessionId: string): void;
-  setBindingEnabled(bindingId: string, enabled: boolean): void;
-  listRuns(filter: CoachAutomationRunQuery): CoachAutomationRun[];
-  /** Activities newer than a binding's watermark, oldest first. */
+  setAnalysisEnabled(analysisId: string, enabled: boolean): void;
+  listRuns(filter: CoachAnalysisRunQuery): CoachAnalysisRun[];
+  /** Activities newer than a analysis's watermark, oldest first. */
   listActivitiesAfter(
     afterEpochSeconds: number | undefined,
     limit: number
   ): CoachActivityRow[];
-  recordRun(input: Omit<CoachAutomationRun, "id" | "startedAt">): CoachAutomationRun;
+  recordRun(input: Omit<CoachAnalysisRun, "id" | "startedAt">): CoachAnalysisRun;
   updateRun(
     id: string,
-    patch: Partial<Omit<CoachAutomationRun, "id" | "automationId" | "bindingId">>
-  ): CoachAutomationRun | null;
+    patch: Partial<Omit<CoachAnalysisRun, "id" | "analysisId" | "analysisId">>
+  ): CoachAnalysisRun | null;
   /** Undefined when the conversation no longer exists (2.4). */
   getSessionEntries(sessionId: string): PersistedChatEntry[] | undefined;
   /** 5.7: the conversation's rolling summary and what it covers. */
@@ -584,7 +584,7 @@ export interface CoachAutomationRunnerDeps {
   rollSummary(
     previous: string | undefined,
     entries: PersistedChatEntry[],
-    runtime: AutomationRuntime
+    runtime: AnalysisRuntime
   ): Promise<{ summary: string | null; usage?: ChatTokenUsage }>;
   createSession(provider: ChatProvider): string;
   saveSession(sessionId: string, entries: PersistedChatEntry[]): void;
@@ -597,24 +597,24 @@ export interface CoachAutomationRunnerDeps {
   >;
   /** Whether COROS credentials are on disk — a local read, never a request. */
   corosAuthenticated(): boolean;
-  getPause(): CoachAutomationPause | null;
-  setPause(pause: CoachAutomationPause | null): void;
+  getPause(): CoachAnalysisPause | null;
+  setPause(pause: CoachAnalysisPause | null): void;
   /** 13: the monthly ceiling in tokens, or null for none. */
   getBudget(): number | null;
-  /** Tokens spent by automations since the start of the current local month. */
+  /** Tokens spent by analyses since the start of the current local month. */
   getMonthToDateTokens(): number;
-  createCollector(marker: ChatEntryAutomationMarker): ChatStreamCollectorSink;
+  createCollector(marker: ChatEntryAnalysisMarker): ChatStreamCollectorSink;
   streamChat(
     sink: ChatStreamSink,
     runId: string,
     messages: ChatMessage[],
     options: {
-      runtime?: CoachAutomation["runtime"];
+      runtime?: CoachAnalysis["runtime"];
       toolPolicy: "read-only";
       roleInstructions?: string;
     }
   ): Promise<void>;
-  emitRunUpdate(run: CoachAutomationRun): void;
+  emitRunUpdate(run: CoachAnalysisRun): void;
   /** Aborts an in-flight stream by run id; the same seam "Cancel" uses. */
   cancelRun(runId: string): void;
   /** How long a run may emit nothing before it is given up on. */
@@ -625,8 +625,8 @@ export interface CoachAutomationRunnerDeps {
  * A run update from outside the runner. The scheduler's `stale-slot` skips
  * never reach `runOneBinding`, so they need their own way onto the wire.
  */
-export function emitAutomationRunUpdate(run: CoachAutomationRun): void {
-  emitToAnyWindow("coachAutomation:runUpdate", run);
+export function emitAnalysisRunUpdate(run: CoachAnalysisRun): void {
+  emitToAnyWindow("analysis:runUpdate", run);
 }
 
 /**
@@ -634,49 +634,39 @@ export function emitAutomationRunUpdate(run: CoachAutomationRun): void {
  * window open at all — the trip is a scheduled run finding COROS locked at
  * 07:30 — so the banner reads the flag on mount and follows this afterwards.
  */
-export function emitAutomationPauseUpdate(pause: CoachAutomationPause | null): void {
-  emitToAnyWindow("coachAutomation:pauseUpdate", pause);
+export function emitAnalysisPauseUpdate(pause: CoachAnalysisPause | null): void {
+  emitToAnyWindow("analysis:pauseUpdate", pause);
 }
 
 /**
- * A binding whose *rendered* state changed, with no run to carry the news.
+ * An analysis that changed, on the wire.
  *
- * Three writers had no wire at all. The scheduler books a slot on a timer, and
- * 9.1's "next fires in 9h" line is the one question the card exists to answer —
- * so a briefing created at lunchtime showed nothing until something unrelated
- * refreshed the screen. Guard rail 2 disables a binding whose conversation the
- * athlete deleted, and a `dedicated` binding adopts the conversation it just
- * rebuilt; both are rendered by the "where it runs" rows, which read once on
- * mount.
+ * Every surface that renders one — the row in the conversation header, the
+ * detail screen — has to follow an edit made somewhere else, and none of them
+ * asked. Until this existed the surfaces kept up through `analysesVersion`, a
+ * counter local to ChatView's tree, so anything that counter did not reach
+ * went on showing the old name and the old trigger until something unrelated
+ * refreshed it.
  *
  * Deliberately *not* emitted for the clocks nothing renders — `last_run_at`,
  * the activity watermark, the backoff pair, `threshold_firing`. A push per
- * binding per run for state no surface shows is the kind of chatter that makes
- * the next reviewer distrust the ones that matter.
+ * analysis per run for state no surface shows is the kind of chatter that
+ * makes the next reviewer distrust the ones that matter. `next_run_at` is the
+ * exception: a card says when it next fires, so booking a slot announces
+ * itself.
  */
-export function emitAutomationBindingUpdate(
-  binding: CoachAutomationBinding | null
-): void {
-  if (!binding) return;
-  emitToAnyWindow("coachAutomation:bindingUpdate", binding);
+export function emitAnalysisUpdate(update: CoachAnalysisUpdate): void {
+  emitToAnyWindow("analysis:changed", update);
 }
 
-/**
- * A definition that changed, with no run and no binding to carry the news.
- *
- * Every automation surface renders the definition — the name on a chip, the
- * trigger under it, the master switch that decides whether a binding is live —
- * and until now nothing put a definition change on the wire. The surfaces kept
- * up through `automationsVersion`, a counter local to ChatView's tree, so a
- * surface that counter does not reach went on showing the old name and the old
- * trigger until something unrelated refreshed it. Detaching and re-attaching
- * was the athlete's way out, because a binding update *does* have a wire.
- *
- * Emitted on the two edits and the delete, not on the clocks: `last_run_at` and
- * the watermarks live on the binding and already have their own rule.
- */
-export function emitAutomationUpdate(update: CoachAutomationUpdate): void {
-  emitToAnyWindow("coachAutomation:automationUpdate", update);
+/** The same push, from a caller holding the analysis rather than the event. */
+export function emitAnalysisChanged(analysis: CoachAnalysis | null): void {
+  if (!analysis) return;
+  emitAnalysisUpdate({
+    analysisId: analysis.id,
+    sessionId: analysis.sessionId,
+    analysis
+  });
 }
 
 /**
@@ -690,34 +680,23 @@ function emitToAnyWindow(channel: string, payload: unknown): void {
   target?.webContents.send(channel, payload);
 }
 
-function createDefaultDeps(): CoachAutomationRunnerDeps {
+function createDefaultDeps(): CoachAnalysisRunnerDeps {
   return {
     now: () => new Date(),
-    getAutomation: (id) => getCoachAutomation(id),
-    listBindings: (automationId) => listCoachAutomationBindings(automationId),
-    getBinding: (id) => getCoachAutomationBinding(id),
-    setBindingSchedule: (bindingId, schedule) => {
-      setCoachAutomationBindingSchedule(bindingId, schedule);
+    getAnalysis: (id) => getCoachAnalysis(id),
+    setAnalysisSchedule: (analysisId, schedule) => {
+      setCoachAnalysisSchedule(analysisId, schedule);
     },
-    setBindingSession: (bindingId, sessionId) => {
-      // A `dedicated` binding adopting its rebuilt conversation (2.4): the row
-      // that names it is on screen and has no other way to hear.
-      emitAutomationBindingUpdate(
-        setCoachAutomationBindingSession(bindingId, sessionId)
-      );
+    setAnalysisEnabled: (analysisId, enabled) => {
+      // Guard rail 2 breaking an analysis whose conversation is gone. The run
+      // log says so on the next push; without this the row one tab away goes
+      // on showing the toggle on and no broken marker.
+      emitAnalysisChanged(setCoachAnalysisEnabled(analysisId, enabled));
     },
-    setBindingEnabled: (bindingId, enabled) => {
-      // Guard rail 2 breaking a binding whose conversation is gone. The run log
-      // says so on the next push; without this the row one tab away goes on
-      // showing the toggle on and no broken marker.
-      emitAutomationBindingUpdate(
-        setCoachAutomationBindingEnabled(bindingId, enabled)
-      );
-    },
-    listRuns: (filter) => listCoachAutomationRuns(filter),
+    listRuns: (filter) => listCoachAnalysisRuns(filter),
     listActivitiesAfter: (after, limit) => listCoachActivityRowsAfter(after, limit),
-    recordRun: (input) => recordCoachAutomationRun(input),
-    updateRun: (id, patch) => updateCoachAutomationRun(id, patch),
+    recordRun: (input) => recordCoachAnalysisRun(input),
+    updateRun: (id, patch) => updateCoachAnalysisRun(id, patch),
     getSessionEntries: (sessionId) => {
       // getChatSession returns [] both for "empty" and "gone", so an empty
       // transcript is confirmed against the session list instead.
@@ -731,9 +710,9 @@ function createDefaultDeps(): CoachAutomationRunnerDeps {
     getContextWindow: () => getContextWindow(),
     rollSummary: (previous, entries, runtime) =>
       // The run's own provider and model (decision 2), not the interactive
-      // chat's. A roll is a turn taken on this automation's behalf: its cost
+      // chat's. A roll is a turn taken on this analysis's behalf: its cost
       // lands on this run's row (13), guard rail 3 pre-flighted *this* provider
-      // and no other, and an automation pointed at a second provider must not
+      // and no other, and an analysis pointed at a second provider must not
       // quietly spend on the first.
       rollTranscriptSummary(previous, entries, {
         runtime,
@@ -775,29 +754,29 @@ function createDefaultDeps(): CoachAutomationRunnerDeps {
       }
     },
     corosAuthenticated: () => getTrainingHubStatus().authenticated,
-    getBudget: () => getCoachAutomationBudget(),
+    getBudget: () => getCoachAnalysisBudget(),
     getMonthToDateTokens: () => {
-      const totals = sumCoachAutomationTokensSince(startOfLocalMonth(new Date()));
+      const totals = sumCoachAnalysisTokensSince(startOfLocalMonth(new Date()));
       return totals.inputTokens + totals.outputTokens;
     },
-    getPause: () => getCoachAutomationPause(),
+    getPause: () => getCoachAnalysisPause(),
     setPause: (pause) => {
-      setCoachAutomationPause(pause);
-      emitAutomationPauseUpdate(pause);
+      setCoachAnalysisPause(pause);
+      emitAnalysisPauseUpdate(pause);
     },
     createCollector: (marker) => createCollectorSink(marker),
     streamChat: (sink, runId, messages, options) =>
       streamChat(sink, runId, messages, options),
-    emitRunUpdate: (run) => emitAutomationRunUpdate(run),
+    emitRunUpdate: (run) => emitAnalysisRunUpdate(run),
     cancelRun: (runId) => cancelChat(runId),
     idleTimeoutMs: AUTOMATION_IDLE_TIMEOUT_MS
   };
 }
 
-let defaultDeps: CoachAutomationRunnerDeps | null = null;
+let defaultDeps: CoachAnalysisRunnerDeps | null = null;
 function resolveDeps(
-  deps?: Partial<CoachAutomationRunnerDeps>
-): CoachAutomationRunnerDeps {
+  deps?: Partial<CoachAnalysisRunnerDeps>
+): CoachAnalysisRunnerDeps {
   defaultDeps ??= createDefaultDeps();
   return deps ? { ...defaultDeps, ...deps } : defaultDeps;
 }
@@ -806,23 +785,20 @@ function resolveDeps(
 // Trigger expansion and the run queue
 // ---------------------------------------------------------------------------
 
-export interface AutomationTriggerEvent {
-  automationId: string;
-  kind: AutomationTriggerKind;
+export interface AnalysisTriggerEvent {
+  analysisId: string;
+  kind: AnalysisTriggerKind;
   payload?: Record<string, unknown>;
-  /** Restricts the fan-out; defaults to every enabled binding. */
-  bindingIds?: string[];
   /**
    * 3.4: a manual run bypasses cooldown, quiet hours and the daily cap, so the
-   * athlete can build confidence in a rule before enabling it.
+   * athlete can build confidence in an analysis before enabling it.
    */
   bypassGuards?: boolean;
 }
 
 interface QueuedRun {
-  binding: CoachAutomationBinding;
-  automation: CoachAutomation;
-  event: AutomationTriggerEvent;
+  analysis: CoachAnalysis;
+  event: AnalysisTriggerEvent;
   /** The single activity this run analyses; absent for non-activity triggers. */
   activity?: CoachActivityRow;
   /** Position in a multi-activity catch-up sequence; 0 is the first run. */
@@ -830,32 +806,34 @@ interface QueuedRun {
 }
 
 /**
- * 2.3: one trigger produces one run per enabled binding, not one run broadcast
- * to many conversations — each conversation carries different history, so the
- * answers legitimately differ. Ordering by session then `sort_order` keeps
- * same-conversation runs serialized and in the order the athlete chose.
+ * A trigger produces runs for **one** analysis, because an analysis is one
+ * place.
+ *
+ * There used to be a fan-out here: a definition was attached to several
+ * conversations and one trigger produced a run in each, ordered by session so
+ * same-conversation runs stayed serialized. An analysis belongs to one
+ * conversation now, so the list is at most one long before the activity
+ * expansion below turns it into a catch-up sequence.
+ *
+ * The trigger kind is still checked. A schedule tick must not run an analysis
+ * whose trigger is an activity filter, and the tick reads the analyses in one
+ * pass rather than one query per kind. A manual run is exempt, as it is from
+ * the guard rails: "run this one now" is the athlete asking, and a manual
+ * analysis has no trigger to match.
  */
 export function expandTriggerToQueue(
-  event: AutomationTriggerEvent,
-  deps?: Partial<CoachAutomationRunnerDeps>
+  event: AnalysisTriggerEvent,
+  deps?: Partial<CoachAnalysisRunnerDeps>
 ): QueuedRun[] {
   const resolved = resolveDeps(deps);
-  const automation = resolved.getAutomation(event.automationId);
-  if (!automation || (!automation.enabled && !event.bypassGuards)) {
+  const analysis = resolved.getAnalysis(event.analysisId);
+  if (!analysis || (!analysis.enabled && !event.bypassGuards)) {
     return [];
   }
-
-  const wanted = event.bindingIds ? new Set(event.bindingIds) : null;
-  return resolved
-    .listBindings(automation.id)
-    .filter((binding) => binding.enabled || event.bypassGuards)
-    .filter((binding) => !wanted || wanted.has(binding.id))
-    .sort(
-      (left, right) =>
-        (left.sessionId ?? "").localeCompare(right.sessionId ?? "") ||
-        left.sortOrder - right.sortOrder
-    )
-    .map((binding) => ({ binding, automation, event, sequenceIndex: 0 }));
+  if (event.kind !== "manual" && analysis.trigger?.kind !== event.kind) {
+    return [];
+  }
+  return [{ analysis, event, sequenceIndex: 0 }];
 }
 
 // One run at a time process-wide (5.4). The provider is the bottleneck anyway,
@@ -881,7 +859,7 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
  * three presses, and the presses in between had nothing to aim at: the runs
  * they were meant to stop had not started, so they had no id yet.
  *
- * The token is the thing the fan-out is stopped by. `runAutomationTrigger`
+ * The token is the thing the fan-out is stopped by. `runAnalysisTrigger`
  * checks it between the steps of its plan, and every run it produces is claimed
  * by it, so Stop on any one of those runs finds the whole trigger — including
  * the run sitting in the process-wide queue behind a stall.
@@ -899,7 +877,7 @@ interface TriggerCancellation {
 const liveTriggers = new Set<TriggerCancellation>();
 
 function createTriggerCancellation(
-  deps: CoachAutomationRunnerDeps
+  deps: CoachAnalysisRunnerDeps
 ): TriggerCancellation {
   const runIds = new Set<string>();
   let stopped = false;
@@ -925,9 +903,9 @@ function createTriggerCancellation(
  * on one run, but what they meant is "stop this" — so the trigger that produced
  * the run is ended, not just the stream it happens to be on.
  */
-export function cancelAutomationRun(
+export function cancelAnalysisRun(
   runId: string,
-  deps?: Partial<CoachAutomationRunnerDeps>
+  deps?: Partial<CoachAnalysisRunnerDeps>
 ): void {
   let owned = false;
   for (const token of liveTriggers) {
@@ -944,21 +922,20 @@ export function cancelAutomationRun(
 }
 
 // ---------------------------------------------------------------------------
-// Running one binding
+// Running one analysis
 // ---------------------------------------------------------------------------
 
 function skip(
   queued: QueuedRun,
-  reason: AutomationSkipReason,
-  deps: CoachAutomationRunnerDeps,
+  reason: AnalysisSkipReason,
+  deps: CoachAnalysisRunnerDeps,
   sessionId?: string,
   /** The reason in words, where the code alone would not say enough. */
   error?: string
-): CoachAutomationRun {
+): CoachAnalysisRun {
   const startedAt = deps.now().toISOString();
   const run = deps.recordRun({
-    automationId: queued.automation.id,
-    bindingId: queued.binding.id,
+    analysisId: queued.analysis.id,
     status: "skipped",
     triggerKind: queued.event.kind,
     skipReason: reason,
@@ -975,10 +952,11 @@ function skip(
 function checkRateGuards(
   queued: QueuedRun,
   sessionId: string | null,
-  deps: CoachAutomationRunnerDeps
-): AutomationSkipReason | null {
-  const { automation, binding, event } = queued;
+  deps: CoachAnalysisRunnerDeps
+): AnalysisSkipReason | null {
+  const { analysis, event } = queued;
   const now = deps.now();
+  const conditions = analysis.conditions;
 
   if (event.bypassGuards) {
     return null;
@@ -987,49 +965,49 @@ function checkRateGuards(
   // Guard rail 4b — the month's ceiling — is *not* here. It reads the same
   // `budget` skip code as the daily cap below, and folding the two into one
   // return value meant the runner could not tell them apart: exhausting one
-  // binding's three runs for the day raised the app-wide pause and held every
-  // other automation the athlete has. It is its own branch in `runOneBinding`,
+  // analysis's three runs for the day raised the app-wide pause and held every
+  // other analysis the athlete has. It is its own branch in `runOneBinding`,
   // which is also where section 4 numbers it.
 
   // Backoff comes first because it outlives the others and explains more: a
-  // binding that is both inside quiet hours and backed off is backed off for a
+  // analysis that is both inside quiet hours and backed off is backed off for a
   // reason the athlete can act on, and the run log should say so.
   //
   // Unlike the cooldown below, this is checked at every step of a catch-up
   // sequence rather than only the first. A failure part-way through a sequence
   // is exactly the storm being prevented, and a `skipped` run ends the sequence
-  // (see `runAutomationTrigger`), so the leftovers ride along with the trigger
+  // (see `runAnalysisTrigger`), so the leftovers ride along with the trigger
   // after the backoff expires.
-  if (binding.backoffUntil && now.getTime() < Date.parse(binding.backoffUntil)) {
+  if (analysis.backoffUntil && now.getTime() < Date.parse(analysis.backoffUntil)) {
     return "backoff";
   }
 
-  if (isWithinQuietHours(now, automation.conditions.quietHours)) {
+  if (isWithinQuietHours(now, conditions.quietHours)) {
     return "quiet-hours";
   }
 
-  // The cooldown governs how often a binding may *react*, not how fast it may
+  // The cooldown governs how often a analysis may *react*, not how fast it may
   // work through the backlog that one reaction uncovered — so it is checked
   // once, on the first run of a multi-activity catch-up sequence.
-  if (binding.lastRunAt && queued.sequenceIndex === 0) {
-    const elapsed = now.getTime() - new Date(binding.lastRunAt).getTime();
-    if (elapsed < minutesToMs(automation.conditions.cooldownMin)) {
+  if (analysis.lastRunAt && queued.sequenceIndex === 0) {
+    const elapsed = now.getTime() - new Date(analysis.lastRunAt).getTime();
+    if (elapsed < minutesToMs(conditions.cooldownMin)) {
       return "cooldown";
     }
   }
 
   const today = deps.listRuns({
-    bindingId: binding.id,
+    analysisId: analysis.id,
     since: startOfLocalDay(now).toISOString(),
     statuses: ["success", "silent", "failed"]
   });
-  if (today.length >= automation.conditions.maxRunsPerDay) {
+  if (today.length >= conditions.maxRunsPerDay) {
     return "budget";
   }
 
   if (sessionId) {
     // Both statuses that write to the transcript, which is what 2.3 is counting
-    // — "five automation messages per conversation per hour". A silent run is
+    // — "five analysis messages per conversation per hour". A silent run is
     // not nothing: it persists 5.5's trace, it took a full provider turn to
     // decide it had nothing to say, and five coaches concluding that in the
     // same hour is exactly the wall of chips the guard exists to stop. It is
@@ -1050,28 +1028,28 @@ function checkRateGuards(
 /**
  * Section 10's backoff, applied to whatever the run turned out to be.
  *
- * A failure steps the binding through `AUTOMATION_BACKOFF_STEPS_MS` and stays
+ * A failure steps the analysis through `AUTOMATION_BACKOFF_STEPS_MS` and stays
  * on the last one; anything that reached the provider and did not fail clears
  * the streak. A *skip* does neither, and that is deliberate rather than an
  * omission: a skip never got as far as the provider, so it says nothing about
  * whether the provider is alive — and a `backoff` skip clearing the backoff
  * would be a guard rail that switches itself off on its first use.
  *
- * `binding` is the row as it stood when the run started, which is the right
+ * `analysis` is the row as it stood when the run started, which is the right
  * base: runs are serialised process-wide (5.4), so nothing else can have
- * touched this binding's streak in between.
+ * touched this analysis's streak in between.
  */
 function applyBackoff(
-  binding: CoachAutomationBinding,
-  status: CoachAutomationRun["status"] | undefined,
-  deps: CoachAutomationRunnerDeps
+  analysis: CoachAnalysis,
+  status: CoachAnalysisRun["status"] | undefined,
+  deps: CoachAnalysisRunnerDeps
 ): void {
   if (status === "failed") {
     const level = Math.min(
-      (binding.backoffLevel ?? 0) + 1,
+      (analysis.backoffLevel ?? 0) + 1,
       AUTOMATION_BACKOFF_STEPS_MS.length
     );
-    deps.setBindingSchedule(binding.id, {
+    deps.setAnalysisSchedule(analysis.id, {
       backoffLevel: level,
       backoffUntil: new Date(
         deps.now().getTime() + AUTOMATION_BACKOFF_STEPS_MS[level - 1]
@@ -1082,83 +1060,56 @@ function applyBackoff(
   if (status !== "success" && status !== "silent" && status !== "cancelled") {
     return;
   }
-  // Nothing is written for a binding that had no streak to clear: a healthy
-  // automation must not rewrite its own row on every run.
-  if (binding.backoffLevel === undefined && binding.backoffUntil === undefined) {
+  // Nothing is written for a analysis that had no streak to clear: a healthy
+  // analysis must not rewrite its own row on every run.
+  if (analysis.backoffLevel === undefined && analysis.backoffUntil === undefined) {
     return;
   }
-  deps.setBindingSchedule(binding.id, { backoffLevel: 0, backoffUntil: null });
+  deps.setAnalysisSchedule(analysis.id, { backoffLevel: 0, backoffUntil: null });
 }
 
 /**
- * Where a run will write, resolved in two halves. Only the *check* happens at
- * guard rail 2; the conversation itself is created after every guard has
- * passed, because a `per-run` binding that creates its conversation up front
- * would leave an empty thread behind on every cooldown, quiet-hour or offline
- * skip — and the activity watcher polls every 15 minutes.
+ * Where a run will write.
+ *
+ * This used to be resolved in two halves — check the target at guard rail 2,
+ * create the conversation only after every other guard had passed — because a
+ * `per-run` analysis that made its conversation up front left an empty thread
+ * behind on every cooldown, quiet-hour or offline skip, and the activity
+ * watcher polls every 15 minutes. Nothing creates a conversation any more: an
+ * analysis names one the athlete opened, so the target either exists or the
+ * run does not happen. The two halves collapse into one read.
  */
-type SessionTarget =
-  | { kind: "existing"; sessionId: string; entries: PersistedChatEntry[] }
-  /** A conversation this binding still has to create. */
-  | { kind: "create" };
+type SessionTarget = {
+  sessionId: string;
+  entries: PersistedChatEntry[];
+};
 
 /**
- * Guard rail 2 / 2.4. A `dedicated` binding rebuilds its conversation when the
- * athlete deleted it; an `existing` one is disabled instead, because only the
- * athlete knows which thread it should point at now.
+ * Guard rail 2. The conversation an analysis names is normally deleted
+ * *with* the analysis (`applyAnalysisSessionDeleted`), so reaching this with
+ * nothing there means the two got out of step — a merge from another machine
+ * that carried the analysis but not the deletion, most likely. The
+ * analysis is switched off rather than removed: a delete on a read that
+ * might be a race is the one mistake with no way back.
  */
 function checkSessionTarget(
   queued: QueuedRun,
-  deps: CoachAutomationRunnerDeps
-): { ok: true; target: SessionTarget } | { ok: false; reason: AutomationSkipReason } {
-  const { binding } = queued;
+  deps: CoachAnalysisRunnerDeps
+): { ok: true; target: SessionTarget } | { ok: false; reason: AnalysisSkipReason } {
+  const { analysis } = queued;
 
-  if (binding.mode === "per-run") {
-    return { ok: true, target: { kind: "create" } };
-  }
-
-  const entries = binding.sessionId
-    ? deps.getSessionEntries(binding.sessionId)
+  const entries = analysis.sessionId
+    ? deps.getSessionEntries(analysis.sessionId)
     : undefined;
   if (entries) {
     return {
       ok: true,
-      target: { kind: "existing", sessionId: binding.sessionId as string, entries }
+      target: { sessionId: analysis.sessionId, entries }
     };
   }
 
-  if (binding.mode === "dedicated") {
-    return { ok: true, target: { kind: "create" } };
-  }
-
-  deps.setBindingEnabled(binding.id, false);
+  deps.setAnalysisEnabled(analysis.id, false);
   return { ok: false, reason: "missing-session" };
-}
-
-/** Creates and names the conversation a "create" target asked for. */
-function createTargetSession(
-  queued: QueuedRun,
-  deps: CoachAutomationRunnerDeps
-): string {
-  const { automation, binding } = queued;
-  const provider = automation.runtime.provider ?? deps.getChatProvider();
-  const sessionId = deps.createSession(provider);
-
-  if (binding.mode === "per-run") {
-    const vars = templateVars(queued, deps);
-    const title = binding.titleTemplate
-      ? renderAutomationTemplate(binding.titleTemplate, vars)
-      : `${automation.name} · ${vars.date}`;
-    if (title) {
-      deps.setSessionTitle(sessionId, title);
-    }
-    return sessionId;
-  }
-
-  // A dedicated binding owns its conversation, so it adopts the rebuilt one.
-  deps.setSessionTitle(sessionId, automation.name);
-  deps.setBindingSession(binding.id, sessionId);
-  return sessionId;
 }
 
 function asText(value: unknown): string | undefined {
@@ -1170,7 +1121,7 @@ function asText(value: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * 5.7 shipped as automation-only and is no longer: the interactive chat rolls
+ * 5.7 shipped as analysis-only and is no longer: the interactive chat rolls
  * the same summary, through the same window, on the same conversation row. The
  * mechanism moved to [chatContextCompaction.ts](./chatContextCompaction.ts) and
  * the numbers moved to chat settings; these two are what an athlete who has
@@ -1190,11 +1141,11 @@ export {
 /** The 2.5 variables, resolved once from the run's own trigger payload. */
 function templateVars(
   queued: QueuedRun,
-  deps: CoachAutomationRunnerDeps
-): AutomationTemplateVars {
+  deps: CoachAnalysisRunnerDeps
+): AnalysisTemplateVars {
   const now = deps.now();
   return {
-    rule: { name: queued.automation.name },
+    rule: { name: queued.analysis.name },
     date: isoDate(now),
     week: { range: weekRange(now) },
     activity: {
@@ -1219,10 +1170,10 @@ function describeActivity(activity: CoachActivityRow): string {
 
 function buildPlaybookTurn(
   queued: QueuedRun,
-  deps: CoachAutomationRunnerDeps
+  deps: CoachAnalysisRunnerDeps
 ): string {
-  const body = renderAutomationTemplate(
-    queued.automation.playbook,
+  const body = renderAnalysisTemplate(
+    queued.analysis.playbook,
     templateVars(queued, deps)
   );
   // A catch-up sequence sends the same playbook once per activity, so each run
@@ -1258,25 +1209,24 @@ export const AUTOMATION_IDLE_TIMEOUT_MS = 3 * 60_000;
  */
 async function runOneBinding(
   queued: QueuedRun,
-  deps?: Partial<CoachAutomationRunnerDeps>,
+  deps?: Partial<CoachAnalysisRunnerDeps>,
   cancellation?: TriggerCancellation
-): Promise<CoachAutomationRun | null> {
+): Promise<CoachAnalysisRun | null> {
   const resolved = resolveDeps(deps);
-  const { automation, event } = queued;
+  const { event } = queued;
 
   if (cancellation?.cancelled()) {
     return null;
   }
 
-  // The binding was snapshotted when the trigger fanned out, and a catch-up
+  // The analysis was snapshotted when the trigger was expanded, and a catch-up
   // sequence writes to it between runs (its clock, its activity watermark), so
   // every guard below has to read the row as it stands now.
-  const binding = resolved.getBinding(queued.binding.id) ?? queued.binding;
-  const step: QueuedRun = { ...queued, binding };
+  const analysis = resolved.getAnalysis(queued.analysis.id) ?? queued.analysis;
+  const step: QueuedRun = { ...queued, analysis };
 
-  // 1. Both switches still on — they may have flipped between queue and run.
-  const current = resolved.getAutomation(automation.id);
-  if (!event.bypassGuards && (!current?.enabled || !binding.enabled)) {
+  // 1. Still switched on — it may have flipped between queue and run.
+  if (!event.bypassGuards && !analysis.enabled) {
     return skip(step, "disabled", resolved);
   }
 
@@ -1285,18 +1235,17 @@ async function runOneBinding(
   if (!checked.ok) {
     return skip(step, checked.reason, resolved);
   }
-  const knownSessionId =
-    checked.target.kind === "existing" ? checked.target.sessionId : undefined;
+  const knownSessionId = checked.target.sessionId;
 
   // 2b. This activity is still owed. Two triggers can fan out from the same
   // watermark before either runs — a poll and a "Run now" seconds apart — and
-  // the plan is built outside the run queue. The binding was re-read above, so
+  // the plan is built outside the run queue. The analysis was re-read above, so
   // the check costs nothing and stops the same activity being analysed twice
   // into the same conversation.
   if (
     step.activity?.start_time != null &&
-    binding.lastActivityAt !== undefined &&
-    step.activity.start_time <= binding.lastActivityAt
+    analysis.lastActivityAt !== undefined &&
+    step.activity.start_time <= analysis.lastActivityAt
   ) {
     return skip(step, "no-activity", resolved, knownSessionId);
   }
@@ -1305,7 +1254,7 @@ async function runOneBinding(
   // The verdict's reason rides along on the row: "not signed in" is the common
   // case but not the only one, and a run log that cannot tell a missing API key
   // from a missing CLI sends the athlete to the wrong screen.
-  const provider = automation.runtime.provider ?? resolved.getChatProvider();
+  const provider = analysis.runtime.provider ?? resolved.getChatProvider();
   const auth = resolved.checkProviderAuth(provider);
   if (!auth.ok) {
     return skip(step, "no-auth", resolved, knownSessionId, auth.reason);
@@ -1318,8 +1267,8 @@ async function runOneBinding(
       return skip(step, "offline", resolved, knownSessionId);
     }
     // One skip explains it, and the pause is what stops the next fifteen from
-    // repeating it (10). *Every* automation is held, not this binding: what has
-    // to happen is one login code, and no binding can supply it.
+    // repeating it (10). *Every* analysis is held, not this analysis: what has
+    // to happen is one login code, and no analysis can supply it.
     const held = skip(step, "two-factor-required", resolved, knownSessionId);
     resolved.setPause({
       reason: "two-factor-required",
@@ -1344,9 +1293,9 @@ async function runOneBinding(
 
   // 4b. The month's allowance (13). Its own branch rather than one more rate
   // guard, because it is the only refusal here that is not a fact about this
-  // binding: it is one fact about every automation the athlete has, so it
+  // analysis: it is one fact about every analysis the athlete has, so it
   // raises the pause the same way section 10's 2FA demand does, and one skip
-  // per binding per poll until the 1st is the run log that already learned not
+  // per analysis per poll until the 1st is the run log that already learned not
   // to fill.
   if (!event.bypassGuards && overBudget(resolved)) {
     const declined = skip(
@@ -1365,11 +1314,11 @@ async function runOneBinding(
   }
 
   // 5-8. Rate guards. A conversation that does not exist yet cannot be busy,
-  // so the burst guard only applies to one the binding already writes into.
+  // so the burst guard only applies to one the analysis already writes into.
   //
   // Guard 7 shares the `budget` code with 4b above and nothing else: it is this
-  // binding's own three-runs-a-day, it clears at midnight without the athlete
-  // doing anything, and it says nothing about the other automations. The reason
+  // analysis's own three-runs-a-day, it clears at midnight without the athlete
+  // doing anything, and it says nothing about the other analyses. The reason
   // in words is what keeps the run log able to tell the two apart.
   const rateSkip = checkRateGuards(step, knownSessionId ?? null, resolved);
   if (rateSkip) {
@@ -1379,20 +1328,12 @@ async function runOneBinding(
       resolved,
       knownSessionId,
       rateSkip === "budget"
-        ? `This coach has already run ${automation.conditions.maxRunsPerDay} times here today.`
+        ? `This analysis has already run ${analysis.conditions.maxRunsPerDay} times here today.`
         : undefined
     );
   }
 
-  // Every guard passed: only now is it worth putting a conversation on disk.
-  const session =
-    checked.target.kind === "existing"
-      ? checked.target
-      : {
-          kind: "existing" as const,
-          sessionId: createTargetSession(step, resolved),
-          entries: [] as PersistedChatEntry[]
-        };
+  const session = checked.target;
 
   // 5.7: a year-old briefing thread must still cost one turn. Done here, while
   // the run is still being prepared, so the mid-preparation Stop check below
@@ -1405,7 +1346,7 @@ async function runOneBinding(
       resolved.rollSummary(
         previous,
         toSummarise,
-        resolveAutomationRuntime(automation)
+        resolveAnalysisRuntime(analysis)
       ),
     store: (rolled, through) =>
       resolved.setSessionSummary(session.sessionId, rolled, through)
@@ -1428,11 +1369,10 @@ async function runOneBinding(
 
   // Section 7's default is resolved once, here, so the run log records what the
   // run actually used rather than what the definition happened to leave blank.
-  const runtime = resolveAutomationRuntime(automation);
+  const runtime = resolveAnalysisRuntime(analysis);
   const startedAt = resolved.now().toISOString();
   let run = resolved.recordRun({
-    automationId: automation.id,
-    bindingId: binding.id,
+    analysisId: analysis.id,
     status: "running",
     triggerKind: event.kind,
     sessionId: session.sessionId,
@@ -1440,18 +1380,25 @@ async function runOneBinding(
     ...(runtime.effort ? { effort: runtime.effort } : {}),
     ...(event.payload ? { triggerPayload: event.payload } : {}),
     startedAt
-  } as Omit<CoachAutomationRun, "id" | "startedAt">);
+  } as Omit<CoachAnalysisRun, "id" | "startedAt">);
   // The run now has an id, which is the only thing Stop can aim at. Claiming it
   // is what turns a Stop on this run into a Stop on the whole trigger.
   cancellation?.claim(run.id);
   resolved.emitRunUpdate(run);
 
-  const marker: ChatEntryAutomationMarker = {
+  // `automationId` is the marker's *stored* key name, not a rename that was
+  // missed: every transcript entry an athlete already has spells it that way,
+  // and renaming it would cost historical runs their attribution.
+  //
+  // `bindingId` is deliberately absent. It named the attachment, which no
+  // longer exists — writing the analysis id into it as well would be a second
+  // copy of the same value that the next reader has to work out is redundant.
+  // Entries that already carry one still parse; see `ChatEntryAnalysisMarker`.
+  const marker: ChatEntryAnalysisMarker = {
     runId: run.id,
-    automationId: automation.id,
-    bindingId: binding.id,
-    name: automation.name,
-    triggerLabel: triggerLabel(automation)
+    automationId: analysis.id,
+    name: analysis.name,
+    triggerLabel: triggerLabel(analysis.trigger)
   };
 
   const playbook = buildPlaybookTurn(step, resolved);
@@ -1460,20 +1407,20 @@ async function runOneBinding(
   const sink = createTeeSink(collector, watchdog.touch);
 
   const finish = (
-    patch: Partial<Omit<CoachAutomationRun, "id" | "automationId" | "bindingId">>,
+    patch: Partial<Omit<CoachAnalysisRun, "id" | "analysisId" | "analysisId">>,
     /**
      * False for the one exit taken before the provider was ever called. The
      * backoff is a claim about the provider, and a run that did not reach it
      * has nothing to say either way — least of all "it is healthy again".
      */
     reachedProvider = true
-  ): CoachAutomationRun => {
+  ): CoachAnalysisRun => {
     // Every other way out of this run goes through here, which is what makes
     // the backoff cover the timeout as well as the throw — the two paths
     // section 10 says must behave alike, and the two that leave the other
     // clocks alone.
     if (reachedProvider) {
-      applyBackoff(binding, patch.status, resolved);
+      applyBackoff(analysis, patch.status, resolved);
     }
     const finished =
       resolved.updateRun(run.id, {
@@ -1487,7 +1434,7 @@ async function runOneBinding(
   // Stop may have landed while the COROS check above was in flight. The run row
   // exists by now, so it is finished rather than dropped — but nothing was ever
   // asked of the provider, so this must not clear a backoff streak: an athlete
-  // pressing Stop would otherwise reset the hold on a binding that is failing.
+  // pressing Stop would otherwise reset the hold on a analysis that is failing.
   if (cancellation?.cancelled()) {
     // Nothing was asked of the model, but a roll on the way in may already have
     // spent — and it is spent whether or not this run got anywhere.
@@ -1507,7 +1454,7 @@ async function runOneBinding(
       {
         runtime,
         toolPolicy: "read-only",
-        ...(automation.role ? { roleInstructions: automation.role } : {})
+        ...(analysis.role ? { roleInstructions: analysis.role } : {})
       }
     );
     // Nothing awaits the stream once the watchdog has won the race, so a
@@ -1523,7 +1470,7 @@ async function runOneBinding(
   } catch (error) {
     return finish({
       status: "failed",
-      error: error instanceof Error ? error.message : "Automation run failed.",
+      error: error instanceof Error ? error.message : "Analysis run failed.",
       ...costOf(collector.usage())
     });
   } finally {
@@ -1545,9 +1492,9 @@ async function runOneBinding(
     });
   }
 
-  // The binding's own clock advances for every attempt that reached the
-  // provider, so a failing automation still respects its cooldown.
-  resolved.setBindingSchedule(binding.id, {
+  // The analysis's own clock advances for every attempt that reached the
+  // provider, so a failing analysis still respects its cooldown.
+  resolved.setAnalysisSchedule(analysis.id, {
     lastRunAt: resolved.now().toISOString()
   });
 
@@ -1576,7 +1523,7 @@ async function runOneBinding(
     return finish({ status: "cancelled", ...cost });
   }
 
-  // The binding's watermark moves only once the model has actually looked at
+  // The analysis's watermark moves only once the model has actually looked at
   // the activity *and* what it said is on disk. A failed or cancelled run
   // leaves it where it was, so the activity comes back with the next trigger
   // instead of being lost — and so does a run whose persistence threw, which
@@ -1585,7 +1532,7 @@ async function runOneBinding(
   // was never written, and the activity was gone for good.
   const advanceWatermark = (): void => {
     if (step.activity?.start_time) {
-      resolved.setBindingSchedule(binding.id, {
+      resolved.setAnalysisSchedule(analysis.id, {
         lastActivityAt: step.activity.start_time
       });
     }
@@ -1605,12 +1552,12 @@ async function runOneBinding(
   // saying `running` until the next launch reconciled it. Meanwhile the
   // watermark had already moved, so the activity was gone for good.
   try {
-    const output = parseAutomationOutput(collector.text());
+    const output = parseAnalysisOutput(collector.text());
     if (output.silent) {
       // The answer itself is a control token the athlete must never read, so
       // nothing the model wrote is persisted. What lands instead is a one-line
       // trace saying the coach looked (5.5): a conversation that keeps no
-      // record of a run reads as a broken automation rather than as a
+      // record of a run reads as a broken analysis rather than as a
       // considered "no".
       resolved.saveSession(session.sessionId, [
         ...readBack(),
@@ -1683,54 +1630,54 @@ function createTeeSink(
 // ---------------------------------------------------------------------------
 
 /**
- * One binding's share of a trigger, expanded into the runs it actually owes.
+ * One analysis's share of a trigger, expanded into the runs it actually owes.
  * A non-activity trigger is a single run, unchanged; an activity trigger turns
  * into one run per pending activity, oldest first, each naming its own subject.
  */
-function planBindingRuns(
+function planAnalysisRuns(
   queued: QueuedRun,
-  deps: CoachAutomationRunnerDeps
+  deps: CoachAnalysisRunnerDeps
 ): QueuedRun[] {
-  if (queued.automation.trigger.kind !== "activity") {
+  const trigger = queued.analysis.trigger;
+  if (!trigger || trigger.kind !== "activity") {
     return [queued];
   }
-  return selectActivitiesForBinding(
-    queued.automation,
-    queued.binding,
-    queued.event,
-    deps
-  ).map((activity, index) => ({
-    ...queued,
-    activity,
-    sequenceIndex: index,
-    event: {
-      ...queued.event,
-      payload: {
-        ...queued.event.payload,
-        activityIds: [activity.activity_id],
-        activityCount: 1,
-        ...(activity.name ? { activityName: activity.name } : {}),
-        ...(activity.sport_name ? { activitySport: activity.sport_name } : {}),
-        ...(activity.start_time ? { activityStartTime: activity.start_time } : {})
+  return selectActivitiesForAnalysis(queued.analysis, queued.event, deps).map(
+    (activity, index) => ({
+      ...queued,
+      activity,
+      sequenceIndex: index,
+      event: {
+        ...queued.event,
+        payload: {
+          ...queued.event.payload,
+          activityIds: [activity.activity_id],
+          activityCount: 1,
+          ...(activity.name ? { activityName: activity.name } : {}),
+          ...(activity.sport_name ? { activitySport: activity.sport_name } : {}),
+          ...(activity.start_time
+            ? { activityStartTime: activity.start_time }
+            : {})
+        }
       }
-    }
-  }));
+    })
+  );
 }
 
 /**
  * Section 10's pause, read at the gate rather than as a guard rail.
  *
  * The other guard rails record a `skipped` run each, which is right for them —
- * a cooldown or a quiet hour is a fact about *that* binding and the log is
+ * a cooldown or a quiet hour is a fact about *that* analysis and the log is
  * where the athlete reads it. This one is not: it is the same fact about all of
- * them, and recording it per binding per poll is precisely the run log full of
+ * them, and recording it per analysis per poll is precisely the run log full of
  * identical `two-factor-required` rows that the pause exists to stop. So a held
  * trigger produces no runs and logs nothing. The one row that *did* get
  * recorded — the run that tripped it — is what the banner points at.
  */
 function pauseHolds(
-  event: AutomationTriggerEvent,
-  deps: CoachAutomationRunnerDeps
+  event: AnalysisTriggerEvent,
+  deps: CoachAnalysisRunnerDeps
 ): boolean {
   const pause = deps.getPause();
   if (!pause) {
@@ -1760,56 +1707,56 @@ function pauseHolds(
 }
 
 /**
- * Fans a trigger out and runs every resulting binding, one at a time.
+ * Fans a trigger out and runs every resulting analysis, one at a time.
  *
  * The whole fan-out is one cancellable unit (10). Stop on any run this produces
  * ends the rest of it, which is what the athlete meant by pressing it, and what
  * three separate presses used to be needed for.
  */
-export async function runAutomationTrigger(
-  event: AutomationTriggerEvent,
-  deps?: Partial<CoachAutomationRunnerDeps>
-): Promise<CoachAutomationRun[]> {
+export async function runAnalysisTrigger(
+  event: AnalysisTriggerEvent,
+  deps?: Partial<CoachAnalysisRunnerDeps>
+): Promise<CoachAnalysisRun[]> {
   const resolved = resolveDeps(deps);
   if (pauseHolds(event, resolved)) {
     return [];
   }
   const cancellation = createTriggerCancellation(resolved);
   liveTriggers.add(cancellation);
-  const runs: CoachAutomationRun[] = [];
+  const runs: CoachAnalysisRun[] = [];
   let stopped = false;
   try {
     for (const queued of expandTriggerToQueue(event, deps)) {
       // A shortcut, not the guard: the token is read at the top of every step
       // (see `runOneBinding`), which is what covers a step already queued
       // behind a stall. This only stops the fan-out queueing one dead step per
-      // remaining binding on the way out.
+      // remaining analysis on the way out.
       if (stopped) {
         break;
       }
-      const plan = planBindingRuns(queued, resolved);
+      const plan = planAnalysisRuns(queued, resolved);
 
       if (!plan.length) {
-        // Activity-driven, with nothing new since this binding's watermark. A
+        // Activity-driven, with nothing new since this analysis's watermark. A
         // manual run records the skip so the UI can say so out loud; the
         // 15-minute poll stays quiet rather than filling the log with
         // non-events.
         if (event.kind === "manual") {
           runs.push(
-            skip(queued, "no-activity", resolved, queued.binding.sessionId ?? undefined)
+            skip(queued, "no-activity", resolved, queued.analysis.sessionId ?? undefined)
           );
         }
         continue;
       }
 
       for (const step of plan) {
-        let run: CoachAutomationRun | null;
+        let run: CoachAnalysisRun | null;
         try {
           // The lease is taken inside `enqueue`, not around it: acquiring it
           // before the step reaches the front of the queue would hold the lock
           // across the wait and keep the other machines idle for no reason.
           const outcome = await enqueue(() =>
-            runExclusively(step.automation.id, () =>
+            runExclusively(step.analysis.id, () =>
               runOneBinding(step, deps, cancellation)
             )
           );
@@ -1821,7 +1768,7 @@ export async function runAutomationTrigger(
                 queued,
                 "another-device",
                 resolved,
-                queued.binding.sessionId ?? undefined,
+                queued.analysis.sessionId ?? undefined,
                 `Running on ${outcome.holder ?? "another device"}.`
               )
             );
@@ -1829,20 +1776,19 @@ export async function runAutomationTrigger(
           }
           run = outcome.result;
         } catch (error) {
-          // One binding blowing up must not starve the rest of the fan-out, and
+          // One analysis blowing up must not starve the rest of the fan-out, and
           // the failure still has to be visible in the run log — and count
-          // against the binding's backoff, like any other failure.
+          // against the analysis's backoff, like any other failure.
           const failedAt = resolved.now().toISOString();
           run = resolved.recordRun({
-            automationId: step.automation.id,
-            bindingId: step.binding.id,
+            analysisId: step.analysis.id,
             status: "failed",
             triggerKind: event.kind,
-            error: error instanceof Error ? error.message : "Automation run failed.",
+            error: error instanceof Error ? error.message : "Analysis run failed.",
             finishedAt: failedAt
-          } as Omit<CoachAutomationRun, "id" | "startedAt">);
+          } as Omit<CoachAnalysisRun, "id" | "startedAt">);
           applyBackoff(
-            resolved.getBinding(step.binding.id) ?? step.binding,
+            resolved.getAnalysis(step.analysis.id) ?? step.analysis,
             "failed",
             resolved
           );
@@ -1866,10 +1812,10 @@ export async function runAutomationTrigger(
         // Every remaining place in this fan-out would get the same answer, and
         // the pause this run just set means the next poll will not even ask —
         // so the log carries the one row that explains it rather than one per
-        // binding.
+        // analysis.
         //
         // Asked of the pause rather than of the skip code: guard 7's daily cap
-        // records `budget` too, and it is a fact about one binding that must
+        // records `budget` too, and it is a fact about one analysis that must
         // not silence the other places this trigger was going to reach. The
         // pause naming *this* run is the only thing that means "and everything
         // after it would say the same".
@@ -1894,14 +1840,14 @@ export async function runAutomationTrigger(
 }
 
 
-export function getAutomationSpend(): CoachAutomationSpend {
+export function getAnalysisSpend(): CoachAnalysisSpend {
   const monthStart = startOfLocalMonth(new Date());
-  const totals = sumCoachAutomationTokensSince(monthStart);
+  const totals = sumCoachAnalysisTokensSince(monthStart);
   return {
     monthStart,
     inputTokens: totals.inputTokens,
     outputTokens: totals.outputTokens,
-    budget: getCoachAutomationBudget(),
+    budget: getCoachAnalysisBudget(),
     countedRuns: totals.countedRuns,
     providerRuns: totals.providerRuns
   };
@@ -1912,15 +1858,15 @@ export function getAutomationSpend(): CoachAutomationSpend {
  * clearing it) removes the reason, and the gate notices on the next trigger.
  * Lowering it below what is already spent pauses at the next trigger instead.
  */
-export function setAutomationBudget(budget: number | null): CoachAutomationSpend {
-  setCoachAutomationBudget(budget);
-  return getAutomationSpend();
+export function setAnalysisBudget(budget: number | null): CoachAnalysisSpend {
+  setCoachAnalysisBudget(budget);
+  return getAnalysisSpend();
 }
 
 /** What the banner reads on mount, before any push has happened. */
-export function getAutomationPause(
-  deps?: Partial<CoachAutomationRunnerDeps>
-): CoachAutomationPause | null {
+export function getAnalysisPause(
+  deps?: Partial<CoachAnalysisRunnerDeps>
+): CoachAnalysisPause | null {
   return resolveDeps(deps).getPause();
 }
 
@@ -1931,32 +1877,26 @@ export function getAutomationPause(
  * therefore means *try again*, which is the only thing a button here can
  * honestly promise.
  */
-export function resumeAutomations(
-  deps?: Partial<CoachAutomationRunnerDeps>
-): CoachAutomationPause | null {
+export function resumeAnalyses(
+  deps?: Partial<CoachAnalysisRunnerDeps>
+): CoachAnalysisPause | null {
   resolveDeps(deps).setPause(null);
   return null;
 }
 
 /** 3.4 "Run now": bypasses cooldown, quiet hours and the daily cap. */
-export function runAutomationNow(
-  automationId: string,
-  bindingIds?: string[],
-  deps?: Partial<CoachAutomationRunnerDeps>
-): Promise<CoachAutomationRun[]> {
-  return runAutomationTrigger(
-    {
-      automationId,
-      kind: "manual",
-      bypassGuards: true,
-      ...(bindingIds ? { bindingIds } : {})
-    },
+export function runAnalysisNow(
+  analysisId: string,
+  deps?: Partial<CoachAnalysisRunnerDeps>
+): Promise<CoachAnalysisRun[]> {
+  return runAnalysisTrigger(
+    { analysisId, kind: "manual", bypassGuards: true },
     deps
   );
 }
 
 /** Test seam: resets the process-wide queue and live tokens between scenarios. */
-export function resetAutomationQueueForTests(): void {
+export function resetAnalysisQueueForTests(): void {
   queueTail = Promise.resolve();
   liveTriggers.clear();
 }

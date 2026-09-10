@@ -1,4 +1,4 @@
-import type { AutomationTrigger } from "./types";
+import type { AnalysisTrigger } from "./types";
 
 /**
  * The four threshold metrics of 3.3, as pure functions over locally cached
@@ -278,7 +278,7 @@ export function isSleepDebt(
 
 /** Whether a threshold trigger's condition holds right now. */
 export function evaluateThresholdTrigger(
-  trigger: Extract<AutomationTrigger, { kind: "threshold" }>,
+  trigger: Extract<AnalysisTrigger, { kind: "threshold" }>,
   now: Date,
   snapshot: ThresholdSnapshot
 ): boolean {

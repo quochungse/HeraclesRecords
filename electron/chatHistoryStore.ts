@@ -14,7 +14,7 @@ import type {
   ActivityVisualChannelSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
-  ChatEntryAutomationMarker,
+  ChatEntryAnalysisMarker,
   ChatProvider,
   ChatSessionSummary,
   CoachInputChoice,
@@ -753,11 +753,11 @@ function parseHrZonePreview(value: unknown): HrZonePreview | null {
 /**
  * Attribution is rebuilt field by field like everything else here: a marker
  * missing any of its five fields is dropped rather than half-restored, so the
- * UI never renders an automation chip it cannot attribute.
+ * UI never renders an analysis chip it cannot attribute.
  */
-function parseAutomationMarker(
+function parseAnalysisMarker(
   value: unknown
-): ChatEntryAutomationMarker | undefined {
+): ChatEntryAnalysisMarker | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
@@ -771,7 +771,7 @@ function parseAutomationMarker(
     }
     marker[field] = entry;
   }
-  return marker as unknown as ChatEntryAutomationMarker;
+  return marker as unknown as ChatEntryAnalysisMarker;
 }
 
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
@@ -790,7 +790,7 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
     typeof value.reasoningSummary === "string" && value.reasoningSummary.trim()
       ? value.reasoningSummary
       : undefined;
-  const automation = parseAutomationMarker(value.automation);
+  const automation = parseAnalysisMarker(value.automation);
   return {
     kind: "message",
     role,
@@ -848,7 +848,7 @@ function parseEntry(value: unknown): PersistedChatEntry | null {
     // when; a chip that can answer neither is not worth restoring, and this
     // entry is only ever written by the runner, so half of one means the row
     // came from somewhere unexpected.
-    const automation = parseAutomationMarker(value.automation);
+    const automation = parseAnalysisMarker(value.automation);
     const at =
       typeof value.at === "number" && Number.isFinite(value.at)
         ? value.at
@@ -1055,7 +1055,7 @@ export function createChatSession(
 
 /**
  * The entries a save would silently destroy: everything the row holds past the
- * point the caller knows about. Position is the whole test — the automation
+ * point the caller knows about. Position is the whole test — the analysis
  * runner only ever appends, so a foreign write is always a tail.
  *
  * A caller that knows nothing (0) therefore keeps everything, which is the
@@ -1146,7 +1146,7 @@ export function setChatSessionPinned(
  * Renames a conversation. Automations need this for both the `dedicated`
  * conversation they create up front and the `titleTemplate` of a `per-run`
  * binding: `saveChatSession` only ever derives a title while the stored one is
- * still the default, which would otherwise name an automation's conversation
+ * still the default, which would otherwise name an analysis's conversation
  * after its own playbook text.
  *
  * Renaming deliberately leaves `updatedAt` alone so it does not jump the
@@ -1174,7 +1174,7 @@ export function setChatSessionTitle(
 
 /**
  * Whether the conversation row still exists. `getChatSession` returns `[]` for
- * both an empty transcript and a deleted one, which an automation binding has
+ * both an empty transcript and a deleted one, which an analysis has
  * to tell apart (2.4).
  */
 export function chatSessionExists(

@@ -1,6 +1,6 @@
 import type {
   ActivityVisualPreview,
-  ChatEntryAutomationMarker,
+  ChatEntryAnalysisMarker,
   ChatMessage,
   CoachInputPrompt,
   FitnessTrendPreview,
@@ -26,13 +26,14 @@ export interface ChatMessageEntry {
   source?: SourceInfo;
   reasoningSummary?: string;
   /**
-   * Set when a coach automation wrote this entry. Both converters below have to
+   * Set when an analysis wrote this entry. The key keeps its stored spelling —
+   * see `ChatEntryAnalysisMarker`. Both converters below have to
    * carry it: they rebuild entries field by field, so an unlisted field is
    * dropped — and `toPersistedEntries` runs whenever the athlete replies in the
    * conversation, which would silently strip attribution off the run's own
    * messages.
    */
-  automation?: ChatEntryAutomationMarker;
+  automation?: ChatEntryAnalysisMarker;
 }
 
 export interface ChatPlanDraftEntry {
@@ -65,10 +66,10 @@ export interface ChatHrZoneEntry {
   preview: HrZonePreview;
 }
 
-/** An automation looked and found nothing worth saying (5.5). */
-export interface ChatAutomationSilentEntry {
+/** An analysis looked and found nothing worth saying (5.5). */
+export interface ChatAnalysisSilentEntry {
   kind: "automationSilent";
-  automation: ChatEntryAutomationMarker;
+  automation: ChatEntryAnalysisMarker;
   /** Epoch milliseconds. */
   at: number;
 }
@@ -86,7 +87,7 @@ export type ChatEntry =
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
   | ChatHrZoneEntry
-  | ChatAutomationSilentEntry
+  | ChatAnalysisSilentEntry
   | ChatToolNoticeEntry;
 
 export function isChatVisualEntry(
@@ -206,7 +207,7 @@ export function upsertHrZoneEntry(
  * has to count the same ones the main process stored. Two functions that
  * flattened two nearly-identical shapes had already drifted apart: this one
  * expanded a `coachPrompt` into the question and its answer, the main-process
- * one dropped it, and an automation therefore could not see what it had asked.
+ * one dropped it, and an analysis therefore could not see what it had asked.
  */
 
 function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {

@@ -5,7 +5,7 @@ import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { deleteSettings, getSetting, setSetting } from "./database";
-import { applyCoachAutomationSessionDeleted } from "./coachAutomationStore";
+import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
   getTrainingHubStatus,
@@ -98,11 +98,11 @@ import {
 } from "./chatHistoryStore";
 import type {
   ActivityVisualPreview,
-  AutomationRuntime,
+  AnalysisRuntime,
   AnthropicApiConfig,
   AnthropicApiConnectionTest,
   ChatAuthStatus,
-  ChatEntryAutomationMarker,
+  ChatEntryAnalysisMarker,
   ChatSettings,
   ChatProvider,
   ChatTokenUsage,
@@ -462,11 +462,10 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
 
 export function deleteChatSessionById(id: string): void {
   deleteChatSession(id);
-  // Section 2.4: bindings pointing at this conversation have to react now, not
-  // the next time a trigger happens to fire. A "dedicated" binding rebuilds its
-  // conversation on its next run; an "existing" one is disabled, because only
-  // the athlete knows which thread it should point at instead.
-  applyCoachAutomationSessionDeleted(id);
+  // Section 2.4: the analyses inside this conversation go with it. An analysis
+  // lives in exactly one conversation and cannot be moved, so there is nothing
+  // to re-point and nothing left for one to be about.
+  applyAnalysisSessionDeleted(id);
 }
 
 export async function testLocalChatConnection(
@@ -908,7 +907,7 @@ function getStoredToken(): StoredChatToken | null {
 
 /**
  * Where a stream's events go. Interactive chat pushes them at a renderer;
- * headless automation runs will accumulate them in the main process instead,
+ * headless analysis runs will accumulate them in the main process instead,
  * so `streamChat` must not know which it is talking to.
  */
 export interface ChatStreamSink {
@@ -979,11 +978,11 @@ export function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
 
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
-  /** Automation runs override the saved provider/model/effort (decision 2). */
-  runtime?: AutomationRuntime;
-  /** Automation runs narrow the tool set (decision 3). Defaults to interactive. */
+  /** Analysis runs override the saved provider/model/effort (decision 2). */
+  runtime?: AnalysisRuntime;
+  /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
   toolPolicy?: ChatToolPolicy;
-  /** Automation role, injected as its own hardened instruction block. */
+  /** Analysis role, injected as its own hardened instruction block. */
   roleInstructions?: string;
 }
 
@@ -1013,11 +1012,11 @@ export function createWindowSink(
  * The headless sink: turns the same stream events into the
  * `PersistedChatEntry[]` an interactive turn would have produced in the
  * renderer, mirroring how ChatView handles `chat:streamInfo` and
- * `chat:streamDone`. An automation run has no renderer to assemble its
+ * `chat:streamDone`. An analysis run has no renderer to assemble its
  * transcript, so this is where that assembly moves to.
  *
  * It deliberately omits `bindAbort`: closing the window must not abort an
- * automation run.
+ * analysis run.
  */
 export interface ChatStreamCollectorSink extends ChatStreamSink {
   /** The transcript so far. Complete once `chat:streamDone` has arrived. */
@@ -1050,7 +1049,7 @@ function upsertEntry(
 }
 
 export function createCollectorSink(
-  automation?: ChatEntryAutomationMarker
+  marker?: ChatEntryAnalysisMarker
 ): ChatStreamCollectorSink {
   const entries: PersistedChatEntry[] = [];
   let pendingCoachPrompts: CoachInputPrompt[] = [];
@@ -1240,7 +1239,9 @@ export function createCollectorSink(
         content: fullText,
         ...(turnSource ? { source: turnSource } : {}),
         ...(reasoningSummary ? { reasoningSummary } : {}),
-        ...(automation ? { automation } : {})
+        // `automation` is the *stored* key on a transcript entry, not a rename
+        // that was missed — see `ChatEntryAnalysisMarker`.
+        ...(marker ? { automation: marker } : {})
       });
     }
     for (const prompt of prompts) {
@@ -1334,7 +1335,7 @@ export async function streamChat(
    * The one way this turn reports a failure. Everything it spent before it
    * broke rides along: 13 records a cost on every exit that reached the model,
    * and a failed turn is not a refund — a provider that reliably breaks would
-   * otherwise run an automation through the month's ceiling for free.
+   * otherwise run an analysis through the month's ceiling for free.
    *
    * It is a function rather than a rule to remember at each throw site because
    * dropping the usage on one of them type-checks and compiles into a send that
@@ -1358,7 +1359,7 @@ export async function streamChat(
   let fullText = "";
   try {
     const settings = getChatSettings();
-    // An automation may run on a different provider than the interactive chat
+    // An analysis may run on a different provider than the interactive chat
     // without touching the saved settings (decision 2).
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
@@ -1409,7 +1410,7 @@ export async function streamChat(
         effort: runtime.effort ?? settings.claudeCode.effort,
         configDir: claudeConfigDir,
         onModelResolved: (model) => {
-          // An automation's override says nothing about the interactive
+          // An analysis's override says nothing about the interactive
           // default, so never let one overwrite the saved defaultModel.
           if (runtime.model?.trim() || settings.claudeCode.model?.trim()) return;
           const current = getChatSettings();
@@ -2020,7 +2021,7 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
 ]);
 
 /**
- * Narrows a tool set to what an automation run may call. Beyond the allowlist
+ * Narrows a tool set to what an analysis run may call. Beyond the allowlist
  * this drops every non-COROS MCP server the athlete configured: their write
  * surface is unknown, so they are excluded by default rather than inspected.
  */
@@ -2121,7 +2122,7 @@ async function executeChatTool(
   // was never offered.
   if (!isToolAllowedUnderPolicy(name, toolPolicy)) {
     throw new Error(
-      `${name} is not available to an automation run; it may only read, analyse and draft.`
+      `${name} is not available to an analysis run; it may only read, analyse and draft.`
     );
   }
 

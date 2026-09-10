@@ -7,10 +7,10 @@ import type {
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
- * long transcript, shared by the interactive chat and by automation runs.
+ * long transcript, shared by the interactive chat and by analysis runs.
  *
  * It started as section 5.7 of the coach-automations design, where only
- * headless runs used it. Nothing about it was ever automation-specific: an
+ * headless runs used it. Nothing about it was ever analysis-specific: an
  * athlete who chats daily in one conversation pays the same growing bill as a
  * daily briefing thread does, and the summary is stored on the *conversation*
  * (`chat_sessions.coach_summary`), so a conversation with both a coach and an
@@ -18,7 +18,7 @@ import type {
  * from.
  *
  * Everything here is pure. The roll itself is a model call and the storage is
- * SQLite; both arrive as callbacks, which is what lets the automation runner
+ * SQLite; both arrive as callbacks, which is what lets the analysis runner
  * keep its injected test seams while sharing this code.
  */
 

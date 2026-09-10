@@ -1,27 +1,42 @@
 /**
- * The starting points offered when the athlete creates a coach (9.1).
+ * The starting points offered when the athlete creates an analysis (9.1).
  *
  * Plain data, and it lives beside the store rather than in the renderer so the
  * store's own normalizers can be run over it: a preset with a malformed trigger
  * degrades silently to "manual" on the way in, which is exactly the kind of
  * typo a gallery of hand-written definitions invites.
+ *
+ * **A preset's trigger is a suggestion, pre-filled and editable, not something
+ * it asserts.** Creating one happens inside a conversation, so unlike the
+ * shape before it there *is* somewhere for a trigger to fire — but the athlete
+ * sees the 07:00 on the form and can change it or drop it before anything is
+ * saved. A preset teaches what a trigger is for; it does not decide.
  */
-import type { AutomationBindingMode, CoachAutomationInput } from "./types";
+import type {
+  AnalysisConditions,
+  AnalysisTrigger,
+  CoachAnalysisInput
+} from "./types";
 
-export interface CoachAutomationPreset {
+export interface CoachAnalysisPreset {
   id: string;
   label: string;
   description: string;
-  definition: CoachAutomationInput;
-  /** How the preset suggests attaching itself on the "where it runs" tab. */
-  suggestedBinding: { mode: AutomationBindingMode; titleTemplate?: string };
+  /**
+   * Everything but the conversation. The screen that creates from a preset is
+   * inside one and fills `sessionId` in; a preset cannot know it.
+   */
+  definition: Omit<CoachAnalysisInput, "sessionId">;
+  /** Pre-filled on the attach screen. The athlete can change or drop it. */
+  suggestedTrigger?: AnalysisTrigger;
+  suggestedConditions?: Partial<AnalysisConditions>;
 }
 
 /**
  * The gallery is a menu of starting points, so each preset earns its place by
- * teaching something different about what an automation can be — a trigger
- * kind, a binding mode, a job — rather than by being a variation on the last
- * one. Four entries, in the order an athlete meets them.
+ * teaching something different about what an analysis can be — a job, and the
+ * kind of trigger that job suggests — rather than by being a variation on the
+ * last one. Four entries, in the order an athlete meets them.
  *
  * Effort is left unset wherever `low` is right, because that is now the
  * documented default (section 7); only the two that genuinely want more say so.
@@ -32,7 +47,7 @@ export interface CoachAutomationPreset {
  * just did, so they can judge the answer immediately. It shipped alone in
  * phase 1 for exactly that reason.
  */
-const POST_ACTIVITY_DEBRIEF: CoachAutomationPreset = {
+const POST_ACTIVITY_DEBRIEF: CoachAnalysisPreset = {
   id: "post-activity-debrief",
   label: "Post-activity debrief",
   description:
@@ -50,22 +65,19 @@ const POST_ACTIVITY_DEBRIEF: CoachAutomationPreset = {
       "- Whether it fits the week's pattern, or breaks it.\n" +
       "- Anything in recovery or accumulated load that this session changes.\n\n" +
       "Only raise something if it is materially different from recent history.",
-    trigger: { kind: "activity", sportTypes: [], minDurationSec: 1200 },
-    runtime: {},
-    conditions: { cooldownMin: 120, maxRunsPerDay: 3 }
+    runtime: {}
   },
-  suggestedBinding: {
-    mode: "per-run",
-    titleTemplate: "{{rule.name}} · {{activity.name}} · {{date}}"
-  }
+  suggestedTrigger: { kind: "activity", sportTypes: [], minDurationSec: 1200 },
+  suggestedConditions: { cooldownMin: 120, maxRunsPerDay: 3 }
 };
 
 /**
- * The schedule counterpart: it speaks whether or not the athlete trained. A
- * `dedicated` conversation matters more here than anywhere else — a briefing
- * that cannot see what it said yesterday repeats itself.
+ * The schedule counterpart: it speaks whether or not the athlete trained.
+ * Attaching it to a conversation it keeps coming back to matters more here than
+ * anywhere else — a briefing that cannot see what it said yesterday repeats
+ * itself, and an analysis lives in exactly that kind of conversation.
  */
-const MORNING_BRIEFING: CoachAutomationPreset = {
+const MORNING_BRIEFING: CoachAnalysisPreset = {
   id: "morning-briefing",
   label: "Morning briefing",
   description:
@@ -82,18 +94,17 @@ const MORNING_BRIEFING: CoachAutomationPreset = {
       "- What today should be, and why that follows from the last few days.\n" +
       "- Anything in recovery or accumulated load that changes it.\n\n" +
       "If today is a rest day and nothing is off, say so and stop. Only raise something if it is materially different from recent history.",
-    trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" },
-    runtime: {},
-    // A briefing that fires once a day does not need a cooldown fighting it,
-    // and quiet hours keep it from arriving in the middle of the night if the
-    // laptop was closed at 07:00 and opened at 02:00.
-    conditions: {
-      cooldownMin: 0,
-      maxRunsPerDay: 1,
-      quietHours: { start: "22:00", end: "06:00" }
-    }
+    runtime: {}
   },
-  suggestedBinding: { mode: "dedicated" }
+  suggestedTrigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" },
+  // A briefing that fires once a day does not need a cooldown fighting it,
+  // and quiet hours keep it from arriving in the middle of the night if the
+  // laptop was closed at 07:00 and opened at 02:00.
+  suggestedConditions: {
+    cooldownMin: 0,
+    maxRunsPerDay: 1,
+    quietHours: { start: "22:00", end: "06:00" }
+  }
 };
 
 /**
@@ -101,7 +112,7 @@ const MORNING_BRIEFING: CoachAutomationPreset = {
  * is also the first to ask for more effort than the default: it runs once a
  * week and reads a week of training, so `medium` is cheap in absolute terms.
  */
-const WEEKLY_REVIEW: CoachAutomationPreset = {
+const WEEKLY_REVIEW: CoachAnalysisPreset = {
   id: "weekly-review",
   label: "Weekly review",
   description:
@@ -118,25 +129,24 @@ const WEEKLY_REVIEW: CoachAutomationPreset = {
       "- What was scheduled and did not happen, and whether that matters.\n" +
       "- The one thing that should change next week, if anything should.\n\n" +
       "A week that went to plan is a finding too — say so briefly rather than inventing concerns.",
-    trigger: {
-      kind: "schedule",
-      cadence: "weekly",
-      dayOfWeek: 0,
-      timeOfDay: "18:00"
-    },
-    runtime: { effort: "medium" },
-    conditions: { cooldownMin: 0, maxRunsPerDay: 1 }
+    runtime: { effort: "medium" }
   },
-  suggestedBinding: { mode: "dedicated" }
+  suggestedTrigger: {
+    kind: "schedule",
+    cadence: "weekly",
+    dayOfWeek: 0,
+    timeOfDay: "18:00"
+  },
+  suggestedConditions: { cooldownMin: 0, maxRunsPerDay: 1 }
 };
 
 /**
  * The only preset that proposes work rather than describing it. Decision 3
  * holds: it drafts, and the draft waits in the conversation as a card the
  * athlete confirms. Worth a place in the gallery because nothing else shows
- * that an automation can do more than talk.
+ * that an analysis can do more than talk.
  */
-const WEEK_AHEAD_PLAN: CoachAutomationPreset = {
+const WEEK_AHEAD_PLAN: CoachAnalysisPreset = {
   id: "week-ahead-plan",
   label: "Next week's plan",
   description:
@@ -152,19 +162,18 @@ const WEEK_AHEAD_PLAN: CoachAutomationPreset = {
       "Base it on the last two or three weeks of actual training and anything already on the calendar. " +
       "Progress from where they are rather than where a plan says they should be.\n\n" +
       "Draft the week as a training plan so it can be reviewed and approved, then say in one line what the week is for.",
-    trigger: {
-      kind: "schedule",
-      cadence: "weekly",
-      dayOfWeek: 1,
-      timeOfDay: "06:30"
-    },
-    runtime: { effort: "medium" },
-    conditions: { cooldownMin: 0, maxRunsPerDay: 1 }
+    runtime: { effort: "medium" }
   },
-  suggestedBinding: { mode: "dedicated" }
+  suggestedTrigger: {
+    kind: "schedule",
+    cadence: "weekly",
+    dayOfWeek: 1,
+    timeOfDay: "06:30"
+  },
+  suggestedConditions: { cooldownMin: 0, maxRunsPerDay: 1 }
 };
 
-export const COACH_AUTOMATION_PRESETS: CoachAutomationPreset[] = [
+export const COACH_ANALYSIS_PRESETS: CoachAnalysisPreset[] = [
   POST_ACTIVITY_DEBRIEF,
   MORNING_BRIEFING,
   WEEKLY_REVIEW,

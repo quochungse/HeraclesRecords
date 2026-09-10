@@ -1,5 +1,19 @@
 # The trigger-lifecycle cluster — three states, every ending
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: the schedule slot, the activity watermark and the threshold flag behave exactly as described; what changed is that the trigger they follow is now the attachment's, so an edit resets one attachment rather than all of them.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 R2 step 3 of [coach-automations-review.md](./coach-automations-review.md).
 Sections 2.3, 2.4, 3.1, 3.2 and 3.3 of
 [coach-automations.md](./coach-automations.md) describe three pieces of state a

@@ -8,9 +8,9 @@ const Module = require("node:module");
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 // chatService is compiled to CommonJS for Electron and pulls in `electron` and
-// the better-sqlite3 native binding at require time, neither of which loads
+// the better-sqlite3 native attachment at require time, neither of which loads
 // under plain node. Stubbing the two lets this file cover the stream sink —
-// the seam every headless automation run goes through — without an Electron
+// the seam every headless analysis run goes through — without an Electron
 // harness. Nothing here touches the stubs; the sink is pure wiring.
 const fakeElectron = {
   BrowserWindow: class {},
@@ -234,7 +234,7 @@ runStream(plain, [
   ["chat:streamStart", {}],
   ["chat:streamDone", { fullText: "hello" }]
 ]);
-assert.equal("automation" in plain.entries()[0], false);
+assert.equal("analysis" in plain.entries()[0], false);
 
 // --- an mcp failure is recorded on the source ------------------------------
 const failing = createCollectorSink();
@@ -321,7 +321,7 @@ assert.deepEqual(persisted[1].automation, marker);
 
 // --- 13: a failed turn is not a refund -------------------------------------
 // Usage used to reach the collector only on `chat:streamDone`, which a stream
-// that errors never sends — so *no* failed automation run ever recorded what it
+// that errors never sends — so *no* failed analysis run ever recorded what it
 // spent, and a provider that reliably breaks could run through the month's
 // ceiling for free. That is the exact hole section 13 says it closed, and the
 // runner's own suite could not see it: its fake collector reported usage on

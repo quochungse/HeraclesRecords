@@ -1,5 +1,19 @@
 # Persistence and lifecycle — what survives an upgrade, and what survives a crash
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: every column reading it pins is still true, and three columns were added to the attachment (`trigger_json`, `conditions_json`, `device_only`) that it does not cover.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 R4 of [coach-automations-review.md](./coach-automations-review.md), both steps.
 Section 1's columns and section 10's *"app quits mid-run"* row.
 

@@ -9,17 +9,22 @@ import {
 import type { CoachDailySampleRow, CoachUnseenActivityRow } from "./database";
 import { getCorosMcpStatus } from "./corosMcpService";
 import { getTrainingSleepData } from "./sleepDataService";
-import { listCoachAutomations } from "./coachAutomationStore";
+import { listTriggeredCoachAnalyses } from "./coachAnalysisStore";
 import {
-  activityMatchesAutomation,
-  runAutomationTrigger
-} from "./coachAutomationService";
+  activityMatchesTrigger,
+  runAnalysisTrigger
+} from "./coachAnalysisService";
 import {
   getDailyMetrics,
   getTrainingHubStatus,
   listTrainingHubActivities
 } from "./trainingHubService";
-import type { CoachAutomation, CoachAutomationRun } from "./types";
+import type {
+  CoachAnalysis,
+  CoachAnalysisRun
+} from "./types";
+
+
 
 /** 3.2: the watcher polls this often for as long as the process is alive. */
 export const ACTIVITY_POLL_INTERVAL_MS = 15 * 60_000;
@@ -59,14 +64,15 @@ export interface CoachActivityWatcherDeps {
   listUnseenActivities(sinceEpochSeconds?: number): CoachUnseenActivityRow[];
   markSeen(activityIds: string[]): void;
   markAllSeen(): number;
-  listAutomations(): CoachAutomation[];
+  /** Every enabled analysis carrying a real trigger, in one read. */
+  listTriggeredAnalyses(): CoachAnalysis[];
   isCorosAuthenticated(): boolean;
   getSetting(key: string): string | undefined;
   setSetting(key: string, value: string): void;
   runTrigger(event: {
-    automationId: string;
+    analysisId: string;
     kind: "activity";
-  }): Promise<CoachAutomationRun[]>;
+  }): Promise<CoachAnalysisRun[]>;
   /** 3.3's local cache: what COROS says about these days, or [] if it cannot. */
   readDailySamples(startDay: string, endDay: string): Promise<CoachDailySampleRow[]>;
   writeDailySamples(rows: CoachDailySampleRow[], capturedAt: string): void;
@@ -91,11 +97,11 @@ function createDefaultDeps(): CoachActivityWatcherDeps {
     listUnseenActivities: (since) => listUnseenCoachActivityRows(since),
     markSeen: (ids) => markCoachActivitiesSeen(ids),
     markAllSeen: () => markAllCoachActivitiesSeen(),
-    listAutomations: () => listCoachAutomations(),
+    listTriggeredAnalyses: () => listTriggeredCoachAnalyses(),
     isCorosAuthenticated: () => getTrainingHubStatus().authenticated,
     getSetting: (key) => getSetting(key),
     setSetting: (key, value) => setSetting(key, value),
-    runTrigger: (event) => runAutomationTrigger(event),
+    runTrigger: (event) => runAnalysisTrigger(event),
     readDailySamples: async (startDay, endDay) => {
       const byDay = new Map<string, CoachDailySampleRow>();
       const row = (day: string): CoachDailySampleRow => {
@@ -139,14 +145,14 @@ function createDefaultDeps(): CoachActivityWatcherDeps {
     },
     dailySampleTimeoutMs: DAILY_SAMPLE_TIMEOUT_MS,
     onError: (error) => {
-      console.error("[coach-automation] activity watcher tick failed:", error);
+      console.error("[coach-analysis] activity watcher tick failed:", error);
     }
   };
 }
 
 // The matcher lives with the runner, which now owns activity selection too;
 // re-exported here because this is where callers expect to find it.
-export { activityMatchesAutomation };
+export { activityMatchesTrigger };
 
 const TIMED_OUT = Symbol("timed-out");
 
@@ -211,19 +217,19 @@ export class CoachActivityWatcher {
     // activity half did, so it needs the same two reads and must not repeat
     // them. Defaults cover the read itself throwing, in which case the snapshot
     // has nothing to act on either.
-    let automations: CoachAutomation[] = [];
+    let triggered: CoachAnalysis[] = [];
     let connected = false;
     try {
       // Read once and passed down. Three separate reads of the same list per
-      // tick — poll, the catch-up and the snapshot — is three full
-      // `listCoachAutomations()` calls, each of which parses and normalises
-      // every stored definition. The list cannot change inside one tick: this
-      // is the main process and nothing here awaits an IPC handler.
-      automations = this.deps.listAutomations();
+      // tick — poll, the catch-up and the snapshot — is three full walks of
+      // every analysis, each parsing and normalising a stored trigger. The
+      // list cannot change inside one tick: this is the main process and
+      // nothing here awaits an IPC handler.
+      triggered = this.deps.listTriggeredAnalyses();
       connected = this.deps.isCorosAuthenticated();
-      const { coldStart, fired } = await this.poll(automations, connected);
+      const { coldStart, fired } = await this.poll(triggered, connected);
       if (!coldStart) {
-        await this.offerOwedActivities(fired, automations, connected);
+        await this.offerOwedActivities(fired, triggered, connected);
       }
     } catch (error) {
       this.deps.onError(error);
@@ -232,7 +238,7 @@ export class CoachActivityWatcher {
       // Last, and outside the work above: activities are the time-sensitive
       // half of this tick — a run the athlete is waiting for — and a slow COROS
       // asked about a 30-day baseline must not stand in front of them.
-      await this.snapshotDailySamples(this.deps.now(), automations, connected);
+      await this.snapshotDailySamples(this.deps.now(), triggered, connected);
     } catch (error) {
       this.deps.onError(error);
     } finally {
@@ -241,22 +247,22 @@ export class CoachActivityWatcher {
   }
 
   /**
-   * Fires one payload-free trigger per matching automation, and reports which
-   * ones — the catch-up below must not ask a second time for an automation this
+   * Fires one payload-free trigger per matching analysis, and reports which
+   * ones — the catch-up below must not ask a second time for an analysis this
    * poll already fired.
    *
    * `coldStart` is true on the tick that stamped the back catalogue.
    */
   private async poll(
-    all: CoachAutomation[],
+    all: CoachAnalysis[],
     connected: boolean
   ): Promise<{ coldStart: boolean; fired: Set<string> }> {
     const fired = new Set<string>();
-    const automations = all.filter(
-      (automation) => automation.enabled && automation.trigger.kind === "activity"
+    const watching = all.filter(
+      (analysis) => analysis.trigger?.kind === "activity"
     );
 
-    // The cold-start stamp still has to happen with no automations configured,
+    // The cold-start stamp still has to happen with no analyses configured,
     // otherwise the athlete's whole history is "new" the day they add one.
     const firstRun = !this.deps.getSetting(INITIALIZED_SETTING);
 
@@ -275,7 +281,7 @@ export class CoachActivityWatcher {
       return { coldStart: true, fired };
     }
 
-    if (!automations.length) {
+    if (!watching.length) {
       // Nothing is listening, so keep the marker moving; otherwise a rule added
       // next week would fire for everything that landed in the meantime.
       const unseen = this.deps.listUnseenActivities();
@@ -289,24 +295,30 @@ export class CoachActivityWatcher {
       return { coldStart: false, fired };
     }
 
-    const matched = automations.filter((automation) =>
-      unseen.some((activity) => activityMatchesAutomation(activity, automation))
+    // Matching is per analysis, because the filters are: one conversation may
+    // want every ride over an hour and another only the runs. Each match
+    // produces one trigger, and the runner picks that analysis's activities
+    // from that analysis's own watermark.
+    const matched = watching.filter((analysis) =>
+      unseen.some((activity) =>
+        activityMatchesTrigger(activity, analysis.trigger)
+      )
     );
 
-    // Rows are stamped once every automation has had its look, whether or not
+    // Rows are stamped once every analysis has had its look, whether or not
     // any of them matched. An unmatched activity is genuinely handled, and a
     // matched one is stamped before the trigger goes out: the flag means "the
-    // watcher has looked at this", and it has. What each binding still owes is
-    // the runner's answer from that binding's own watermark, and a run the
-    // stamp outlived is re-offered by the catch-up below.
+    // watcher has looked at this", and it has. What each analysis still owes
+    // is the runner's answer from its own watermark, and a run the stamp
+    // outlived is re-offered by the catch-up below.
     this.deps.markSeen(unseen.map((activity) => activity.activity_id));
 
     // Several activities landing between two polls produce one trigger per
-    // automation, not one per activity: the trigger says *look*, and the runner
+    // analysis, not one per activity: the trigger says *look*, and the runner
     // selects the activities and fills in each run's payload itself.
-    for (const automation of matched) {
-      fired.add(automation.id);
-      await this.deps.runTrigger({ automationId: automation.id, kind: "activity" });
+    for (const analysis of matched) {
+      fired.add(analysis.id);
+      await this.deps.runTrigger({ analysisId: analysis.id, kind: "activity" });
     }
     return { coldStart: false, fired };
   }
@@ -321,18 +333,18 @@ export class CoachActivityWatcher {
    * *firing* condition was "there are unseen rows", so once a row was stamped
    * the trigger never came round again. A run refused for any reason — quiet
    * hours, a cooldown, a backoff, either pause, a signed-out provider — left
-   * the activity owed by the binding's watermark and asked for by nobody. With
+   * the activity owed by the analysis's watermark and asked for by nobody. With
    * `multiActivity` off, which is the default, the next activity to arrive then
    * replaced it and it was never analysed at all.
    *
    * So the tick asks again. The split of 3.2 is untouched: this says *look
-   * again*, and the runner still decides what is owed. A binding with nothing
+   * again*, and the runner still decides what is owed. An analysis with nothing
    * pending produces an empty plan, which a non-manual trigger logs nothing for,
-   * so the only automations this costs anything are the ones genuinely waiting.
+   * so the only analyses this costs anything are the ones genuinely waiting.
    */
   private async offerOwedActivities(
     fired: Set<string>,
-    all: CoachAutomation[],
+    all: CoachAnalysis[],
     connected: boolean
   ): Promise<void> {
     // Behind the same gate `poll` uses, so the watcher keeps its one rule: it
@@ -343,15 +355,15 @@ export class CoachActivityWatcher {
     if (!connected) {
       return;
     }
-    for (const automation of all) {
-      if (!automation.enabled || automation.trigger.kind !== "activity") {
+    for (const analysis of all) {
+      if (analysis.trigger?.kind !== "activity") {
         continue;
       }
-      if (fired.has(automation.id)) {
+      if (fired.has(analysis.id)) {
         // Already asked this tick, by the poll that just found new activity.
         continue;
       }
-      await this.deps.runTrigger({ automationId: automation.id, kind: "activity" });
+      await this.deps.runTrigger({ analysisId: analysis.id, kind: "activity" });
     }
   }
 
@@ -364,7 +376,7 @@ export class CoachActivityWatcher {
    */
   private async snapshotDailySamples(
     now: Date,
-    all: CoachAutomation[],
+    all: CoachAnalysis[],
     connected: boolean
   ): Promise<void> {
     // Deliberately not behind the "is anything listening for activities" check
@@ -381,8 +393,7 @@ export class CoachActivityWatcher {
       return;
     }
     const wanted = all.some(
-      (automation) =>
-        automation.enabled && automation.trigger.kind === "threshold"
+      (analysis) => analysis.trigger?.kind === "threshold"
     );
     if (!wanted) {
       return;
