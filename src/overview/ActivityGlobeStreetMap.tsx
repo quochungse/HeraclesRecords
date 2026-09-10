@@ -5,6 +5,7 @@ import {
   ROUTE_BASE_LAYERS,
   type RouteBaseLayer,
 } from "../maps/routes/constants";
+import { createBaseLayer } from "../maps/routes/baseLayers";
 import { useTheme } from "../theme/ThemeProvider";
 import type {
   ActivityRoutePolyline,
@@ -321,11 +322,7 @@ export function ActivityGlobeStreetMap({
     });
     mapRef.current = map;
 
-    L.tileLayer(tile.url, {
-      maxZoom: tile.maxZoom,
-      attribution: tile.attribution,
-      ...(tile.subdomains ? { subdomains: tile.subdomains } : {}),
-    }).addTo(map);
+    createBaseLayer(map, tile).addTo(map);
 
     const initialHeat: GlobePoint[] =
       visits.length > 0

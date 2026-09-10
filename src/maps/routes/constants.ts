@@ -20,21 +20,54 @@ export type RouteBaseLayer =
   | "topo"
   | "satellite";
 
-export interface TileLayerConfig {
-  url: string;
-  attribution: string;
-  maxZoom: number;
-  subdomains?: string;
+/** Fields every base map style carries, whatever it is rendered from. */
+interface BaseLayerCommon {
   label: string;
   description: string;
+  attribution: string;
+  maxZoom: number;
+}
+
+/** A classic {z}/{x}/{y} raster tile style, drawn by Leaflet itself. */
+export interface RasterBaseLayerConfig extends BaseLayerCommon {
+  kind: "raster";
+  url: string;
+  subdomains?: string;
 }
 
 /**
- * Base tile layers. All are free/keyless. `outdoors` uses CyclOSM, a
- * cycling/outdoor-focused OSM render that pairs well with the Explore overlays.
+ * A vector style rendered client-side by MapLibre. Build these through
+ * `createBaseLayer` in `baseLayers.ts` — never `L.tileLayer`.
  */
-export const ROUTE_BASE_LAYERS: Record<RouteBaseLayer, TileLayerConfig> = {
+export interface VectorBaseLayerConfig extends BaseLayerCommon {
+  kind: "vector";
+  /** URL of the MapLibre style JSON. */
+  styleUrl: string;
+}
+
+export type BaseLayerConfig = RasterBaseLayerConfig | VectorBaseLayerConfig;
+
+/** OpenFreeMap asks for this wording specifically; keep all three credits. */
+const OPENFREEMAP_ATTRIBUTION =
+  '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> ' +
+  '&copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> ' +
+  'Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+/**
+ * Base map styles. All are free and keyless — no style here may need an API
+ * key, because nothing in the app has one to give it.
+ *
+ * `light` and `dark` are OpenFreeMap vector styles rather than raster tiles.
+ * They used to be CARTO's `light_all`/`dark_all`, which in August 2026 started
+ * answering keyless requests with a valid 200 PNG that has "API KEY REQUIRED"
+ * printed across it — a watermark, not an error, so nothing in the app could
+ * detect it. OpenFreeMap's `positron` is the same design lineage (CARTO's
+ * Positron is where it came from) and its `dark` matches Dark Matter, so the
+ * two screens that pick a style by theme look as they did before.
+ */
+export const ROUTE_BASE_LAYERS: Record<RouteBaseLayer, BaseLayerConfig> = {
   street: {
+    kind: "raster",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     maxZoom: 19,
     label: "Street",
@@ -43,6 +76,7 @@ export const ROUTE_BASE_LAYERS: Record<RouteBaseLayer, TileLayerConfig> = {
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   },
   outdoors: {
+    kind: "raster",
     url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
     maxZoom: 20,
     subdomains: "abc",
@@ -52,24 +86,23 @@ export const ROUTE_BASE_LAYERS: Record<RouteBaseLayer, TileLayerConfig> = {
       '&copy; <a href="https://www.cyclosm.org">CyclOSM</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   },
   light: {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    kind: "vector",
+    styleUrl: "https://tiles.openfreemap.org/styles/positron",
     maxZoom: 20,
-    subdomains: "abcd",
     label: "Light",
     description: "Clean minimal map",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    attribution: OPENFREEMAP_ATTRIBUTION
   },
   dark: {
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    kind: "vector",
+    styleUrl: "https://tiles.openfreemap.org/styles/dark",
     maxZoom: 20,
-    subdomains: "abcd",
     label: "Dark",
     description: "Low-glare night map",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    attribution: OPENFREEMAP_ATTRIBUTION
   },
   topo: {
+    kind: "raster",
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     maxZoom: 17,
     subdomains: "abc",
@@ -79,6 +112,7 @@ export const ROUTE_BASE_LAYERS: Record<RouteBaseLayer, TileLayerConfig> = {
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM, &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
   },
   satellite: {
+    kind: "raster",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     maxZoom: 19,
     label: "Satellite",
