@@ -31871,11 +31871,14 @@ tr.data-intervals-row-missing {
 
 /* ----- Settings view ----- */
 
+/* No width cap: the panels fill `.content` like every other view, so widening
+   the window widens the settings instead of growing an empty gutter beside
+   them. Body copy keeps its own measure below — a paragraph that needs one
+   caps itself rather than leaning on the container to do it. */
 .settings-view {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 980px;
 }
 
 .settings-units-panel {
@@ -32429,11 +32432,14 @@ button.settings-about-link {
 }
 
 /* The 520px measure the other panel headings share is set for two or three
-   lines of explanation. This one is a single sentence and the panel is 980px
-   wide, so capping it there broke it across two lines with half the row empty
-   beside it. Let it use the width it has; the panel is what limits it. */
+   lines of explanation. This one is a single sentence, and at 520px it broke
+   across three lines with half the row empty beside it. It used to say
+   `none` and let the panel do the limiting, which worked only while the panel
+   was capped at 980px; with the cap gone that turned into a single 1400px
+   line on a wide window. 900px is the same two-line shape it had at 980px,
+   and it holds that shape however wide the window gets. */
 .settings-sync-panel .settings-connections-heading p:not(.eyebrow) {
-  max-width: none;
+  max-width: 900px;
 }
 
 .settings-nav-row-actions {
