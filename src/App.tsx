@@ -1906,6 +1906,36 @@ export default function App() {
     }
   }
 
+  /**
+   * Overview's Refresh.
+   *
+   * The same COROS reload the connection card triggers — same `busy` key, so
+   * the "Syncing data" pill and the Settings button agree with this one — plus
+   * the watch and the local library, because this screen shows those too. They
+   * are on a 15s poll of their own, so including them costs almost nothing and
+   * saves the athlete wondering which half of the screen the button covered.
+   *
+   * Errors go through `reportTrainingHubError`, which keeps the start-up
+   * re-login's wreckage off screen: a launch can have this button pressed while
+   * the stored token is still being probed.
+   */
+  async function handleOverviewRefresh() {
+    setBusy("training-refresh");
+    setError(null);
+    setMessage(null);
+
+    try {
+      // `refreshAll` reports its own failures and never rejects, so a watch
+      // that is not plugged in cannot take the COROS half down with it.
+      await Promise.all([refreshAll(), refreshTrainingHub()]);
+      setMessage("Refreshed.");
+    } catch (caught) {
+      await reportTrainingHubError(caught);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleTrainingHubExport(
     activity: TrainingHubActivity,
     fileType: TrainingHubActivityFileType,
@@ -2505,6 +2535,8 @@ export default function App() {
             ) : null}
             {activeView === "overview" ? (
               <MediaOverviewTab
+                onRefresh={() => void handleOverviewRefresh()}
+                refreshing={busy === "training-refresh"}
                 trainingOverview={
                   <div className="dashboard-block">
                     <Suspense
@@ -3288,6 +3320,19 @@ interface MediaOverviewTabProps {
   watchStatus: WatchStatus | null;
   watchConnected: boolean;
   trainingConnected: boolean;
+  /**
+   * Re-reads COROS, and the watch and library alongside it.
+   *
+   * The one entry point on this screen for that. Everything here except the
+   * COROS half is already on a 15s poll, and the COROS half is the half that
+   * changes when the athlete finishes a run — so before this button the only
+   * way to see a new activity was to quit the app and open it again. The
+   * connection card kept a Refresh when it moved into Settings, which is two
+   * screens away from the one showing the stale numbers.
+   */
+  onRefresh: () => void;
+  /** Drives the spinner; also true while the same refresh runs from Settings. */
+  refreshing: boolean;
   trainingActivities: TrainingHubActivity[];
   trainingActivityDetail: TrainingHubActivityDetail | null;
   /** Feeds the contextual subtitle only — the panels get their own copies. */
@@ -3307,6 +3352,8 @@ function MediaOverviewTab({
   watchStatus,
   watchConnected,
   trainingConnected,
+  onRefresh,
+  refreshing,
   trainingActivities,
   trainingActivityDetail,
   trainingUpcomingWorkouts,
@@ -3371,6 +3418,20 @@ function MediaOverviewTab({
           <h1 className="dashboard-greeting">{greeting}</h1>
           <p className="dashboard-subtitle">{subtitle}</p>
         </div>
+        <button
+          className="secondary-button dashboard-welcome-action"
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          title="Refresh COROS data, the watch and the library"
+        >
+          {refreshing ? (
+            <Loader2 className="spin" size={16} aria-hidden="true" />
+          ) : (
+            <RefreshCw size={16} aria-hidden="true" />
+          )}
+          {refreshing ? "Refreshing" : "Refresh"}
+        </button>
       </header>
 
       {trainingOverview}

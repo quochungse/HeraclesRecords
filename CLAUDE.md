@@ -317,6 +317,19 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     the storage layer needs no locking. Exclusivity is needed for two things only, and each
     takes a `Lease`: running a scheduled automation (`automationLease`) and compacting the
     log (`syncLoop.compactIfDue`).
+  - **A pull tells the renderer which tables it wrote, and a view re-reads its own.**
+    `sync:changed` used to carry two counts, which say something arrived but not what — so a
+    screen had two moves, reload everything or reload nothing, and nothing is what shipped:
+    a Coach conversation written on the other machine sat in SQLite while the sidebar kept
+    the list it read on mount, and the Sync panel told the athlete to restart.
+    `SyncChangedEvent.tables` (from `tablesTouched`, which names `table` entries and skips
+    `setting`/`localStorage` keys) is what makes a listener selective. Everything a pull
+    produces is **queued** in `pendingSyncChange` rather than passed to `sendSyncChanged` as
+    arguments: the loop follows the app, not the window, so a pull can land before the
+    renderer is listening, and an argument has nowhere to wait — which is how the counts used
+    to be lost outright. `markRendererReady` delivers the queue. `ChatView` is the first
+    subscriber; it holds a re-read back while the athlete's own turn is streaming, because
+    the timeline on screen is the newer copy then. `npm run test:sync-changed-fanout`.
 
 - **Backup / Restore** (`electron/backup/`) — a separate feature from sync, deliberately.
   One file the person saves where they like (`backup:export` opens a save dialog) and reads

@@ -155,6 +155,24 @@ export function resolve(entries: readonly OpEntry[]): Map<string, OpEntry> {
   return winners;
 }
 
+/**
+ * The tables a set of merged entries wrote into or deleted from.
+ *
+ * `ApplyResult.applied` says how much arrived, never what — which left a
+ * renderer with only two moves on a pull, reload everything or reload nothing,
+ * and nothing is what shipped. This is the other half of the answer, and it is
+ * separate from the merge so it can be checked without one: `scope` is the
+ * whole test, because a `setting` or `localStorage` entry's `key` is a key and
+ * would name a table that does not exist.
+ */
+export function tablesTouched(entries: readonly OpEntry[]): string[] {
+  const tables = new Set<string>();
+  for (const entry of entries) {
+    if (entry.scope === "table") tables.add(entry.key);
+  }
+  return [...tables];
+}
+
 /** Merge a batch of entries into `target`. */
 export function applyEntries(
   target: SyncTarget,

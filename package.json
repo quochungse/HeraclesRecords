@@ -68,6 +68,7 @@
     "test:sync-full-state": "npm run build:electron && node scripts/test-sync-full-state.mjs",
     "test:backup-restore": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-backup-restore.mjs",
     "test:sync-twoway": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-sync-twoway.mjs",
+    "test:sync-changed-fanout": "npm run build:electron && node scripts/test-sync-changed-fanout.mjs",
     "test:sync-bridge": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-sync-bridge.mjs",
     "test:sync-ownership": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-sync-ownership.mjs",
     "test:sync-preferences": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-sync-preferences.mjs",

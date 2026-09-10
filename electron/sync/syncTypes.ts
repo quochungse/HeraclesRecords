@@ -172,6 +172,19 @@ export interface SyncPresenceClaim {
 export interface SyncChangedEvent {
   readonly applied: number;
   readonly deleted: number;
+  /**
+   * The tables a merge just wrote into or deleted from, de-duplicated.
+   *
+   * A count alone says something arrived but not what, which left every screen
+   * with the same two options: reload everything on any pull, or reload nothing
+   * and wait for a restart. Both were wrong, and the second is what shipped —
+   * a conversation written on another machine sat in SQLite while the Coach
+   * sidebar kept the list it read on mount. Naming the tables lets a view
+   * re-read only its own.
+   *
+   * Empty when the pull carried nothing but settings or localStorage keys.
+   */
+  readonly tables: readonly string[];
   readonly localStorage: ReadonlyArray<{
     readonly op: "set" | "delete";
     readonly key: string;

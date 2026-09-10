@@ -83,10 +83,14 @@ export function SyncPanel({ api }: SyncPanelProps) {
   // can land.
   useEffect(() => {
     return api.onSyncChanged((change) => {
+      // No longer "restart to see everything": a pull now names the tables it
+      // wrote, and a screen that subscribes re-reads its own as the change
+      // lands. Not every screen does yet, so the second half stays honest
+      // rather than promising more than the app does.
       setMessage(
         `Synced from another device: ${change.applied} records updated` +
           (change.deleted > 0 ? `, ${change.deleted} removed` : "") +
-          ". Restart to see everything."
+          ". Some screens catch up on their own; restart if one looks stale."
       );
       void refresh();
     });

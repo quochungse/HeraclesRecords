@@ -22,6 +22,7 @@ import { GoogleOAuth } from "./sync/googleOAuth";
 import { GoogleDriveProvider } from "./sync/googleDriveProvider";
 import { SyncLoop } from "./sync/syncLoop";
 import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
+import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { attachAutomationLeases } from "./sync/automationLease";
 import {
@@ -1111,6 +1112,40 @@ let syncSeedStatus: SyncSeedStatus = {
 const syncTarget = new SqliteSyncTarget();
 
 /**
+ * What a pull merged, waiting for a renderer to tell.
+ *
+ * The localStorage half of a pull has always been queued — `SqliteSyncTarget`
+ * holds it, because the main process cannot perform those writes itself. The
+ * counts and the table names had no such queue: they arrived as arguments and
+ * were dropped whole when the window was not ready, and the `did-finish-load`
+ * follow-up then announced `0, 0`. So a pull that landed during startup or a
+ * reload told the renderer nothing at all, and the screens that should have
+ * re-read their tables kept the copies they had for the life of the process.
+ *
+ * Accumulated rather than replaced: two pulls can land before the window is
+ * ready, and the second one's tables do not cover the first one's.
+ */
+let pendingSyncChange: {
+  applied: number;
+  deleted: number;
+  tables: Set<string>;
+} = { applied: 0, deleted: 0, tables: new Set() };
+
+/** Record what a merge wrote and offer it to the renderer. */
+function noteSyncApplied(result: ApplyResult): void {
+  pendingSyncChange.applied += result.applied;
+  pendingSyncChange.deleted += result.deleted;
+  // `setting` and `localStorage` entries are left out by `tablesTouched`: they
+  // name a key, not a table. The first reaches the renderer through whatever
+  // reads that setting, the second travels in the event's own `localStorage`
+  // half.
+  for (const table of tablesTouched(result.merged)) {
+    pendingSyncChange.tables.add(table);
+  }
+  sendSyncChanged();
+}
+
+/**
  * Hand a pull's results to the renderer, localStorage writes included.
  *
  * Nothing is drained without a renderer to drain it into. `SqliteSyncTarget`
@@ -1125,13 +1160,15 @@ const syncTarget = new SqliteSyncTarget();
  * drain the queue into nothing and lose exactly what this guard is here to
  * protect.
  *
- * Called again from `did-finish-load`, which is what delivers anything that
+ * Called again from `markRendererReady`, which is what delivers anything that
  * accumulated while there was nowhere to send it.
  */
-function sendSyncChanged(applied = 0, deleted = 0): void {
+function sendSyncChanged(): void {
   if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) return;
   const localStorage = syncTarget.drainLocalStorage();
+  const { applied, deleted, tables } = pendingSyncChange;
   if (localStorage.length === 0 && applied === 0 && deleted === 0) return;
+  pendingSyncChange = { applied: 0, deleted: 0, tables: new Set() };
 
   // Fold these into the published snapshot before the renderer writes them.
   // The renderer publishes by comparing its localStorage against what this
@@ -1148,7 +1185,12 @@ function sendSyncChanged(applied = 0, deleted = 0): void {
     });
   }
 
-  mainWindow.webContents.send("sync:changed", { applied, deleted, localStorage });
+  mainWindow.webContents.send("sync:changed", {
+    applied,
+    deleted,
+    tables: [...tables],
+    localStorage
+  });
 }
 
 /**
@@ -1279,15 +1321,12 @@ function startSyncLoop(): SyncLoop | null {
       online: net.isOnline()
     }),
     onApplied: (result) => {
-      // Tell the renderer to reload, and hand it the localStorage writes the
-      // main process cannot perform itself.
-      //
-      // Draining only when a window is there to receive them is the point: the
+      // Tell the renderer what to re-read, and hand it the localStorage writes
+      // the main process cannot perform itself. Queued rather than sent: the
       // loop follows the app lifecycle, so on macOS it keeps pulling with every
-      // window closed, and a drain into `mainWindow?.send` would have thrown
-      // those writes away with no second copy anywhere. Left queued, they go
-      // out on `did-finish-load` when a window next exists.
-      sendSyncChanged(result.applied, result.deleted);
+      // window closed, and there is no second copy of either half anywhere.
+      // `markRendererReady` is what delivers them once a window is listening.
+      noteSyncApplied(result);
     },
     onError: (error) => console.warn("[sync] loop error", error)
   });

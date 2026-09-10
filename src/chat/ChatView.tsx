@@ -1879,6 +1879,15 @@ export function ChatView({
   // being recreated (and re-subscribed) on every keystroke.
   const activeRequestIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  /**
+   * A turn of the athlete's own is in the air, so the timeline on screen is
+   * ahead of the row: their message and the tokens streaming under it are not
+   * saved yet. Read from an IPC handler, hence a ref.
+   */
+  const chatBusyRef = useRef(false);
+  /** A conversation a sync pull rewrote while `chatBusyRef` was up, waiting for
+   *  the turn to end before it is re-read. */
+  const syncReloadPendingRef = useRef<string | null>(null);
   // Accumulates source info across the current stream's info events.
   const sourceRef = useRef<SourceInfo | null>(null);
   const thinkingRef = useRef("");
@@ -2282,6 +2291,56 @@ export function ChatView({
     });
   }, [api, showLiveAutomation]);
 
+  /**
+   * A conversation written on another machine.
+   *
+   * Sync merges `chat_sessions` rows straight into SQLite, behind this window's
+   * back — the same shape of change an automation run makes, arriving from a
+   * different direction. Nothing here noticed: the sidebar rendered the list it
+   * read on mount and the transcript its copy from `loadSession`, so a
+   * conversation held or extended on the other computer only appeared after a
+   * restart, which is what the Sync panel's "Restart to see everything" was
+   * apologising for.
+   *
+   * `tables`, not the count: a pull carrying nothing but preferences must not
+   * cost the sidebar a query, and a pull carrying a coach's schedule must not
+   * cost it a transcript re-read.
+   */
+  useEffect(() => {
+    if (!api?.onSyncChanged) return;
+    // The provider on screen, for the reason the run-update subscription gives:
+    // the list belongs to a provider, and a merged conversation of another
+    // provider's is not in it.
+    const provider = chatSettings.provider;
+    return api.onSyncChanged((change) => {
+      if (
+        change.tables.includes("coach_automations") ||
+        change.tables.includes("coach_automation_bindings")
+      ) {
+        // Which conversations carry the ⚡ mark is a fact about the coaches, so
+        // a merged automation moves it on conversations this window never
+        // touched. Same counter the attach/detach path bumps.
+        setAutomationsVersion((value) => value + 1);
+      }
+
+      if (!change.tables.includes("chat_sessions")) return;
+      void refreshSessions(provider).catch(() => undefined);
+
+      const sessionId = activeSessionIdRef.current;
+      if (!sessionId) return;
+      // Mid-turn the copy on screen is the newer one — the athlete's message
+      // and the tokens under it are not in the row yet — so replacing it would
+      // take their own words off the screen. `foreignTail` keeps the merged
+      // entries safe in the row meanwhile (5.6b), so this only has to wait for
+      // the turn to end.
+      if (chatBusyRef.current) {
+        syncReloadPendingRef.current = sessionId;
+        return;
+      }
+      void reloadTranscript(sessionId);
+    });
+  }, [api, chatSettings.provider, refreshSessions]);
+
   // Load sign-in/provider state on mount.
   useEffect(() => {
     let cancelled = false;
@@ -2339,6 +2398,20 @@ export function ChatView({
   useEffect(() => {
     onActivityChange?.(streaming || exportingLatestActivity);
   }, [streaming, exportingLatestActivity, onActivityChange]);
+
+  // The turn is over, so a reload a pull had to hold back can happen now.
+  useEffect(() => {
+    chatBusyRef.current = streaming || exportingLatestActivity;
+    if (chatBusyRef.current) return;
+    const sessionId = syncReloadPendingRef.current;
+    syncReloadPendingRef.current = null;
+    if (!sessionId || sessionId !== activeSessionIdRef.current) return;
+    void reloadTranscript(sessionId);
+    // `reloadTranscript` reads refs and setters only, so the closure this
+    // captures is as good as a fresh one — the same reason the run-update
+    // subscription above can hold on to it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming, exportingLatestActivity]);
 
   const refreshMcpStatuses = useCallback(async () => {
     if (!api) return;

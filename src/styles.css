@@ -2158,6 +2158,16 @@ input::placeholder {
   gap: 16px;
 }
 
+/* The greeting block is the first flex child and the action the second, so the
+   button lands right. Nudged down a little: aligned to the top of a 42px
+   display line it reads as floating above the header rather than sitting in
+   it. */
+.dashboard-welcome-action {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
 .dashboard-greeting {
   margin: 0;
   color: var(--text-primary);
