@@ -2306,13 +2306,12 @@ export function ChatView({
     // provider's is not in it.
     const provider = chatSettings.provider;
     return api.onSyncChanged((change) => {
-      if (
-        change.tables.includes("coach_automations") ||
-        change.tables.includes("coach_automation_bindings")
-      ) {
-        // Which conversations carry the ⚡ mark is a fact about the coaches, so
-        // a merged analysis moves it on conversations this window never
-        // touched. Same counter the attach/detach path bumps.
+      if (change.tables.includes("coach_analyses")) {
+        // Which conversations carry the ⚡ mark is a fact about the analyses,
+        // so a merged one moves it on conversations this window never touched.
+        // `coach_analyses` is the only table of the feature that travels: a
+        // private trigger is `device` tier and a run is `derived`, so neither
+        // arrives here. Same counter creating and deleting bumps.
         setAnalysesVersion((value) => value + 1);
       }
 

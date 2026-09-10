@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, MoreHorizontal, Play, Plus, Trash2, Zap } from "lucide-react";
+import { Loader2, MoreHorizontal, Play, Plus, Zap } from "lucide-react";
 import type { CorosLinkApi } from "../../coroslink-api";
 import type { CoachAnalysisSummary } from "../../../electron/types";
 import { describeTrigger, formatTimeAgo } from "./analysisLabels";
@@ -211,8 +211,16 @@ export function ConversationAnalyses({
         >
           <div className="chat-coaches-panel-head">
             <strong>Analyses in this conversation</strong>
-            <span>
-              {liveCount}/{MAX_PER_SESSION}
+            {/* The count against the ceiling is what the ceiling counts: a
+                switched-off analysis still occupies one of the five, so
+                showing only the live ones read as room that the Create
+                button then refused to give. */}
+            <span
+              title={`${liveCount} of these ${
+                liveCount === 1 ? "is" : "are"
+              } switched on`}
+            >
+              {summaries.length}/{MAX_PER_SESSION}
             </span>
           </div>
 
@@ -333,7 +341,7 @@ export function ConversationAnalyses({
           <div className="chat-coaches-panel-foot">
             <button
               type="button"
-              className="chat-coaches-attach"
+              className="chat-coaches-create"
               disabled={busyId !== null || !api || full}
               title={
                 full

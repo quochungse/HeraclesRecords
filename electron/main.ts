@@ -387,7 +387,7 @@ import {
   runAnalysisNow,
   setAnalysisBudget
 } from "./coachAnalysisService";
-import { getChatSessionTitle, setChatSessionTitle } from "./chatHistoryStore";
+import { setChatSessionTitle } from "./chatHistoryStore";
 import {
   cancelChat,
   createChatSessionForProvider,
@@ -454,7 +454,6 @@ import {
   updateMcpServer
 } from "./mcpServersStore";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
-import { getTrainingSleepData } from "./sleepDataService";
 import {
   clearSleepHistoryCache,
   getCachedSleepSummary,

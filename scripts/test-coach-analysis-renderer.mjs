@@ -270,13 +270,13 @@ async function main() {
     );
     await harness("click", ".chat-coaches-pill");
     await waitFor(
-      () => harness("exists", ".chat-coaches-attach"),
+      () => harness("exists", ".chat-coaches-create"),
       "the popover opens"
     );
     await harness("clearCalls");
 
     // Create: the button reaches the parent, which is what opens the screen.
-    await harness("click", ".chat-coaches-attach");
+    await harness("click", ".chat-coaches-create");
     await waitFor(
       () => harness("callCount", "prop:onCreateAnalysis"),
       "Create Auto Analysis has to reach the screen that hosts the form"

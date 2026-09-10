@@ -3,7 +3,6 @@ import type {
   AnalysisThresholdMetric,
   AnalysisTrigger
 } from "../../../electron/types";
-import { DEFAULT_ANALYSIS_CONDITIONS } from "../../../electron/types";
 import {
   SPORT_FILTER_OPTIONS,
   THRESHOLD_METRIC_OPTIONS
@@ -22,14 +21,6 @@ export interface TriggerDraft {
   trigger: AnalysisTrigger | null;
   conditions: AnalysisConditions;
   deviceOnly: boolean;
-}
-
-export function emptyTriggerDraft(): TriggerDraft {
-  return {
-    trigger: null,
-    conditions: { ...DEFAULT_ANALYSIS_CONDITIONS },
-    deviceOnly: false
-  };
 }
 
 export function TriggerForm({

@@ -796,10 +796,22 @@ assert.match(
     /runCoachAnalysisNow\(analysisId\)/,
     "running from the conversation runs that analysis"
   );
+
+  // ...and it runs from exactly one place. The detail screen deliberately has
+  // no Run now: it opens over the conversation that holds the button, and two
+  // of them one click apart is two ways to start the same run twice. Stop is
+  // the other half of that decision and stays on both, because a run in flight
+  // is shown on both and there is nothing to duplicate about ending one.
+  const detail = read("src", "chat", "analyses", "AnalysisDetail.tsx");
+  assert.doesNotMatch(
+    detail,
+    /runCoachAnalysisNow\(/,
+    "the detail screen must not offer a second Run now"
+  );
   assert.match(
-    read("src", "chat", "analyses", "AnalysisDetail.tsx"),
-    /runCoachAnalysisNow\(analysisId\)/,
-    "and so does running from its own screen"
+    detail,
+    /await api\.cancelCoachAnalysisRun\(runId\)/,
+    "but it must still be able to stop the run it is showing"
   );
 
   // --- the entry points, which are the shape of the feature ----------------

@@ -634,7 +634,7 @@ export function emitAnalysisRunUpdate(run: CoachAnalysisRun): void {
  * window open at all — the trip is a scheduled run finding COROS locked at
  * 07:30 — so the banner reads the flag on mount and follows this afterwards.
  */
-export function emitAnalysisPauseUpdate(pause: CoachAnalysisPause | null): void {
+function emitAnalysisPauseUpdate(pause: CoachAnalysisPause | null): void {
   emitToAnyWindow("analysis:pauseUpdate", pause);
 }
 
@@ -716,7 +716,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       // quietly spend on the first.
       rollTranscriptSummary(previous, entries, {
         runtime,
-        idleTimeoutMs: AUTOMATION_IDLE_TIMEOUT_MS
+        idleTimeoutMs: ANALYSIS_IDLE_TIMEOUT_MS
       }),
     createSession: (provider) => createChatSession(provider).id,
     saveSession: (sessionId, entries) => {
@@ -769,7 +769,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       streamChat(sink, runId, messages, options),
     emitRunUpdate: (run) => emitAnalysisRunUpdate(run),
     cancelRun: (runId) => cancelChat(runId),
-    idleTimeoutMs: AUTOMATION_IDLE_TIMEOUT_MS
+    idleTimeoutMs: ANALYSIS_IDLE_TIMEOUT_MS
   };
 }
 
@@ -1199,7 +1199,7 @@ function buildPlaybookTurn(
  * provider fetch on this path carries a deadline of its own, so the runner
  * keeps one.
  */
-export const AUTOMATION_IDLE_TIMEOUT_MS = 3 * 60_000;
+const ANALYSIS_IDLE_TIMEOUT_MS = 3 * 60_000;
 
 /**
  * Returns null when the fan-out was stopped before this run began — including

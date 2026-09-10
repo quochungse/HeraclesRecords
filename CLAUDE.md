@@ -283,7 +283,7 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   `coach_analysis_local_triggers` (`device` tier); the analysis still travels and reads as
   manual over there. Turning the flag on must clear the row's `trigger_json` and turning
   it off must delete the local row, or one copy silently shadows or outlives the other.
-  `readTrigger`/`writeTrigger` in the store are the only places that know which side a
+  `readTrigger`/`writeAnalysis` in the store are the only places that know which side a
   trigger is on.
 
   **The old tables are dropped, not migrated.** `dropLegacyAutomationTables` removes

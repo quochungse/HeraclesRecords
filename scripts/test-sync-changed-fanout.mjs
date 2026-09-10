@@ -56,11 +56,11 @@ test("tablesTouched names tables, de-duplicated and in nothing else's company", 
     tablesTouched([
       entry("table", "chat_sessions", { recordId: "a" }),
       entry("table", "chat_sessions", { recordId: "b" }),
-      entry("table", "coach_automations", { recordId: "c" }),
+      entry("table", "coach_analyses", { recordId: "c" }),
       entry("setting", "chat.provider"),
       entry("localStorage", "theme")
     ]),
-    ["chat_sessions", "coach_automations"]
+    ["chat_sessions", "coach_analyses"]
   );
 });
 

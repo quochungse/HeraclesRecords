@@ -934,8 +934,11 @@ export function applyAnalysisSessionDeleted(
 
 /**
  * Every analysis carrying a real trigger and switched on, for the scheduler's
- * tick and the activity watcher's poll. One read: the trigger is on the row,
- * so there is nothing to join and nothing to look up per analysis.
+ * tick and the activity watcher's poll.
+ *
+ * One read of the analyses themselves: a shared trigger is on the row, so
+ * there is nothing to join. Only a "this device only" analysis costs a second
+ * lookup, because its trigger is deliberately in a table that does not travel.
  */
 export function listTriggeredCoachAnalyses(
   database: CoachAnalysisDatabase = defaultDatabase
