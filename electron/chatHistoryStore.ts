@@ -347,6 +347,11 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
     warnings: value.warnings,
     uploadedAt:
       typeof value.uploadedAt === "number" ? value.uploadedAt : undefined,
+    // Rebuilt field by field like the rest, so an unlisted key is dropped —
+    // and dropping this one would bring a removed creation back on the next
+    // save.
+    removedAt:
+      typeof value.removedAt === "number" ? value.removedAt : undefined,
     uploadResult:
       isRecord(value.uploadResult) &&
       typeof value.uploadResult.workoutsScheduled === "number" &&
@@ -960,6 +965,8 @@ function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
       return preview.length > 80 ? `${preview.slice(0, 80)}…` : preview;
     }
     if (entry.kind === "planDraft") {
+      // A removed creation is not what the conversation is about any more.
+      if (entry.draft.removedAt) continue;
       return entry.draft.summary || entry.draft.name;
     }
     if (entry.kind === "coachPrompt") {

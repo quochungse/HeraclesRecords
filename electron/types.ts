@@ -4052,6 +4052,15 @@ export interface PlanDraftPreview {
   conflicts: string[];
   warnings: string[];
   uploadedAt?: number;
+  /**
+   * Set when the athlete removed this creation from the conversation. The
+   * entry stays in the transcript and the draft is rewritten in place, because
+   * a save that shortens the array is exactly what `foreignTail` refuses — a
+   * shorter array reads as "the row grew behind my back" and the guard puts the
+   * tail back. Nothing that was already saved to COROS or the library is
+   * touched; only the card goes.
+   */
+  removedAt?: number;
   uploadResult?: {
     workoutsScheduled: number;
     workoutsCreated: number;

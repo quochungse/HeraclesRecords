@@ -78,7 +78,7 @@ export function AnalysesModal({
       onClick={editing ? undefined : onClose}
     >
       <section
-        className="panel chat-settings-modal"
+        className="panel chat-settings-modal coach-analyses-modal"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="chat-settings-modal-header">

@@ -841,4 +841,44 @@ assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
 ]);
 assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
 
+// Removing a creation is a mark on the draft that survives a round trip, and
+// a save that keeps the array's length so `foreignTail` has no tail to put
+// back. Both halves matter: `parsePlanDraft` rebuilds the draft field by
+// field, so an unlisted key is dropped, and a save that *shortened* the array
+// would have the guard restore the entry it just removed.
+{
+  const removedDb = createMemoryDatabase();
+  const session = createChatSession("claude-code", removedDb);
+  const keptMessage = { kind: "message", role: "user", content: "Plan my week" };
+  const creation = structuredClone(oneOffWorkoutEntry);
+  saveChatSession(session.id, [keptMessage, creation], removedDb, {
+    knownEntryCount: 0
+  });
+
+  const removed = structuredClone(creation);
+  removed.draft.removedAt = 1758000000000;
+  saveChatSession(session.id, [keptMessage, removed], removedDb, {
+    knownEntryCount: 2
+  });
+
+  const stored = parseChatTranscriptJson(
+    removedDb.getSession(session.id).messages_json
+  );
+  assert.equal(stored.length, 2);
+  assert.equal(stored[1].draft.removedAt, 1758000000000);
+  // The removed creation stops speaking for the conversation in the sidebar.
+  assert.equal(
+    listChatSessions("claude-code", removedDb)[0].preview,
+    "Plan my week"
+  );
+
+  // And a draft that was never removed keeps saying nothing about it, rather
+  // than gaining a null field that a `deepEqual` elsewhere would trip on.
+  assert.equal(
+    parseChatTranscriptJson(JSON.stringify([oneOffWorkoutEntry]))[0].draft
+      .removedAt,
+    undefined
+  );
+}
+
 console.log("chat history store tests passed");

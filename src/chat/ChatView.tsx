@@ -27,6 +27,8 @@ import {
   LogOut,
   MessageCircle,
   Network,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RefreshCw,
   Send,
@@ -74,7 +76,6 @@ import type {
   LocalChatConnectionTest,
   LocalChatDiscovery,
   OpenRouterConnectionTest,
-  CorosMcpStatus,
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
@@ -102,6 +103,7 @@ import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
+import { CoachCreationModal } from "./CoachCreationModal";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -163,22 +165,6 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   customInstructions: "",
   compactContext: DEFAULT_COMPACT_CONTEXT
 };
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window === "undefined" ? false : window.matchMedia(query).matches
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const handleChange = () => setMatches(media.matches);
-    handleChange();
-    media.addEventListener("change", handleChange);
-    return () => media.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
-}
 
 const CHAT_MARKDOWN_REMARK_PLUGINS = [remarkGfm];
 const CHAT_MARKDOWN_COMPONENTS: Components = {
@@ -1842,16 +1828,20 @@ export function ChatView({
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [exportingLatestActivity, setExportingLatestActivity] = useState(false);
   const [currentSource, setCurrentSource] = useState<SourceInfo | null>(null);
-  const [mcpStatus, setMcpStatus] = useState<CorosMcpStatus | null>(null);
-  const [mcpStatuses, setMcpStatuses] = useState<McpServerStatus[]>([]);
   const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
   const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
-  const [mcpBusy, setMcpBusy] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [selectedPlanDraftId, setSelectedPlanDraftId] = useState<
     string | null
   >(null);
-  const [planPanelExpanded, setPlanPanelExpanded] = useState(false);
+  /**
+   * The Creations panel starts closed and opens itself when the coach makes
+   * something new — the one moment there is news in it. Every other time it is
+   * a column of titles taken out of the conversation's width, so the athlete
+   * opens it when they want it.
+   */
+  const [planPanelOpen, setPlanPanelOpen] = useState(false);
+  /** The creation the popup is showing. null is closed. */
+  const [openCreationId, setOpenCreationId] = useState<string | null>(null);
   const [highlightedChatEntryIndex, setHighlightedChatEntryIndex] = useState<
     number | null
   >(null);
@@ -1910,8 +1900,10 @@ export function ChatView({
   const autoDetectLocalRef = useRef(false);
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const mcpRef = useRef<HTMLDivElement>(null);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Which conversation `seenPlanDraftIdsRef` is describing. */
+  const planPanelSessionRef = useRef<string | null>(null);
+  const seenPlanDraftIdsRef = useRef<Set<string>>(new Set());
   const chatHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -2414,20 +2406,6 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, exportingLatestActivity]);
 
-  const refreshMcpStatuses = useCallback(async () => {
-    if (!api) return;
-    const [corosResult, statusesResult] = await Promise.allSettled([
-      api.getCorosMcpStatus(),
-      api.getMcpStatuses()
-    ]);
-    if (corosResult.status === "fulfilled") {
-      setMcpStatus(corosResult.value);
-    }
-    if (statusesResult.status === "fulfilled") {
-      setMcpStatuses(statusesResult.value);
-    }
-  }, [api]);
-
   // Provider settings and the Claude account are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
@@ -2450,22 +2428,6 @@ export function ChatView({
       cancelled = true;
     };
   }, [active, api, checkingAuth]);
-
-  // Load MCP connection status on mount (and shortly after, to catch the
-  // silent startup reconnect completing in the main process).
-  //
-  // Keyed on `active` as well, because servers are added and removed from
-  // Settings now, not from here. This panel stays mounted once opened, so
-  // without this the tool list would still show whatever was connected the
-  // first time Coach was opened.
-  useEffect(() => {
-    if (!api || !active) return;
-    void refreshMcpStatuses();
-    const timer = setTimeout(() => void refreshMcpStatuses(), 2500);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [active, api, refreshMcpStatuses]);
 
   // Ask about dead MCP sessions here rather than at launch: nothing opens an
   // OAuth window on the athlete's behalf any more, so this is the one place
@@ -2506,7 +2468,6 @@ export function ChatView({
           authRequired.has(status.id)
       );
 
-      setMcpStatuses(statuses);
       if (broken.length > 0) {
         setMcpPrompt(broken);
       }
@@ -2543,9 +2504,8 @@ export function ChatView({
     } finally {
       setMcpPrompt([]);
       setMcpPromptBusy(false);
-      await refreshMcpStatuses();
     }
-  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
+  }, [api, mcpPrompt, onError]);
 
   // Later: touch nothing. The effect above re-runs the next time Coach becomes
   // the active view, so the question comes back on its own.
@@ -2574,34 +2534,8 @@ export function ChatView({
       }
     } finally {
       setMcpPromptBusy(false);
-      await refreshMcpStatuses();
     }
-  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
-
-  useEffect(() => {
-    if (!showTools || settingsOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!mcpRef.current?.contains(event.target as Node)) {
-        setShowTools(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowTools(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [showTools, settingsOpen]);
+  }, [api, mcpPrompt, onError]);
 
   // Subscribe once to the streaming push channels.
   useEffect(() => {
@@ -3161,23 +3095,6 @@ export function ChatView({
   }, [api, checkingAuth, chatSettings, chatSettings.provider, chatSettings.local.model]);
 
 
-  const handleConnectMcp = async () => {
-    if (!api || mcpBusy) return;
-    setMcpBusy(true);
-    onError(null);
-    try {
-      const status = await api.connectCorosMcp();
-      setMcpStatus(status);
-      // Surface the discovered tools for verification during this milestone.
-      console.log("[COROS MCP] tools:", status.tools);
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "COROS connection failed.");
-    } finally {
-      await refreshMcpStatuses();
-      setMcpBusy(false);
-    }
-  };
-
   /**
    * Rolls the conversation's summary forward when the window says it is time,
    * ahead of the athlete's own turn.
@@ -3534,6 +3451,31 @@ export function ChatView({
     }
   };
 
+  /**
+   * Take a creation out of the conversation.
+   *
+   * A mark on the draft, not a splice: the entry keeps its place in the
+   * transcript so the array the window saves is the same length the row holds
+   * — a shorter one is what `foreignTail` reads as a foreign append and undoes.
+   * Whatever was already uploaded to COROS or saved to the library is left
+   * alone; this removes the card, not the workout.
+   */
+  const handleRemovePlanDraft = (draftId: string) => {
+    setOpenCreationId((current) => (current === draftId ? null : current));
+    setTimeline((prev) => {
+      const next = prev.map((entry): ChatEntry =>
+        entry.kind === "planDraft" && entry.draft.draftId === draftId
+          ? {
+              kind: "planDraft",
+              draft: { ...entry.draft, removedAt: Date.now() }
+            }
+          : entry
+      );
+      persistHistory(activeSessionIdRef.current, next, true);
+      return next;
+    });
+  };
+
   const handleReviewPlanDraft = (draft: PlanDraftPreview) => {
     if (!onReviewPlan) return;
     try {
@@ -3680,29 +3622,57 @@ export function ChatView({
     isOpenRouterProvider && !chatSettings.openRouter.hasApiKey;
   const showAnthropicKeyGate =
     isClaudeApiProvider && !chatSettings.anthropic.hasApiKey;
-  const showPlanPanel = useMediaQuery("(min-width: 1400px)");
+  // A removed creation keeps its transcript entry — see `PlanDraftPreview.
+  // removedAt` for why it cannot simply be spliced out — so every reader
+  // filters here, and nothing downstream has to remember to.
   const planDrafts = timeline.flatMap((entry) =>
-    entry.kind === "planDraft" ? [entry.draft] : []
+    entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft] : []
   );
-  const latestPlanDraft = planDrafts.at(-1);
-  const selectedPlanDraft =
-    planDrafts.find((draft) => draft.draftId === selectedPlanDraftId) ??
-    latestPlanDraft;
+  const openCreation =
+    planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
   const trainingPlanDrafts = planDrafts.filter(
     (draft) => draft.artifactType !== "workout"
   );
-  const selectedTrainingPlanNumber = selectedPlanDraft?.artifactType !== "workout"
-    ? trainingPlanDrafts.findIndex(
-        (draft) => draft.draftId === selectedPlanDraft?.draftId
-      ) + 1
-    : 0;
+  const openCreationKicker =
+    openCreation === null
+      ? ""
+      : openCreation.artifactType === "workout"
+        ? "One-off workout"
+        : `Plan ${
+            trainingPlanDrafts.findIndex(
+              (draft) => draft.draftId === openCreation.draftId
+            ) + 1
+          } of ${trainingPlanDrafts.length}`;
 
+  /**
+   * Opening the panel is reserved for news, so this has to tell a creation
+   * that just arrived from one that was already in the transcript when the
+   * conversation was opened. Ids seen for this session are what separates
+   * them; switching conversations adopts whatever is there and closes up,
+   * because scrolling back through an old chat is not the coach proposing
+   * anything.
+   */
+  const planDraftIdKey = planDrafts.map((draft) => draft.draftId).join("|");
   useEffect(() => {
-    setSelectedPlanDraftId(latestPlanDraft?.draftId ?? null);
-    if (latestPlanDraft) {
-      setPlanPanelExpanded(false);
+    const ids = planDrafts.map((draft) => draft.draftId);
+    if (planPanelSessionRef.current !== activeSessionId) {
+      planPanelSessionRef.current = activeSessionId;
+      seenPlanDraftIdsRef.current = new Set(ids);
+      setPlanPanelOpen(false);
+      setOpenCreationId(null);
+      setSelectedPlanDraftId(ids.at(-1) ?? null);
+      return;
     }
-  }, [activeSessionId, latestPlanDraft?.draftId]);
+    const fresh = ids.filter((id) => !seenPlanDraftIdsRef.current.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) seenPlanDraftIdsRef.current.add(id);
+    setSelectedPlanDraftId(fresh[fresh.length - 1] ?? null);
+    setPlanPanelOpen(true);
+    // `planDrafts` is rebuilt on every render; the id list is what actually
+    // changes, and re-running on the array identity would reopen the panel on
+    // every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, planDraftIdKey]);
 
   const providerSwitch = (
     <ProviderSwitch
@@ -4242,76 +4212,26 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          <div className="chat-mcp" ref={mcpRef}>
-            {(() => {
-              const connectedServers = mcpStatuses.filter((s) => s.connected);
-              const totalTools = connectedServers.reduce(
-                (n, s) => n + s.toolCount,
-                0
-              );
-              return connectedServers.length > 0 ? (
-              <>
-                <button
-                  type="button"
-                  className="chat-mcp-pill connected"
-                  onClick={() => setShowTools((open) => !open)}
-                  title={`Connected via MCP: ${connectedServers
-                    .map((s) => s.name)
-                    .join(", ")}`}
-                  aria-expanded={showTools}
-                  aria-haspopup="dialog"
-                >
-                  <Database size={13} aria-hidden="true" />
-                  {connectedServers.length === 1
-                    ? connectedServers[0].name
-                    : `${connectedServers.length} MCP servers`}{" "}
-                  · {totalTools} tools
-                </button>
-                {showTools ? (
-                  <div className="chat-mcp-panel">
-                    <ul>
-                      {connectedServers.map((s) => (
-                        <li key={s.id}>
-                          <code>{s.name}</code>
-                          <span>{s.toolCount} tools</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="chat-mcp-panel-head">
-                      <button
-                        type="button"
-                        onClick={() => setSettingsOpen(true)}
-                      >
-                        Manage servers
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <button
-                type="button"
-                className="chat-mcp-pill"
-                onClick={() => {
-                  setSettingsOpen(true);
-                  void handleConnectMcp();
-                }}
-                disabled={mcpBusy}
-              >
-                {mcpBusy ? (
-                  <Loader2 className="chat-spinner" size={13} aria-hidden="true" />
-                ) : (
-                  <Database size={13} aria-hidden="true" />
-                )}
-                {mcpBusy
-                  ? "Connecting…"
-                  : mcpStatus?.authorized
-                    ? "Reconnect COROS"
-                    : "Connect COROS"}
-              </button>
-            );
-            })()}
-          </div>
+          {planDrafts.length > 0 ? (
+            <button
+              type="button"
+              className="chat-creations-pill"
+              aria-expanded={planPanelOpen}
+              aria-controls="chat-creations-panel"
+              onClick={() => setPlanPanelOpen((open) => !open)}
+              title={
+                planPanelOpen ? "Hide Coach creations" : "Show Coach creations"
+              }
+            >
+              {planPanelOpen ? (
+                <PanelRightClose size={13} aria-hidden="true" />
+              ) : (
+                <PanelRightOpen size={13} aria-hidden="true" />
+              )}
+              Creations
+              <span className="chat-creations-count">{planDrafts.length}</span>
+            </button>
+          ) : null}
           {isChatGptProvider ? (
             <button
               type="button"
@@ -4411,34 +4331,18 @@ function AnalysisSilentChip({
             }
 
             if (entry.kind === "planDraft") {
-              if (showPlanPanel) {
+              // Removed by the athlete: the entry stays so the saved array
+              // keeps its length, but nothing draws it.
+              if (entry.draft.removedAt) {
                 return null;
               }
-              return (
-                <div
-                  key={entry.draft.draftId}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <CoachDraftPreviewCard
-                      draft={entry.draft}
-                      uploading={uploadingDraftId === entry.draft.draftId}
-                      uploaded={uploadedPlans[entry.draft.draftId]}
-                      onUpload={(destination, scheduleDate) =>
-                        void handleUploadPlanDraft(
-                          entry.draft.draftId,
-                          destination,
-                          scheduleDate
-                        )
-                      }
-                      onReview={onReviewPlan ? () => handleReviewPlanDraft(entry.draft) : undefined}
-                    />
-                  </div>
-                </div>
-              );
+              // Creations are read from the panel and the popup it opens, at
+              // every window width. There used to be a second copy of the card
+              // inline here for windows too narrow to hold the panel, and the
+              // width test that chose between them also decided whether the
+              // header's Creations button existed — so narrowing the window
+              // took the button away and left the panel with no way back.
+              return null;
             }
 
             if (entry.kind === "workoutDelete") {
@@ -4669,178 +4573,118 @@ function AnalysisSilentChip({
             onStop={handleStop}
           />
         </div>
-        {showPlanPanel && selectedPlanDraft ? (
+        {planPanelOpen && planDrafts.length > 0 ? (
           <aside
-            className={`chat-plan-panel${
-              planPanelExpanded ? " is-expanded" : " is-list-view"
-            }`}
-            aria-label={
-              planPanelExpanded ? "Generated item details" : "Coach creations"
-            }
+            id="chat-creations-panel"
+            className="chat-plan-panel"
+            aria-label="Coach creations"
           >
-            {!planPanelExpanded ? (
-              <>
-                <header className="chat-plan-list-header">
-                  <div>
-                    <span className="chat-plan-panel-icon">
-                      <BookOpen size={15} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <strong>Coach creations</strong>
-                      <span>Plans and one-off workouts</span>
-                    </div>
-                  </div>
-                  <strong className="chat-plan-list-count">
-                    {planDrafts.length}
-                  </strong>
-                </header>
-                <ol className="chat-plan-list">
-                  {planDrafts.map((draft, index) => {
-                    const saved = Boolean(
-                      uploadedPlans[draft.draftId] ||
-                        draft.uploadResult ||
-                        draft.uploadedAt
+            <header className="chat-plan-list-header">
+              <div>
+                <span className="chat-plan-panel-icon">
+                  <BookOpen size={15} aria-hidden="true" />
+                </span>
+                <div>
+                  <strong>Coach creations</strong>
+                  <span>Plans and one-off workouts</span>
+                </div>
+              </div>
+              <div className="chat-plan-list-header-end">
+                <strong className="chat-plan-list-count">
+                  {planDrafts.length}
+                </strong>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Hide Coach creations"
+                  title="Hide Coach creations"
+                  onClick={() => setPlanPanelOpen(false)}
+                >
+                  <PanelRightClose size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+            <ol className="chat-plan-list">
+              {planDrafts.map((draft, index) => {
+                const saved = Boolean(
+                  uploadedPlans[draft.draftId] ||
+                    draft.uploadResult ||
+                    draft.uploadedAt
+                );
+                const isWorkout = draft.artifactType === "workout";
+                const planNumber = isWorkout
+                  ? 0
+                  : planDrafts
+                      .slice(0, index + 1)
+                      .filter((item) => item.artifactType !== "workout").length;
+                const weeks = isWorkout
+                  ? 0
+                  : Math.max(
+                      1,
+                      groupPlanEntriesByWeek(draft.entries).filter(
+                        (week) => week.id !== "unscheduled"
+                      ).length
                     );
-                    const isWorkout = draft.artifactType === "workout";
-                    const planNumber = isWorkout
-                      ? 0
-                      : planDrafts
-                          .slice(0, index + 1)
-                          .filter((item) => item.artifactType !== "workout").length;
-                    const weeks = isWorkout
-                      ? 0
-                      : Math.max(
-                          1,
-                          groupPlanEntriesByWeek(draft.entries).filter(
-                            (week) => week.id !== "unscheduled"
-                          ).length
-                        );
-                    const primarySport = draft.entries[0]?.sport;
-                    const SportIcon = sportTheme(primarySport).icon;
-                    const selected = draft.draftId === selectedPlanDraft.draftId;
+                const primarySport = draft.entries[0]?.sport;
+                const SportIcon = sportTheme(primarySport).icon;
+                const selected = draft.draftId === selectedPlanDraftId;
 
-                    return (
-                      <li key={draft.draftId}>
-                        <button
-                          type="button"
-                          className={`chat-plan-list-item${
-                            selected ? " is-selected" : ""
-                          }`}
-                          onClick={() => {
-                            setSelectedPlanDraftId(draft.draftId);
-                            setPlanPanelExpanded(true);
-                          }}
-                          aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-                        >
-                          <span
-                            className="chat-plan-list-sport"
-                            style={planSportStyle(primarySport)}
-                          >
-                            <SportIcon
-                              size={15}
-                              strokeWidth={2}
-                              aria-hidden="true"
-                            />
-                          </span>
-                          <span className="chat-plan-list-copy">
-                            <span className="chat-plan-list-kicker">
-                              {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
-                            </span>
-                            <strong>
-                              {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
-                            </strong>
-                            <span className="chat-plan-list-meta">
-                              <span>
-                                {draft.entries.length}{" "}
-                                {draft.entries.length === 1
-                                  ? "workout"
-                                  : "workouts"}
-                              </span>
-                              {!isWorkout ? (
-                                <span>
-                                  {weeks} {weeks === 1 ? "week" : "weeks"}
-                                </span>
-                              ) : (
-                                <span>Workout Library</span>
-                              )}
-                              <span data-status={saved ? "saved" : "draft"}>
-                                {saved ? "Saved" : "Draft"}
-                              </span>
-                            </span>
-                          </span>
-                          <ChevronRight size={15} aria-hidden="true" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </>
-            ) : (
-              <>
-                <header className="chat-plan-panel-header">
-                  <div className="chat-plan-panel-heading">
+                return (
+                  <li key={draft.draftId}>
                     <button
                       type="button"
-                      className="chat-plan-panel-back"
-                      onClick={() => setPlanPanelExpanded(false)}
-                      aria-label="Back to Coach creations"
-                      title="Back to Coach creations"
+                      className={`chat-plan-list-item${
+                        selected ? " is-selected" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedPlanDraftId(draft.draftId);
+                        setOpenCreationId(draft.draftId);
+                      }}
+                      aria-haspopup="dialog"
+                      aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
                     >
-                      <ChevronLeft size={15} aria-hidden="true" />
-                      Creations
-                    </button>
-                    <div className="chat-plan-panel-title is-detail-title">
-                      <div>
-                        <strong title={selectedPlanDraft.name}>
-                          {selectedPlanDraft.name ||
-                            (selectedPlanDraft.artifactType === "workout"
-                              ? "Untitled workout"
-                              : "Untitled plan")}
-                        </strong>
-                        <span>
-                          {selectedPlanDraft.artifactType === "workout"
-                            ? "One-off workout"
-                            : `Plan ${selectedTrainingPlanNumber} of ${trainingPlanDrafts.length}`}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="chat-plan-panel-actions">
-                      <button
-                        type="button"
-                        className="chat-plan-panel-chat-link"
-                        onClick={() =>
-                          handleScrollToPlanChat(selectedPlanDraft.draftId)
-                        }
-                        title="View the generated response in chat"
+                      <span
+                        className="chat-plan-list-sport"
+                        style={planSportStyle(primarySport)}
                       >
-                        <MessageCircle size={14} aria-hidden="true" />
-                        View in chat
-                      </button>
-                    </div>
-                  </div>
-                </header>
-                <div className="chat-plan-panel-body">
-                  <CoachDraftPreviewCard
-                    key={selectedPlanDraft.draftId}
-                    draft={selectedPlanDraft}
-                    uploading={uploadingDraftId === selectedPlanDraft.draftId}
-                    uploaded={uploadedPlans[selectedPlanDraft.draftId]}
-                    onUpload={(destination, scheduleDate) =>
-                      void handleUploadPlanDraft(
-                        selectedPlanDraft.draftId,
-                        destination,
-                        scheduleDate
-                      )
-                    }
-                    onReview={
-                      onReviewPlan
-                        ? () => handleReviewPlanDraft(selectedPlanDraft)
-                        : undefined
-                    }
-                  />
-                </div>
-              </>
-            )}
+                        <SportIcon
+                          size={15}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <span className="chat-plan-list-copy">
+                        <span className="chat-plan-list-kicker">
+                          {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
+                        </span>
+                        <strong>
+                          {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
+                        </strong>
+                        <span className="chat-plan-list-meta">
+                          <span>
+                            {draft.entries.length}{" "}
+                            {draft.entries.length === 1
+                              ? "workout"
+                              : "workouts"}
+                          </span>
+                          {!isWorkout ? (
+                            <span>
+                              {weeks} {weeks === 1 ? "week" : "weeks"}
+                            </span>
+                          ) : (
+                            <span>Workout Library</span>
+                          )}
+                          <span data-status={saved ? "saved" : "draft"}>
+                            {saved ? "Saved" : "Draft"}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronRight size={15} aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
           </aside>
         ) : null}
       </div>
@@ -4853,6 +4697,41 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      <CoachCreationModal
+        draft={openCreation}
+        kicker={openCreationKicker}
+        onClose={() => setOpenCreationId(null)}
+        onViewInChat={() => {
+          if (!openCreation) return;
+          setOpenCreationId(null);
+          handleScrollToPlanChat(openCreation.draftId);
+        }}
+        onRemove={() => {
+          if (!openCreation) return;
+          handleRemovePlanDraft(openCreation.draftId);
+        }}
+      >
+        {openCreation ? (
+          <CoachDraftPreviewCard
+            key={openCreation.draftId}
+            draft={openCreation}
+            uploading={uploadingDraftId === openCreation.draftId}
+            uploaded={uploadedPlans[openCreation.draftId]}
+            onUpload={(destination, scheduleDate) =>
+              void handleUploadPlanDraft(
+                openCreation.draftId,
+                destination,
+                scheduleDate
+              )
+            }
+            onReview={
+              onReviewPlan
+                ? () => handleReviewPlanDraft(openCreation)
+                : undefined
+            }
+          />
+        ) : null}
+      </CoachCreationModal>
       <AnalysesModal
         api={api}
         target={analysisTarget}
