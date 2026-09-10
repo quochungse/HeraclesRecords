@@ -4,6 +4,12 @@ import { setWorkerUrl } from "maplibre-gl";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ROUTE_BASE_LAYERS, type BaseLayerConfig, type RouteBaseLayer } from "./constants";
+import {
+  ONEWAY_ARROW_LAYER_IDS,
+  ONEWAY_ARROW_ROTATION,
+  onewayArrowLayer
+} from "./onewayArrows";
+import type { Map as MaplibreMap } from "maplibre-gl";
 
 /**
  * MapLibre v6 spawns its worker from a URL that Vite cannot statically see, so
@@ -69,6 +75,48 @@ export function resolveBaseLayerConfig(config: BaseLayerConfig): BaseLayerConfig
 type VectorLayerOptions = Parameters<typeof L.maplibreGL>[0] & { pane: string };
 
 /**
+ * Corrects the one-way arrows a style ships, or adds them when it ships none.
+ * See `onewayArrows.ts` for why every arrow was drawn across the road.
+ *
+ * New layers go beneath the first symbol layer so arrows never cover a label.
+ */
+function applyOnewayArrows(gl: MaplibreMap): void {
+  const firstSymbolLayer = gl
+    .getStyle()
+    .layers.find((candidate) => candidate.type === "symbol")?.id;
+
+  for (const id of ONEWAY_ARROW_LAYER_IDS) {
+    if (gl.getLayer(id)) {
+      gl.setLayoutProperty(id, "icon-rotate", ONEWAY_ARROW_ROTATION[id]);
+    } else {
+      gl.addLayer(onewayArrowLayer(id), firstSymbolLayer);
+    }
+  }
+}
+
+/**
+ * The MapLibre map exists only once Leaflet has added the layer, and its style
+ * is fetched after that, so the fix has two moments to wait for and either can
+ * already have passed.
+ */
+function fixOnewayArrowsWhenReady(layer: L.MaplibreGL): void {
+  layer.on("add", () => {
+    const gl = layer.getMaplibreMap();
+
+    // `style.load` already means the style is in place, so it must not be
+    // gated on `isStyleLoaded()` — that reads false while the style is still
+    // settling, and gating on it drops the fix with no second chance.
+    // Listening rather than `once` keeps the fix across a style swap.
+    gl.on("style.load", () => applyOnewayArrows(gl));
+
+    // And a style that finished loading before this ran fires nothing at all.
+    if (gl.isStyleLoaded()) {
+      applyOnewayArrows(gl);
+    }
+  });
+}
+
+/**
  * Builds the base map layer for a style, raster or vector. Every screen goes
  * through here so the two kinds cannot drift apart — and so a caller never has
  * to know which kind it asked for.
@@ -90,7 +138,9 @@ export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
       // can appear, and this is where the plugin reads it from.
       attributionControl: { customAttribution: resolved.attribution }
     };
-    return L.maplibreGL(options);
+    const layer = L.maplibreGL(options);
+    fixOnewayArrowsWhenReady(layer);
+    return layer;
   }
 
   return L.tileLayer(resolved.url, {
