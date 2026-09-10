@@ -7,9 +7,11 @@ import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
   ROUTE_BASE_LAYERS,
   ROUTE_OVERLAY_LAYERS,
+  type BaseLayerConfig,
   type RouteBaseLayer,
   type RouteOverlayId
 } from "../../maps/routes/constants";
+import { baseLayerMaxZoom, createBaseLayer } from "../../maps/routes/baseLayers";
 import { MapLayerControl } from "../../maps/routes/panels";
 import { useTheme } from "../../theme/ThemeProvider";
 import {
@@ -146,12 +148,12 @@ function buildRouteGeometry(
 }
 
 interface MapStyle {
-  tile: { url: string; maxZoom: number; subdomains?: string; attribution: string };
+  tile: BaseLayerConfig;
   routeColor: string;
   ghostOpacity: number;
 }
 
-/** The theme-matched CARTO layer used when no explicit layer is chosen. */
+/** The theme-matched layer used when no explicit layer is chosen. */
 function themeBaseLayer(theme: string): RouteBaseLayer {
   return theme === "paper" ? "light" : "dark";
 }
@@ -181,7 +183,7 @@ function RouteMapCanvas({
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const tileLayerRef = useRef<L.Layer | null>(null);
   const ghostLineRef = useRef<L.Polyline | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
   const overlayLayersRef = useRef(new Map<RouteOverlayId, L.TileLayer>());
@@ -211,11 +213,7 @@ function RouteMapCanvas({
       scrollWheelZoom
     });
 
-    const tileLayer = L.tileLayer(tile.url, {
-      maxZoom: tile.maxZoom,
-      attribution: tile.attribution,
-      ...(tile.subdomains ? { subdomains: tile.subdomains } : {})
-    }).addTo(map);
+    const tileLayer = createBaseLayer(map, tile).addTo(map);
 
     const ghostLine = L.polyline(route.latLngs, {
       color: routeColor,
@@ -313,18 +311,14 @@ function RouteMapCanvas({
       theme,
       baseLayer
     );
-    const next = L.tileLayer(tile.url, {
-      maxZoom: tile.maxZoom,
-      attribution: tile.attribution,
-      ...(tile.subdomains ? { subdomains: tile.subdomains } : {})
-    });
-    next.addTo(map);
-    next.bringToBack();
+    // The base map has its own pane below every other layer, so the new one
+    // cannot cover the route however late it is added.
+    const next = createBaseLayer(map, tile).addTo(map);
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current);
     }
     tileLayerRef.current = next;
-    map.setMaxZoom(tile.maxZoom);
+    map.setMaxZoom(baseLayerMaxZoom(tile));
     ghostLineRef.current?.setStyle({ color: routeColor, opacity: ghostOpacity });
     routeLineRef.current?.setStyle({ color: routeColor });
     appliedBaseLayerRef.current = baseLayer;

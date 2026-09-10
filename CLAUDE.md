@@ -259,7 +259,35 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.
 - **Maps / Routes** (`mapService.ts`, `routeShareServer.ts`) — COROS map packages over USB;
-  OpenRouteService for route generation, exported as GPX.
+  route generation exported as GPX. Routing is **keyless by default** (BRouter + Nominatim);
+  OpenRouteService is an opt-in backend a power user enables by saving their own key, and
+  `resolveRouteBackend()` falls back to keyless unless both the opt-in and a key are present.
+  **Base map styles all live in `ROUTE_BASE_LAYERS` (`src/maps/routes/constants.ts`) and must
+  stay keyless** — the app holds no map provider key, offers no field to enter one, and bakes
+  none into the build, so a style that needs one is not a degraded map, it is no map.
+  `light` and `dark` are **OpenFreeMap vector styles rendered by MapLibre**, not raster tiles.
+  They were CARTO's `light_all`/`dark_all` until August 2026, when CARTO began answering
+  keyless requests with a perfectly valid 200 PNG that has "API KEY REQUIRED" printed across
+  it — a watermark, not an error, which is why nothing in the app noticed and why checking a
+  provider by status code proves nothing. Both theme-driven screens (Overview map, activity
+  detail map) resolve to those two ids through `themeBaseLayer(theme)`, so both wore it.
+  `npm run test:base-layers` fails on a key-shaped endpoint, on anything pointing back at
+  CARTO, and on `light`/`dark` ceasing to be vector.
+
+  Two things hold the vector path up, and both are load-bearing:
+  **`createBaseLayer` (`baseLayers.ts`) is the only way to build a base layer** — raster or
+  vector — so no screen has to know which kind it asked for, and every base map lands in the
+  `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where trail overlays and
+  route lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
+  code needed on every swap; a vector layer has no `bringToBack()` to call.
+  And **MapLibre v6 needs `setWorkerUrl()` with Vite**: it spawns its worker from a URL the
+  bundler cannot statically see, so no worker chunk is emitted and the URL arrives empty,
+  resolving back to the page itself. The failure is silent and misleading — the map builds,
+  `styledata` fires, tiles arrive 200, `areTilesLoaded()` says true, and the canvas paints
+  the style's background colour and nothing else, while the console blames a
+  "non-JavaScript MIME type text/html". `import workerUrl from
+  "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"` is what makes it emit; do not remove
+  that import because it looks unused.
 - **Watch Faces** (`corosWatchfaceService.ts`, ~4.1k lines, 41 renderer files) — the most
   intricate binary-format area; several tests need a real Electron window for canvas.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS

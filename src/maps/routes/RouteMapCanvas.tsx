@@ -13,6 +13,7 @@ import {
   type RouteBaseLayer,
   type RouteOverlayId
 } from "./constants";
+import { createBaseLayer } from "./baseLayers";
 import { findRetracedRouteSections } from "./routeOverlap";
 
 export type RouteStudioMode = "generate" | "draw" | "explore" | "sketch";
@@ -86,7 +87,7 @@ export function RouteMapCanvas({
 }: RouteMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const baseLayerRef = useRef<L.TileLayer | null>(null);
+  const baseLayerRef = useRef<L.Layer | null>(null);
   const overlayLayersRef = useRef<Map<RouteOverlayId, L.TileLayer>>(new Map());
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const waypointLayerRef = useRef<L.LayerGroup | null>(null);
@@ -279,14 +280,9 @@ export function RouteMapCanvas({
       return;
     }
     const config = ROUTE_BASE_LAYERS[baseLayer];
-    const next = L.tileLayer(config.url, {
-      maxZoom: config.maxZoom,
-      attribution: config.attribution,
-      ...(config.subdomains ? { subdomains: config.subdomains } : {})
-    });
-    // Base layer sits beneath route/overlay panes.
-    next.addTo(map);
-    next.bringToBack();
+    // The base map has a pane of its own beneath the route and overlay panes,
+    // so it stays underneath no matter when it is added.
+    const next = createBaseLayer(map, config).addTo(map);
     if (baseLayerRef.current) {
       map.removeLayer(baseLayerRef.current);
     }
