@@ -274,24 +274,36 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   `npm run test:base-layers` fails on a key-shaped endpoint, on anything pointing back at
   CARTO, and on `light`/`dark` ceasing to be vector.
 
-  Two things hold the vector path up, and both are load-bearing:
+  Three things hold the vector path up, and all are load-bearing:
   **`createBaseLayer` (`baseLayers.ts`) is the only way to build a base layer** — raster or
   vector — so no screen has to know which kind it asked for, and every base map lands in the
   `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where trail overlays and
   route lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
   code needed on every swap; a vector layer has no `bringToBack()` to call.
+  **It also binds the map's max zoom, and that is not decoration.** Leaflet reads a zoom limit
+  off a layer in exactly one place — `GridLayer.beforeAdd` — so a raster base map bounded the
+  map for free, while `L.maplibreGL`, a plain `L.Layer`, bounds nothing and `getMaxZoom()`
+  falls back to `Infinity`. That is not merely "zooms too far": `fitBounds` clamps to
+  `getMaxZoom()`, so a route whose points share one spot resolves to zoom `Infinity`, the
+  pixel origin goes infinite with it, and every polyline collapses to `M0 0` — a blank map on
+  the two screens whose *default* style is vector. `createBaseLayer` calls `setMaxZoom` for
+  both kinds, which is also why the trail overlays carry `maxNativeZoom` rather than
+  `maxZoom`: an overlay must stretch its last tile, not drag the base map's zoom limit down.
   **One-way arrows are corrected here, not taken as given** (`onewayArrows.ts`). OpenFreeMap's
   `oneway` sprite icon is drawn pointing up, while MapLibre rotates a line-placed icon so the
   icon's *horizontal* axis follows the line — so an unrotated icon lands across the road
   instead of along it. Their own `bright` style compensates with `icon-rotate` 90/-90;
   `dark` ships 0/180, so every arrow sat perpendicular to the street, and `positron` omits the
   layers entirely, so the two themes disagreed about whether one-way streets are shown at all.
-  `applyOnewayArrows` sets the rotation where the layer exists and adds the layer where it does
-  not, from one description, so the themes cannot drift apart again. It runs on `style.load`
+  `applyOnewayArrows` replaces whatever arrow layers a style ships — removing and re-adding at
+  the same position — rather than patching `icon-rotate` on them, because rotation is not the
+  only thing the styles disagree on: `dark` ships no road-class filter, so a rotation-only fix
+  left it drawing arrows on paths and ferries that `positron`, built from the one description,
+  never shows. It runs on `style.load`
   and **must not be gated on `isStyleLoaded()`** — that reads false while the style is still
   settling, and gating on it drops the fix with no second chance (it was written that way once;
   the arrows stayed wrong and nothing failed). `npm run test:oneway-arrows` fails on the 0/180
-  the upstream style ships.
+  the upstream style ships, and in three more places against a rotation-only fix.
 
   And **MapLibre v6 needs `setWorkerUrl()` with Vite**: it spawns its worker from a URL the
   bundler cannot statically see, so no worker chunk is emitted and the URL arrives empty,

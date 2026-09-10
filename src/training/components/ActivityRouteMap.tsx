@@ -11,7 +11,7 @@ import {
   type RouteBaseLayer,
   type RouteOverlayId
 } from "../../maps/routes/constants";
-import { baseLayerMaxZoom, createBaseLayer } from "../../maps/routes/baseLayers";
+import { createBaseLayer } from "../../maps/routes/baseLayers";
 import { MapLayerControl } from "../../maps/routes/panels";
 import { useTheme } from "../../theme/ThemeProvider";
 import {
@@ -312,13 +312,13 @@ function RouteMapCanvas({
       baseLayer
     );
     // The base map has its own pane below every other layer, so the new one
-    // cannot cover the route however late it is added.
+    // cannot cover the route however late it is added, and `createBaseLayer`
+    // rebinds the map's max zoom to the style it just built.
     const next = createBaseLayer(map, tile).addTo(map);
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current);
     }
     tileLayerRef.current = next;
-    map.setMaxZoom(baseLayerMaxZoom(tile));
     ghostLineRef.current?.setStyle({ color: routeColor, opacity: ghostOpacity });
     routeLineRef.current?.setStyle({ color: routeColor });
     appliedBaseLayerRef.current = baseLayer;
@@ -347,7 +347,10 @@ function RouteMapCanvas({
       }
       const config = ROUTE_OVERLAY_LAYERS[id];
       const layer = L.tileLayer(config.url, {
-        maxZoom: config.maxZoom,
+        // `maxZoom` is the base map's to set, not an overlay's: an overlay
+        // that ran out of tiles used to drag the whole map's zoom limit down
+        // with it. `maxNativeZoom` stretches its last real tile instead.
+        maxNativeZoom: config.maxZoom,
         attribution: config.attribution,
         opacity: 0.85
       });

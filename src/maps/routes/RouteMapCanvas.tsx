@@ -281,7 +281,8 @@ export function RouteMapCanvas({
     }
     const config = ROUTE_BASE_LAYERS[baseLayer];
     // The base map has a pane of its own beneath the route and overlay panes,
-    // so it stays underneath no matter when it is added.
+    // so it stays underneath no matter when it is added, and `createBaseLayer`
+    // rebinds the map's max zoom to the style it just built.
     const next = createBaseLayer(map, config).addTo(map);
     if (baseLayerRef.current) {
       map.removeLayer(baseLayerRef.current);
@@ -308,7 +309,10 @@ export function RouteMapCanvas({
       if (!active.has(id)) {
         const config = ROUTE_OVERLAY_LAYERS[id];
         const layer = L.tileLayer(config.url, {
-          maxZoom: config.maxZoom,
+          // `maxZoom` is the base map's to set, not an overlay's: an overlay
+          // that ran out of tiles used to drag the whole map's zoom limit
+          // down with it. `maxNativeZoom` stretches its last real tile.
+          maxNativeZoom: config.maxZoom,
           attribution: config.attribution,
           opacity: 0.85
         }).addTo(map);

@@ -1,4 +1,4 @@
-import type { LayerSpecification } from "maplibre-gl";
+import type { LayerSpecification, Map as MaplibreMap } from "maplibre-gl";
 
 /**
  * One-way arrows, fixed and made consistent across themes.
@@ -12,7 +12,7 @@ import type { LayerSpecification } from "maplibre-gl";
  * streets are shown at all.
  *
  * Both are corrected here from one description, so the themes cannot drift
- * again: an existing layer has its rotation set, a missing one is added.
+ * again — see `applyOnewayArrows`.
  */
 export const ONEWAY_ARROW_LAYER_IDS = [
   "road_oneway",
@@ -20,6 +20,10 @@ export const ONEWAY_ARROW_LAYER_IDS = [
 ] as const;
 
 export type OnewayArrowLayerId = (typeof ONEWAY_ARROW_LAYER_IDS)[number];
+
+/** The OpenMapTiles source and layer every arrow is read from. */
+export const ONEWAY_ARROW_SOURCE = "openmaptiles";
+const ONEWAY_ARROW_SOURCE_LAYER = "transportation";
 
 /**
  * `road_oneway` marks ways digitised along the direction of travel, and
@@ -58,16 +62,20 @@ export const ONEWAY_ARROW_SPACING = 200;
 /** Below this zoom the arrows are noise; above it they are wayfinding. */
 export const ONEWAY_ARROW_MIN_ZOOM = 15;
 
+type SymbolLayer = Extract<LayerSpecification, { type: "symbol" }>;
+
 /**
- * The full layer description, used when a style has no one-way layer of its
- * own. Mirrors `bright` apart from the spacing above.
+ * The one description of an arrow layer. Mirrors `bright` apart from the
+ * spacing above — including its class filter, which `dark` omits, so without
+ * this the dark theme would keep drawing arrows on paths and ferries that the
+ * light theme leaves bare.
  */
-export function onewayArrowLayer(id: OnewayArrowLayerId): LayerSpecification {
+export function onewayArrowLayer(id: OnewayArrowLayerId): SymbolLayer {
   return {
     id,
     type: "symbol",
-    source: "openmaptiles",
-    "source-layer": "transportation",
+    source: ONEWAY_ARROW_SOURCE,
+    "source-layer": ONEWAY_ARROW_SOURCE_LAYER,
     minzoom: ONEWAY_ARROW_MIN_ZOOM,
     filter: [
       "all",
@@ -85,4 +93,39 @@ export function onewayArrowLayer(id: OnewayArrowLayerId): LayerSpecification {
     },
     paint: { "icon-opacity": 0.5 }
   };
+}
+
+/**
+ * Replaces whatever one-way layers a style ships with the description above,
+ * and adds them to a style that ships none.
+ *
+ * Patching only `icon-rotate` on an existing layer would leave the rest of the
+ * style's own spec — `dark`'s missing class filter above all — so the arrows
+ * would still differ between themes even once they pointed the right way.
+ * Removing and re-adding applies the whole description in one move.
+ */
+export function applyOnewayArrows(gl: MaplibreMap): void {
+  // A style built on some other schema has no `transportation` layer to read,
+  // and `addLayer` against a missing source throws.
+  if (!gl.getSource(ONEWAY_ARROW_SOURCE)) {
+    return;
+  }
+
+  // Positions are read from one snapshot: each layer is put back exactly where
+  // it was, so the snapshot stays true for the next id.
+  const layers = gl.getStyle().layers;
+  const firstSymbolId = layers.find((layer) => layer.type === "symbol")?.id;
+
+  for (const id of ONEWAY_ARROW_LAYER_IDS) {
+    const index = layers.findIndex((layer) => layer.id === id);
+    if (index >= 0) {
+      gl.removeLayer(id);
+    }
+    // Keep the layer where the style put it; a style without one gets it just
+    // below the first label, which is where `bright` keeps it.
+    gl.addLayer(
+      onewayArrowLayer(id),
+      index >= 0 ? layers[index + 1]?.id : firstSymbolId
+    );
+  }
 }

@@ -4,12 +4,7 @@ import { setWorkerUrl } from "maplibre-gl";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ROUTE_BASE_LAYERS, type BaseLayerConfig, type RouteBaseLayer } from "./constants";
-import {
-  ONEWAY_ARROW_LAYER_IDS,
-  ONEWAY_ARROW_ROTATION,
-  onewayArrowLayer
-} from "./onewayArrows";
-import type { Map as MaplibreMap } from "maplibre-gl";
+import { applyOnewayArrows } from "./onewayArrows";
 
 /**
  * MapLibre v6 spawns its worker from a URL that Vite cannot statically see, so
@@ -52,9 +47,11 @@ function supportsWebgl(): boolean {
   if (webglSupported === undefined) {
     try {
       const canvas = document.createElement("canvas");
-      webglSupported = Boolean(
-        canvas.getContext("webgl2") ?? canvas.getContext("webgl")
-      );
+      const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+      webglSupported = Boolean(context);
+      // A probe that keeps its context spends one of the handful a browser
+      // will hand out, and every base map here wants one of its own.
+      context?.getExtension("WEBGL_lose_context")?.loseContext();
     } catch {
       webglSupported = false;
     }
@@ -65,7 +62,7 @@ function supportsWebgl(): boolean {
 /** The raster style stood in for a vector one when WebGL is unavailable. */
 const VECTOR_FALLBACK: RouteBaseLayer = "street";
 
-export function resolveBaseLayerConfig(config: BaseLayerConfig): BaseLayerConfig {
+function resolveBaseLayerConfig(config: BaseLayerConfig): BaseLayerConfig {
   if (config.kind === "vector" && !supportsWebgl()) {
     return ROUTE_BASE_LAYERS[VECTOR_FALLBACK];
   }
@@ -73,26 +70,6 @@ export function resolveBaseLayerConfig(config: BaseLayerConfig): BaseLayerConfig
 }
 
 type VectorLayerOptions = Parameters<typeof L.maplibreGL>[0] & { pane: string };
-
-/**
- * Corrects the one-way arrows a style ships, or adds them when it ships none.
- * See `onewayArrows.ts` for why every arrow was drawn across the road.
- *
- * New layers go beneath the first symbol layer so arrows never cover a label.
- */
-function applyOnewayArrows(gl: MaplibreMap): void {
-  const firstSymbolLayer = gl
-    .getStyle()
-    .layers.find((candidate) => candidate.type === "symbol")?.id;
-
-  for (const id of ONEWAY_ARROW_LAYER_IDS) {
-    if (gl.getLayer(id)) {
-      gl.setLayoutProperty(id, "icon-rotate", ONEWAY_ARROW_ROTATION[id]);
-    } else {
-      gl.addLayer(onewayArrowLayer(id), firstSymbolLayer);
-    }
-  }
-}
 
 /**
  * The MapLibre map exists only once Leaflet has added the layer, and its style
@@ -125,6 +102,16 @@ export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
   const pane = ensureBasemapPane(map);
   const resolved = resolveBaseLayerConfig(config);
 
+  // Leaflet reads a zoom limit off a layer in exactly one place —
+  // `GridLayer.beforeAdd` — so a raster base map bounded the map for free
+  // while a vector one, being a plain `L.Layer`, bounds nothing: the map's
+  // max zoom fell back to `Infinity`. Unbounded is not merely "zooms too
+  // far". `fitBounds` clamps to `getMaxZoom()`, so a route whose points share
+  // a spot (a treadmill session that got one GPS fix) resolves to zoom
+  // Infinity and the map renders nothing at all. Setting it here, for both
+  // kinds, is what keeps every screen bounded whichever style it asks for.
+  map.setMaxZoom(resolved.maxZoom);
+
   if (resolved.kind === "vector") {
     // The plugin's typings describe only MapLibre's own map options, but at
     // runtime it is an ordinary Leaflet layer and reads `options.pane` through
@@ -149,9 +136,4 @@ export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
     attribution: resolved.attribution,
     ...(resolved.subdomains ? { subdomains: resolved.subdomains } : {})
   });
-}
-
-/** Max zoom actually available for a style, after any WebGL fallback. */
-export function baseLayerMaxZoom(config: BaseLayerConfig): number {
-  return resolveBaseLayerConfig(config).maxZoom;
 }
