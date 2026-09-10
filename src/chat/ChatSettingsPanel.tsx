@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { BrainCircuit, ChevronRight, Loader2, X } from "lucide-react";
-import type { ChatSettings } from "../../electron/types";
+import { BrainCircuit, ChevronRight, Loader2, TriangleAlert, X } from "lucide-react";
+import type {
+  ChatSettings,
+  CoachAnalysisPause,
+  CoachAnalysisSpend
+} from "../../electron/types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "../../electron/types";
 import {
   DEFAULT_COMPACT_CONTEXT,
@@ -11,6 +15,7 @@ import {
   normalizeContextWindow
 } from "../../electron/chatContextCompaction";
 import type { CorosLinkApi } from "../coroslink-api";
+import { formatTokens } from "./analyses/analysisLabels";
 
 export function ChatSettingsPanel({
   api,
@@ -262,7 +267,175 @@ export function ChatSettingsPanel({
         </p>
       </section>
 
+      <AnalysesSettingsSection api={api} />
     </div>
+  );
+}
+
+/**
+ * The two things about analyses that are not about any one analysis: what they
+ * have cost this month, and whether they are all held.
+ *
+ * They live in Settings because that is what they are — feature-wide
+ * preferences with no conversation to belong to. They used to sit at the top
+ * of a screen that listed every analysis the athlete had; that screen went
+ * when an analysis became something that lives in one conversation, and these
+ * two would otherwise have gone with it.
+ */
+function AnalysesSettingsSection({ api }: { api: CorosLinkApi | undefined }) {
+  const [pause, setPause] = useState<CoachAnalysisPause | null>(null);
+  const [spend, setSpend] = useState<CoachAnalysisSpend | null>(null);
+  const [resuming, setResuming] = useState(false);
+  /** Held while the field is focused so typing is not fought by a re-render. */
+  const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [nextPause, nextSpend] = await Promise.all([
+          api.getCoachAnalysisPause(),
+          api.getCoachAnalysisSpend()
+        ]);
+        if (cancelled) return;
+        setPause(nextPause);
+        setSpend(nextSpend);
+      } catch (caught) {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : String(caught));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  // The trip usually happens with no window open at all — a scheduled run
+  // finding COROS asking for a login code at 07:30 — so this panel follows the
+  // push rather than only reading once on mount.
+  useEffect(() => {
+    if (!api?.onCoachAnalysisPauseUpdate) return;
+    return api.onCoachAnalysisPauseUpdate((next) => setPause(next));
+  }, [api]);
+
+  const commitBudget = async (raw: string) => {
+    if (!api) return;
+    setBudgetDraft(null);
+    const trimmed = raw.trim();
+    const parsed = trimmed === "" ? null : Number(trimmed);
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) return;
+    try {
+      setSpend(await api.setCoachAnalysisBudget(parsed));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+
+  const resume = async () => {
+    if (!api) return;
+    setResuming(true);
+    setError(null);
+    try {
+      setPause(await api.resumeCoachAnalyses());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setResuming(false);
+    }
+  };
+
+  return (
+    <section className="chat-settings-section">
+      <h3>Analyses</h3>
+      <p className="chat-settings-copy">
+        An analysis runs on its own inside the conversation it was written in —
+        create one from the Analyses control in a conversation&rsquo;s header.
+        What is here applies to all of them at once.
+      </p>
+
+      {error ? <p className="coach-analysis-error">{error}</p> : null}
+
+      {pause ? (
+        <p className="coach-analysis-banner" role="status">
+          <TriangleAlert size={15} aria-hidden="true" />
+          <span>
+            <strong>Every analysis is paused.</strong>{" "}
+            {pause.reason === "budget" ? (
+              <>
+                This month&rsquo;s token budget ran out, so they stopped rather
+                than spending past a number you set. They start again on the
+                1st — or now, if you raise the budget below.
+              </>
+            ) : (
+              <>
+                COROS asked for a login code and no analysis can supply one, so
+                they stopped rather than filling the run log with the same skip
+                every fifteen minutes. Sign in to COROS, then resume.
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            className="chat-local-action"
+            disabled={!api || resuming}
+            onClick={() => void resume()}
+          >
+            {resuming ? (
+              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+            ) : null}
+            Resume
+          </button>
+        </p>
+      ) : null}
+
+      {spend ? (
+        <p className="coach-analysis-spend">
+          <span>
+            <strong>
+              {formatTokens(spend.inputTokens + spend.outputTokens)}
+            </strong>{" "}
+            tokens this month
+            {/* A total that is short of the truth has to say so, or a budget
+                reads as comfortably under when nobody actually knows. */}
+            {spend.providerRuns > spend.countedRuns ? (
+              <>
+                {" · "}
+                <span title="Some providers do not report what a turn cost.">
+                  {spend.providerRuns - spend.countedRuns} run
+                  {spend.providerRuns - spend.countedRuns === 1 ? "" : "s"} not
+                  counted
+                </span>
+              </>
+            ) : null}
+          </span>
+          <label className="chat-local-field coach-analysis-budget">
+            {/* The unit is in the label rather than after the field: the
+                placeholder reads "none", and a suffix would leave the
+                unset state saying "none tokens". */}
+            <span>Monthly budget (tokens)</span>
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              placeholder="none"
+              disabled={!api}
+              value={
+                budgetDraft ??
+                (spend.budget === null ? "" : String(spend.budget))
+              }
+              onChange={(event) => setBudgetDraft(event.target.value)}
+              onBlur={(event) => void commitBudget(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+          </label>
+        </p>
+      ) : null}
+    </section>
   );
 }
 

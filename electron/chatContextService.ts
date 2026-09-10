@@ -24,8 +24,8 @@ import {
   type TranscriptContextResult
 } from "./chatContextCompaction";
 import {
-  AUTOMATION_DEFAULT_EFFORT,
-  type AutomationRuntime,
+  ANALYSIS_DEFAULT_EFFORT,
+  type AnalysisRuntime,
   type ChatContextCompaction,
   type ChatContextInspection,
   type ChatTokenUsage,
@@ -36,7 +36,7 @@ import {
  * The main-process half of context compaction: reading and writing the stored
  * summary, and running the summariser turn that produces it.
  *
- * Everything here is shared by the interactive chat and by automation runs.
+ * Everything here is shared by the interactive chat and by analysis runs.
  * The pure planning lives in `chatContextCompaction.ts`; this file is the part
  * that touches SQLite and the provider.
  */
@@ -83,12 +83,12 @@ export function writeSessionSummary(
 
 export interface RollSummaryOptions {
   /**
-   * The provider, model and effort the roll runs on. An automation passes its
+   * The provider, model and effort the roll runs on. An analysis passes its
    * own (its tokens land on its run's row, and its provider is the one that was
    * pre-flighted); the interactive chat passes nothing and inherits the saved
    * settings.
    */
-  runtime?: AutomationRuntime;
+  runtime?: AnalysisRuntime;
   idleTimeoutMs?: number;
 }
 
@@ -107,7 +107,7 @@ export async function rollTranscriptSummary(
   entries: PersistedChatEntry[],
   options: RollSummaryOptions = {}
 ): Promise<{ summary: string | null; usage?: ChatTokenUsage; reason?: string }> {
-  // Its own request id, never the caller's: an automation roll happens while a
+  // Its own request id, never the caller's: an analysis roll happens while a
   // run is still being prepared and has no row yet, and an interactive roll
   // must not be cancelled by a Stop aimed at the turn it is preparing for.
   const requestId = `coach-summary-${randomUUID()}`;
@@ -150,7 +150,7 @@ export async function rollTranscriptSummary(
         // capability, and a summariser compressing text it was handed has
         // nothing to think harder about — so a coach set to `high` gets a
         // `high` answer and a `low` summary.
-        runtime: { ...(options.runtime ?? {}), effort: AUTOMATION_DEFAULT_EFFORT }
+        runtime: { ...(options.runtime ?? {}), effort: ANALYSIS_DEFAULT_EFFORT }
       }
     );
     streaming.catch(() => undefined);
@@ -193,7 +193,7 @@ export async function rollTranscriptSummary(
 export interface CompactSessionOptions {
   /** Roll now, whatever the limit says — the conversation menu's action. */
   force?: boolean;
-  runtime?: AutomationRuntime;
+  runtime?: AnalysisRuntime;
   window?: ContextWindow;
   idleTimeoutMs?: number;
 }

@@ -1,5 +1,5 @@
 // Section 3.1: the schedule trigger. Slot maths, missed slots, DST boundaries
-// and per-binding independence.
+// and per-analysis independence.
 //
 // Every assertion here is about the athlete's *local wall clock*, so the whole
 // file runs in one fixed zone. America/New_York is chosen because 2026 gives it
@@ -15,7 +15,7 @@ const Module = require("node:module");
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 // The scheduler reaches the runner and the store, which pull in electron and
-// the better-sqlite3 native binding at require time. Every collaborator is
+// the better-sqlite3 native analysis at require time. Every collaborator is
 // injected per instance, so the stubs only exist to get the module loaded.
 const fakeElectron = {
   BrowserWindow: Object.assign(class {}, { getAllWindows: () => [] }),
@@ -33,12 +33,12 @@ Module._load = function patchedLoad(request, ...rest) {
 };
 
 const {
-  CoachAutomationScheduler,
+  CoachAnalysisScheduler,
   SCHEDULER_TICK_INTERVAL_MS,
   STALE_SLOT_MS,
   nextScheduleSlot,
   quietHoursEnd
-} = require(path.join(repoRoot, "dist-electron", "coachAutomationScheduler.js"));
+} = require(path.join(repoRoot, "dist-electron", "coachAnalysisScheduler.js"));
 
 assert.equal(SCHEDULER_TICK_INTERVAL_MS, 60_000, "3.1: the tick is 60 seconds");
 assert.equal(STALE_SLOT_MS, 24 * 60 * 60_000, "3.1: a slot goes stale after a day");
@@ -172,9 +172,9 @@ assert.deepEqual(
 // The ticker
 // ---------------------------------------------------------------------------
 
-function harness({ automations, bindings, now }) {
+function harness({ analyses, now }) {
   const clock = { value: now };
-  const rows = new Map(bindings.map((binding) => [binding.id, { ...binding }]));
+  const rows = new Map(analyses.map((analysis) => [analysis.id, { ...analysis }]));
   const bookings = [];
   const staleSkips = [];
   const triggers = [];
@@ -182,14 +182,17 @@ function harness({ automations, bindings, now }) {
 
   const deps = {
     now: () => clock.value,
-    listAutomations: () => automations,
-    listActiveBindings: (automationId) =>
-      [...rows.values()].filter(
-        (row) => row.automationId === automationId && row.enabled !== false
-      ),
-    setBindingNextRun: (bindingId, nextRunAt) => {
-      bookings.push({ bindingId, nextRunAt });
-      const row = rows.get(bindingId);
+    // What the store's `listTriggeredCoachAnalyses` returns: enabled analyses
+    // with a real trigger. The filter lives in the store rather than in the
+    // tick, so the fake applies it here — a tick that re-filtered would pass
+    // this suite and then skip analyses the store had already vouched for.
+    listTriggeredAnalyses: () =>
+      [...rows.values()]
+        .filter((row) => row.enabled !== false)
+        .filter((row) => row.trigger && row.trigger.kind !== "manual"),
+    setAnalysisNextRun: (analysisId, nextRunAt) => {
+      bookings.push({ analysisId, nextRunAt });
+      const row = rows.get(analysisId);
       if (!row) return;
       if (nextRunAt === null) delete row.nextRunAt;
       else row.nextRunAt = nextRunAt;
@@ -215,53 +218,47 @@ function harness({ automations, bindings, now }) {
     triggers,
     errors,
     deps,
-    scheduler: new CoachAutomationScheduler(deps)
+    scheduler: new CoachAnalysisScheduler(deps)
   };
 }
 
+// One fixture, because there is one entity: an analysis carries what it says,
+// where it says it, when it fires and the guard rails around that.
 const briefing = (patch = {}) => ({
   id: "auto-1",
+  sessionId: "sess-1",
   name: "Daily briefing",
   playbook: "Brief me.",
   enabled: true,
+  runtime: {},
   trigger: daily("07:00"),
   conditions: { cooldownMin: 120, maxRunsPerDay: 3 },
-  runtime: {},
-  ...patch
-});
-
-const binding = (patch = {}) => ({
-  id: "bind-1",
-  automationId: "auto-1",
-  mode: "dedicated",
-  sessionId: "sess-1",
-  enabled: true,
+  deviceOnly: false,
   sortOrder: 0,
   createdAt: at(2026, 8, 1, 9).toISOString(),
+  updatedAt: at(2026, 8, 1, 9).toISOString(),
   ...patch
 });
 
-// A binding the scheduler has never seen books its first slot and waits. Firing
+// A analysis the scheduler has never seen books its first slot and waits. Firing
 // on sight would mean creating a "daily at 07:00" rule at lunchtime and getting
 // the briefing immediately — which is not what "daily at 07:00" says.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding()],
+    analyses: [briefing()],
     now: at(2026, 8, 20, 12, 0)
   });
   await h.scheduler.tick();
-  assert.equal(h.triggers.length, 0, "a freshly seeded binding does not run");
+  assert.equal(h.triggers.length, 0, "a freshly seeded analysis does not run");
   assert.deepEqual(h.bookings, [
-    { bindingId: "bind-1", nextRunAt: at(2026, 8, 21, 7, 0).toISOString() }
+    { analysisId: "auto-1", nextRunAt: at(2026, 8, 21, 7, 0).toISOString() }
   ]);
 }
 
 // Not due yet: nothing happens at all, including no rewrite of the booking.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ nextRunAt: at(2026, 8, 21, 7, 0).toISOString() })],
+    analyses: [briefing({ nextRunAt: at(2026, 8, 21, 7, 0).toISOString() })],
     now: at(2026, 8, 20, 12, 0)
   });
   await h.scheduler.tick();
@@ -273,13 +270,12 @@ const binding = (patch = {}) => ({
 // mid-answer loses one briefing rather than retrying the same slot all day.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ nextRunAt: at(2026, 8, 20, 7, 0).toISOString() })],
+    analyses: [briefing({ nextRunAt: at(2026, 8, 20, 7, 0).toISOString() })],
     now: at(2026, 8, 20, 7, 0, 30)
   });
   const order = [];
-  const bookOriginal = h.deps.setBindingNextRun;
-  h.deps.setBindingNextRun = (...args) => {
+  const bookOriginal = h.deps.setAnalysisNextRun;
+  h.deps.setAnalysisNextRun = (...args) => {
     order.push("book");
     bookOriginal(...args);
   };
@@ -288,11 +284,11 @@ const binding = (patch = {}) => ({
     order.push("run");
     return runOriginal(...args);
   };
-  await new CoachAutomationScheduler(h.deps).tick();
+  await new CoachAnalysisScheduler(h.deps).tick();
 
   assert.deepEqual(order, ["book", "run"], "the slot is booked before the run");
   assert.deepEqual(h.triggers, [
-    { automationId: "auto-1", kind: "schedule", bindingIds: ["bind-1"] }
+    { analysisId: "auto-1", kind: "schedule" }
   ]);
   assert.equal(
     h.bookings[0].nextRunAt,
@@ -306,14 +302,13 @@ const binding = (patch = {}) => ({
 // briefing delivered a week late is worse than no briefing.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ nextRunAt: at(2026, 8, 15, 7, 0).toISOString() })],
+    analyses: [briefing({ nextRunAt: at(2026, 8, 15, 7, 0).toISOString() })],
     now: at(2026, 8, 20, 12, 0)
   });
   await h.scheduler.tick();
   assert.deepEqual(h.triggers, [], "a stale slot never runs");
   assert.deepEqual(h.staleSkips, [
-    { automationId: "auto-1", bindingId: "bind-1", sessionId: "sess-1" }
+    { analysisId: "auto-1", sessionId: "sess-1" }
   ]);
   assert.equal(
     h.staleSkips.length,
@@ -326,8 +321,7 @@ const binding = (patch = {}) => ({
 // Exactly on the 24h line is still late, not stale — the rule is "more than".
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ nextRunAt: at(2026, 8, 19, 7, 0).toISOString() })],
+    analyses: [briefing({ nextRunAt: at(2026, 8, 19, 7, 0).toISOString() })],
     now: at(2026, 8, 20, 7, 0)
   });
   await h.scheduler.tick();
@@ -343,17 +337,18 @@ const binding = (patch = {}) => ({
 // Quiet hours defer, they never cancel. Unlike an activity, a slot has nowhere
 // to wait: dropping it loses the briefing outright.
 {
-  const quiet = briefing({
-    trigger: daily("23:00"),
-    conditions: {
-      cooldownMin: 120,
-      maxRunsPerDay: 3,
-      quietHours: { start: "22:00", end: "06:00" }
-    }
-  });
   const h = harness({
-    automations: [quiet],
-    bindings: [binding({ nextRunAt: at(2026, 8, 20, 23, 0).toISOString() })],
+    analyses: [
+      briefing({
+        trigger: daily("23:00"),
+        conditions: {
+          cooldownMin: 120,
+          maxRunsPerDay: 3,
+          quietHours: { start: "22:00", end: "06:00" }
+        },
+        nextRunAt: at(2026, 8, 20, 23, 0).toISOString()
+      })
+    ],
     now: at(2026, 8, 20, 23, 0, 30)
   });
 
@@ -361,7 +356,7 @@ const binding = (patch = {}) => ({
   assert.deepEqual(h.triggers, [], "nothing runs inside the window");
   assert.deepEqual(h.staleSkips, [], "and nothing is written off either");
   assert.equal(
-    h.rows.get("bind-1").nextRunAt,
+    h.rows.get("auto-1").nextRunAt,
     at(2026, 8, 21, 6, 0).toISOString(),
     "the slot moves to the end of the window"
   );
@@ -371,33 +366,32 @@ const binding = (patch = {}) => ({
   h.clock.value = at(2026, 8, 21, 6, 0, 30);
   await h.scheduler.tick();
   assert.deepEqual(h.triggers, [
-    { automationId: "auto-1", kind: "schedule", bindingIds: ["bind-1"] }
+    { analysisId: "auto-1", kind: "schedule" }
   ]);
   assert.equal(
-    h.rows.get("bind-1").nextRunAt,
+    h.rows.get("auto-1").nextRunAt,
     at(2026, 8, 21, 23, 0).toISOString(),
     "and the cadence picks up again from the trigger, not from the deferral"
   );
 }
 
-// Per-binding independence (3.1): one definition, two conversations, two
-// clocks. Attaching the coach somewhere new must not reset the first.
+// Per-analysis independence (3.1): three analyses, three clocks. Writing one
+// somewhere new must not reset the others.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [
-      binding({
-        id: "bind-a",
+    analyses: [
+      briefing({
+        id: "auto-a",
         sessionId: "sess-a",
         nextRunAt: at(2026, 8, 20, 7, 0).toISOString()
       }),
-      binding({
-        id: "bind-b",
+      briefing({
+        id: "auto-b",
         sessionId: "sess-b",
         sortOrder: 1,
         nextRunAt: at(2026, 8, 21, 7, 0).toISOString()
       }),
-      binding({ id: "bind-c", sessionId: "sess-c", sortOrder: 2 })
+      briefing({ id: "auto-c", sessionId: "sess-c", sortOrder: 2 })
     ],
     now: at(2026, 8, 20, 7, 30)
   });
@@ -405,29 +399,28 @@ const binding = (patch = {}) => ({
 
   assert.deepEqual(
     h.triggers,
-    [{ automationId: "auto-1", kind: "schedule", bindingIds: ["bind-a"] }],
-    "only the due binding runs, and it runs alone"
+    [{ analysisId: "auto-a", kind: "schedule" }],
+    "only the due analysis runs, and it runs alone"
   );
   assert.equal(
-    h.rows.get("bind-b").nextRunAt,
+    h.rows.get("auto-b").nextRunAt,
     at(2026, 8, 21, 7, 0).toISOString(),
-    "the binding that was not due keeps its own slot"
+    "the analysis that was not due keeps its own slot"
   );
   assert.equal(
-    h.rows.get("bind-c").nextRunAt,
+    h.rows.get("auto-c").nextRunAt,
     at(2026, 8, 21, 7, 0).toISOString(),
-    "and the new binding is seeded without borrowing anyone else's"
+    "and the new analysis is seeded without borrowing anyone else's"
   );
 }
 
-// One broken binding must not strand the ones behind it in the loop.
+// One broken analysis must not strand the ones behind it in the loop.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [
-      binding({ id: "bind-a", nextRunAt: at(2026, 8, 20, 7, 0).toISOString() }),
-      binding({
-        id: "bind-b",
+    analyses: [
+      briefing({ id: "auto-a", nextRunAt: at(2026, 8, 20, 7, 0).toISOString() }),
+      briefing({
+        id: "auto-b",
         sortOrder: 1,
         nextRunAt: at(2026, 8, 20, 7, 0).toISOString()
       })
@@ -435,30 +428,30 @@ const binding = (patch = {}) => ({
     now: at(2026, 8, 20, 7, 30)
   });
   h.deps.runTrigger = async (event) => {
-    if (event.bindingIds[0] === "bind-a") throw new Error("provider exploded");
+    if (event.analysisId === "auto-a") throw new Error("provider exploded");
     h.triggers.push(event);
     return [];
   };
-  await new CoachAutomationScheduler(h.deps).tick();
+  await new CoachAnalysisScheduler(h.deps).tick();
 
   assert.equal(h.errors.length, 1, "the failure is reported, not swallowed");
   assert.deepEqual(
     h.triggers,
-    [{ automationId: "auto-1", kind: "schedule", bindingIds: ["bind-b"] }],
-    "and the next binding still gets its turn"
+    [{ analysisId: "auto-b", kind: "schedule" }],
+    "and the next analysis still gets its turn"
   );
 }
 
-// Only schedule triggers, and only enabled ones.
+// Only schedule and threshold triggers, and only on an enabled analysis.
 {
   const h = harness({
-    automations: [
+    analyses: [
       briefing({ id: "auto-off", enabled: false }),
-      briefing({ id: "auto-activity", trigger: { kind: "activity", sportTypes: [] } })
-    ],
-    bindings: [
-      binding({ id: "bind-off", automationId: "auto-off" }),
-      binding({ id: "bind-activity", automationId: "auto-activity" })
+      briefing({
+        id: "auto-activity",
+        trigger: { kind: "activity", sportTypes: [] }
+      }),
+      briefing({ id: "auto-manual", trigger: null })
     ],
     now: at(2026, 8, 20, 12, 0)
   });
@@ -467,16 +460,15 @@ const binding = (patch = {}) => ({
   assert.deepEqual(
     h.bookings,
     [],
-    "a disabled or non-schedule automation is not even given a slot"
+    "a disabled analysis, an activity trigger and a manual one are all left alone"
   );
 }
 
-// A disabled binding is filtered out by the store's active-bindings query, so
+// A disabled analysis is filtered out by the store's active-analysiss query, so
 // it is neither run nor seeded.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ enabled: false })],
+    analyses: [briefing({ enabled: false })],
     now: at(2026, 8, 20, 12, 0)
   });
   await h.scheduler.tick();
@@ -487,11 +479,10 @@ const binding = (patch = {}) => ({
 // while the app was closed is handled at launch, not up to a minute later.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [binding({ nextRunAt: at(2026, 8, 20, 7, 0).toISOString() })],
+    analyses: [briefing({ nextRunAt: at(2026, 8, 20, 7, 0).toISOString() })],
     now: at(2026, 8, 20, 9, 0)
   });
-  const scheduler = new CoachAutomationScheduler(h.deps);
+  const scheduler = new CoachAnalysisScheduler(h.deps);
   scheduler.start(60_000);
   assert.ok(scheduler.isRunning());
   await new Promise((resolve) => setImmediate(resolve));
@@ -501,15 +492,14 @@ const binding = (patch = {}) => ({
 }
 
 // Overlapping ticks. A run outlives its minute — the provider takes as long as
-// it takes — and the next tick arrives with the rest of the bindings still
+// it takes — and the next tick arrives with the rest of the analyses still
 // unvisited. Without the guard it would start them alongside the one in flight.
 {
   const h = harness({
-    automations: [briefing()],
-    bindings: [
-      binding({ id: "bind-a", nextRunAt: at(2026, 8, 20, 7, 0).toISOString() }),
-      binding({
-        id: "bind-b",
+    analyses: [
+      briefing({ id: "auto-a", nextRunAt: at(2026, 8, 20, 7, 0).toISOString() }),
+      briefing({
+        id: "auto-b",
         sortOrder: 1,
         nextRunAt: at(2026, 8, 20, 7, 0).toISOString()
       })
@@ -525,22 +515,22 @@ const binding = (patch = {}) => ({
     await gate;
     return [];
   };
-  const scheduler = new CoachAutomationScheduler(h.deps);
+  const scheduler = new CoachAnalysisScheduler(h.deps);
   const first = scheduler.tick();
   await scheduler.tick();
   assert.deepEqual(
-    h.triggers.map((event) => event.bindingIds[0]),
-    ["bind-a"],
+    h.triggers.map((event) => event.analysisId),
+    ["auto-a"],
     "the second tick is a no-op while the first is still working"
   );
 
   release();
   await first;
   assert.deepEqual(
-    h.triggers.map((event) => event.bindingIds[0]),
-    ["bind-a", "bind-b"],
-    "and the waiting binding is reached by the tick that owns it, not skipped"
+    h.triggers.map((event) => event.analysisId),
+    ["auto-a", "auto-b"],
+    "and the waiting analysis is reached by the tick that owns it, not skipped"
   );
 }
 
-console.log("PASS coach automation schedule");
+console.log("PASS coach analysis schedule");

@@ -1,5 +1,38 @@
 # Coach Automations (proactive coach runs)
 
+> **Superseded — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10). The
+> trigger moved off the definition and onto an attachment; then the attachment
+> was removed and an analysis became one thing living in one conversation. The
+> feature, its types, its IPC channels, its files and its tables were renamed,
+> and **the tables this document describes are dropped on upgrade** — see
+> "Migration: there isn't one".
+>
+> This document is kept because most of it is still true and none of it was
+> cheap. The run pipeline (§5), the guard rails (§4), the tool policy (§6), the
+> effort default (§7), the failure handling (§10) and the cost model (§13)
+> describe the built code accurately, allowing for the vocabulary. What is
+> **wrong** is listed here rather than patched in place, because a half-edited
+> document is worse than a dated one:
+>
+> | Section | Now |
+> |---|---|
+> | Vocabulary, and the diagram above it | There is one entity. An *automation* is an analysis; a *binding* does not exist |
+> | §1 Data model | New tables (`coach_analyses`, `coach_analysis_local_triggers`, `coach_analysis_runs`); the four described here are dropped, with their rows |
+> | §1 TypeScript shapes | `CoachAnalysis`, `CoachAnalysisInput`, `CoachAnalysisPatch` — see `electron/types.ts` |
+> | §2 Bindings, all of it | Gone. An analysis is created in one conversation and cannot be moved |
+> | §2.5 Naming conversations | Nothing in the feature names or creates a conversation |
+> | §3 Triggers | Unchanged in behaviour; they live on the analysis |
+> | §3.4 Manual | Run now runs the one analysis it was pressed on; there is no picker |
+> | §8 IPC surface | `analysis:*`, and eight of these channels no longer exist |
+> | §9 UI | `src/chat/analyses/`. No global list; the conversation is the entry point; the pause and the budget are in Settings |
+> | §11 Testing | Suites renamed `test-coach-analysis-*`; `test:analysis-legacy-drop` added |
+> | §13 Cost | Still accurate, except that a long activity catch-up now meets the burst guard |
+>
+> Vocabulary below is pre-rename throughout. The `app_settings` keys and the
+> stored transcript-marker keys did **not** change and still read as written.
+
 Status: **all three phases shipped, and reviewed**. Target: CorosLink desktop (Electron main + React renderer). Written 2026-08-21, revised 2026-08-25 against the built code, reconciled 2026-08-27 after the review below.
 
 Every section describes what exists. Nothing here is design any more — the two that were, 3.3 and 5.7, shipped in phase 3. Where the build diverged from the original design the divergence is written down with its reason; those reasons are the useful part.

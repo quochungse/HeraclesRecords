@@ -18172,11 +18172,6 @@ tr.data-intervals-row-missing {
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
   backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
   box-shadow: var(--sidebar-glass-shadow);
-  transition: flex-basis 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.chat-plan-panel.is-expanded {
-  flex-basis: clamp(440px, 38vw, 620px);
 }
 
 .chat-plan-list-header {
@@ -18359,57 +18354,6 @@ tr.data-intervals-row-missing {
   transform: translateX(2px);
 }
 
-.chat-plan-panel-header {
-  display: block;
-  flex: none;
-  padding: 11px 12px;
-  border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 72%, transparent);
-  animation: chat-plan-panel-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.chat-plan-panel-heading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.chat-plan-panel-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chat-plan-panel-title > div {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.chat-plan-panel-title strong {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.chat-plan-panel-title span {
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-
-.chat-plan-panel-title.is-detail-title {
-  overflow: hidden;
-}
-
-.chat-plan-panel-title.is-detail-title strong,
-.chat-plan-panel-title.is-detail-title span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .chat-plan-panel-icon {
   display: grid;
   place-items: center;
@@ -18420,45 +18364,6 @@ tr.data-intervals-row-missing {
   border-radius: 9px;
   background: var(--chat-signal-soft);
   color: var(--chat-signal-strong) !important;
-}
-
-.chat-plan-panel-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: none;
-}
-
-.chat-plan-panel-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 30px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-secondary);
-  padding: 0 8px 0 6px;
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease,
-    background 0.15s ease, transform 0.15s ease;
-}
-
-.chat-plan-panel-back:hover {
-  border-color: var(--chat-signal-border);
-  background: var(--glass-bg-hover);
-  color: var(--chat-signal-strong);
-}
-
-.chat-plan-panel-back:active {
-  transform: translateY(1px);
-}
-
-.chat-plan-panel-back:focus-visible {
-  outline: 2px solid var(--chat-signal);
-  outline-offset: 2px;
 }
 
 .chat-plan-panel-chat-link {
@@ -18496,107 +18401,101 @@ tr.data-intervals-row-missing {
   }
 }
 
-.chat-plan-panel-body {
-  flex: 1;
-  min-height: 0;
+/* The count and the hide button, as one group at the end of the list header. */
+.chat-plan-list-header-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* ----- The Creations popup ----- */
+
+/* Wider than the settings frame it shares its shell with: a plan is a grid of
+   weeks, and the extra width is what keeps a week on one row. */
+.chat-creation-modal {
+  width: min(880px, 96vw);
+}
+
+.chat-creation-modal-title > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chat-creation-modal-title h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-creation-modal-title > div > span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.chat-creation-modal-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.chat-creation-modal-body {
   overflow-y: auto;
-  padding: 12px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 14%, transparent)
-    transparent;
-  animation: chat-plan-panel-enter 0.24s 0.03s cubic-bezier(0.22, 1, 0.36, 1)
-    both;
+  padding: 16px;
+  /* Hold the scrollbar's width whether or not this creation needs one, so a
+     short workout and a twelve-week plan are laid out on the same measure. */
+  scrollbar-gutter: stable;
 }
 
-.chat-plan-panel-body:hover {
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 30%, transparent)
-    transparent;
-}
-
-.chat-plan-panel-body::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.chat-plan-panel-body::-webkit-scrollbar-track,
-.chat-plan-panel-body::-webkit-scrollbar-track-piece,
-.chat-plan-panel-body::-webkit-scrollbar-corner {
-  background: transparent;
-  box-shadow: none;
-}
-
-.chat-plan-panel-body::-webkit-scrollbar-thumb {
-  min-height: 44px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-plan-panel-body:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-secondary) 28%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-plan-panel-body::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-plan-panel-body > .chat-plan-card {
+/* The card supplies the frame everywhere else; here the dialog is the frame,
+   so it draws none of its own. */
+.chat-creation-modal-body > .chat-plan-card {
   width: 100%;
   min-width: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   padding: 0;
+  box-shadow: none;
 }
 
-.chat-plan-panel .chat-plan-entry {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-.chat-plan-panel .chat-plan-entry-meta {
-  grid-column: 2;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chat-plan-panel .chat-plan-entry.is-strength .chat-plan-entry-meta {
-  justify-content: flex-end;
-}
-
-.chat-plan-panel .chat-plan-actions > button {
-  justify-content: center;
-  white-space: nowrap;
-}
-
-.chat-plan-panel .chat-plan-actions .chat-plan-review {
-  flex: 0 1 auto;
-}
-
-.chat-plan-panel .chat-plan-actions .chat-plan-upload {
-  flex: 1 1 220px;
-}
-
-.chat-plan-panel .chat-plan-actions {
+/* Saving is the point of the card, and a long plan would otherwise put its
+   button below the fold. */
+.chat-creation-modal-body .chat-plan-actions {
   position: sticky;
   bottom: -1px;
   padding: 10px 0 1px;
   background: linear-gradient(
     180deg,
     transparent 0,
-    color-mix(in srgb, var(--bg-base) 92%, transparent) 18px
+    color-mix(in srgb, var(--surface) 92%, transparent) 18px
   );
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
-@media (max-width: 1399px) {
-  .chat-plan-panel {
-    display: none;
-  }
+.chat-creation-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--glass-border);
+}
+
+/* Remove sits at the far end from the save button inside the card, so the two
+   are never next to each other. */
+.chat-creation-modal-remove {
+  margin-right: auto;
+}
+
+.chat-creation-modal-confirm {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .chat-main-login {
@@ -19433,7 +19332,7 @@ tr.data-intervals-row-missing {
 }
 
 /* 9.3: a coach writes into this conversation, or has. */
-.chat-session-row-automation-mark {
+.chat-session-row-analysis-mark {
   flex: none;
   margin-right: 5px;
   color: var(--accent-strong);
@@ -19901,10 +19800,6 @@ tr.data-intervals-row-missing {
   gap: 10px;
 }
 
-.chat-mcp-pill-settings {
-  width: fit-content;
-}
-
 .chat-mcp-panel-settings {
   position: static;
   width: 100%;
@@ -19917,6 +19812,55 @@ tr.data-intervals-row-missing {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+/* Stands where the MCP status chip used to, and matches the Analyses chip
+   beside it — both open the conversation's own side of the app. */
+.chat-creations-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-bg) 66%, transparent);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.chat-creations-pill:hover {
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
+  background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
+  color: var(--text-primary);
+}
+
+.chat-creations-pill[aria-expanded="true"] {
+  border-color: var(--chat-signal-border);
+  background: var(--chat-signal-soft);
+  color: var(--chat-signal-strong);
+}
+
+.chat-creations-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--accent-strong);
+  font-size: 10.5px;
+  font-weight: 700;
+  /* Its own line height, for the reason `.chat-coaches-count` states. */
+  line-height: 1;
 }
 
 .chat-account {
@@ -20815,13 +20759,10 @@ tr.data-intervals-row-missing {
   .chat-avatar,
   .chat-typing span,
   .chat-thinking summary i,
-  .chat-mcp-pill.connected::before,
   .chat-mcp-panel,
   .chat-sidebar-expand-button,
   .chat-plan-list-header,
-  .chat-plan-list,
-  .chat-plan-panel-header,
-  .chat-plan-panel-body {
+  .chat-plan-list {
     animation: none;
   }
 
@@ -20848,8 +20789,7 @@ tr.data-intervals-row-missing {
   .chat-layout,
   .chat-sidebar-shell,
   .chat-sidebar.is-overlay,
-  .chat-sidebar-overlay,
-  .chat-plan-panel {
+  .chat-sidebar-overlay {
     transition: none;
   }
 }
@@ -22951,10 +22891,6 @@ tr.data-intervals-row-missing {
     text-align: left;
   }
 
-  .chat-plan-panel .chat-plan-entry.is-strength .chat-plan-entry-meta {
-    justify-content: flex-start;
-  }
-
   .chat-plan-destination-options {
     grid-template-columns: 1fr;
   }
@@ -23367,61 +23303,6 @@ tr.data-intervals-row-missing {
 }
 
 /* COROS MCP connect control */
-.chat-mcp {
-  position: relative;
-}
-
-.chat-mcp-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.chat-mcp-pill:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--glass-bg);
-}
-
-.chat-mcp-pill:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.chat-mcp-pill.connected {
-  background: var(--chat-signal-soft);
-  border-color: var(--chat-signal-border);
-  color: var(--chat-signal-strong);
-  box-shadow: 0 0 0 1px var(--chat-signal-soft),
-    0 4px 16px var(--chat-signal-glow);
-}
-
-.chat-mcp-pill.connected:hover:not(:disabled) {
-  color: var(--chat-signal-strong);
-  border-color: var(--chat-signal);
-  background: var(--chat-signal-soft);
-}
-
-/* Small pulsing "live" dot before the connected label */
-.chat-mcp-pill.connected::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--chat-signal);
-  box-shadow: 0 0 8px var(--chat-signal);
-  animation: chat-dot-pulse 1.8s ease-in-out infinite;
-}
-
 .chat-mcp-panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -33722,11 +33603,9 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
    live, acting-on-its-own feature — exactly what the chat reserves its
    "signal" colour for — so the accent is re-pointed at that green for these
    screens only. Every `var(--accent)` rule below then follows automatically. */
-.coach-automations-panel,
-.coach-automation-detail,
-.coach-automation-create,
-.coach-automation-attach-screen,
-.coach-automation-dialog,
+.coach-analysis-detail,
+.coach-analysis-create,
+.coach-analysis-dialog,
 .chat-coaches-panel {
   --accent: var(--chat-signal);
   --accent-strong: var(--chat-signal-strong);
@@ -33735,15 +33614,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   --accent-glow: var(--chat-signal-glow);
 }
 
-/* ----- Coach automations (Settings → Coach → Automations) ----- */
+/* ----- Coach analyses (the screens one analysis is read and edited on) ----- */
 
-.coach-automations-panel,
-.coach-automation-detail {
+.coach-analysis-detail {
   display: grid;
   gap: 14px;
 }
 
-.coach-automation-error {
+.coach-analysis-error {
   margin: 0;
   padding: 9px 11px;
   border: 1px solid var(--error-border);
@@ -33754,8 +33632,8 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 }
 
 /* Section 10: a provider sign-in that expired. A warning, not an error — the
-   automations are fine, they are just declining until the athlete signs in. */
-.coach-automation-banner {
+   analyses are fine, they are just declining until the athlete signs in. */
+.coach-analysis-banner {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -33769,16 +33647,16 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   line-height: 1.45;
 }
 
-.coach-automation-banner > svg {
+.coach-analysis-banner > svg {
   flex: none;
   margin-top: 2px;
   color: var(--warning-text);
 }
 
-/* Section 13: what the automations have cost this month, beside the ceiling
+/* Section 13: what the analyses have cost this month, beside the ceiling
    that stops them. One line, because a number nobody set a budget against is
    still worth seeing and a whole panel for it would not be. */
-.coach-automation-spend {
+.coach-analysis-spend {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -33790,12 +33668,12 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   font-size: 12.5px;
 }
 
-.coach-automation-spend > span:first-child {
+.coach-analysis-spend > span:first-child {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.coach-automation-budget {
+.coach-analysis-budget {
   flex: none;
   flex-direction: row;
   align-items: center;
@@ -33803,23 +33681,20 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   margin: 0;
 }
 
-.coach-automation-budget input {
+.coach-analysis-budget input {
   width: 96px;
 }
 
 /* The pause banner carries the one control that lifts it (10). It sits beside
    the prose rather than under it, and never shrinks: a Resume button squeezed
    to two characters by a long sentence is not a way out of anything. */
-.coach-automation-banner > button {
+.coach-analysis-banner > button {
   flex: none;
   align-self: center;
   margin-left: auto;
 }
 
-.coach-automation-card-list,
-.coach-automation-binding-list,
-.coach-automation-run-list,
-.coach-automation-session-list {
+.coach-analysis-run-list {
   display: grid;
   gap: 9px;
   margin: 0;
@@ -33827,62 +33702,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   list-style: none;
 }
 
-.coach-automation-card {
-  display: grid;
-  gap: 7px;
-  padding: 13px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 74%, transparent);
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-
-.coach-automation-card[data-enabled="false"] {
-  opacity: 0.62;
-}
-
-.coach-automation-card:hover {
-  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
-  background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
-}
-
-.coach-automation-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.coach-automation-card-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.coach-automation-card-trigger,
-.coach-automation-card-status {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.coach-automation-unattached {
-  color: var(--warning-text);
-}
-
-.coach-automation-card-actions,
-.coach-automation-binding-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-
-.coach-automation-switch {
+.coach-analysis-switch {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -33893,18 +33713,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 /* ----- Detail ----- */
 
-.coach-automation-detail-header {
+.coach-analysis-detail-actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 6px;
 }
 
-.coach-automation-detail-header h3 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.coach-automation-tabs {
+.coach-analysis-tabs {
   display: flex;
   gap: 3px;
   padding: 3px;
@@ -33913,7 +33729,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   background: color-mix(in srgb, var(--glass-bg) 60%, transparent);
 }
 
-.coach-automation-tab {
+.coach-analysis-tab {
   flex: 1;
   padding: 7px 10px;
   border: 0;
@@ -33928,18 +33744,18 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
     color 0.16s ease;
 }
 
-.coach-automation-tab[data-active="true"] {
+.coach-analysis-tab[data-active="true"] {
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-weight: 600;
 }
 
-.coach-automation-tabpanel {
+.coach-analysis-tabpanel {
   display: grid;
   gap: 12px;
 }
 
-.coach-automation-fieldset {
+.coach-analysis-fieldset {
   display: grid;
   gap: 10px;
   margin: 0;
@@ -33948,7 +33764,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   border-radius: var(--radius-md);
 }
 
-.coach-automation-fieldset legend {
+.coach-analysis-fieldset legend {
   padding: 0 6px;
   font-size: 12px;
   font-weight: 600;
@@ -33957,35 +33773,35 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   letter-spacing: 0.04em;
 }
 
-.coach-automation-row {
+.coach-analysis-row {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   align-items: flex-end;
 }
 
-.coach-automation-row > .chat-local-field {
+.coach-analysis-row > .chat-local-field {
   flex: 1 1 150px;
   min-width: 0;
 }
 
-.coach-automation-model-row {
+.coach-analysis-model-row {
   align-items: center;
 }
 
-.coach-automation-hint {
+.coach-analysis-hint {
   margin: 0;
   font-size: 11.5px;
   color: var(--text-muted);
 }
 
-.coach-automation-sports {
+.coach-analysis-sports {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.coach-automation-chip {
+.coach-analysis-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -33998,72 +33814,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   cursor: pointer;
 }
 
-/* ----- Bindings ----- */
-
-.coach-automation-bindings-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.coach-automation-binding-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
-}
-
-.coach-automation-binding-row[data-broken="true"] {
-  border-color: color-mix(
-    in srgb,
-    var(--warning-border) 70%,
-    var(--glass-border)
-  );
-}
-
-.coach-automation-binding-main {
-  display: grid;
-  gap: 4px;
-  /* Without this the block is sized to its content and lands centred between
-     the switch and the row actions. */
-  flex: 1 1 auto;
-  justify-items: start;
-  text-align: left;
-  min-width: 0;
-}
-
-.coach-automation-binding-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.coach-automation-binding-meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.coach-automation-binding-warning {
-  font-size: 12px;
-  color: var(--warning-text);
-}
-
-/* ----- Run log ----- */
-
-.coach-automation-run-filter {
-  max-width: 260px;
-}
-
-.coach-automation-run-row {
+.coach-analysis-run-row {
   display: flex;
   align-items: flex-start;
   gap: 11px;
@@ -34073,7 +33824,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   background: color-mix(in srgb, var(--glass-bg) 66%, transparent);
 }
 
-.coach-automation-run-status {
+.coach-analysis-run-status {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: 999px;
@@ -34084,41 +33835,41 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--text-secondary);
 }
 
-.coach-automation-run-status[data-status="success"] {
+.coach-analysis-run-status[data-status="success"] {
   background: var(--success-bg);
   color: var(--success-text);
 }
 
-.coach-automation-run-status[data-status="failed"] {
+.coach-analysis-run-status[data-status="failed"] {
   background: var(--error-bg);
   color: var(--error-text);
 }
 
-.coach-automation-run-status[data-status="running"] {
+.coach-analysis-run-status[data-status="running"] {
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   color: var(--text-primary);
 }
 
-.coach-automation-run-body {
+.coach-analysis-run-body {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.coach-automation-run-summary {
+.coach-analysis-run-summary {
   font-size: 12.5px;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
-.coach-automation-run-meta {
+.coach-analysis-run-meta {
   font-size: 11.5px;
   color: var(--text-muted);
 }
 
 /* A row whose run wrote into a conversation opens it. Same box as the rows
    that cannot, so the log does not look like two kinds of thing. */
-.coach-automation-run-open {
+.coach-analysis-run-open {
   width: 100%;
   font: inherit;
   color: inherit;
@@ -34129,12 +33880,12 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
     background 0.16s ease;
 }
 
-.coach-automation-run-open:hover {
+.coach-analysis-run-open:hover {
   border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
   background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
 }
 
-.coach-automation-run-open-icon {
+.coach-analysis-run-open-icon {
   flex: 0 0 auto;
   align-self: center;
   margin-left: auto;
@@ -34143,7 +33894,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 /* ----- Attach dialog ----- */
 
-.coach-automation-dialog-backdrop {
+.coach-analysis-dialog-backdrop {
   position: fixed;
   inset: 0;
   /* Sits above .chat-settings-backdrop (80): the attach dialog opens from
@@ -34157,7 +33908,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   backdrop-filter: blur(6px);
 }
 
-.coach-automation-dialog {
+.coach-analysis-dialog {
   width: min(560px, 100%);
   /* Flex, not a fixed grid track list: the error paragraph is conditional, so
      `grid-template-rows: auto auto 1fr` put the body in an `auto` row whenever
@@ -34170,24 +33921,24 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   max-height: min(80vh, 720px);
 }
 
-.coach-automation-dialog-header,
-.coach-automation-dialog > .coach-automation-error {
+.coach-analysis-dialog-header,
+.coach-analysis-dialog > .coach-analysis-error {
   flex: 0 0 auto;
 }
 
-.coach-automation-dialog-header {
+.coach-analysis-dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.coach-automation-dialog-header h3 {
+.coach-analysis-dialog-header h3 {
   margin: 0;
   font-size: 15px;
 }
 
-.coach-automation-dialog-body {
+.coach-analysis-dialog-body {
   display: grid;
   align-content: start;
   gap: 14px;
@@ -34196,115 +33947,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   overflow-y: auto;
 }
 
-.coach-automation-attach-mode {
-  display: grid;
-  gap: 9px;
-  padding: 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-}
-
-.coach-automation-attach-mode-head {
-  display: flex;
-  gap: 9px;
-  align-items: flex-start;
-}
-
-/* The mode this coach's preset was written around. */
-.coach-automation-attach-mode[data-suggested="true"] {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
-}
-
-.coach-automation-attach-suggested {
-  flex: none;
-  margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent-strong);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.coach-automation-attach-mode-head p {
-  margin: 3px 0 0;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.coach-automation-attach-existing h4 {
-  margin: 0 0 8px;
-  font-size: 13px;
-}
-
-.coach-automation-session-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 9px 11px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 60%, transparent);
-  color: var(--text-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
-}
-
-.coach-automation-session-row:hover:not([data-disabled]) {
-  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
-  background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
-}
-
-/* A conversation already holding five automations is disabled with its reason
-   spelled out beside it, so it never reads as a broken button. */
-.coach-automation-session-row[data-disabled="true"] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.coach-automation-session-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coach-automation-session-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* 3.4's "where should this run?" picker: the same row as the attach list, with
-   the tick that makes it a choice rather than an action. */
-.coach-automation-run-choice {
-  gap: 10px;
-}
-
-.coach-automation-run-choice input[type="checkbox"] {
-  flex: 0 0 auto;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
-.coach-automation-run-choice .coach-automation-session-title {
-  flex: 1 1 auto;
-}
-
-/* ----- Coach automations, conversation side (9.3) ----- */
+/* ----- Coach analyses, conversation side (9.3) ----- */
 
 .chat-coaches {
   position: relative;
@@ -34416,6 +34059,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   min-width: 0;
 }
 
+/* The switch is the row's fixed left edge: without this it stretches with the
+   flex row and the name beside it loses its alignment. */
+.chat-coaches-row-switch {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0;
+}
+
 .chat-coaches-row-name {
   display: inline-flex;
   align-items: center;
@@ -34447,8 +34098,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   border-top: 1px solid var(--glass-border);
 }
 
-.chat-coaches-attach,
-.chat-coaches-manage {
+.chat-coaches-create {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -34464,28 +34114,21 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   cursor: pointer;
 }
 
-/* The secondary way out of the popover, so it reads as lighter than Attach. */
-.chat-coaches-manage {
-  justify-content: center;
-  border-style: dashed;
-}
-
-.chat-coaches-attach:hover:not(:disabled),
-.chat-coaches-manage:hover {
+.chat-coaches-create:hover:not(:disabled) {
   background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
   color: var(--text-primary);
 }
 
 /* ----- Attribution inside the transcript ----- */
 
-.chat-row-automation {
+.chat-row-analysis {
   display: grid;
   gap: 6px;
   justify-items: center;
   padding: 2px 0;
 }
 
-.chat-automation-chip {
+.chat-analysis-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -34499,21 +34142,21 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   cursor: pointer;
 }
 
-.chat-automation-chip:hover {
+.chat-analysis-chip:hover {
   color: var(--text-primary);
 }
 
 /* The silent-run trace wears the same pill, but there is nothing to open. */
-.chat-automation-chip-static {
+.chat-analysis-chip-static {
   cursor: default;
 }
 
-.chat-automation-chip-trigger,
-.chat-automation-attribution-trigger {
+.chat-analysis-chip-trigger,
+.chat-analysis-attribution-trigger {
   color: var(--text-muted);
 }
 
-.chat-automation-prompt {
+.chat-analysis-prompt {
   max-width: min(640px, 90%);
   margin: 0;
   padding: 9px 12px;
@@ -34527,7 +34170,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   overflow-wrap: anywhere;
 }
 
-.chat-automation-attribution {
+.chat-analysis-attribution {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -34537,33 +34180,41 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: color-mix(in srgb, var(--accent) 78%, var(--text-secondary));
 }
 
-/* ----- Automations screen (Coaches → Manage automations) ----- */
+/* ----- The modal that hosts one analysis ----- */
 
-.coach-automations-modal-body {
+/* One size, whichever tab is open. Settings is a column of forms and the run
+   log is often a single line, so a dialog sized to its content dropped from
+   full height to a few hundred pixels on a tab change — moving the tab strip
+   out from under the cursor that had just clicked it, and shifting the whole
+   frame on screen because the backdrop centres it. The height is the same
+   ceiling the shell already had as a maximum, so the tall tab looks exactly
+   as it did and only the short one stops collapsing. */
+.coach-analyses-modal {
+  height: min(92vh, 900px);
+}
+
+.coach-analyses-modal-body {
   display: grid;
   gap: 14px;
   align-content: start;
   padding: 16px;
   overflow-y: auto;
-}
+  /* Reserve the scrollbar's width on the tab that does not need one, or the
+     content reflows sideways by its width on every switch. */
+  scrollbar-gutter: stable;
+}/* ----- Create screen ----- */
 
-.coach-automation-new {
-  justify-self: start;
-}
-
-/* ----- Create screen ----- */
-
-.coach-automation-create {
+.coach-analysis-create {
   display: grid;
   gap: 14px;
 }
 
-.coach-automation-starters {
+.coach-analysis-starters {
   display: grid;
   gap: 8px;
 }
 
-.coach-automation-starter {
+.coach-analysis-starter {
   display: grid;
   gap: 4px;
   padding: 11px 12px;
@@ -34579,17 +34230,17 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
     background 0.16s ease;
 }
 
-.coach-automation-starter:hover {
+.coach-analysis-starter:hover {
   border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
   background: color-mix(in srgb, var(--glass-bg-hover) 78%, transparent);
 }
 
-.coach-automation-starter[data-selected="true"] {
+.coach-analysis-starter[data-selected="true"] {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--glass-border));
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
-.coach-automation-starter-head {
+.coach-analysis-starter-head {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -34598,33 +34249,31 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--text-primary);
 }
 
-.coach-automation-starter-copy {
+.coach-analysis-starter-copy {
   font-size: 12.5px;
   line-height: 1.5;
 }
 
-.coach-automation-starter-trigger {
+.coach-analysis-starter-trigger {
   font-size: 11.5px;
   color: var(--text-muted);
 }
 
-.coach-automation-create-actions {
+.coach-analysis-create-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-/* ----- Disabled buttons on the automations screens -----
+/* ----- Disabled buttons on the analyses screens -----
    `.primary-button` has no global :disabled rule, so a disabled one still
    renders in full accent with its glow and reads as clickable. Scoped here
    rather than changed globally, matching how `.calendar-modal-footer` already
    handles the same gap. */
 
-.coach-automations-panel .primary-button:disabled,
-.coach-automation-detail .primary-button:disabled,
-.coach-automation-create .primary-button:disabled,
-.coach-automation-attach-screen .primary-button:disabled,
-.coach-automation-dialog .primary-button:disabled {
+.coach-analysis-detail .primary-button:disabled,
+.coach-analysis-create .primary-button:disabled,
+.coach-analysis-dialog .primary-button:disabled {
   /* Recede, do not glow. A light fill on this dark surface makes a dead
      button the brightest thing on the panel, which reads as "wrong colour"
      rather than "unavailable". */
@@ -34636,75 +34285,62 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   transform: none;
 }
 
-.coach-automations-panel .chat-local-action:disabled,
-.coach-automation-detail .chat-local-action:disabled,
-.coach-automation-create .chat-local-action:disabled,
-.coach-automation-attach-screen .chat-local-action:disabled,
-.coach-automation-dialog .chat-local-action:disabled {
+.coach-analysis-detail .chat-local-action:disabled,
+.coach-analysis-create .chat-local-action:disabled,
+.coach-analysis-dialog .chat-local-action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.coach-automation-detail .icon-button:disabled,
+.coach-analysis-detail .icon-button:disabled,
 .chat-coaches-panel .icon-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
 /* The switch reads as off when the row it belongs to is busy. */
-.coach-automation-switch:has(input:disabled) {
+.coach-analysis-switch:has(input:disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Fieldsets disable their whole group while a save is in flight. */
-.coach-automation-fieldset:disabled {
+.coach-analysis-fieldset:disabled {
   opacity: 0.6;
 }
 
-.coach-automation-fieldset:disabled .coach-automation-chip,
-.coach-automation-starter:disabled {
+.coach-analysis-fieldset:disabled .coach-analysis-chip,
+.coach-analysis-starter:disabled {
   cursor: not-allowed;
 }
 
 /* `.primary-button` is 44px tall, which towers over the 34px secondary buttons
    it sits beside in these dense panels. */
-.coach-automations-panel .primary-button,
-.coach-automation-detail .primary-button,
-.coach-automation-create .primary-button,
-.coach-automation-attach-screen .primary-button,
-.coach-automation-dialog .primary-button {
+.coach-analysis-detail .primary-button,
+.coach-analysis-create .primary-button,
+.coach-analysis-dialog .primary-button {
   min-height: 34px;
   padding: 0 14px;
   font-size: 12px;
   border-radius: var(--radius-pill);
 }
 
-.coach-automation-attach-action {
-  justify-content: center;
-  width: 100%;
-}
-
-/* ----- Active vs disabled on the automations screens -----
+/* ----- Active vs disabled on the analyses screens -----
    Disabled reads grey (above); anything actionable reads in the accent, so the
    two states are told apart by colour rather than by trying a click. */
 
-.coach-automations-panel .chat-local-action:not(:disabled):not(.is-danger),
-.coach-automation-detail .chat-local-action:not(:disabled):not(.is-danger),
-.coach-automation-create .chat-local-action:not(:disabled):not(.is-danger),
-.coach-automation-attach-screen .chat-local-action:not(:disabled):not(.is-danger),
-.coach-automation-dialog .chat-local-action:not(:disabled):not(.is-danger),
-.chat-coaches-panel .chat-coaches-attach:not(:disabled) {
+.coach-analysis-detail .chat-local-action:not(:disabled):not(.is-danger),
+.coach-analysis-create .chat-local-action:not(:disabled):not(.is-danger),
+.coach-analysis-dialog .chat-local-action:not(:disabled):not(.is-danger),
+.chat-coaches-panel .chat-coaches-create:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
   color: var(--accent);
 }
 
-.coach-automations-panel .chat-local-action:not(:disabled):not(.is-danger):hover,
-.coach-automation-detail .chat-local-action:not(:disabled):not(.is-danger):hover,
-.coach-automation-create .chat-local-action:not(:disabled):not(.is-danger):hover,
-.coach-automation-attach-screen .chat-local-action:not(:disabled):not(.is-danger):hover,
-.coach-automation-dialog .chat-local-action:not(:disabled):not(.is-danger):hover,
-.chat-coaches-panel .chat-coaches-attach:not(:disabled):hover {
+.coach-analysis-detail .chat-local-action:not(:disabled):not(.is-danger):hover,
+.coach-analysis-create .chat-local-action:not(:disabled):not(.is-danger):hover,
+.coach-analysis-dialog .chat-local-action:not(:disabled):not(.is-danger):hover,
+.chat-coaches-panel .chat-coaches-create:not(:disabled):hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -34712,14 +34348,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 /* Icon actions light up on hover, except the destructive one: detach keeps its
    own weight so it is never mistaken for a safe action. */
-.coach-automation-detail .icon-button:not(:disabled):hover,
+.coach-analysis-detail .icon-button:not(:disabled):hover,
 .chat-coaches-panel .icon-button:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--glass-border));
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
-.coach-automation-detail .icon-button[aria-label="Detach"]:not(:disabled):hover,
+.coach-analysis-detail .icon-button[aria-label="Detach"]:not(:disabled):hover,
 .chat-coaches-panel .icon-button[aria-label="Detach"]:not(:disabled):hover {
   border-color: var(--error-border);
   background: var(--error-bg);
@@ -34727,27 +34363,22 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 }
 
 /* On/off switches, and the sport filter chips, follow the same rule. */
-.coach-automation-switch input,
-.coach-automation-chip input {
+.coach-analysis-switch input,
+.coach-analysis-chip input {
   accent-color: var(--accent);
 }
 
-.coach-automation-switch:has(input:checked) {
+.coach-analysis-switch:has(input:checked) {
   color: var(--accent);
 }
 
-.coach-automation-chip:has(input:checked) {
+.coach-analysis-chip:has(input:checked) {
   border-color: color-mix(in srgb, var(--accent) 60%, var(--glass-border));
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
-/* An automation that is switched off should not shout in the accent. */
-.coach-automation-card[data-enabled="false"] .coach-automation-card-name {
-  color: var(--text-secondary);
-}
-
-.coach-automation-save-row {
+.coach-analysis-save-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -34756,71 +34387,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 /* Says why the save button is unavailable, instead of leaving a grey button
    with no explanation. */
-.coach-automation-save-reason {
+.coach-analysis-save-reason {
   font-size: 12px;
   color: var(--warning-text);
 }
 
-/* ----- The switch leads each row -----
-   Its state is `automation.enabled && binding.enabled`, the same condition the
-   runner uses, so a row can never read "on" beside a coach that will not fire.
-   An off row greys out rather than disappearing: the athlete still needs to
-   see it is attached. */
+/* ----- Deleting an analysis ----- */
 
-.chat-coaches-row-switch,
-.coach-automation-binding-switch {
-  flex: 0 0 auto;
-  align-self: center;
-  margin: 0;
-}
-
-.chat-coaches-row[data-off="true"] .chat-coaches-row-name,
-.chat-coaches-row[data-off="true"] .chat-coaches-row-meta,
-.coach-automation-binding-row[data-off="true"] .coach-automation-binding-title,
-.coach-automation-binding-row[data-off="true"] .coach-automation-binding-meta {
-  color: var(--text-muted);
-}
-
-.chat-coaches-row[data-off="true"] .chat-coaches-row-name svg,
-.coach-automation-binding-row[data-off="true"] .coach-automation-binding-title svg {
-  opacity: 0.55;
-}
-
-/* ----- Attach screen (Where it runs → Attach to a conversation) -----
-   Its own screen inside the Automations modal rather than a dialog over one:
-   choosing where a coach runs is a step in the flow, not an interruption of it. */
-
-.coach-automation-attach-screen {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  /* Fill the modal body so the conversation list gets real room instead of the
-     few rows a floating dialog could show. */
-  min-height: min(560px, 68vh);
-}
-
-.coach-automation-attach-body {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  flex: 1 1 auto;
-}
-
-
-
-/* ----- Back in the modal title bar -----
-   Sub-screens publish their back action here instead of drawing a header of
-   their own, so there is one way back however deep the athlete is. */
-
-.coach-automations-back {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-}
-
-/* ----- Deleting an automation ----- */
-
-.coach-automation-danger-zone {
+.coach-analysis-danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -34831,23 +34405,23 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   border-radius: var(--radius-md);
 }
 
-.coach-automation-danger-zone strong {
+.coach-analysis-danger-zone strong {
   font-size: 13px;
   color: var(--text-primary);
 }
 
-.coach-automation-danger-zone p {
+.coach-analysis-danger-zone p {
   margin: 3px 0 0;
   max-width: 52ch;
   font-size: 12.5px;
   color: var(--text-secondary);
 }
 
-.coach-automation-confirm {
+.coach-analysis-confirm {
   min-height: 0;
 }
 
-.coach-automation-confirm-lead {
+.coach-analysis-confirm-lead {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -34857,41 +34431,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--error-text);
 }
 
-.coach-automation-confirm-list {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.coach-automation-confirm-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-  font-size: 12.5px;
-  color: var(--text-primary);
-}
-
-.coach-automation-confirm-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coach-automation-confirm-note {
-  margin-left: auto;
-  flex: 0 0 auto;
-  font-size: 11.5px;
-  color: var(--text-muted);
-}
-
-.coach-automation-confirm-actions {
+.coach-analysis-confirm-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

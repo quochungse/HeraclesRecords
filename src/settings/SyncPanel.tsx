@@ -273,7 +273,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
       ? status.googleConnected || switching
         ? "Your Google Drive, in a folder this app creates and can only see its own files in."
         : "Connecting opens your browser to Google — consent happens there, never inside the app."
-      : "A folder on this computer. A folder kept in sync by Dropbox or Drive Desktop can work, but two machines may then run the same scheduled automation — connect Google Drive directly to avoid that.";
+      : "A folder on this computer. A folder kept in sync by Dropbox or Drive Desktop can work, but two machines may then run the same scheduled analysis — connect Google Drive directly to avoid that.";
 
   return (
     <div

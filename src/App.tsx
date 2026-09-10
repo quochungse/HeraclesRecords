@@ -363,7 +363,7 @@ export default function App() {
   });
   const [coachStreaming, setCoachStreaming] = useState(false);
   /**
-   * Runs an automation started on its own, keyed by run id. An auto run happens
+   * Runs an analysis started on its own, keyed by run id. An auto run happens
    * in the main process and never touches the composer, so `coachStreaming` --
    * which only ever reports what the athlete typed -- leaves the nav dot dark
    * for exactly the runs the athlete had no other way of noticing.
@@ -372,7 +372,7 @@ export default function App() {
    * the Coach view is first opened: a run firing while the athlete sits on
    * Overview would otherwise have no listener at all.
    */
-  const [runningAutomationIds, setRunningAutomationIds] = useState<Set<string>>(
+  const [runningAnalysisIds, setRunningAnalysisIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
@@ -616,30 +616,30 @@ export default function App() {
 
   /**
    * The Coach nav dot for runs nobody asked for. A run already in flight when
-   * this window opened is seeded from the run log -- `cancelStaleCoachAutomationRuns`
+   * this window opened is seeded from the run log -- `cancelStaleCoachAnalysisRuns`
    * settles the rows left over from a previous launch at startup, so anything
    * still `running` really is.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) {
+    if (!api?.onCoachAnalysisRunUpdate) {
       return;
     }
     let cancelled = false;
     void api
-      .listCoachAutomationRuns({ statuses: ["running"] })
+      .listCoachAnalysisRuns({ statuses: ["running"] })
       .then((runs) => {
         if (cancelled) return;
         // Merged rather than replaced: a run that started while this lookup was
         // in flight is already in the set, and is not in the answer.
-        setRunningAutomationIds((current) => {
+        setRunningAnalysisIds((current) => {
           const next = new Set(current);
           for (const run of runs) next.add(run.id);
           return next;
         });
       })
       .catch(() => undefined);
-    const unsubscribe = api.onCoachAutomationRunUpdate((run) => {
-      setRunningAutomationIds((current) => {
+    const unsubscribe = api.onCoachAnalysisRunUpdate((run) => {
+      setRunningAnalysisIds((current) => {
         const running = run.status === "running";
         if (running === current.has(run.id)) {
           return current;
@@ -659,8 +659,8 @@ export default function App() {
     };
   }, [api]);
 
-  /** Either kind of coach work: the athlete's turn, or an automation's. */
-  const coachBusy = coachStreaming || runningAutomationIds.size > 0;
+  /** Either kind of coach work: the athlete's turn, or an analysis's. */
+  const coachBusy = coachStreaming || runningAnalysisIds.size > 0;
 
   useEffect(() => {
     if (activeView === "coach") {

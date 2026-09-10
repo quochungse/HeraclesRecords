@@ -7,7 +7,7 @@ const Module = require("node:module");
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 // The watcher reaches trainingHubService and the runner, which pull in electron
-// and the better-sqlite3 native binding at require time. Every collaborator is
+// and the better-sqlite3 native attachment at require time. Every collaborator is
 // injected per instance, so the stubs only exist to get the module loaded.
 const fakeElectron = {
   BrowserWindow: Object.assign(class {}, { getAllWindows: () => [] }),
@@ -28,7 +28,7 @@ const {
   ACTIVITY_LOOKBACK_DAYS,
   ACTIVITY_POLL_INTERVAL_MS,
   CoachActivityWatcher,
-  activityMatchesAutomation
+  activityMatchesTrigger
 } = require(path.join(repoRoot, "dist-electron", "coachActivityWatcher.js"));
 
 assert.equal(ACTIVITY_POLL_INTERVAL_MS, 15 * 60_000, "3.2: default poll is 15 minutes");
@@ -52,8 +52,10 @@ const activity = (patch = {}) => ({
   ...patch
 });
 
-const activityAutomation = (trigger = {}, patch = {}) => ({
+/** One analysis: what it watches, and the conversation it speaks into. */
+const activityAnalysis = (trigger = {}, patch = {}) => ({
   id: "a1",
+  sessionId: "s1",
   name: "Debrief",
   playbook: "Debrief {{activity.name}}.",
   enabled: true,
@@ -66,41 +68,41 @@ const activityAutomation = (trigger = {}, patch = {}) => ({
 });
 
 // An empty sportTypes means every sport.
-assert.equal(activityMatchesAutomation(activity(), activityAutomation()), true);
+assert.equal(activityMatchesTrigger(activity(), activityAnalysis().trigger), true);
 assert.equal(
-  activityMatchesAutomation(activity(), activityAutomation({ sportTypes: [100, 101] })),
+  activityMatchesTrigger(activity(), activityAnalysis({ sportTypes: [100, 101] }).trigger),
   true
 );
 assert.equal(
-  activityMatchesAutomation(activity({ sport_type: 200 }), activityAutomation({ sportTypes: [100] })),
+  activityMatchesTrigger(activity({ sport_type: 200 }), activityAnalysis({ sportTypes: [100] }).trigger),
   false
 );
 assert.equal(
-  activityMatchesAutomation(activity({ duration: 600 }), activityAutomation({ minDurationSec: 3600 })),
+  activityMatchesTrigger(activity({ duration: 600 }), activityAnalysis({ minDurationSec: 3600 }).trigger),
   false
 );
 assert.equal(
-  activityMatchesAutomation(activity({ duration: 3600 }), activityAutomation({ minDurationSec: 3600 })),
+  activityMatchesTrigger(activity({ duration: 3600 }), activityAnalysis({ minDurationSec: 3600 }).trigger),
   true
 );
 assert.equal(
-  activityMatchesAutomation(activity({ distance: 5000 }), activityAutomation({ minDistanceM: 10000 })),
+  activityMatchesTrigger(activity({ distance: 5000 }), activityAnalysis({ minDistanceM: 10000 }).trigger),
   false
 );
 // A missing metric fails a floor rather than passing it by accident.
 assert.equal(
-  activityMatchesAutomation(activity({ duration: null }), activityAutomation({ minDurationSec: 1 })),
+  activityMatchesTrigger(activity({ duration: null }), activityAnalysis({ minDurationSec: 1 }).trigger),
   false
 );
 assert.equal(
-  activityMatchesAutomation(activity({ distance: null }), activityAutomation({ minDistanceM: 1 })),
+  activityMatchesTrigger(activity({ distance: null }), activityAnalysis({ minDistanceM: 1 }).trigger),
   false
 );
 // Only "activity" triggers ever match here.
 assert.equal(
-  activityMatchesAutomation(
+  activityMatchesTrigger(
     activity(),
-    activityAutomation({}, { trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" } })
+    activityAnalysis({}, { trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" } })
   ),
   false
 );
@@ -113,7 +115,7 @@ function createWorld(overrides = {}) {
   const state = {
     now: new Date("2026-08-21T09:00:00.000Z"),
     rows: new Map(), // activity_id -> { row, seen: boolean }
-    automations: [],
+    analyses: [],
     settings: new Map(),
     authenticated: true,
     refreshes: [],
@@ -155,7 +157,13 @@ function createWorld(overrides = {}) {
       }
       return changed;
     },
-    listAutomations: () => state.automations.map((entry) => ({ ...entry })),
+    // What the store's `listTriggeredCoachAnalyses` returns: enabled
+    // analyses carrying a real trigger.
+    listTriggeredAnalyses: () =>
+      state.analyses
+        .filter((entry) => entry.enabled !== false)
+        .filter((entry) => entry.trigger && entry.trigger.kind !== "manual")
+        .map((entry) => ({ ...entry })),
     isCorosAuthenticated: () => state.authenticated,
     getSetting: (key) => state.settings.get(key),
     setSetting: (key, value) => state.settings.set(key, value),
@@ -198,7 +206,7 @@ const advance = (world, minutes) => {
 
 {
   const world = createWorld();
-  world.automations = [activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })];
+  world.analyses = [activityAnalysis({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })];
   for (let index = 0; index < 40; index += 1) {
     world.addActivity({ activity_id: `old-${index}` });
   }
@@ -216,7 +224,7 @@ const advance = (world, minutes) => {
   world.addActivity({ activity_id: "fresh" });
   await watcher.tick();
   assert.equal(world.triggers.length, 1);
-  assert.equal(world.triggers[0].automationId, "a1");
+  assert.equal(world.triggers[0].analysisId, "a1");
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +235,7 @@ const advance = (world, minutes) => {
   const world = createWorld();
   world.markInitialized();
   world.authenticated = false;
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
   world.addActivity({ activity_id: "act-1" });
 
   const watcher = new CoachActivityWatcher(world.deps);
@@ -238,13 +246,13 @@ const advance = (world, minutes) => {
 }
 
 // ---------------------------------------------------------------------------
-// 3.2 step 5: one trigger per automation, however many activities landed
+// 3.2 step 5: one trigger per analysis, however many activities landed
 // ---------------------------------------------------------------------------
 
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
   world.addActivity({ activity_id: "act-1", name: "Long run", start_time: NOW_EPOCH - 900 });
   world.addActivity({ activity_id: "act-2", name: "Evening swim", start_time: NOW_EPOCH - 800 });
 
@@ -252,10 +260,10 @@ const advance = (world, minutes) => {
   await watcher.tick();
   assert.equal(world.triggers.length, 1, "two new activities produce one run");
   const [fired] = world.triggers;
-  assert.equal(fired.automationId, "a1");
+  assert.equal(fired.analysisId, "a1");
   assert.equal(fired.kind, "activity");
-  // The poll decides *when* to fire; which activities each binding then
-  // analyses is the runner's call, from that binding's own watermark — so the
+  // The poll decides *when* to fire; which activities each attachment then
+  // analyses is the runner's call, from that attachment's own watermark — so the
   // trigger deliberately carries no activity payload.
   assert.equal(fired.payload, undefined);
   assert.deepEqual(world.unseenIds(), [], "stamped as it fired");
@@ -266,25 +274,25 @@ const advance = (world, minutes) => {
   // "is there anything unseen" firing condition never came round again and the
   // activity was dropped. This block used to assert the opposite ("the same
   // activity is never fired twice"), which is a claim the watcher is in no
-  // position to make: 3.2 gives it *when*, and which activities a binding still
-  // owes is the runner's answer from that binding's own watermark.
+  // position to make: 3.2 gives it *when*, and which activities a attachment still
+  // owes is the runner's answer from that attachment's own watermark.
   await watcher.tick();
   assert.equal(world.triggers.length, 2, "the tick asks again");
   assert.equal(world.triggers[1].payload, undefined, "payload-free, like the first");
 }
 
 // ---------------------------------------------------------------------------
-// Fan-out across automations, and non-matching rows
+// Fan-out across analyses, and non-matching rows
 // ---------------------------------------------------------------------------
 
 {
   const world = createWorld();
   world.markInitialized();
   const zero = { cooldownMin: 0, maxRunsPerDay: 9 };
-  world.automations = [
-    activityAutomation({ sportTypes: [100] }, { id: "runs", conditions: zero }),
-    activityAutomation({ sportTypes: [200] }, { id: "swims", conditions: zero }),
-    activityAutomation({ sportTypes: [100] }, { id: "off", conditions: zero, enabled: false })
+  world.analyses = [
+    activityAnalysis({ sportTypes: [100] }, { id: "runs", conditions: zero }),
+    activityAnalysis({ sportTypes: [200] }, { id: "swims", conditions: zero }),
+    activityAnalysis({ sportTypes: [100] }, { id: "off", conditions: zero, enabled: false })
   ];
   world.addActivity({ activity_id: "run-1", sport_type: 100, start_time: NOW_EPOCH - 700 });
   world.addActivity({ activity_id: "swim-1", sport_type: 200, start_time: NOW_EPOCH - 800 });
@@ -294,9 +302,9 @@ const advance = (world, minutes) => {
   await watcher.tick();
 
   assert.deepEqual(
-    world.triggers.map((trigger) => trigger.automationId).sort(),
+    world.triggers.map((trigger) => trigger.analysisId).sort(),
     ["runs", "swims"],
-    "a disabled automation is never matched"
+    "a disabled analysis is never matched"
   );
   assert.deepEqual(
     world.unseenIds(),
@@ -306,22 +314,22 @@ const advance = (world, minutes) => {
 }
 
 // ---------------------------------------------------------------------------
-// An automation switched off between ticks stops being asked
+// An analysis switched off between ticks stops being asked
 // ---------------------------------------------------------------------------
-// Also the detector for caching the automation list across ticks: a list read
+// Also the detector for caching the analysis list across ticks: a list read
 // once and reused never sees `enabled = false`.
 
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
   world.addActivity({ activity_id: "act-1" });
 
   const watcher = new CoachActivityWatcher(world.deps);
   await watcher.tick();
   assert.equal(world.triggers.length, 1);
 
-  world.automations[0].enabled = false;
+  world.analyses[0].enabled = false;
   advance(world, 30);
   world.addActivity({ activity_id: "act-2" });
   await watcher.tick();
@@ -330,14 +338,14 @@ const advance = (world, minutes) => {
 }
 
 // ---------------------------------------------------------------------------
-// With no activity automation configured the marker still advances
+// With no activity analysis configured the marker still advances
 // ---------------------------------------------------------------------------
 
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [
-    activityAutomation({}, { trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" } })
+  world.analyses = [
+    activityAnalysis({}, { trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:00" } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -384,7 +392,7 @@ const advance = (world, minutes) => {
     }
   });
   world.markInitialized();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
 
   const watcher = new CoachActivityWatcher(world.deps);
   await watcher.tick();
@@ -404,8 +412,8 @@ const advance = (world, minutes) => {
     }
   });
   world.markInitialized();
-  world.automations = [
-    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
+  world.analyses = [
+    activityAnalysis({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -457,7 +465,7 @@ const thresholdRule = (patch = {}) => ({
   assert.deepEqual(world.sampleReads, [], "no threshold rule, no snapshot");
 
   // A rule switched off is a rule that will not be evaluated, so it is not one.
-  world.automations = [thresholdRule({ enabled: false })];
+  world.analyses = [thresholdRule({ enabled: false })];
   await new CoachActivityWatcher(world.deps).tick();
   assert.deepEqual(world.sampleReads, [], "and a paused rule reads nothing either");
 }
@@ -466,7 +474,7 @@ const thresholdRule = (patch = {}) => ({
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [thresholdRule()];
+  world.analyses = [thresholdRule()];
   const watcher = new CoachActivityWatcher(world.deps);
 
   await watcher.tick();
@@ -490,14 +498,14 @@ const thresholdRule = (patch = {}) => ({
   assert.equal(world.sampleReads.length, 2, "and once the window passes it does");
 }
 
-// --- a threshold automation with no activity trigger still gets its data ----
+// --- a threshold analysis with no activity trigger still gets its data ----
 {
   // The snapshot is deliberately not behind the "is anything listening for
   // activities" check below it: a threshold rule has no activity trigger, so
   // gating on that would starve exactly the feature the cache exists for.
   const world = createWorld();
   world.markInitialized();
-  world.automations = [thresholdRule()];
+  world.analyses = [thresholdRule()];
 
   await new CoachActivityWatcher(world.deps).tick();
   assert.equal(world.sampleReads.length, 1);
@@ -512,7 +520,7 @@ const thresholdRule = (patch = {}) => ({
     }
   });
   world.markInitialized();
-  world.automations = [thresholdRule()];
+  world.analyses = [thresholdRule()];
   const watcher = new CoachActivityWatcher(world.deps);
 
   await watcher.tick();
@@ -536,7 +544,7 @@ const thresholdRule = (patch = {}) => ({
     readDailySamples: () => new Promise(() => {})
   });
   world.markInitialized();
-  world.automations = [thresholdRule()];
+  world.analyses = [thresholdRule()];
   const watcher = new CoachActivityWatcher(world.deps);
 
   const settled = await Promise.race([
@@ -566,15 +574,15 @@ assert.equal(
 // whatever it answers — right, because the flag means "the watcher has looked".
 // But the
 // watcher's firing condition was "is anything unseen", so a run refused for any
-// reason left the activity owed by the binding's watermark and asked for by
+// reason left the activity owed by the attachment's watermark and asked for by
 // nobody. With `multiActivity` off, which is the default, the next activity to
 // arrive replaced it and it was never analysed at all.
 
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [
-    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
+  world.analyses = [
+    activityAnalysis({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -594,13 +602,13 @@ assert.equal(
   assert.equal(world.triggers.length, 3, "and the one after that");
 }
 
-// A binding with nothing owed costs nothing: the trigger still goes, the runner
+// A attachment with nothing owed costs nothing: the trigger still goes, the runner
 // plans nothing, and a non-manual trigger with an empty plan logs no row. The
 // watcher cannot tell the two apart and 3.2 says it should not try.
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
 
   const watcher = new CoachActivityWatcher(world.deps);
   await watcher.tick();
@@ -608,12 +616,12 @@ assert.equal(
   assert.deepEqual(world.refreshes.length, 1, "and still only one index refresh");
 }
 
-// The poll and the catch-up do not both fire for the same automation on the
+// The poll and the catch-up do not both fire for the same analysis on the
 // same tick: the poll reports what it fired and the catch-up skips those.
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
   world.addActivity({ activity_id: "act-1" });
 
   const watcher = new CoachActivityWatcher(world.deps);
@@ -626,7 +634,7 @@ assert.equal(
 // one thing that stamp exists to stop.
 {
   const world = createWorld();
-  world.automations = [activityAutomation()];
+  world.analyses = [activityAnalysis()];
   world.addActivity({ activity_id: "old-1" });
 
   const watcher = new CoachActivityWatcher(world.deps);
@@ -650,8 +658,8 @@ assert.equal(
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [
-    activityAutomation({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
+  world.analyses = [
+    activityAnalysis({}, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } })
   ];
   world.addActivity({ activity_id: "act-1" });
 
@@ -686,28 +694,28 @@ assert.equal(
 // ---------------------------------------------------------------------------
 // Counted rather than estimated, and asserted so it cannot drift. The two reads
 // below were four and three respectively — poll, the flush, the catch-up and
-// the snapshot each asking again — and `listCoachAutomations()` parses and
+// the snapshot each asking again — and `listCoachAnalyses()` parses and
 // normalises every stored definition on each call. The list cannot change
 // inside one tick: this is the main process and nothing here awaits an IPC
 // handler.
 {
   const world = createWorld();
   world.markInitialized();
-  world.automations = [
-    activityAutomation({ id: "a1" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
-    activityAutomation({ id: "a2" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
+  world.analyses = [
+    activityAnalysis({ id: "a1" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
+    activityAnalysis({ id: "a2" }, { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } }),
     // A threshold rule, so the snapshot half of the tick runs too and its own
     // reads are inside the count.
-    { ...activityAutomation({ id: "a3" }), trigger: { kind: "threshold", metric: "sleepDebt", value: 4 } }
+    { ...activityAnalysis({ id: "a3" }), trigger: { kind: "threshold", metric: "sleepDebt", value: 4 } }
   ];
 
   let listReads = 0;
   let authReads = 0;
   const counted = new CoachActivityWatcher({
     ...world.deps,
-    listAutomations: () => {
+    listTriggeredAnalyses: () => {
       listReads += 1;
-      return world.deps.listAutomations();
+      return world.deps.listTriggeredAnalyses();
     },
     isCorosAuthenticated: () => {
       authReads += 1;
@@ -716,7 +724,7 @@ assert.equal(
   });
 
   await counted.tick();
-  assert.equal(listReads, 1, "one tick reads the automation list once");
+  assert.equal(listReads, 1, "one tick reads the attachment list once");
   assert.equal(authReads, 1, "and asks about COROS once");
 
   // A second tick is a second read, not a cached one: the athlete can add a

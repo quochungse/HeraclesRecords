@@ -36,25 +36,50 @@ assert.deepEqual(
   "main.ts handles a channel nothing invokes"
 );
 
-// --- section 8: the coach automation surface -------------------------------
+// --- section 8: the analysis surface ---------------------------------------
+// Hand-maintained, and that is the point: the two scrapes above only prove
+// main and preload agree with *each other*, so a channel deleted from both at
+// once passes them and fails here.
 const SECTION_8_CHANNELS = [
-  "coachAutomation:list",
-  "coachAutomation:get",
-  "coachAutomation:save",
-  "coachAutomation:setEnabled",
-  "coachAutomation:delete",
-  "coachAutomation:listBindings",
-  "coachAutomation:attach",
-  "coachAutomation:detach",
-  "coachAutomation:setBindingEnabled",
-  "coachAutomation:reorderBindings",
-  "coachAutomation:listForSession",
-  "coachAutomation:runNow",
-  "coachAutomation:listRuns",
-  "coachAutomation:cancelRun",
-  "coachAutomation:markSeen",
+  // Every read is either "this conversation's analyses" or "this one
+  // analysis". There is deliberately no channel that lists them all: an
+  // analysis belongs to one conversation, so a list spanning every
+  // conversation would be a list of unrelated things, and the screen that
+  // showed one is gone.
+  "analysis:listForSession",
+  "analysis:get",
+  "analysis:create",
+  "analysis:update",
+  "analysis:setEnabled",
+  "analysis:delete",
+  "analysis:reorder",
+  "analysis:runNow",
+  "analysis:listRuns",
+  "analysis:cancelRun",
+  "analysis:markSeen",
   "chat:renameSession"
 ];
+
+// The attach model is gone, and these are the channels that carried it. They
+// are named here so that reintroducing one has to be a decision rather than a
+// merge: an analysis lives in one conversation and cannot be moved, so there
+// is nothing left for any of them to mean.
+for (const retired of [
+  "analysis:list",
+  "analysis:save",
+  "analysis:attach",
+  "analysis:detach",
+  "analysis:listAttachments",
+  "analysis:updateAttachment",
+  "analysis:setAttachmentEnabled",
+  "analysis:reorderAttachments"
+]) {
+  assert.equal(
+    handled.has(retired) || invoked.has(retired),
+    false,
+    `${retired} belongs to the attach model, which no longer exists`
+  );
+}
 
 for (const channel of SECTION_8_CHANNELS) {
   assert.ok(handled.has(channel), `main.ts is missing a handler for ${channel}`);
@@ -67,7 +92,7 @@ for (const channel of SECTION_8_CHANNELS) {
 // renderer harness cannot see the mismatch: it keys its fake listeners on the
 // *preload method* name, so a typo in either channel string leaves every test
 // green and the push silently dead. This is the check that says otherwise.
-const serviceSource = read("electron/coachAutomationService.ts");
+const serviceSource = read("electron/coachAnalysisService.ts");
 
 const emitted = new Set(
   [...serviceSource.matchAll(/emitToAnyWindow\(\s*\n?\s*"([^"]+)"/g)].map(
@@ -111,29 +136,28 @@ assert.deepEqual(
 // And the other direction: a listener whose emitter was renamed away is a
 // subscription that can never fire.
 for (const channel of listened) {
-  if (!channel.startsWith("coachAutomation:")) continue;
+  if (!channel.startsWith("analysis:")) continue;
   assert.ok(
     emitted.has(channel),
     `preload subscribes to ${channel} but nothing emits it`
   );
 }
 
-// --- and the three writers that have to reach for the binding push ---------
-// Source about source, and the only kind of check available: every one of these
-// lives in a `createDefaultDeps`, which no suite executes — the runner and the
-// scheduler are both driven through injected fakes, so the default wiring is
+// --- and the writers that have to reach for the analysis push -------------
+// Source about source, and the only kind of check available: both of these
+// live in a `createDefaultDeps`, which no suite executes — the runner and the
+// scheduler are driven through injected fakes, so the default wiring is
 // exactly the code a test can never reach. Dropping one of these wrappers
-// compiles, type-checks and leaves every suite green, and the athlete's card
+// compiles, type-checks and leaves every suite green, and the athlete's row
 // silently stops saying when it next fires.
 for (const [file, call] of [
-  ["electron/coachAutomationScheduler.ts", "setCoachAutomationBindingSchedule"],
-  ["electron/coachAutomationService.ts", "setCoachAutomationBindingSession"],
-  ["electron/coachAutomationService.ts", "setCoachAutomationBindingEnabled"]
+  ["electron/coachAnalysisScheduler.ts", "setCoachAnalysisSchedule"],
+  ["electron/coachAnalysisService.ts", "setCoachAnalysisEnabled"]
 ]) {
   assert.match(
     read(file),
-    new RegExp(`emitAutomationBindingUpdate\\(\\s*\\n?\\s*${call}\\(`),
-    `${file} must announce the binding it changed via ${call}`
+    new RegExp(`emitAnalysisChanged\\(\\s*\\n?\\s*${call}\\(`),
+    `${file} must announce the analysis it changed via ${call}`
   );
 }
 
@@ -169,32 +193,45 @@ assert.deepEqual(
   "the renderer's CorosLinkApi declares a method preload does not expose"
 );
 
-// Every automation method reaches the renderer under a name it can call.
+// Every analysis method reaches the renderer under a name it can call.
 for (const method of [
   "renameChatSession",
-  "listCoachAutomations",
-  "getCoachAutomation",
-  "saveCoachAutomation",
-  "setCoachAutomationEnabled",
-  "deleteCoachAutomation",
-  "listCoachAutomationBindings",
-  "attachCoachAutomation",
-  "detachCoachAutomation",
-  "setCoachAutomationBindingEnabled",
-  "reorderCoachAutomationBindings",
-  "listCoachAutomationsForSession",
-  "runCoachAutomationNow",
-  "listCoachAutomationRuns",
-  "cancelCoachAutomationRun",
-  "markCoachAutomationRunsSeen",
-  "onCoachAutomationRunUpdate",
-  "getCoachAutomationPause",
-  "resumeCoachAutomations",
-  "onCoachAutomationPauseUpdate",
-  "getCoachAutomationSpend",
-  "setCoachAutomationBudget"
+  "listCoachAnalysesForSession",
+  "getCoachAnalysis",
+  "createCoachAnalysis",
+  "updateCoachAnalysis",
+  "setCoachAnalysisEnabled",
+  "deleteCoachAnalysis",
+  "reorderCoachAnalyses",
+  "runCoachAnalysisNow",
+  "listCoachAnalysisRuns",
+  "cancelCoachAnalysisRun",
+  "markCoachAnalysisRunsSeen",
+  "onCoachAnalysisRunUpdate",
+  "onCoachAnalysisUpdate",
+  "getCoachAnalysisPause",
+  "resumeCoachAnalyses",
+  "onCoachAnalysisPauseUpdate",
+  "getCoachAnalysisSpend",
+  "setCoachAnalysisBudget"
 ]) {
   assert.ok(apiKeys.has(method), `CorosLinkApi is missing ${method}`);
+}
+
+// The pre-rename names must be gone, not merely unused. A leftover
+// `listCoachAutomations` on the bridge is a second way to reach the same
+// feature, and the next person to add a caller will pick whichever they find
+// first — which is how a "renamed" surface quietly keeps both spellings.
+for (const stale of [...apiKeys, ...preloadKeys]) {
+  assert.ok(
+    !/Automation/.test(stale),
+    `${stale} still spells the pre-rename concept; the bridge should say Analysis`
+  );
+  // And nothing may still speak of attachments: an analysis is its own place.
+  assert.ok(
+    !/Attach/.test(stale),
+    `${stale} belongs to the attach model, which no longer exists`
+  );
 }
 
 console.log("ipc surface tests passed");

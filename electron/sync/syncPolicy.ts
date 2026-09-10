@@ -55,13 +55,28 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // --- Coach: the reason this feature exists -------------------------------
   chat_sessions: "personal",
   chat_plan_drafts: "personal",
-  coach_automations: "personal",
-  coach_automation_bindings: "personal",
+  // One analysis, in one conversation, carrying its own trigger. Its
+  // predecessors (coach_automations, coach_automation_bindings,
+  // coach_automation_local_triggers, coach_automation_runs) are dropped by
+  // `dropLegacyAutomationTables` and deliberately absent here: a row for one
+  // of them arriving from a machine still on the old build has no policy, and
+  // an unclassified table syncs nowhere, so the merge skips it.
+  coach_analyses: "personal",
+  // The trigger of an analysis marked "this device only". `device` is the
+  // whole point of the table: the athlete asked for a schedule that belongs to
+  // this desk, so it must not reach the vault or a backup file. The analysis
+  // still travels and reads as manual on the other machine.
+  //
+  // It is a table rather than a column because the tier is per table, the
+  // oplog carries whole rows (SELECT *) and a merge is an INSERT OR REPLACE —
+  // a column held back from a payload arrives as NULL over there, not as
+  // "unchanged". There is no honest way to withhold half a row.
+  coach_analysis_local_triggers: "device",
 
-  // Execution records of automation runs. Not synced: a run belongs to whichever
-  // machine held the automation lease, and syncing them would fight that lease.
+  // Execution records of analysis runs. Not synced: a run belongs to whichever
+  // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.
-  coach_automation_runs: "derived",
+  coach_analysis_runs: "derived",
   // Metric snapshots sampled from COROS on a schedule.
   coach_daily_samples: "derived",
   // The Sleep screen's night cache. Every row can be fetched again from COROS,
@@ -179,7 +194,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "updater.autoDownload": "preference",
   "maps.routeBackend": "preference",
   "hevy.includeWarmups": "preference",
-  // Pausing automations is a decision about the account, not about one laptop.
+  // Pausing analyses is a decision about the account, not about one laptop.
   "coachAutomation.pause": "preference",
   "coachAutomation.monthlyTokenBudget": "preference",
 

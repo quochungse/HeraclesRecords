@@ -1,9 +1,8 @@
 import { COROS_KNOWN_SPORT_TYPES } from "../../../electron/corosSportTypes";
 import type {
-  AutomationThresholdMetric,
-  AutomationTrigger,
-  CoachAutomationBindingView,
-  CoachAutomationRun
+  AnalysisThresholdMetric,
+  AnalysisTrigger,
+  CoachAnalysisRun
 } from "../../../electron/types";
 
 /** Sports offered in the trigger filter, in the order athletes think of them. */
@@ -32,8 +31,17 @@ const WEEKDAYS = [
   "Saturday"
 ];
 
-/** The one-line "when does this fire" copy under an automation's name. */
-export function describeTrigger(trigger: AutomationTrigger): string {
+/**
+ * The one-line "when does this fire" copy under an analysis's name.
+ *
+ * `null` is the common case, not an edge: an analysis with no trigger is a
+ * manual one, and that is what most start as. It answers "Manual" rather than
+ * "Manual only" — there is nothing left for it to be *only*.
+ */
+export function describeTrigger(trigger: AnalysisTrigger | null): string {
+  if (!trigger) {
+    return "Manual";
+  }
   if (trigger.kind === "schedule") {
     return trigger.cadence === "weekly"
       ? `Every ${WEEKDAYS[trigger.dayOfWeek ?? 1]} at ${trigger.timeOfDay}`
@@ -65,12 +73,12 @@ export function describeTrigger(trigger: AutomationTrigger): string {
   if (trigger.kind === "threshold") {
     return describeThresholdMetric(trigger.metric, trigger.value);
   }
-  return "Manual only";
+  return "Manual";
 }
 
 /** The four metrics of 3.3, named the way an athlete would say them. */
 export const THRESHOLD_METRIC_OPTIONS: Array<{
-  value: AutomationThresholdMetric;
+  value: AnalysisThresholdMetric;
   label: string;
   /** What the number means, so the field never reads as a bare quantity. */
   unit: string;
@@ -102,8 +110,8 @@ export const THRESHOLD_METRIC_OPTIONS: Array<{
   }
 ];
 
-export function describeThresholdMetric(
-  metric: AutomationThresholdMetric,
+function describeThresholdMetric(
+  metric: AnalysisThresholdMetric,
   value: number
 ): string {
   const option = THRESHOLD_METRIC_OPTIONS.find((entry) => entry.value === metric);
@@ -112,24 +120,7 @@ export function describeThresholdMetric(
   }${option.unit}` : `When ${metric} crosses ${value}`;
 }
 
-export function describeBindingMode(binding: CoachAutomationBindingView): string {
-  if (binding.mode === "per-run") {
-    return binding.titleTemplate
-      ? `titled "${binding.titleTemplate}"`
-      : "a fresh conversation each run";
-  }
-  if (binding.sessionMissing) {
-    return "conversation deleted";
-  }
-  return binding.sessionTitle ?? "conversation";
-}
-
-export function bindingModeLabel(binding: CoachAutomationBindingView): string {
-  if (binding.mode === "per-run") return "New conversation each run";
-  return binding.sessionTitle ?? "Conversation";
-}
-
-const RUN_STATUS_LABELS: Record<CoachAutomationRun["status"], string> = {
+const RUN_STATUS_LABELS: Record<CoachAnalysisRun["status"], string> = {
   running: "Running",
   success: "Reported",
   silent: "Nothing to report",
@@ -138,12 +129,13 @@ const RUN_STATUS_LABELS: Record<CoachAutomationRun["status"], string> = {
   cancelled: "Cancelled"
 };
 
-export function runStatusLabel(run: CoachAutomationRun): string {
+export function runStatusLabel(run: CoachAnalysisRun): string {
   return RUN_STATUS_LABELS[run.status] ?? run.status;
 }
 
 const SKIP_REASON_LABELS: Record<string, string> = {
   disabled: "switched off",
+  "another-device": "ran on another device",
   "missing-session": "conversation missing",
   "no-auth": "not signed in",
   offline: "COROS unreachable",
@@ -176,24 +168,6 @@ export function formatTimeAgo(iso: string | undefined): string {
 }
 
 /**
- * "in 3h" style, for the next slot on a schedule automation's card. Null when
- * there is no slot booked yet — the scheduler seeds one on its next tick, and
- * an empty space says that better than a placeholder does.
- */
-export function formatTimeUntil(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const minutes = Math.round((then - Date.now()) / 60_000);
-  if (minutes <= 0) return "any moment";
-  if (minutes < 60) return `in ${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `in ${hours}h`;
-  const days = Math.round(hours / 24);
-  return days === 1 ? "tomorrow" : `in ${days}d`;
-}
-
-/**
  * "12.4k" / "1.2M". A token count is an order-of-magnitude fact — nobody
  * budgets to the token — and 483,912 on a run-log row is six characters of
  * noise where two would do.
@@ -210,14 +184,14 @@ export function formatTokens(count: number): string {
 }
 
 /** What one run cost, or null when the provider reported nothing. */
-export function formatRunTokens(run: CoachAutomationRun): string | null {
+export function formatRunTokens(run: CoachAnalysisRun): string | null {
   if (run.inputTokens === undefined && run.outputTokens === undefined) {
     return null;
   }
   return formatTokens((run.inputTokens ?? 0) + (run.outputTokens ?? 0));
 }
 
-export function formatDuration(run: CoachAutomationRun): string {
+export function formatDuration(run: CoachAnalysisRun): string {
   if (!run.finishedAt) return "—";
   const ms = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return "—";

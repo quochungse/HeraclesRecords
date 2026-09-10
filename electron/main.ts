@@ -24,7 +24,7 @@ import { SyncLoop } from "./sync/syncLoop";
 import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
 import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
-import { attachAutomationLeases } from "./sync/automationLease";
+import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
   collectFullStateEntries,
@@ -359,39 +359,35 @@ import {
   stopCoachActivityWatcher
 } from "./coachActivityWatcher";
 import {
-  startCoachAutomationScheduler,
-  stopCoachAutomationScheduler
-} from "./coachAutomationScheduler";
+  startCoachAnalysisScheduler,
+  stopCoachAnalysisScheduler
+} from "./coachAnalysisScheduler";
 import {
-  CoachAutomationBindingError,
-  attachCoachAutomation,
-  cancelStaleCoachAutomationRuns,
-  createCoachAutomation,
-  deleteCoachAutomation,
-  detachCoachAutomation,
-  getCoachAutomation,
-  listCoachAutomationBindings,
-  listCoachAutomationBindingsForSession,
-  listCoachAutomationRuns,
-  listCoachAutomationSummaries,
-  listCoachAutomationSessionAttention,
-  markCoachAutomationRunsSeen,
-  markCoachAutomationSessionSeen,
-  reorderCoachAutomationBindings,
-  setCoachAutomationBindingEnabled,
-  setCoachAutomationEnabled,
-  updateCoachAutomation
-} from "./coachAutomationStore";
+  CoachAnalysisError,
+  cancelStaleCoachAnalysisRuns,
+  createCoachAnalysis,
+  deleteCoachAnalysis,
+  getCoachAnalysis,
+  listCoachAnalysisRuns,
+  listCoachAnalysisSummariesForSession,
+  listCoachAnalysisSessionAttention,
+  markCoachAnalysisRunsSeen,
+  markCoachAnalysisSessionSeen,
+  reorderCoachAnalyses,
+  setCoachAnalysisEnabled,
+  updateCoachAnalysis
+} from "./coachAnalysisStore";
 import {
-  cancelAutomationRun,
-  emitAutomationUpdate,
-  getAutomationPause,
-  getAutomationSpend,
-  resumeAutomations,
-  runAutomationNow,
-  setAutomationBudget
-} from "./coachAutomationService";
-import { getChatSessionTitle, setChatSessionTitle } from "./chatHistoryStore";
+  cancelAnalysisRun,
+  emitAnalysisChanged,
+  emitAnalysisUpdate,
+  getAnalysisPause,
+  getAnalysisSpend,
+  resumeAnalyses,
+  runAnalysisNow,
+  setAnalysisBudget
+} from "./coachAnalysisService";
+import { setChatSessionTitle } from "./chatHistoryStore";
 import {
   cancelChat,
   createChatSessionForProvider,
@@ -458,7 +454,6 @@ import {
   updateMcpServer
 } from "./mcpServersStore";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
-import { getTrainingSleepData } from "./sleepDataService";
 import {
   clearSleepHistoryCache,
   getCachedSleepSummary,
@@ -470,12 +465,10 @@ import type {
   ChatMessage,
   ChatProvider,
   ChatSettings,
-  CoachAutomationAttachResult,
-  CoachAutomationBindingInput,
-  CoachAutomationBindingView,
-  CoachAutomationDetail,
-  CoachAutomationInput,
-  CoachAutomationRunQuery,
+  CoachAnalysisCreateResult,
+  CoachAnalysisInput,
+  CoachAnalysisPatch,
+  CoachAnalysisRunQuery,
   CorosTrainingPlanDraftInput,
   LocalChatConfig,
   OpenRouterConfig,
@@ -954,7 +947,7 @@ app.whenReady().then(() => {
   // Sync follows the app process too. A folder vault opens without anyone
   // typing anything, so waiting for the Settings screen to be visited would
   // mean a machine left on the Overview never synced at all — and the
-  // automation lease below would never attach.
+  // analysis lease below would never attach.
   //
   // The COROS re-login goes first, and the vault waits on it, because the
   // vault's owner *is* the COROS account: a `prepare()` that ran while the
@@ -995,14 +988,14 @@ app.whenReady().then(() => {
   // likely something to pull, and its network came back a moment ago.
   powerMonitor.on("resume", () => syncLoopInstance?.resume());
 
-  // Coach automations follow the app process, not the window: with the window
+  // Coach analyses follow the app process, not the window: with the window
   // closed on macOS they keep running, and the athlete sees the results as
   // unread next time a window exists. Deliberately not wired to createWindow.
   // A run in flight when the app quit has nothing left to finish it, so the
   // run log would show it spinning forever (section 10).
-  cancelStaleCoachAutomationRuns();
+  cancelStaleCoachAnalysisRuns();
   startCoachActivityWatcher();
-  startCoachAutomationScheduler();
+  startCoachAnalysisScheduler();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1020,29 +1013,8 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   stopRouteShare();
   stopCoachActivityWatcher();
-  stopCoachAutomationScheduler();
+  stopCoachAnalysisScheduler();
 });
-
-/**
- * A binding plus the conversation it writes into. A missing title means the
- * athlete deleted that conversation, which the UI shows as a broken binding
- * (2.4) — a `per-run` binding has no conversation of its own and is neither.
- */
-function describeSession(sessionId: string | null): {
-  sessionTitle?: string;
-  sessionMissing?: boolean;
-} {
-  if (!sessionId) return {};
-  const title = getChatSessionTitle(sessionId);
-  return title === null ? { sessionMissing: true } : { sessionTitle: title };
-}
-
-function describeBindings(automationId: string): CoachAutomationBindingView[] {
-  return listCoachAutomationBindings(automationId).map((binding) => ({
-    ...binding,
-    ...describeSession(binding.sessionId)
-  }));
-}
 
 // Built on first use, because it reads settings and so needs the database to be
 // open. One instance for the life of the process; it caches nothing itself, so
@@ -1272,7 +1244,7 @@ function flushTrainingHubSessionChanged(): void {
 function stopSyncLoop(): void {
   syncSeedStatus = { state: "pending", entries: 0, error: null };
   attachSyncSink(null);
-  attachAutomationLeases(null);
+  attachAnalysisLeases(null);
   syncLoopInstance?.stop();
   syncLoopInstance = null;
 }
@@ -1337,18 +1309,18 @@ function startSyncLoop(): SyncLoop | null {
     nextHlc: loop.nextHlc
   });
 
-  // Automations sync, so the same 6am job now exists on every machine. Without
+  // Analyses sync, so the same 6am job now exists on every machine. Without
   // a lease all of them would run it.
-  attachAutomationLeases({
+  attachAnalysisLeases({
     enabled: () => service.isReady,
     provider: () => service.dataProvider(),
     deviceId: syncDeviceId,
     now: () => Date.now(),
-    onSkipped: (automationId, holder) =>
-      console.info(`[sync] automation ${automationId} is running on ${holder}`),
-    onLeaseLost: (automationId) =>
+    onSkipped: (analysisId, holder) =>
+      console.info(`[sync] analysis ${analysisId} is running on ${holder}`),
+    onLeaseLost: (analysisId) =>
       console.warn(
-        `[sync] lost the lease for automation ${automationId} mid-run; ` +
+        `[sync] lost the lease for analysis ${analysisId} mid-run; ` +
           `another device may have taken it over`
       )
   });
@@ -2086,76 +2058,41 @@ function registerIpcHandlers(): void {
     deleteChatSessionById(sessionId);
   });
 
-  // 2.5: automations name the conversations they create, both the dedicated
-  // one and each per-run title. Renaming leaves updatedAt alone.
+  // Renaming leaves updatedAt alone. Nothing in the analysis feature calls
+  // this any more — nothing in the analysis feature creates or titles a
+  // conversation — but the
+  // chat sidebar does, which is whose channel it was to begin with.
   ipcMain.handle(
     "chat:renameSession",
     (_event, sessionId: string, title: string) =>
       setChatSessionTitle(sessionId, title)
   );
 
-  // ----- Coach automations -----
+  // ----- Coach analyses -----
+  //
+  // One analysis lives in one conversation, so every read here is either
+  // "this conversation's analyses" or "this one analysis". There is no list
+  // of all of them, because there is no screen that shows one.
 
-  ipcMain.handle("coachAutomation:list", () => listCoachAutomationSummaries());
-
-  ipcMain.handle(
-    "coachAutomation:get",
-    (_event, automationId: string): CoachAutomationDetail | null => {
-      const automation = getCoachAutomation(automationId);
-      if (!automation) return null;
-      return { automation, bindings: describeBindings(automationId) };
-    }
+  ipcMain.handle("analysis:listForSession", (_event, sessionId: string) =>
+    listCoachAnalysisSummariesForSession(sessionId)
   );
 
-  // Every definition change goes out on the wire, so a surface showing the
-  // coach — a chip in the conversation header, a card on the list — follows the
-  // edit instead of waiting for something unrelated to refresh it.
-  ipcMain.handle(
-    "coachAutomation:save",
-    (_event, input: CoachAutomationInput, automationId?: string) => {
-      const automation = automationId
-        ? updateCoachAutomation(automationId, input)
-        : createCoachAutomation(input);
-      // A save against an id that no longer exists answers null and changed
-      // nothing; there is no news in that.
-      if (automation) {
-        emitAutomationUpdate({ automationId: automation.id, automation });
-      }
-      return automation;
-    }
+  ipcMain.handle("analysis:get", (_event, analysisId: string) =>
+    getCoachAnalysis(analysisId)
   );
 
-  ipcMain.handle(
-    "coachAutomation:setEnabled",
-    (_event, automationId: string, enabled: boolean) => {
-      const automation = setCoachAutomationEnabled(automationId, enabled);
-      if (automation) {
-        emitAutomationUpdate({ automationId, automation });
-      }
-      return automation;
-    }
-  );
-
-  ipcMain.handle("coachAutomation:delete", (_event, automationId: string) => {
-    deleteCoachAutomation(automationId);
-    // Null is the whole point here: a surface cannot re-read a definition that
-    // is gone, so the push has to say so rather than leave it to a 404.
-    emitAutomationUpdate({ automationId, automation: null });
-  });
-
-  ipcMain.handle("coachAutomation:listBindings", (_event, automationId: string) =>
-    describeBindings(automationId)
-  );
-
-  // Attach answers with a result rather than throwing: the refusal codes are
+  // Create answers with a result rather than throwing: the refusal codes are
   // UI copy, and an Error crossing IPC arrives with its `code` stripped.
   ipcMain.handle(
-    "coachAutomation:attach",
-    (_event, input: CoachAutomationBindingInput): CoachAutomationAttachResult => {
+    "analysis:create",
+    (_event, input: CoachAnalysisInput): CoachAnalysisCreateResult => {
       try {
-        return { ok: true, binding: attachCoachAutomation(input) };
+        const analysis = createCoachAnalysis(input);
+        emitAnalysisChanged(analysis);
+        return { ok: true, analysis };
       } catch (error) {
-        if (error instanceof CoachAutomationBindingError) {
+        if (error instanceof CoachAnalysisError) {
           return { ok: false, code: error.code, message: error.message };
         }
         throw error;
@@ -2163,77 +2100,95 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle("coachAutomation:detach", (_event, bindingId: string) => {
-    detachCoachAutomation(bindingId);
+  // Every change goes out on the wire, so a surface showing the analysis — the
+  // row in the conversation header, its own detail screen — follows the edit
+  // instead of waiting for something unrelated to refresh it.
+  ipcMain.handle(
+    "analysis:update",
+    (_event, analysisId: string, patch: CoachAnalysisPatch) => {
+      const analysis = updateCoachAnalysis(analysisId, patch);
+      // An edit against an id that no longer exists answers null and changed
+      // nothing; there is no news in that.
+      emitAnalysisChanged(analysis);
+      return analysis;
+    }
+  );
+
+  ipcMain.handle(
+    "analysis:setEnabled",
+    (_event, analysisId: string, enabled: boolean) => {
+      const analysis = setCoachAnalysisEnabled(analysisId, enabled);
+      emitAnalysisChanged(analysis);
+      return analysis;
+    }
+  );
+
+  ipcMain.handle("analysis:delete", (_event, analysisId: string) => {
+    // Read before the delete: the push names the conversation it was in, and
+    // after the row is gone there is nothing left to read that from.
+    const analysis = getCoachAnalysis(analysisId);
+    deleteCoachAnalysis(analysisId);
+    if (analysis) {
+      // Null is the whole point here: a surface cannot re-read an analysis
+      // that is gone, so the push has to say so rather than leave it to a 404.
+      emitAnalysisUpdate({
+        analysisId,
+        sessionId: analysis.sessionId,
+        analysis: null
+      });
+    }
   });
 
   ipcMain.handle(
-    "coachAutomation:setBindingEnabled",
-    (_event, bindingId: string, enabled: boolean) =>
-      setCoachAutomationBindingEnabled(bindingId, enabled)
+    "analysis:reorder",
+    (_event, sessionId: string, analysisIds: string[]) =>
+      reorderCoachAnalyses(sessionId, analysisIds)
+  );
+
+  ipcMain.handle("analysis:runNow", (_event, analysisId: string) =>
+    runAnalysisNow(analysisId)
   );
 
   ipcMain.handle(
-    "coachAutomation:reorderBindings",
-    (_event, sessionId: string, bindingIds: string[]) =>
-      reorderCoachAutomationBindings(sessionId, bindingIds)
+    "analysis:listRuns",
+    (_event, filter?: CoachAnalysisRunQuery) =>
+      listCoachAnalysisRuns(filter ?? {})
   );
 
-  // The chat UI asks which automations are attached to the open conversation.
-  ipcMain.handle(
-    "coachAutomation:listForSession",
-    (_event, sessionId: string): CoachAutomationDetail["bindings"] =>
-      listCoachAutomationBindingsForSession(sessionId).map((binding) => ({
-        ...binding,
-        ...describeSession(binding.sessionId)
-      }))
-  );
-
-  ipcMain.handle(
-    "coachAutomation:runNow",
-    (_event, automationId: string, bindingIds?: string[]) =>
-      runAutomationNow(automationId, bindingIds)
-  );
-
-  ipcMain.handle(
-    "coachAutomation:listRuns",
-    (_event, filter?: CoachAutomationRunQuery) =>
-      listCoachAutomationRuns(filter ?? {})
-  );
-
-  // Stop means the trigger, not the run: a trigger fans out to one run per
-  // place (2.3), and stopping one of them used to leave the rest to run (10).
-  // The run's own stream is still aborted — that is where the id comes in.
-  ipcMain.handle("coachAutomation:cancelRun", (_event, runId: string) => {
-    cancelAutomationRun(runId);
+  // Stop means the trigger, not the run it was pressed on: an activity
+  // catch-up is a sequence of runs and stopping one used to leave the rest to
+  // run (10). The run's own stream is still aborted — that is where the id
+  // comes in.
+  ipcMain.handle("analysis:cancelRun", (_event, runId: string) => {
+    cancelAnalysisRun(runId);
   });
 
   // Section 10's pause: read on mount, then followed by push. The renderer
   // needs both because the trip usually happens with no window open at all —
   // a scheduled run finding COROS asking for a login code at 07:30.
-  ipcMain.handle("coachAutomation:getPause", () => getAutomationPause());
+  ipcMain.handle("analysis:getPause", () => getAnalysisPause());
 
-  ipcMain.handle("coachAutomation:resume", () => resumeAutomations());
+  ipcMain.handle("analysis:resume", () => resumeAnalyses());
 
-  // 13: what the automations have cost this month, and the ceiling.
-  ipcMain.handle("coachAutomation:getSpend", () => getAutomationSpend());
-
-  ipcMain.handle(
-    "coachAutomation:setBudget",
-    (_event, budget: number | null) => setAutomationBudget(budget)
-  );
-
-  ipcMain.handle("coachAutomation:markSeen", (_event, runIds: string[]) =>
-    markCoachAutomationRunsSeen(runIds)
-  );
-
-  ipcMain.handle("coachAutomation:sessionAttention", () =>
-    listCoachAutomationSessionAttention()
-  );
+  // 13: what the analyses have cost this month, and the ceiling.
+  ipcMain.handle("analysis:getSpend", () => getAnalysisSpend());
 
   ipcMain.handle(
-    "coachAutomation:markSessionSeen",
-    (_event, sessionId: string) => markCoachAutomationSessionSeen(sessionId)
+    "analysis:setBudget",
+    (_event, budget: number | null) => setAnalysisBudget(budget)
+  );
+
+  ipcMain.handle("analysis:markSeen", (_event, runIds: string[]) =>
+    markCoachAnalysisRunsSeen(runIds)
+  );
+
+  ipcMain.handle("analysis:sessionAttention", () =>
+    listCoachAnalysisSessionAttention()
+  );
+
+  ipcMain.handle(
+    "analysis:markSessionSeen",
+    (_event, sessionId: string) => markCoachAnalysisSessionSeen(sessionId)
   );
 
   ipcMain.handle("chatMcp:getStatus", () => getCorosMcpStatus());

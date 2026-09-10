@@ -1,6 +1,6 @@
-import type { CoachAutomationRun } from "../../../electron/types";
+import type { CoachAnalysisRun } from "../../../electron/types";
 import { showToast } from "../../toast";
-import { skipReasonLabel } from "./automationLabels";
+import { skipReasonLabel } from "./analysisLabels";
 
 /**
  * "Run now" is the one trigger the athlete watches happen, so it has to answer
@@ -8,9 +8,12 @@ import { skipReasonLabel } from "./automationLabels";
  * feedback; a run that declined or failed leaves the screen unchanged and reads
  * as a broken button, so those are the outcomes announced here.
  */
-export function announceRunNow(runs: CoachAutomationRun[]): void {
+export function announceRunNow(runs: CoachAnalysisRun[]): void {
   if (!runs.length) {
-    showToast("Attach this coach to a conversation first.", "error");
+    // An analysis is always in a conversation, so the only way to produce no
+    // runs at all is a switched-off one — which the row already shows, but a
+    // button that does nothing has to say why anyway.
+    showToast("This analysis is switched off.", "error");
     return;
   }
 

@@ -13,7 +13,7 @@ import {
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
   CachedCorosMapPackage,
-  CoachAutomationRunQuery,
+  CoachAnalysisRunQuery,
   GeneratedRoute,
   LocalTrack,
   NativeCorosPlanDetail,
@@ -377,84 +377,103 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
-    -- Coach automations. The definition knows nothing about conversations;
-    -- coach_automation_bindings holds every place it is active.
-    CREATE TABLE IF NOT EXISTS coach_automations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      role TEXT,
-      playbook TEXT NOT NULL,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      preset_id TEXT,
-      trigger_json TEXT NOT NULL,
+    -- Coach analyses. One analysis lives in exactly one conversation, and
+    -- carries everything about itself: what it says, when it fires, and the
+    -- clocks that decide whether it may.
+    --
+    -- The tables it replaced (coach_automations, coach_automation_bindings,
+    -- coach_automation_local_triggers, coach_automation_runs) are dropped
+    -- outright by dropLegacyAutomationTables. Nothing is migrated; see there.
+    CREATE TABLE IF NOT EXISTS coach_analyses (
+      id              TEXT PRIMARY KEY,
+      session_id      TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      role            TEXT,
+      playbook        TEXT NOT NULL,
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      preset_id       TEXT,
+      runtime_json    TEXT,
+      -- NULL = manual, or the trigger is device-only and lives in the table
+      -- below. Either way there is nothing here for the oplog to carry.
+      trigger_json    TEXT,
+      conditions_json TEXT,
+      device_only     INTEGER NOT NULL DEFAULT 0,
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      last_run_at     TEXT,
+      next_run_at     TEXT,
+      -- start_time (epoch seconds) of the newest activity already looked at.
+      -- NULL = never, in which case the creation time is the floor instead.
+      last_activity_at INTEGER,
+      -- Section 10's backoff. NULL/0 mean healthy.
+      backoff_until   TEXT,
+      backoff_level   INTEGER,
+      -- 3.3's transition state, and its three values all matter: NULL = never
+      -- evaluated, 0 = the condition was false last tick, 1 = it was true.
+      -- NULL is what stops an analysis written today firing on a condition
+      -- that has held all week.
+      threshold_firing INTEGER,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT NOT NULL
+    );
+
+    -- Every read is "the analyses of this conversation", in run order.
+    CREATE INDEX IF NOT EXISTS idx_coach_analyses_session
+      ON coach_analyses (session_id);
+
+    -- A trigger the athlete marked "this device only". It lives here rather
+    -- than in a column on coach_analyses because syncPolicy classifies whole
+    -- tables and the oplog carries whole rows (SELECT *): a column left out of
+    -- a payload arrives as NULL on the other machine, not as "unchanged", so
+    -- there is no honest way to hold one column back. This table is device
+    -- tier, which is the tier with no way off the machine at all — not into
+    -- the vault, not into a backup.
+    --
+    -- No FOREIGN KEY: this database never turns on PRAGMA foreign_keys, so a
+    -- cascade would silently not fire and would read as protection that is not
+    -- there. The store deletes these rows alongside the analysis.
+    CREATE TABLE IF NOT EXISTS coach_analysis_local_triggers (
+      analysis_id     TEXT PRIMARY KEY,
+      trigger_json    TEXT NOT NULL,
       conditions_json TEXT NOT NULL,
-      runtime_json TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at      TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS coach_automation_bindings (
-      id TEXT PRIMARY KEY,
-      automation_id TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      session_id TEXT,
-      title_template TEXT,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      last_run_at TEXT,
-      next_run_at TEXT,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (automation_id) REFERENCES coach_automations(id) ON DELETE CASCADE
-    );
-
-    -- One automation cannot be attached twice to the same conversation.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_binding_unique_session
-      ON coach_automation_bindings (automation_id, session_id)
-      WHERE session_id IS NOT NULL;
-
-    -- At most one "new conversation per run" binding per automation.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_binding_unique_per_run
-      ON coach_automation_bindings (automation_id)
-      WHERE session_id IS NULL;
-
-    CREATE INDEX IF NOT EXISTS idx_binding_session
-      ON coach_automation_bindings (session_id);
-
-    -- Every activity trigger asks "what landed after this binding's watermark",
-    -- once per binding, and the answer is ordered by start_time.
+    -- Every activity trigger asks "what landed after this analysis's
+    -- watermark", once per analysis, ordered by start_time.
     CREATE INDEX IF NOT EXISTS idx_training_activities_start_time
       ON training_activities (start_time);
 
-    CREATE TABLE IF NOT EXISTS coach_automation_runs (
-      id TEXT PRIMARY KEY,
-      automation_id TEXT NOT NULL,
-      binding_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      trigger_kind TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS coach_analysis_runs (
+      id                   TEXT PRIMARY KEY,
+      analysis_id          TEXT NOT NULL,
+      status               TEXT NOT NULL,
+      trigger_kind         TEXT NOT NULL,
       trigger_payload_json TEXT,
-      session_id TEXT,
-      summary TEXT,
-      model TEXT,
-      effort TEXT,
-      error TEXT,
-      skip_reason TEXT,
-      seen_at TEXT,
-      started_at TEXT NOT NULL,
-      finished_at TEXT
+      session_id           TEXT,
+      summary              TEXT,
+      model                TEXT,
+      effort               TEXT,
+      -- What each run cost (13). NULL means the provider reported nothing,
+      -- which is not the same as a run that cost nothing — the budget has to
+      -- be able to say what it cannot see.
+      input_tokens         INTEGER,
+      output_tokens        INTEGER,
+      error                TEXT,
+      skip_reason          TEXT,
+      seen_at              TEXT,
+      started_at           TEXT NOT NULL,
+      finished_at          TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_automation_runs_automation
-      ON coach_automation_runs (automation_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_analysis_runs_analysis
+      ON coach_analysis_runs (analysis_id, started_at DESC);
 
-    CREATE INDEX IF NOT EXISTS idx_automation_runs_binding
-      ON coach_automation_runs (binding_id, started_at DESC);
-
-    -- The monthly spend (13) asks "what did every automation cost since the
-    -- 1st", which narrows by nothing but the date. The two indexes above are
-    -- both prefixed by an id, so neither can serve it — without this the budget
+    -- The monthly spend (13) asks "what did every analysis cost since the
+    -- 1st", which narrows by nothing but the date. The index above is
+    -- prefixed by an id, so it cannot serve it — without this the budget
     -- guard rail scans the whole run log on every run.
-    CREATE INDEX IF NOT EXISTS idx_automation_runs_started
-      ON coach_automation_runs (started_at);
+    CREATE INDEX IF NOT EXISTS idx_analysis_runs_started
+      ON coach_analysis_runs (started_at);
 
     -- 3.3: the two series a threshold metric needs and the app does not
     -- otherwise keep. COROS owns resting HR and sleep; the activity watcher
@@ -504,33 +523,17 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_sessions", "pinned_at", "TEXT");
   // 5.7: the rolling summary that stands in for the head of a long transcript,
   // and how many entries of that head it accounts for. On the conversation
-  // rather than the binding, because five automations can be attached to one
-  // conversation and the summary is a fact about the conversation.
+  // rather than the analysis, because a conversation can hold five of them
+  // and the summary is a fact about the conversation.
   ensureColumn(db, "chat_sessions", "coach_summary", "TEXT");
   ensureColumn(db, "chat_sessions", "coach_summary_through", "INTEGER");
-  // coach_seen_at marks a row as already considered by the automation activity
+  // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
   ensureColumn(db, "training_activities", "coach_seen_at", "TEXT");
-  // last_activity_at is the start_time (epoch seconds) of the newest activity
-  // this binding has already analysed. NULL = it never analysed one, in which
-  // case the attach time acts as the floor instead.
-  ensureColumn(db, "coach_automation_bindings", "last_activity_at", "INTEGER");
-  // backoff_until / backoff_level are section 10's per-binding backoff. A failed
-  // run leaves the other two clocks alone on purpose, so this is the only thing
-  // holding a dead provider off; NULL/0 mean the binding is healthy.
-  ensureColumn(db, "coach_automation_bindings", "backoff_until", "TEXT");
-  ensureColumn(db, "coach_automation_bindings", "backoff_level", "INTEGER");
-  // threshold_firing is 3.3's per-binding transition state, and its three
-  // values all matter: NULL = never evaluated, 0 = the condition was false last
-  // tick, 1 = it was true. NULL is what stops a binding attached today firing
-  // on a condition that has held all week.
-  ensureColumn(db, "coach_automation_bindings", "threshold_firing", "INTEGER");
-  // What each run cost (13). NULL means the provider reported
-  // nothing, which is not the same as a run that cost nothing — the budget has
-  // to be able to say what it cannot see.
-  ensureColumn(db, "coach_automation_runs", "input_tokens", "INTEGER");
-  ensureColumn(db, "coach_automation_runs", "output_tokens", "INTEGER");
+  // Nothing else here belongs to the analyses. Their table was created new
+  // rather than grown, so every column it has is in the CREATE block above.
+  dropLegacyAutomationTables(db);
   migrateChatTranscriptsToSessions(db);
 
   // Seed the built-in COROS MCP server so existing users get a registry entry
@@ -651,6 +654,53 @@ function migrateChatSessionProviderConstraint(
         ON chat_sessions(provider, updated_at DESC);
     `);
   })();
+}
+
+/**
+ * The Automation → Analysis rework drops its predecessor's tables outright.
+ *
+ * **Nothing is migrated, deliberately.** The shape did not narrow, it changed:
+ * an automation was a definition that could be attached to several
+ * conversations, each attachment carrying a trigger, and an analysis lives in
+ * exactly one conversation and carries its own. There is no honest mapping
+ * from one to the other. An automation attached nowhere has no conversation to
+ * become an analysis in; one attached three times would become three analyses
+ * the athlete never wrote, each inheriting a schedule they set once. Guessing
+ * either way produces coaching that speaks without being asked, which is the
+ * one failure this feature cannot afford.
+ *
+ * What is *not* dropped is everything the athlete would miss. Their
+ * conversations are `chat_sessions` rows and are untouched, including every
+ * answer an automation ever wrote into one — those are transcript entries and
+ * stay exactly where they are, chip and all. What goes is the machinery: the
+ * definitions, the attachments, and the log of runs against them.
+ *
+ * No tombstones. Each machine drops these for itself on the upgrade, and a row
+ * republished by one still on the old build lands in a table that no longer
+ * exists — `syncPolicy` no longer classifies these names, so the merge path
+ * skips them rather than recreating anything.
+ */
+function dropLegacyAutomationTables(database: Database.Database): void {
+  for (const table of [
+    "coach_automation_bindings",
+    "coach_automation_local_triggers",
+    "coach_automation_runs",
+    "coach_automations"
+  ]) {
+    if (!tableExists(database, table)) continue;
+    console.log(`[db] dropping legacy automation table: ${table}`);
+    database.exec(`DROP TABLE ${table}`);
+  }
+  for (const index of [
+    "idx_binding_unique_session",
+    "idx_binding_unique_per_run",
+    "idx_binding_session",
+    "idx_automation_runs_automation",
+    "idx_automation_runs_binding",
+    "idx_automation_runs_started"
+  ]) {
+    database.exec(`DROP INDEX IF EXISTS ${index}`);
+  }
 }
 
 function migrateChatTranscriptsToSessions(database: Database.Database): void {
@@ -1188,121 +1238,20 @@ export function deleteChatSessionRow(id: string): void {
   notifySyncedDelete("chat_sessions", id);
 }
 
-export interface CoachAutomationRow {
+export interface CoachAnalysisRow {
   id: string;
+  session_id: string;
   name: string;
   role: string | null;
   playbook: string;
   enabled: number;
   preset_id: string | null;
-  trigger_json: string;
-  conditions_json: string;
   runtime_json: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-const COACH_AUTOMATION_COLUMNS = `id, name, role, playbook, enabled, preset_id,
-         trigger_json, conditions_json, runtime_json, created_at, updated_at`;
-
-export function listCoachAutomationRows(): CoachAutomationRow[] {
-  return requireDatabase()
-    .prepare(
-      `SELECT ${COACH_AUTOMATION_COLUMNS}
-       FROM coach_automations
-       ORDER BY created_at ASC`
-    )
-    .all() as CoachAutomationRow[];
-}
-
-export function getCoachAutomationRow(
-  id: string
-): CoachAutomationRow | undefined {
-  return requireDatabase()
-    .prepare(
-      `SELECT ${COACH_AUTOMATION_COLUMNS}
-       FROM coach_automations
-       WHERE id = ?`
-    )
-    .get(id) as CoachAutomationRow | undefined;
-}
-
-export function insertCoachAutomationRow(row: CoachAutomationRow): void {
-  requireDatabase()
-    .prepare(
-      `INSERT INTO coach_automations
-         (id, name, role, playbook, enabled, preset_id, trigger_json,
-          conditions_json, runtime_json, created_at, updated_at)
-       VALUES
-         (@id, @name, @role, @playbook, @enabled, @preset_id, @trigger_json,
-          @conditions_json, @runtime_json, @created_at, @updated_at)`
-    )
-    .run(row);
-  notifySyncedRow("coach_automations", ["id"], [row.id]);
-}
-
-export function updateCoachAutomationRow(row: CoachAutomationRow): void {
-  requireDatabase()
-    .prepare(
-      `UPDATE coach_automations
-       SET name = @name, role = @role, playbook = @playbook, enabled = @enabled,
-           preset_id = @preset_id, trigger_json = @trigger_json,
-           conditions_json = @conditions_json, runtime_json = @runtime_json,
-           updated_at = @updated_at
-       WHERE id = @id`
-    )
-    .run(row);
-  notifySyncedRow("coach_automations", ["id"], [row.id]);
-}
-
-export function deleteCoachAutomationRow(id: string): void {
-  requireDatabase()
-    .prepare("DELETE FROM coach_automations WHERE id = ?")
-    .run(id);
-  notifySyncedDelete("coach_automations", id);
-}
-
-/**
- * Bindings declare `ON DELETE CASCADE`, but this database never turns on
- * `PRAGMA foreign_keys`, so the cascade would silently not fire. The store
- * deletes the bindings itself through this call.
- */
-export function deleteCoachAutomationBindingRowsForAutomation(
-  automationId: string
-): void {
-  // Collected before the delete: a tombstone needs the id, and after the row is
-  // gone there is nothing left to read it from.
-  const bindingIds = (
-    requireDatabase()
-      .prepare(
-        "SELECT id FROM coach_automation_bindings WHERE automation_id = ?"
-      )
-      .all(automationId) as Array<{ id: string }>
-  ).map((row) => row.id);
-  requireDatabase()
-    .prepare("DELETE FROM coach_automation_bindings WHERE automation_id = ?")
-    .run(automationId);
-  for (const id of bindingIds) {
-    notifySyncedDelete("coach_automation_bindings", id);
-  }
-}
-
-export function countCoachAutomationBindingRows(automationId: string): number {
-  const row = requireDatabase()
-    .prepare(
-      "SELECT COUNT(*) AS count FROM coach_automation_bindings WHERE automation_id = ?"
-    )
-    .get(automationId) as { count: number };
-  return row.count;
-}
-
-export interface CoachAutomationBindingRow {
-  id: string;
-  automation_id: string;
-  mode: string;
-  session_id: string | null;
-  title_template: string | null;
-  enabled: number;
+  /** The trigger, when it is allowed to travel. NULL = manual, or device-only. */
+  trigger_json: string | null;
+  conditions_json: string | null;
+  /** 1 = the trigger is in `coach_analysis_local_triggers` and stays here. */
+  device_only: number;
   sort_order: number;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -1312,91 +1261,171 @@ export interface CoachAutomationBindingRow {
   /** NULL = never evaluated; 0/1 = the condition last tick (3.3). */
   threshold_firing: number | null;
   created_at: string;
+  updated_at: string;
 }
 
-const COACH_BINDING_COLUMNS = `id, automation_id, mode, session_id, title_template,
-         enabled, sort_order, last_run_at, next_run_at, last_activity_at,
-         backoff_until, backoff_level, threshold_firing, created_at`;
+const COACH_ANALYSIS_COLUMNS = `id, session_id, name, role, playbook, enabled,
+         preset_id, runtime_json, trigger_json, conditions_json, device_only,
+         sort_order, last_run_at, next_run_at, last_activity_at, backoff_until,
+         backoff_level, threshold_firing, created_at, updated_at`;
 
-export function listCoachAutomationBindingRows(
-  automationId: string
-): CoachAutomationBindingRow[] {
+/** Every analysis on the machine, for the scheduler's tick. */
+export function listCoachAnalysisRows(): CoachAnalysisRow[] {
   return requireDatabase()
     .prepare(
-      `SELECT ${COACH_BINDING_COLUMNS}
-       FROM coach_automation_bindings
-       WHERE automation_id = ?
+      `SELECT ${COACH_ANALYSIS_COLUMNS} FROM coach_analyses
        ORDER BY sort_order ASC, created_at ASC`
     )
-    .all(automationId) as CoachAutomationBindingRow[];
+    .all() as CoachAnalysisRow[];
 }
 
-export function listCoachAutomationBindingRowsForSession(
+/** The analyses of one conversation, in the order they run in it (2.3). */
+export function listCoachAnalysisRowsForSession(
   sessionId: string
-): CoachAutomationBindingRow[] {
+): CoachAnalysisRow[] {
   return requireDatabase()
     .prepare(
-      `SELECT ${COACH_BINDING_COLUMNS}
-       FROM coach_automation_bindings
+      `SELECT ${COACH_ANALYSIS_COLUMNS} FROM coach_analyses
        WHERE session_id = ?
        ORDER BY sort_order ASC, created_at ASC`
     )
-    .all(sessionId) as CoachAutomationBindingRow[];
+    .all(sessionId) as CoachAnalysisRow[];
 }
 
-export function getCoachAutomationBindingRow(
+export function getCoachAnalysisRow(
   id: string
-): CoachAutomationBindingRow | undefined {
+): CoachAnalysisRow | undefined {
   return requireDatabase()
-    .prepare(
-      `SELECT ${COACH_BINDING_COLUMNS}
-       FROM coach_automation_bindings
-       WHERE id = ?`
-    )
-    .get(id) as CoachAutomationBindingRow | undefined;
+    .prepare(`SELECT ${COACH_ANALYSIS_COLUMNS} FROM coach_analyses WHERE id = ?`)
+    .get(id) as CoachAnalysisRow | undefined;
 }
 
-export function insertCoachAutomationBindingRow(
-  row: CoachAutomationBindingRow
-): void {
+export function countCoachAnalysisRowsForSession(sessionId: string): number {
+  return (
+    requireDatabase()
+      .prepare(
+        "SELECT COUNT(*) AS count FROM coach_analyses WHERE session_id = ?"
+      )
+      .get(sessionId) as { count: number }
+  ).count;
+}
+
+export function insertCoachAnalysisRow(row: CoachAnalysisRow): void {
   requireDatabase()
     .prepare(
-      `INSERT INTO coach_automation_bindings
-         (id, automation_id, mode, session_id, title_template, enabled,
-          sort_order, last_run_at, next_run_at, last_activity_at,
-          backoff_until, backoff_level, threshold_firing, created_at)
+      `INSERT INTO coach_analyses
+         (id, session_id, name, role, playbook, enabled, preset_id,
+          runtime_json, trigger_json, conditions_json, device_only, sort_order,
+          last_run_at, next_run_at, last_activity_at, backoff_until,
+          backoff_level, threshold_firing, created_at, updated_at)
        VALUES
-         (@id, @automation_id, @mode, @session_id, @title_template, @enabled,
+         (@id, @session_id, @name, @role, @playbook, @enabled, @preset_id,
+          @runtime_json, @trigger_json, @conditions_json, @device_only,
           @sort_order, @last_run_at, @next_run_at, @last_activity_at,
-          @backoff_until, @backoff_level, @threshold_firing, @created_at)`
+          @backoff_until, @backoff_level, @threshold_firing, @created_at,
+          @updated_at)`
     )
     .run(row);
-  notifySyncedRow("coach_automation_bindings", ["id"], [row.id]);
+  notifySyncedRow("coach_analyses", ["id"], [row.id]);
 }
 
-export function updateCoachAutomationBindingRow(
-  row: CoachAutomationBindingRow
-): void {
+export function updateCoachAnalysisRow(row: CoachAnalysisRow): void {
   requireDatabase()
     .prepare(
-      `UPDATE coach_automation_bindings
-       SET mode = @mode, session_id = @session_id,
-           title_template = @title_template, enabled = @enabled,
+      `UPDATE coach_analyses
+       SET name = @name, role = @role, playbook = @playbook,
+           enabled = @enabled, preset_id = @preset_id,
+           runtime_json = @runtime_json, trigger_json = @trigger_json,
+           conditions_json = @conditions_json, device_only = @device_only,
            sort_order = @sort_order, last_run_at = @last_run_at,
            next_run_at = @next_run_at, last_activity_at = @last_activity_at,
            backoff_until = @backoff_until, backoff_level = @backoff_level,
-           threshold_firing = @threshold_firing
+           threshold_firing = @threshold_firing, updated_at = @updated_at
        WHERE id = @id`
     )
     .run(row);
-  notifySyncedRow("coach_automation_bindings", ["id"], [row.id]);
+  notifySyncedRow("coach_analyses", ["id"], [row.id]);
 }
 
-export function deleteCoachAutomationBindingRow(id: string): void {
+export function deleteCoachAnalysisRow(id: string): void {
+  requireDatabase().prepare("DELETE FROM coach_analyses WHERE id = ?").run(id);
+  deleteAnalysisLocalTriggerRow(id);
+  notifySyncedDelete("coach_analyses", id);
+}
+
+/**
+ * A conversation was deleted, so its analyses go with it. Collected before the
+ * delete: a tombstone needs the id, and after the row is gone there is nothing
+ * left to read it from.
+ */
+export function deleteCoachAnalysisRowsForSession(sessionId: string): string[] {
+  const ids = (
+    requireDatabase()
+      .prepare("SELECT id FROM coach_analyses WHERE session_id = ?")
+      .all(sessionId) as Array<{ id: string }>
+  ).map((row) => row.id);
   requireDatabase()
-    .prepare("DELETE FROM coach_automation_bindings WHERE id = ?")
-    .run(id);
-  notifySyncedDelete("coach_automation_bindings", id);
+    .prepare("DELETE FROM coach_analyses WHERE session_id = ?")
+    .run(sessionId);
+  for (const id of ids) {
+    deleteAnalysisLocalTriggerRow(id);
+    notifySyncedDelete("coach_analyses", id);
+  }
+  return ids;
+}
+
+export interface AnalysisLocalTriggerRow {
+  analysis_id: string;
+  trigger_json: string;
+  conditions_json: string;
+  updated_at: string;
+}
+
+/**
+ * The device-only half of an analysis. None of these four touch
+ * `notifySyncedRow`: the table is `device` tier, and a sync notification for
+ * it would be the one thing the tier exists to prevent.
+ */
+export function getAnalysisLocalTriggerRow(
+  analysisId: string
+): AnalysisLocalTriggerRow | undefined {
+  return requireDatabase()
+    .prepare(
+      `SELECT analysis_id, trigger_json, conditions_json, updated_at
+       FROM coach_analysis_local_triggers WHERE analysis_id = ?`
+    )
+    .get(analysisId) as AnalysisLocalTriggerRow | undefined;
+}
+
+export function listAnalysisLocalTriggerRows(): AnalysisLocalTriggerRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT analysis_id, trigger_json, conditions_json, updated_at
+       FROM coach_analysis_local_triggers`
+    )
+    .all() as AnalysisLocalTriggerRow[];
+}
+
+export function upsertAnalysisLocalTriggerRow(
+  row: AnalysisLocalTriggerRow
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO coach_analysis_local_triggers
+         (analysis_id, trigger_json, conditions_json, updated_at)
+       VALUES (@analysis_id, @trigger_json, @conditions_json, @updated_at)
+       ON CONFLICT(analysis_id) DO UPDATE SET
+         trigger_json = excluded.trigger_json,
+         conditions_json = excluded.conditions_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(row);
+}
+
+export function deleteAnalysisLocalTriggerRow(analysisId: string): void {
+  requireDatabase()
+    .prepare("DELETE FROM coach_analysis_local_triggers WHERE analysis_id = ?")
+    .run(analysisId);
 }
 
 export interface CoachDailySampleRow {
@@ -1580,10 +1609,9 @@ export function listCoachThresholdSlots(fromDay: string): CoachThresholdSlotRow[
     .all(fromDay) as CoachThresholdSlotRow[];
 }
 
-export interface CoachAutomationRunRow {
+export interface CoachAnalysisRunRow {
   id: string;
-  automation_id: string;
-  binding_id: string;
+  analysis_id: string;
   status: string;
   trigger_kind: string;
   trigger_payload_json: string | null;
@@ -1600,7 +1628,7 @@ export interface CoachAutomationRunRow {
   finished_at: string | null;
 }
 
-export interface CoachAutomationTokenTotals {
+export interface CoachAnalysisTokenTotals {
   inputTokens: number;
   outputTokens: number;
   /** Runs that reported a cost, and runs that reached the provider at all. */
@@ -1609,16 +1637,16 @@ export interface CoachAutomationTokenTotals {
 }
 
 /**
- * What the automations have spent since `sinceIso`.
+ * What the analyses have spent since `sinceIso`.
  *
  * `countedRuns` and `providerRuns` are both reported so the UI can say when a
  * total is short of the truth. A provider that does not report usage — a local
  * server without `stream_options`, say — would otherwise make a budget read as
  * comfortably under when nobody has any idea.
  */
-export function sumCoachAutomationTokensSince(
+export function sumCoachAnalysisTokensSince(
   sinceIso: string
-): CoachAutomationTokenTotals {
+): CoachAnalysisTokenTotals {
   const row = requireDatabase()
     .prepare(
       `SELECT
@@ -1627,11 +1655,11 @@ export function sumCoachAutomationTokensSince(
          SUM(CASE WHEN input_tokens IS NOT NULL
                     OR output_tokens IS NOT NULL THEN 1 ELSE 0 END) AS countedRuns,
          COUNT(*) AS providerRuns
-       FROM coach_automation_runs
+       FROM coach_analysis_runs
        WHERE started_at >= ?
          AND status IN ('success', 'silent', 'failed', 'cancelled')`
     )
-    .get(sinceIso) as CoachAutomationTokenTotals;
+    .get(sinceIso) as CoachAnalysisTokenTotals;
   return {
     inputTokens: row.inputTokens ?? 0,
     outputTokens: row.outputTokens ?? 0,
@@ -1640,23 +1668,19 @@ export function sumCoachAutomationTokensSince(
   };
 }
 
-const COACH_RUN_COLUMNS = `id, automation_id, binding_id, status, trigger_kind,
+const COACH_ANALYSIS_RUN_COLUMNS = `id, analysis_id, status, trigger_kind,
          trigger_payload_json, session_id, summary, model, effort, error,
          skip_reason, seen_at, input_tokens, output_tokens,
          started_at, finished_at`;
 
-export function listCoachAutomationRunRows(
-  filter: CoachAutomationRunQuery = {}
-): CoachAutomationRunRow[] {
+export function listCoachAnalysisRunRows(
+  filter: CoachAnalysisRunQuery = {}
+): CoachAnalysisRunRow[] {
   const clauses: string[] = [];
   const params: unknown[] = [];
-  if (filter.automationId) {
-    clauses.push("automation_id = ?");
-    params.push(filter.automationId);
-  }
-  if (filter.bindingId) {
-    clauses.push("binding_id = ?");
-    params.push(filter.bindingId);
+  if (filter.analysisId) {
+    clauses.push("analysis_id = ?");
+    params.push(filter.analysisId);
   }
   if (filter.sessionId) {
     clauses.push("session_id = ?");
@@ -1680,35 +1704,35 @@ export function listCoachAutomationRunRows(
   }
   return requireDatabase()
     .prepare(
-      `SELECT ${COACH_RUN_COLUMNS}
-       FROM coach_automation_runs
+      `SELECT ${COACH_ANALYSIS_RUN_COLUMNS}
+       FROM coach_analysis_runs
        ${where}
        ORDER BY started_at DESC
        ${limit}`
     )
-    .all(...params) as CoachAutomationRunRow[];
+    .all(...params) as CoachAnalysisRunRow[];
 }
 
-export function getCoachAutomationRunRow(
+export function getCoachAnalysisRunRow(
   id: string
-): CoachAutomationRunRow | undefined {
+): CoachAnalysisRunRow | undefined {
   return requireDatabase()
     .prepare(
-      `SELECT ${COACH_RUN_COLUMNS} FROM coach_automation_runs WHERE id = ?`
+      `SELECT ${COACH_ANALYSIS_RUN_COLUMNS} FROM coach_analysis_runs WHERE id = ?`
     )
-    .get(id) as CoachAutomationRunRow | undefined;
+    .get(id) as CoachAnalysisRunRow | undefined;
 }
 
-export function insertCoachAutomationRunRow(row: CoachAutomationRunRow): void {
+export function insertCoachAnalysisRunRow(row: CoachAnalysisRunRow): void {
   requireDatabase()
     .prepare(
-      `INSERT INTO coach_automation_runs
-         (id, automation_id, binding_id, status, trigger_kind,
+      `INSERT INTO coach_analysis_runs
+         (id, analysis_id, status, trigger_kind,
           trigger_payload_json, session_id, summary, model, effort, error,
           skip_reason, seen_at, input_tokens, output_tokens,
           started_at, finished_at)
        VALUES
-         (@id, @automation_id, @binding_id, @status, @trigger_kind,
+         (@id, @analysis_id, @status, @trigger_kind,
           @trigger_payload_json, @session_id, @summary, @model, @effort, @error,
           @skip_reason, @seen_at, @input_tokens, @output_tokens,
           @started_at, @finished_at)`
@@ -1727,7 +1751,7 @@ export interface CoachUnseenActivityRow {
 }
 
 /**
- * Activities the automation watcher has not processed yet. `coach_seen_at` is
+ * Activities the analysis watcher has not processed yet. `coach_seen_at` is
  * stamped on the row itself rather than tracked in a side table, so it survives
  * a re-sync of the activity index.
  */
@@ -1803,10 +1827,10 @@ export function markAllCoachActivitiesSeen(): number {
   return result.changes;
 }
 
-export function updateCoachAutomationRunRow(row: CoachAutomationRunRow): void {
+export function updateCoachAnalysisRunRow(row: CoachAnalysisRunRow): void {
   requireDatabase()
     .prepare(
-      `UPDATE coach_automation_runs
+      `UPDATE coach_analysis_runs
        SET status = @status, trigger_payload_json = @trigger_payload_json,
            session_id = @session_id, summary = @summary, model = @model,
            effort = @effort, error = @error, skip_reason = @skip_reason,

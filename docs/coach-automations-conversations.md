@@ -1,5 +1,19 @@
 # The conversation cluster — three writers, one transcript
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: the three writers on one transcript and the interleavings between them are unchanged. The `per-run` writer is gone, so one column of its tables describes a mode that no longer exists.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 R2 step 4 of [coach-automations-review.md](./coach-automations-review.md).
 Sections 5.6b and 5.7 of [coach-automations.md](./coach-automations.md) put three
 writers on one `chat_sessions` row: the window, the runner, and the rolling

@@ -1,5 +1,19 @@
 # Cost and exposure — counted, and checked the way an attacker would
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: the tool policy and the cost model are untouched. One number moved: a long activity catch-up now meets the burst guard, because every attachment shares one conversation.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 R6 of [coach-automations-review.md](./coach-automations-review.md), both steps.
 Sections 6, 13 and decision 3.
 

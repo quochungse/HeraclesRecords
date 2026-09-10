@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const Module = require("node:module");
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-// The runner pulls in electron and the better-sqlite3 native binding through
+// The runner pulls in electron and the better-sqlite3 native attachment through
 // chatService/database at require time, neither of which loads under plain
 // node. Every real collaborator is injected per call, so the stubs are only
 // needed to get the module loaded.
@@ -34,23 +34,23 @@ const {
   planTranscriptContext,
   summaryContextMessage,
   checkProviderAuth,
-  getAutomationPause,
-  resumeAutomations,
+  getAnalysisPause,
+  resumeAnalyses,
   AUTOMATION_OUTPUT_CONTRACT,
-  AUTOMATION_DEFAULT_EFFORT,
+  ANALYSIS_DEFAULT_EFFORT,
   NOTHING_TO_REPORT,
-  cancelAutomationRun,
-  resolveAutomationRuntime,
+  cancelAnalysisRun,
+  resolveAnalysisRuntime,
   SESSION_BURST_PER_HOUR,
   expandTriggerToQueue,
   isWithinQuietHours,
   MULTI_ACTIVITY_MAX_PER_TRIGGER,
-  parseAutomationOutput,
-  renderAutomationTemplate,
-  resetAutomationQueueForTests,
-  runAutomationNow,
-  runAutomationTrigger
-} = require(path.join(repoRoot, "dist-electron", "coachAutomationService.js"));
+  parseAnalysisOutput,
+  renderAnalysisTemplate,
+  resetAnalysisQueueForTests,
+  runAnalysisNow,
+  runAnalysisTrigger
+} = require(path.join(repoRoot, "dist-electron", "coachAnalysisService.js"));
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -59,21 +59,21 @@ const {
 // --- output contract (5.5) --------------------------------------------------
 // Line 1 is the headline, with no label to find: the contract stopped asking
 // for one, so nothing has to be taken back out of the athlete's transcript.
-assert.deepEqual(parseAutomationOutput("Load is ramping fast.\nMore detail."), {
+assert.deepEqual(parseAnalysisOutput("Load is ramping fast.\nMore detail."), {
   silent: false,
   summary: "Load is ramping fast."
 });
 assert.equal(
-  parseAutomationOutput("**Bolded by the model**\n- detail").summary,
+  parseAnalysisOutput("**Bolded by the model**\n- detail").summary,
   "Bolded by the model",
   "emphasis is stripped from the badge, not from the conversation"
 );
 assert.equal(
-  parseAutomationOutput(`${"x".repeat(300)}\nmore`).summary.length,
+  parseAnalysisOutput(`${"x".repeat(300)}\nmore`).summary.length,
   140,
   "the summary is capped for the badge"
 );
-assert.deepEqual(parseAutomationOutput("Just some prose.\nSecond line."), {
+assert.deepEqual(parseAnalysisOutput("Just some prose.\nSecond line."), {
   silent: false,
   summary: "Just some prose."
 });
@@ -82,21 +82,21 @@ assert.deepEqual(parseAutomationOutput("Just some prose.\nSecond line."), {
 // simply read. No list of markdown constructs to skip — the single guard is
 // that a line with no letters in it is not a sentence.
 assert.equal(
-  parseAutomationOutput("**Load is flat.**\n- Sleep is short.").summary,
+  parseAnalysisOutput("**Load is flat.**\n- Sleep is short.").summary,
   "Load is flat.",
   "markup is trimmed off both ends"
 );
 assert.equal(
-  parseAutomationOutput("# Week in review\nLoad is flat.").summary,
+  parseAnalysisOutput("# Week in review\nLoad is flat.").summary,
   "Week in review"
 );
 assert.equal(
-  parseAutomationOutput("---\n\n***\n\nRamp is steady.").summary,
+  parseAnalysisOutput("---\n\n***\n\nRamp is steady.").summary,
   "Ramp is steady.",
   "a line with no letters is not a sentence, whatever syntax produced it"
 );
 assert.equal(
-  parseAutomationOutput("| 33 | 412 |\nRamp is steady.").summary,
+  parseAnalysisOutput("| 33 | 412 |\nRamp is steady.").summary,
   "Ramp is steady.",
   "and that covers a numeric table row without naming tables"
 );
@@ -104,11 +104,11 @@ assert.equal(
 // opens with a labelled table gets a poor row rather than a rescued one. The
 // prompt is where that is prevented, not the parser.
 assert.equal(
-  parseAutomationOutput("| Week | Load |\n| --- | --- |\n\nRamp is steady.").summary,
+  parseAnalysisOutput("| Week | Load |\n| --- | --- |\n\nRamp is steady.").summary,
   "| Week | Load |"
 );
 // Nothing but markup: something beats an empty row.
-assert.equal(parseAutomationOutput("---").summary, "");
+assert.equal(parseAnalysisOutput("---").summary, "");
 
 // The contract must stay additive, and must explain rather than enumerate.
 assert.doesNotMatch(AUTOMATION_OUTPUT_CONTRACT, /observation|recommended action/i);
@@ -126,19 +126,19 @@ assert.match(
 
 // The silent marker is still a marker: it is what keeps a run that found
 // nothing out of the athlete's conversation.
-assert.deepEqual(parseAutomationOutput(NOTHING_TO_REPORT), { silent: true });
-assert.deepEqual(parseAutomationOutput(`  ${NOTHING_TO_REPORT}\n`), { silent: true });
+assert.deepEqual(parseAnalysisOutput(NOTHING_TO_REPORT), { silent: true });
+assert.deepEqual(parseAnalysisOutput(`  ${NOTHING_TO_REPORT}\n`), { silent: true });
 assert.deepEqual(
-  parseAutomationOutput(`Nothing stands out.\n${NOTHING_TO_REPORT}`),
+  parseAnalysisOutput(`Nothing stands out.\n${NOTHING_TO_REPORT}`),
   { silent: true },
   "the marker still counts when the model adds preamble"
 );
-assert.deepEqual(parseAutomationOutput("`NOTHING_TO_REPORT`"), { silent: true });
-assert.deepEqual(parseAutomationOutput(""), { silent: true });
-assert.deepEqual(parseAutomationOutput("   \n  "), { silent: true });
+assert.deepEqual(parseAnalysisOutput("`NOTHING_TO_REPORT`"), { silent: true });
+assert.deepEqual(parseAnalysisOutput(""), { silent: true });
+assert.deepEqual(parseAnalysisOutput("   \n  "), { silent: true });
 // A sentence merely mentioning the marker is a real report, not silence.
 assert.equal(
-  parseAutomationOutput("I would have said NOTHING_TO_REPORT but load spiked.").silent,
+  parseAnalysisOutput("I would have said NOTHING_TO_REPORT but load spiked.").silent,
   false
 );
 assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
@@ -157,12 +157,12 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
   );
   assert.match(
     chatView,
-    /NOTHING_TO_REPORT\.startsWith\(liveAutomation\.text\.trim\(\)\)/,
+    /NOTHING_TO_REPORT\.startsWith\(liveAnalysis\.text\.trim\(\)\)/,
     "the live bubble must hold its text back while it could still be the marker"
   );
   assert.doesNotMatch(
     chatView,
-    /content=\{liveAutomation\.text\}/,
+    /content=\{liveAnalysis\.text\}/,
     "the live bubble must render the guarded text, never the raw stream"
   );
   // The transcript trace replaced the toast that used to explain the bubble
@@ -228,7 +228,7 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
 
 // --- template rendering (2.5) ----------------------------------------------
 assert.equal(
-  renderAutomationTemplate("{{rule.name}} · {{activity.name}} · {{date}}", {
+  renderAnalysisTemplate("{{rule.name}} · {{activity.name}} · {{date}}", {
     rule: { name: "Debrief" },
     activity: { name: "Long run" },
     date: "2026-08-21"
@@ -236,13 +236,13 @@ assert.equal(
   "Debrief · Long run · 2026-08-21"
 );
 assert.equal(
-  renderAutomationTemplate("{{ week.range }} / {{activity.sport}}", {
+  renderAnalysisTemplate("{{ week.range }} / {{activity.sport}}", {
     week: { range: "2026-08-16..2026-08-22" }
   }),
   "2026-08-16..2026-08-22 /",
   "an unknown variable collapses to nothing"
 );
-assert.equal(renderAutomationTemplate("{{nope}}", {}), "");
+assert.equal(renderAnalysisTemplate("{{nope}}", {}), "");
 
 // --- quiet hours (4) --------------------------------------------------------
 const at = (hh, mm) => new Date(2026, 7, 21, hh, mm, 0);
@@ -261,8 +261,7 @@ assert.equal(isWithinQuietHours(at(13, 0), { start: "9am", end: "5pm" }), false,
 function createWorld(overrides = {}) {
   const state = {
     now: new Date("2026-08-21T09:00:00.000Z"),
-    automations: new Map(),
-    bindings: new Map(),
+    analyses: new Map(),
     runs: [],
     sessions: new Map(), // id -> { title, entries }
     updates: [],
@@ -311,42 +310,34 @@ function createWorld(overrides = {}) {
 
   const deps = {
     now: () => state.now,
-    getAutomation: (id) => state.automations.get(id) ?? null,
-    listBindings: (automationId) =>
-      [...state.bindings.values()]
-        .filter((binding) => binding.automationId === automationId)
-        .map((binding) => ({ ...binding })),
-    getBinding: (id) => {
-      const binding = state.bindings.get(id);
-      return binding ? { ...binding } : null;
+    getAnalysis: (id) => {
+      const analysis = state.analyses.get(id);
+      return analysis ? { ...analysis } : null;
     },
-    setBindingSchedule: (bindingId, schedule) => {
-      const binding = state.bindings.get(bindingId);
-      if (!binding) return;
-      if (schedule.lastRunAt !== undefined) binding.lastRunAt = schedule.lastRunAt;
-      if (schedule.nextRunAt !== undefined) binding.nextRunAt = schedule.nextRunAt;
+    setAnalysisSchedule: (analysisId, schedule) => {
+      const analysis = state.analyses.get(analysisId);
+      if (!analysis) return;
+      if (schedule.lastRunAt !== undefined) analysis.lastRunAt = schedule.lastRunAt;
+      if (schedule.nextRunAt !== undefined) analysis.nextRunAt = schedule.nextRunAt;
       if (schedule.lastActivityAt !== undefined) {
-        binding.lastActivityAt = schedule.lastActivityAt ?? undefined;
+        analysis.lastActivityAt = schedule.lastActivityAt ?? undefined;
       }
       if (schedule.backoffUntil !== undefined) {
-        binding.backoffUntil = schedule.backoffUntil ?? undefined;
+        analysis.backoffUntil = schedule.backoffUntil ?? undefined;
       }
       // Level 0 reads back as absent, the way the real row does: the store only
       // surfaces a level above zero, and a fake that kept the 0 would let
       // `applyBackoff` see a streak where the database shows none.
       if (schedule.backoffLevel !== undefined) {
-        binding.backoffLevel = schedule.backoffLevel || undefined;
+        analysis.backoffLevel = schedule.backoffLevel || undefined;
       }
     },
-    setBindingSession: (bindingId, sessionId) => {
-      state.bindings.get(bindingId).sessionId = sessionId;
-    },
-    setBindingEnabled: (bindingId, enabled) => {
-      state.bindings.get(bindingId).enabled = enabled;
+    setAnalysisEnabled: (analysisId, enabled) => {
+      state.analyses.get(analysisId).enabled = enabled;
     },
     listRuns: (filter) =>
       state.runs.filter((run) => {
-        if (filter.bindingId && run.bindingId !== filter.bindingId) return false;
+        if (filter.analysisId && run.analysisId !== filter.analysisId) return false;
         if (filter.sessionId && run.sessionId !== filter.sessionId) return false;
         if (filter.since && run.startedAt < filter.since) return false;
         if (filter.statuses && !filter.statuses.includes(run.status)) return false;
@@ -473,36 +464,42 @@ function createWorld(overrides = {}) {
   return state;
 }
 
-function addAutomation(world, id, patch = {}) {
-  const automation = {
+function addAnalysis(world, id, patch = {}) {
+  const analysis = {
     id,
-    name: `Automation ${id}`,
+    sessionId: "s1",
+    name: `Analysis ${id}`,
     playbook: "Summarise yesterday for {{date}}.",
     enabled: true,
+    runtime: {},
     trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:30" },
     conditions: { cooldownMin: 120, maxRunsPerDay: 3 },
-    runtime: {},
+    deviceOnly: false,
+    sortOrder: 0,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
     ...patch
   };
-  world.automations.set(id, automation);
-  return automation;
+  world.analyses.set(id, analysis);
+  return analysis;
 }
 
-function addBinding(world, id, patch = {}) {
-  const binding = {
-    id,
-    automationId: "a1",
-    mode: "existing",
-    sessionId: "s1",
-    enabled: true,
-    sortOrder: 0,
-    createdAt: "2026-08-01T00:00:00.000Z",
-    ...patch
-  };
-  world.bindings.set(id, binding);
-  return binding;
+/**
+ * The fixtures were written when an analysis and the place it ran were two
+ * objects. They are one now, so this folds what used to be the second half —
+ * the conversation, the run order, the clocks — into the analysis the case
+ * already made.
+ *
+ * Kept as a second call rather than inlined because that is how the cases
+ * read: "an analysis like this, running like that". Its `id` argument is
+ * ignored; there is one id.
+ */
+function addAttachment(world, _id, patch = {}) {
+  const { analysisId = "a1", ...rest } = patch;
+  const analysis = world.analyses.get(analysisId);
+  assert.ok(analysis, `fixture: no analysis ${analysisId} to configure`);
+  Object.assign(analysis, rest);
+  return analysis;
 }
 
 const RUNNER_NOW_EPOCH = Math.floor(Date.parse("2026-08-21T09:00:00.000Z") / 1000);
@@ -528,73 +525,116 @@ function addSession(world, id, entries = []) {
 }
 
 // ---------------------------------------------------------------------------
-// 2.3 fan-out and ordering
+// What a trigger expands to
 // ---------------------------------------------------------------------------
+//
+// One analysis, so at most one queued run before the activity expansion turns
+// it into a catch-up sequence. There used to be a fan-out here — one
+// definition attached to several conversations, ordered by session so
+// same-conversation runs stayed serialised — and it is gone with the model
+// that needed it.
 
 {
   const world = createWorld();
-  addAutomation(world, "a1");
-  addSession(world, "sA");
-  addSession(world, "sB");
-  addBinding(world, "b-late", { sessionId: "sB", sortOrder: 0 });
-  addBinding(world, "b-second", { sessionId: "sA", sortOrder: 5 });
-  addBinding(world, "b-first", { sessionId: "sA", sortOrder: 1 });
-  addBinding(world, "b-off", { sessionId: "sB", sortOrder: 9, enabled: false });
+  addAnalysis(world, "a1");
+  addSession(world, "s1");
 
-  const queue = expandTriggerToQueue(
-    { automationId: "a1", kind: "schedule" },
-    world.deps
-  );
   assert.deepEqual(
-    queue.map((entry) => entry.binding.id),
-    ["b-first", "b-second", "b-late"],
-    "ordered by session then sort_order; the disabled binding is not queued"
+    expandTriggerToQueue({ analysisId: "a1", kind: "schedule" }, world.deps).map(
+      (entry) => entry.analysis.id
+    ),
+    ["a1"],
+    "one analysis, one queued run"
   );
 
-  // A disabled automation fans out to nothing at all.
-  world.automations.get("a1").enabled = false;
-  assert.deepEqual(expandTriggerToQueue({ automationId: "a1", kind: "schedule" }, world.deps), []);
-  world.automations.get("a1").enabled = true;
-  assert.deepEqual(expandTriggerToQueue({ automationId: "missing", kind: "schedule" }, world.deps), []);
-
-  // bindingIds narrows the fan-out (manual run against one place).
+  // A switched-off analysis expands to nothing at all.
+  world.analyses.get("a1").enabled = false;
   assert.deepEqual(
+    expandTriggerToQueue({ analysisId: "a1", kind: "schedule" }, world.deps),
+    []
+  );
+  world.analyses.get("a1").enabled = true;
+  assert.deepEqual(
+    expandTriggerToQueue({ analysisId: "missing", kind: "schedule" }, world.deps),
+    []
+  );
+
+  // The trigger kind still has to match. A schedule tick must not run an
+  // analysis whose trigger is an activity filter — the tick reads them all in
+  // one pass rather than one query per kind, so the filter has to be here.
+  world.analyses.get("a1").trigger = { kind: "activity", sportTypes: [] };
+  assert.deepEqual(
+    expandTriggerToQueue({ analysisId: "a1", kind: "schedule" }, world.deps),
+    [],
+    "a schedule tick does not run an activity analysis"
+  );
+  assert.equal(
+    expandTriggerToQueue({ analysisId: "a1", kind: "activity" }, world.deps).length,
+    1
+  );
+
+  // A manual analysis has no trigger to match, and "run this one now" is the
+  // athlete asking — so a manual event runs it whatever it says.
+  world.analyses.get("a1").trigger = null;
+  assert.deepEqual(
+    expandTriggerToQueue({ analysisId: "a1", kind: "schedule" }, world.deps),
+    []
+  );
+  assert.equal(
+    expandTriggerToQueue({ analysisId: "a1", kind: "manual" }, world.deps).length,
+    1,
+    "manual runs a manual analysis"
+  );
+
+  // And a manual run reaches a switched-off one only with the bypass, which
+  // is what 3.4's "run it anyway" is.
+  world.analyses.get("a1").enabled = false;
+  assert.deepEqual(
+    expandTriggerToQueue({ analysisId: "a1", kind: "manual" }, world.deps),
+    []
+  );
+  assert.equal(
     expandTriggerToQueue(
-      { automationId: "a1", kind: "manual", bindingIds: ["b-second"] },
+      { analysisId: "a1", kind: "manual", bypassGuards: true },
       world.deps
-    ).map((entry) => entry.binding.id),
-    ["b-second"]
+    ).length,
+    1
   );
 }
 
 // ---------------------------------------------------------------------------
-// Serialization: same-conversation runs never overlap
+// Serialization: runs never overlap (5.4)
 // ---------------------------------------------------------------------------
+//
+// Process-wide, not per conversation. It used to fall out of the fan-out —
+// one trigger walked its attachments in order and awaited each — and the
+// fan-out is gone, so what enforces it now is the queue every trigger goes
+// through. Two triggers fired without awaiting the first is the case that
+// used to be impossible to reach from one call.
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } });
-  addSession(world, "sA");
-  addBinding(world, "b1", { sessionId: "sA", sortOrder: 0 });
-  addBinding(world, "b2", { sessionId: "sA", sortOrder: 1 });
-  addBinding(world, "b3", { sessionId: "sA", sortOrder: 2 });
+  addAnalysis(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } });
+  addAnalysis(world, "a2", {
+    conditions: { cooldownMin: 0, maxRunsPerDay: 9 },
+    sortOrder: 1
+  });
+  addSession(world, "s1");
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
-    world.deps
-  );
-  assert.equal(runs.length, 3);
-  assert.equal(world.maxConcurrent, 1, "runs against one conversation are serialized");
-  assert.deepEqual(
-    world.streamCalls.map((call) => call.runId),
-    runs.map((run) => run.id),
-    "and execute in sort_order"
-  );
-  // Each later run sees the earlier one's message in its context (2.3).
+  const [first, second] = await Promise.all([
+    runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps),
+    runAnalysisTrigger({ analysisId: "a2", kind: "schedule" }, world.deps)
+  ]);
+  assert.equal(first.length, 1);
+  assert.equal(second.length, 1);
+  assert.equal(world.maxConcurrent, 1, "two triggers at once still run one at a time");
+
+  // Each later run sees the earlier one's message in its context (2.3): they
+  // share the conversation, and the second reads it after the first wrote.
   assert.ok(
-    world.streamCalls[2].messages.length > world.streamCalls[0].messages.length,
-    "a later coach sees what the earlier one wrote"
+    world.streamCalls[1].messages.length > world.streamCalls[0].messages.length,
+    "a later analysis sees what the earlier one wrote"
   );
 }
 
@@ -603,9 +643,9 @@ function addSession(world, id, entries = []) {
 // ---------------------------------------------------------------------------
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     name: "Morning briefing",
     role: "Strict marathon coach",
     runtime: { model: "claude-opus-5", effort: "low" }
@@ -614,10 +654,10 @@ function addSession(world, id, entries = []) {
     { kind: "message", role: "user", content: "Hi" },
     { kind: "message", role: "assistant", content: "Hello" }
   ]);
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
 
@@ -628,7 +668,7 @@ function addSession(world, id, entries = []) {
   assert.equal(run.effort, "low");
   assert.ok(run.finishedAt);
 
-  // streamChat is told this is a read-only run carrying the automation's role.
+  // streamChat is told this is a read-only run carrying the analysis's role.
   const call = world.streamCalls[0];
   assert.equal(call.runId, run.id);
   assert.equal(call.options.toolPolicy, "read-only");
@@ -636,7 +676,7 @@ function addSession(world, id, entries = []) {
   assert.deepEqual(call.options.runtime, { model: "claude-opus-5", effort: "low" });
 
   // Section 7: an explicit effort is honoured as written.
-  assert.equal(AUTOMATION_DEFAULT_EFFORT, "low");
+  assert.equal(ANALYSIS_DEFAULT_EFFORT, "low");
 
   // The conversation's history is replayed, then the rendered playbook.
   assert.equal(call.messages.length, 3);
@@ -656,10 +696,13 @@ function addSession(world, id, entries = []) {
     { kind: "message", role: "user", content: "Hi" },
     { kind: "message", role: "assistant", content: "Hello" }
   ]);
+  // `automationId` is the marker's stored key name — kept so that every
+  // transcript entry an athlete already has keeps its attribution. `bindingId`
+  // is gone with the attachments; entries that carry one still parse, and
+  // nothing writes one any more. See `ChatEntryAnalysisMarker`.
   const marker = {
     runId: run.id,
     automationId: "a1",
-    bindingId: "b1",
     name: "Morning briefing",
     triggerLabel: "Daily at 07:30"
   };
@@ -669,8 +712,8 @@ function addSession(world, id, entries = []) {
   assert.equal(saved[3].role, "assistant");
   assert.deepEqual(saved[3].automation, marker, "so is the answer");
 
-  // The binding's clock advanced, and the renderer saw start then finish.
-  assert.equal(world.bindings.get("b1").lastRunAt, world.now.toISOString());
+  // The attachment's clock advanced, and the renderer saw start then finish.
+  assert.equal(world.analyses.get("a1").lastRunAt, world.now.toISOString());
   assert.deepEqual(world.updates, [
     { id: run.id, status: "running" },
     { id: run.id, status: "success" }
@@ -682,14 +725,14 @@ function addSession(world, id, entries = []) {
 // ---------------------------------------------------------------------------
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { text: NOTHING_TO_REPORT };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1", [{ kind: "message", role: "user", content: "Hi" }]);
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "silent");
   assert.equal(run.summary, undefined, "a silent run carries no badge text");
 
@@ -701,7 +744,7 @@ function addSession(world, id, entries = []) {
   assert.equal(entries[1].kind, "automationSilent");
   assert.equal(entries[1].at, world.now.getTime(), "the trace records when it looked");
   assert.equal(entries[1].automation.runId, run.id);
-  assert.equal(entries[1].automation.name, world.automations.get("a1").name);
+  assert.equal(entries[1].automation.name, world.analyses.get("a1").name);
   assert.equal(
     JSON.stringify(entries).includes(NOTHING_TO_REPORT),
     false,
@@ -709,18 +752,18 @@ function addSession(world, id, entries = []) {
   );
 
   assert.equal(world.runs.length, 1, "the run is still logged");
-  assert.equal(world.bindings.get("b1").lastRunAt, world.now.toISOString());
+  assert.equal(world.analyses.get("a1").lastRunAt, world.now.toISOString());
 }
 
 // The trace appends to the conversation as it stands now, not to the snapshot
 // taken before the stream — same hazard as a reported answer has.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { text: NOTHING_TO_REPORT };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1", [{ kind: "message", role: "user", content: "before" }]);
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
   const original = world.deps.streamChat;
   world.deps.streamChat = async (...args) => {
@@ -732,7 +775,7 @@ function addSession(world, id, entries = []) {
     return original(...args);
   };
 
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.deepEqual(
     world.sessions.get("s1").entries.map((entry) => entry.content ?? entry.kind),
     ["before", "typed mid-run", "automationSilent"],
@@ -751,116 +794,106 @@ function addSession(world, id, entries = []) {
     { kind: "schedule", cadence: "weekly", dayOfWeek: 0, timeOfDay: "18:00" },
     { kind: "manual" }
   ]) {
-    resetAutomationQueueForTests();
+    resetAnalysisQueueForTests();
     const world = createWorld();
-    addAutomation(world, "a1", { trigger, runtime: { model: "claude-opus-5" } });
+    addAnalysis(world, "a1", { trigger, runtime: { model: "claude-opus-5" } });
     addSession(world, "s1");
-    addBinding(world, "b1", { sessionId: "s1" });
+    addAttachment(world, "b1", { sessionId: "s1" });
     // Ignored by every trigger but the activity one, which otherwise has
     // nothing to analyse and skips before it reaches the provider.
     addActivity(world, "t1", 1);
 
-    const [run] = await runAutomationTrigger(
-      { automationId: "a1", kind: "manual", bypassGuards: true },
+    const [run] = await runAnalysisTrigger(
+      { analysisId: "a1", kind: "manual", bypassGuards: true },
       world.deps
     );
     const label = `${trigger.kind}/${trigger.cadence ?? "-"}`;
     assert.equal(run.status, "success", label);
     assert.deepEqual(
       world.streamCalls[0].options.runtime,
-      { model: "claude-opus-5", effort: AUTOMATION_DEFAULT_EFFORT },
+      { model: "claude-opus-5", effort: ANALYSIS_DEFAULT_EFFORT },
       `${label}: the run must use the default, not the chat's effort`
     );
     assert.equal(
       run.effort,
-      AUTOMATION_DEFAULT_EFFORT,
+      ANALYSIS_DEFAULT_EFFORT,
       `${label}: and the run log must record what it actually used`
     );
     // The definition is untouched: the default is resolved at run time, so the
     // athlete's blank stays blank and follows the default if it ever changes.
-    assert.equal(world.automations.get("a1").runtime.effort, undefined, label);
+    assert.equal(world.analyses.get("a1").runtime.effort, undefined, label);
   }
 
-  // resolveAutomationRuntime is the one place that decision lives.
+  // resolveAnalysisRuntime is the one place that decision lives.
   assert.deepEqual(
-    resolveAutomationRuntime({ runtime: {} }),
-    { effort: AUTOMATION_DEFAULT_EFFORT }
+    resolveAnalysisRuntime({ runtime: {} }),
+    { effort: ANALYSIS_DEFAULT_EFFORT }
   );
   assert.deepEqual(
-    resolveAutomationRuntime({ runtime: { effort: "high", model: "m" } }),
+    resolveAnalysisRuntime({ runtime: { effort: "high", model: "m" } }),
     { effort: "high", model: "m" },
     "an explicit effort is never overridden"
   );
 }
 
 // ---------------------------------------------------------------------------
-// Session resolution (2.1 / 2.4)
+// Session resolution (2.4)
 // ---------------------------------------------------------------------------
+//
+// There is one case left, where there used to be three. `per-run` created a
+// conversation on every run and `dedicated` rebuilt its own when the athlete
+// deleted it; both modes are gone, and with them every path in the runner that
+// created a chat session. An attachment names a conversation the athlete
+// opened, so either it is there or the run does not happen.
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { name: "Debrief" });
-  addBinding(world, "b1", {
-    mode: "per-run",
-    sessionId: null,
-    titleTemplate: "{{rule.name}} · {{activity.name}}"
-  });
+  addAnalysis(world, "a1", { name: "Debrief" });
+  addSession(world, "s1");
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger(
+  const [run] = await runAnalysisTrigger(
     {
-      automationId: "a1",
-      kind: "activity",
+      analysisId: "a1",
+      kind: "schedule",
       payload: { activityName: "Long run", activitySport: "run" }
     },
     world.deps
   );
   assert.equal(run.status, "success");
-  const created = world.sessions.get(run.sessionId);
-  assert.equal(created.title, "Debrief · Long run");
-  assert.equal(created.entries.length, 2, "a fresh conversation holds only this run");
+  assert.equal(run.sessionId, "s1", "it writes into the conversation it names");
+  assert.deepEqual(run.triggerPayload, {
+    activityName: "Long run",
+    activitySport: "run"
+  });
   assert.equal(
-    world.bindings.get("b1").sessionId,
-    null,
-    "a per-run binding never adopts the conversation it created"
+    world.sessions.size,
+    1,
+    "and creates no conversation of its own — nothing in the runner can any more"
   );
-  assert.deepEqual(run.triggerPayload, { activityName: "Long run", activitySport: "run" });
 }
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { name: "Daily briefing" });
-  // The athlete deleted the conversation this dedicated binding wrote into.
-  addBinding(world, "b1", { mode: "dedicated", sessionId: "s-gone" });
+  addAnalysis(world, "a1");
+  // The conversation is gone. Normally it takes the attachment with it
+  // (`applyAnalysisSessionDeleted`); reaching the runner in this state means
+  // the two got out of step, most likely a merge that carried the attachment
+  // but not the deletion.
+  addAttachment(world, "b1", { sessionId: "s-gone" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
-  assert.equal(run.status, "success");
-  assert.notEqual(run.sessionId, "s-gone");
-  assert.equal(world.sessions.get(run.sessionId).title, "Daily briefing");
-  assert.equal(
-    world.bindings.get("b1").sessionId,
-    run.sessionId,
-    "the dedicated binding is repointed at the conversation it rebuilt"
-  );
-  assert.equal(world.bindings.get("b1").enabled, true);
-}
-
-{
-  resetAutomationQueueForTests();
-  const world = createWorld();
-  addAutomation(world, "a1");
-  addBinding(world, "b1", { mode: "existing", sessionId: "s-gone" });
-
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "skipped");
   assert.equal(run.skipReason, "missing-session");
   assert.equal(
-    world.bindings.get("b1").enabled,
+    world.analyses.get("a1").enabled,
     false,
-    "an existing binding is disabled for the athlete to re-point"
+    "the attachment is switched off rather than deleted — a delete on what may be a race has no way back"
   );
   assert.equal(world.streamCalls.length, 0, "no model call was made");
+  assert.equal(world.sessions.size, 0, "and nothing was invented to write into");
 }
 
 // ---------------------------------------------------------------------------
@@ -868,29 +901,29 @@ function addSession(world, id, entries = []) {
 // ---------------------------------------------------------------------------
 
 async function runWith(configure) {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
   configure(world);
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule", ...(world.event ?? {}) },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule", ...(world.event ?? {}) },
     world.deps
   );
   return { world, run };
 }
 
-// 1. the automation was switched off between queue and run
+// 1. the analysis was switched off between queue and run
 {
   const { world, run } = await runWith((w) => {
-    const original = w.deps.getAutomation;
+    const original = w.deps.getAnalysis;
     let calls = 0;
-    w.deps.getAutomation = (id) => {
+    w.deps.getAnalysis = (id) => {
       calls += 1;
-      const automation = original(id);
+      const analysis = original(id);
       // First call is the fan-out; the re-check inside the run sees it off.
-      return calls > 1 ? { ...automation, enabled: false } : automation;
+      return calls > 1 ? { ...analysis, enabled: false } : analysis;
     };
   });
   assert.equal(run.status, "skipped");
@@ -924,7 +957,7 @@ async function runWith(configure) {
 // 5. quiet hours
 {
   const { run } = await runWith((w) => {
-    w.automations.get("a1").conditions.quietHours = { start: "00:00", end: "23:59" };
+    w.analyses.get("a1").conditions.quietHours = { start: "00:00", end: "23:59" };
   });
   assert.equal(run.skipReason, "quiet-hours");
 }
@@ -932,14 +965,14 @@ async function runWith(configure) {
 // 6. cooldown
 {
   const { run } = await runWith((w) => {
-    w.bindings.get("b1").lastRunAt = new Date(
+    w.analyses.get("a1").lastRunAt = new Date(
       w.now.getTime() - 30 * 60_000
     ).toISOString();
   });
   assert.equal(run.skipReason, "cooldown", "30min since the last run, cooldown is 120min");
 
   const elapsed = await runWith((w) => {
-    w.bindings.get("b1").lastRunAt = new Date(
+    w.analyses.get("a1").lastRunAt = new Date(
       w.now.getTime() - 180 * 60_000
     ).toISOString();
   });
@@ -952,8 +985,7 @@ async function runWith(configure) {
     for (let index = 0; index < 3; index += 1) {
       w.runs.push({
         id: `earlier-${index}`,
-        automationId: "a1",
-        bindingId: "b1",
+        analysisId: "a1",
         status: "success",
         triggerKind: "schedule",
         sessionId: "s1",
@@ -970,8 +1002,7 @@ async function runWith(configure) {
     for (let index = 0; index < 5; index += 1) {
       w.runs.push({
         id: `skipped-${index}`,
-        automationId: "a1",
-        bindingId: "b1",
+        analysisId: "a1",
         status: "skipped",
         triggerKind: "schedule",
         sessionId: "s1",
@@ -985,12 +1016,12 @@ async function runWith(configure) {
 // 8. conversation burst guard (2.3)
 {
   const { run } = await runWith((w) => {
-    w.automations.get("a1").conditions.maxRunsPerDay = 50;
+    w.analyses.get("a1").conditions.maxRunsPerDay = 50;
     for (let index = 0; index < SESSION_BURST_PER_HOUR; index += 1) {
       w.runs.push({
         id: `other-${index}`,
-        automationId: "other",
-        bindingId: `other-b${index}`,
+        analysisId: "other",
+        attachmentId: `other-b${index}`,
         status: "success",
         triggerKind: "schedule",
         sessionId: "s1",
@@ -998,18 +1029,18 @@ async function runWith(configure) {
       });
     }
   });
-  assert.equal(run.skipReason, "burst", "five automation messages an hour is the cap");
+  assert.equal(run.skipReason, "burst", "five analysis messages an hour is the cap");
 }
 
 // A run older than an hour does not count toward the burst guard.
 {
   const { run } = await runWith((w) => {
-    w.automations.get("a1").conditions.maxRunsPerDay = 50;
+    w.analyses.get("a1").conditions.maxRunsPerDay = 50;
     for (let index = 0; index < SESSION_BURST_PER_HOUR; index += 1) {
       w.runs.push({
         id: `stale-${index}`,
-        automationId: "other",
-        bindingId: `other-b${index}`,
+        analysisId: "other",
+        attachmentId: `other-b${index}`,
         status: "success",
         triggerKind: "schedule",
         sessionId: "s1",
@@ -1023,114 +1054,144 @@ async function runWith(configure) {
 // ---------------------------------------------------------------------------
 // A skipped run must not leave an empty conversation behind
 // ---------------------------------------------------------------------------
-// Guard rail 2 only *checks* that a target is resolvable; the conversation is
-// created after every guard passes. Creating it up front would litter the
-// sidebar with an empty thread on every cooldown or offline skip, and the
-// activity watcher polls every 15 minutes.
+// A refused run writes nothing into the conversation it was aimed at.
+//
+// This block used to be about the other half of guard rail 2: a `per-run`
+// attachment created its conversation only after every guard had passed, or a
+// cooldown would litter the sidebar with an empty thread every fifteen
+// minutes. Nothing creates conversations any more, so the risk moved rather
+// than disappearing — a skip must now leave the *existing* transcript
+// untouched, which is the same claim about a thread the athlete is reading.
 
 for (const [label, configure] of [
   ["not signed in", (w) => { w.providerAuth = { ok: false, reason: "ChatGPT is not signed in." }; }],
   ["COROS offline", (w) => { w.corosResult = { ok: false, twoFactorRequired: false }; }],
   ["quiet hours", (w) => {
-    w.automations.get("a1").conditions.quietHours = { start: "00:00", end: "23:59" };
+    w.analyses.get("a1").conditions.quietHours = { start: "00:00", end: "23:59" };
   }],
   ["cooldown", (w) => {
-    w.bindings.get("b1").lastRunAt = new Date(w.now.getTime() - 60_000).toISOString();
+    w.analyses.get("a1").lastRunAt = new Date(w.now.getTime() - 60_000).toISOString();
   }]
 ]) {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { name: "Debrief" });
-  addBinding(world, "b1", {
-    mode: "per-run",
-    sessionId: null,
-    titleTemplate: "{{rule.name}} · {{date}}"
-  });
+  addAnalysis(world, "a1", { name: "Debrief" });
+  addSession(world, "s1");
+  addAttachment(world, "b1", { sessionId: "s1" });
+  const before = world.sessions.get("s1").entries.length;
   configure(world);
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "skipped", `${label}: expected a skip`);
   assert.equal(
-    world.sessions.size,
-    0,
-    `${label}: a skipped per-run binding created a conversation anyway`
+    world.sessions.get("s1").entries.length,
+    before,
+    `${label}: a skipped run wrote into the transcript anyway`
   );
-  assert.equal(run.sessionId, undefined, `${label}: skip recorded a session that was never made`);
+  assert.equal(
+    world.sessions.size,
+    1,
+    `${label}: nothing may create a conversation of its own`
+  );
 }
 
-// A dedicated binding whose conversation was deleted does not rebuild it just
-// to skip: the rebuild happens on a run that actually reaches the provider.
+// Guard rail 2 comes before the rest, and says so in the log. A conversation
+// that is gone is not a question the provider can answer, so a missing target
+// beats a signed-out provider to the skip reason — which is the ordering the
+// athlete needs, since one of the two is the fixable one.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.providerAuth = { ok: false, reason: "ChatGPT is not signed in." };
-  addAutomation(world, "a1");
-  addBinding(world, "b1", { mode: "dedicated", sessionId: "s-gone" });
+  addAnalysis(world, "a1");
+  addAttachment(world, "b1", { sessionId: "s-gone" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
-  assert.equal(run.skipReason, "no-auth");
-  assert.equal(world.sessions.size, 0, "the conversation was rebuilt for a skipped run");
-  assert.equal(world.bindings.get("b1").sessionId, "s-gone", "and the binding was repointed");
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
+  assert.equal(run.skipReason, "missing-session");
+  assert.equal(world.sessions.size, 0, "and nothing was created to write into");
 }
 
-// The burst guard cannot fire for a conversation that does not exist yet.
+// The burst guard counts one conversation's traffic, so another conversation
+// being busy is not this one's problem.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     conditions: { cooldownMin: 0, maxRunsPerDay: 50 }
   });
-  addBinding(world, "b1", { mode: "per-run", sessionId: null });
+  addSession(world, "s1");
+  addAttachment(world, "b1", { sessionId: "s1" });
   for (let index = 0; index < SESSION_BURST_PER_HOUR + 2; index += 1) {
     world.runs.push({
       id: `busy-${index}`,
-      automationId: "other",
-      bindingId: `other-${index}`,
+      analysisId: "other",
+      attachmentId: `other-${index}`,
       status: "success",
-      triggerKind: "activity",
+      triggerKind: "schedule",
       sessionId: "some-other-session",
       startedAt: world.now.toISOString()
     });
   }
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "success");
 }
 
 // ---------------------------------------------------------------------------
-// One binding failing must not starve the rest of the fan-out
+// One analysis failing must not poison the queue for the next
 // ---------------------------------------------------------------------------
+//
+// This used to be about a fan-out: one trigger walked several attachments and
+// a failure part-way had to leave the rest to run. There is no fan-out now,
+// so the risk moved to the process-wide queue every trigger goes through — an
+// error escaping one run would reject the tail and take the next analysis
+// with it.
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
+    sessionId: "sA",
+    conditions: { cooldownMin: 0, maxRunsPerDay: 9 }
+  });
+  addAnalysis(world, "a2", {
+    sessionId: "sB",
+    conditions: { cooldownMin: 0, maxRunsPerDay: 9 }
+  });
+  addAnalysis(world, "a3", {
+    sessionId: "sC",
     conditions: { cooldownMin: 0, maxRunsPerDay: 9 }
   });
   addSession(world, "sA");
   addSession(world, "sB");
   addSession(world, "sC");
-  addBinding(world, "b1", { sessionId: "sA", sortOrder: 0 });
-  addBinding(world, "b2", { sessionId: "sB", sortOrder: 0 });
-  addBinding(world, "b3", { sessionId: "sC", sortOrder: 0 });
 
-  // An unexpected store failure on the middle binding, not a stream error.
-  // Keyed by conversation rather than by call count: a run reads its
-  // transcript both before and after the stream.
+  // An unexpected store failure on the middle one, not a stream error. Keyed
+  // by conversation rather than by call count: a run reads its transcript
+  // both before and after the stream.
   const realGetEntries = world.deps.getSessionEntries;
   world.deps.getSessionEntries = (sessionId) => {
     if (sessionId === "sB") throw new Error("database is locked");
     return realGetEntries(sessionId);
   };
 
-  const runs = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
-  assert.equal(runs.length, 3, "every binding still produced a run record");
+  const runs = [];
+  for (const analysisId of ["a1", "a2", "a3"]) {
+    runs.push(
+      ...(await runAnalysisTrigger({ analysisId, kind: "schedule" }, world.deps))
+    );
+  }
+  assert.equal(runs.length, 3, "every analysis still produced a run record");
   assert.deepEqual(
     runs.map((run) => run.status),
     ["success", "failed", "success"],
-    "the failure is isolated to its own binding"
+    "the failure is isolated to the analysis it happened in"
   );
   assert.equal(runs[1].error, "database is locked");
-  assert.equal(world.streamCalls.length, 2, "the surviving bindings still reached the provider");
+  assert.equal(
+    world.streamCalls.length,
+    2,
+    "the surviving analyses still reached the provider"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1138,9 +1199,9 @@ for (const [label, configure] of [
 // ---------------------------------------------------------------------------
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     conditions: {
       cooldownMin: 120,
       maxRunsPerDay: 1,
@@ -1148,32 +1209,31 @@ for (const [label, configure] of [
     }
   });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     lastRunAt: new Date(world.now.getTime() - 60_000).toISOString()
   });
   world.runs.push({
     id: "earlier",
-    automationId: "a1",
-    bindingId: "b1",
+    analysisId: "a1",
     status: "success",
     triggerKind: "schedule",
     sessionId: "s1",
     startedAt: world.now.toISOString()
   });
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(run.status, "success");
   assert.equal(run.triggerKind, "manual");
 
-  // It also reaches a binding the athlete has switched off, which is how they
+  // It also reaches a attachment the athlete has switched off, which is how they
   // try a rule out before enabling it.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const offWorld = createWorld();
-  addAutomation(offWorld, "a1", { enabled: false });
+  addAnalysis(offWorld, "a1", { enabled: false });
   addSession(offWorld, "s1");
-  addBinding(offWorld, "b1", { sessionId: "s1", enabled: false });
-  const [offRun] = await runAutomationNow("a1", undefined, offWorld.deps);
+  addAttachment(offWorld, "b1", { sessionId: "s1", enabled: false });
+  const [offRun] = await runAnalysisNow("a1", offWorld.deps);
   assert.equal(offRun.status, "success");
 }
 
@@ -1182,14 +1242,14 @@ for (const [label, configure] of [
 // ---------------------------------------------------------------------------
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { throws: "Claude Code is not installed." };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "failed");
   assert.equal(run.error, "Claude Code is not installed.");
   assert.ok(run.finishedAt);
@@ -1198,41 +1258,41 @@ for (const [label, configure] of [
 }
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { error: "Claude is not authenticated.", authError: true };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "skipped");
   assert.equal(run.skipReason, "no-auth", "an auth failure mid-stream is a skip, not a failure");
   assert.equal(run.error, "Claude is not authenticated.");
 }
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { error: "The model exploded.", authError: false };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "failed");
   assert.equal(run.error, "The model exploded.");
 }
 
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { cancelled: true, text: "half a th" };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.status, "cancelled");
   assert.deepEqual(world.sessions.get("s1").entries, []);
 }
@@ -1241,16 +1301,16 @@ for (const [label, configure] of [
 // the log lifts the headline, the conversation keeps the answer verbatim. The
 // runner asks for no label, so it has nothing to edit out on the way in.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = {
     text: "**Load is ramping fast.**\n- Volume up 22%.\n- Sleep is short."
   };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.equal(run.summary, "Load is ramping fast.", "the log lifts the headline");
 
   const saved = world.sessions.get("s1").entries;
@@ -1263,13 +1323,13 @@ for (const [label, configure] of [
 }
 
 // A run takes as long as the provider does. Anything the athlete said in that
-// conversation meanwhile has to survive the automation's append.
+// conversation meanwhile has to survive the analysis's append.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1", [{ kind: "message", role: "user", content: "before" }]);
-  addBinding(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b1", { sessionId: "s1" });
 
   const original = world.deps.streamChat;
   world.deps.streamChat = async (...args) => {
@@ -1282,7 +1342,7 @@ for (const [label, configure] of [
     return original(...args);
   };
 
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.deepEqual(
     world.sessions.get("s1").entries.map((entry) => entry.content),
     [
@@ -1293,26 +1353,26 @@ for (const [label, configure] of [
       // keeps it, the conversation does not.
       "Load is ramping fast.\nEase off Thursday."
     ],
-    "the athlete's turn is not deleted by the automation's append"
+    "the athlete's turn is not deleted by the analysis's append"
   );
 }
 
-// A binding whose run fails still had its clock advanced, so a broken
-// automation cannot hammer the provider every tick.
+// A attachment whose run fails still had its clock advanced, so a broken
+// analysis cannot hammer the provider every tick.
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { error: "boom" };
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1" });
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
-  assert.equal(world.bindings.get("b1").lastRunAt, world.now.toISOString());
+  addAttachment(world, "b1", { sessionId: "s1" });
+  await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
+  assert.equal(world.analyses.get("a1").lastRunAt, world.now.toISOString());
 }
 
 
 // ---------------------------------------------------------------------------
-// Activity selection: what a binding still owes an opinion on
+// Activity selection: what a attachment still owes an opinion on
 // ---------------------------------------------------------------------------
 
 const ACTIVITY_TRIGGER = { kind: "activity", sportTypes: [] };
@@ -1326,20 +1386,20 @@ const analysedIds = (world) =>
 
 // --- multiActivity off: only the newest match, however many piled up --------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t3", 5);
   addActivity(world, "t4", 4);
   addActivity(world, "t5", 3);
 
-  const runs = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const runs = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(runs.length, 1, "one trigger, one run");
   assert.deepEqual(analysedIds(world), ["t5"], "the newest match, not the backlog");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 3 * 86_400,
     "the watermark still jumps to the newest, so the skipped ones stay skipped"
   );
@@ -1347,19 +1407,19 @@ const analysedIds = (world) =>
 
 // --- multiActivity on: one run per pending activity, oldest first -----------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t3", 5);
   addActivity(world, "t4", 4);
   addActivity(world, "t5", 3);
 
-  const runs = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const runs = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(runs.length, 3);
   assert.deepEqual(analysedIds(world), ["t3", "t4", "t5"], "chronological, not newest-first");
   assert.ok(
@@ -1376,10 +1436,10 @@ const analysedIds = (world) =>
   assert.match(focus[1], /activity id t4/);
   assert.match(focus[2], /activity id t5/);
 
-  assert.equal(world.bindings.get("b1").lastActivityAt, RUNNER_NOW_EPOCH - 3 * 86_400);
+  assert.equal(world.analyses.get("a1").lastActivityAt, RUNNER_NOW_EPOCH - 3 * 86_400);
 
   // Nothing new since: the same trigger a second time does nothing at all.
-  const again = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const again = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(again, [], "an automatic trigger with nothing to say stays silent");
   assert.equal(world.runs.length, 3, "and logs no non-event");
 }
@@ -1392,20 +1452,15 @@ const analysedIds = (world) =>
   // that sentence, and every multiActivity fixture until now held ten or fewer
   // activities — where `slice(-10)` and `slice(0, 10)` are the same list. The
   // mutation that swapped them went undetected until this fixture ran twelve.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
-    // A `per-run` binding, which is the mode 9.1's post-activity debrief uses
-    // and the only one where a twelve-deep backlog is reachable: the burst
-    // guard counts per conversation, and this one writes into a new one each
-    // time. The daily cap is lifted past the sequence for the same reason —
-    // what is under test is which end of the backlog the cap takes from.
     conditions: { cooldownMin: 0, maxRunsPerDay: 24 }
   });
-  addBinding(world, "b1", {
-    mode: "per-run",
-    sessionId: null,
+  addSession(world, "s1");
+  addAttachment(world, "b1", {
+    sessionId: "s1",
     lastActivityAt: RUNNER_NOW_EPOCH - 30 * 86_400
   });
   // Oldest first, so `act-1` is the one furthest back.
@@ -1413,41 +1468,60 @@ const analysedIds = (world) =>
     addActivity(world, `act-${index}`, 13 - index);
   }
 
-  await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  // The claim is unchanged; what reaches the provider is not. A twelve-deep
+  // backlog used to run end to end through a `per-run` attachment, which wrote
+  // into a new conversation each time and so never met the burst guard's
+  // five-per-conversation-per-hour. Every attachment now shares one
+  // conversation, so the sequence is refused part-way — which is the guard
+  // doing its job. What is still under test is which end of the backlog the
+  // *plan* took from, and the first run names it.
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
 
   const analysed = analysedIds(world);
-  assert.equal(analysed.length, MULTI_ACTIVITY_MAX_PER_TRIGGER, "the cap holds");
-  assert.deepEqual(
-    analysed,
-    ["act-3", "act-4", "act-5", "act-6", "act-7", "act-8", "act-9", "act-10", "act-11", "act-12"],
-    "the ten most recent, oldest first — not the ten oldest"
+  assert.equal(
+    analysed[0],
+    "act-3",
+    "the plan starts at the oldest of the ten most recent — not at act-1"
   );
   assert.equal(
-    analysed.includes("act-1"),
+    analysed.includes("act-1") || analysed.includes("act-2"),
     false,
-    "and the two the cap dropped are gone for good: the watermark jumped past them"
+    "and the two the cap dropped are never offered"
+  );
+  // Five ran and the sixth was refused; the refusal is a logged run too, and
+  // it carries the activity it was going to analyse — which is how the run
+  // log says *which* one the guard held back.
+  assert.equal(
+    analysed.length,
+    SESSION_BURST_PER_HOUR + 1,
+    "the burst guard ends the catch-up short of the ten the plan held"
   );
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
-    RUNNER_NOW_EPOCH - 1 * 86_400,
-    "which is what the watermark landing on the newest says"
+    world.runs.filter((entry) => entry.status === "success").length,
+    SESSION_BURST_PER_HOUR
+  );
+  assert.equal(world.runs.at(-1).skipReason, "burst");
+  assert.equal(
+    world.analyses.get("a1").lastActivityAt,
+    RUNNER_NOW_EPOCH - (13 - 7) * 86_400,
+    "and the watermark stops with it, so the rest is still owed"
   );
 }
 
 // --- two triggers racing off the same watermark -----------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t5", 3);
 
   // The 15-minute poll and a "Run now" seconds apart: both plan their runs
   // before either has moved the watermark.
   const [first, second] = await Promise.all([
-    runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps),
-    runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps)
+    runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps),
+    runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps)
   ]);
 
   const runs = [...first, ...second];
@@ -1465,22 +1539,22 @@ const analysedIds = (world) =>
 
 // --- never analysed: the attach time is the floor ---------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
   // Attached two days ago; the older activities predate it.
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     createdAt: new Date((RUNNER_NOW_EPOCH - 2 * 86_400) * 1000).toISOString()
   });
   addActivity(world, "before-attach", 5);
   addActivity(world, "after-attach", 1);
 
-  await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(
     analysedIds(world),
     ["after-attach"],
@@ -1488,13 +1562,13 @@ const analysedIds = (world) =>
   );
 }
 
-// --- "Run now" on a binding that never analysed anything --------------------
+// --- "Run now" on a attachment that never analysed anything --------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     createdAt: new Date((RUNNER_NOW_EPOCH - 60) * 1000).toISOString()
   });
@@ -1502,7 +1576,7 @@ const analysedIds = (world) =>
   addActivity(world, "older", 5);
   addActivity(world, "newest", 3);
 
-  const runs = await runAutomationNow("a1", undefined, world.deps);
+  const runs = await runAnalysisNow("a1", world.deps);
   assert.equal(runs.length, 1);
   assert.deepEqual(
     analysedIds(world),
@@ -1513,17 +1587,17 @@ const analysedIds = (world) =>
 
 // --- "Run now" with a watermark and nothing new -----------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
   addActivity(world, "already-done", 3);
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     lastActivityAt: RUNNER_NOW_EPOCH - 3 * 86_400
   });
 
-  const runs = await runAutomationNow("a1", undefined, world.deps);
+  const runs = await runAnalysisNow("a1", world.deps);
   assert.equal(runs.length, 1);
   assert.equal(runs[0].status, "skipped");
   assert.equal(
@@ -1536,19 +1610,19 @@ const analysedIds = (world) =>
 
 // --- the cooldown gates the reaction, not the catch-up ----------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: { cooldownMin: 120, maxRunsPerDay: 9 }
   });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t3", 5);
   addActivity(world, "t4", 4);
   addActivity(world, "t5", 3);
 
-  const runs = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const runs = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(
     runs.map((run) => run.status),
     ["success", "success", "success"],
@@ -1558,14 +1632,14 @@ const analysedIds = (world) =>
 
 // --- the daily cap stops the sequence, and the leftovers are not lost -------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: { cooldownMin: 0, maxRunsPerDay: 2 }
   });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t3", 5);
   addActivity(world, "t4", 4);
   addActivity(world, "t5", 3);
@@ -1573,7 +1647,7 @@ const analysedIds = (world) =>
   // refusal once for t5 and again for t6.
   addActivity(world, "t6", 2);
 
-  const runs = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const runs = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(runs.map((run) => run.status), ["success", "success", "skipped"]);
   assert.equal(runs[2].skipReason, "budget");
   assert.deepEqual(analysedIds(world), ["t3", "t4", "t5"]);
@@ -1583,7 +1657,7 @@ const analysedIds = (world) =>
     "the refusal is logged once, not once per pending activity"
   );
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 4 * 86_400,
     "the watermark stops at t4, so t5 rides along with the next trigger"
   );
@@ -1591,36 +1665,36 @@ const analysedIds = (world) =>
 
 // --- the sport/duration filters still apply to the selection ---------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { kind: "activity", sportTypes: [100], multiActivity: true, minDurationSec: 1800 },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "swim", 5, { sport_type: 200, sport_name: "Swim" });
   addActivity(world, "short-run", 4, { duration: 600 });
   addActivity(world, "long-run", 3);
 
-  await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(analysedIds(world), ["long-run"]);
 }
 
 // --- a failed run leaves the watermark alone, so the activity comes back ----
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { error: "provider exploded" };
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t5", 3);
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(run.status, "failed");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 8 * 86_400,
     "a failure must not silently consume the activity"
   );
@@ -1628,18 +1702,18 @@ const analysedIds = (world) =>
 
 // --- a silent run still consumed the activity -------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
   world.outcome = { text: NOTHING_TO_REPORT };
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "t5", 3);
 
-  const [run] = await runAutomationTrigger({ automationId: "a1", kind: "activity" }, world.deps);
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(run.status, "silent");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 3 * 86_400,
     "the model looked and had nothing to say; that is still an answer"
   );
@@ -1666,19 +1740,19 @@ async function withDeadline(work, ms, what) {
 
 // --- the run is given up on rather than left open ---------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     idleTimeoutMs: 20,
     // Never settles, and never emits: the shape of an MCP connect or a provider
     // fetch that has stopped answering. Neither carries a deadline of its own.
     streamChat: () => new Promise(() => {})
   });
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
   const [run] = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a run whose provider went quiet has to end by itself"
   );
@@ -1693,7 +1767,7 @@ async function withDeadline(work, ms, what) {
 
 // --- a stream that keeps talking is never given up on -----------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     idleTimeoutMs: 40,
     // Six times the window in total, but never quiet for a whole one: a long
@@ -1705,12 +1779,12 @@ async function withDeadline(work, ms, what) {
       }
     }
   });
-  addAutomation(world, "a1");
+  addAnalysis(world, "a1");
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
   const [run] = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a talkative run has to finish"
   );
@@ -1719,26 +1793,26 @@ async function withDeadline(work, ms, what) {
 
 // --- and it does not wedge the runs behind it -------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const stalled = createWorld({
     idleTimeoutMs: 20,
     streamChat: () => new Promise(() => {})
   });
-  addAutomation(stalled, "a1");
+  addAnalysis(stalled, "a1");
   addSession(stalled, "s1");
-  addBinding(stalled, "b1");
+  addAttachment(stalled, "b1");
 
   const healthy = createWorld();
-  addAutomation(healthy, "a2");
+  addAnalysis(healthy, "a2");
   addSession(healthy, "s1");
-  addBinding(healthy, "b2", { automationId: "a2" });
+  addAttachment(healthy, "b2", { analysisId: "a2" });
 
   // Queued behind the stall, on the process-wide queue of 5.4. Without a bound
   // on the run in front of it this never resolves, which is what an athlete
   // sees as a "Run now" button that spins with nothing behind it.
-  const first = runAutomationNow("a1", undefined, stalled.deps);
+  const first = runAnalysisNow("a1", stalled.deps);
   const [behind] = await withDeadline(
-    runAutomationNow("a2", undefined, healthy.deps),
+    runAnalysisNow("a2", healthy.deps),
     2_000,
     "one stalled run must not hold every later run for the life of the process"
   );
@@ -1748,7 +1822,7 @@ async function withDeadline(work, ms, what) {
 
 
 // ---------------------------------------------------------------------------
-// Per-binding backoff after a failure (10)
+// Per-attachment backoff after a failure (10)
 // ---------------------------------------------------------------------------
 
 const MINUTE = 60_000;
@@ -1759,11 +1833,11 @@ assert.deepEqual(
   "section 10's steps, and the last one is the ceiling"
 );
 
-/** How far ahead of the world clock a binding is held off, in minutes. */
-const backoffMinutes = (world, bindingId = "b1") => {
-  const binding = world.bindings.get(bindingId);
-  return binding.backoffUntil
-    ? Math.round((Date.parse(binding.backoffUntil) - world.now.getTime()) / MINUTE)
+/** How far ahead of the world clock an analysis is held off, in minutes. */
+const backoffMinutes = (world, analysisId = "a1") => {
+  const analysis = world.analyses.get(analysisId);
+  return analysis.backoffUntil
+    ? Math.round((Date.parse(analysis.backoffUntil) - world.now.getTime()) / MINUTE)
     : null;
 };
 
@@ -1779,16 +1853,16 @@ async function waitFor(read, what) {
 
 // --- 5m, 15m, 60m, and the dead provider is not called in between -----------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.outcome.throws = "the provider hung up";
 
   const fire = async () => {
-    const [run] = await runAutomationTrigger(
-      { automationId: "a1", kind: "schedule" },
+    const [run] = await runAnalysisTrigger(
+      { analysisId: "a1", kind: "schedule" },
       world.deps
     );
     return run;
@@ -1796,7 +1870,7 @@ async function waitFor(read, what) {
 
   assert.equal((await fire()).status, "failed");
   assert.equal(backoffMinutes(world), 5, "the first failure is worth five minutes");
-  assert.equal(world.bindings.get("b1").backoffLevel, 1);
+  assert.equal(world.analyses.get("a1").backoffLevel, 1);
 
   // Enforced in the runner, not in the scheduler: the schedule trigger fires as
   // usual and is declined here, with a reason on the row for the athlete.
@@ -1809,7 +1883,7 @@ async function waitFor(read, what) {
   // A declined run is not a failure and not a success, so it neither escalates
   // the backoff nor clears it — the second of those would be a guard rail that
   // switched itself off the first time it did anything.
-  assert.equal(world.bindings.get("b1").backoffLevel, 1);
+  assert.equal(world.analyses.get("a1").backoffLevel, 1);
   assert.equal(backoffMinutes(world), 1);
 
   world.now = new Date(world.now.getTime() + MINUTE);
@@ -1823,7 +1897,7 @@ async function waitFor(read, what) {
   world.now = new Date(world.now.getTime() + 60 * MINUTE);
   await fire();
   assert.equal(backoffMinutes(world), 60, "an hour is the ceiling, not a step on the way up");
-  assert.equal(world.bindings.get("b1").backoffLevel, 3);
+  assert.equal(world.analyses.get("a1").backoffLevel, 3);
 }
 
 // --- a timed-out run backs off exactly as a thrown one does -----------------
@@ -1832,23 +1906,23 @@ async function waitFor(read, what) {
   // they were. They have to be indistinguishable here, or the backoff covers
   // only half of what made "give up on a run that has gone quiet" safe.
   const backoffTrace = async (streamChat) => {
-    resetAutomationQueueForTests();
+    resetAnalysisQueueForTests();
     const world = createWorld({ idleTimeoutMs: 20, streamChat });
-    addAutomation(world, "a1", { conditions: NO_LIMITS });
+    addAnalysis(world, "a1", { conditions: NO_LIMITS });
     addSession(world, "s1");
-    addBinding(world, "b1");
+    addAttachment(world, "b1");
 
     const trace = [];
     for (const wait of [0, 5, 15]) {
       world.now = new Date(world.now.getTime() + wait * MINUTE);
       const [run] = await withDeadline(
-        runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps),
+        runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps),
         2_000,
         "a run that never ends has to end by itself"
       );
       trace.push({
         status: run.status,
-        level: world.bindings.get("b1").backoffLevel,
+        level: world.analyses.get("a1").backoffLevel,
         minutes: backoffMinutes(world)
       });
     }
@@ -1875,22 +1949,22 @@ async function waitFor(read, what) {
 // --- reset on any non-failure ----------------------------------------------
 {
   const afterRun = async (outcome) => {
-    resetAutomationQueueForTests();
+    resetAnalysisQueueForTests();
     const world = createWorld();
-    addAutomation(world, "a1", { conditions: NO_LIMITS });
+    addAnalysis(world, "a1", { conditions: NO_LIMITS });
     addSession(world, "s1");
-    addBinding(world, "b1", {
+    addAttachment(world, "b1", {
       backoffLevel: 2,
       // Already expired, so the guard lets this run through — it is the run's
       // outcome being tested, not the guard.
       backoffUntil: new Date(world.now.getTime() - MINUTE).toISOString()
     });
     Object.assign(world.outcome, outcome);
-    const [run] = await runAutomationTrigger(
-      { automationId: "a1", kind: "schedule" },
+    const [run] = await runAnalysisTrigger(
+      { analysisId: "a1", kind: "schedule" },
       world.deps
     );
-    return { status: run.status, binding: world.bindings.get("b1") };
+    return { status: run.status, attachment: world.analyses.get("a1") };
   };
 
   for (const [expected, outcome] of [
@@ -1898,10 +1972,10 @@ async function waitFor(read, what) {
     ["silent", { text: NOTHING_TO_REPORT }],
     ["cancelled", { cancelled: true }]
   ]) {
-    const { status, binding } = await afterRun(outcome);
+    const { status, attachment } = await afterRun(outcome);
     assert.equal(status, expected);
-    assert.equal(binding.backoffLevel, undefined, `a ${expected} run clears the streak`);
-    assert.equal(binding.backoffUntil, undefined);
+    assert.equal(attachment.backoffLevel, undefined, `a ${expected} run clears the streak`);
+    assert.equal(attachment.backoffUntil, undefined);
   }
 }
 
@@ -1911,48 +1985,48 @@ async function waitFor(read, what) {
   // is the only one that goes through the same exit as a success. Section 10
   // already promises no retry storm for it; clearing a streak of real failures
   // on the way past would start one.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     backoffLevel: 2,
     backoffUntil: new Date(world.now.getTime() - MINUTE).toISOString()
   });
   Object.assign(world.outcome, { error: "Sign in to continue.", authError: true });
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
   assert.equal(run.status, "skipped");
   assert.equal(run.skipReason, "no-auth");
-  assert.equal(world.bindings.get("b1").backoffLevel, 2, "the streak is left alone");
+  assert.equal(world.analyses.get("a1").backoffLevel, 2, "the streak is left alone");
 }
 
 // --- "Run now" overrules it, like every other rate guard (3.4) --------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     backoffLevel: 3,
     backoffUntil: new Date(world.now.getTime() + 60 * MINUTE).toISOString()
   });
 
-  const [automatic] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [automatic] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
   assert.equal(automatic.skipReason, "backoff");
 
   // The athlete has just fixed whatever was broken and wants to know whether it
   // worked. An hour of silence is the wrong answer to that.
-  const [manual] = await runAutomationNow("a1", undefined, world.deps);
+  const [manual] = await runAnalysisNow("a1", world.deps);
   assert.equal(manual.status, "success");
   assert.equal(
-    world.bindings.get("b1").backoffLevel,
+    world.analyses.get("a1").backoffLevel,
     undefined,
     "and the answer it got clears the streak"
   );
@@ -1960,14 +2034,14 @@ async function waitFor(read, what) {
 
 // --- a failure part-way through a catch-up sequence stops the sequence ------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
   });
@@ -1976,8 +2050,8 @@ async function waitFor(read, what) {
   addActivity(world, "t3", 3);
   world.outcome.throws = "the provider hung up";
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   // Unlike the cooldown, the backoff is checked at every step of a sequence:
@@ -1986,7 +2060,7 @@ async function waitFor(read, what) {
   assert.equal(runs[1].skipReason, "backoff");
   assert.equal(world.streamCalls.length, 1, "the second activity is not attempted");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 8 * 86_400,
     "and all three are still owed once the backoff expires"
   );
@@ -1994,18 +2068,18 @@ async function waitFor(read, what) {
 
 // --- a run that blows up before it reaches the provider backs off too -------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     getSessionEntries: () => {
       throw new Error("the transcript could not be read");
     }
   });
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
   assert.equal(run.status, "failed");
@@ -2016,28 +2090,28 @@ async function waitFor(read, what) {
   );
 }
 
-// --- a healthy binding does not rewrite its own row on every run ------------
+// --- a healthy analysis does not rewrite its own row on every run -----------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
   const writes = [];
-  const stamp = world.deps.setBindingSchedule;
-  world.deps.setBindingSchedule = (bindingId, schedule) => {
+  const stamp = world.deps.setAnalysisSchedule;
+  world.deps.setAnalysisSchedule = (analysisId, schedule) => {
     writes.push(schedule);
-    stamp(bindingId, schedule);
+    stamp(analysisId, schedule);
   };
 
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
   assert.ok(writes.length, "the run still stamps its clock");
   assert.ok(
     writes.every(
       (write) => write.backoffLevel === undefined && write.backoffUntil === undefined
     ),
-    "an automation that has never failed has no streak to clear"
+    "an analysis that has never failed has no streak to clear"
   );
 }
 
@@ -2047,7 +2121,7 @@ async function waitFor(read, what) {
 
 // --- one press stops a three-place fan-out ---------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     // The athlete presses Stop on the run they can see. Two more conversations
     // are queued behind it, and before the token each needed its own press —
@@ -2058,19 +2132,19 @@ async function waitFor(read, what) {
     // only thing that can stop the two behind it.
     streamChat: async (_sink, runId) => {
       world.streamCalls.push({ runId });
-      cancelAutomationRun(runId, world.deps);
+      cancelAnalysisRun(runId, world.deps);
     }
   });
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
   addSession(world, "s2");
   addSession(world, "s3");
-  addBinding(world, "b1", { sessionId: "s1" });
-  addBinding(world, "b2", { sessionId: "s2" });
-  addBinding(world, "b3", { sessionId: "s3" });
+  addAttachment(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b2", { sessionId: "s2" });
+  addAttachment(world, "b3", { sessionId: "s3" });
 
   const runs = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a cancelled fan-out still has to return"
   );
@@ -2089,7 +2163,7 @@ async function waitFor(read, what) {
   // The token was clear when this step started, so the check at the top of it
   // saw nothing; by the time there was a provider to call, the athlete had
   // already pressed Stop on the step before it.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   let ready = () => undefined;
   const gettingReady = new Promise((resolve) => {
     ready = resolve;
@@ -2109,28 +2183,28 @@ async function waitFor(read, what) {
       world.streamCalls.push({ runId });
     }
   });
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
   });
   addActivity(world, "t1", 5);
   addActivity(world, "t2", 4);
 
-  const fanOut = runAutomationNow("a1", undefined, world.deps);
+  const fanOut = runAnalysisNow("a1", world.deps);
   await gettingReady;
-  cancelAutomationRun(world.runs[0].id, world.deps);
+  cancelAnalysisRun(world.runs[0].id, world.deps);
   release();
 
   const runs = await withDeadline(fanOut, 2_000, "a cancelled step still has to return");
   assert.deepEqual(runs.map((run) => run.status), ["success", "cancelled"]);
   assert.equal(world.streamCalls.length, 1, "the second run never reaches the provider");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 5 * 86_400,
     "and the activity it was cancelled over is still owed"
   );
@@ -2138,7 +2212,7 @@ async function waitFor(read, what) {
 
 // --- and the run queued behind a stall -------------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   let release = () => undefined;
   const world = createWorld({
     // Long enough that the idle bound is not what ends this: the point is that
@@ -2157,15 +2231,15 @@ async function waitFor(read, what) {
       release();
     }
   });
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
   addSession(world, "s2");
-  addBinding(world, "b1", { sessionId: "s1" });
-  addBinding(world, "b2", { sessionId: "s2" });
+  addAttachment(world, "b1", { sessionId: "s1" });
+  addAttachment(world, "b2", { sessionId: "s2" });
 
-  const fanOut = runAutomationNow("a1", undefined, world.deps);
+  const fanOut = runAnalysisNow("a1", world.deps);
   const stalled = await waitFor(() => world.runs[0], "the first run has to start");
-  cancelAutomationRun(stalled.id, world.deps);
+  cancelAnalysisRun(stalled.id, world.deps);
 
   const runs = await withDeadline(fanOut, 2_000, "Stop has to end the fan-out");
   assert.deepEqual(runs.map((run) => run.status), ["cancelled"]);
@@ -2178,19 +2252,19 @@ async function waitFor(read, what) {
   // the two activities behind it are dropped all the same. Nothing about the
   // run itself says the athlete pressed Stop, so the sequence has only the
   // token to go on.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     streamChat: async (_sink, runId) => {
       world.streamCalls.push({ runId });
-      cancelAutomationRun(runId, world.deps);
+      cancelAnalysisRun(runId, world.deps);
     }
   });
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
     conditions: NO_LIMITS
   });
   addSession(world, "s1");
-  addBinding(world, "b1", {
+  addAttachment(world, "b1", {
     sessionId: "s1",
     lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
   });
@@ -2199,14 +2273,14 @@ async function waitFor(read, what) {
   addActivity(world, "t3", 3);
 
   const runs = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a cancelled sequence still has to return"
   );
   assert.deepEqual(runs.map((run) => run.status), ["success"]);
   assert.deepEqual(analysedIds(world), ["t1"], "the two behind it are dropped, not run");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 5 * 86_400,
     "and what the model did look at is not thrown away"
   );
@@ -2214,7 +2288,7 @@ async function waitFor(read, what) {
 
 // --- a Stop no live trigger owns still reaches the abort map ----------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld({
     streamChat: async (_sink, runId) => {
       world.streamCalls.push({ runId });
@@ -2222,18 +2296,23 @@ async function waitFor(read, what) {
         // Somebody else's run, or one this trigger has already let go of — a
         // stream left settling in its own time after a timeout outlives the
         // fan-out that started it.
-        cancelAutomationRun("run-from-another-life", world.deps);
+        cancelAnalysisRun("run-from-another-life", world.deps);
       }
     }
   });
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  // A two-step catch-up, so there is a live sequence for the unrelated Stop
+  // to fail to end. (It used to be a two-conversation fan-out.)
+  addAnalysis(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    conditions: NO_LIMITS,
+    lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
+  });
   addSession(world, "s1");
-  addSession(world, "s2");
-  addBinding(world, "b1", { sessionId: "s1" });
-  addBinding(world, "b2", { sessionId: "s2" });
+  addActivity(world, "t1", 5);
+  addActivity(world, "t2", 4);
 
-  const runs = await runAutomationNow("a1", undefined, world.deps);
-  assert.equal(runs.length, 2, "an unrelated Stop does not end a live trigger");
+  const runs = await runAnalysisNow("a1", world.deps);
+  assert.equal(runs.length, 2, "an unrelated Stop does not end a live sequence");
   assert.deepEqual(world.cancelledRunIds, ["run-from-another-life"]);
 }
 
@@ -2250,7 +2329,7 @@ const SIGNED_IN = {
 };
 
 // Each provider is asked about its own credential and nothing else. This is
-// the whole point of widening the pre-flight: an automation may override the
+// the whole point of widening the pre-flight: an analysis may override the
 // provider (decision 2), so a signed-out ChatGPT must not hold back a rule
 // running on Claude Code, and never did — it simply used to be invisible.
 for (const [provider, broken, expected] of [
@@ -2288,7 +2367,7 @@ for (const [provider, broken, expected] of [
 
 // The states that decline are the ones that are unambiguous *and* stable. A
 // fresh install whose Coach view nobody has opened has no recorded state at
-// all, and holding every automation on a machine where nothing is wrong is a
+// all, and holding every analysis on a machine where nothing is wrong is a
 // worse answer than letting the stream report it.
 for (const state of [undefined, "connecting", "connection-failed", "usage-limit-reached"]) {
   assert.deepEqual(
@@ -2312,19 +2391,32 @@ for (const state of [undefined, "connecting", "connection-failed", "usage-limit-
 }
 
 // ---------------------------------------------------------------------------
-// Pausing every automation on a 2FA demand (10)
+// Pausing every analysis on a 2FA demand (10)
 // ---------------------------------------------------------------------------
 
 const TWO_FACTOR = { ok: false, twoFactorRequired: true };
 
-/** An automation attached in three places, so a fan-out has somewhere to go. */
+/** An analysis attached in three places, so a fan-out has somewhere to go. */
+/**
+ * One analysis with three runs' worth of work in front of it.
+ *
+ * It used to be one definition attached to three conversations, which is what
+ * "three places" meant. There is one place now, so the three come from an
+ * activity catch-up instead — and the claims these cases make are unchanged
+ * by the substitution: the pause writes *one* row and then stops the rest,
+ * whether the rest were three conversations or three activities.
+ */
 function threePlaceWorld(configure = () => undefined) {
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  for (const [index, id] of ["b1", "b2", "b3"].entries()) {
-    addSession(world, `s${index + 1}`);
-    addBinding(world, id, { sessionId: `s${index + 1}` });
-  }
+  addAnalysis(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    conditions: NO_LIMITS,
+    lastActivityAt: RUNNER_NOW_EPOCH - 12 * 86_400
+  });
+  addSession(world, "s1");
+  addActivity(world, "p1", 5);
+  addActivity(world, "p2", 4);
+  addActivity(world, "p3", 3);
   configure(world);
   // COROS asking for a login code means there is nothing usable on disk either.
   if (world.corosResult.twoFactorRequired) {
@@ -2333,15 +2425,15 @@ function threePlaceWorld(configure = () => undefined) {
   return world;
 }
 
-// --- one row, not one per binding, and then silence ------------------------
+// --- one row, not one per step, and then silence ----------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld((w) => {
     w.corosResult = TWO_FACTOR;
   });
 
-  const first = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const first = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(
@@ -2358,8 +2450,8 @@ function threePlaceWorld(configure = () => undefined) {
 
   // And the next fifteen minutes, and the fifteen after that.
   world.now = new Date(world.now.getTime() + 15 * MINUTE);
-  const later = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const later = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(later, [], "a held trigger produces no runs");
@@ -2372,16 +2464,16 @@ function threePlaceWorld(configure = () => undefined) {
 
 // --- a manual run is the athlete asking, so it still goes through ----------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld((w) => {
     w.corosResult = TWO_FACTOR;
   });
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   world.runs.length = 0;
 
   // Still locked: the athlete gets the one skip that says so, rather than a
   // button that silently does nothing.
-  const [again] = await runAutomationNow("a1", undefined, world.deps);
+  const [again] = await runAnalysisNow("a1", world.deps);
   assert.equal(again.skipReason, "two-factor-required");
   assert.ok(world.pause, "and it stays paused");
 
@@ -2391,7 +2483,7 @@ function threePlaceWorld(configure = () => undefined) {
   // case a fake that collapsed the two facts into one could not tell apart.
   world.corosResult = { ok: true };
   assert.equal(world.corosOnDisk, false, "nothing the gate can read has changed");
-  const [fixed] = await runAutomationNow("a1", ["b1"], world.deps);
+  const [fixed] = await runAnalysisNow("a1", world.deps);
   assert.equal(fixed.status, "success");
   assert.equal(world.pause, null, "a COROS session that answers clears the pause");
 }
@@ -2399,45 +2491,45 @@ function threePlaceWorld(configure = () => undefined) {
 // --- the cause disappearing is not a second way to resume ------------------
 {
   // The athlete signs in to COROS from the settings screen, which knows nothing
-  // about automations. Nothing would ever ask again, because the gate is what
+  // about analyses. Nothing would ever ask again, because the gate is what
   // stops the asking — so the gate is where the pause has to notice.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld((w) => {
     w.corosResult = TWO_FACTOR;
   });
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.pause);
 
   world.corosResult = { ok: true };
   world.corosOnDisk = true;
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(world.pause, null, "the pause lifts itself once its cause is gone");
   assert.deepEqual(
     runs.map((run) => run.status),
     ["success", "success", "success"],
-    "and the whole fan-out runs again"
+    "and the whole catch-up runs again"
   );
 }
 
 // --- Resume clears it, and promises nothing else ---------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld((w) => {
     w.corosResult = TWO_FACTOR;
   });
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
-  assert.ok(getAutomationPause(world.deps), "the banner reads the flag it shows");
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
+  assert.ok(getAnalysisPause(world.deps), "the banner reads the flag it shows");
 
-  assert.equal(resumeAutomations(world.deps), null);
-  assert.equal(getAutomationPause(world.deps), null);
+  assert.equal(resumeAnalyses(world.deps), null);
+  assert.equal(getAnalysisPause(world.deps), null);
 
   // Resume means "try again", not "fixed": COROS is still asking, so the next
   // trigger re-trips it rather than quietly declining forever.
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(runs.map((run) => run.skipReason), ["two-factor-required"]);
@@ -2449,21 +2541,29 @@ function threePlaceWorld(configure = () => undefined) {
   // The two arrive on the same path and only one of them is unanswerable by
   // retrying. Pausing everything for a flaky network would be a feature that
   // switches the app off every time a train goes into a tunnel.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld((w) => {
     w.corosResult = { ok: false, twoFactorRequired: false };
   });
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(
     runs.map((run) => run.skipReason),
-    ["offline", "offline", "offline"],
-    "an offline skip is per binding and the fan-out carries on"
+    ["offline"],
+    "an offline skip is an ordinary refusal, logged once"
   );
   assert.equal(world.pause, null, "and nothing is paused");
+  // The two activities behind it are still owed rather than skipped one by
+  // one: a refusal applies to the whole catch-up — COROS will not have come
+  // back by the next step — so the sequence stops and the watermark stays put.
+  assert.equal(
+    world.analyses.get("a1").lastActivityAt,
+    RUNNER_NOW_EPOCH - 12 * 86_400,
+    "the watermark does not move, so the next trigger picks them up"
+  );
 }
 
 
@@ -2623,13 +2723,13 @@ const lastWire = (world) =>
 
 // --- a short conversation is untouched --------------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(4));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.rolls, [], "nothing to summarise");
   assert.deepEqual(
     lastWire(world).map((message) => message.content).slice(0, 4),
@@ -2640,13 +2740,13 @@ const lastWire = (world) =>
 
 // --- a long one is rolled, stored, and sent as summary + tail ---------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
 
   assert.equal(world.rolls.length, 1);
   assert.equal(world.rolls[0].previous, undefined, "the first roll has nothing to build on");
@@ -2672,17 +2772,17 @@ const lastWire = (world) =>
 
 // --- the window is a setting, and the runner uses the one it is handed ------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(30));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   // Below the shipped 60, so a runner still reading the constant would send
   // this transcript whole and roll nothing — the fixture is on the side where
   // the two readings disagree.
   world.contextWindow = { limit: 20, keep: 6 };
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.equal(world.rolls.length, 1, "a narrower window rolls sooner");
   assert.equal(world.rolls[0].count, 30 - 6);
   assert.equal(world.summaryWrites[0].through, 24);
@@ -2695,30 +2795,30 @@ const lastWire = (world) =>
 
 // --- a wider window than the transcript rolls nothing -----------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   // Above the shipped 60: the same 100-entry transcript that rolls by default
   // must now go whole, which no constant-reading runner could do.
   world.contextWindow = { limit: 200, keep: 20 };
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.rolls, [], "a wider window defers the roll");
   assert.equal(lastWire(world).length, 100 + 1, "and the whole transcript goes");
 }
 
 // --- the next run reuses it rather than rolling again -----------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.summaries.set("s1", { summary: "Already rolled.", through: 80 });
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.rolls, [], "20 live entries needs no model call at all");
   assert.deepEqual(world.summaryWrites, [], "and writes nothing");
   assert.match(lastWire(world)[0].content, /Already rolled\./);
@@ -2726,14 +2826,14 @@ const lastWire = (world) =>
 
 // --- a roll that builds on the last one carries it forward ------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(150));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.summaries.set("s1", { summary: "Marathon in October.", through: 80 });
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.equal(world.rolls.length, 1);
   assert.equal(
     world.rolls[0].previous,
@@ -2746,14 +2846,14 @@ const lastWire = (world) =>
 
 // --- a roll that fails costs more, and loses nothing ------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.rollResult = null;
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(run.status, "success", "a summary that could not be written is not a failed run");
   assert.deepEqual(world.summaryWrites, [], "and nothing is stored that was not written");
 
@@ -2770,21 +2870,23 @@ const lastWire = (world) =>
 
   // And it rolls again next time rather than giving up on the conversation.
   world.rollResult = "Second time lucky.";
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.equal(world.summaryWrites.length, 1);
 }
 
-// --- a per-run binding never reaches the limit ------------------------------
+// --- an empty conversation never reaches the limit -------------------------
 {
-  // 5.7 is about `dedicated` and `existing` bindings. A `per-run` binding gets
-  // a conversation of its own every time, so it is covered by the same count
-  // rather than by a mode check — there is nothing there to trim.
-  resetAutomationQueueForTests();
+  // 5.7 trims by counting entries, not by asking what kind of attachment it
+  // is — which is what made the mode check unnecessary before the modes went
+  // away, and is why nothing here changed when they did. An attachment
+  // pointed at a conversation nobody has written in yet has nothing to trim.
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  addBinding(world, "b1", { mode: "per-run", sessionId: null });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s-fresh");
+  addAttachment(world, "b1", { sessionId: "s-fresh" });
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.rolls, []);
   assert.equal(lastWire(world).length, 1, "a fresh conversation is just the playbook");
 }
@@ -2837,14 +2939,14 @@ const lastWire = (world) =>
       "failed"
     ]
   ]) {
-    resetAutomationQueueForTests();
+    resetAnalysisQueueForTests();
     const world = createWorld();
-    addAutomation(world, "a1", { conditions: NO_LIMITS });
+    addAnalysis(world, "a1", { conditions: NO_LIMITS });
     addSession(world, "s1");
-    addBinding(world, "b1");
+    addAttachment(world, "b1");
     configure(world);
 
-    const [run] = await runAutomationNow("a1", undefined, world.deps);
+    const [run] = await runAnalysisNow("a1", world.deps);
     assert.equal(run.status, expected, `${label}: fixture sanity`);
     // A failed or cancelled run spent tokens too. A budget that forgave those
     // is a budget a broken provider can run through for nothing.
@@ -2855,14 +2957,14 @@ const lastWire = (world) =>
 
 // --- a provider that reports nothing leaves it unknown, not zero ------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.usage = null;
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(run.status, "success");
   assert.equal(
     run.inputTokens,
@@ -2874,27 +2976,27 @@ const lastWire = (world) =>
 
 // --- a run that never reached the provider has nothing to record ------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.corosResult = { ok: false, twoFactorRequired: false };
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(run.skipReason, "offline");
   assert.equal(run.inputTokens, undefined, "a skip costs nothing and claims nothing");
 }
 
 // --- over the ceiling: one row, then everything is held ---------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(
@@ -2907,8 +3009,8 @@ const lastWire = (world) =>
   assert.equal(world.pause.runId, runs[0].id, "the pause points at the row that explains it");
 
   // And the fifteen minutes after that, and the fifteen after those.
-  const later = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const later = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(later, [], "a held trigger produces no runs");
@@ -2917,16 +3019,16 @@ const lastWire = (world) =>
 
 // --- raising the ceiling lifts it, without a second control -----------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.pause);
 
   world.budget = 900_000;
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(world.pause, null, "the number that stopped everything is no longer the number");
@@ -2935,30 +3037,30 @@ const lastWire = (world) =>
 
 // --- and so does the month rolling over -------------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.pause);
 
   // The 1st: the month-to-date total is a fresh month's.
   world.monthToDateTokens = 0;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(world.pause, null, "a budget pause does not outlive its month");
 }
 
 // --- clearing the ceiling lifts it too --------------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 900_000;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.pause);
 
   world.budget = null;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(world.pause, null, "no ceiling is not a ceiling of zero here either");
 }
 
@@ -2968,14 +3070,14 @@ const lastWire = (world) =>
   // the athlete pressing the button while over budget has been told the number
   // and pressed it anyway. A ceiling that also refused them would be a ceiling
   // on their own decisions rather than on unattended spend.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.pause);
 
-  const [run] = await runAutomationNow("a1", ["b1"], world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(run.status, "success");
   assert.equal(run.inputTokens, 120, "and it is counted like any other run");
 }
@@ -2985,29 +3087,33 @@ const lastWire = (world) =>
   // The total is a SUM over the whole run log and no ceiling is the default, so
   // reading it first would make every athlete who never set a budget pay for
   // that scan on every run — to discard the answer.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.monthToDateTokens = 50_000_000;
 
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.budgetReads >= 3, "fixture sanity: every run asked about the ceiling");
   assert.equal(world.spendReads, 0, "and none of them totalled up the run log");
 
   // With a ceiling set, the total is what decides, so of course it is read.
+  // The watermark is wound back first: the catch-up above consumed all three
+  // activities, and a second trigger with nothing owed would plan no runs and
+  // read nothing at all.
   world.budget = 500_000;
   world.monthToDateTokens = 0;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  world.analyses.get("a1").lastActivityAt = RUNNER_NOW_EPOCH - 12 * 86_400;
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.ok(world.spendReads > 0, "a ceiling that exists is compared against something");
 }
 
 // --- an unset budget never stops anything -----------------------------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.monthToDateTokens = 50_000_000;
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(runs.length, 3, "a number nobody chose must not pause anybody's coaches");
@@ -3026,14 +3132,14 @@ const lastWire = (world) =>
   // Reachable: a budget pause holds the gate, "Run now" bypasses the gate, and
   // the run then passes the COROS check. Clearing there took the banner down
   // and let one more unattended run through before guard rail 4b put it back.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
-  await runAutomationTrigger({ automationId: "a1", kind: "schedule" }, world.deps);
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.equal(world.pause.reason, "budget", "fixture sanity: paused on the ceiling");
 
-  const [manual] = await runAutomationNow("a1", ["b1"], world.deps);
+  const [manual] = await runAnalysisNow("a1", world.deps);
   assert.equal(manual.status, "success", "the athlete's own button still runs");
   assert.equal(
     world.pause?.reason,
@@ -3043,42 +3149,45 @@ const lastWire = (world) =>
 
   // The 2FA pause it is modelled on still lifts on the same path.
   world.pause = { reason: "two-factor-required", since: world.now.toISOString() };
-  await runAutomationNow("a1", ["b1"], world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.equal(world.pause, null, "which is the pause a COROS session *does* answer");
 }
 
 // --- Stop before the provider must not clear a backoff streak --------------
 {
   // The backoff is a claim about the provider. A run cancelled while it was
-  // still being prepared never asked the provider anything, so it cannot report
-  // one healthy — an athlete pressing Stop would otherwise reset the hold on a
-  // binding that is failing, and the storm starts again.
-  // Two places, because the window only opens for a run the token has something
-  // to be cancelled *by*: the first place produces the id Stop is pressed on,
-  // and the second is the one still getting itself ready when it lands.
-  resetAutomationQueueForTests();
+  // still being prepared never asked the provider anything, so it cannot
+  // report one healthy — an athlete pressing Stop would otherwise reset the
+  // hold on an analysis that is failing, and the storm starts again.
+  //
+  // Two steps, because the window only opens for a run the token has
+  // something to be cancelled *by*: the first produces the id Stop is pressed
+  // on, and the second is the one still getting itself ready when it lands.
+  // (Two conversations used to supply that; a catch-up supplies it now.)
+  resetAnalysisQueueForTests();
   let corosChecks = 0;
   const world = createWorld({
     ensureCorosSession: async () => {
       corosChecks += 1;
       if (corosChecks === 2) {
-        cancelAutomationRun(world.runs[0].id, world.deps);
+        cancelAnalysisRun(world.runs[0].id, world.deps);
       }
       return { ok: true };
     }
   });
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  addSession(world, "s1");
-  addSession(world, "s2");
-  addBinding(world, "b1", { sessionId: "s1" });
-  addBinding(world, "b2", {
-    sessionId: "s2",
+  addAnalysis(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    conditions: NO_LIMITS,
+    lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400,
     backoffLevel: 2,
     backoffUntil: new Date(world.now.getTime() - MINUTE).toISOString()
   });
+  addSession(world, "s1");
+  addActivity(world, "c1", 5);
+  addActivity(world, "c2", 4);
 
   const runs = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a cancelled run still has to return"
   );
@@ -3088,13 +3197,19 @@ const lastWire = (world) =>
     1,
     "fixture sanity: the second run never reached the provider"
   );
+  // The first step reached the provider and cleared the streak; the second
+  // was stopped before it asked anything, so it has nothing to say about the
+  // provider's health and must not re-clear or re-set it.
   assert.equal(
-    world.bindings.get("b2").backoffLevel,
-    2,
-    "so its streak survives — a Stop is not a provider reporting itself healthy"
+    world.analyses.get("a1").backoffLevel,
+    undefined,
+    "the step that did reach the provider cleared the streak"
   );
-  // And the one that *did* reach the provider cleared its own, as it should.
-  assert.equal(world.bindings.get("b1").backoffLevel, undefined);
+  assert.equal(
+    world.analyses.get("a1").backoffUntil,
+    undefined,
+    "and the cancelled one added no hold of its own"
+  );
 }
 
 Module._load = originalLoad;
@@ -3105,14 +3220,14 @@ Module._load = originalLoad;
   // pays for that with a provider turn of its own. Reading only the run's own
   // stream left that turn outside 13's month-to-date total, so the budget
   // under-reported by exactly the thing whose whole purpose is cost.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.rollUsage = { inputTokens: 4_000, outputTokens: 300 };
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(world.rolls.length, 1, "fixture sanity: the transcript needed a roll");
   assert.equal(run.status, "success");
   assert.equal(run.inputTokens, 4_000 + 120, "the roll is summed into the run's cost");
@@ -3122,15 +3237,15 @@ Module._load = originalLoad;
 // --- a roll that spent and then declined still spent ------------------------
 {
   // Best-effort means the run carries on, not that the tokens came back.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.rollResult = null;
   world.rollUsage = { inputTokens: 4_000, outputTokens: 12 };
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.summaryWrites, [], "fixture sanity: the roll produced nothing");
   assert.equal(run.inputTokens, 4_000 + 120, "and is still on the bill");
 }
@@ -3140,29 +3255,43 @@ Module._load = originalLoad;
   // The mid-preparation Stop of section 10. Nothing was asked of the provider,
   // but the roll on the way in already had its turn — and the exit that records
   // no cost at all is the one where the tokens vanish silently.
-  resetAutomationQueueForTests();
+  // Two steps of a catch-up. The roll happens *before* the run has a row, so
+  // Stop needs an id from somewhere — the first step supplies one, and the
+  // token that owns it is still live while the second is getting ready. (Two
+  // conversations used to supply that; a sequence supplies it now.)
+  //
+  // The stored summary is discarded so the second step rolls too: otherwise
+  // the first step's roll covers the transcript and the second has nothing
+  // left to fold in.
+  resetAnalysisQueueForTests();
   let rolls = 0;
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  addSession(world, "s1");
-  addSession(world, "s2", transcript(100));
-  addBinding(world, "b1", { sessionId: "s1" });
-  addBinding(world, "b2", { sessionId: "s2" });
+  addAnalysis(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    conditions: NO_LIMITS,
+    lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
+  });
+  addSession(world, "s1", transcript(100));
+  addActivity(world, "r1", 5);
+  addActivity(world, "r2", 4);
+  world.deps.setSessionSummary = () => undefined;
   world.rollUsage = { inputTokens: 4_000, outputTokens: 300 };
   world.deps.rollSummary = async () => {
     rolls += 1;
-    // Stop lands while this run is still getting itself ready: the roll has
-    // spent, and the run has a row but will never reach the model.
-    cancelAutomationRun(world.runs[0].id, world.deps);
+    // Stop lands while the second step is still getting itself ready: its
+    // roll has spent, and it will get a row and never reach the model.
+    if (rolls === 2) {
+      cancelAnalysisRun(world.runs[0].id, world.deps);
+    }
     return { summary: "Rolled summary.", usage: world.rollUsage };
   };
 
   const runs = await withDeadline(
-    runAutomationNow("a1", undefined, world.deps),
+    runAnalysisNow("a1", world.deps),
     2_000,
     "a cancelled run still has to return"
   );
-  assert.equal(rolls, 1, "fixture sanity: the second place rolled before it was stopped");
+  assert.equal(rolls, 2, "fixture sanity: the stopped step rolled first");
   assert.deepEqual(runs.map((run) => run.status), ["success", "cancelled"]);
   assert.equal(
     world.streamCalls.length,
@@ -3177,14 +3306,14 @@ Module._load = originalLoad;
 {
   // Adding a reported number to an unreported one must not invent the missing
   // half as zero: a total that is short of the truth has to say so (13).
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.usage = null;
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
+  const [run] = await runAnalysisNow("a1", world.deps);
   assert.equal(world.rolls.length, 1, "fixture sanity: it rolled");
   assert.equal(
     run.inputTokens,
@@ -3193,62 +3322,67 @@ Module._load = originalLoad;
   );
 }
 
-// --- the daily cap is one binding's business, not everybody's ---------------
+// --- the daily cap is one analysis's business, not everybody's -------------
 {
   // Guard rail 7 records the same `budget` code as 4b, and the runner used to
-  // raise the app-wide pause on either. So a coach that had already run its
-  // three times today held *every* automation the athlete has — and stopped the
-  // rest of its own fan-out on the way out.
-  resetAutomationQueueForTests();
-  const world = threePlaceWorld();
-  world.automations.get("a1").conditions = {
-    cooldownMin: 0,
-    maxRunsPerDay: 1
-  };
-  // b1 has had its one run for the day; b2 and b3 have not.
+  // raise the app-wide pause on either. So an analysis that had already run
+  // its three times today held *every* analysis the athlete has.
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 1 } });
+  addAnalysis(world, "a2", {
+    sessionId: "s2",
+    conditions: { cooldownMin: 0, maxRunsPerDay: 1 }
+  });
+  addSession(world, "s1");
+  addSession(world, "s2");
+  // a1 has had its one run for the day; a2 has not.
   world.runs.push({
     id: "earlier",
-    automationId: "a1",
-    bindingId: "b1",
+    analysisId: "a1",
     status: "success",
     triggerKind: "schedule",
     startedAt: world.now.toISOString()
   });
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [capped] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
-
-  assert.equal(runs[0].skipReason, "budget", "b1 has had its allowance");
+  assert.equal(capped.skipReason, "budget", "a1 has had its allowance");
   assert.match(
-    runs[0].error,
+    capped.error,
     /already run 1 times? here today/,
     "and the row says which of the two `budget` means"
   );
   assert.equal(
     world.pause,
     null,
-    "one binding's day is not one fact about every automation the athlete has"
+    "one analysis's day is not one fact about every analysis the athlete has"
   );
-  assert.deepEqual(
-    runs.map((run) => run.status),
-    ["skipped", "success", "success"],
-    "and the other places this trigger was going to reach still run"
+
+  const [other] = await runAnalysisTrigger(
+    { analysisId: "a2", kind: "schedule" },
+    world.deps
+  );
+  assert.equal(
+    other.status,
+    "success",
+    "and the next analysis is not held by the first one's cap"
   );
 }
 
 // --- the month's ceiling still does both ------------------------------------
 {
   // The half that *is* one fact about everything: it pauses, and the fan-out
-  // that hit it stops there rather than writing the same row per binding.
-  resetAutomationQueueForTests();
+  // that hit it stops there rather than writing the same row per attachment.
+  resetAnalysisQueueForTests();
   const world = threePlaceWorld();
   world.budget = 500_000;
   world.monthToDateTokens = 500_000;
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.deepEqual(runs.map((run) => run.skipReason), ["budget"], "one row explains it");
@@ -3263,16 +3397,15 @@ Module._load = originalLoad;
   // provider turn to decide on. Counting only `success` let five coaches
   // conclude "nothing new" into one conversation every hour, for ever, at full
   // price — the burst the guard exists to stop, minus the words.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   for (let index = 0; index < SESSION_BURST_PER_HOUR; index += 1) {
     world.runs.push({
       id: `silent-${index}`,
-      automationId: "a1",
-      bindingId: "b1",
+      analysisId: "a1",
       sessionId: "s1",
       status: "silent",
       triggerKind: "schedule",
@@ -3280,8 +3413,8 @@ Module._load = originalLoad;
     });
   }
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "schedule" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "schedule" },
     world.deps
   );
   assert.equal(run.skipReason, "burst", "five traces in an hour is a full conversation");
@@ -3301,18 +3434,18 @@ Module._load = originalLoad;
   // saying `running` until the next launch reconciled it, and wrote a second
   // row as `failed` from the fan-out's handler. Three wrong facts from one
   // throw, and the activity was gone for good.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   const activity = addActivity(world, "act-1", 1);
   world.deps.saveSession = () => {
     throw new Error("the conversation went away under it");
   };
 
-  const runs = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const runs = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
 
@@ -3325,7 +3458,7 @@ Module._load = originalLoad;
     "and nothing is left saying `running` for the next launch to reconcile"
   );
   assert.notEqual(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     activity.start_time,
     "the activity was never written, so it is still owed"
   );
@@ -3333,14 +3466,14 @@ Module._load = originalLoad;
   world.deps.saveSession = (sessionId, entries) => {
     world.sessions.get(sessionId).entries = entries;
   };
-  world.bindings.get("b1").backoffUntil = undefined;
-  world.bindings.get("b1").backoffLevel = undefined;
-  const [retry] = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  world.analyses.get("a1").backoffUntil = undefined;
+  world.analyses.get("a1").backoffLevel = undefined;
+  const [retry] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(retry.status, "success");
-  assert.equal(world.bindings.get("b1").lastActivityAt, activity.start_time);
+  assert.equal(world.analyses.get("a1").lastActivityAt, activity.start_time);
 }
 
 // --- a run that reached the model and then failed to land still backs off ---
@@ -3348,64 +3481,68 @@ Module._load = originalLoad;
   // It asked the provider, so the streak is a claim it is entitled to make —
   // and without it an activity trigger would re-offer the same activity on
   // every 15-minute poll into a store that keeps refusing it.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.deps.saveSession = () => {
     throw new Error("nope");
   };
 
-  await runAutomationNow("a1", undefined, world.deps);
-  assert.equal(world.bindings.get("b1").backoffLevel, 1, "the first step of the backoff");
+  await runAnalysisNow("a1", world.deps);
+  assert.equal(world.analyses.get("a1").backoffLevel, 1, "the first step of the backoff");
 }
 
 // --- a silent run that cannot land its trace is the same story -------------
 {
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "act-1", 1);
   world.outcome = { text: NOTHING_TO_REPORT };
   world.deps.saveSession = () => {
     throw new Error("no trace either");
   };
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(run.status, "failed", "a trace that never landed is not a silent run");
   assert.equal(
-    world.bindings.get("b1").lastActivityAt,
+    world.analyses.get("a1").lastActivityAt,
     RUNNER_NOW_EPOCH - 8 * 86_400,
     "and the activity is still owed"
   );
 }
 
-// --- a binding detached mid-run leaves its clocks nowhere to be written ----
+// --- an analysis deleted mid-run leaves its clocks nowhere to be written ---
 {
-  // Detach deletes the row (2.4). The run in flight holds the old copy, so
+  // Deleting removes the row (2.4). The run in flight holds the old copy, so
   // every clock write it makes afterwards has no row to land on. It must not
   // throw its way out — the answer is already in the conversation, and a run
-  // that wrote its answer and then crashed on bookkeeping is the worst of both.
-  resetAutomationQueueForTests();
+  // that wrote its answer and then crashed on bookkeeping is the worst of
+  // both.
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addAnalysis(world, "a1", {
+    trigger: ACTIVITY_TRIGGER,
+    conditions: NO_LIMITS,
+    lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400
+  });
   addSession(world, "s1");
-  addBinding(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
   addActivity(world, "act-1", 1);
   const original = world.deps.streamChat;
   world.deps.streamChat = async (...args) => {
-    world.bindings.delete("b1");
+    world.analyses.delete("a1");
     return original(...args);
   };
 
-  const [run] = await runAutomationTrigger(
-    { automationId: "a1", kind: "activity" },
+  const [run] = await runAnalysisTrigger(
+    { analysisId: "a1", kind: "activity" },
     world.deps
   );
   assert.equal(run.status, "success", "the answer still lands where it was told to");
@@ -3419,22 +3556,22 @@ Module._load = originalLoad;
 
 // --- the roll runs on the coach the athlete chose --------------------------
 {
-  // A roll is a provider turn taken on this automation's behalf: its cost lands
+  // A roll is a provider turn taken on this analysis's behalf: its cost lands
   // on this run's row (13), and guard rail 3 pre-flighted *this* provider and
   // no other. It used to go out with no runtime at all, so it silently spent on
-  // whatever the interactive chat happened to be set to — an automation pointed
+  // whatever the interactive chat happened to be set to — an analysis pointed
   // at a second provider had its summariser billed to the first, on a provider
   // nothing had checked was even usable.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", {
+  addAnalysis(world, "a1", {
     conditions: NO_LIMITS,
     runtime: { provider: "claude-api", model: "claude-opus-5", effort: "high" }
   });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.equal(world.rolls.length, 1, "fixture sanity: it rolled");
   assert.equal(world.rolls[0].runtime.provider, "claude-api");
   assert.equal(world.rolls[0].runtime.model, "claude-opus-5");
@@ -3483,11 +3620,11 @@ Module._load = originalLoad;
   // is computed against the snapshot the run read, and committed minutes later
   // against a longer transcript — which is safe only because every other writer
   // appends: the entries the summary covers are the same entries they were.
-  resetAutomationQueueForTests();
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
   addSession(world, "s1", transcript(100));
-  addBinding(world, "b1");
+  addAttachment(world, "b1");
   world.deps.rollSummary = async (previous, entries) => {
     world.rolls.push({ previous, count: entries.length });
     // The athlete says something while the summariser is thinking.
@@ -3498,7 +3635,7 @@ Module._load = originalLoad;
     return { summary: "Rolled summary." };
   };
 
-  await runAutomationNow("a1", undefined, world.deps);
+  await runAnalysisNow("a1", world.deps);
   assert.deepEqual(world.summaryWrites, [
     { sessionId: "s1", summary: "Rolled summary.", through: 80 }
   ]);
@@ -3520,53 +3657,30 @@ Module._load = originalLoad;
   );
 }
 
-// --- a rebuilt conversation starts with no summary -------------------------
+// --- a conversation that is gone takes its summary out of play -------------
 {
-  // 2.4: a `dedicated` binding whose conversation the athlete deleted builds a
-  // new one. The summary lived on the deleted row and went with it, so the new
-  // conversation must not inherit a count describing a transcript that no
-  // longer exists — 5.7 calls that the one failure nobody can notice by reading
-  // the answer.
-  resetAutomationQueueForTests();
+  // 5.7's stored summary lives on the `chat_sessions` row, so a deleted
+  // conversation takes it with it. Nothing rebuilds a conversation any more —
+  // the attachment is switched off instead — so what this now pins is the
+  // other half of the same rule: a run that cannot resolve its target must not
+  // reach for a transcript, a summary or a roll on its way to the skip.
+  resetAnalysisQueueForTests();
   const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  addBinding(world, "b1", { mode: "dedicated", sessionId: "s-gone" });
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addAttachment(world, "b1", { sessionId: "s-gone" });
   world.summaries.set("s-gone", { summary: "Stale.", through: 80 });
 
-  const [run] = await runAutomationNow("a1", undefined, world.deps);
-  assert.equal(run.status, "success");
-  assert.notEqual(run.sessionId, "s-gone", "it rebuilt rather than wrote nowhere");
-  assert.deepEqual(world.rolls, [], "an empty conversation has nothing to trim");
-  assert.equal(
-    world.summaries.get(run.sessionId),
-    undefined,
-    "and no summary followed it across"
-  );
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "skipped");
+  assert.equal(run.skipReason, "missing-session");
+  assert.deepEqual(world.rolls, [], "a skipped run rolls nothing");
+  assert.deepEqual(world.summaryWrites, [], "and writes no summary");
+  assert.equal(world.streamCalls.length, 0, "and reaches no provider");
   assert.deepEqual(
-    lastWire(world).map((message) => message.role),
-    ["user"],
-    "so the model gets the playbook and nothing standing in for a lost thread"
+    world.summaries.get("s-gone"),
+    { summary: "Stale.", through: 80 },
+    "the orphaned summary is left exactly where it was, not tidied up here"
   );
 }
 
-// --- a per-run binding never trims, however many runs it has made ----------
-{
-  // Each run gets its own conversation, so the count that says "nothing to
-  // trim" is the same count, every time — no special case needed (5.7).
-  resetAutomationQueueForTests();
-  const world = createWorld();
-  addAutomation(world, "a1", { conditions: NO_LIMITS });
-  addBinding(world, "b1", {
-    mode: "per-run",
-    sessionId: null,
-    titleTemplate: "{{rule.name}} · {{date}}"
-  });
-
-  await runAutomationNow("a1", undefined, world.deps);
-  await runAutomationNow("a1", undefined, world.deps);
-  assert.equal(world.sessions.size, 2, "one conversation per run");
-  assert.deepEqual(world.rolls, []);
-  assert.deepEqual(world.summaryWrites, []);
-}
-
-console.log("coach automation runner tests passed");
+console.log("coach analysis runner tests passed");

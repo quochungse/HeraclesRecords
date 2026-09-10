@@ -393,7 +393,7 @@ saveChatSession(
 assert.equal(listChatSessions("openrouter", db).length, 1);
 assert.equal(listChatSessions("chatgpt", db).length, 2);
 
-// --- setChatSessionTitle (coach automations name their own conversations) ---
+// --- setChatSessionTitle (coach analyses name their own conversations) ---
 const named = createChatSession("local", db);
 const renamed = setChatSessionTitle(named.id, "  Morning briefing  ", db);
 assert.equal(renamed.title, "Morning briefing");
@@ -417,7 +417,7 @@ assert.equal(setChatSessionTitle("missing", "Nope", db), null);
 
 // A renamed conversation keeps its name: saveChatSession only derives a title
 // while the stored one is still the default, which is exactly what stops an
-// automation's conversation being named after its own playbook text.
+// analysis's conversation being named after its own playbook text.
 setChatSessionTitle(named.id, "Daily briefing", db);
 const afterPlaybook = saveChatSession(
   named.id,
@@ -427,7 +427,7 @@ const afterPlaybook = saveChatSession(
 assert.equal(afterPlaybook.title, "Daily briefing");
 deleteChatSession(named.id, db);
 
-// --- automation attribution survives a round-trip (section 5.6) ------------
+// --- analysis attribution survives a round-trip (section 5.6) ------------
 // parseMessageEntry rebuilds entries field by field, so an unlisted field is
 // silently dropped on reload. These assertions are the guard on that.
 const marker = {
@@ -468,7 +468,7 @@ assert.deepEqual(reloaded[0].automation, marker, "the user turn keeps its marker
 assert.deepEqual(reloaded[1].automation, marker, "the assistant turn keeps its marker");
 assert.equal(reloaded[1].reasoningSummary, "checked yesterday's load");
 assert.equal(
-  "automation" in reloaded[2],
+  "analysis" in reloaded[2],
   false,
   "an interactive turn gains no marker"
 );
@@ -490,15 +490,15 @@ const partialCases = [
   null,
   []
 ];
-for (const automation of partialCases) {
+for (const analysis of partialCases) {
   const parsed = parseChatTranscriptJson(
-    JSON.stringify([{ kind: "message", role: "assistant", content: "hi", automation }])
+    JSON.stringify([{ kind: "message", role: "assistant", content: "hi", analysis }])
   );
-  assert.equal(parsed.length, 1, `message dropped for ${JSON.stringify(automation)}`);
+  assert.equal(parsed.length, 1, `message dropped for ${JSON.stringify(analysis)}`);
   assert.equal(
     parsed[0].automation,
     undefined,
-    `partial marker kept for ${JSON.stringify(automation)}`
+    `partial marker kept for ${JSON.stringify(analysis)}`
   );
 }
 
@@ -549,7 +549,7 @@ deleteChatSession(traced.id, db);
 // rather than half-rendered, and the turns around it are untouched.
 const brokenTraces = [
   { kind: "automationSilent", at: lookedAt },
-  { kind: "automationSilent", automation: { ...marker, name: "" }, at: lookedAt },
+  { kind: "automationSilent", analysis: { ...marker, name: "" }, at: lookedAt },
   { kind: "automationSilent", automation: marker },
   { kind: "automationSilent", automation: marker, at: "06:12" },
   { kind: "automationSilent", automation: marker, at: Number.NaN }
@@ -763,7 +763,7 @@ assert.deepEqual(
 
 // --- the option survives the whole IPC chain -------------------------------
 // A store that can merge but is never asked to is no better than one that
-// cannot. The renderer's end is asserted in test-coach-automation-runner.mjs;
+// cannot. The renderer's end is asserted in test-coach-analysis-runner.mjs;
 // these are the three links between it and this function, none of which
 // TypeScript would notice going missing — a dropped argument is still a valid
 // call to every signature involved.
@@ -840,5 +840,45 @@ assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
   { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
 ]);
 assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
+
+// Removing a creation is a mark on the draft that survives a round trip, and
+// a save that keeps the array's length so `foreignTail` has no tail to put
+// back. Both halves matter: `parsePlanDraft` rebuilds the draft field by
+// field, so an unlisted key is dropped, and a save that *shortened* the array
+// would have the guard restore the entry it just removed.
+{
+  const removedDb = createMemoryDatabase();
+  const session = createChatSession("claude-code", removedDb);
+  const keptMessage = { kind: "message", role: "user", content: "Plan my week" };
+  const creation = structuredClone(oneOffWorkoutEntry);
+  saveChatSession(session.id, [keptMessage, creation], removedDb, {
+    knownEntryCount: 0
+  });
+
+  const removed = structuredClone(creation);
+  removed.draft.removedAt = 1758000000000;
+  saveChatSession(session.id, [keptMessage, removed], removedDb, {
+    knownEntryCount: 2
+  });
+
+  const stored = parseChatTranscriptJson(
+    removedDb.getSession(session.id).messages_json
+  );
+  assert.equal(stored.length, 2);
+  assert.equal(stored[1].draft.removedAt, 1758000000000);
+  // The removed creation stops speaking for the conversation in the sidebar.
+  assert.equal(
+    listChatSessions("claude-code", removedDb)[0].preview,
+    "Plan my week"
+  );
+
+  // And a draft that was never removed keeps saying nothing about it, rather
+  // than gaining a null field that a `deepEqual` elsewhere would trip on.
+  assert.equal(
+    parseChatTranscriptJson(JSON.stringify([oneOffWorkoutEntry]))[0].draft
+      .removedAt,
+    undefined
+  );
+}
 
 console.log("chat history store tests passed");

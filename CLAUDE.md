@@ -162,7 +162,7 @@ directions — a handler nothing invokes fails just as loudly as an invoke with 
 
 **Adding or renaming an IPC channel means editing all three files, then running
 `npm run test:ipc-surface`.** Channels are namespaced `domain:verb` (`chat:`, `maps:`,
-`trainingHub:`, `watchfaces:`, `coachAutomation:`, `trainingLibrary:`, …).
+`trainingHub:`, `watchfaces:`, `analysis:`, `trainingLibrary:`, …).
 
 ### Data
 
@@ -249,12 +249,64 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   `openRouterProvider`, `localChatProvider`) — streaming chat with COROS-data tools
   (`chatActivityTools`, `chatAnalyticsTools`, `chatWorkoutTools`, `chatInteractionTools`)
   and MCP servers.
-- **Coach Automations** (`coachAutomationService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
-  headless scheduled coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs
-  are **read-only**: the tool allowlist excludes every write tool, and drafts land as approval
-  cards. Heavily documented — [docs/coach-automations.md](docs/coach-automations.md) is the
-  entry point, with eight companion files covering refusals, lifecycle, persistence, and
-  test integrity.
+- **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
+  headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
+  **read-only**: the tool allowlist excludes every write tool, and drafts land as approval
+  cards. [docs/coach-analysis.md](docs/coach-analysis.md) is the entry point;
+  [docs/coach-automations.md](docs/coach-automations.md) and its eight companions are the
+  **pre-refactor** record — accurate about the run pipeline, the guard rails and the cost
+  model, wrong about the data model, and each says so in a banner.
+
+  **One analysis lives in exactly one conversation, and that is the whole model.** A
+  `CoachAnalysis` is a role, a playbook, a runtime, a `sessionId` it cannot change, and —
+  optionally — the trigger that makes it fire on its own. It is created *from* a
+  conversation ("Create Auto Analysis"), opened from a **⋯** on its row, and deleted with
+  the conversation. There is no definition/attachment split, no attach step and no screen
+  listing every analysis — a list spanning conversations would be a list of unrelated
+  things. Two earlier shapes existed; both are gone, and reintroducing either has to be a
+  decision rather than a merge (`test:ipc-surface` fails on a channel or bridge method
+  spelling `Attach`).
+
+  Four things to know before touching this:
+
+  **Nothing in the feature creates a chat session.** The runner's `createTargetSession`
+  and `setBindingSession` were deleted, not disabled. An analysis names a conversation the
+  athlete opened; deleting it removes the analyses inside it
+  (`applyAnalysisSessionDeleted`). Reaching the runner with the conversation gone means
+  the two got out of step, and the analysis is switched off rather than removed — a delete
+  on what may be a race has no way back.
+
+  **"This device only" is a separate table, and it had to be.** `syncPolicy` classifies
+  whole tables, the oplog carries whole rows (`SELECT *`) and a merge is `INSERT OR
+  REPLACE` — so a column withheld from a payload arrives on the other machine as NULL,
+  meaning *deleted*, not *unchanged*. A private trigger therefore lives in
+  `coach_analysis_local_triggers` (`device` tier); the analysis still travels and reads as
+  manual over there. Turning the flag on must clear the row's `trigger_json` and turning
+  it off must delete the local row, or one copy silently shadows or outlives the other.
+  `readTrigger`/`writeAnalysis` in the store are the only places that know which side a
+  trigger is on.
+
+  **The old tables are dropped, not migrated.** `dropLegacyAutomationTables` removes
+  `coach_automations`, `coach_automation_bindings`, `coach_automation_local_triggers` and
+  `coach_automation_runs` with their rows. There is no honest mapping: an automation
+  attached nowhere has no conversation to become an analysis in, and one attached three
+  times would become three the athlete never wrote. **Conversations are untouched** —
+  including every answer an automation wrote into one, which is a `chat_sessions`
+  transcript entry and keeps its chip. `npm run test:analysis-legacy-drop` drives that
+  against a hand-written old-shape database, and is **its own file** because
+  `initializeDatabase` returns the process's existing database: a drop test sharing a
+  process with another database test silently tests nothing.
+
+  **Two stored spellings are pre-rename on purpose.** The `app_settings` keys
+  `coachAutomation.pause` / `coachAutomation.monthlyTokenBudget` (already in other
+  machines' vaults under those names), and the `automation` / `automationId` keys inside a
+  stored chat entry — every transcript an athlete has spells them that way, and renaming
+  either costs historical runs their attribution.
+
+  The pause and the monthly budget live in **Settings → Analyses**
+  (`ChatSettingsPanel`): they are feature-wide and the screen that used to host them is
+  gone, so without a home a paused world would have no Resume button.
+
 - **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.
@@ -368,7 +420,8 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     the previous account's records in place. Closing that means giving every row an owner.
   - **A device only ever writes inside its own `oplog/<deviceId>/` directory**, which is why
     the storage layer needs no locking. Exclusivity is needed for two things only, and each
-    takes a `Lease`: running a scheduled automation (`automationLease`) and compacting the
+    takes a `Lease`: running a scheduled analysis (`electron/sync/automationLease.ts`,
+    named before the rename) and compacting the
     log (`syncLoop.compactIfDue`).
   - **A pull tells the renderer which tables it wrote, and a view re-reads its own.**
     `sync:changed` used to carry two counts, which say something arrived but not what — so a
@@ -417,7 +470,7 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
 ### Testability convention in the main process
 
 Long-running main-process components take an injected `Deps` interface with a
-`createDefaultDeps()` fallback (`coachAutomationService`, `coachAutomationScheduler`,
+`createDefaultDeps()` fallback (`coachAnalysisService`, `coachAnalysisScheduler`,
 `coachActivityWatcher`). Suites inject fakes. The consequence, stated explicitly in the coach
 docs: **`createDefaultDeps` is code no suite can reach** — wiring a new dep there is untested
 by construction. Wire it where a test can see it.

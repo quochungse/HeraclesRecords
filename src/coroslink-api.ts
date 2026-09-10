@@ -17,7 +17,7 @@ import type {
   ActivityBackupProgress,
   BinaryStatus,
   CachedCorosMapPackage,
-  CoachAutomationSessionAttention,
+  CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
   CorosMapDownloadJob,
@@ -116,19 +116,16 @@ import type {
   ChatMessage,
   ChatProvider,
   ChatSessionSummary,
-  CoachAutomation,
-  CoachAutomationAttachResult,
-  CoachAutomationBinding,
-  CoachAutomationBindingInput,
-  CoachAutomationBindingView,
-  CoachAutomationDetail,
-  CoachAutomationInput,
-  CoachAutomationRun,
-  CoachAutomationPause,
-  CoachAutomationSpend,
-  CoachAutomationRunQuery,
-  CoachAutomationSummary,
-  CoachAutomationUpdate,
+  CoachAnalysis,
+  CoachAnalysisCreateResult,
+  CoachAnalysisInput,
+  CoachAnalysisPatch,
+  CoachAnalysisRun,
+  CoachAnalysisPause,
+  CoachAnalysisSpend,
+  CoachAnalysisRunQuery,
+  CoachAnalysisSummary,
+  CoachAnalysisUpdate,
   ChatSettings,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
@@ -714,72 +711,50 @@ export interface CorosLinkApi {
     sessionId: string,
     title: string
   ) => Promise<ChatSessionSummary | null>;
-  listCoachAutomations: () => Promise<CoachAutomationSummary[]>;
-  getCoachAutomation: (
-    automationId: string
-  ) => Promise<CoachAutomationDetail | null>;
-  saveCoachAutomation: (
-    input: CoachAutomationInput,
-    automationId?: string
-  ) => Promise<CoachAutomation | null>;
-  setCoachAutomationEnabled: (
-    automationId: string,
-    enabled: boolean
-  ) => Promise<CoachAutomation | null>;
-  deleteCoachAutomation: (automationId: string) => Promise<void>;
-  listCoachAutomationBindings: (
-    automationId: string
-  ) => Promise<CoachAutomationBindingView[]>;
-  attachCoachAutomation: (
-    input: CoachAutomationBindingInput
-  ) => Promise<CoachAutomationAttachResult>;
-  detachCoachAutomation: (bindingId: string) => Promise<void>;
-  setCoachAutomationBindingEnabled: (
-    bindingId: string,
-    enabled: boolean
-  ) => Promise<CoachAutomationBinding | null>;
-  reorderCoachAutomationBindings: (
-    sessionId: string,
-    bindingIds: string[]
-  ) => Promise<CoachAutomationBinding[]>;
-  listCoachAutomationsForSession: (
+  listCoachAnalysesForSession: (
     sessionId: string
-  ) => Promise<CoachAutomationBindingView[]>;
-  runCoachAutomationNow: (
-    automationId: string,
-    bindingIds?: string[]
-  ) => Promise<CoachAutomationRun[]>;
-  listCoachAutomationRuns: (
-    filter?: CoachAutomationRunQuery
-  ) => Promise<CoachAutomationRun[]>;
-  cancelCoachAutomationRun: (runId: string) => Promise<void>;
-  getCoachAutomationPause: () => Promise<CoachAutomationPause | null>;
-  resumeCoachAutomations: () => Promise<CoachAutomationPause | null>;
-  getCoachAutomationSpend: () => Promise<CoachAutomationSpend>;
-  setCoachAutomationBudget: (budget: number | null) => Promise<CoachAutomationSpend>;
-  markCoachAutomationRunsSeen: (runIds: string[]) => Promise<number>;
-  listCoachAutomationSessionAttention: () => Promise<
-    CoachAutomationSessionAttention[]
+  ) => Promise<CoachAnalysisSummary[]>;
+  getCoachAnalysis: (analysisId: string) => Promise<CoachAnalysis | null>;
+  createCoachAnalysis: (
+    input: CoachAnalysisInput
+  ) => Promise<CoachAnalysisCreateResult>;
+  updateCoachAnalysis: (
+    analysisId: string,
+    patch: CoachAnalysisPatch
+  ) => Promise<CoachAnalysis | null>;
+  setCoachAnalysisEnabled: (
+    analysisId: string,
+    enabled: boolean
+  ) => Promise<CoachAnalysis | null>;
+  deleteCoachAnalysis: (analysisId: string) => Promise<void>;
+  reorderCoachAnalyses: (
+    sessionId: string,
+    analysisIds: string[]
+  ) => Promise<CoachAnalysis[]>;
+  runCoachAnalysisNow: (analysisId: string) => Promise<CoachAnalysisRun[]>;
+  listCoachAnalysisRuns: (
+    filter?: CoachAnalysisRunQuery
+  ) => Promise<CoachAnalysisRun[]>;
+  cancelCoachAnalysisRun: (runId: string) => Promise<void>;
+  getCoachAnalysisPause: () => Promise<CoachAnalysisPause | null>;
+  resumeCoachAnalyses: () => Promise<CoachAnalysisPause | null>;
+  getCoachAnalysisSpend: () => Promise<CoachAnalysisSpend>;
+  setCoachAnalysisBudget: (
+    budget: number | null
+  ) => Promise<CoachAnalysisSpend>;
+  markCoachAnalysisRunsSeen: (runIds: string[]) => Promise<number>;
+  listCoachAnalysisSessionAttention: () => Promise<
+    CoachAnalysisSessionAttention[]
   >;
-  markCoachAutomationSessionSeen: (sessionId: string) => Promise<number>;
-  /** A binding whose rendered state changed with no run to carry the news. */
-  onCoachAutomationBindingUpdate: (
-    callback: (binding: CoachAutomationBinding) => void
+  markCoachAnalysisSessionSeen: (sessionId: string) => Promise<number>;
+  onCoachAnalysisRunUpdate: (
+    callback: (run: CoachAnalysisRun) => void
   ) => () => void;
-  onCoachAutomationRunUpdate: (
-    callback: (run: CoachAutomationRun) => void
+  onCoachAnalysisUpdate: (
+    callback: (update: CoachAnalysisUpdate) => void
   ) => () => void;
-  /**
-   * A definition that changed anywhere: the name on a chip, the trigger under
-   * it, the master switch — or the whole coach being deleted. Every surface
-   * that renders a coach follows this, so an edit reaches the places the coach
-   * is already attached without the athlete detaching and re-attaching it.
-   */
-  onCoachAutomationUpdate: (
-    callback: (update: CoachAutomationUpdate) => void
-  ) => () => void;
-  onCoachAutomationPauseUpdate: (
-    callback: (pause: CoachAutomationPause | null) => void
+  onCoachAnalysisPauseUpdate: (
+    callback: (pause: CoachAnalysisPause | null) => void
   ) => () => void;
   onChatStreamStart: (callback: (payload: ChatStreamStart) => void) => () => void;
   onChatStreamToken: (callback: (payload: ChatStreamToken) => void) => () => void;

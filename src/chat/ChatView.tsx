@@ -27,6 +27,8 @@ import {
   LogOut,
   MessageCircle,
   Network,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RefreshCw,
   Send,
@@ -65,16 +67,15 @@ import type {
   ChatProvider,
   ChatSessionSummary,
   ChatSettings,
-  ChatEntryAutomationMarker,
+  ChatEntryAnalysisMarker,
   ClaudeCodeStatus,
-  CoachAutomationRun,
-  CoachAutomationSessionAttention,
+  CoachAnalysisRun,
+  CoachAnalysisSessionAttention,
   CoachInputChoice,
   CoachInputPrompt,
   LocalChatConnectionTest,
   LocalChatDiscovery,
   OpenRouterConnectionTest,
-  CorosMcpStatus,
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
@@ -99,8 +100,10 @@ import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
-import { ConversationCoaches } from "./automations/ConversationCoaches";
-import { CoachAutomationsModal } from "./automations/CoachAutomationsModal";
+import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
+import { AnalysesModal } from "./analyses/AnalysesModal";
+import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
+import { CoachCreationModal } from "./CoachCreationModal";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -162,22 +165,6 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   customInstructions: "",
   compactContext: DEFAULT_COMPACT_CONTEXT
 };
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window === "undefined" ? false : window.matchMedia(query).matches
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const handleChange = () => setMatches(media.matches);
-    handleChange();
-    media.addEventListener("change", handleChange);
-    return () => media.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
-}
 
 const CHAT_MARKDOWN_REMARK_PLUGINS = [remarkGfm];
 const CHAT_MARKDOWN_COMPONENTS: Components = {
@@ -287,12 +274,12 @@ function CoachInputCard({
 }
 
 /**
- * An automation run streaming into the conversation that is open. Deliberately
+ * An analysis run streaming into the conversation that is open. Deliberately
  * separate from the athlete's own streaming state: theirs is persisted as their
  * turn when it ends, while a run's text is already being written to disk by the
  * main process, and merging the two would save it twice.
  */
-interface LiveAutomationRun {
+interface LiveAnalysisRun {
   runId: string;
   name: string;
   text: string;
@@ -1794,8 +1781,10 @@ export function ChatView({
   const [checkingClaude, setCheckingClaude] = useState(false);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [automationsOpen, setAutomationsOpen] = useState(false);
-  const [automationsVersion, setAutomationsVersion] = useState(0);
+  /** Which analysis screen the modal is showing, if any. */
+  const [analysisTarget, setAnalysisTarget] =
+    useState<AnalysesModalTarget | null>(null);
+  const [analysesVersion, setAnalysesVersion] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState<ChatEntry[]>([]);
   /**
@@ -1812,7 +1801,7 @@ export function ChatView({
    * something the athlete has not read. Keyed by session id.
    */
   const [sessionAttention, setSessionAttention] = useState<
-    Map<string, CoachAutomationSessionAttention>
+    Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
   /** A summariser turn is running ahead of the athlete's own. */
@@ -1839,16 +1828,20 @@ export function ChatView({
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [exportingLatestActivity, setExportingLatestActivity] = useState(false);
   const [currentSource, setCurrentSource] = useState<SourceInfo | null>(null);
-  const [mcpStatus, setMcpStatus] = useState<CorosMcpStatus | null>(null);
-  const [mcpStatuses, setMcpStatuses] = useState<McpServerStatus[]>([]);
   const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
   const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
-  const [mcpBusy, setMcpBusy] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [selectedPlanDraftId, setSelectedPlanDraftId] = useState<
     string | null
   >(null);
-  const [planPanelExpanded, setPlanPanelExpanded] = useState(false);
+  /**
+   * The Creations panel starts closed and opens itself when the coach makes
+   * something new — the one moment there is news in it. Every other time it is
+   * a column of titles taken out of the conversation's width, so the athlete
+   * opens it when they want it.
+   */
+  const [planPanelOpen, setPlanPanelOpen] = useState(false);
+  /** The creation the popup is showing. null is closed. */
+  const [openCreationId, setOpenCreationId] = useState<string | null>(null);
   const [highlightedChatEntryIndex, setHighlightedChatEntryIndex] = useState<
     number | null
   >(null);
@@ -1862,17 +1855,17 @@ export function ChatView({
   const [deletedWorkouts, setDeletedWorkouts] = useState<
     Record<string, DeleteWorkoutResult>
   >({});
-  // An automation run writing into the conversation that is open right now.
-  const [liveAutomation, setLiveAutomation] = useState<LiveAutomationRun | null>(
+  // An analysis run writing into the conversation that is open right now.
+  const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
   );
   // House rule 1 asks a run with nothing to say to answer with the marker and
   // nothing else, so a run heading for silence has no other text in flight.
   // What has arrived is held back while it could still be that marker: it is a
   // control token, and the athlete watching the bubble must never read it.
-  const liveAutomationText =
-    liveAutomation && !NOTHING_TO_REPORT.startsWith(liveAutomation.text.trim())
-      ? liveAutomation.text
+  const liveAnalysisText =
+    liveAnalysis && !NOTHING_TO_REPORT.startsWith(liveAnalysis.text.trim())
+      ? liveAnalysis.text
       : "";
 
   // Ref so the push-event handlers filter on the current request without
@@ -1898,8 +1891,8 @@ export function ChatView({
   // request can restore the question instead of silently losing it.
   const resumedCoachPromptRef = useRef<CoachInputPrompt | null>(null);
   // Same reason as activeRequestIdRef: the push handlers have to recognise the
-  // automation's stream without re-subscribing.
-  const liveAutomationRef = useRef<LiveAutomationRun | null>(null);
+  // analysis's stream without re-subscribing.
+  const liveAnalysisRef = useRef<LiveAnalysisRun | null>(null);
   // Whether the Coach panel is the view on screen. The panel stays mounted once
   // it has been opened, so "the conversation is open" is not the same question
   // as "the athlete can see it" -- and only the second one means read.
@@ -1907,8 +1900,10 @@ export function ChatView({
   const autoDetectLocalRef = useRef(false);
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const mcpRef = useRef<HTMLDivElement>(null);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Which conversation `seenPlanDraftIdsRef` is describing. */
+  const planPanelSessionRef = useRef<string | null>(null);
+  const seenPlanDraftIdsRef = useRef<Set<string>>(new Set());
   const chatHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -1990,7 +1985,7 @@ export function ChatView({
   const refreshSessionAttention = useCallback(async () => {
     if (!api) return;
     try {
-      const rows = await api.listCoachAutomationSessionAttention();
+      const rows = await api.listCoachAnalysisSessionAttention();
       setSessionAttention(new Map(rows.map((row) => [row.sessionId, row])));
     } catch {
       // A conversation list without its marks is still a conversation list.
@@ -2006,7 +2001,7 @@ export function ChatView({
     async (sessionId: string) => {
       if (!api) return;
       try {
-        if ((await api.markCoachAutomationSessionSeen(sessionId)) > 0) {
+        if ((await api.markCoachAnalysisSessionSeen(sessionId)) > 0) {
           await refreshSessionAttention();
         }
       } catch {
@@ -2035,7 +2030,7 @@ export function ChatView({
   };
 
   /**
-   * Re-reads the open conversation from disk. An automation run persists in the
+   * Re-reads the open conversation from disk. An analysis run persists in the
    * main process, behind this window's back, so the transcript on screen is the
    * only copy that does not know about it — and the next thing the athlete
    * types would save that stale copy straight over the coach's answer.
@@ -2080,8 +2075,8 @@ export function ChatView({
       return;
     }
     onError(null);
-    setAutomationsOpen(false);
-    setAutomationsVersion((value) => value + 1);
+    setAnalysisTarget(null);
+    setAnalysesVersion((value) => value + 1);
     await loadSession(sessionId);
   };
 
@@ -2119,27 +2114,25 @@ export function ChatView({
   // so the list re-reads on the same version counter the header chips use.
   useEffect(() => {
     void refreshSessionAttention();
-  }, [refreshSessionAttention, automationsVersion]);
+  }, [refreshSessionAttention, analysesVersion]);
 
   /**
-   * The ⚡ mark is "a live coach speaks here", and a coach's master switch is
-   * half of what makes it live — `listCoachAutomationSessionAttention` skips
-   * every binding of a disabled automation. Switching a coach off therefore
-   * moves the mark on conversations this window never touched, with no binding
-   * and no run to say so.
+   * The ⚡ mark is "an analysis speaks here", and its switch is what makes it
+   * live — `listCoachAnalysisSessionAttention` skips a disabled one. Switching
+   * one off therefore moves the mark on a conversation this window may not
+   * even have open, with no run to say so.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationUpdate) return;
-    return api.onCoachAutomationUpdate(() => {
+    if (!api?.onCoachAnalysisUpdate) return;
+    return api.onCoachAnalysisUpdate(() => {
       void refreshSessionAttention();
     });
   }, [api, refreshSessionAttention]);
 
   /**
-   * A run reaches into the conversation list from outside this window. A
-   * `per-run` binding brings a conversation into existence every time it fires
-   * (2.2), a `dedicated` one rebuilds its own when it has been deleted, and
-   * every run bumps whatever it wrote into to the top (9.3).
+   * A run reaches into the conversation list from outside this window: every
+   * run bumps whatever it wrote into to the top (9.3), and the conversation it
+   * wrote into may be one this window has never opened.
    *
    * The sidebar renders from a list this window read once, on mount and on a
    * provider change, so none of that was visible until the app was restarted:
@@ -2150,12 +2143,12 @@ export function ChatView({
    * only way the athlete can open it and watch the answer arrive.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    // The provider on screen, not the run's: an automation may run on one of
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    // The provider on screen, not the run's: an analysis may run on one of
     // its own (decision 2), and that conversation belongs to that provider's
     // list rather than this one.
     const provider = chatSettings.provider;
-    return api.onCoachAutomationRunUpdate((run) => {
+    return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId) return;
       void refreshSessions(provider).catch(() => undefined);
     });
@@ -2167,8 +2160,8 @@ export function ChatView({
    * so this one watches every run.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    return api.onCoachAutomationRunUpdate((run) => {
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    return api.onCoachAnalysisRunUpdate((run) => {
       // Still working: nothing has landed in any conversation yet.
       if (run.status === "running") return;
       if (
@@ -2189,8 +2182,8 @@ export function ChatView({
   }, [api, markSessionRead, refreshSessionAttention]);
 
   useEffect(() => {
-    liveAutomationRef.current = liveAutomation;
-  }, [liveAutomation]);
+    liveAnalysisRef.current = liveAnalysis;
+  }, [liveAnalysis]);
 
   /**
    * Coming back to the Coach view is reading whatever landed while it was
@@ -2209,16 +2202,16 @@ export function ChatView({
    * lookup: an athlete watching a bubble needs to know which of their coaches
    * is speaking.
    */
-  const showLiveAutomation = useCallback(
-    (run: CoachAutomationRun) => {
-      setLiveAutomation({ runId: run.id, name: "Automation coach", text: "" });
+  const showLiveAnalysis = useCallback(
+    (run: CoachAnalysisRun) => {
+      setLiveAnalysis({ runId: run.id, name: "Analysis coach", text: "" });
       void api
-        ?.getCoachAutomation(run.automationId)
-        .then((detail) => {
-          if (!detail) return;
-          setLiveAutomation((current) =>
+        ?.getCoachAnalysis(run.analysisId)
+        .then((analysis) => {
+          if (!analysis) return;
+          setLiveAnalysis((current) =>
             current?.runId === run.id
-              ? { ...current, name: detail.automation.name }
+              ? { ...current, name: analysis.name }
               : current
           );
         })
@@ -2233,49 +2226,49 @@ export function ChatView({
    *
    * And it picks up whatever is streaming into the new one. The subscription
    * below only ever hears about a run while its conversation is already open,
-   * so opening one mid-run — which is exactly what a `per-run` binding invites
-   * the athlete to do, its conversation appearing in the sidebar the moment the
-   * run starts — showed an empty transcript with nothing to say why. The text
+   * so opening one mid-run — a conversation jumping to the top of the sidebar
+   * is exactly what invites the athlete to do that — showed an empty
+   * transcript with nothing to say why. The text
    * already streamed is gone, but the bubble says who is working and the tokens
    * from here on land in it.
    */
   useEffect(() => {
-    setLiveAutomation(null);
+    setLiveAnalysis(null);
     if (!api || !activeSessionId) return;
     let cancelled = false;
     void api
-      .listCoachAutomationRuns({
+      .listCoachAnalysisRuns({
         sessionId: activeSessionId,
         statuses: ["running"],
         limit: 1
       })
       .then((runs) => {
         if (cancelled || !runs.length) return;
-        showLiveAutomation(runs[0]);
+        showLiveAnalysis(runs[0]);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [api, activeSessionId, showLiveAutomation]);
+  }, [api, activeSessionId, showLiveAnalysis]);
 
   /**
    * A run that targets the conversation on screen has to show up in it as it
-   * happens — an automation the athlete triggered and then cannot see reads as
+   * happens — an analysis the athlete triggered and then cannot see reads as
    * a button that did nothing.
    */
   useEffect(() => {
-    if (!api?.onCoachAutomationRunUpdate) return;
-    return api.onCoachAutomationRunUpdate((run) => {
+    if (!api?.onCoachAnalysisRunUpdate) return;
+    return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId || run.sessionId !== activeSessionIdRef.current) return;
 
       if (run.status === "running") {
-        showLiveAutomation(run);
+        showLiveAnalysis(run);
         return;
       }
 
-      if (liveAutomationRef.current?.runId === run.id) {
-        setLiveAutomation(null);
+      if (liveAnalysisRef.current?.runId === run.id) {
+        setLiveAnalysis(null);
       }
 
       // A skip never reached the model and adds nothing. A silent run does add
@@ -2289,13 +2282,13 @@ export function ChatView({
       // coach's answer before the deferred reload ever got to see it.
       void reloadTranscript(run.sessionId);
     });
-  }, [api, showLiveAutomation]);
+  }, [api, showLiveAnalysis]);
 
   /**
    * A conversation written on another machine.
    *
    * Sync merges `chat_sessions` rows straight into SQLite, behind this window's
-   * back — the same shape of change an automation run makes, arriving from a
+   * back — the same shape of change an analysis run makes, arriving from a
    * different direction. Nothing here noticed: the sidebar rendered the list it
    * read on mount and the transcript its copy from `loadSession`, so a
    * conversation held or extended on the other computer only appeared after a
@@ -2313,14 +2306,13 @@ export function ChatView({
     // provider's is not in it.
     const provider = chatSettings.provider;
     return api.onSyncChanged((change) => {
-      if (
-        change.tables.includes("coach_automations") ||
-        change.tables.includes("coach_automation_bindings")
-      ) {
-        // Which conversations carry the ⚡ mark is a fact about the coaches, so
-        // a merged automation moves it on conversations this window never
-        // touched. Same counter the attach/detach path bumps.
-        setAutomationsVersion((value) => value + 1);
+      if (change.tables.includes("coach_analyses")) {
+        // Which conversations carry the ⚡ mark is a fact about the analyses,
+        // so a merged one moves it on conversations this window never touched.
+        // `coach_analyses` is the only table of the feature that travels: a
+        // private trigger is `device` tier and a run is `derived`, so neither
+        // arrives here. Same counter creating and deleting bumps.
+        setAnalysesVersion((value) => value + 1);
       }
 
       if (!change.tables.includes("chat_sessions")) return;
@@ -2413,20 +2405,6 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, exportingLatestActivity]);
 
-  const refreshMcpStatuses = useCallback(async () => {
-    if (!api) return;
-    const [corosResult, statusesResult] = await Promise.allSettled([
-      api.getCorosMcpStatus(),
-      api.getMcpStatuses()
-    ]);
-    if (corosResult.status === "fulfilled") {
-      setMcpStatus(corosResult.value);
-    }
-    if (statusesResult.status === "fulfilled") {
-      setMcpStatuses(statusesResult.value);
-    }
-  }, [api]);
-
   // Provider settings and the Claude account are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
@@ -2449,22 +2427,6 @@ export function ChatView({
       cancelled = true;
     };
   }, [active, api, checkingAuth]);
-
-  // Load MCP connection status on mount (and shortly after, to catch the
-  // silent startup reconnect completing in the main process).
-  //
-  // Keyed on `active` as well, because servers are added and removed from
-  // Settings now, not from here. This panel stays mounted once opened, so
-  // without this the tool list would still show whatever was connected the
-  // first time Coach was opened.
-  useEffect(() => {
-    if (!api || !active) return;
-    void refreshMcpStatuses();
-    const timer = setTimeout(() => void refreshMcpStatuses(), 2500);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [active, api, refreshMcpStatuses]);
 
   // Ask about dead MCP sessions here rather than at launch: nothing opens an
   // OAuth window on the athlete's behalf any more, so this is the one place
@@ -2505,7 +2467,6 @@ export function ChatView({
           authRequired.has(status.id)
       );
 
-      setMcpStatuses(statuses);
       if (broken.length > 0) {
         setMcpPrompt(broken);
       }
@@ -2542,9 +2503,8 @@ export function ChatView({
     } finally {
       setMcpPrompt([]);
       setMcpPromptBusy(false);
-      await refreshMcpStatuses();
     }
-  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
+  }, [api, mcpPrompt, onError]);
 
   // Later: touch nothing. The effect above re-runs the next time Coach becomes
   // the active view, so the question comes back on its own.
@@ -2573,34 +2533,8 @@ export function ChatView({
       }
     } finally {
       setMcpPromptBusy(false);
-      await refreshMcpStatuses();
     }
-  }, [api, mcpPrompt, onError, refreshMcpStatuses]);
-
-  useEffect(() => {
-    if (!showTools || settingsOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!mcpRef.current?.contains(event.target as Node)) {
-        setShowTools(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowTools(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [showTools, settingsOpen]);
+  }, [api, mcpPrompt, onError]);
 
   // Subscribe once to the streaming push channels.
   useEffect(() => {
@@ -2664,8 +2598,8 @@ export function ChatView({
 
     const unsubscribers = [
       api.onChatStreamStart((payload) => {
-        if (payload.requestId === liveAutomationRef.current?.runId) {
-          setLiveAutomation((current) =>
+        if (payload.requestId === liveAnalysisRef.current?.runId) {
+          setLiveAnalysis((current) =>
             current?.runId === payload.requestId ? { ...current, text: "" } : current
           );
           return;
@@ -2681,8 +2615,8 @@ export function ChatView({
         // A run's tokens must never touch the athlete's own streaming state:
         // that state gets persisted as their turn when the stream ends, and the
         // runner has already written the same text from the main process.
-        if (payload.requestId === liveAutomationRef.current?.runId) {
-          setLiveAutomation((current) =>
+        if (payload.requestId === liveAnalysisRef.current?.runId) {
+          setLiveAnalysis((current) =>
             current?.runId === payload.requestId
               ? { ...current, text: current.text + payload.delta }
               : current
@@ -2695,8 +2629,8 @@ export function ChatView({
       }),
       api.onChatStreamInfo((payload) => {
         // Cards (plan drafts, charts) belong to whoever asked for them; an
-        // automation's transcript is reloaded from disk when its run ends.
-        if (payload.requestId === liveAutomationRef.current?.runId) return;
+        // analysis's transcript is reloaded from disk when its run ends.
+        if (payload.requestId === liveAnalysisRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
         if (payload.kind === "context") {
           sourceRef.current = {
@@ -2813,7 +2747,7 @@ export function ChatView({
     timeline,
     streamingText,
     thinkingText,
-    liveAutomation,
+    liveAnalysis,
     exportingLatestActivity
   ]);
 
@@ -3159,23 +3093,6 @@ export function ChatView({
       .catch(() => undefined);
   }, [api, checkingAuth, chatSettings, chatSettings.provider, chatSettings.local.model]);
 
-
-  const handleConnectMcp = async () => {
-    if (!api || mcpBusy) return;
-    setMcpBusy(true);
-    onError(null);
-    try {
-      const status = await api.connectCorosMcp();
-      setMcpStatus(status);
-      // Surface the discovered tools for verification during this milestone.
-      console.log("[COROS MCP] tools:", status.tools);
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "COROS connection failed.");
-    } finally {
-      await refreshMcpStatuses();
-      setMcpBusy(false);
-    }
-  };
 
   /**
    * Rolls the conversation's summary forward when the window says it is time,
@@ -3533,6 +3450,31 @@ export function ChatView({
     }
   };
 
+  /**
+   * Take a creation out of the conversation.
+   *
+   * A mark on the draft, not a splice: the entry keeps its place in the
+   * transcript so the array the window saves is the same length the row holds
+   * — a shorter one is what `foreignTail` reads as a foreign append and undoes.
+   * Whatever was already uploaded to COROS or saved to the library is left
+   * alone; this removes the card, not the workout.
+   */
+  const handleRemovePlanDraft = (draftId: string) => {
+    setOpenCreationId((current) => (current === draftId ? null : current));
+    setTimeline((prev) => {
+      const next = prev.map((entry): ChatEntry =>
+        entry.kind === "planDraft" && entry.draft.draftId === draftId
+          ? {
+              kind: "planDraft",
+              draft: { ...entry.draft, removedAt: Date.now() }
+            }
+          : entry
+      );
+      persistHistory(activeSessionIdRef.current, next, true);
+      return next;
+    });
+  };
+
   const handleReviewPlanDraft = (draft: PlanDraftPreview) => {
     if (!onReviewPlan) return;
     try {
@@ -3679,29 +3621,57 @@ export function ChatView({
     isOpenRouterProvider && !chatSettings.openRouter.hasApiKey;
   const showAnthropicKeyGate =
     isClaudeApiProvider && !chatSettings.anthropic.hasApiKey;
-  const showPlanPanel = useMediaQuery("(min-width: 1400px)");
+  // A removed creation keeps its transcript entry — see `PlanDraftPreview.
+  // removedAt` for why it cannot simply be spliced out — so every reader
+  // filters here, and nothing downstream has to remember to.
   const planDrafts = timeline.flatMap((entry) =>
-    entry.kind === "planDraft" ? [entry.draft] : []
+    entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft] : []
   );
-  const latestPlanDraft = planDrafts.at(-1);
-  const selectedPlanDraft =
-    planDrafts.find((draft) => draft.draftId === selectedPlanDraftId) ??
-    latestPlanDraft;
+  const openCreation =
+    planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
   const trainingPlanDrafts = planDrafts.filter(
     (draft) => draft.artifactType !== "workout"
   );
-  const selectedTrainingPlanNumber = selectedPlanDraft?.artifactType !== "workout"
-    ? trainingPlanDrafts.findIndex(
-        (draft) => draft.draftId === selectedPlanDraft?.draftId
-      ) + 1
-    : 0;
+  const openCreationKicker =
+    openCreation === null
+      ? ""
+      : openCreation.artifactType === "workout"
+        ? "One-off workout"
+        : `Plan ${
+            trainingPlanDrafts.findIndex(
+              (draft) => draft.draftId === openCreation.draftId
+            ) + 1
+          } of ${trainingPlanDrafts.length}`;
 
+  /**
+   * Opening the panel is reserved for news, so this has to tell a creation
+   * that just arrived from one that was already in the transcript when the
+   * conversation was opened. Ids seen for this session are what separates
+   * them; switching conversations adopts whatever is there and closes up,
+   * because scrolling back through an old chat is not the coach proposing
+   * anything.
+   */
+  const planDraftIdKey = planDrafts.map((draft) => draft.draftId).join("|");
   useEffect(() => {
-    setSelectedPlanDraftId(latestPlanDraft?.draftId ?? null);
-    if (latestPlanDraft) {
-      setPlanPanelExpanded(false);
+    const ids = planDrafts.map((draft) => draft.draftId);
+    if (planPanelSessionRef.current !== activeSessionId) {
+      planPanelSessionRef.current = activeSessionId;
+      seenPlanDraftIdsRef.current = new Set(ids);
+      setPlanPanelOpen(false);
+      setOpenCreationId(null);
+      setSelectedPlanDraftId(ids.at(-1) ?? null);
+      return;
     }
-  }, [activeSessionId, latestPlanDraft?.draftId]);
+    const fresh = ids.filter((id) => !seenPlanDraftIdsRef.current.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) seenPlanDraftIdsRef.current.add(id);
+    setSelectedPlanDraftId(fresh[fresh.length - 1] ?? null);
+    setPlanPanelOpen(true);
+    // `planDrafts` is rebuilt on every render; the id list is what actually
+    // changes, and re-running on the array identity would reopen the panel on
+    // every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, planDraftIdKey]);
 
   const providerSwitch = (
     <ProviderSwitch
@@ -4097,18 +4067,18 @@ export function ChatView({
 
 /**
  * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
- * automations, so every entry a run produced says which coach spoke.
+ * analyses, so every entry a run produced says which coach spoke.
  */
-function AutomationAttribution({
+function AnalysisAttribution({
   marker
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
 }) {
   return (
-    <span className="chat-automation-attribution">
+    <span className="chat-analysis-attribution">
       <Zap size={12} aria-hidden="true" />
       {marker.name}
-      <span className="chat-automation-attribution-trigger">
+      <span className="chat-analysis-attribution-trigger">
         · {marker.triggerLabel}
       </span>
     </span>
@@ -4118,15 +4088,15 @@ function AutomationAttribution({
 /**
  * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
  * default — it is machinery, not conversation — but openable, because an
- * athlete judging an automation's answer needs to see what it was asked.
+ * athlete judging an analysis's answer needs to see what it was asked.
  */
-function AutomationPromptChip({
+function AnalysisPromptChip({
   marker,
   prompt,
   index,
   highlighted
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
   prompt: string;
   index: number;
   highlighted: boolean;
@@ -4134,22 +4104,22 @@ function AutomationPromptChip({
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className={`chat-row chat-row-automation${
+      className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
       data-chat-entry-index={index}
     >
       <button
         type="button"
-        className="chat-automation-chip"
+        className="chat-analysis-chip"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
         <Zap size={12} aria-hidden="true" />
         {marker.name}
-        <span className="chat-automation-chip-trigger">· {marker.triggerLabel}</span>
+        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
       </button>
-      {expanded ? <pre className="chat-automation-prompt">{prompt}</pre> : null}
+      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
     </div>
   );
 }
@@ -4179,32 +4149,32 @@ function formatLookedAt(at: number): string {
 }
 
 /**
- * 5.5: an automation looked and had nothing to say. One line, the same pill as
+ * 5.5: an analysis looked and had nothing to say. One line, the same pill as
  * the playbook chip, but nothing to open — the whole point is that there is no
  * content behind it.
  */
-function AutomationSilentChip({
+function AnalysisSilentChip({
   marker,
   at,
   index,
   highlighted
 }: {
-  marker: ChatEntryAutomationMarker;
+  marker: ChatEntryAnalysisMarker;
   at: number;
   index: number;
   highlighted: boolean;
 }) {
   return (
     <div
-      className={`chat-row chat-row-automation${
+      className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
       data-chat-entry-index={index}
     >
-      <span className="chat-automation-chip chat-automation-chip-static">
+      <span className="chat-analysis-chip chat-analysis-chip-static">
         <Zap size={12} aria-hidden="true" />
         {marker.name} looked, nothing new
-        <span className="chat-automation-chip-trigger">
+        <span className="chat-analysis-chip-trigger">
           · {formatLookedAt(at)}
         </span>
       </span>
@@ -4228,83 +4198,39 @@ function AutomationSilentChip({
             <Settings2 size={16} aria-hidden="true" />
             Settings
           </button>
-          <ConversationCoaches
+          <ConversationAnalyses
             api={api}
             sessionId={activeSessionId}
-            refreshVersion={automationsVersion}
-            onChanged={() => setAutomationsVersion((value) => value + 1)}
-            onManageAutomations={() => setAutomationsOpen(true)}
+            refreshVersion={analysesVersion}
+            onChanged={() => setAnalysesVersion((value) => value + 1)}
+            onCreateAnalysis={() => {
+              if (!activeSessionId) return;
+              setAnalysisTarget({ kind: "create", sessionId: activeSessionId });
+            }}
+            onOpenAnalysis={(analysisId) =>
+              setAnalysisTarget({ kind: "detail", analysisId })
+            }
           />
-          <div className="chat-mcp" ref={mcpRef}>
-            {(() => {
-              const connectedServers = mcpStatuses.filter((s) => s.connected);
-              const totalTools = connectedServers.reduce(
-                (n, s) => n + s.toolCount,
-                0
-              );
-              return connectedServers.length > 0 ? (
-              <>
-                <button
-                  type="button"
-                  className="chat-mcp-pill connected"
-                  onClick={() => setShowTools((open) => !open)}
-                  title={`Connected via MCP: ${connectedServers
-                    .map((s) => s.name)
-                    .join(", ")}`}
-                  aria-expanded={showTools}
-                  aria-haspopup="dialog"
-                >
-                  <Database size={13} aria-hidden="true" />
-                  {connectedServers.length === 1
-                    ? connectedServers[0].name
-                    : `${connectedServers.length} MCP servers`}{" "}
-                  · {totalTools} tools
-                </button>
-                {showTools ? (
-                  <div className="chat-mcp-panel">
-                    <ul>
-                      {connectedServers.map((s) => (
-                        <li key={s.id}>
-                          <code>{s.name}</code>
-                          <span>{s.toolCount} tools</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="chat-mcp-panel-head">
-                      <button
-                        type="button"
-                        onClick={() => setSettingsOpen(true)}
-                      >
-                        Manage servers
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <button
-                type="button"
-                className="chat-mcp-pill"
-                onClick={() => {
-                  setSettingsOpen(true);
-                  void handleConnectMcp();
-                }}
-                disabled={mcpBusy}
-              >
-                {mcpBusy ? (
-                  <Loader2 className="chat-spinner" size={13} aria-hidden="true" />
-                ) : (
-                  <Database size={13} aria-hidden="true" />
-                )}
-                {mcpBusy
-                  ? "Connecting…"
-                  : mcpStatus?.authorized
-                    ? "Reconnect COROS"
-                    : "Connect COROS"}
-              </button>
-            );
-            })()}
-          </div>
+          {planDrafts.length > 0 ? (
+            <button
+              type="button"
+              className="chat-creations-pill"
+              aria-expanded={planPanelOpen}
+              aria-controls="chat-creations-panel"
+              onClick={() => setPlanPanelOpen((open) => !open)}
+              title={
+                planPanelOpen ? "Hide Coach creations" : "Show Coach creations"
+              }
+            >
+              {planPanelOpen ? (
+                <PanelRightClose size={13} aria-hidden="true" />
+              ) : (
+                <PanelRightOpen size={13} aria-hidden="true" />
+              )}
+              Creations
+              <span className="chat-creations-count">{planDrafts.length}</span>
+            </button>
+          ) : null}
           {isChatGptProvider ? (
             <button
               type="button"
@@ -4404,34 +4330,18 @@ function AutomationSilentChip({
             }
 
             if (entry.kind === "planDraft") {
-              if (showPlanPanel) {
+              // Removed by the athlete: the entry stays so the saved array
+              // keeps its length, but nothing draws it.
+              if (entry.draft.removedAt) {
                 return null;
               }
-              return (
-                <div
-                  key={entry.draft.draftId}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <CoachDraftPreviewCard
-                      draft={entry.draft}
-                      uploading={uploadingDraftId === entry.draft.draftId}
-                      uploaded={uploadedPlans[entry.draft.draftId]}
-                      onUpload={(destination, scheduleDate) =>
-                        void handleUploadPlanDraft(
-                          entry.draft.draftId,
-                          destination,
-                          scheduleDate
-                        )
-                      }
-                      onReview={onReviewPlan ? () => handleReviewPlanDraft(entry.draft) : undefined}
-                    />
-                  </div>
-                </div>
-              );
+              // Creations are read from the panel and the popup it opens, at
+              // every window width. There used to be a second copy of the card
+              // inline here for windows too narrow to hold the panel, and the
+              // width test that chose between them also decided whether the
+              // header's Creations button existed — so narrowing the window
+              // took the button away and left the panel with no way back.
+              return null;
             }
 
             if (entry.kind === "workoutDelete") {
@@ -4507,8 +4417,8 @@ function AutomationSilentChip({
 
             if (entry.kind === "automationSilent") {
               return (
-                <AutomationSilentChip
-                  key={`automation-silent-${index}`}
+                <AnalysisSilentChip
+                  key={`analysis-silent-${index}`}
                   marker={entry.automation}
                   at={entry.at}
                   index={index}
@@ -4517,12 +4427,12 @@ function AutomationSilentChip({
               );
             }
 
-            // 5.6: the synthetic user turn an automation sends is stored with
+            // 5.6: the synthetic user turn an analysis sends is stored with
             // role "user", but it was never typed by the athlete — showing it as
             // their bubble would misattribute the playbook to them.
             if (entry.automation && entry.role === "user") {
               return (
-                <AutomationPromptChip
+                <AnalysisPromptChip
                   key={`message-${index}`}
                   marker={entry.automation}
                   prompt={entry.content}
@@ -4551,7 +4461,7 @@ function AutomationSilentChip({
                 </div>
                 <div className="chat-bubble">
                   {entry.automation ? (
-                    <AutomationAttribution marker={entry.automation} />
+                    <AnalysisAttribution marker={entry.automation} />
                   ) : null}
                   {entry.role === "assistant" ? (
                     <>
@@ -4609,21 +4519,21 @@ function AutomationSilentChip({
 
           {/* Same avatar and bubble as the persisted answer this becomes, so
               the reload at the end of the run does not make the row jump. */}
-          {liveAutomation ? (
+          {liveAnalysis ? (
             <div className="chat-row chat-row-assistant">
               <div className="chat-avatar chat-avatar-assistant">
                 <Sparkles size={16} aria-hidden="true" />
               </div>
               <div className="chat-bubble chat-bubble-streaming">
-                <span className="chat-automation-attribution">
+                <span className="chat-analysis-attribution">
                   <Zap size={12} aria-hidden="true" />
-                  {liveAutomation.name}
-                  <span className="chat-automation-attribution-trigger">
+                  {liveAnalysis.name}
+                  <span className="chat-analysis-attribution-trigger">
                     · running now
                   </span>
                 </span>
-                {liveAutomationText ? (
-                  <AssistantMarkdown content={liveAutomationText} streaming />
+                {liveAnalysisText ? (
+                  <AssistantMarkdown content={liveAnalysisText} streaming />
                 ) : (
                   <div className="chat-stream-pending">
                     <span className="chat-stream-status">
@@ -4662,178 +4572,118 @@ function AutomationSilentChip({
             onStop={handleStop}
           />
         </div>
-        {showPlanPanel && selectedPlanDraft ? (
+        {planPanelOpen && planDrafts.length > 0 ? (
           <aside
-            className={`chat-plan-panel${
-              planPanelExpanded ? " is-expanded" : " is-list-view"
-            }`}
-            aria-label={
-              planPanelExpanded ? "Generated item details" : "Coach creations"
-            }
+            id="chat-creations-panel"
+            className="chat-plan-panel"
+            aria-label="Coach creations"
           >
-            {!planPanelExpanded ? (
-              <>
-                <header className="chat-plan-list-header">
-                  <div>
-                    <span className="chat-plan-panel-icon">
-                      <BookOpen size={15} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <strong>Coach creations</strong>
-                      <span>Plans and one-off workouts</span>
-                    </div>
-                  </div>
-                  <strong className="chat-plan-list-count">
-                    {planDrafts.length}
-                  </strong>
-                </header>
-                <ol className="chat-plan-list">
-                  {planDrafts.map((draft, index) => {
-                    const saved = Boolean(
-                      uploadedPlans[draft.draftId] ||
-                        draft.uploadResult ||
-                        draft.uploadedAt
+            <header className="chat-plan-list-header">
+              <div>
+                <span className="chat-plan-panel-icon">
+                  <BookOpen size={15} aria-hidden="true" />
+                </span>
+                <div>
+                  <strong>Coach creations</strong>
+                  <span>Plans and one-off workouts</span>
+                </div>
+              </div>
+              <div className="chat-plan-list-header-end">
+                <strong className="chat-plan-list-count">
+                  {planDrafts.length}
+                </strong>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Hide Coach creations"
+                  title="Hide Coach creations"
+                  onClick={() => setPlanPanelOpen(false)}
+                >
+                  <PanelRightClose size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+            <ol className="chat-plan-list">
+              {planDrafts.map((draft, index) => {
+                const saved = Boolean(
+                  uploadedPlans[draft.draftId] ||
+                    draft.uploadResult ||
+                    draft.uploadedAt
+                );
+                const isWorkout = draft.artifactType === "workout";
+                const planNumber = isWorkout
+                  ? 0
+                  : planDrafts
+                      .slice(0, index + 1)
+                      .filter((item) => item.artifactType !== "workout").length;
+                const weeks = isWorkout
+                  ? 0
+                  : Math.max(
+                      1,
+                      groupPlanEntriesByWeek(draft.entries).filter(
+                        (week) => week.id !== "unscheduled"
+                      ).length
                     );
-                    const isWorkout = draft.artifactType === "workout";
-                    const planNumber = isWorkout
-                      ? 0
-                      : planDrafts
-                          .slice(0, index + 1)
-                          .filter((item) => item.artifactType !== "workout").length;
-                    const weeks = isWorkout
-                      ? 0
-                      : Math.max(
-                          1,
-                          groupPlanEntriesByWeek(draft.entries).filter(
-                            (week) => week.id !== "unscheduled"
-                          ).length
-                        );
-                    const primarySport = draft.entries[0]?.sport;
-                    const SportIcon = sportTheme(primarySport).icon;
-                    const selected = draft.draftId === selectedPlanDraft.draftId;
+                const primarySport = draft.entries[0]?.sport;
+                const SportIcon = sportTheme(primarySport).icon;
+                const selected = draft.draftId === selectedPlanDraftId;
 
-                    return (
-                      <li key={draft.draftId}>
-                        <button
-                          type="button"
-                          className={`chat-plan-list-item${
-                            selected ? " is-selected" : ""
-                          }`}
-                          onClick={() => {
-                            setSelectedPlanDraftId(draft.draftId);
-                            setPlanPanelExpanded(true);
-                          }}
-                          aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-                        >
-                          <span
-                            className="chat-plan-list-sport"
-                            style={planSportStyle(primarySport)}
-                          >
-                            <SportIcon
-                              size={15}
-                              strokeWidth={2}
-                              aria-hidden="true"
-                            />
-                          </span>
-                          <span className="chat-plan-list-copy">
-                            <span className="chat-plan-list-kicker">
-                              {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
-                            </span>
-                            <strong>
-                              {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
-                            </strong>
-                            <span className="chat-plan-list-meta">
-                              <span>
-                                {draft.entries.length}{" "}
-                                {draft.entries.length === 1
-                                  ? "workout"
-                                  : "workouts"}
-                              </span>
-                              {!isWorkout ? (
-                                <span>
-                                  {weeks} {weeks === 1 ? "week" : "weeks"}
-                                </span>
-                              ) : (
-                                <span>Workout Library</span>
-                              )}
-                              <span data-status={saved ? "saved" : "draft"}>
-                                {saved ? "Saved" : "Draft"}
-                              </span>
-                            </span>
-                          </span>
-                          <ChevronRight size={15} aria-hidden="true" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </>
-            ) : (
-              <>
-                <header className="chat-plan-panel-header">
-                  <div className="chat-plan-panel-heading">
+                return (
+                  <li key={draft.draftId}>
                     <button
                       type="button"
-                      className="chat-plan-panel-back"
-                      onClick={() => setPlanPanelExpanded(false)}
-                      aria-label="Back to Coach creations"
-                      title="Back to Coach creations"
+                      className={`chat-plan-list-item${
+                        selected ? " is-selected" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedPlanDraftId(draft.draftId);
+                        setOpenCreationId(draft.draftId);
+                      }}
+                      aria-haspopup="dialog"
+                      aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
                     >
-                      <ChevronLeft size={15} aria-hidden="true" />
-                      Creations
-                    </button>
-                    <div className="chat-plan-panel-title is-detail-title">
-                      <div>
-                        <strong title={selectedPlanDraft.name}>
-                          {selectedPlanDraft.name ||
-                            (selectedPlanDraft.artifactType === "workout"
-                              ? "Untitled workout"
-                              : "Untitled plan")}
-                        </strong>
-                        <span>
-                          {selectedPlanDraft.artifactType === "workout"
-                            ? "One-off workout"
-                            : `Plan ${selectedTrainingPlanNumber} of ${trainingPlanDrafts.length}`}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="chat-plan-panel-actions">
-                      <button
-                        type="button"
-                        className="chat-plan-panel-chat-link"
-                        onClick={() =>
-                          handleScrollToPlanChat(selectedPlanDraft.draftId)
-                        }
-                        title="View the generated response in chat"
+                      <span
+                        className="chat-plan-list-sport"
+                        style={planSportStyle(primarySport)}
                       >
-                        <MessageCircle size={14} aria-hidden="true" />
-                        View in chat
-                      </button>
-                    </div>
-                  </div>
-                </header>
-                <div className="chat-plan-panel-body">
-                  <CoachDraftPreviewCard
-                    key={selectedPlanDraft.draftId}
-                    draft={selectedPlanDraft}
-                    uploading={uploadingDraftId === selectedPlanDraft.draftId}
-                    uploaded={uploadedPlans[selectedPlanDraft.draftId]}
-                    onUpload={(destination, scheduleDate) =>
-                      void handleUploadPlanDraft(
-                        selectedPlanDraft.draftId,
-                        destination,
-                        scheduleDate
-                      )
-                    }
-                    onReview={
-                      onReviewPlan
-                        ? () => handleReviewPlanDraft(selectedPlanDraft)
-                        : undefined
-                    }
-                  />
-                </div>
-              </>
-            )}
+                        <SportIcon
+                          size={15}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <span className="chat-plan-list-copy">
+                        <span className="chat-plan-list-kicker">
+                          {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
+                        </span>
+                        <strong>
+                          {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
+                        </strong>
+                        <span className="chat-plan-list-meta">
+                          <span>
+                            {draft.entries.length}{" "}
+                            {draft.entries.length === 1
+                              ? "workout"
+                              : "workouts"}
+                          </span>
+                          {!isWorkout ? (
+                            <span>
+                              {weeks} {weeks === 1 ? "week" : "weeks"}
+                            </span>
+                          ) : (
+                            <span>Workout Library</span>
+                          )}
+                          <span data-status={saved ? "saved" : "draft"}>
+                            {saved ? "Saved" : "Draft"}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronRight size={15} aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
           </aside>
         ) : null}
       </div>
@@ -4846,16 +4696,51 @@ function AutomationSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
-      <CoachAutomationsModal
+      <CoachCreationModal
+        draft={openCreation}
+        kicker={openCreationKicker}
+        onClose={() => setOpenCreationId(null)}
+        onViewInChat={() => {
+          if (!openCreation) return;
+          setOpenCreationId(null);
+          handleScrollToPlanChat(openCreation.draftId);
+        }}
+        onRemove={() => {
+          if (!openCreation) return;
+          handleRemovePlanDraft(openCreation.draftId);
+        }}
+      >
+        {openCreation ? (
+          <CoachDraftPreviewCard
+            key={openCreation.draftId}
+            draft={openCreation}
+            uploading={uploadingDraftId === openCreation.draftId}
+            uploaded={uploadedPlans[openCreation.draftId]}
+            onUpload={(destination, scheduleDate) =>
+              void handleUploadPlanDraft(
+                openCreation.draftId,
+                destination,
+                scheduleDate
+              )
+            }
+            onReview={
+              onReviewPlan
+                ? () => handleReviewPlanDraft(openCreation)
+                : undefined
+            }
+          />
+        ) : null}
+      </CoachCreationModal>
+      <AnalysesModal
         api={api}
-        open={automationsOpen}
+        target={analysisTarget}
         provider={chatSettings.provider}
-        onChanged={() => setAutomationsVersion((value) => value + 1)}
+        onChanged={() => setAnalysesVersion((value) => value + 1)}
         onClose={() => {
-          setAutomationsOpen(false);
+          setAnalysisTarget(null);
           // Catch-all: anything the modal changed is reflected on close, even
           // a path that forgot to report itself.
-          setAutomationsVersion((value) => value + 1);
+          setAnalysesVersion((value) => value + 1);
         }}
         onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
       />

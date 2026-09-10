@@ -1,5 +1,19 @@
 # Coach Automations — ground-truth map
 
+> **Superseded in part — read [coach-analysis.md](./coach-analysis.md) first.**
+>
+> Two reworks have happened since this was written (both 2026-09-10): the
+> trigger moved off the definition onto an attachment, and then the attachment
+> was removed — an analysis is now one thing living in one conversation, and
+> the tables described here are dropped on upgrade. This file is kept as the
+> record of the design it reviewed: the inventory of tables, channels, dep seams and suites is now one release out of date, and §2's channel names, §3's seams and §6's suite names have all been renamed.
+>
+> Vocabulary here is pre-rename throughout — *automation* is an analysis,
+> a *binding* no longer exists, `coachAutomation:*` channels are `analysis:*`,
+> and `coachAutomationService.ts` is `coachAnalysisService.ts`. The tables were
+> renamed and their rows dropped; the `app_settings` keys and the stored
+> transcript-marker keys did **not** change.
+
 Companion to [coach-automations.md](./coach-automations.md). This file is a
 checkable inventory of what the feature actually is in `electron/`, plus every
 place the doc no longer describes it. Nothing here is a fix and nothing here is

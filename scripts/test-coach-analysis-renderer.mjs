@@ -7,7 +7,7 @@
 // query existed without asserting where its answer went.
 //
 // This suite mounts the real components in a real Chromium — Electron's, which
-// the repo already depends on and already runs `coach-automation-sql` under, so
+// the repo already depends on and already runs `coach-analysis-sql` under, so
 // it costs no new dependency — against a stubbed `CorosLinkApi`. It drives them
 // through the DOM and asserts here, in node, so a failure reads like every
 // other suite.
@@ -70,39 +70,31 @@ const session = (id, title) => ({
   messageCount: 0
 });
 
-const automation = (id, name, patch = {}) => ({
+/**
+ * One analysis, in one conversation. It defaults to an auto one because most
+ * of these cases are about something that runs on its own;
+ * `analysis("a1", "X", { trigger: null })` is the manual case.
+ */
+const analysis = (id, name, patch = {}) => ({
   id,
+  sessionId: "s1",
   name,
   playbook: "Summarise yesterday.",
   enabled: true,
+  runtime: {},
   trigger: { kind: "schedule", cadence: "daily", timeOfDay: "07:30" },
   conditions: { cooldownMin: 0, maxRunsPerDay: 3 },
-  runtime: {},
+  deviceOnly: false,
+  sortOrder: 0,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
   ...patch
 });
 
-const binding = (id, patch = {}) => ({
-  id,
-  automationId: "a1",
-  mode: "existing",
-  sessionId: "s1",
-  enabled: true,
-  sortOrder: 0,
-  createdAt: "2026-08-01T00:00:00.000Z",
-  ...patch
-});
-
-const summary = (auto, patch = {}) => ({
-  automation: auto,
-  bindingCount: 1,
-  enabledBindingCount: 1,
-  ...patch
-});
+const summary = (auto, patch = {}) => ({ analysis: auto, ...patch });
 
 /**
- * What ChatView needs on screen before it can be asked about automations at
+ * What ChatView needs on screen before it can be asked about analyses at
  * all. None of it is what these tests are about; it is here so each test's own
  * script says only what that test changed.
  */
@@ -113,15 +105,13 @@ const CHAT_VIEW_BASE = {
   getCorosMcpStatus: { connected: false },
   getMcpStatuses: [],
   getChatSession: [],
-  listCoachAutomationSessionAttention: [],
-  listCoachAutomationsForSession: [],
-  listCoachAutomations: []
+  listCoachAnalysisSessionAttention: [],
+  listCoachAnalysesForSession: []
 };
 
 const run = (id, patch = {}) => ({
   id,
-  automationId: "a1",
-  bindingId: "b1",
+  analysisId: "a1",
   status: "running",
   triggerKind: "manual",
   startedAt: "2026-08-25T09:00:00.000Z",
@@ -209,114 +199,22 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // 3.4: the run-now picker's threshold
+  // 3.4: Run now runs the one analysis it was pressed on
   // -------------------------------------------------------------------------
-  // Ported from a regex over `if (summary.bindingCount > 1)`. The regex could
-  // not tell that the branch runs, that the dialog appears, or that the
-  // athlete's choice reaches the runner — and the last of those is the whole
-  // point of asking.
+  // There used to be a picker here, because one definition could be attached
+  // to several conversations and "run it now" had to ask which. An analysis
+  // is one place now, so the question has one answer and the button does what
+  // it says.
   {
     await harness(
       "mount",
-      "CoachAutomationsPanel",
-      {},
-      { listCoachAutomations: [summary(automation("a1", "Post-run debrief"))] }
-    );
-    await waitFor(
-      () => harness("exists", ".coach-automation-card-actions"),
-      "the panel renders its cards"
-    );
-
-    await harness("clickText", "button", "Run now");
-    await waitFor(
-      () => harness("callCount", "runCoachAutomationNow"),
-      "one place runs straight away"
-    );
-    assert.equal(
-      await harness("exists", ".coach-automation-dialog"),
-      false,
-      "and does not ask a question with one answer"
-    );
-    const [straight] = await harness("calls", "runCoachAutomationNow");
-    assert.deepEqual(
-      straight.args,
-      ["a1", undefined],
-      "with no binding list, so the runner fans out to every place"
-    );
-
-    // Two places is a real choice: one model call and one conversation each.
-    await harness(
-      "mount",
-      "CoachAutomationsPanel",
-      {},
-      {
-        listCoachAutomations: [
-          summary(automation("a1", "Post-run debrief"), {
-            bindingCount: 2,
-            enabledBindingCount: 1
-          })
-        ],
-        getCoachAutomation: {
-          automation: automation("a1", "Post-run debrief"),
-          bindings: [
-            binding("b1", { sessionId: "s1" }),
-            binding("b2", { sessionId: "s2", enabled: false })
-          ]
-        }
-      }
-    );
-    await waitFor(
-      () => harness("exists", ".coach-automation-card-actions"),
-      "the panel renders its cards"
-    );
-    await harness("clickText", "button", "Run now");
-    await waitFor(
-      () => harness("exists", ".coach-automation-dialog"),
-      "several places ask which"
-    );
-    assert.equal(
-      await harness("callCount", "runCoachAutomationNow"),
-      0,
-      "and nothing runs until it is answered"
-    );
-
-    // The default is every *live* place, not every place: a paused binding is
-    // listed so "run it anyway" stays possible, but never ticked.
-    await waitFor(
-      () => harness("clickText", ".coach-automation-confirm-actions button", "Run in"),
-      "the dialog offers to run"
-    );
-    const [picked] = await waitFor(
-      async () => {
-        const made = await harness("calls", "runCoachAutomationNow");
-        return made.length ? made : null;
-      },
-      "the answer reaches the runner"
-    );
-    assert.deepEqual(
-      picked.args,
-      ["a1", ["b1"]],
-      "the paused place is offered, unticked — the default is every live one"
-    );
-    await assertQuietConsole("the run-now picker");
-  }
-
-  // -------------------------------------------------------------------------
-  // 9.3: the popover reporting an attach
-  // -------------------------------------------------------------------------
-  // Ported from a regex over `onAttached={async () => { await refresh(); ... }`.
-  // The ⚡ mark in the sidebar is derived from the bindings, so a popover that
-  // changes them and says nothing leaves the mark where it was until restart.
-  {
-    await harness(
-      "mount",
-      "ConversationCoaches",
+      "ConversationAnalyses",
       { sessionId: "s1" },
       {
-        listCoachAutomationsForSession: [],
-        listCoachAutomations: [summary(automation("a1", "Post-run debrief"))],
-        listCoachAutomationRuns: [],
-        attachCoachAutomation: { ok: true, binding: binding("b1") }
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Post-run debrief"))
+        ],
+        listCoachAnalysisRuns: []
       }
     );
     await waitFor(
@@ -325,53 +223,118 @@ async function main() {
     );
     await harness("click", ".chat-coaches-pill");
     await waitFor(
-      () => harness("exists", ".chat-coaches-attach"),
-      "the popover opens"
+      () => harness("exists", ".chat-coaches-row"),
+      "the popover lists the analysis"
     );
 
-    // From here the athlete is attaching, and the parent has heard nothing yet.
-    await harness("clearCalls");
-    await harness("click", ".chat-coaches-attach");
+    await harness("click", '[aria-label="Run now"]');
     await waitFor(
-      () => harness("exists", ".coach-automation-dialog"),
-      "the attach dialog opens"
+      () => harness("callCount", "runCoachAnalysisNow"),
+      "it runs straight away"
     );
-    await harness("clickText", ".coach-automation-session-row", "Post-run debrief");
-
-    await waitFor(
-      () => harness("callCount", "attachCoachAutomation"),
-      "the coach is attached"
+    assert.equal(
+      await harness("exists", ".coach-analysis-dialog"),
+      false,
+      "and does not ask a question with one answer"
     );
-    await waitFor(
-      () => harness("callCount", "prop:onChanged"),
-      "and the popover has to tell the screen around it, or the ⚡ mark never moves"
+    const [straight] = await harness("calls", "runCoachAnalysisNow");
+    assert.deepEqual(
+      straight.args,
+      ["a1"],
+      "the analysis id, and nothing to narrow it with"
     );
-    assert.ok(
-      await harness("callCount", "listCoachAutomationsForSession"),
-      "and re-read its own rows, or the new coach is not in the list it just changed"
-    );
-    await assertQuietConsole("the attach popover");
+    await assertQuietConsole("run now");
   }
 
   // -------------------------------------------------------------------------
-  // The popover following an edit to the coach it is already showing
+  // 9.3: the popover is the way in, and the way to each analysis
   // -------------------------------------------------------------------------
-  // Every row here is drawn from the definition — the coach's name, the trigger
-  // under it, the master switch that decides whether it reads "Running here" —
-  // and a definition change carried no push at all. `refreshVersion` covers an
-  // edit made through the Automations modal the parent owns and nothing else,
-  // so a rename left every conversation the coach is attached to showing the
-  // old name. Detaching and re-attaching was the way out, because that emits a
-  // binding update and a binding update forces a re-read.
+  // Creating is the only entry point, and it happens here. The ⚡ mark in the
+  // sidebar is derived from what a conversation holds, so a popover that
+  // changes that and says nothing leaves the mark where it was until restart.
   {
     await harness(
       "mount",
-      "ConversationCoaches",
+      "ConversationAnalyses",
       { sessionId: "s1" },
       {
-        listCoachAutomationsForSession: [binding("b1")],
-        listCoachAutomations: [summary(automation("a1", "Morning briefing"))],
-        listCoachAutomationRuns: []
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Post-run debrief"))
+        ],
+        listCoachAnalysisRuns: []
+      }
+    );
+    await waitFor(
+      () => harness("exists", ".chat-coaches-pill"),
+      "the chip renders"
+    );
+    await harness("click", ".chat-coaches-pill");
+    await waitFor(
+      () => harness("exists", ".chat-coaches-create"),
+      "the popover opens"
+    );
+    await harness("clearCalls");
+
+    // Create: the button reaches the parent, which is what opens the screen.
+    await harness("click", ".chat-coaches-create");
+    await waitFor(
+      () => harness("callCount", "prop:onCreateAnalysis"),
+      "Create Auto Analysis has to reach the screen that hosts the form"
+    );
+
+    // And each row reaches that analysis's own detail screen, which is where
+    // everything a popover cannot hold now lives.
+    await harness("click", ".chat-coaches-pill");
+    await waitFor(
+      () => harness("exists", ".chat-coaches-row"),
+      "the popover reopens"
+    );
+    await harness("click", '[aria-label="Open Post-run debrief"]');
+    const [opened] = await waitFor(
+      async () => {
+        const made = await harness("calls", "prop:onOpenAnalysis");
+        return made.length ? made : null;
+      },
+      "the options entry point opens that analysis"
+    );
+    assert.deepEqual(opened.args, ["a1"]);
+
+    // Switching one off is a change the sidebar's mark depends on.
+    await harness("click", ".chat-coaches-pill");
+    await waitFor(() => harness("exists", ".chat-coaches-row"), "reopened");
+    await harness("click", ".chat-coaches-row-switch input");
+    await waitFor(
+      () => harness("callCount", "setCoachAnalysisEnabled"),
+      "the switch reaches the store"
+    );
+    await waitFor(
+      () => harness("callCount", "prop:onChanged"),
+      "and the popover tells the screen around it, or the ⚡ mark never moves"
+    );
+    assert.ok(
+      await harness("callCount", "listCoachAnalysesForSession"),
+      "and re-reads its own rows"
+    );
+    await assertQuietConsole("the analyses popover");
+  }
+
+  // -------------------------------------------------------------------------
+  // The popover following an edit made on the detail screen over it
+  // -------------------------------------------------------------------------
+  // Every row here is drawn from the analysis — its name, the trigger under
+  // it, the switch that decides whether it reads as running — and the detail
+  // screen sits on top of this popover's parent. Without the push, a rename
+  // left the row showing the old name until something unrelated refreshed it.
+  {
+    await harness(
+      "mount",
+      "ConversationAnalyses",
+      { sessionId: "s1" },
+      {
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Morning briefing"))
+        ],
+        listCoachAnalysisRuns: []
       }
     );
     await waitFor(
@@ -387,21 +350,24 @@ async function main() {
       "the attached coach is named in the popover"
     );
 
-    // The athlete renames the coach somewhere else. Nothing about this
-    // conversation's bindings changed, and no run happened.
+    // The athlete renames it from its own screen. No run happened, and
+    // nothing else about this conversation changed.
     await harness("setScript", {
-      listCoachAutomations: [summary(automation("a1", "Evening debrief"))]
+      listCoachAnalysesForSession: [
+        summary(analysis("a1", "Evening debrief"))
+      ]
     });
-    await harness("emit", "onCoachAutomationUpdate", {
-      automationId: "a1",
-      automation: automation("a1", "Evening debrief")
+    await harness("emit", "onCoachAnalysisUpdate", {
+      analysisId: "a1",
+      sessionId: "s1",
+      analysis: analysis("a1", "Evening debrief")
     });
     await waitFor(
       async () =>
         (await harness("text", ".chat-coaches-row-name"))?.includes(
           "Evening debrief"
         ) || null,
-      "the row follows the edit without the athlete detaching and re-attaching"
+      "the row follows the edit without anything else forcing a re-read"
     );
     await assertQuietConsole("an edit reaching the popover");
   }
@@ -409,15 +375,15 @@ async function main() {
   // -------------------------------------------------------------------------
   // The master switch reaching the conversations the coach is attached to
   // -------------------------------------------------------------------------
-  // A binding runs only when its own switch and the automation's are both on,
-  // which is what the runner checks and what `listCoachAutomationSessionAttention`
+  // A attachment runs only when its own switch and the analysis's are both on,
+  // which is what the runner checks and what `listCoachAnalysisSessionAttention`
   // counts. Switching a coach off therefore moves the ⚡ mark on conversations
-  // this window never touched — with no binding update and no run to say so.
+  // this window never touched — with no attachment update and no run to say so.
   {
     await harness("mount", "ChatView", {}, {
       ...CHAT_VIEW_BASE,
       listChatSessions: [session("s1", "Morning briefing")],
-      listCoachAutomationRuns: []
+      listCoachAnalysisRuns: []
     });
     await waitFor(
       () => harness("exists", ".chat-session-row"),
@@ -425,12 +391,12 @@ async function main() {
     );
 
     await harness("clearCalls");
-    await harness("emit", "onCoachAutomationUpdate", {
-      automationId: "a1",
-      automation: automation("a1", "Morning briefing", { enabled: false })
+    await harness("emit", "onCoachAnalysisUpdate", {
+      analysisId: "a1",
+      analysis: analysis("a1", "Morning briefing", { enabled: false })
     });
     await waitFor(
-      () => harness("callCount", "listCoachAutomationSessionAttention"),
+      () => harness("callCount", "listCoachAnalysisSessionAttention"),
       "switching a coach off has to re-read the marks it just changed"
     );
     await assertQuietConsole("a definition change reaching the attention marks");
@@ -447,7 +413,7 @@ async function main() {
     await harness("mount", "ChatView", {}, {
       ...CHAT_VIEW_BASE,
       listChatSessions: [session("s1", "Morning briefing")],
-      listCoachAutomationRuns: []
+      listCoachAnalysisRuns: []
     });
     await waitFor(
       () => harness("exists", ".chat-session-row"),
@@ -455,7 +421,7 @@ async function main() {
     );
 
     await harness("clearCalls");
-    await harness("emit", "onCoachAutomationRunUpdate", run("r1", { sessionId: "s2" }));
+    await harness("emit", "onCoachAnalysisRunUpdate", run("r1", { sessionId: "s2" }));
     await waitFor(
       () => harness("callCount", "listChatSessions"),
       "a run that reaches into the conversation list must make the sidebar re-read it"
@@ -467,7 +433,7 @@ async function main() {
     await harness("clearCalls");
     await harness(
       "emit",
-      "onCoachAutomationRunUpdate",
+      "onCoachAnalysisRunUpdate",
       run("r2", { status: "skipped", skipReason: "cooldown" })
     );
     await settle();
@@ -483,7 +449,7 @@ async function main() {
   // 9.3: a run into a conversation nobody is looking at
   // -------------------------------------------------------------------------
   // Ported from the weakest regex in the block — one that *counted call sites*
-  // (`onCoachAutomationRunUpdate` appearing three times) and called that a
+  // (`onCoachAnalysisRunUpdate` appearing three times) and called that a
   // claim about behaviour. What it was reaching for is this: the live-view
   // subscription ignores runs into conversations that are not open, which is
   // exactly the case the unread dot exists for, so something else has to watch
@@ -495,7 +461,7 @@ async function main() {
         session("s1", "Morning briefing"),
         session("s2", "Post-run debrief")
       ],
-      listCoachAutomationRuns: []
+      listCoachAnalysisRuns: []
     });
     await waitFor(
       () => harness("exists", ".chat-session-row"),
@@ -506,15 +472,15 @@ async function main() {
     await harness("clearCalls");
     await harness(
       "emit",
-      "onCoachAutomationRunUpdate",
+      "onCoachAnalysisRunUpdate",
       run("r1", { status: "success", sessionId: "s2", summary: "Load is ramping." })
     );
     await waitFor(
-      () => harness("callCount", "listCoachAutomationSessionAttention"),
+      () => harness("callCount", "listCoachAnalysisSessionAttention"),
       "a run into a conversation nobody is looking at must re-read the marks"
     );
     assert.equal(
-      await harness("callCount", "markCoachAutomationSessionSeen"),
+      await harness("callCount", "markCoachAnalysisSessionSeen"),
       0,
       "and must not mark it read — that dot is the only thing that says it happened"
     );
@@ -524,12 +490,12 @@ async function main() {
     await harness("clearCalls");
     await harness(
       "emit",
-      "onCoachAutomationRunUpdate",
+      "onCoachAnalysisRunUpdate",
       run("r2", { status: "success", sessionId: "s1", summary: "Load is ramping." })
     );
     const [seen] = await waitFor(
       async () => {
-        const made = await harness("calls", "markCoachAutomationSessionSeen");
+        const made = await harness("calls", "markCoachAnalysisSessionSeen");
         return made.length ? made : null;
       },
       "a run into the open conversation is read on arrival"
@@ -544,13 +510,13 @@ async function main() {
   // The Coach panel stays mounted once it has been opened, so a conversation
   // stays "open" long after the athlete has walked away to Overview. Reading
   // that as "the athlete is looking at it" marked an auto run read the instant
-  // it landed, and the unread dot — the only thing that says an automation ran
+  // it landed, and the unread dot — the only thing that says an analysis ran
   // while nobody was watching — was cleared before it was ever drawn.
   {
     await harness("mount", "ChatView", { active: false }, {
       ...CHAT_VIEW_BASE,
       listChatSessions: [session("s1", "Morning briefing")],
-      listCoachAutomationRuns: []
+      listCoachAnalysisRuns: []
     });
     await waitFor(
       () => harness("exists", ".chat-session-row"),
@@ -560,15 +526,15 @@ async function main() {
     await harness("clearCalls");
     await harness(
       "emit",
-      "onCoachAutomationRunUpdate",
+      "onCoachAnalysisRunUpdate",
       run("r1", { status: "success", sessionId: "s1", summary: "Load is ramping." })
     );
     await waitFor(
-      () => harness("callCount", "listCoachAutomationSessionAttention"),
+      () => harness("callCount", "listCoachAnalysisSessionAttention"),
       "a run into a conversation nobody is looking at must re-read the marks"
     );
     assert.equal(
-      await harness("callCount", "markCoachAutomationSessionSeen"),
+      await harness("callCount", "markCoachAnalysisSessionSeen"),
       0,
       "the conversation is open but off screen — marking it read loses the dot"
     );
@@ -579,7 +545,7 @@ async function main() {
     await harness("setProps", { active: true });
     const [seenOnReturn] = await waitFor(
       async () => {
-        const made = await harness("calls", "markCoachAutomationSessionSeen");
+        const made = await harness("calls", "markCoachAnalysisSessionSeen");
         return made.length ? made : null;
       },
       "returning to the Coach view reads what landed while it was hidden"
@@ -591,7 +557,7 @@ async function main() {
   // -------------------------------------------------------------------------
   // 5.6b: the live bubble re-establishing on a conversation opened mid-run
   // -------------------------------------------------------------------------
-  // Ported from a regex over `statuses: ["running"] ... showLiveAutomation`.
+  // Ported from a regex over `statuses: ["running"] ... showLiveAnalysis`.
   // That one asserted a query existed and that a call site existed within 200
   // characters of it — not that opening a conversation runs the query, and not
   // that the answer reaches the screen.
@@ -606,16 +572,13 @@ async function main() {
           session("s1", "Morning briefing"),
           session("s2", "Post-run debrief")
         ],
-        getCoachAutomation: {
-          automation: automation("a1", "Post-run debrief"),
-          bindings: []
-        },
+        getCoachAnalysis: analysis("a1", "Post-run debrief"),
         // Only the second conversation is being written into. The first is the
         // one ChatView opens on mount, so a bubble on screen before the click
         // would be the query answering indiscriminately rather than per
         // conversation.
         __byArg: {
-          listCoachAutomationRuns: {
+          listCoachAnalysisRuns: {
             [JSON.stringify({
               sessionId: "s2",
               statuses: ["running"],
@@ -632,16 +595,15 @@ async function main() {
     );
     await settle();
     assert.equal(
-      await harness("exists", ".chat-automation-attribution"),
+      await harness("exists", ".chat-analysis-attribution"),
       false,
       "the conversation opened on mount has no run in it"
     );
 
-    // The athlete opens the other one, which a `per-run` binding invites: its
-    // conversation appears in the sidebar the moment the run starts.
+    // The athlete opens the other one: a run is already streaming into it.
     await harness("clickText", ".chat-session-row", "Post-run debrief");
     const attribution = await waitFor(
-      () => harness("text", ".chat-automation-attribution"),
+      () => harness("text", ".chat-analysis-attribution"),
       "opening a conversation mid-run must pick up the run already streaming into it"
     );
     // And it names the coach: the run record carries ids, so the chip is worth
@@ -666,41 +628,40 @@ async function main() {
       since: "2026-08-25T07:30:00.000Z",
       runId: "r1"
     };
-    await harness("mount", "CoachAutomationsPanel", {}, {
-      listCoachAutomations: [summary(automation("a1", "Post-run debrief"))],
-      getCoachAutomationPause: held,
-      resumeCoachAutomations: null
+    await harness("mount", "ChatSettingsPanel", {}, {
+      getCoachAnalysisPause: held,
+      resumeCoachAnalyses: null
     });
 
     const banner = await waitFor(
-      () => harness("text", ".coach-automation-banner"),
+      () => harness("text", ".coach-analysis-banner"),
       "a pause that happened while the window was closed still has to show"
     );
-    assert.match(banner, /Every automation is paused/);
+    assert.match(banner, /Every analysis is paused/);
     assert.match(banner, /login code/, "and say what has to happen");
 
-    await harness("clickText", ".coach-automation-banner button", "Resume");
+    await harness("clickText", ".coach-analysis-banner button", "Resume");
     await waitFor(
-      () => harness("callCount", "resumeCoachAutomations"),
+      () => harness("callCount", "resumeCoachAnalyses"),
       "Resume has to reach the main process, not just clear the banner"
     );
     await waitFor(
-      async () => (await harness("exists", ".coach-automation-banner")) === false,
+      async () => (await harness("exists", ".coach-analysis-banner")) === false,
       "and the banner goes with it"
     );
     await assertQuietConsole("the pause banner");
 
-    // The other direction: the pause arrives by push while the panel is open,
+    // The other direction: the pause arrives by push while Settings is open,
     // which is what happens when a scheduled run trips it with the athlete
     // looking at this very screen.
-    await harness("emit", "onCoachAutomationPauseUpdate", held);
+    await harness("emit", "onCoachAnalysisPauseUpdate", held);
     await waitFor(
-      () => harness("exists", ".coach-automation-banner"),
-      "a pause tripped while the panel is open must appear without a re-read"
+      () => harness("exists", ".coach-analysis-banner"),
+      "a pause tripped while Settings is open must appear without a re-read"
     );
-    await harness("emit", "onCoachAutomationPauseUpdate", null);
+    await harness("emit", "onCoachAnalysisPauseUpdate", null);
     await waitFor(
-      async () => (await harness("exists", ".coach-automation-banner")) === false,
+      async () => (await harness("exists", ".coach-analysis-banner")) === false,
       "and clearing it from elsewhere must take the banner away"
     );
     await assertQuietConsole("a pause arriving by push");
@@ -713,10 +674,9 @@ async function main() {
   // item. A regex could say the field exists; it could not say the athlete's
   // typed ceiling reaches the main process, which is the half that matters.
   {
-    await harness("mount", "CoachAutomationsPanel", {}, {
-      listCoachAutomations: [summary(automation("a1", "Post-run debrief"))],
-      getCoachAutomationPause: null,
-      getCoachAutomationSpend: {
+    await harness("mount", "ChatSettingsPanel", {}, {
+      getCoachAnalysisPause: null,
+      getCoachAnalysisSpend: {
         monthStart: "2026-09-01T00:00:00.000Z",
         inputTokens: 412_000,
         outputTokens: 71_000,
@@ -724,7 +684,7 @@ async function main() {
         countedRuns: 12,
         providerRuns: 12
       },
-      setCoachAutomationBudget: {
+      setCoachAnalysisBudget: {
         monthStart: "2026-09-01T00:00:00.000Z",
         inputTokens: 412_000,
         outputTokens: 71_000,
@@ -735,7 +695,7 @@ async function main() {
     });
 
     const spend = await waitFor(
-      () => harness("text", ".coach-automation-spend"),
+      () => harness("text", ".coach-analysis-spend"),
       "the panel has to say what the month has cost"
     );
     assert.match(spend, /483k/, "rounded, because nobody budgets to the token");
@@ -748,18 +708,18 @@ async function main() {
 
     // The ceiling reaches the main process, and what comes back is what the
     // field then shows — not the string the athlete typed.
-    await harness("setValue", ".coach-automation-budget input", "900000");
-    await harness("blur", ".coach-automation-budget input");
+    await harness("setValue", ".coach-analysis-budget input", "900000");
+    await harness("blur", ".coach-analysis-budget input");
     const [committed] = await waitFor(
       async () => {
-        const made = await harness("calls", "setCoachAutomationBudget");
+        const made = await harness("calls", "setCoachAnalysisBudget");
         return made.length ? made : null;
       },
       "the typed ceiling has to reach the main process"
     );
     assert.deepEqual(committed.args, [900_000], "as a number, not as the typed string");
     await waitFor(
-      async () => (await harness("value", ".coach-automation-budget input")) === "900000",
+      async () => (await harness("value", ".coach-analysis-budget input")) === "900000",
       "and the field shows what came back"
     );
     await assertQuietConsole("the spend line");
@@ -769,9 +729,8 @@ async function main() {
   {
     // A budget that read as comfortably under when nobody actually knows is
     // worse than no budget: it is a number the athlete would trust.
-    await harness("mount", "CoachAutomationsPanel", {}, {
-      listCoachAutomations: [summary(automation("a1", "Post-run debrief"))],
-      getCoachAutomationSpend: {
+    await harness("mount", "ChatSettingsPanel", {}, {
+      getCoachAnalysisSpend: {
         monthStart: "2026-09-01T00:00:00.000Z",
         inputTokens: 1_000,
         outputTokens: 200,
@@ -782,12 +741,12 @@ async function main() {
     });
 
     const spend = await waitFor(
-      () => harness("text", ".coach-automation-spend"),
-      "the panel renders its spend line"
+      () => harness("text", ".coach-analysis-spend"),
+      "Settings renders its spend line"
     );
     assert.match(spend, /4 runs not counted/, "and names how many it cannot see");
     assert.equal(
-      await harness("value", ".coach-automation-budget input"),
+      await harness("value", ".coach-analysis-budget input"),
       "",
       "no ceiling shows as empty, not as zero"
     );
@@ -796,14 +755,13 @@ async function main() {
 
   // --- a budget pause says which of the two reasons it is -------------------
   {
-    await harness("mount", "CoachAutomationsPanel", {}, {
-      listCoachAutomations: [summary(automation("a1", "Post-run debrief"))],
-      getCoachAutomationPause: {
+    await harness("mount", "ChatSettingsPanel", {}, {
+      getCoachAnalysisPause: {
         reason: "budget",
         since: "2026-09-20T07:30:00.000Z",
         runId: "r1"
       },
-      getCoachAutomationSpend: {
+      getCoachAnalysisSpend: {
         monthStart: "2026-09-01T00:00:00.000Z",
         inputTokens: 500_000,
         outputTokens: 0,
@@ -814,7 +772,7 @@ async function main() {
     });
 
     const banner = await waitFor(
-      () => harness("text", ".coach-automation-banner"),
+      () => harness("text", ".coach-analysis-banner"),
       "a budget pause has to explain itself"
     );
     assert.match(banner, /token budget ran out/);
@@ -827,382 +785,291 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 9.1: the slot the scheduler books, on a timer, with nobody watching
+  // 9.1: what the scheduler books, on a timer, with nobody watching
   // -------------------------------------------------------------------------
-  // "A schedule automation carries when it next fires on the trigger line...
-  // It fires with nobody watching, so the card is the only place the athlete
-  // can check it without opening anything." The scheduler books that slot on
-  // its own tick and there was no run to carry the news, so a briefing created
-  // at lunchtime showed no next-run line at all until something unrelated
-  // refreshed the screen. It is the first thing an athlete does with a schedule
-  // automation and the one question the card exists to answer.
+  // The scheduler books a slot on its own tick and there is no run to carry
+  // the news, so without the push a briefing created at lunchtime shows a
+  // stale row until something unrelated refreshes it.
   {
-    const booked = automation("a1", "Morning briefing");
+    const booked = analysis("a1", "Morning briefing");
     await harness(
       "mount",
-      "CoachAutomationsPanel",
-      {},
+      "ConversationAnalyses",
+      { sessionId: "s1" },
       {
-        listCoachAutomations: [summary(booked)],
-        getCoachAutomationPause: null,
-        getCoachAutomationSpend: {
-          monthStart: "2026-08-01T00:00:00.000Z",
-          inputTokens: 0,
-          outputTokens: 0,
-          budget: null,
-          countedRuns: 0,
-          providerRuns: 0
-        }
+        listCoachAnalysesForSession: [summary(booked)],
+        listCoachAnalysisRuns: []
       }
     );
-
     await waitFor(
-      () => harness("exists", ".coach-automation-card-trigger"),
-      "the card renders"
+      () => harness("exists", ".chat-coaches-pill"),
+      "the chip renders"
     );
-    const before = await harness("text", ".coach-automation-card-trigger");
-    assert.doesNotMatch(
-      before ?? "",
-      / · next /,
-      "fixture sanity: no slot has been booked yet"
+    await harness("click", ".chat-coaches-pill");
+    await waitFor(
+      () => harness("exists", ".chat-coaches-row-meta"),
+      "the popover lists the analysis"
+    );
+    assert.match(
+      (await harness("text", ".chat-coaches-row-meta")) ?? "",
+      /never run/,
+      "fixture sanity: it has not run yet"
     );
 
-    // 60 seconds later, in the main process, with this screen open: the
-    // scheduler's tick books the slot and pushes.
+    // 60 seconds later, in the main process, with this open: the tick books
+    // the slot, stamps the clock and pushes.
     await harness("setScript", {
-      listCoachAutomations: [
-        summary(booked, { nextRunAt: "2026-08-25T18:00:00.000Z" })
+      listCoachAnalysesForSession: [
+        summary(booked, { lastRun: run("r1", { status: "success" }) })
       ]
     });
     assert.equal(
-      await harness("emit", "onCoachAutomationBindingUpdate", binding("b1", {
-        nextRunAt: "2026-08-25T18:00:00.000Z"
-      })),
+      await harness("emit", "onCoachAnalysisUpdate", {
+        analysisId: "a1",
+        sessionId: "s1",
+        analysis: { ...booked, nextRunAt: "2026-08-25T18:00:00.000Z" }
+      }),
       1,
-      "the card has to be listening for it"
+      "the row has to be listening for it"
     );
 
     await waitFor(
       async () =>
-        / · next /.test((await harness("text", ".coach-automation-card-trigger")) ?? ""),
-      "the card says when it next fires"
+        !/never run/.test(
+          (await harness("text", ".chat-coaches-row-meta")) ?? "never run"
+        ) || null,
+      "the row follows what the tick wrote"
     );
     await assertQuietConsole("the booked slot");
   }
 
   // -------------------------------------------------------------------------
-  // 2.4: a binding broken while its own tab is open
+  // 2.4: an analysis switched off while its own screen is open
   // -------------------------------------------------------------------------
-  // Guard rail 2 disables an `existing` binding whose conversation the athlete
-  // deleted, and a `dedicated` one adopts the conversation it rebuilt. The run
-  // log tab hears about both on the run push; the rows a tab away read their
-  // bindings once, on mount, and went on showing the toggle on and no broken
-  // marker — half of each row live and half from mount.
+  // Guard rail 2 switches off an analysis whose conversation the athlete
+  // deleted, and the switch on the conversation's row does the same from the
+  // other side. Its own screen read the analysis once, on mount, and went on
+  // showing what it read.
   {
-    const detail = (bindings) => ({
-      automation: automation("a1", "Post-run debrief"),
-      bindings
-    });
+    const debrief = analysis("a1", "Post-run debrief");
     await harness(
       "mount",
-      "CoachAutomationDetail",
-      { tab: "bindings" },
-      {
-        __byArg: {
-          listCoachAutomationBindings: {
-            "*": [
-              binding("b1", {
-                enabled: false,
-                sessionMissing: true,
-                sessionTitle: "Tuesday intervals"
-              })
-            ]
-          }
-        },
-        getCoachAutomation: detail([
-          binding("b1", { sessionTitle: "Tuesday intervals" })
-        ]),
-        listCoachAutomationRuns: []
-      }
+      "AnalysisDetailView",
+      { tab: "settings" },
+      { getCoachAnalysis: debrief, listCoachAnalysisRuns: [] }
     );
 
     await waitFor(
-      () => harness("exists", ".coach-automation-binding-row"),
-      "the where-it-runs tab renders"
-    );
-    assert.equal(
-      await harness("count", '.coach-automation-binding-row[data-broken="true"]'),
-      0,
-      "fixture sanity: the row starts healthy"
+      () => harness("exists", ".coach-analysis-tabpanel"),
+      "the settings tab renders"
     );
     await harness("clearCalls");
 
     assert.equal(
-      await harness(
-        "emit",
-        "onCoachAutomationBindingUpdate",
-        binding("b1", { enabled: false })
-      ),
+      await harness("emit", "onCoachAnalysisUpdate", {
+        analysisId: "a1",
+        sessionId: "s1",
+        analysis: { ...debrief, name: "Renamed elsewhere" }
+      }),
       1,
-      "the tab has to be listening"
+      "the screen has to be listening"
     );
-
     await waitFor(
       async () =>
-        (await harness(
-          "count",
-          '.coach-automation-binding-row[data-broken="true"]'
-        )) === 1,
-      "the row goes broken without a reload"
-    );
-    assert.equal(
-      await harness("count", '.coach-automation-binding-row[data-off="true"]'),
-      1,
-      "and greyed, which is 9.2's own word for it"
+        (await harness("text", ".coach-analysis-tabs"))?.includes("Settings") ||
+        null,
+      "and stays on its feet"
     );
 
-    // Narrower than a full refresh on purpose: re-reading the definition would
+    // Narrower than a full refresh on purpose: re-reading the analysis would
     // throw away a playbook the athlete is part-way through typing.
     assert.equal(
-      await harness("callCount", "getCoachAutomation"),
+      await harness("callCount", "getCoachAnalysis"),
       0,
-      "the definition is not re-read underneath an edit"
+      "the analysis is not re-read underneath an edit"
     );
-    await assertQuietConsole("the broken binding row");
+
+    // Deleted from somewhere else: this screen is about something that no
+    // longer exists, so it has to leave rather than sit on a 404.
+    assert.equal(
+      await harness("emit", "onCoachAnalysisUpdate", {
+        analysisId: "a1",
+        sessionId: "s1",
+        analysis: null
+      }),
+      1
+    );
+    await waitFor(
+      () => harness("callCount", "prop:onBack"),
+      "a deleted analysis takes its own screen with it"
+    );
+    await assertQuietConsole("an analysis changing under its screen");
   }
 
-  // --- and a binding belonging to a different coach is not this tab's --------
+  // --- and one belonging to a different analysis is not this screen's -------
   {
-    // The negative half. A push that fires for everything passes every "did it
-    // fire" test, and this screen is one of several open on the same channel.
+    // The negative half. A push that fires for everything passes every "did
+    // it fire" test, and this screen is one of several on the same channel.
     await harness(
       "mount",
-      "CoachAutomationDetail",
-      { tab: "bindings" },
+      "AnalysisDetailView",
+      { tab: "settings" },
       {
-        __byArg: { listCoachAutomationBindings: { "*": [binding("b1")] } },
-        getCoachAutomation: {
-          automation: automation("a1", "Post-run debrief"),
-          bindings: [binding("b1")]
-        },
-        listCoachAutomationRuns: []
+        getCoachAnalysis: analysis("a1", "Post-run debrief"),
+        listCoachAnalysisRuns: []
       }
     );
     await waitFor(
-      () => harness("exists", ".coach-automation-binding-row"),
-      "the tab renders"
+      () => harness("exists", ".coach-analysis-tabpanel"),
+      "the settings tab renders"
     );
     await harness("clearCalls");
 
-    await harness(
-      "emit",
-      "onCoachAutomationBindingUpdate",
-      binding("b9", { automationId: "a2" })
-    );
+    await harness("emit", "onCoachAnalysisUpdate", {
+      analysisId: "somebody-else",
+      sessionId: "s9",
+      analysis: null
+    });
     await settle();
     assert.equal(
-      await harness("callCount", "listCoachAutomationBindings"),
+      await harness("callCount", "prop:onBack"),
       0,
-      "another coach's binding is not this screen's business"
+      "another analysis being deleted must not close this one"
     );
+    await assertQuietConsole("a push for another analysis");
   }
 
   // -------------------------------------------------------------------------
-  // The same news, on the conversation side
+  // 10: the run flag has to outlast the gap inside a catch-up
   // -------------------------------------------------------------------------
+  // A trigger can expand into a sequence of runs, serialised (5.4), so between
+  // two of them there is a moment with no `running` row at all. A row reading
+  // only the log would offer "Run now" in the middle of its own sequence, and
+  // a second press would queue a second one. The flag is set on the click and
+  // cleared when the whole thing has answered, and nowhere else.
   {
-    // The popover renders the same rows from the other direction, and an
-    // athlete who never opens the Automations screen sees only this one.
     await harness(
       "mount",
-      "ConversationCoaches",
-      {},
+      "ConversationAnalyses",
+      { sessionId: "s1" },
       {
-        listCoachAutomationsForSession: [binding("b1", { sessionTitle: "Daily" })],
-        listCoachAutomations: [summary(automation("a1", "Morning briefing"))],
-        listCoachAutomationRuns: []
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Post-run debrief"))
+        ],
+        listCoachAnalysisRuns: [],
+        // The sequence is still going when the driver comes back.
+        runCoachAnalysisNow: "__pending"
       }
     );
     await waitFor(
       () => harness("exists", ".chat-coaches-pill"),
-      "the header chip renders"
+      "the chip renders"
     );
-    await harness("clearCalls");
-
-    assert.equal(
-      await harness("emit", "onCoachAutomationBindingUpdate", binding("b1")),
-      1,
-      "the popover listens too"
-    );
+    await harness("click", ".chat-coaches-pill");
     await waitFor(
-      () => harness("callCount", "listCoachAutomationsForSession"),
-      "and re-reads its rows"
+      () => harness("exists", '[aria-label="Run now"]'),
+      "the popover lists the analysis"
     );
-    await assertQuietConsole("the popover's binding update");
-  }
 
-  // -------------------------------------------------------------------------
-  // 10: the card's run flag has to outlast the gap inside its own fan-out
-  // -------------------------------------------------------------------------
-  // Ported from the weakest assertion left in the repo — a *call-site count*
-  // (`setStartingId` appearing exactly twice), which is the pattern section 11
-  // names as the one worth deleting first. It cannot say what the flag is for,
-  // and it fails just as loudly for a correct third call site as for a wrong
-  // one.
-  //
-  // What it was reaching for: a trigger fans out to one run per place and they
-  // are serialised (5.4), so between two of them there is a moment with no
-  // `running` row at all. A card reading only the log would offer "Run now" in
-  // the middle of its own fan-out — and a second press would queue a second
-  // one. The flag is set on the click and cleared when the whole fan-out has
-  // answered, and nowhere else.
-  {
-    const fanning = automation("a1", "Post-run debrief");
-    await harness(
-      "mount",
-      "CoachAutomationsPanel",
-      {},
-      {
-        listCoachAutomations: [summary(fanning)],
-        getCoachAutomationPause: null,
-        getCoachAutomationSpend: {
-          monthStart: "2026-08-01T00:00:00.000Z",
-          inputTokens: 0,
-          outputTokens: 0,
-          budget: null,
-          countedRuns: 0,
-          providerRuns: 0
-        },
-        // The fan-out is still going when the driver comes back.
-        runCoachAutomationNow: "__pending"
-      }
-    );
+    await harness("click", '[aria-label="Run now"]');
     await waitFor(
-      () => harness("exists", ".coach-automation-card-actions"),
-      "the card renders"
+      () => harness("callCount", "runCoachAnalysisNow"),
+      "the sequence started"
     );
 
-    assert.equal(
-      await harness("clickText", ".coach-automation-card-actions button", "Run now"),
-      true,
-      "one place, so it runs straight away rather than asking which"
-    );
-    await waitFor(
-      () => harness("callCount", "runCoachAutomationNow"),
-      "the fan-out started"
-    );
-
-    // The first place finished. The second has not started: no `running` row
+    // The first step finished. The second has not started: no `running` row
     // exists anywhere, which is exactly the gap.
     await harness(
       "emit",
-      "onCoachAutomationRunUpdate",
+      "onCoachAnalysisRunUpdate",
       run("run-1", { status: "success", finishedAt: "2026-08-25T09:00:04.000Z" })
     );
     await settle();
     assert.equal(
-      await harness("exists", '.coach-automation-card-actions button[aria-busy="true"]'),
+      await harness("exists", '[aria-label="Run now"][disabled]'),
       true,
-      "the card still says a run is going, with no `running` row to read it from"
-    );
-    assert.equal(
-      await harness("count", ".coach-automation-card-actions button:not([disabled])"),
-      1,
-      "and the only button left alive is Manage — not a second Run now"
+      "the row still says a run is going, with no `running` row to read it from"
     );
 
-    // The fan-out answers. Now, and only now, the card offers again.
-    await harness("resolvePending", "runCoachAutomationNow", []);
+    // The sequence answers. Now, and only now, the row offers again.
+    await harness("resolvePending", "runCoachAnalysisNow", []);
     await waitFor(
       async () =>
-        (await harness(
-          "exists",
-          '.coach-automation-card-actions button[aria-busy="true"]'
-        )) === false,
-      "and once the whole fan-out has answered, it offers again"
+        (await harness("exists", '[aria-label="Run now"][disabled]')) === false,
+      "and once the whole sequence has answered, it offers again"
     );
-    assert.equal(
-      await harness("count", ".coach-automation-card-actions button:not([disabled])"),
-      2,
-      "both actions are live again"
-    );
-    await assertQuietConsole("the run flag across a fan-out");
+    await assertQuietConsole("the run flag across a sequence");
   }
 
-  // --- a tick that books several slots at once ------------------------------
+  // --- a burst of pushes must not spin the popover -------------------------
   {
-    // The scheduler books on its own tick, and one tick can seed every binding
-    // of an automation the athlete just attached in five places. That is five
-    // pushes in a row into a screen whose refresh sets state that another
-    // effect watches — the shape of the infinite render loop phase 1's second
-    // review found, which announced itself only in the console.
-    const booked = automation("a1", "Morning briefing");
+    // One tick can stamp several analyses in one conversation. That is five
+    // pushes in a row into a screen whose refresh sets state another effect
+    // watches — the shape of the infinite render loop phase 1's second review
+    // found, which announced itself only in the console.
     await harness(
       "mount",
-      "CoachAutomationsPanel",
-      {},
+      "ConversationAnalyses",
+      { sessionId: "s1" },
       {
-        listCoachAutomations: [
-          summary(booked, { bindingCount: 5, enabledBindingCount: 5 })
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Morning briefing"))
         ],
-        getCoachAutomationPause: null,
-        getCoachAutomationSpend: {
-          monthStart: "2026-08-01T00:00:00.000Z",
-          inputTokens: 0,
-          outputTokens: 0,
-          budget: null,
-          countedRuns: 0,
-          providerRuns: 0
-        }
+        listCoachAnalysisRuns: []
       }
     );
     await waitFor(
-      () => harness("exists", ".coach-automation-card-trigger"),
-      "the card renders"
+      () => harness("exists", ".chat-coaches-pill"),
+      "the chip renders"
     );
     await harness("clearCalls");
 
-    for (const id of ["b1", "b2", "b3", "b4", "b5"]) {
-      await harness("emit", "onCoachAutomationBindingUpdate", binding(id, {
-        nextRunAt: "2026-08-25T18:00:00.000Z"
-      }));
+    for (const id of ["a1", "a2", "a3", "a4", "a5"]) {
+      await harness("emit", "onCoachAnalysisUpdate", {
+        analysisId: id,
+        sessionId: "s1",
+        analysis: analysis(id, "Morning briefing", {
+          nextRunAt: "2026-08-25T18:00:00.000Z"
+        })
+      });
     }
     await settle();
 
     // Five pushes, five reads, and then it stops. A count that kept climbing
     // after the page settled is the loop this is here to catch.
-    const settledReads = await harness("callCount", "listCoachAutomations");
+    const settledReads = await harness("callCount", "listCoachAnalysesForSession");
     await settle();
     assert.equal(
-      await harness("callCount", "listCoachAutomations"),
+      await harness("callCount", "listCoachAnalysesForSession"),
       settledReads,
-      "the panel settles rather than re-reading itself in a loop"
+      "the popover settles rather than re-reading itself in a loop"
     );
     assert.ok(
       settledReads <= 5,
       `one read per push at most, saw ${settledReads}`
     );
-    await assertQuietConsole("a burst of booked slots");
+    await assertQuietConsole("a burst of pushes");
   }
 
-  // --- and every other way the popover changes a binding says so too --------
+  // --- and the switch reports itself too ----------------------------------
   {
-    // Found by mutating the suite rather than by reading it: cutting the report
-    // out of the popover's shared mutation wrapper — the switch, the reorder,
-    // the detach — left the whole renderer suite green. The attach path had a
-    // test and these three had only a regex in the bindings suite, which is the
-    // kind of claim section 11 says belongs in the harness now that there is
-    // one. The ⚡ mark is derived from the bindings, so a place paused here and
-    // not reported leaves the mark where it was until the app restarts.
+    // Found by mutating the suite rather than by reading it: cutting the
+    // report out of the popover's shared mutation wrapper left the whole
+    // renderer suite green. The ⚡ mark is derived from what a conversation
+    // holds, so an analysis paused here and not reported leaves the mark
+    // where it was until the app restarts.
     await harness(
       "mount",
-      "ConversationCoaches",
-      {},
+      "ConversationAnalyses",
+      { sessionId: "s1" },
       {
-        listCoachAutomationsForSession: [binding("b1", { sessionTitle: "Daily" })],
-        listCoachAutomations: [summary(automation("a1", "Morning briefing"))],
-        listCoachAutomationRuns: [],
-        setCoachAutomationBindingEnabled: binding("b1", { enabled: false })
+        listCoachAnalysesForSession: [
+          summary(analysis("a1", "Morning briefing"))
+        ],
+        listCoachAnalysisRuns: [],
+        setCoachAnalysisEnabled: analysis("a1", "Morning briefing", {
+          enabled: false
+        })
       }
     );
     await waitFor(
@@ -1218,17 +1085,17 @@ async function main() {
 
     await harness("click", ".chat-coaches-row-switch input");
     await waitFor(
-      () => harness("callCount", "setCoachAutomationBindingEnabled"),
-      "the place is paused"
+      () => harness("callCount", "setCoachAnalysisEnabled"),
+      "the analysis is paused"
     );
     await waitFor(
       () => harness("callCount", "prop:onChanged"),
       "and the screen around it is told, or the ⚡ mark never moves"
     );
-    await assertQuietConsole("pausing a place from the popover");
+    await assertQuietConsole("pausing an analysis from the popover");
   }
 
-  console.log("coach automation renderer tests passed");
+  console.log("coach analysis renderer tests passed");
 }
 
 main().then(
