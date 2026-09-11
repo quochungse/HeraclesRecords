@@ -431,6 +431,9 @@ export function TrainingOverview({
             <div className="training-intelligence-grid">
               <div className="training-intelligence-column">
                 <RecoveryRing summary={summary} weekTotals={weekTotals} />
+              </div>
+              <div className="training-intelligence-column">
+                <FitnessTrendPanel snapshot={snapshot} activities={activities} />
                 <SleepSummaryPanel
                   sleep={snapshot?.sleep}
                   connecting={sleepConnecting}
@@ -438,16 +441,17 @@ export function TrainingOverview({
                   onOpenDetails={onOpenSleepDetails}
                 />
               </div>
-              <div className="training-intelligence-column">
-                <FitnessTrendPanel snapshot={snapshot} activities={activities} />
-                <UpcomingWorkoutsPanel
-                  api={api}
-                  workouts={upcomingWorkouts}
-                  sportTypes={sportTypes}
-                />
-              </div>
             </div>
           </section>
+
+          {/* Its own row, directly under Training Intelligence. The panel
+              renders nothing when the calendar is empty, so a week with no
+              scheduled sessions leaves no gap here. */}
+          <UpcomingWorkoutsPanel
+            api={api}
+            workouts={upcomingWorkouts}
+            sportTypes={sportTypes}
+          />
 
           <div className="training-heatmap-wrap">
             <TrainingHeatmapPanel
@@ -458,7 +462,6 @@ export function TrainingOverview({
           </div>
           <TrainingTrendCharts
             points={snapshot?.trendPoints ?? []}
-            activities={activities}
             mcpConnected={snapshot?.sleep?.mcpConnected}
           />
           <TrainingZoneDistributionCharts

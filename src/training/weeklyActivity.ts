@@ -4,9 +4,35 @@ import type {
   TrainingHubDailyMetric
 } from "../../electron/types";
 import type { UnitSystem } from "../../electron/types";
+import {
+  SPORT_COLOR_CATEGORIES,
+  SPORT_COLOR_LABELS,
+  sportColorCategory
+} from "./sportColors";
+import type { SportColorCategory } from "./sportColors";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
 
 export type WeeklyActivityMetric = "distance" | "duration" | "trainingLoad";
+
+/** Key and label of the block standing for a day's value no activity claims. */
+export const WEEKLY_ACTIVITY_RESIDUAL_KEY = "residual";
+const WEEKLY_ACTIVITY_RESIDUAL_LABEL = "Unattributed";
+
+/**
+ * One block of a day's column — an activity, coloured by its sport, so a day
+ * holding a run and a ride reads as two blocks rather than one blended bar.
+ * Mirrors `TrainingLoadBlock`, which splits the load columns the same way.
+ */
+export interface WeeklyActivitySegment {
+  /** An activityId, or WEEKLY_ACTIVITY_RESIDUAL_KEY for the day's leftover. */
+  key: string;
+  label: string;
+  /** null only on the residual block, which stands for no sport. */
+  category: SportColorCategory | null;
+  /** Chart space, the same scale as `WeeklyActivityDay.value`. */
+  value: number;
+  displayValue: string;
+}
 
 export interface WeeklyActivityDay {
   happenDay: string;
@@ -14,6 +40,12 @@ export interface WeeklyActivityDay {
   value: number;
   displayValue: string;
   isToday: boolean;
+  /**
+   * Bottom to top — activities in start order, residual last. Empty when no
+   * activity carries this metric, which is what keeps a day COROS reported but
+   * whose activities have not loaded on the plain unattributed fill.
+   */
+  segments: WeeklyActivitySegment[];
 }
 
 export interface WeeklyActivitySeries {
@@ -23,6 +55,12 @@ export interface WeeklyActivitySeries {
   hasData: boolean;
   metricLabel: string;
   yAxisUnit: string;
+}
+
+export interface WeeklyActivityLegendEntry {
+  key: string;
+  label: string;
+  category: SportColorCategory | null;
 }
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -240,13 +278,67 @@ function formatAxisTick(value: number, metric: WeeklyActivityMetric, useMinutes:
   return value >= 1 ? value.toFixed(1) : value.toFixed(2);
 }
 
+/**
+ * Below this a block rounds to nothing on screen, so it is treated as absent
+ * rather than drawn as a sliver claiming a session that carried no distance.
+ * Raw units, per metric: metres, seconds, load.
+ */
+const SEGMENT_EPSILON: Record<WeeklyActivityMetric, number> = {
+  distance: 10,
+  duration: 30,
+  trainingLoad: 0.5
+};
+
+function readActivityMetricRaw(
+  activity: TrainingHubActivity,
+  metric: WeeklyActivityMetric
+): number | undefined {
+  switch (metric) {
+    case "distance":
+      return activity.distance;
+    case "duration":
+      return activity.duration;
+    case "trainingLoad":
+      return activity.trainingLoad;
+  }
+}
+
+function groupActivitiesByDay(
+  activities: TrainingHubActivity[]
+): Map<string, TrainingHubActivity[]> {
+  const byDay = new Map<string, TrainingHubActivity[]>();
+
+  for (const activity of activities) {
+    const happenDay = happenDayFromTimestamp(activity.startTime);
+    if (!happenDay) {
+      continue;
+    }
+
+    const existing = byDay.get(happenDay);
+    if (existing) {
+      existing.push(activity);
+    } else {
+      byDay.set(happenDay, [activity]);
+    }
+  }
+
+  for (const list of byDay.values()) {
+    list.sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0));
+  }
+
+  return byDay;
+}
+
 export function buildWeeklyActivitySeries(
   dayList: TrainingHubDailyMetric[],
   metric: WeeklyActivityMetric,
   referenceDate = new Date(),
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  activities: TrainingHubActivity[] = []
 ): WeeklyActivitySeries {
   const dayMap = new Map(dayList.map((day) => [day.happenDay, day]));
+  const activitiesByDay = groupActivitiesByDay(activities);
+  const epsilon = SEGMENT_EPSILON[metric];
   const weekKeys = getCalendarWeekDateKeys(referenceDate);
   const todayKey = dateToHappenDay(referenceDate);
   let totalRaw = 0;
@@ -255,11 +347,63 @@ export function buildWeeklyActivitySeries(
 
   const days = weekKeys.map((happenDay, index) => {
     const raw = readMetricRaw(dayMap.get(happenDay), metric);
-    const hasValue = raw !== undefined && Number.isFinite(raw) && raw > 0;
-    const chartValue = hasValue ? toChartValue(raw, metric, unitSystem) : 0;
+    const dailyRaw =
+      raw !== undefined && Number.isFinite(raw) && raw > 0 ? raw : 0;
 
-    if (hasValue && raw !== undefined) {
-      totalRaw += raw;
+    // The column height is COROS's daily figure, the same rule the training
+    // load columns follow — except when the activities add up to more, in
+    // which case clipping a session that happened would be the worse lie.
+    const blocks: { activity: TrainingHubActivity; raw: number }[] = [];
+    let attributedRaw = 0;
+    for (const activity of activitiesByDay.get(happenDay) ?? []) {
+      const activityRaw = readActivityMetricRaw(activity, metric);
+      if (
+        activityRaw === undefined ||
+        !Number.isFinite(activityRaw) ||
+        activityRaw < epsilon
+      ) {
+        continue;
+      }
+      blocks.push({ activity, raw: activityRaw });
+      attributedRaw += activityRaw;
+    }
+
+    const dayRaw = Math.max(dailyRaw, attributedRaw);
+    const hasValue = dayRaw > 0;
+    const chartValue = hasValue ? toChartValue(dayRaw, metric, unitSystem) : 0;
+
+    const segments: WeeklyActivitySegment[] = blocks.map(
+      ({ activity, raw: blockRaw }) => {
+        const category = sportColorCategory(activity.sportType);
+        return {
+          key: activity.activityId,
+          // The sport, not the activity's own name: names are free text an
+          // athlete edits, and the label has to match the legend beside it.
+          label: SPORT_COLOR_LABELS[category],
+          category,
+          value: toChartValue(blockRaw, metric, unitSystem),
+          displayValue: formatDayDisplayValue(blockRaw, metric, unitSystem)
+        };
+      }
+    );
+
+    // Load COROS counted outside a session, or a session synced without this
+    // metric, becomes one neutral block rather than quietly disappearing. It
+    // only appears beside attributed blocks: on its own it would repaint every
+    // ordinary day grey while the activity list is still loading.
+    if (segments.length > 0 && dayRaw - attributedRaw >= epsilon) {
+      const residualRaw = dayRaw - attributedRaw;
+      segments.push({
+        key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
+        label: WEEKLY_ACTIVITY_RESIDUAL_LABEL,
+        category: null,
+        value: toChartValue(residualRaw, metric, unitSystem),
+        displayValue: formatDayDisplayValue(residualRaw, metric, unitSystem)
+      });
+    }
+
+    if (hasValue) {
+      totalRaw += dayRaw;
       hasData = true;
       maxChartValue = Math.max(maxChartValue, chartValue);
     }
@@ -268,10 +412,11 @@ export function buildWeeklyActivitySeries(
       happenDay,
       weekdayLabel: WEEKDAY_LABELS[index],
       value: chartValue,
-      displayValue: hasValue && raw !== undefined
-        ? formatDayDisplayValue(raw, metric, unitSystem)
+      displayValue: hasValue
+        ? formatDayDisplayValue(dayRaw, metric, unitSystem)
         : "—",
-      isToday: happenDay === todayKey
+      isToday: happenDay === todayKey,
+      segments
     };
   });
 
@@ -289,6 +434,49 @@ export function buildWeeklyActivitySeries(
     metricLabel: getWeeklyActivityMetricLabel(metric, unitSystem),
     yAxisUnit: yAxisUnitForMetric(metric, maxChartValue, unitSystem)
   };
+}
+
+/**
+ * Legend for a week's columns: the sports actually present, in the canonical
+ * order the colour settings list them, plus the residual entry when one is
+ * drawn. Takes one day array per metric on the chart, since the sports shown
+ * are the union across them.
+ */
+export function weeklyActivitySportLegend(
+  dayGroups: readonly (readonly WeeklyActivityDay[])[]
+): WeeklyActivityLegendEntry[] {
+  const present = new Set<SportColorCategory>();
+  let hasResidual = false;
+
+  for (const days of dayGroups) {
+    for (const day of days) {
+      for (const segment of day.segments) {
+        if (segment.category) {
+          present.add(segment.category);
+        } else {
+          hasResidual = true;
+        }
+      }
+    }
+  }
+
+  const entries: WeeklyActivityLegendEntry[] = SPORT_COLOR_CATEGORIES.filter(
+    (category) => present.has(category)
+  ).map((category) => ({
+    key: category,
+    label: SPORT_COLOR_LABELS[category],
+    category
+  }));
+
+  if (hasResidual) {
+    entries.push({
+      key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
+      label: WEEKLY_ACTIVITY_RESIDUAL_LABEL,
+      category: null
+    });
+  }
+
+  return entries;
 }
 
 export function formatWeeklyActivityAxisTick(
