@@ -261,7 +261,13 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   `narrowCorosMcpTools` hides two kinds of COROS MCP tool: one a local tool supersedes (only
   while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
   devices, COROS's own activity write-up). A new local tool must be placed on one side of
-  `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails.
+  `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails, and must be given a
+  source in `LOCAL_CHAT_TOOL_SOURCES` (`chatToolSources.ts`) or `test:chat-tool-sources`
+  fails. The badge under an answer groups the tools a turn called by that source — **DB**
+  (this machine's store), **Coros** (the Training Hub API) or **MCP** (a connected server,
+  recognised by its `server__` prefix). Every call travels as `kind: "mcp"` on the stream,
+  which is why the badge once said "MCP" for a turn that only read the Training Hub API; an
+  unlisted local tool would fall back to that label.
 
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`

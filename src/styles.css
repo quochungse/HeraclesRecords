@@ -21715,14 +21715,27 @@ tr.data-intervals-row-missing {
   flex-shrink: 0;
 }
 
-.chat-source-mcp {
+/* One pill per source when tools ran — DB, Coros, MCP; the grouping lives in
+   electron/chatToolSources.ts. */
+.chat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chat-sources > .chat-source {
+  margin-top: 0;
+}
+
+.chat-source-tool {
   background: var(--chat-signal-soft);
   border-color: var(--chat-signal-border);
   color: var(--chat-signal-strong);
   box-shadow: 0 2px 12px var(--chat-signal-glow);
 }
 
-.chat-source-mcp svg {
+.chat-source-tool svg {
   color: var(--chat-signal);
 }
 

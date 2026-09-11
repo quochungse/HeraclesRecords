@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
+  Cloud,
   Database,
   ExternalLink,
   FileDown,
@@ -29,6 +30,7 @@ import {
   Network,
   PanelRightClose,
   PanelRightOpen,
+  Plug,
   Plus,
   RefreshCw,
   Send,
@@ -132,6 +134,10 @@ import {
   type SourceInfo
 } from "./chatTypes";
 import { formatTurnCost, formatTurnCostDetail } from "./turnCost";
+import {
+  groupChatToolsBySource,
+  type ChatToolSource
+} from "../../electron/chatToolSources";
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -1545,15 +1551,42 @@ function DeletePreviewCard({
   );
 }
 
+const SOURCE_ICONS: Record<ChatToolSource, typeof Database> = {
+  db: Database,
+  coros: Cloud,
+  mcp: Plug
+};
+
+/**
+ * Where the answer's data came from: one pill per source — DB for this
+ * machine's own store, Coros for the Training Hub API, MCP for a connected MCP
+ * server — each naming the tools that read from it. `mcpUsed`/`mcpTools` are
+ * the stored names from when every tool was labelled MCP; the grouping is done
+ * here, by name, so old transcripts read correctly too.
+ */
 function SourceBadge({ source }: { source: SourceInfo }) {
-  if (source.mcpUsed) {
-    const tools = source.mcpTools.filter(Boolean);
+  const groups = source.mcpUsed ? groupChatToolsBySource(source.mcpTools) : [];
+  const failure = source.mcpUsed ? source.mcpError : undefined;
+  if (groups.length > 0 || failure) {
     return (
-      <div className={`chat-source ${source.mcpError ? "chat-source-error" : "chat-source-mcp"}`}>
-        <Database size={12} aria-hidden="true" />
-        MCP
-        {tools.length > 0 ? ` · ${[...new Set(tools)].join(", ")}` : ""}
-        {source.mcpError ? " · failed" : ""}
+      <div className="chat-sources">
+        {groups.map((group) => {
+          const Icon = SOURCE_ICONS[group.source];
+          return (
+            <div
+              key={group.source}
+              className={`chat-source chat-source-tool chat-source-${group.source}`}
+            >
+              <Icon size={12} aria-hidden="true" />
+              {`${group.label} · ${group.tools.join(", ")}`}
+            </div>
+          );
+        })}
+        {failure ? (
+          <div className="chat-source chat-source-error" title={failure}>
+            Tool failed
+          </div>
+        ) : null}
       </div>
     );
   }
