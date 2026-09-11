@@ -1,6 +1,10 @@
 import { CalendarDays, ChevronRight, Moon } from "lucide-react";
-import { useMemo } from "react";
-import type { TrainingHubUpcomingWorkout } from "../../../electron/types";
+import { useMemo, useState } from "react";
+import type {
+  TrainingHubSportType,
+  TrainingHubUpcomingWorkout
+} from "../../../electron/types";
+import type { CorosLinkApi } from "../../coroslink-api";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   filterUpcomingWorkoutsFromToday,
@@ -11,13 +15,23 @@ import {
   inferUpcomingWorkoutCategory,
   isUpcomingWorkoutToday
 } from "../formatters";
+import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
 
 interface UpcomingWorkoutsPanelProps {
+  api: CorosLinkApi;
   workouts: TrainingHubUpcomingWorkout[];
+  sportTypes: TrainingHubSportType[];
 }
 
-export function UpcomingWorkoutsPanel({ workouts }: UpcomingWorkoutsPanelProps) {
+export function UpcomingWorkoutsPanel({
+  api,
+  workouts,
+  sportTypes
+}: UpcomingWorkoutsPanelProps) {
   const { unitSystem } = useUnitSystem();
+  const [selected, setSelected] = useState<TrainingHubUpcomingWorkout | null>(
+    null
+  );
   const scheduledWorkouts = useMemo(
     () => filterUpcomingWorkoutsFromToday(workouts),
     [workouts]
@@ -29,6 +43,14 @@ export function UpcomingWorkoutsPanel({ workouts }: UpcomingWorkoutsPanelProps) 
     (workout) => !isUpcomingWorkoutToday(workout.happenDay)
   );
   const nextWorkout = laterWorkouts[0];
+
+  // Nothing scheduled means no panel at all, not an empty one: this sits on its
+  // own row under Training Intelligence, and a card whose only content is "no
+  // scheduled workouts" is a whole row spent saying nothing.
+  if (scheduledWorkouts.length === 0) {
+    return null;
+  }
+
   const countLabel = `${scheduledWorkouts.length} upcoming ${
     scheduledWorkouts.length === 1 ? "workout" : "workouts"
   }`;
@@ -40,82 +62,97 @@ export function UpcomingWorkoutsPanel({ workouts }: UpcomingWorkoutsPanelProps) 
         <div className="training-upcoming-heading">
           <p className="eyebrow">Training Calendar</p>
           <h2>Upcoming Workouts</h2>
-          {scheduledWorkouts.length > 0 ? (
-            <p className="training-upcoming-count">{countLabel}</p>
-          ) : null}
+          <p className="training-upcoming-count">{countLabel}</p>
         </div>
-        {scheduledWorkouts.length > 0 ? (
-          <p className="training-upcoming-stats">{statsLabel}</p>
-        ) : null}
+        <p className="training-upcoming-stats">{statsLabel}</p>
       </header>
 
-      {scheduledWorkouts.length === 0 ? (
-        <div className="training-empty-state">
-          <p>No scheduled workouts in the next two weeks.</p>
-        </div>
-      ) : (
-        <div className="training-upcoming-body">
-          {todayWorkouts.length > 0 ? (
-            <div className="training-upcoming-today-stack">
-              {todayWorkouts.map((workout, index) => (
-                <TodayWorkoutCard
-                  key={`today-${workout.happenDay}-${workout.sortNo ?? index}-${workout.name}`}
-                  workout={workout}
-                />
-              ))}
-            </div>
-          ) : (
-            <RestDayCard nextWorkout={nextWorkout} />
-          )}
+      <div className="training-upcoming-body">
+        {todayWorkouts.length > 0 ? (
+          <div className="training-upcoming-today-stack">
+            {todayWorkouts.map((workout, index) => (
+              <TodayWorkoutCard
+                key={`today-${workout.happenDay}-${workout.sortNo ?? index}-${workout.name}`}
+                workout={workout}
+                onOpen={() => setSelected(workout)}
+              />
+            ))}
+          </div>
+        ) : (
+          <RestDayCard nextWorkout={nextWorkout} />
+        )}
 
-          {laterWorkouts.length > 0 ? (
-            <ul className="training-upcoming-list">
-              {laterWorkouts.map((workout, index) => {
-                const rowStats = formatUpcomingWorkoutRowStats(
-                  workout.volume,
-                  workout.trainingLoad,
-                  unitSystem
-                );
+        {laterWorkouts.length > 0 ? (
+          <ul className="training-upcoming-list">
+            {laterWorkouts.map((workout, index) => {
+              const rowStats = formatUpcomingWorkoutRowStats(
+                workout.volume,
+                workout.trainingLoad,
+                unitSystem
+              );
 
-                return (
-                  <li
+              return (
+                <li
+                  className="training-upcoming-item"
+                  key={`${workout.happenDay}-${workout.sortNo ?? index}-${workout.name}`}
+                >
+                  <button
+                    type="button"
                     className="training-upcoming-row"
-                    key={`${workout.happenDay}-${workout.sortNo ?? index}-${workout.name}`}
+                    onClick={() => setSelected(workout)}
                   >
-                    <div className="training-upcoming-rail" aria-hidden="true">
+                    <span className="training-upcoming-rail" aria-hidden="true">
                       <span className="training-upcoming-dot" />
-                    </div>
+                    </span>
                     <span className="training-upcoming-date">
                       {formatUpcomingWorkoutDate(workout.happenDay)}
                     </span>
-                    <div className="training-upcoming-main">
-                      <div className="training-upcoming-title-row">
+                    <span className="training-upcoming-main">
+                      <span className="training-upcoming-title-row">
                         <strong className="training-upcoming-title">
                           {workout.name}
                         </strong>
                         <span className="training-upcoming-tag">
                           {inferUpcomingWorkoutCategory(workout.name)}
                         </span>
-                      </div>
+                      </span>
                       {rowStats ? (
-                        <p className="training-upcoming-row-stats">{rowStats}</p>
+                        <span className="training-upcoming-row-stats">
+                          {rowStats}
+                        </span>
                       ) : null}
-                    </div>
-                    <span className="training-upcoming-chevron" aria-hidden="true">
+                    </span>
+                    <span
+                      className="training-upcoming-chevron"
+                      aria-hidden="true"
+                    >
                       <ChevronRight size={18} strokeWidth={2.2} />
                     </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-        </div>
-      )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
+
+      <UpcomingWorkoutDetailPanel
+        api={api}
+        workout={selected}
+        sportTypes={sportTypes}
+        onClose={() => setSelected(null)}
+      />
     </section>
   );
 }
 
-function TodayWorkoutCard({ workout }: { workout: TrainingHubUpcomingWorkout }) {
+function TodayWorkoutCard({
+  workout,
+  onOpen
+}: {
+  workout: TrainingHubUpcomingWorkout;
+  onOpen: () => void;
+}) {
   const { unitSystem } = useUnitSystem();
   const category = inferUpcomingWorkoutCategory(workout.name);
   const detailLine = formatUpcomingWorkoutDetailLine(
@@ -126,19 +163,26 @@ function TodayWorkoutCard({ workout }: { workout: TrainingHubUpcomingWorkout }) 
   );
 
   return (
-    <article className="training-upcoming-today">
-      <div className="training-upcoming-today-icon" aria-hidden="true">
+    <button
+      type="button"
+      className="training-upcoming-today training-upcoming-today-button"
+      onClick={onOpen}
+    >
+      <span className="training-upcoming-today-icon" aria-hidden="true">
         <CalendarDays size={22} strokeWidth={2.2} />
-      </div>
-      <div className="training-upcoming-today-copy">
-        <div className="training-upcoming-today-heading">
+      </span>
+      <span className="training-upcoming-today-copy">
+        <span className="training-upcoming-today-heading">
           <span className="training-upcoming-today-pill">Today</span>
           <span className="training-upcoming-today-tag">{category}</span>
-        </div>
-        <h3 className="training-upcoming-today-title">{workout.name}</h3>
-        <p className="training-upcoming-today-meta">{detailLine}</p>
-      </div>
-    </article>
+        </span>
+        <span className="training-upcoming-today-title">{workout.name}</span>
+        <span className="training-upcoming-today-meta">{detailLine}</span>
+      </span>
+      <span className="training-upcoming-chevron" aria-hidden="true">
+        <ChevronRight size={18} strokeWidth={2.2} />
+      </span>
+    </button>
   );
 }
 

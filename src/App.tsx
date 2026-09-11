@@ -880,10 +880,12 @@ export default function App() {
 
       // One MCP call whatever the window, so ask for the whole span the trend
       // charts can be switched to — Overview's sleep chart offers a 30-day
-      // chip, and a shorter fetch would leave its second half empty.
+      // chip, and a shorter fetch would leave its second half empty. Daily
+      // health is asked a week, because Overview's step tile sums Monday to
+      // today; `latest` still sorts by date, so today's figures stay today's.
       const [sleepResult, dailyHealthResult] = await Promise.allSettled([
         api.getTrainingSleepData(TRAINING_TREND_MAX_DAYS),
-        api.getTrainingDailyHealthData(1),
+        api.getTrainingDailyHealthData(7),
       ]);
 
       if (trainingWellnessLoadSequenceRef.current !== loadSequence) {
@@ -2581,6 +2583,7 @@ export default function App() {
                         onCancelTwoFactor={handleTrainingHubCancel2fa}
                         activities={trainingHubActivities}
                         upcomingWorkouts={trainingHubUpcomingWorkouts}
+                        sportTypes={trainingHubSportTypes}
                         snapshot={trainingHubSnapshot}
                         rpeBackfill={rpeBackfill}
                         busy={busy}
@@ -2804,6 +2807,7 @@ export default function App() {
                 <LazyProfileView
                   api={api}
                   status={trainingHubStatus}
+                  snapshot={trainingHubSnapshot}
                   onOpenOverview={() => setActiveView("overview")}
                   onMessage={setMessage}
                   onError={setError}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { TrainingHubActivity } from "../../../electron/types";
 import { formatHappenDayLabel } from "../formatters";
@@ -11,18 +11,33 @@ import {
   formatWeeklyActivityAxisTick,
   getWeeklyActivityMetricLabel,
   getWeeklyActivityYAxisUnitLabel,
+  weeklyActivitySportLegend,
   WEEKLY_ACTIVITY_METRICS,
   type WeeklyActivityMetric
 } from "../weeklyActivity";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   defineSelectionPreference,
+  readSelectionPreference,
   selectionIsArrayOf,
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 
-const FITNESS_METRICS_PREFERENCE =
+const FITNESS_METRIC_PREFERENCE =
+  defineSelectionPreference<WeeklyActivityMetric>({
+    key: "training.weeklyMetric",
+    defaultValue: "distance",
+    validate: selectionIsOneOf(WEEKLY_ACTIVITY_METRICS)
+  });
+
+/**
+ * The chart used to stack up to three metrics at once, so the stored preference
+ * is an array under a different key. It is read only as the scalar's fallback,
+ * which keeps an athlete on the metric they last chose rather than resetting
+ * them to distance the first time they open the redesigned chart.
+ */
+const LEGACY_FITNESS_METRICS_PREFERENCE =
   defineSelectionPreference<WeeklyActivityMetric[]>({
     key: "training.weeklyMetrics",
     defaultValue: ["distance"],
@@ -37,19 +52,17 @@ interface FitnessTrendPanelProps {
   activities?: TrainingHubActivity[];
 }
 
-// Short chip labels keep grouped legends compact; the dropdown uses full labels.
-const METRIC_SHORT_LABELS: Record<WeeklyActivityMetric, string> = {
-  distance: "Distance",
-  duration: "Duration",
-  trainingLoad: "Load"
-};
-
-interface MetricMultiSelectProps {
-  selected: WeeklyActivityMetric[];
-  onChange: (next: WeeklyActivityMetric[]) => void;
+interface MetricSelectProps {
+  selected: WeeklyActivityMetric;
+  onChange: (next: WeeklyActivityMetric) => void;
 }
 
-function MetricMultiSelect({ selected, onChange }: MetricMultiSelectProps) {
+/**
+ * Picks the one metric the columns measure. Deliberately colourless: hue on this
+ * chart belongs to the sport a block stands for, and a swatch here would claim
+ * it stands for the unit instead.
+ */
+function MetricSelect({ selected, onChange }: MetricSelectProps) {
   const { unitSystem } = useUnitSystem();
   const rootRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -80,52 +93,21 @@ function MetricMultiSelect({ selected, onChange }: MetricMultiSelectProps) {
     };
   }, [isOpen]);
 
-  function toggle(metric: WeeklyActivityMetric) {
-    if (selected.includes(metric)) {
-      // Keep at least one metric on the chart at all times.
-      if (selected.length === 1) {
-        return;
-      }
-      onChange(selected.filter((value) => value !== metric));
-    } else {
-      onChange(
-        WEEKLY_ACTIVITY_METRICS.filter(
-          (value) => selected.includes(value) || value === metric
-        )
-      );
-    }
-  }
-
-  const triggerLabel =
-    selected.length === WEEKLY_ACTIVITY_METRICS.length
-      ? "All metrics"
-      : selected.length === 1
-        ? getWeeklyActivityMetricLabel(selected[0], unitSystem)
-        : `${METRIC_SHORT_LABELS[selected[0]]} +${selected.length - 1}`;
-
   return (
-    <div className="metric-multiselect" ref={rootRef}>
+    <div className="metric-select" ref={rootRef}>
       <button
         type="button"
-        className="metric-multiselect-trigger"
+        className="metric-select-trigger"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
-        <span className="metric-multiselect-swatches" aria-hidden="true">
-          {selected.map((metric) => (
-            <span
-              key={metric}
-              className={`training-fitness-swatch training-fitness-swatch--${metric}`}
-            />
-          ))}
+        <span className="metric-select-label">
+          {getWeeklyActivityMetricLabel(selected, unitSystem)}
         </span>
-        <span className="metric-multiselect-label">{triggerLabel}</span>
         <ChevronDown
           className={
-            isOpen
-              ? "metric-multiselect-icon is-open"
-              : "metric-multiselect-icon"
+            isOpen ? "metric-select-icon is-open" : "metric-select-icon"
           }
           size={16}
           strokeWidth={2.4}
@@ -134,11 +116,9 @@ function MetricMultiSelect({ selected, onChange }: MetricMultiSelectProps) {
       </button>
 
       {isOpen ? (
-        <div className="metric-multiselect-menu" role="listbox" aria-multiselectable="true">
-          <p className="metric-multiselect-hint">Stack up to three metrics</p>
+        <div className="metric-select-menu" role="listbox">
           {WEEKLY_ACTIVITY_METRICS.map((metric) => {
-            const isSelected = selected.includes(metric);
-            const isLastSelected = isSelected && selected.length === 1;
+            const isSelected = metric === selected;
 
             return (
               <button
@@ -146,21 +126,17 @@ function MetricMultiSelect({ selected, onChange }: MetricMultiSelectProps) {
                 key={metric}
                 className={
                   isSelected
-                    ? "metric-multiselect-option is-selected"
-                    : "metric-multiselect-option"
+                    ? "metric-select-option is-selected"
+                    : "metric-select-option"
                 }
                 role="option"
                 aria-selected={isSelected}
-                aria-disabled={isLastSelected}
-                onClick={() => toggle(metric)}
+                onClick={() => {
+                  onChange(metric);
+                  setIsOpen(false);
+                }}
               >
-                <span
-                  className={
-                    isSelected
-                      ? `metric-multiselect-check is-on training-fitness-swatch--${metric}`
-                      : "metric-multiselect-check"
-                  }
-                >
+                <span className="metric-select-check">
                   {isSelected ? (
                     <Check size={13} strokeWidth={3} aria-hidden="true" />
                   ) : null}
@@ -181,8 +157,13 @@ export function FitnessTrendPanel({
 }: FitnessTrendPanelProps) {
   const { unitSystem } = useUnitSystem();
   const [barsVisible, setBarsVisible] = useState(false);
-  const [selectedMetrics, setSelectedMetrics] = useSelectionPreference(
-    FITNESS_METRICS_PREFERENCE
+  const legacyMetric = useMemo(
+    () => readSelectionPreference(LEGACY_FITNESS_METRICS_PREFERENCE).value[0],
+    []
+  );
+  const [selectedMetric, setSelectedMetric] = useSelectionPreference(
+    FITNESS_METRIC_PREFERENCE,
+    legacyMetric
   );
   const dayList = useMemo(
     () =>
@@ -195,69 +176,76 @@ export function FitnessTrendPanel({
       ),
     [snapshot, activities]
   );
-  const seriesByMetric = useMemo(
+  const series = useMemo(
     () =>
-      selectedMetrics.map((metric) => ({
-        metric,
-        series: buildWeeklyActivitySeries(dayList, metric, new Date(), unitSystem)
-      })),
-    [dayList, selectedMetrics, unitSystem]
+      buildWeeklyActivitySeries(
+        dayList,
+        selectedMetric,
+        new Date(),
+        unitSystem,
+        activities
+      ),
+    [activities, dayList, selectedMetric, unitSystem]
+  );
+  // Columns are coloured by sport, so the week needs a key naming them.
+  const sportLegend = useMemo(
+    () => weeklyActivitySportLegend(series.days),
+    [series]
   );
 
-  const isSingle = seriesByMetric.length === 1;
-  const primary = seriesByMetric[0];
-  const maxValue = primary.series.yMax || 1;
+  const maxValue = series.yMax || 1;
   const yAxisTicks = useMemo(
     () => buildWeeklyActivityYAxisTicks(maxValue),
     [maxValue]
   );
-  const yAxisUnitLabel = isSingle
-    ? getWeeklyActivityYAxisUnitLabel(primary.metric, primary.series.yAxisUnit)
-    : "rel";
-  const hasData = seriesByMetric.some(({ series }) => series.hasData);
-  const dayCount = primary.series.days.length;
+  const yAxisUnitLabel = getWeeklyActivityYAxisUnitLabel(
+    selectedMetric,
+    series.yAxisUnit
+  );
+  const hasData = series.hasData;
 
   useEffect(() => {
     setBarsVisible(false);
     const frame = requestAnimationFrame(() => setBarsVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, [selectedMetrics, hasData]);
+  }, [selectedMetric, hasData]);
 
   return (
     <section className="panel training-fitness-panel">
       <div className="training-fitness-header">
         <p className="eyebrow">Weekly Activity</p>
         <div className="training-metric-select-wrap">
-          <MetricMultiSelect
-            selected={selectedMetrics}
-            onChange={setSelectedMetrics}
-          />
+          <MetricSelect selected={selectedMetric} onChange={setSelectedMetric} />
         </div>
       </div>
 
-      <div className="training-fitness-legend" aria-hidden="true">
-        {seriesByMetric.map(({ metric, series }) => (
-          <span key={metric} className="training-fitness-legend-item">
-            <span
-              className={`training-fitness-swatch training-fitness-swatch--${metric}`}
-            />
-            {getWeeklyActivityMetricLabel(metric, unitSystem)}
-            {series.hasData ? (
-              <strong className="training-fitness-legend-total">
-                {series.weeklyTotal}
-              </strong>
-            ) : null}
-          </span>
-        ))}
+      {/* The sport key, and nothing else: the week's totals already have a home
+          in the summary tiles above, where every metric is on screen at once. */}
+      <div className="training-fitness-legends" aria-hidden="true">
+        <ul className="training-chart-sport-legend training-fitness-sport-legend">
+          {sportLegend.map((entry) => (
+            <li className="training-fitness-legend-item" key={entry.key}>
+              <span
+                className="training-chart-legend-swatch"
+                style={
+                  {
+                    "--swatch-color": entry.category
+                      ? `var(--sport-${entry.category})`
+                      : "var(--text-muted)"
+                  } as CSSProperties
+                }
+              />
+              {entry.label}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {hasData ? (
         <div
           className="training-fitness-chart"
           role="img"
-          aria-label={`Weekly activity chart for ${seriesByMetric
-            .map(({ series }) => series.metricLabel.toLowerCase())
-            .join(", ")}.`}
+          aria-label={`Weekly activity chart for ${series.metricLabel.toLowerCase()}, by sport.`}
         >
           <div className="training-fitness-y-axis" aria-hidden="true">
             {yAxisUnitLabel ? (
@@ -266,13 +254,11 @@ export function FitnessTrendPanel({
             <div className="training-fitness-y-ticks">
               {[...yAxisTicks].reverse().map((tick) => (
                 <span key={tick} className="training-fitness-y-tick">
-                  {isSingle
-                    ? formatWeeklyActivityAxisTick(
-                        tick,
-                        primary.metric,
-                        primary.series.yAxisUnit
-                      )
-                    : ""}
+                  {formatWeeklyActivityAxisTick(
+                    tick,
+                    selectedMetric,
+                    series.yAxisUnit
+                  )}
                 </span>
               ))}
             </div>
@@ -294,76 +280,128 @@ export function FitnessTrendPanel({
               role="list"
               aria-label="Weekly activity for the current calendar week"
             >
-              {Array.from({ length: dayCount }, (_unused, dayIndex) => {
-                const dayInfo = primary.series.days[dayIndex];
-                const fullLabel = formatHappenDayLabel(dayInfo.happenDay);
-                const dayHasValue = seriesByMetric.some(
-                  ({ series }) => series.days[dayIndex].value > 0
-                );
+              {series.days.map((bar, dayIndex) => {
+                const fullLabel = formatHappenDayLabel(bar.happenDay);
+                const barHasValue = bar.value > 0;
+                const stackTotal =
+                  bar.segments.reduce(
+                    (sum, segment) => sum + segment.value,
+                    0
+                  ) || 1;
+                const heightPct = barHasValue
+                  ? Math.max(10, (bar.value / maxValue) * 100)
+                  : 0;
 
                 return (
                   <span
-                    key={dayInfo.happenDay}
+                    key={bar.happenDay}
                     className={`training-fitness-day${
-                      !dayHasValue ? " is-empty" : ""
-                    }${dayInfo.isToday ? " is-today" : ""}`}
+                      barHasValue ? "" : " is-empty"
+                    }${bar.isToday ? " is-today" : ""}`}
                     role="listitem"
-                    tabIndex={0}
-                    aria-label={`${fullLabel}: ${seriesByMetric
-                      .map(
-                        ({ series }) =>
-                          `${series.metricLabel} ${series.days[dayIndex].displayValue}`
-                      )
-                      .join(", ")}`}
+                    // A rest day has no tooltip to open, so it is not a tab
+                    // stop either — landing on one would be a stop that does
+                    // nothing.
+                    tabIndex={barHasValue ? 0 : undefined}
+                    aria-label={`${fullLabel}: ${
+                      bar.segments.length > 0
+                        ? bar.segments
+                            .map(
+                              (segment) =>
+                                `${segment.label} ${segment.displayValue}`
+                            )
+                            .join(", ")
+                        : `${series.metricLabel} ${bar.displayValue}`
+                    }`}
                   >
                     <span className="training-fitness-bar-group">
-                      {seriesByMetric.map(({ metric, series }, metricIndex) => {
-                        const bar = series.days[dayIndex];
-                        const barHasValue = bar.value > 0;
-                        const heightPct = barHasValue
-                          ? Math.max(
-                              10,
-                              (bar.value / (series.yMax || 1)) * 100
-                            )
-                          : 0;
-
-                        return (
+                      <span
+                        className={[
+                          "training-fitness-bar",
+                          bar.segments.length > 0 ? "is-stacked" : "",
+                          barHasValue ? "" : "is-empty"
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={{
+                          height:
+                            barsVisible && barHasValue
+                              ? `${heightPct}%`
+                              : undefined,
+                          transitionDelay: `${dayIndex * 60}ms`
+                        }}
+                      >
+                        {bar.segments.map((segment) => (
                           <span
-                            key={metric}
-                            className={`training-fitness-bar training-fitness-bar--${metric}${
-                              barHasValue ? "" : " is-empty"
+                            key={segment.key}
+                            className={`training-fitness-segment${
+                              segment.category ? "" : " is-residual"
                             }`}
-                            style={{
-                              height:
-                                barsVisible && barHasValue
-                                  ? `${heightPct}%`
-                                  : undefined,
-                              transitionDelay: `${
-                                dayIndex * 60 + metricIndex * 40
-                              }ms`
-                            }}
+                            style={
+                              {
+                                // Percentage points of the stack, not the raw
+                                // value: flex-basis is 0, and grow factors
+                                // summing to less than 1 hand out only that
+                                // fraction of the column — which left a duration
+                                // bar of 0.84 hours with a sixth of itself empty
+                                // above the blocks.
+                                flexGrow: Math.max(
+                                  (segment.value / stackTotal) * 100,
+                                  0.01
+                                ),
+                                ...(segment.category
+                                  ? {
+                                      "--segment-color": `var(--sport-${segment.category})`
+                                    }
+                                  : {})
+                              } as CSSProperties
+                            }
                           />
-                        );
-                      })}
+                        ))}
+                      </span>
                     </span>
                     <span className="training-fitness-date">
-                      {dayInfo.weekdayLabel}
+                      {bar.weekdayLabel}
                     </span>
-                    <span className="training-fitness-tooltip" role="tooltip">
-                      <strong>{fullLabel}</strong>
-                      {seriesByMetric.map(({ metric, series }) => (
-                        <span
-                          key={metric}
-                          className="training-fitness-tooltip-row"
-                        >
-                          <span
-                            className={`training-fitness-swatch training-fitness-swatch--${metric}`}
-                          />
-                          {series.metricLabel}:{" "}
-                          {series.days[dayIndex].displayValue}
-                        </span>
-                      ))}
-                    </span>
+                    {/* One row per block, in the order they stack, named by
+                        sport rather than by the unit on the axis — the axis
+                        already says what is measured. A day holding two
+                        sessions reads as two rows, the way it draws as two
+                        blocks. A day with a figure but no activity behind it
+                        falls back to the metric, because there is no sport to
+                        name; a day with nothing at all gets no tooltip, since
+                        "Duration: —" is the empty slot saying it twice. */}
+                    {barHasValue ? (
+                      <span className="training-fitness-tooltip" role="tooltip">
+                        <strong>{fullLabel}</strong>
+                        {bar.segments.length > 0 ? (
+                          bar.segments.map((segment) => (
+                            <span
+                              key={segment.key}
+                              className="training-fitness-tooltip-row"
+                            >
+                              <span
+                                className="training-fitness-swatch"
+                                style={
+                                  {
+                                    background: segment.category
+                                      ? `var(--sport-${segment.category})`
+                                      : "var(--text-muted)"
+                                  } as CSSProperties
+                                }
+                              />
+                              <span className="training-fitness-tooltip-text">
+                                {segment.label}: {segment.displayValue}
+                              </span>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="training-fitness-tooltip-row">
+                            {series.metricLabel}: {bar.displayValue}
+                          </span>
+                        )}
+                      </span>
+                    ) : null}
                   </span>
                 );
               })}

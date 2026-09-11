@@ -3,9 +3,11 @@ import { TrainingSummaryTiles } from "./TrainingSummaryTiles";
 import { recoveryTone } from "../parsers";
 import { MCP_DAILY_HEALTH_NOTICE } from "../../mcp/mcpNotice";
 import type { TrainingSummaryMetrics } from "../types";
+import type { WeekToDateTotals } from "../weeklyActivity";
 
 interface RecoveryRingProps {
   summary: TrainingSummaryMetrics;
+  weekTotals: WeekToDateTotals;
 }
 
 function readinessCopy(
@@ -37,7 +39,7 @@ function readinessCopy(
   }
 }
 
-export function RecoveryRing({ summary }: RecoveryRingProps) {
+export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
   const [isReady, setIsReady] = useState(false);
   const recovery = summary.recoveryPct ?? 0;
   const percent = Math.max(0, Math.min(100, recovery));
@@ -47,11 +49,10 @@ export function RecoveryRing({ summary }: RecoveryRingProps) {
   const targetOffset = circumference - (percent / 100) * circumference;
   const tone = hasData ? recoveryTone(percent) : "neutral";
   const { label, message } = readinessCopy(tone);
-  // A tile's one line can say a figure needs MCP but not where to connect it,
-  // so that is said once underneath. Either figure missing counts — one feed.
+  // A tile's one line can say the step count needs MCP but not where to
+  // connect it, so that is said once underneath.
   const dailyHealthNeedsMcp =
-    summary.mcpConnected === false &&
-    (summary.steps === undefined || summary.calories === undefined);
+    summary.mcpConnected === false && weekTotals.steps === undefined;
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setIsReady(true));
@@ -92,9 +93,8 @@ export function RecoveryRing({ summary }: RecoveryRingProps) {
         <p className="training-ring-message">{message}</p>
 
         <TrainingSummaryTiles
-          summary={summary}
-          layout="stack"
-          metrics={["load", "heart", "steps", "calories"]}
+          totals={weekTotals}
+          mcpConnected={summary.mcpConnected}
           className="training-ring-metrics"
         />
 

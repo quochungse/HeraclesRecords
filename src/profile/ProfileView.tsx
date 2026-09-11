@@ -22,18 +22,24 @@ import type {
 import type { CorosLinkApi } from "../coroslink-api";
 import { FitnessScoresPanel } from "../training/components/FitnessScoresPanel";
 import { PersonalRecordsPanel } from "../training/components/PersonalRecordsPanel";
-import { RacePredictorCards } from "../training/components/RacePredictorCards";
+import { Vo2MaxWidget } from "../training/components/Vo2MaxWidget";
 import { formatPaceSecondsPerKm } from "../training/formatters";
 import {
   HR_ZONE_MODELS,
   hrZoneModelDefinition
 } from "../training/heartRateZoneModel";
+import type { TrainingHubSnapshot } from "../training/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import "./profile.css";
 
 interface ProfileViewProps {
   api: CorosLinkApi;
   status: TrainingHubStatus | null;
+  /**
+   * The snapshot Overview reads. VO2 max history lives in its day lists, which
+   * the profile read does not carry.
+   */
+  snapshot: TrainingHubSnapshot | null;
   onOpenOverview: () => void;
   onMessage: (message: string) => void;
   onError: (message: string) => void;
@@ -214,13 +220,14 @@ function zoneValue(
 export function ProfileView({
   api,
   status,
+  snapshot,
   onOpenOverview,
   onMessage,
   onError
 }: ProfileViewProps) {
   const { unitSystem } = useUnitSystem();
   const [profile, setProfile] = useState<CorosProfile | null>(null);
-  // The fitness scores and race predictor read the same dashboard Overview uses.
+  // The fitness scores read the same dashboard Overview uses.
   const [dashboard, setDashboard] = useState<TrainingHubDashboard | null>(null);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
@@ -878,7 +885,7 @@ export function ProfileView({
               dashboard={dashboard}
               racePredictor={dashboard?.racePredictor ?? null}
             />
-            <RacePredictorCards racePredictor={dashboard?.racePredictor ?? null} />
+            <Vo2MaxWidget snapshot={snapshot} />
           </div>
 
           <PersonalRecordsPanel dashboard={dashboard} />

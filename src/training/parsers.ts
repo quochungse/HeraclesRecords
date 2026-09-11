@@ -12,7 +12,7 @@ import {
   mergeTrainingDayLists
 } from "../../electron/trainingTrendUtils";
 import { formatHappenDayLabel, recentTrainingHubDateList } from "./formatters";
-import { TRAINING_HEATMAP_DAYS, TRAINING_LOAD_TREND_DAYS } from "./chartConfig";
+import { TRAINING_HEATMAP_DAYS, TRAINING_TREND_MAX_DAYS } from "./chartConfig";
 import type {
   HeatmapCell,
   HeatmapGrid,
@@ -201,7 +201,13 @@ function buildSummary(
   const racePredictor = dashboard?.racePredictor ?? null;
   const recent = dayList.slice(-7);
   const latest = recent[recent.length - 1];
-  const latestHealth = dailyHealth?.latest;
+  // Today's record, not the feed's latest one: the greeting below says "steps
+  // today", and the feed is asked a week now — its latest day stays yesterday's
+  // until COROS has written today's.
+  const todayKey = recentTrainingHubDateList(1)[0];
+  const todayHealth = dailyHealth?.records.find(
+    (record) => record.happenDay === todayKey
+  );
   const priorRhrValues = recent
     .slice(0, -1)
     .map((day) => day.rhr)
@@ -220,18 +226,14 @@ function buildSummary(
   const latestRhr = latest?.rhr ?? dashboard?.rhr;
 
   return {
-    staminaLevel: racePredictor?.staminaLevel ?? latest?.staminaLevel,
     recoveryPct: racePredictor?.recoveryPct ?? dashboard?.recoveryPct,
-    todayLoad: latest?.trainingLoad,
     weekLoadTotal: weekLoadTotal > 0 ? weekLoadTotal : undefined,
-    latestRhr,
     rhrDelta:
       latestRhr !== undefined && priorRhrAverage !== undefined
         ? latestRhr - priorRhrAverage
         : undefined,
-    steps: latestHealth?.steps,
-    calories: latestHealth?.calories,
-    // Kept, or the two tiles above are blank with no way to say why.
+    steps: todayHealth?.steps,
+    // Kept, or the step tile is blank with no way to say why.
     mcpConnected: dailyHealth?.mcpConnected
   };
 }
@@ -245,7 +247,7 @@ export function buildTrainingHubSnapshot(
 ): TrainingHubSnapshot {
   const dayList = mergeTrainingDayLists(dailyMetrics, analytics);
   const trendPoints = mergeSleepIntoTrendPoints(
-    buildTrendPoints(dayList, TRAINING_LOAD_TREND_DAYS),
+    buildTrendPoints(dayList, TRAINING_TREND_MAX_DAYS),
     sleep
   );
 

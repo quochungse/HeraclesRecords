@@ -2,42 +2,22 @@ import type { Theme } from "../theme/theme";
 
 export const TRAINING_HEATMAP_DAYS = 365;
 
-/**
- * Days of trend the Overview snapshot carries — the training-load chart's
- * window, and the longest of the trend charts. The rest draw a tail of it.
- */
-export const TRAINING_LOAD_TREND_DAYS = 30;
-
 /** Days the HRV and sleep trend charts open on before the athlete picks. */
 export const TRAINING_SHORT_TREND_DAYS = 7;
 
-/**
- * Windows the HRV and sleep trend charts can be switched between, in render
- * order. Bounded by TRAINING_LOAD_TREND_DAYS for the same reason the load
- * chart's list is: the snapshot carries no more than that.
- */
+/** Windows the HRV and sleep trend charts switch between, in render order. */
 export const TRAINING_TREND_WINDOWS = [7, 30] as const;
 
 export type TrainingTrendWindow = (typeof TRAINING_TREND_WINDOWS)[number];
 
 /**
- * Windows the training-load bar chart can be switched between, in render order.
- * The widest must stay <= TRAINING_LOAD_TREND_DAYS, which is all the snapshot
- * carries — a wider option would draw empty columns for days it has no load for.
+ * The furthest back any trend chip can be switched to. It is three things at
+ * once and they must stay one number: how many trend points the snapshot
+ * builds, how many days of sleep the fetch asks for, and the widest chip on
+ * offer. Derived from the window list rather than written out, so widening a
+ * chip's options cannot leave the snapshot or the fetch behind.
  */
-export const TRAINING_LOAD_WINDOWS = [7, 14, 30] as const;
-
-export type TrainingLoadWindow = (typeof TRAINING_LOAD_WINDOWS)[number];
-
-/**
- * The furthest back any trend chip can be switched to, and so the span a fetch
- * has to cover to fill every one of them. Derived from the window lists rather
- * than written out, so widening a chip's options cannot leave the fetch behind.
- */
-export const TRAINING_TREND_MAX_DAYS = Math.max(
-  ...TRAINING_TREND_WINDOWS,
-  ...TRAINING_LOAD_WINDOWS
-);
+export const TRAINING_TREND_MAX_DAYS = Math.max(...TRAINING_TREND_WINDOWS);
 
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
@@ -197,85 +177,6 @@ const PAPER_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = 
     stops: { top: "#4a80e0", mid: "#3d6fd6", bottom: "#3d6fd6" }
   }
 };
-
-/**
- * How one block of a training-load column is painted. Every value is expressed
- * against the block's own sport color, so the recipe holds for all five sports
- * and the neutral one without naming any of them.
- */
-export interface TrainingLoadBlockStyle {
-  /** Vertical gradient, as opacity of the block color at top and bottom. */
-  fill: { top: number; bottom: number };
-  /** White highlight over the block's upper part — what makes it read as lit. */
-  sheenOpacity: number;
-  /** Hairline in the block color, separating the slab from the track behind. */
-  strokeOpacity: number;
-  strokeWidth: number;
-  /** Lit edge along the block's top. Height in px; 0 leaves it off. */
-  capHeight: number;
-  capOpacity: number;
-  /** Soft bloom in the block's own color, so a column reads as lit glass. */
-  glowOpacity: number;
-  glowBlur: number;
-  /**
-   * Corner radius. `topRadius` rounds the column's own two top corners and is
-   * kept in step with `trackRadius` so the slab and its slot agree; the edges
-   * where two blocks of one day meet get the much smaller `innerRadius`, which
-   * softens the seam without making each block look like a separate pill.
-   */
-  topRadius: number;
-  innerRadius: number;
-  /**
-   * The faint slot every day sits in, drawn whether the day has load or not.
-   * It gives the columns something to stand in and is what makes a rest day
-   * read as a day with nothing on it rather than as missing data.
-   */
-  trackFill: string;
-  /** The same slot under the pointer — the chart's only hover affordance. */
-  trackHoverFill: string;
-  trackRadius: number;
-}
-
-const DARK_LOAD_BLOCK_STYLE: TrainingLoadBlockStyle = {
-  fill: { top: 1, bottom: 0.62 },
-  sheenOpacity: 0.2,
-  strokeOpacity: 0.35,
-  strokeWidth: 1,
-  capHeight: 2.5,
-  capOpacity: 1,
-  glowOpacity: 0.4,
-  glowBlur: 9,
-  topRadius: 6,
-  innerRadius: 2,
-  trackFill: "rgba(255, 255, 255, 0.045)",
-  trackHoverFill: "rgba(255, 255, 255, 0.1)",
-  trackRadius: 6
-};
-
-/**
- * Paper needs more ink than dark: the same translucency that reads as glass on
- * a near-black panel reads as washed-out on white, and a light ground gives a
- * colored bloom almost nothing to bloom against.
- */
-const PAPER_LOAD_BLOCK_STYLE: TrainingLoadBlockStyle = {
-  fill: { top: 1, bottom: 0.7 },
-  sheenOpacity: 0.3,
-  strokeOpacity: 0.22,
-  strokeWidth: 1,
-  capHeight: 2.5,
-  capOpacity: 1,
-  glowOpacity: 0.2,
-  glowBlur: 6,
-  topRadius: 6,
-  innerRadius: 2,
-  trackFill: "rgba(38, 34, 28, 0.05)",
-  trackHoverFill: "rgba(38, 34, 28, 0.1)",
-  trackRadius: 6
-};
-
-export function getTrainingLoadBlockStyle(theme: Theme): TrainingLoadBlockStyle {
-  return theme === "paper" ? PAPER_LOAD_BLOCK_STYLE : DARK_LOAD_BLOCK_STYLE;
-}
 
 /** Per-metric series palette — gives each trend chart its own color identity. */
 export function getTrainingMetricPalettes(

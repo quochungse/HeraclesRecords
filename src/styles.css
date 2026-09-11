@@ -10663,7 +10663,6 @@ td span {
 .training-upcoming-panel,
 .training-records-panel,
 .training-scores-panel,
-.training-race-panel,
 .training-backup-panel,
 .training-chart-panel {
   animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -10806,7 +10805,7 @@ td span {
   --stat-icon-color: #fdba74;
 }
 
-.training-stat-card.tone-heart {
+.training-stat-card.tone-distance {
   --stat-accent: #f472b6;
   --stat-border: rgba(244, 114, 182, 0.18);
   --stat-border-hover: rgba(244, 114, 182, 0.32);
@@ -10834,7 +10833,7 @@ td span {
   --stat-icon-color: #7dd3fc;
 }
 
-.training-stat-card.tone-calories {
+.training-stat-card.tone-duration {
   --stat-accent: #a78bfa;
   --stat-border: rgba(167, 139, 250, 0.18);
   --stat-border-hover: rgba(167, 139, 250, 0.32);
@@ -10967,23 +10966,24 @@ td span {
 
 .training-intelligence-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 0.82fr) minmax(360px, 1.08fr) minmax(260px, 0.68fr);
-  grid-template-areas:
-    "recovery fitness fitness"
-    "recovery sleep vo2";
+  grid-template-columns: minmax(330px, 0.82fr) minmax(360px, 1.76fr);
   align-items: stretch;
   gap: 14px;
 }
 
-.training-intelligence-main {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-content: stretch;
-  align-items: stretch;
+/* Two stacks side by side: recovery on its own, weekly activity over sleep.
+   A column is one grid item, so its panels keep their own heights, and the last
+   one takes the slack — which is what keeps both columns ending level however
+   much taller the pair on the right runs. */
+.training-intelligence-column {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  height: 100%;
   min-width: 0;
-  min-height: 0;
+}
+
+.training-intelligence-column > :last-child {
+  flex: 1 1 auto;
 }
 
 .training-performance-grid {
@@ -11002,22 +11002,6 @@ td span {
   height: 100%;
 }
 
-.training-intelligence-grid > .training-ring-panel {
-  grid-area: recovery;
-}
-
-.training-intelligence-grid > .training-fitness-panel {
-  grid-area: fitness;
-}
-
-.training-intelligence-grid > .sleep-panel {
-  grid-area: sleep;
-}
-
-.training-intelligence-grid > .vo2-widget-panel {
-  grid-area: vo2;
-}
-
 .training-summary-tiles.is-stack {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -11030,7 +11014,12 @@ td span {
     "icon label"
     "value value"
     "detail detail";
-  grid-template-columns: auto minmax(0, 1fr);
+  /* The icon track is a fixed 28px, matching the icon, and deliberately not
+     `auto`: the value and detail rows span both columns, so an intrinsic track
+     absorbs their min-content width. A wide figure ("20,643", "2h 50m") pulled
+     the icon column out to its own width and left the label beside it 11px to
+     render "DURATION" in — an ellipsis at every narrow window. */
+  grid-template-columns: 28px minmax(0, 1fr);
   align-content: start;
   gap: 8px 10px;
   min-height: 104px;
@@ -11097,10 +11086,13 @@ td span {
   white-space: nowrap;
 }
 
+/* `grid-area` alone, and no `grid-row`/`grid-column: auto` beside it: those
+   undid the named area and auto-placed the figure into the icon cell, where it
+   sized that column to itself. The base rule they were there to cancel
+   (`grid-column: 3`, the bar variant's layout) is cancelled by this shorthand
+   just as well. */
 .training-stat-card.is-widget .training-stat-card__value {
   grid-area: value;
-  grid-row: auto;
-  grid-column: auto;
   align-self: auto;
   color: var(--text-primary);
   font-size: clamp(1.45rem, 2vw, 1.75rem);
@@ -12037,6 +12029,11 @@ td span {
   min-height: 0;
 }
 
+/* The bare bar carries no colour of the metric it measures — hue is the sport's
+   on this chart. What it wears is the unattributed tone: a day COROS reported
+   whose activities carry nothing for this metric (a gym session under distance,
+   or a week whose activity list has not loaded) draws as one neutral column, the
+   same tone the residual block inside a stack uses. */
 .training-fitness-bar {
   display: block;
   flex: 1 1 0;
@@ -12045,28 +12042,71 @@ td span {
   min-height: 6px;
   height: 0;
   border-radius: 9px 9px 4px 4px;
-  background: linear-gradient(180deg, #dcd57a 0%, #74c08f 52%, #2d9a74 100%);
-  box-shadow: 0 0 18px rgba(45, 154, 116, 0.18);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--text-muted) 58%, transparent) 0%,
+    color-mix(in srgb, var(--text-muted) 34%, transparent) 100%
+  );
   transition:
     height 0.85s cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 0.25s ease,
     background 0.35s ease;
 }
 
-/* Per-metric bar colours so stacked metrics stay distinguishable. */
-.training-fitness-bar--distance {
-  background: linear-gradient(180deg, #dcd57a 0%, #74c08f 52%, #2d9a74 100%);
-  box-shadow: 0 0 18px rgba(45, 154, 116, 0.18);
+/* A day that has activities draws one block per activity, coloured by its sport
+   — the same split the training-load columns make. */
+.training-fitness-bar.is-stacked {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  overflow: hidden;
+  background: none;
+  box-shadow: none;
 }
 
-.training-fitness-bar--duration {
-  background: linear-gradient(180deg, #a9c7ff 0%, #6398f2 55%, #3b6fd4 100%);
-  box-shadow: 0 0 16px rgba(90, 143, 240, 0.22);
+.training-fitness-segment {
+  --segment-color: var(--sport-other);
+  display: block;
+  width: 100%;
+  /* flex-grow is set inline, in chart units, so blocks divide the column in
+     proportion to their value; the floor keeps a short session on screen. */
+  flex: 0 1 0;
+  min-height: 4px;
+  border-radius: 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--segment-color) 58%, #ffffff) 0%,
+    var(--segment-color) 55%,
+    color-mix(in srgb, var(--segment-color) 78%, #000000) 100%
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--segment-color) 18%, transparent);
 }
 
-.training-fitness-bar--trainingLoad {
-  background: linear-gradient(180deg, #ffe3a0 0%, #f4b740 55%, #d0901c 100%);
-  box-shadow: 0 0 16px rgba(216, 155, 34, 0.22);
+/* column-reverse: the first child is the bottom block, the last the top one. */
+.training-fitness-segment:first-child {
+  border-radius: 3px 3px 4px 4px;
+}
+
+.training-fitness-segment:last-child {
+  border-radius: 9px 9px 3px 3px;
+}
+
+.training-fitness-segment:only-child {
+  border-radius: 9px 9px 4px 4px;
+}
+
+/* Load or distance COROS counted outside any session: neutral on purpose, so it
+   cannot be read as a sixth sport. */
+.training-fitness-segment.is-residual {
+  /* Mixed off --text-muted rather than a fixed white wash, so the block stays
+     visible on the paper theme's light ground. Same tone as a bar with nothing
+     attributed at all, so neutral always reads as "no sport". */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--text-muted) 58%, transparent) 0%,
+    color-mix(in srgb, var(--text-muted) 34%, transparent) 100%
+  );
+  box-shadow: none;
 }
 
 .training-fitness-bar.is-empty {
@@ -12075,18 +12115,26 @@ td span {
   box-shadow: none;
 }
 
-.training-fitness-day:hover .training-fitness-bar,
-.training-fitness-day:focus-visible .training-fitness-bar {
+/* A rest day opens no tooltip, so it lights up for nothing — leave its stub
+   inert rather than offering an affordance that leads nowhere. */
+.training-fitness-day:not(.is-empty):hover .training-fitness-bar,
+.training-fitness-day:not(.is-empty):focus-visible .training-fitness-bar {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.2),
     0 0 20px rgba(255, 255, 255, 0.12);
 }
 
-/* Legend + colour swatches shared by the header, tooltip, and dropdown. */
-.training-fitness-legend {
+/* The sport key, wrapped so the panel keeps the three grid rows its template
+   declares even when no sport is on the chart yet. */
+.training-fitness-legends {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.training-fitness-sport-legend {
+  gap: 5px 14px;
 }
 
 .training-fitness-legend-item {
@@ -12098,11 +12146,6 @@ td span {
   font-weight: 600;
 }
 
-.training-fitness-legend-total {
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
 .training-fitness-swatch {
   display: inline-block;
   width: 10px;
@@ -12111,31 +12154,30 @@ td span {
   border-radius: 3px;
 }
 
-.training-fitness-swatch--distance {
-  background: linear-gradient(135deg, #dcd57a 0%, var(--accent-muted) 100%);
-}
-
-.training-fitness-swatch--duration {
-  background: #5a8ff0;
-}
-
-.training-fitness-swatch--trainingLoad {
-  background: #f4b740;
-}
-
+/* Sport labels are short, but the row still truncates rather than growing the
+   tooltip wide enough to cover the columns beside the one being read. */
 .training-fitness-tooltip-row {
   display: flex;
   align-items: center;
   gap: 7px;
+  max-width: 208px;
 }
 
-/* Glassmorphic multi-select for stacking weekly metrics. */
-.metric-multiselect {
+.training-fitness-tooltip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Glassmorphic picker for the one metric the weekly columns measure. It carries
+   no colour of its own: hue on this chart belongs to the sport a block stands
+   for, so a swatch here would claim it stands for the unit instead. */
+.metric-select {
   position: relative;
   flex-shrink: 0;
 }
 
-.metric-multiselect-trigger {
+.metric-select-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -12156,31 +12198,26 @@ td span {
     background 0.16s ease;
 }
 
-.metric-multiselect-trigger:hover,
-.metric-multiselect-trigger[aria-expanded="true"] {
+.metric-select-trigger:hover,
+.metric-select-trigger[aria-expanded="true"] {
   border-color: rgba(255, 255, 255, 0.24);
   background: rgba(255, 255, 255, 0.09);
 }
 
-.metric-multiselect-swatches {
-  display: inline-flex;
-  gap: 3px;
-}
-
-.metric-multiselect-label {
+.metric-select-label {
   white-space: nowrap;
 }
 
-.metric-multiselect-icon {
+.metric-select-icon {
   color: var(--text-secondary);
   transition: transform 0.18s ease;
 }
 
-.metric-multiselect-icon.is-open {
+.metric-select-icon.is-open {
   transform: rotate(180deg);
 }
 
-.metric-multiselect-menu {
+.metric-select-menu {
   position: absolute;
   z-index: 30;
   top: calc(100% + 8px);
@@ -12199,16 +12236,7 @@ td span {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.metric-multiselect-hint {
-  margin: 2px 8px 6px;
-  color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.metric-multiselect-option {
+.metric-select-option {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -12225,28 +12253,31 @@ td span {
   transition: background 0.14s ease;
 }
 
-.metric-multiselect-option:hover {
+.metric-select-option:hover {
   background: rgba(255, 255, 255, 0.07);
 }
 
-.metric-multiselect-option.is-selected {
+.metric-select-option.is-selected {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.metric-multiselect-check {
+/* Round, because exactly one option can be on — the square read as a checkbox
+   back when the chart stacked several metrics at once. */
+.metric-select-check {
   display: grid;
   place-items: center;
   width: 18px;
   height: 18px;
   flex-shrink: 0;
   border: 1.5px solid rgba(255, 255, 255, 0.28);
-  border-radius: 6px;
+  border-radius: 50%;
   background: transparent;
-  color: #05130d;
+  color: var(--bg-base);
 }
 
-.metric-multiselect-check.is-on {
+.metric-select-option.is-selected .metric-select-check {
   border-color: transparent;
+  background: var(--accent);
 }
 
 .training-fitness-date {
@@ -13039,10 +13070,15 @@ td span {
   }
 }
 
+/* Its column holds this one card against two stacked ones, so the row runs far
+   taller than the ring, the message and the tiles need. Centring the three keeps
+   them one composition — `space-between` opens a hole in the middle instead, and
+   `start` leaves the whole surplus below the tiles. With no slack (a narrow
+   single-column layout) this reads the same as `start`. */
 .training-ring-content {
   display: grid;
   justify-items: center;
-  align-content: start;
+  align-content: center;
   gap: clamp(13px, 1.8vh, 19px);
   height: 100%;
   overflow: visible;
@@ -13113,7 +13149,7 @@ td span {
   text-wrap: balance;
 }
 
-/* Why steps and calories are empty. Quieter than the readiness line above:
+/* Why the step count is empty. Quieter than the readiness line above:
    it reports a setting, not a training state. */
 .training-ring-message.is-quiet {
   max-width: 34ch;
@@ -13141,21 +13177,14 @@ td span {
   font-size: clamp(1.35rem, 1.85vw, 1.58rem);
 }
 
+/* HRV and sleep, side by side. The positional rules that used to live here —
+   a full-width span for the load chart, and a parity swap for the training
+   calendar it shared a row with — went with those two panels: the grid now
+   holds exactly two, and neither is ever the odd one out. */
 .training-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
-}
-
-/* Training load is the headline chart: it takes the full row on its own,
-   leaving HRV and sleep to share the one below. */
-.training-chart-grid > .training-chart-panel[data-metric="load"] {
-  grid-column: 1 / -1;
-}
-
-/* Any other odd trailing chart would leave half a row empty — let it span too. */
-.training-chart-grid > .training-chart-panel:last-child:nth-child(even) {
-  grid-column: 1 / -1;
 }
 
 .training-chart-panel {
@@ -13198,17 +13227,6 @@ td span {
   display: grid;
   justify-items: end;
   gap: 8px;
-}
-
-/* The load panel stacks its chart and its sport legend, so the panel itself
-   keeps the two children its grid was written for. */
-.training-chart-body {
-  display: grid;
-  /* The panel's min-height leaves slack; without this the grid hands it to the
-     row above and the legend drifts away from the chart it labels. */
-  align-content: start;
-  gap: 12px;
-  min-width: 0;
 }
 
 .training-chart-shell {
@@ -13412,47 +13430,6 @@ td span {
       color-mix(in srgb, var(--swatch-color) 62%, transparent)
     );
   box-shadow: 0 0 6px color-mix(in srgb, var(--swatch-color) 30%, transparent);
-}
-
-/* Activity names are free text and run long; the tooltip truncates rather than
-   growing wide enough to cover the columns beside the one being read. */
-.training-chart-tooltip.is-blocks {
-  max-width: 300px;
-}
-
-.training-chart-tooltip.is-blocks .training-chart-tooltip-key {
-  min-width: 0;
-}
-
-.training-chart-tooltip-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.training-chart-tooltip-empty {
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.training-chart-tooltip-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding-top: 7px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.training-chart-tooltip-total strong {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 .training-chart-empty {
@@ -14055,8 +14032,7 @@ td span {
   font-weight: 600;
 }
 
-.training-scores-panel,
-.training-race-panel {
+.training-scores-panel {
   display: grid;
   gap: 12px;
   align-content: start;
@@ -14071,12 +14047,6 @@ td span {
   backdrop-filter: none;
 }
 
-.training-race-panel {
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
-}
-
-.training-race-header,
 .training-scores-header {
   display: flex;
   align-items: flex-start;
@@ -14084,28 +14054,18 @@ td span {
   gap: 16px;
 }
 
-.training-race-header svg,
 .training-scores-header svg {
   flex-shrink: 0;
   color: var(--text-secondary);
 }
 
-.training-race-heading,
 .training-scores-heading {
   display: grid;
   gap: 2px;
 }
 
-.training-race-heading h2,
 .training-scores-heading h2 {
   margin: 0;
-}
-
-.training-race-level {
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .score-bar-list {
@@ -14181,103 +14141,6 @@ td span {
   color: var(--text-primary);
   font-size: 20px;
   font-weight: 600;
-}
-
-.race-card-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: minmax(0, 1fr);
-  gap: 12px;
-  min-height: 0;
-  width: 100%;
-}
-
-.race-card {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  background:
-    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 12%, transparent), transparent 62%),
-    rgba(255, 255, 255, 0.025);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  padding: 9px 10px;
-  animation: training-card-enter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
-}
-
-.race-card::before {
-  content: "";
-  position: absolute;
-  inset: 10px auto 10px 0;
-  width: 2px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  opacity: 0.66;
-}
-
-.race-card:nth-child(2) {
-  animation-delay: 0.05s;
-}
-
-.race-card:nth-child(3) {
-  animation-delay: 0.1s;
-}
-
-.race-card:nth-child(4) {
-  animation-delay: 0.15s;
-}
-
-.race-card:hover {
-  border-color: color-mix(in srgb, var(--accent-muted) 32%, transparent);
-  background:
-    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 18%, transparent), transparent 62%),
-    color-mix(in srgb, var(--accent-muted) 6%, transparent);
-  transform: translateY(-2px);
-}
-
-.race-card-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  width: fit-content;
-  max-width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 2px 7px;
-  white-space: nowrap;
-}
-
-.race-card-time {
-  justify-self: end;
-  color: var(--text-primary);
-  font-size: 1.12rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-  margin-top: 0;
-  white-space: nowrap;
-}
-
-.race-card-pace {
-  justify-self: end;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
-  white-space: nowrap;
 }
 
 .training-activities-panel {
@@ -15088,6 +14951,9 @@ tr.data-intervals-row-missing {
   display: grid;
   gap: 18px;
   align-content: start;
+  /* Kept at the chart panels' padding now that it has its own row, so its
+     eyebrow still lines up with theirs down the left edge of the column. */
+  padding: clamp(18px, 1.8vw, 24px);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: var(--radius-lg);
   background:
@@ -15181,7 +15047,28 @@ tr.data-intervals-row-missing {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-muted) 32%, transparent);
 }
 
+/* The today card is a button too, so its copy elements are spans: keep them
+   stacking the way the <h3>/<p> they replaced did. */
+.training-upcoming-today-button {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.training-upcoming-today-button:hover,
+.training-upcoming-today-button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
+}
+
+.training-upcoming-today-button .training-upcoming-chevron {
+  align-self: center;
+}
+
 .training-upcoming-today-copy {
+  flex: 1;
   min-width: 0;
 }
 
@@ -15216,6 +15103,7 @@ tr.data-intervals-row-missing {
 }
 
 .training-upcoming-today-title {
+  display: block;
   margin: 0;
   font-size: 20px;
   font-weight: 700;
@@ -15223,6 +15111,7 @@ tr.data-intervals-row-missing {
 }
 
 .training-upcoming-today-meta {
+  display: block;
   margin: 8px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
@@ -15247,15 +15136,37 @@ tr.data-intervals-row-missing {
   list-style: none;
 }
 
+/* Each row opens the workout's detail slide-over, so it is a real button —
+   the grid lives on it rather than on the <li>, which keeps only the rail's
+   first/last bookkeeping. */
 .training-upcoming-row {
   display: grid;
   grid-template-columns: 12px 52px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
+  width: 100%;
   padding: 14px 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.training-upcoming-row:hover,
+.training-upcoming-row:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.training-upcoming-row:hover .training-upcoming-chevron,
+.training-upcoming-row:focus-visible .training-upcoming-chevron,
+.training-upcoming-today-button:hover .training-upcoming-chevron,
+.training-upcoming-today-button:focus-visible .training-upcoming-chevron {
+  color: var(--text-secondary);
 }
 
 .training-upcoming-rail {
@@ -15279,15 +15190,15 @@ tr.data-intervals-row-missing {
   transform: translateX(-50%);
 }
 
-.training-upcoming-row:first-child .training-upcoming-rail::before {
+.training-upcoming-item:first-child .training-upcoming-rail::before {
   top: 50%;
 }
 
-.training-upcoming-row:last-child .training-upcoming-rail::before {
+.training-upcoming-item:last-child .training-upcoming-rail::before {
   bottom: 50%;
 }
 
-.training-upcoming-row:only-child .training-upcoming-rail::before {
+.training-upcoming-item:only-child .training-upcoming-rail::before {
   display: none;
 }
 
@@ -16982,13 +16893,11 @@ tr.data-intervals-row-missing {
   .training-activities-panel,
   .training-activities-split-panel,
   .training-scores-panel,
-  .training-race-panel,
   .training-chart-panel,
   .training-heatmap-panel,
   .training-ring-panel,
   .training-stat-card,
   .training-table-row,
-  .race-card,
   .training-chart-shell .recharts-wrapper,
   .training-chart-tooltip,
   .training-zone-donut .recharts-wrapper,
@@ -17033,7 +16942,6 @@ tr.data-intervals-row-missing {
 
   .metric-tile-button:hover,
   .training-stat-card:hover,
-  .race-card:hover,
   .primary-button:hover:not(:disabled),
   .secondary-button:hover:not(:disabled),
   .icon-button:hover:not(:disabled) {
@@ -17150,10 +17058,6 @@ tr.data-intervals-row-missing {
     padding: clamp(30px, 3.8vw, 48px) clamp(28px, 4vw, 50px);
   }
 
-  .training-summary-tiles:not(.is-stack) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .training-chart-grid,
   .training-intelligence-grid,
   .training-activities-split,
@@ -17161,23 +17065,11 @@ tr.data-intervals-row-missing {
     grid-template-columns: 1fr;
   }
 
-  .training-intelligence-grid {
-    grid-template-areas:
-      "recovery"
-      "fitness"
-      "sleep"
-      "vo2";
-  }
-
   .training-activities-detail {
     border-left: 0;
     padding-left: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 18px;
-  }
-
-  .training-intelligence-main {
-    grid-template-columns: 1fr;
   }
 
   .training-summary-tiles.is-stack {
@@ -17427,12 +17319,10 @@ tr.data-intervals-row-missing {
   .training-command-center,
   .training-login-fields,
   .training-status-grid,
-  .training-summary-tiles:not(.is-stack),
   .training-dashboard-grid,
   .training-chart-grid,
   .training-performance-grid,
   .training-intelligence-grid,
-  .training-intelligence-main,
   .youtube-layout,
   .spotify-layout {
     grid-template-columns: 1fr;
@@ -25363,22 +25253,20 @@ tr.data-intervals-row-missing {
   background: rgba(246, 243, 236, 0.97);
 }
 
-/* VO2 widget — match flat recessed siblings; panel:not(.is-disconnected) would
- * otherwise apply --shadow-card and make this card look raised. The arrive
- * animation also keyframes a heavy outer shadow that wins over static rules. */
-:root[data-theme="paper"] .training-intelligence .vo2-widget-panel,
-:root[data-theme="paper"] .training-performance-grid > .vo2-widget-panel {
-  background: rgba(38, 34, 28, 0.025);
-  border-color: rgba(38, 34, 28, 0.08);
-  box-shadow: var(--shadow-inset);
+/* VO2 widget — it sits on Personal now, beside the fitness scores, so it takes
+ * the raised white card those siblings get rather than the recessed fill it
+ * wore inside Training Intelligence. The arrive animation keyframes a heavy
+ * outer shadow that wins over static rules, which is what is-ready is for. */
+:root[data-theme="paper"] .profile-fitness-grid > .vo2-widget-panel {
+  border-color: rgba(38, 34, 28, 0.12);
+  box-shadow: var(--shadow-card);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
-:root[data-theme="paper"] .training-intelligence .vo2-widget-panel.is-ready,
-:root[data-theme="paper"] .training-performance-grid > .vo2-widget-panel.is-ready {
+:root[data-theme="paper"] .profile-fitness-grid > .vo2-widget-panel.is-ready {
   animation: none;
-  box-shadow: var(--shadow-inset);
+  box-shadow: var(--shadow-card);
 }
 
 :root[data-theme="paper"] .vo2-widget-panel::before,
@@ -25583,14 +25471,14 @@ tr.data-intervals-row-missing {
 }
 
 /* --- Training Hub: graph menus (fitness metrics + zone select) ------------- */
-:root[data-theme="paper"] .metric-multiselect-trigger,
+:root[data-theme="paper"] .metric-select-trigger,
 :root[data-theme="paper"] .training-zone-select-trigger {
   background: rgba(38, 34, 28, 0.05);
   border-color: var(--glass-border);
 }
 
-:root[data-theme="paper"] .metric-multiselect-trigger:hover,
-:root[data-theme="paper"] .metric-multiselect-trigger[aria-expanded="true"],
+:root[data-theme="paper"] .metric-select-trigger:hover,
+:root[data-theme="paper"] .metric-select-trigger[aria-expanded="true"],
 :root[data-theme="paper"] .training-zone-select-trigger:hover,
 :root[data-theme="paper"] .training-zone-select-trigger[aria-expanded="true"] {
   background: rgba(38, 34, 28, 0.09);
@@ -25601,22 +25489,22 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
-:root[data-theme="paper"] .metric-multiselect-menu,
+:root[data-theme="paper"] .metric-select-menu,
 :root[data-theme="paper"] .training-zone-select-menu {
   border-color: var(--glass-border);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-elevated), var(--glass-inset);
 }
 
-:root[data-theme="paper"] .metric-multiselect-option:hover,
-:root[data-theme="paper"] .metric-multiselect-option.is-selected,
+:root[data-theme="paper"] .metric-select-option:hover,
+:root[data-theme="paper"] .metric-select-option.is-selected,
 :root[data-theme="paper"] .training-zone-select-option.is-active,
 :root[data-theme="paper"] .training-zone-select-option:hover,
 :root[data-theme="paper"] .training-zone-select-option:focus-visible {
   background: rgba(38, 34, 28, 0.07);
 }
 
-:root[data-theme="paper"] .metric-multiselect-check {
+:root[data-theme="paper"] .metric-select-check {
   border-color: rgba(38, 34, 28, 0.28);
 }
 
@@ -25707,10 +25595,6 @@ tr.data-intervals-row-missing {
   box-shadow: 0 0 5px color-mix(in srgb, var(--swatch-color) 22%, transparent);
 }
 
-:root[data-theme="paper"] .training-chart-tooltip-total {
-  border-top-color: rgba(38, 34, 28, 0.12);
-}
-
 /* --- Training Hub: tooltips ------------------------------------------------ */
 :root[data-theme="paper"] .training-fitness-tooltip,
 :root[data-theme="paper"] .training-zone-tooltip {
@@ -25748,36 +25632,14 @@ tr.data-intervals-row-missing {
   background: rgba(38, 34, 28, 0.08);
 }
 
-/* --- Training Hub: scores & race ------------------------------------------- */
-:root[data-theme="paper"] .training-scores-panel,
-:root[data-theme="paper"] .training-race-panel {
+/* --- Training Hub: fitness scores ------------------------------------------ */
+:root[data-theme="paper"] .training-scores-panel {
   box-shadow: var(--shadow-card);
 }
 
 :root[data-theme="paper"] .score-bar-track {
   border-color: rgba(38, 34, 28, 0.08);
   background: rgba(38, 34, 28, 0.07);
-}
-
-:root[data-theme="paper"] .race-card {
-  border-color: rgba(38, 34, 28, 0.1);
-  background:
-    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 10%, transparent), transparent 62%),
-    rgba(38, 34, 28, 0.025);
-  box-shadow: var(--shadow-inset);
-}
-
-:root[data-theme="paper"] .race-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
-  background:
-    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 14%, transparent), transparent 62%),
-    color-mix(in srgb, var(--accent) 6%, transparent);
-  box-shadow: var(--shadow-soft);
-}
-
-:root[data-theme="paper"] .race-card-badge {
-  border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
 }
 
 /* --- Training Hub: upcoming workouts --------------------------------------- */
@@ -26911,6 +26773,16 @@ tr.data-intervals-row-missing {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* Overview opens this same slide-over for an upcoming workout; the scheduled
+   lookup that upgrades its structure runs behind an already-open panel. */
+.training-upcoming-detail-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .calendar-detail-delete.is-armed {

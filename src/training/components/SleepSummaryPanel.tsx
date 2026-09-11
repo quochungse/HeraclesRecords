@@ -170,9 +170,20 @@ export function SleepSummaryPanel({
   // under this panel's heading it becomes a score for a night that never
   // happened.
   const lastNight = pickLastNightSleep(sleep);
-  const staleNight = !lastNight ? sleep?.latest : undefined;
-  const tone = sleepScoreTone(lastNight?.score);
-  const label = sleepScoreLabel(lastNight?.score, "Waiting");
+  // DEV-BUILD SCAFFOLD — delete to restore the rule above. A watch that has not
+  // synced today leaves this card empty, which makes the Overview layout
+  // impossible to judge, so a development build falls back to the newest main
+  // sleep on record. The heading names that night's own date rather than "Last
+  // night", so nothing on screen claims to be this morning's.
+  const previewNight = import.meta.env.DEV
+    ? [...(sleep?.records ?? [])]
+        .filter((record) => record.kind !== "nap")
+        .sort((left, right) => right.happenDay.localeCompare(left.happenDay))[0]
+    : undefined;
+  const night = lastNight ?? previewNight;
+  const staleNight = !night ? sleep?.latest : undefined;
+  const tone = sleepScoreTone(night?.score);
+  const label = sleepScoreLabel(night?.score, "Waiting");
   const isLoading = connecting || refreshing;
 
   return (
@@ -186,7 +197,7 @@ export function SleepSummaryPanel({
       <div className="sleep-panel-header">
         <div>
           <p className="eyebrow">Sleep</p>
-          <h2>{lastNight ? formatSleepNightLabel(lastNight) : "Last night"}</h2>
+          <h2>{night ? formatSleepNightLabel(night) : "Last night"}</h2>
         </div>
         {onOpenDetails ? (
           <button
@@ -220,46 +231,46 @@ export function SleepSummaryPanel({
         <p className="sleep-panel-message">Syncing sleep data…</p>
       ) : null}
 
-      {!isLoading && lastNight ? (
+      {!isLoading && night ? (
         <>
           <div className="sleep-panel-hero">
             <div className="sleep-panel-score">
-              <strong>{lastNight.score !== undefined ? Math.round(lastNight.score) : "–"}</strong>
+              <strong>{night.score !== undefined ? Math.round(night.score) : "–"}</strong>
               <span>{label}</span>
             </div>
             <div className="sleep-panel-duration">
               <span>Main sleep</span>
-              <strong>{formatSleepDurationMinutes(lastNight.totalMinutes)}</strong>
+              <strong>{formatSleepDurationMinutes(night.totalMinutes)}</strong>
             </div>
           </div>
 
-          <SleepStageBar record={lastNight} />
+          <SleepStageBar record={night} />
 
-          {lastNight.completeness === "partial" ? (
+          {night.completeness === "partial" ? (
             <p className="sleep-panel-partial">
-              Partial data: {lastNight.partialReason ?? "COROS is still syncing this sleep."}
+              Partial data: {night.partialReason ?? "COROS is still syncing this sleep."}
             </p>
           ) : null}
 
           <dl className="sleep-panel-metrics" aria-label="Sleep details">
-            <SleepWindowMetric record={lastNight} />
+            <SleepWindowMetric record={night} />
             <SleepMetric
               label="Awake"
-              value={formatSleepMetricDuration(lastNight.awakeMinutes)}
+              value={formatSleepMetricDuration(night.awakeMinutes)}
             />
             <SleepMetric
               label="Wake-ups > 5m"
-              value={lastNight.awakeCountOverFiveMinutes ?? "No data"}
+              value={night.awakeCountOverFiveMinutes ?? "No data"}
             />
             <SleepMetric
               label="Naps"
-              value={formatNapSummary(lastNight)}
+              value={formatNapSummary(night)}
             />
           </dl>
         </>
       ) : null}
 
-      {!isLoading && !lastNight ? (
+      {!isLoading && !night ? (
         <div className="sleep-panel-empty">
           <p className="sleep-panel-message">
             {/* Two empties that look alike and need opposite things doing:

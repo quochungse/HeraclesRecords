@@ -22,9 +22,13 @@ import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
-import { Vo2MaxWidget } from "./components/Vo2MaxWidget";
+import { mergeTrainingDayLists } from "./parsers";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
+import {
+  buildWeekToDateTotals,
+  enrichDayListWithActivityTotals
+} from "./weeklyActivity";
 import loginPageBackground from "../../public/assets/training-hub/Login-page-bg.png";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
@@ -47,6 +51,7 @@ export function TrainingOverview({
   twoFactorCode,
   activities,
   upcomingWorkouts,
+  sportTypes,
   snapshot,
   rpeBackfill,
   busy,
@@ -88,15 +93,30 @@ export function TrainingOverview({
   const summary = useMemo(
     () =>
       snapshot?.summary ?? {
-        staminaLevel: undefined,
         recoveryPct: undefined,
-        todayLoad: undefined,
         weekLoadTotal: undefined,
-        latestRhr: undefined,
         rhrDelta: undefined,
+        steps: undefined,
         mcpConnected: undefined
       },
     [snapshot]
+  );
+  // Built from the same enriched day list the Weekly Activity chart draws, so a
+  // tile and the columns beside it are reading one set of days — the chart shows
+  // Monday to Sunday, the tiles stop at today.
+  const weekTotals = useMemo(
+    () =>
+      buildWeekToDateTotals(
+        enrichDayListWithActivityTotals(
+          mergeTrainingDayLists(
+            snapshot?.dailyMetrics ?? null,
+            snapshot?.analytics ?? null
+          ),
+          activities
+        ),
+        snapshot?.dailyHealth?.records ?? []
+      ),
+    [snapshot, activities]
   );
 
   return (
@@ -408,19 +428,29 @@ export function TrainingOverview({
               ) : null}
             </div>
             <div className="training-intelligence-grid">
-              <RecoveryRing summary={summary} />
-              <FitnessTrendPanel snapshot={snapshot} activities={activities} />
-              <SleepSummaryPanel
-                sleep={snapshot?.sleep}
-                connecting={sleepConnecting}
-                refreshing={busy === "training-refresh"}
-                onOpenDetails={onOpenSleepDetails}
-              />
-              <Vo2MaxWidget snapshot={snapshot} />
+              <div className="training-intelligence-column">
+                <RecoveryRing summary={summary} weekTotals={weekTotals} />
+              </div>
+              <div className="training-intelligence-column">
+                <FitnessTrendPanel snapshot={snapshot} activities={activities} />
+                <SleepSummaryPanel
+                  sleep={snapshot?.sleep}
+                  connecting={sleepConnecting}
+                  refreshing={busy === "training-refresh"}
+                  onOpenDetails={onOpenSleepDetails}
+                />
+              </div>
             </div>
           </section>
 
-          <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
+          {/* Its own row, directly under Training Intelligence. The panel
+              renders nothing when the calendar is empty, so a week with no
+              scheduled sessions leaves no gap here. */}
+          <UpcomingWorkoutsPanel
+            api={api}
+            workouts={upcomingWorkouts}
+            sportTypes={sportTypes}
+          />
 
           <div className="training-heatmap-wrap">
             <TrainingHeatmapPanel
@@ -429,11 +459,6 @@ export function TrainingOverview({
               rpeBackfill={rpeBackfill}
             />
           </div>
-          <TrainingTrendCharts
-            points={snapshot?.trendPoints ?? []}
-            activities={activities}
-            mcpConnected={snapshot?.sleep?.mcpConnected}
-          />
           <TrainingZoneDistributionCharts
             hrZoneModel={hrZoneModel}
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
@@ -443,6 +468,10 @@ export function TrainingOverview({
           <Suspense fallback={null}>
             <LazyStrengthDistributionSection api={api} status={status} />
           </Suspense>
+          <TrainingTrendCharts
+            points={snapshot?.trendPoints ?? []}
+            mcpConnected={snapshot?.sleep?.mcpConnected}
+          />
         </>
       ) : null}
     </div>

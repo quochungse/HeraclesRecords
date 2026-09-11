@@ -4,7 +4,6 @@ import {
   getTrainingChartActiveDot,
   getTrainingChartColors,
   getTrainingChartFillStops,
-  getTrainingLoadBlockStyle,
   getTrainingMetricPalettes
 } from "./chartConfig";
 
@@ -16,8 +15,7 @@ export function useChartColors() {
       colors: getTrainingChartColors(theme),
       fillStops: getTrainingChartFillStops(theme),
       activeDot: getTrainingChartActiveDot(theme),
-      metrics: getTrainingMetricPalettes(theme),
-      loadBlock: getTrainingLoadBlockStyle(theme)
+      metrics: getTrainingMetricPalettes(theme)
     }),
     [theme]
   );

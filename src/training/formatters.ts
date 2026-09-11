@@ -324,22 +324,38 @@ export function happenDayFromTimestamp(timestamp?: number): string | undefined {
   return getLocalHappenDayKey(new Date(ms));
 }
 
-export function isUpcomingWorkoutScheduled(happenDay: string): boolean {
-  return /^\d{8}$/.test(happenDay) && happenDay >= getLocalHappenDayKey();
+/**
+ * `referenceDate` is what "today" means, and it is a parameter rather than a
+ * read of the clock for one reason: the Overview greeting is built against a
+ * `now` its caller supplies, and these three answered from the real clock
+ * instead. A screen passes nothing and gets today, as before.
+ */
+export function isUpcomingWorkoutScheduled(
+  happenDay: string,
+  referenceDate = new Date()
+): boolean {
+  return (
+    /^\d{8}$/.test(happenDay) && happenDay >= getLocalHappenDayKey(referenceDate)
+  );
 }
 
 export function filterUpcomingWorkoutsFromToday<
   T extends { happenDay: string }
->(workouts: T[]): T[] {
-  return workouts.filter((workout) => isUpcomingWorkoutScheduled(workout.happenDay));
+>(workouts: T[], referenceDate = new Date()): T[] {
+  return workouts.filter((workout) =>
+    isUpcomingWorkoutScheduled(workout.happenDay, referenceDate)
+  );
 }
 
-export function formatUpcomingWorkoutDate(happenDay: string): string {
+export function formatUpcomingWorkoutDate(
+  happenDay: string,
+  referenceDate = new Date()
+): string {
   if (!/^\d{8}$/.test(happenDay)) {
     return happenDay;
   }
 
-  const todayKey = getLocalHappenDayKey();
+  const todayKey = getLocalHappenDayKey(referenceDate);
 
   if (happenDay === todayKey) {
     return "Today";
@@ -349,7 +365,7 @@ export function formatUpcomingWorkoutDate(happenDay: string): string {
   const month = Number(happenDay.slice(4, 6)) - 1;
   const day = Number(happenDay.slice(6, 8));
   const date = new Date(year, month, day);
-  const today = new Date();
+  const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
   date.setHours(0, 0, 0, 0);
   const diffDays = Math.round(
@@ -368,12 +384,15 @@ export function formatUpcomingWorkoutDate(happenDay: string): string {
   }).format(date);
 }
 
-export function isUpcomingWorkoutToday(happenDay: string): boolean {
+export function isUpcomingWorkoutToday(
+  happenDay: string,
+  referenceDate = new Date()
+): boolean {
   if (!/^\d{8}$/.test(happenDay)) {
     return false;
   }
 
-  return happenDay === getLocalHappenDayKey();
+  return happenDay === getLocalHappenDayKey(referenceDate);
 }
 
 export function formatUpcomingWorkoutLoad(value?: number): string {
