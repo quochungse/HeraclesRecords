@@ -778,6 +778,15 @@ assert.match(
   }),
   /older activities in it may be missing/
 );
+// A dated list's totals are the period's, not only the rows `limit` let
+// through: "how much did I run last week" must not shrink with the row cap.
+const cappedWeek = formatActivityListForChat(listFixture, "metric", {
+  window: { startDay: "20260901", endDay: "20260907" },
+  limit: 2
+});
+assert.match(cappedWeek, /^Activities \(2026-09-01 → 2026-09-07\): 2 of 4 shown\n/);
+assert.match(cappedWeek, /Totals \(all 4 in the period\):\n/);
+assert.match(cappedWeek, /- All: 4 · 3:55:00 · load 320 · \+640 m\n/);
 
 // The snapshot and the list tool share this row, climb included.
 assert.match(formatActivityListLine(listFixture[0], "metric"), /· load 80 · \+40 m$/);

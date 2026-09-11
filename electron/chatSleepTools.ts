@@ -1,3 +1,4 @@
+import { dateFromDayKey, dayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
 import { SLEEP_TARGET_MINUTES } from "./coachThresholdMetrics";
 import { isCorosMcpUsable } from "./corosMcpService";
 import { getCachedSleepNight, getSleepHistory } from "./sleepHistoryService";
@@ -94,14 +95,9 @@ export function parseSleepNightArgument(value: unknown): string | undefined {
 
 /** Nights back from today a given day sits. */
 function nightsBackFrom(night: string, today: Date): number {
-  const start = new Date(
-    Number(night.slice(0, 4)),
-    Number(night.slice(4, 6)) - 1,
-    Number(night.slice(6, 8))
-  );
   const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return Math.max(
-    Math.round((midnight.getTime() - start.getTime()) / 86_400_000) + 1,
+    Math.round((midnight.getTime() - dateFromDayKey(night).getTime()) / 86_400_000) + 1,
     1
   );
 }
@@ -120,10 +116,11 @@ async function sleepNightRecord(
   today: Date
 ): Promise<TrainingHubSleepRecord | undefined> {
   const cached = getCachedSleepNight(night);
-  if (cached || nightsBackFrom(night, today) > COROS_SLEEP_RETENTION_NIGHTS) {
+  const back = nightsBackFrom(night, today);
+  if (cached || back > COROS_SLEEP_RETENTION_NIGHTS) {
     return cached;
   }
-  const filled = await getSleepHistory({ days: nightsBackFrom(night, today) });
+  const filled = await getSleepHistory({ days: back });
   return filled.records.find((record) => record.happenDay === night);
 }
 
@@ -131,9 +128,11 @@ export async function handleChatSleepTool(
   _name: ChatSleepToolName,
   args: Record<string, unknown>
 ): Promise<string> {
-  const night = parseSleepNightArgument(args.night);
-  const nights = parseSleepNights(args.days);
   try {
+    // Parsed inside the try, so a malformed night reads as this tool's failure
+    // like every other one rather than as a bare message with no tool named.
+    const night = parseSleepNightArgument(args.night);
+    const nights = parseSleepNights(args.days);
     if (night) {
       const today = new Date();
       // The night's own row and its samples are two different caches, and
@@ -152,23 +151,6 @@ export async function handleChatSleepTool(
 }
 
 // ----- Formatting -----------------------------------------------------------
-
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function dateFromDayKey(day: string): Date {
-  return new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)));
-}
-
-function dayLabel(day: string): string {
-  return `${day.slice(4, 6)}-${day.slice(6, 8)} ${WEEKDAYS[dateFromDayKey(day).getDay()]}`;
-}
-
-function dayKey(date: Date): string {
-  return (
-    `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}` +
-    `${String(date.getDate()).padStart(2, "0")}`
-  );
-}
 
 /** "7h12" — a night's length at a glance, and short enough for a table cell. */
 function formatSleepMinutes(minutes: number): string {
@@ -306,9 +288,7 @@ export function formatSleepSummaryForChat(
   // Windowed here as well as by the caller: `getSleepHistory` already returns
   // the window, but a formatter that trusts its input silently prints thirty
   // rows under a "last 7 nights" heading the day some caller forgets to.
-  const from = dayKey(
-    new Date(today.getFullYear(), today.getMonth(), today.getDate() - (nights - 1))
-  );
+  const from = dayKeyDaysAgo(today, nights - 1);
   const records = snapshot.records
     .filter((record) => record.kind !== "nap" && record.happenDay >= from)
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay));

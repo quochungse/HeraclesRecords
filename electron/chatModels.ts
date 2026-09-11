@@ -101,17 +101,22 @@ const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
  * `claude-sonnet-4-6-20250219` becomes `Sonnet 4.6`. Ids that do not match the
  * family-and-version shape are returned untouched rather than mangled.
  *
- * The minor version is bounded to two digits, and the segment after it must end
- * or be followed by another, so a *date* cannot be read as one. Without both,
+ * The minor version is bounded to two digits and may not be followed by a
+ * third, so a *date* cannot be read as one. Without that,
  * `claude-opus-5-20260114` came back as "Opus 5.20260114" — and that is not a
  * hypothetical id: three of the four models this app offers carry a
  * single-component version, so every dated form of them wore it. The dated
  * two-component ids read correctly either way, which is why it went unseen.
+ *
+ * Nothing is required *after* the version: Claude Code reports a 1M-context
+ * run as `claude-opus-5[1m]`, and a Vertex id dates itself with `@`. Requiring
+ * a dash or the end there turned the first into a raw id in the cost footer
+ * and cut the second to "Sonnet 4".
  */
 export function formatClaudeModelName(modelId: string): string {
   const id = modelId.trim();
   const match = new RegExp(
-    `^claude-(${MODEL_FAMILIES.join("|")})-(\\d+)(?:-(\\d{1,2}))?(?:-|$)`
+    `^claude-(${MODEL_FAMILIES.join("|")})-(\\d+)(?:-(\\d{1,2})(?!\\d))?`
   ).exec(id);
   if (!match) return id;
   const [, family, major, minor] = match;

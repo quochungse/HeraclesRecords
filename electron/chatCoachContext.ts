@@ -7,6 +7,7 @@ import {
   workoutSportFromType
 } from "./workoutCapabilities";
 import { formatPaceSeconds } from "./chatActivityTools";
+import { dateFromDayKey, isoFromDayKey } from "./chatDayKeys";
 import type {
   CorosProfile,
   TrainingHubActivity,
@@ -258,9 +259,7 @@ const RECORD_TYPE_LONGEST_RUN = 101;
 const RECORD_TYPE_ELEVATION_GAIN = 103;
 
 function formatRecordDay(happenDay: string | undefined): string | undefined {
-  return happenDay && /^\d{8}$/.test(happenDay)
-    ? `${happenDay.slice(0, 4)}-${happenDay.slice(4, 6)}-${happenDay.slice(6, 8)}`
-    : happenDay;
+  return happenDay && /^\d{8}$/.test(happenDay) ? isoFromDayKey(happenDay) : happenDay;
 }
 
 /**
@@ -314,14 +313,9 @@ export function formatPersonalRecords(
 
 function ageFromBirthday(birthday: number | undefined, today: Date): number | undefined {
   if (birthday === undefined || !/^\d{8}$/.test(String(birthday))) return undefined;
-  const text = String(birthday);
-  const born = new Date(
-    Number(text.slice(0, 4)),
-    Number(text.slice(4, 6)) - 1,
-    Number(text.slice(6, 8))
-  );
+  const born = dateFromDayKey(String(birthday));
   if (Number.isNaN(born.getTime())) return undefined;
-  let age = today.getFullYear() - born.getFullYear();
+  const age = today.getFullYear() - born.getFullYear();
   const beforeBirthday =
     today.getMonth() < born.getMonth() ||
     (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());

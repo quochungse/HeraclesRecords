@@ -2896,7 +2896,8 @@ export function ChatView({
                 content: partialText,
                 source,
                 reasoningSummary,
-                ...(payload.usage ? { usage: payload.usage } : {})
+                ...(payload.usage ? { usage: payload.usage } : {}),
+                ...(payload.model ? { model: payload.model } : {})
               });
             }
             for (const prompt of coachPrompts) {

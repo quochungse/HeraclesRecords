@@ -460,11 +460,8 @@ export async function streamOpenAiCompatibleChatCompletion(
     }
   }
 
-  if (toolsDisabled && fullText.length === 0) {
-    // The retry should normally produce content; this keeps the failure mode
-    // explicit if the local server accepts the no-tool request but emits nothing.
-    return { fullText, model: resolvedModel, ...(counted ? { usage } : {}) };
-  }
+  // A no-tool retry that still emits nothing returns the empty text as it is;
+  // the caller decides what an empty answer means.
   return { fullText, model: resolvedModel, ...(counted ? { usage } : {}) };
 }
 

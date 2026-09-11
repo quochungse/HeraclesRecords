@@ -1392,7 +1392,10 @@ export async function streamChat(
     send("chat:streamError", {
       requestId,
       ...payload,
-      ...(usage ? { usage } : {})
+      ...(usage ? { usage } : {}),
+      // A turn that breaks after answering keeps its partial answer, and that
+      // answer's footer names the model the same as a finished one's.
+      ...(answeredModel ? { model: answeredModel } : {})
     });
   };
 
@@ -2262,9 +2265,26 @@ async function executeChatTool(
       unitSystem
     });
   }
-  if (isChatActivityTool(name)) {
+  // Every read that reaches COROS announces its own failure on the stream, so
+  // the transcript names the tool that broke rather than leaving it to the
+  // model's account of what happened.
+  const reportingFailure = async (read: () => Promise<string>): Promise<string> => {
     try {
-      return await handleChatActivityTool(name as ChatActivityToolName, args, {
+      return await read();
+    } catch (caught) {
+      send("chat:streamInfo", {
+        requestId,
+        kind: "mcp",
+        tool: name,
+        status: "failed",
+        message: caught instanceof Error ? caught.message : String(caught)
+      });
+      throw caught;
+    }
+  };
+  if (isChatActivityTool(name)) {
+    return reportingFailure(() =>
+      handleChatActivityTool(name as ChatActivityToolName, args, {
         requestId,
         onActivityVisual: (preview) => {
           send("chat:streamInfo", {
@@ -2274,23 +2294,12 @@ async function executeChatTool(
           });
         },
         unitSystem
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : String(caught);
-      send("chat:streamInfo", {
-        requestId,
-        kind: "mcp",
-        tool: name,
-        status: "failed",
-        message
-      });
-      throw caught;
-    }
+      })
+    );
   }
   if (isChatAnalyticsTool(name)) {
-    try {
-      return await handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
+    return reportingFailure(() =>
+      handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
         requestId,
         onFitnessTrend: (preview) => {
           send("chat:streamInfo", {
@@ -2307,49 +2316,15 @@ async function executeChatTool(
           });
         },
         unitSystem
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : String(caught);
-      send("chat:streamInfo", {
-        requestId,
-        kind: "mcp",
-        tool: name,
-        status: "failed",
-        message
-      });
-      throw caught;
-    }
+      })
+    );
   }
   if (isChatSleepTool(name)) {
-    try {
-      return await handleChatSleepTool(name as ChatSleepToolName, args);
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : String(caught);
-      send("chat:streamInfo", {
-        requestId,
-        kind: "mcp",
-        tool: name,
-        status: "failed",
-        message
-      });
-      throw caught;
-    }
+    return reportingFailure(() =>
+      handleChatSleepTool(name as ChatSleepToolName, args)
+    );
   }
-  try {
-    return await callMcpTool(name, args);
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
-    send("chat:streamInfo", {
-      requestId,
-      kind: "mcp",
-      tool: name,
-      status: "failed",
-      message
-    });
-    throw caught;
-  }
+  return reportingFailure(() => callMcpTool(name, args));
 }
 
 function findChatTool(name: string): CorosMcpTool | undefined {

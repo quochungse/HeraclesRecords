@@ -7,6 +7,7 @@ import {
 } from "./trainingHubService";
 import { buildTrendPoints, mergeTrainingDayLists, recentTrainingHubDateList } from "./trainingTrendUtils";
 import { formatDurationSeconds, formatPaceSeconds } from "./chatActivityTools";
+import { dateFromDayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
 import type {
   CorosMcpTool,
   CorosProfile,
@@ -150,27 +151,6 @@ async function handleGetFitnessTrends(
 }
 
 // ----- Fitness trends -------------------------------------------------------
-
-function padTwo(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function dayKeyDaysAgo(today: Date, offset: number): string {
-  const date = new Date(today);
-  date.setDate(date.getDate() - offset);
-  return `${date.getFullYear()}${padTwo(date.getMonth() + 1)}${padTwo(date.getDate())}`;
-}
-
-function dateFromDayKey(day: string): Date {
-  return new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)));
-}
-
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-/** "09-07 Sun": the year is in the heading, the weekday is what a coach reads. */
-function dayLabel(day: string): string {
-  return `${day.slice(4, 6)}-${day.slice(6, 8)} ${WEEKDAYS[dateFromDayKey(day).getDay()]}`;
-}
 
 function hasReading(day: TrainingHubDailyMetric): boolean {
   return [
@@ -800,7 +780,9 @@ export function formatHrZoneSummaryForChat(
       entries: sortedEntries(distributions.hrDistance),
       format: (value: number) => formatDistanceValue(value, unitSystem)
     }
-  ].filter((measure) => totalOf(measure.entries) > 0);
+  ]
+    .map((measure) => ({ ...measure, total: totalOf(measure.entries) }))
+    .filter((measure) => measure.total > 0);
 
   if (measures.length === 0) {
     return "No heart-rate zone distribution data for the last 4 weeks.";
@@ -823,7 +805,7 @@ export function formatHrZoneSummaryForChat(
       ...(withRanges ? [ranges[position] ?? "—"] : []),
       ...measures.map((measure) => {
         const value = measure.entries[position]?.value ?? 0;
-        const percent = (value / totalOf(measure.entries)) * 100;
+        const percent = (value / measure.total) * 100;
         return `${measure.format(value)} (${Math.round(percent)}%)`;
       })
     ].join(" | ")

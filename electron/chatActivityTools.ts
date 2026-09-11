@@ -1,3 +1,4 @@
+import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { getStoredTrainingActivity } from "./database";
 import {
   getTrainingHubStatus,
@@ -213,10 +214,6 @@ export interface ActivityListWindow {
   endDay: string;
 }
 
-function localDayKey(date: Date): string {
-  return `${date.getFullYear()}${padTwo(date.getMonth() + 1)}${padTwo(date.getDate())}`;
-}
-
 function parseDayArgument(value: unknown, field: string): string | undefined {
   if (value === undefined || value === null || String(value).trim() === "") {
     return undefined;
@@ -245,7 +242,7 @@ export function parseActivityListWindow(
     }
     return undefined;
   }
-  const endDay = endArg ?? localDayKey(today);
+  const endDay = endArg ?? dayKey(today);
   if (endDay < startDay) {
     throw new Error("end_date is before start_date.");
   }
@@ -343,10 +340,6 @@ export interface ActivityListFormatOptions {
   truncatedAtSource?: boolean;
 }
 
-function formatDayKey(day: string): string {
-  return `${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6, 8)}`;
-}
-
 /**
  * The activity list as the coach reads it. A dated list ends with totals per
  * sport family: "how much did I run last week" is a sum over the rows, and a
@@ -367,7 +360,7 @@ export function formatActivityListForChat(
 
   const scope = [
     options.window
-      ? `${formatDayKey(options.window.startDay)} → ${formatDayKey(options.window.endDay)}`
+      ? `${isoFromDayKey(options.window.startDay)} → ${isoFromDayKey(options.window.endDay)}`
       : "most recent",
     options.sport ? `${SPORT_FAMILY_LABELS[options.sport]} only` : undefined
   ]
@@ -392,7 +385,17 @@ export function formatActivityListForChat(
   }
 
   if (options.window || shown.length > 1) {
-    lines.push("", ...formatActivityTotals(shown, unitSystem));
+    // A dated list is a period, so its totals are the period's: every activity
+    // in it, not only the rows `limit` let through. An undated list has no
+    // period to total, only the rows on show.
+    const counted = options.window ? matching : shown;
+    lines.push(
+      "",
+      counted.length > shown.length
+        ? `Totals (all ${counted.length} in the period):`
+        : "Totals:",
+      ...formatActivityTotals(counted, unitSystem)
+    );
   }
 
   lines.push(
@@ -466,7 +469,7 @@ function formatActivityTotals(
     rows.push(`- ${describe("All", all, false)}`);
   }
 
-  return ["Totals:", ...rows];
+  return rows;
 }
 
 /**
@@ -496,11 +499,14 @@ async function handleGetActivityDetail(
 
   const sections = parseActivityDetailSections(args);
   let listActivity = storedActivity(activityId);
-  const sportArg = Number(args.sport_type ?? args.sportType);
-  const hasSportArg =
-    args.sport_type !== undefined || args.sportType !== undefined
-      ? Number.isFinite(sportArg)
-      : false;
+  // An explicit null or blank is no answer, not sport 0 — `Number(null)` is 0,
+  // and a model that fills every optional field with null would otherwise ask
+  // COROS for the activity under a sport it never was.
+  const sportRaw = args.sport_type ?? args.sportType;
+  const sportArg =
+    sportRaw === undefined || sportRaw === null || String(sportRaw).trim() === ""
+      ? Number.NaN
+      : Number(sportRaw);
 
   try {
     // Only an activity no list has ever returned costs the page fetch it used
@@ -510,7 +516,7 @@ async function handleGetActivityDetail(
         (activity) => activity.activityId === activityId
       );
     }
-    const sportType = hasSportArg ? sportArg : listActivity?.sportType;
+    const sportType = Number.isFinite(sportArg) ? sportArg : listActivity?.sportType;
     if (sportType === undefined || !Number.isFinite(sportType)) {
       throw new Error(
         "sport_type is required for an activity not listed yet. Copy it from " +
@@ -1536,10 +1542,6 @@ function formatLapTable(
 
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function padTwo(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
 /**
  * The activity's calendar date in machine-local time.
  *
@@ -1549,8 +1551,7 @@ function padTwo(value: number): string {
  * rest of the app reads it locally, so this does too.
  */
 function formatIsoDate(epochSeconds: number): string {
-  const date = new Date(epochSeconds * 1000);
-  return `${date.getFullYear()}-${padTwo(date.getMonth() + 1)}-${padTwo(date.getDate())}`;
+  return isoDay(new Date(epochSeconds * 1000));
 }
 
 /**

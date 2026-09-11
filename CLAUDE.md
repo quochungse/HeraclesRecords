@@ -298,11 +298,14 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   *sending* those entries, and appending them wrote them twice — one conversation
   replays eight entries of its own history, two chart cards sharing a `previewId`
   among them, which surfaced as React's "two children with the same key" on
-  opening it. So whatever of the tail the caller's (normalized) array already ends
-  with is dropped; a run's genuine append matches nothing the window holds and is
-  still kept. Rows written before this are not rewritten, which is why the preview
-  rows key on `previewId` *and* position. `test:chat-history-store` (3b, 3c) fails
-  on the position-only guard; `test:chat-transcript-race` renders a duplicated row.
+  opening it. So the longest head of the tail that the caller's (normalized) array
+  holds anywhere past the count is dropped — *anywhere past*, not only at its end,
+  because a stale count is usually followed by newer turns, and an ends-with test
+  finds no overlap there and duplicates the tail one turn later. A run's genuine
+  append matches nothing the window holds and is still kept. Rows written before
+  this are not rewritten, which is why the preview rows key on `previewId` *and*
+  position. `test:chat-history-store` (3b, 3b', 3c) fails on the position-only and
+  the ends-with guard; `test:chat-transcript-race` renders a duplicated row.
 
   **A turn that errors after producing output keeps it.** `chat:streamError` used to
   undo the whole turn: the streamed text, any question card it had just asked, and —

@@ -788,6 +788,12 @@ assert.equal(formatClaudeModelName("claude-haiku-4-5"), "Haiku 4.5");
 assert.equal(formatClaudeModelName("claude-opus-5-20260114"), "Opus 5");
 assert.equal(formatClaudeModelName("claude-fable-5-1-20260114"), "Fable 5.1");
 assert.equal(formatClaudeModelName("claude-opus-5-10-20260114"), "Opus 5.10");
+// Nothing is required after the version. Claude Code names a 1M-context run
+// `claude-opus-5[1m]`, and Vertex dates with `@`; a terminator test turned the
+// first into a raw id and cut the second's minor off.
+assert.equal(formatClaudeModelName("claude-opus-5[1m]"), "Opus 5");
+assert.equal(formatClaudeModelName("claude-sonnet-4-6[1m]"), "Sonnet 4.6");
+assert.equal(formatClaudeModelName("claude-sonnet-4-5@20250929"), "Sonnet 4.5");
 // Anything that is not a family-and-version id is passed through untouched.
 assert.equal(formatClaudeModelName("sonnet"), "sonnet");
 assert.equal(formatClaudeModelName(""), "");

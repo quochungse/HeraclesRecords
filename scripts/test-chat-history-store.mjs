@@ -766,6 +766,27 @@ assert.deepEqual(
     deleteChatSession(session.id, db);
   }
 
+  // 3b'. The same stale count one turn later: the array holds the whole row
+  // *and* a new entry after it. Its end is then the new entry, not the row's
+  // last one, so an ends-with test finds no overlap and appends the tail again.
+  {
+    const session = race();
+    const noted = { kind: "message", role: "assistant", content: "Noted." };
+    saveChatSession(session.id, [athleteOpening, athleteReply, noted], db, {
+      knownEntryCount: 1
+    });
+    const question = { kind: "message", role: "user", content: "And tomorrow?" };
+    saveChatSession(session.id, [athleteOpening, athleteReply, noted, question], db, {
+      knownEntryCount: 1
+    });
+    assert.deepEqual(
+      getChatSession(session.id, db).map((entry) => entry.content),
+      ["Morning.", "Thanks.", "Noted.", "And tomorrow?"],
+      "entries the window holds are not foreign because newer ones follow them"
+    );
+    deleteChatSession(session.id, db);
+  }
+
   // 3c. The overlap test is content, not position, so a run's genuine append
   // still survives a stale count — the entries it added are not ones the window
   // is holding, however far behind its count is.

@@ -3564,6 +3564,8 @@ export interface ChatStreamError {
   authError?: boolean;
   /** What the rounds that completed before the break cost (13). */
   usage?: ChatTokenUsage;
+  /** The model that answered before the break, as on `ChatStreamDone`. */
+  model?: string;
 }
 
 /**
