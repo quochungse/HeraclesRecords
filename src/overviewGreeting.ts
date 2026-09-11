@@ -270,7 +270,7 @@ function planLines(
   now: Date
 ): OverviewGreetingLine[] {
   const scheduled = (context.upcomingWorkouts ?? []).filter((workout) =>
-    isUpcomingWorkoutScheduled(workout.happenDay)
+    isUpcomingWorkoutScheduled(workout.happenDay, now)
   );
 
   if (scheduled.length === 0) {
@@ -278,7 +278,7 @@ function planLines(
   }
 
   const today = scheduled.filter((workout) =>
-    isUpcomingWorkoutToday(workout.happenDay)
+    isUpcomingWorkoutToday(workout.happenDay, now)
   );
 
   if (today.length > 1) {
@@ -296,7 +296,7 @@ function planLines(
   }
 
   const next = scheduled.find(
-    (workout) => !isUpcomingWorkoutToday(workout.happenDay)
+    (workout) => !isUpcomingWorkoutToday(workout.happenDay, now)
   );
 
   if (!next) {
@@ -305,7 +305,9 @@ function planLines(
 
   const gap = daysBetweenDayKeys(getLocalHappenDayKey(now), next.happenDay);
   const when =
-    gap === 1 ? "tomorrow" : `on ${formatUpcomingWorkoutDate(next.happenDay)}`;
+    gap === 1
+      ? "tomorrow"
+      : `on ${formatUpcomingWorkoutDate(next.happenDay, now)}`;
   const name = next.name?.trim();
 
   return [

@@ -95,8 +95,6 @@ export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
         <TrainingSummaryTiles
           totals={weekTotals}
           mcpConnected={summary.mcpConnected}
-          layout="stack"
-          metrics={["load", "steps", "distance", "duration"]}
           className="training-ring-metrics"
         />
 

@@ -1,3 +1,15 @@
+/**
+ * Overview's greeting line: which candidates a context produces, how they rank,
+ * and how the non-urgent ones take turns across a day.
+ *
+ * Every assertion is written against the fixed `NOW` below, so nothing the
+ * module reaches may consult the real clock — the whole suite silently expires
+ * the day it does.
+ *
+ * Run through Electron (`ELECTRON_RUN_AS_NODE=1 electron
+ * --experimental-strip-types`): this machine's Node is built without Amaro, so
+ * plain `node --experimental-strip-types` fails with ERR_NO_TYPESCRIPT.
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -337,11 +349,15 @@ for (const [label, ctx] of [
   }
 }
 
+// One day's three slots, and deliberately not a second day: the pool is built
+// from the context as of `now`, so a date-sensitive line (the sleep score is
+// only "last night" for one of them) drops out overnight and a two-day probe
+// counts a changed pool as a fourth rotation. That the slot repeats on the same
+// hour the next day is `greetingSlotIndex`'s job, asserted below.
 const rotated = new Set();
-for (let slot = 0; slot < 6; slot += 1) {
+for (const hour of [9, 14, 20]) {
   const now = new Date(NOW);
-  now.setDate(now.getDate() + Math.floor(slot / 3));
-  now.setHours([9, 14, 20][slot % 3], 0, 0, 0);
+  now.setHours(hour, 0, 0, 0);
   rotated.add(selectOverviewGreeting({ ...many, now }, FALLBACK));
 }
 assert.equal(

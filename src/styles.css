@@ -10986,17 +10986,6 @@ td span {
   flex: 1 1 auto;
 }
 
-.training-intelligence-main {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-content: stretch;
-  align-items: stretch;
-  gap: 14px;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
 .training-performance-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.72fr) minmax(210px, 0.55fr);
@@ -13238,17 +13227,6 @@ td span {
   display: grid;
   justify-items: end;
   gap: 8px;
-}
-
-/* The load panel stacks its chart and its sport legend, so the panel itself
-   keeps the two children its grid was written for. */
-.training-chart-body {
-  display: grid;
-  /* The panel's min-height leaves slack; without this the grid hands it to the
-     row above and the legend drifts away from the chart it labels. */
-  align-content: start;
-  gap: 12px;
-  min-width: 0;
 }
 
 .training-chart-shell {
@@ -17080,10 +17058,6 @@ tr.data-intervals-row-missing {
     padding: clamp(30px, 3.8vw, 48px) clamp(28px, 4vw, 50px);
   }
 
-  .training-summary-tiles:not(.is-stack) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .training-chart-grid,
   .training-intelligence-grid,
   .training-activities-split,
@@ -17096,10 +17070,6 @@ tr.data-intervals-row-missing {
     padding-left: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 18px;
-  }
-
-  .training-intelligence-main {
-    grid-template-columns: 1fr;
   }
 
   .training-summary-tiles.is-stack {
@@ -17349,12 +17319,10 @@ tr.data-intervals-row-missing {
   .training-command-center,
   .training-login-fields,
   .training-status-grid,
-  .training-summary-tiles:not(.is-stack),
   .training-dashboard-grid,
   .training-chart-grid,
   .training-performance-grid,
   .training-intelligence-grid,
-  .training-intelligence-main,
   .youtube-layout,
   .spotify-layout {
     grid-template-columns: 1fr;

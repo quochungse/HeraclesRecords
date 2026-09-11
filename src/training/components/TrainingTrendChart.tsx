@@ -13,10 +13,10 @@ interface TrainingTrendChartsProps {
 }
 
 /**
- * The two trend panels that share a row. The training load chart used to lead
- * this grid and take the row above on its own; it was removed from Overview,
- * which is why the grid has no positional rules left — two panels, two columns.
- * `trainingLoadBars.ts` and its suite are what drew it, and still stand.
+ * The two trend panels that share the last row of Overview. A training-load bar
+ * chart used to lead this grid and take a full row on its own; it and everything
+ * that drew it are gone, which is why the grid carries no positional rules —
+ * two panels, two columns, and no odd one out to span.
  */
 export function TrainingTrendCharts({
   points,

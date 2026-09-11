@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
@@ -10,8 +10,8 @@ import type { TrainingTrendPoint } from "../types";
 /**
  * The pieces every trend panel is built from — axes, tooltip, area gradient,
  * empty notice, window chips. They live here rather than beside one chart
- * because three surfaces draw from them now: the Overview load and sleep
- * panels, and the HRV panel, which Overview and the Sleep screen share.
+ * because more than one surface draws from them: the Overview sleep panel, and
+ * the HRV panel, which Overview and the Sleep screen share.
  */
 
 export type ChartValueFormatter = (value: number) => string;
@@ -70,7 +70,7 @@ export function usePrefersReducedMotion() {
   return reducedMotion;
 }
 
-export function formatTooltipHeading(date: unknown, fallback: unknown): string {
+function formatTooltipHeading(date: unknown, fallback: unknown): string {
   const raw =
     typeof date === "string" && /^\d{8}$/.test(date) ? date : undefined;
 
@@ -263,17 +263,11 @@ function paddedZeroDomain(dataMax: number): number {
 
 export function TrendChartAxes({
   tooltipValueFormatter,
-  tooltipContent,
-  tooltipCursor,
   yAxisTickFormatter,
   yAxisWidth = 36,
   yAxisDomain
 }: {
   tooltipValueFormatter?: ChartRowFormatter;
-  /** Replaces the default row-per-series tooltip body wholesale. */
-  tooltipContent?: (props: TooltipContentProps) => ReactNode;
-  /** Bars want a filled band; the line charts want a wide stroke. */
-  tooltipCursor?: React.ComponentProps<typeof Tooltip>["cursor"];
   yAxisTickFormatter?: ChartValueFormatter;
   yAxisWidth?: number;
   yAxisDomain?: TrendAxisDomain;
@@ -304,20 +298,11 @@ export function TrendChartAxes({
         domain={yAxisDomain ?? [0, paddedZeroDomain]}
       />
       <Tooltip
-        content={(props) =>
-          tooltipContent ? (
-            tooltipContent(props)
-          ) : (
-            <TrendChartTooltip
-              {...props}
-              valueFormatter={tooltipValueFormatter}
-            />
-          )
-        }
+        content={(props) => (
+          <TrendChartTooltip {...props} valueFormatter={tooltipValueFormatter} />
+        )}
         contentStyle={trainingChartTooltipStyle}
-        cursor={
-          tooltipCursor ?? { stroke: colors.cursorBand, strokeWidth: 26 }
-        }
+        cursor={{ stroke: colors.cursorBand, strokeWidth: 26 }}
       />
     </>
   );
