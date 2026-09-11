@@ -8,6 +8,7 @@ import { deleteSettings, getSetting, setSetting } from "./database";
 import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
+  getCoachCorosProfile,
   getTrainingHubStatus,
   listTrainingHubActivities,
   getTrainingDashboard,
@@ -29,6 +30,8 @@ import {
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
+  formatActivityListLine,
+  formatActivitySpan,
   getChatActivityTools,
   handleChatActivityTool,
   isChatActivityTool,
@@ -40,6 +43,12 @@ import {
   isChatAnalyticsTool,
   type ChatAnalyticsToolName
 } from "./chatAnalyticsTools";
+import {
+  getChatSleepTools,
+  handleChatSleepTool,
+  isChatSleepTool,
+  type ChatSleepToolName
+} from "./chatSleepTools";
 import {
   getChatInteractionTools,
   handleChatInteractionTool,
@@ -108,6 +117,7 @@ import type {
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
+  CorosProfile,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodePermissions,
@@ -135,14 +145,11 @@ import type {
   UnitSystem,
   WorkoutDeletePreview
 } from "./types";
-import {
-  formatDistanceValue,
-  formatElevationValue,
-  normalizeUnitSystem
-} from "./unitSystem.js";
+import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
+  formatAthleteProfile,
   formatCoachDashboard,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
@@ -1062,6 +1069,7 @@ export function createCollectorSink(
   let failure: string | undefined;
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
+  let tokenModel: string | undefined;
 
   const reset = () => {
     pendingCoachPrompts = [];
@@ -1214,6 +1222,9 @@ export function createCollectorSink(
   const handleDone = (payload: Record<string, unknown>) => {
     isFinished = true;
     recordUsage(payload.usage);
+    if (typeof payload.model === "string" && payload.model.trim()) {
+      tokenModel = payload.model.trim();
+    }
     // ChatView reads the final text off the done payload; fall back to the
     // accumulated tokens so a provider that omits it cannot lose the answer.
     const fullText =
@@ -1239,6 +1250,11 @@ export function createCollectorSink(
         content: fullText,
         ...(turnSource ? { source: turnSource } : {}),
         ...(reasoningSummary ? { reasoningSummary } : {}),
+        // Stored on the entry so an analysis's answer carries its own cost into
+        // the conversation, the same as one the athlete asked for: a headless
+        // run is the turn whose price nobody watched being spent.
+        ...(tokenUsage ? { usage: tokenUsage } : {}),
+        ...(tokenModel ? { model: tokenModel } : {}),
         // `automation` is the *stored* key on a transcript entry, not a rename
         // that was missed — see `ChatEntryAnalysisMarker`.
         ...(marker ? { automation: marker } : {})
@@ -1328,8 +1344,36 @@ export async function streamChat(
       outputTokens: (usage?.outputTokens ?? 0) + counted.outputTokens
     };
   };
+  /**
+   * Which model actually answered, which none of the four providers can be read
+   * off the settings for: Claude Code resolves "Default model" per account, a
+   * router picks per request, and the ChatGPT path walks a candidate list until
+   * one is accepted. Left undefined when nobody said, so the footer names no
+   * model rather than naming the wrong one.
+   */
+  let answeredModel: string | undefined;
+  const noteModel = (value: string | undefined) => {
+    const name = value?.trim();
+    if (name) answeredModel = name;
+  };
   const send = (channel: string, payload: unknown) => {
     sink.emit(channel, payload);
+  };
+  /**
+   * The one way this turn reports that it finished, cancellation included.
+   * A function for the same reason `sendStreamError` is one: five exits reach
+   * it, the cost and the model belong on all five, and leaving either off one
+   * of them type-checks and compiles into an answer whose footer is quietly
+   * missing.
+   */
+  const sendStreamDone = (finishReason?: string): void => {
+    send("chat:streamDone", {
+      requestId,
+      fullText,
+      ...(finishReason ? { finishReason } : {}),
+      ...(usage ? { usage } : {}),
+      ...(answeredModel ? { model: answeredModel } : {})
+    });
   };
   /**
    * The one way this turn reports a failure. Everything it spent before it
@@ -1348,7 +1392,10 @@ export async function streamChat(
     send("chat:streamError", {
       requestId,
       ...payload,
-      ...(usage ? { usage } : {})
+      ...(usage ? { usage } : {}),
+      // A turn that breaks after answering keeps its partial answer, and that
+      // answer's footer names the model the same as a finished one's.
+      ...(answeredModel ? { model: answeredModel } : {})
     });
   };
 
@@ -1410,6 +1457,10 @@ export async function streamChat(
         effort: runtime.effort ?? settings.claudeCode.effort,
         configDir: claudeConfigDir,
         onModelResolved: (model) => {
+          // Noted first and unconditionally: this is the only place Claude Code
+          // says what it ran, and the answer is named after it whether or not
+          // the run also gets to update the saved default below.
+          noteModel(model);
           // An analysis's override says nothing about the interactive
           // default, so never let one overwrite the saved defaultModel.
           if (runtime.model?.trim() || settings.claudeCode.model?.trim()) return;
@@ -1467,7 +1518,7 @@ export async function streamChat(
         checkedAt: new Date().toISOString(),
         message: "Claude Code is connected and ready for Coach conversations."
       });
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      sendStreamDone();
       return;
     }
 
@@ -1547,7 +1598,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1631,7 +1683,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1723,7 +1776,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1773,6 +1827,7 @@ export async function streamChat(
         sendStreamError({ message: opened.error, authError: opened.authError });
         return;
       }
+      noteModel(opened.model);
 
       const reader = opened.response.body!.getReader();
       const decoder = new TextDecoder();
@@ -1884,15 +1939,10 @@ export async function streamChat(
       }
     }
 
-    send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+    sendStreamDone();
   } catch (error) {
     if (controller.signal.aborted) {
-      send("chat:streamDone", {
-        requestId,
-        fullText,
-        finishReason: "cancelled",
-        ...(usage ? { usage } : {})
-      });
+      sendStreamDone("cancelled");
     } else {
       if (getChatSettings().provider === "claude-code") {
         const current = getChatSettings().claudeCode;
@@ -1954,13 +2004,63 @@ export async function confirmWorkoutDelete(
 }
 
 function getAllChatTools(): CorosMcpTool[] {
-  return [
+  return narrowCorosMcpTools([
     ...getAllMcpTools(),
     ...getChatActivityTools(),
     ...getChatAnalyticsTools(),
+    ...getChatSleepTools(),
     ...getChatWorkoutTools(),
     ...getChatInteractionTools()
-  ];
+  ]);
+}
+
+/**
+ * COROS MCP tools no chat model can act on, hidden unconditionally.
+ *
+ * The two FIT tools answer with a binary resource or an S3 URL, neither of
+ * which a text turn can read. `queryDevices` is firmware and battery.
+ * `analyzeActivityDetail` is COROS's own coach-style write-up: it fetches the
+ * same activity detail underneath, then adds an opinion — and the opinion is
+ * the one thing this app is not short of.
+ */
+const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
+  "analyzeActivityDetail",
+  "queryDevices",
+  "downloadActivityFitFiles",
+  "queryActivityFitFileDownloadUrls"
+]);
+
+/**
+ * COROS MCP tools a local tool answers better, keyed to that local tool.
+ *
+ * Each remote tool costs its schema on every request round and hands the model
+ * a second way to ask the same question — one that is flakier (the lap and
+ * detail tools are the ones `formatToolFailure` already steers away from),
+ * slower (a network round trip where the local tool reads a cache) and, for
+ * sleep, shorter-sighted (COROS keeps ~9 weeks; the local cache keeps 400
+ * days). A remote tool is hidden only while its local counterpart is actually
+ * on offer, so a COROS MCP connection with Training Hub signed out keeps them.
+ */
+const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
+  querySleepData: "get_sleep_summary",
+  getActivityDetail: "get_activity_detail",
+  queryActivityLapData: "get_activity_detail",
+  queryTrainingSchedule: "list_scheduled_workouts"
+};
+
+export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
+  const offered = new Set(tools.map((tool) => tool.name));
+  return tools.filter((tool) => {
+    const remote = splitToolName(tool.name);
+    if (remote?.serverId !== "coros") {
+      return true;
+    }
+    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName)) {
+      return false;
+    }
+    const local = SUPERSEDED_COROS_MCP_TOOLS[remote.toolName];
+    return local === undefined || !offered.has(local);
+  });
 }
 
 const CLAUDE_REMOTE_READ_TOOLS: Record<
@@ -2012,7 +2112,8 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "list_recent_activities",
   "get_activity_detail",
   "get_fitness_trends",
-  "get_hr_zone_summary",
+  "get_training_zones",
+  "get_sleep_summary",
   "list_scheduled_workouts",
   "search_coros_exercises",
   "draft_workout",
@@ -2081,6 +2182,9 @@ export function getClaudeCodeTools(
   const analyticsTools = permissions.trainingMetrics
     ? getChatAnalyticsTools()
     : [];
+  // The sleep permission's first local tool. Its remote list below names tools
+  // the COROS server does not have, so before this the switch reached nothing.
+  const sleepTools = permissions.sleepData ? getChatSleepTools() : [];
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
       tool.name === "upload_training_plan" ||
@@ -2097,13 +2201,14 @@ export function getClaudeCodeTools(
   });
 
   return applyChatToolPolicy(
-    [
+    narrowCorosMcpTools([
       ...remoteTools,
       ...activityTools,
       ...analyticsTools,
+      ...sleepTools,
       ...workoutTools,
       ...getChatInteractionTools()
-    ],
+    ]),
     toolPolicy
   );
 }
@@ -2160,9 +2265,26 @@ async function executeChatTool(
       unitSystem
     });
   }
-  if (isChatActivityTool(name)) {
+  // Every read that reaches COROS announces its own failure on the stream, so
+  // the transcript names the tool that broke rather than leaving it to the
+  // model's account of what happened.
+  const reportingFailure = async (read: () => Promise<string>): Promise<string> => {
     try {
-      return await handleChatActivityTool(name as ChatActivityToolName, args, {
+      return await read();
+    } catch (caught) {
+      send("chat:streamInfo", {
+        requestId,
+        kind: "mcp",
+        tool: name,
+        status: "failed",
+        message: caught instanceof Error ? caught.message : String(caught)
+      });
+      throw caught;
+    }
+  };
+  if (isChatActivityTool(name)) {
+    return reportingFailure(() =>
+      handleChatActivityTool(name as ChatActivityToolName, args, {
         requestId,
         onActivityVisual: (preview) => {
           send("chat:streamInfo", {
@@ -2172,23 +2294,12 @@ async function executeChatTool(
           });
         },
         unitSystem
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : String(caught);
-      send("chat:streamInfo", {
-        requestId,
-        kind: "mcp",
-        tool: name,
-        status: "failed",
-        message
-      });
-      throw caught;
-    }
+      })
+    );
   }
   if (isChatAnalyticsTool(name)) {
-    try {
-      return await handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
+    return reportingFailure(() =>
+      handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
         requestId,
         onFitnessTrend: (preview) => {
           send("chat:streamInfo", {
@@ -2205,33 +2316,15 @@ async function executeChatTool(
           });
         },
         unitSystem
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : String(caught);
-      send("chat:streamInfo", {
-        requestId,
-        kind: "mcp",
-        tool: name,
-        status: "failed",
-        message
-      });
-      throw caught;
-    }
+      })
+    );
   }
-  try {
-    return await callMcpTool(name, args);
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
-    send("chat:streamInfo", {
-      requestId,
-      kind: "mcp",
-      tool: name,
-      status: "failed",
-      message
-    });
-    throw caught;
+  if (isChatSleepTool(name)) {
+    return reportingFailure(() =>
+      handleChatSleepTool(name as ChatSleepToolName, args)
+    );
   }
+  return reportingFailure(() => callMcpTool(name, args));
 }
 
 function findChatTool(name: string): CorosMcpTool | undefined {
@@ -2253,7 +2346,9 @@ async function resolveModelAndOpenStream(
   tools: Record<string, unknown>[],
   signal: AbortSignal,
   selectedModel?: string
-): Promise<{ response: Response } | { error: string; authError: boolean }> {
+): Promise<
+  { response: Response; model: string } | { error: string; authError: boolean }
+> {
   const cached = getSetting(SETTINGS.model);
   const candidates = getChatGptModelCandidates(selectedModel, cached);
 
@@ -2298,7 +2393,10 @@ async function resolveModelAndOpenStream(
 
     if (response.ok && response.body) {
       if (model !== cached) setSetting(SETTINGS.model, model);
-      return { response };
+      // Named here rather than at the call site: on "Auto" this walks the
+      // candidate list, so the accepted model is the only one worth reporting
+      // and it is known nowhere else.
+      return { response, model };
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -2363,6 +2461,7 @@ function withLiveToolInstructions(
   }
   const activityTools = tools.filter((tool) => isChatActivityTool(tool.name));
   const analyticsTools = tools.filter((tool) => isChatAnalyticsTool(tool.name));
+  const sleepTools = tools.filter((tool) => isChatSleepTool(tool.name));
   const interactionTools = tools.filter((tool) =>
     isChatInteractionTool(tool.name)
   );
@@ -2371,6 +2470,7 @@ function withLiveToolInstructions(
       !isChatWorkoutTool(tool.name) &&
       !isChatActivityTool(tool.name) &&
       !isChatAnalyticsTool(tool.name) &&
+      !isChatSleepTool(tool.name) &&
       !isChatInteractionTool(tool.name)
   );
   const corosMcpTools = mcpTools.filter((tool) =>
@@ -2381,29 +2481,41 @@ function withLiveToolInstructions(
   );
   const planTools = tools.filter((tool) => isChatWorkoutTool(tool.name));
   const sections = [instructions, "", "## Live training data and tools"];
-  if (activityTools.length > 0) {
+  const readsData =
+    activityTools.length + analyticsTools.length + sleepTools.length + corosMcpTools.length > 0;
+  // What follows is only what a tool's own schema cannot say: the rules across
+  // all of them, and the mapping from a question to the sections that answer
+  // it. Each tool's arguments, defaults and units stay in its schema, which is
+  // sent on every round anyway — repeating them here cost tokens twice over and
+  // left two places to update whenever a default moved.
+  if (readsData) {
     sections.push(
-      `Local Training Hub tools (preferred for laps/splits): ${activityTools
-        .map((tool) => tool.name)
-        .join(", ")}. ` +
-        "Use list_recent_activities to find activity_id and sport_type, then " +
-        "get_activity_detail for lap tables. Set include_series=true for HR/pace/power trends. " +
-        "Inline activity charts (HR, pace, power, elevation, laps) appear automatically when data is available."
+      "Read before you fetch. The training snapshot above, when present, already " +
+        "holds the latest activities, the athlete's thresholds, fitness and " +
+        "recovery status and the next 14 days of schedule — answer from it when it " +
+        "covers the question. Across every tool below: ask for only the period, " +
+        "sport and sections the question is about, never fetch the same data twice " +
+        "in one answer, read the totals and averages a tool has already computed " +
+        "rather than recomputing them, and say when a value is missing instead of " +
+        "estimating it."
     );
   }
-  if (analyticsTools.length > 0) {
+  if (activityTools.length > 0) {
     sections.push(
-      `Training analytics tools: ${analyticsTools.map((tool) => tool.name).join(", ")}. ` +
-        "Use get_fitness_trends for 7-day load, resting HR, and HRV recovery trends. " +
-        "Use get_hr_zone_summary for threshold heart rate zone distribution. " +
-        "Inline charts are shown automatically when these tools return data."
+      "Which activity sections answer which question: pacing or intervals → laps, " +
+        "trend; intensity → zones; hills → elevation; gym → strength. One or two " +
+        "each is usually enough when comparing several activities, and series only " +
+        "when the lap table and trend cannot answer."
     );
+  }
+  if (activityTools.length + analyticsTools.length > 0) {
+    sections.push("Charts are drawn from these tools automatically.");
   }
   if (corosMcpTools.length > 0) {
     sections.push(
       `COROS MCP tools: ${corosMcpTools.map((tool) => tool.name).join(", ")}. ` +
-        "Use these for sleep, HRV, recovery, and other MCP-only metrics. " +
-        "For lap splits and interval breakdowns, prefer get_activity_detail."
+        "Prefer the local tools above for anything they cover; reach for these " +
+        "only for what they do not, such as daytime stress or a wellness check."
     );
   }
   if (otherMcpTools.length > 0) {
@@ -2530,7 +2642,7 @@ async function buildTrainingContext(
   const includeActivities = permissions?.recentActivities !== false;
   const includeMetrics = permissions?.trainingMetrics !== false;
   const includeUpcoming = permissions?.upcomingWorkouts !== false;
-  const [activities, dashboard, upcoming] = await Promise.allSettled([
+  const [activities, dashboard, upcoming, profile] = await Promise.allSettled([
     includeActivities
       ? listTrainingHubActivities(1, 25)
       : Promise.resolve([] as TrainingHubActivity[]),
@@ -2539,23 +2651,45 @@ async function buildTrainingContext(
       : Promise.resolve(null as TrainingHubDashboard | null),
     includeUpcoming
       ? getUpcomingWorkouts(14)
-      : Promise.resolve([] as TrainingHubUpcomingWorkout[])
+      : Promise.resolve([] as TrainingHubUpcomingWorkout[]),
+    // Body metrics and thresholds ride with the training-metrics permission,
+    // and cost nothing on any turn inside the profile's hour-long cache.
+    includeMetrics
+      ? getCoachCorosProfile()
+      : Promise.resolve(null as CorosProfile | null)
   ]);
 
   const sections: string[] = [coachInstructions, "", unitInstruction, ""];
   let hasData = false;
 
   if (activities.status === "fulfilled" && activities.value.length > 0) {
-    sections.push(`## Recent activity mix (latest ${activities.value.length})`);
+    const span = formatActivitySpan(activities.value);
+    sections.push(
+      `## Recent activity mix (latest ${activities.value.length}${span ? `, ${span}` : ""})`
+    );
     sections.push(formatRecentActivityMix(activities.value, unitSystem));
     sections.push("");
-    sections.push("## Recent activities");
-    sections.push(formatActivities(activities.value.slice(0, 8), unitSystem));
+    sections.push("## Recent activities (latest 8, local time)");
+    sections.push(
+      activities.value
+        .slice(0, 8)
+        .map((activity) => formatActivityListLine(activity, unitSystem))
+        .join("\n")
+    );
     sections.push("");
     hasData = true;
   }
+  if (profile.status === "fulfilled" && profile.value) {
+    const athlete = formatAthleteProfile(profile.value, unitSystem);
+    if (athlete) {
+      sections.push("## Athlete profile");
+      sections.push(athlete);
+      sections.push("");
+      hasData = true;
+    }
+  }
   if (dashboard.status === "fulfilled" && dashboard.value) {
-    const fitness = formatCoachDashboard(dashboard.value);
+    const fitness = formatCoachDashboard(dashboard.value, unitSystem);
     if (fitness) {
       sections.push("## Fitness & recovery");
       sections.push(fitness);
@@ -2578,38 +2712,6 @@ async function buildTrainingContext(
   }
 
   return { text: sections.join("\n").trim(), hasData };
-}
-
-function formatActivities(
-  activities: TrainingHubActivity[],
-  unitSystem: UnitSystem
-): string {
-  return activities
-    .map((activity) => {
-      const parts = [
-        `id=${activity.activityId}`,
-        `sport_type=${activity.sportType}`,
-        activity.startTime ? isoDate(activity.startTime) : "",
-        activity.sportName ?? "",
-        activity.name ?? "",
-        activity.distance
-          ? formatDistanceValue(activity.distance, unitSystem, {
-              swim:
-                activity.sportType === 300 ||
-                activity.sportType === 301 ||
-                /swim/i.test(activity.sportName ?? "")
-            })
-          : "",
-        activity.duration ? formatDurationSeconds(activity.duration) : "",
-        activity.avgHr ? `avg HR ${activity.avgHr}` : "",
-        activity.trainingLoad ? `load ${activity.trainingLoad}` : "",
-        activity.elevationGain
-          ? `+${formatElevationValue(activity.elevationGain, unitSystem)}`
-          : ""
-      ].filter(Boolean);
-      return `- ${parts.join(" · ")}`;
-    })
-    .join("\n");
 }
 
 function formatUpcomingVolume(
@@ -2673,22 +2775,6 @@ function decodeJwtClaims(jwt: string): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
-}
-
-function isoDate(epochSeconds: number): string {
-  // COROS start times are unix seconds.
-  return new Date(epochSeconds * 1000).toISOString().slice(0, 10);
-}
-
-function formatDurationSeconds(value: number): string {
-  const totalSeconds = Math.round(value);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
 function truncate(text: string, max: number): string {

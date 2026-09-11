@@ -2322,6 +2322,23 @@ export function listStoredTrainingActivities(limit = 500): TrainingHubActivity[]
   return enrichActivitiesWithSportNames(rows.map(toTrainingActivity));
 }
 
+/** One stored activity by id, as every activity list call has written it. */
+export function getStoredTrainingActivity(
+  activityId: string
+): TrainingHubActivity | undefined {
+  const row = requireDatabase()
+    .prepare(
+      `SELECT activity_id, name, sport_type, sport_name, start_time, end_time,
+              duration, distance, avg_hr, max_hr, calories, training_load,
+              elevation_gain
+       FROM training_activities
+       WHERE activity_id = ?`
+    )
+    .get(activityId) as TrainingActivityRow | undefined;
+
+  return row ? enrichActivitiesWithSportNames([toTrainingActivity(row)])[0] : undefined;
+}
+
 /**
  * Cache the parsed set-by-set breakdown of one strength activity. A session
  * with no breakdown (a gym-cardio activity, or a watch that recorded no

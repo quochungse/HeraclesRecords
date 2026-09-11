@@ -44,10 +44,88 @@ const {
   buildBaseCoachInstructions,
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
+  formatAthleteProfile,
   formatCoachDashboard,
+  formatPersonalRecords,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
 } = await import(`${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}`);
+
+// --- Personal records and the athlete's own thresholds reach the snapshot ---
+//
+// Both were fetched on every single turn and thrown away: the dashboard parses
+// records it never printed, and `/account/query` is cached for the Personal
+// screen an hour at a time. Without them "am I getting faster" is answered off
+// the last few activities, and every prescribed pace is guesswork.
+const personalRecordLine = formatPersonalRecords(
+  [
+    {
+      type: 1,
+      label: "4 weeks",
+      records: [{ type: 5, label: "5K", duration: 1800, happenDay: "20260901" }]
+    },
+    {
+      type: 4,
+      label: "All",
+      records: [
+        { type: 5, label: "5K", duration: 1661, happenDay: "20260813" },
+        { type: 4, label: "10K", duration: 4100, happenDay: "20260713" },
+        { type: 101, label: "Longest Run", distance: 21_100, happenDay: "20260602" },
+        // The elevation record keeps its metres in `distance`, which is where
+        // the parser puts them.
+        { type: 103, label: "Most Elevation Gain", distance: 640, happenDay: "20260511" },
+        // COROS pads a group with slots for records never set.
+        { type: 13, label: "Marathon" }
+      ]
+    }
+  ],
+  "metric"
+);
+assert.match(personalRecordLine, /^- Personal records, all-time: /);
+assert.match(personalRecordLine, /5K 27:41 \(2026-08-13\) · 10K 1:08:20 \(2026-07-13\)/);
+assert.match(personalRecordLine, /Longest Run 21\.1[0-9]* km \(2026-06-02\)/);
+assert.match(personalRecordLine, /Most Elevation Gain \+640 m \(2026-05-11\)/);
+assert.doesNotMatch(personalRecordLine, /Marathon/, "an unset record is not a record");
+assert.equal(formatPersonalRecords([], "metric"), undefined);
+
+const athleteProfile = formatAthleteProfile(
+  {
+    userId: "u1",
+    birthday: 19940626,
+    statureCm: 172,
+    weightKg: 65,
+    thresholds: {
+      maxHr: 190,
+      restingHr: 52,
+      lthr: 168,
+      thresholdPaceSecondsPerKm: 328,
+      ftp: 180,
+      zones: { maxHr: [], restingHr: [], lthr: [], thresholdPace: [], cyclePower: [] },
+      ranges: {}
+    }
+  },
+  "metric",
+  new Date(2026, 8, 11)
+);
+assert.match(athleteProfile, /- Body: 32 y · 172 cm · 65 kg/);
+assert.match(
+  athleteProfile,
+  /- Thresholds: max HR 190 bpm · resting HR 52 bpm · LTHR 168 bpm · threshold pace 5:28\/km · FTP 180 W \(zone tables: get_training_zones\)/
+);
+assert.equal(
+  formatAthleteProfile(
+    {
+      userId: "u2",
+      thresholds: {
+        zones: { maxHr: [], restingHr: [], lthr: [], thresholdPace: [], cyclePower: [] },
+        ranges: {}
+      }
+    },
+    "metric"
+  ),
+  undefined,
+  "an account with neither body metrics nor thresholds adds no heading"
+);
 
 const coachInstructions = buildCoachInstructions();
 assert.match(coachInstructions, /multi-sport endurance and strength-training coach/);
@@ -702,6 +780,20 @@ assert.equal(
 assert.equal(formatClaudeModelName("claude-sonnet-4-6-20250219"), "Sonnet 4.6");
 assert.equal(formatClaudeModelName("claude-opus-5"), "Opus 5");
 assert.equal(formatClaudeModelName("claude-haiku-4-5"), "Haiku 4.5");
+// A date is not a minor version. Three of the four models this app offers
+// carry a single-component version, so their dated ids put the date where the
+// minor goes: "Opus 5.20260114" is what the picker and the per-answer cost
+// footer both showed. The two-component ids above read correctly either way,
+// which is why it took a 5-series id to surface it.
+assert.equal(formatClaudeModelName("claude-opus-5-20260114"), "Opus 5");
+assert.equal(formatClaudeModelName("claude-fable-5-1-20260114"), "Fable 5.1");
+assert.equal(formatClaudeModelName("claude-opus-5-10-20260114"), "Opus 5.10");
+// Nothing is required after the version. Claude Code names a 1M-context run
+// `claude-opus-5[1m]`, and Vertex dates with `@`; a terminator test turned the
+// first into a raw id and cut the second's minor off.
+assert.equal(formatClaudeModelName("claude-opus-5[1m]"), "Opus 5");
+assert.equal(formatClaudeModelName("claude-sonnet-4-6[1m]"), "Sonnet 4.6");
+assert.equal(formatClaudeModelName("claude-sonnet-4-5@20250929"), "Sonnet 4.5");
 // Anything that is not a family-and-version id is passed through untouched.
 assert.equal(formatClaudeModelName("sonnet"), "sonnet");
 assert.equal(formatClaudeModelName(""), "");

@@ -1,3 +1,5 @@
+import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
+import { getStoredTrainingActivity } from "./database";
 import {
   getTrainingHubStatus,
   getTrainingHubActivityDetail,
@@ -43,6 +45,59 @@ export type ChatActivityToolName = (typeof CHAT_ACTIVITY_TOOL_NAMES)[number];
 
 const MAX_LAPS = 50;
 
+/**
+ * The parts of `get_activity_detail` the coach can ask for. The summary — date,
+ * pace, HR, climb, load, training effect, weather and the form averages — is
+ * always sent; everything here is on request, so comparing five activities can
+ * cost five summaries rather than five lap tables and five elevation profiles.
+ */
+export const ACTIVITY_DETAIL_SECTIONS = [
+  "laps",
+  "zones",
+  "trend",
+  "elevation",
+  "strength",
+  "series"
+] as const;
+
+export type ActivityDetailSection = (typeof ACTIVITY_DETAIL_SECTIONS)[number];
+
+/** Everything but the sample table, which is ~60 rows and rarely needed. */
+export const DEFAULT_ACTIVITY_DETAIL_SECTIONS: ReadonlySet<ActivityDetailSection> =
+  new Set(ACTIVITY_DETAIL_SECTIONS.filter((section) => section !== "series"));
+
+/**
+ * Sport families the activity list can be narrowed to. Families rather than
+ * COROS codes, because "my runs" means road, indoor, trail and track alike and
+ * a model asked to list four codes gets one of them wrong.
+ */
+export const ACTIVITY_SPORT_FAMILIES = [
+  "run",
+  "bike",
+  "swim",
+  "strength",
+  "walk_hike",
+  "other"
+] as const;
+
+export type ActivitySportFamily = (typeof ACTIVITY_SPORT_FAMILIES)[number];
+
+const SPORT_FAMILY_LABELS: Record<ActivitySportFamily, string> = {
+  run: "Run",
+  bike: "Bike",
+  swim: "Swim",
+  strength: "Strength",
+  walk_hike: "Walk/Hike",
+  other: "Other"
+};
+
+/** Undated lists stay short; a dated one is asked for a whole period. */
+const DEFAULT_UNDATED_LIMIT = 10;
+const MAX_UNDATED_LIMIT = 25;
+const DEFAULT_DATED_LIMIT = 50;
+/** One COROS page. A period with more than this says so rather than paging on. */
+const MAX_DATED_LIMIT = 100;
+
 export function isChatActivityTool(name: string): name is ChatActivityToolName {
   return (CHAT_ACTIVITY_TOOL_NAMES as readonly string[]).includes(name);
 }
@@ -53,22 +108,45 @@ export function getChatActivityTools(): CorosMcpTool[] {
     return [];
   }
 
+  // Descriptions travel with every request round, so they say what the tool
+  // returns and when to reach for it, and leave the field list to the output.
   return [
     {
       name: "list_recent_activities",
       description:
-        "List recent COROS activities with activity_id and sport_type needed for " +
-        "get_activity_detail. Prefer this over COROS MCP when you need reliable lap data.",
+        "List COROS activities: activity_id, sport_type, local start, distance, " +
+        "duration, HR, training load and climb. With start_date (and optionally " +
+        "end_date) it returns every activity in that period plus per-sport totals — " +
+        "use this for a week or block review instead of paging. Without dates it " +
+        "returns the most recent ones; the snapshot already lists the latest 8.",
       inputSchema: {
         type: "object",
         properties: {
+          start_date: {
+            type: "string",
+            description: "First day, YYYYMMDD. Returns the whole period up to end_date."
+          },
+          end_date: {
+            type: "string",
+            description: "Last day, YYYYMMDD, inclusive. Defaults to today."
+          },
+          sport: {
+            type: "string",
+            enum: [...ACTIVITY_SPORT_FAMILIES],
+            description:
+              "Keep one sport family (run includes indoor, trail and track)."
+          },
           limit: {
             type: "number",
-            description: "Number of activities to return (default 10, max 25)"
+            description:
+              `Max activities: default ${DEFAULT_UNDATED_LIMIT} (max ${MAX_UNDATED_LIMIT}) ` +
+              `without dates, ${DEFAULT_DATED_LIMIT} (max ${MAX_DATED_LIMIT}) with dates.`
           },
           page: {
             type: "number",
-            description: "Page number for pagination (default 1)"
+            description:
+              "Page of the plain most-recent list (default 1). Ignored with " +
+              "dates or sport — narrow those with start_date/end_date."
           }
         }
       }
@@ -76,20 +154,15 @@ export function getChatActivityTools(): CorosMcpTool[] {
     {
       name: "get_activity_detail",
       description:
-        "Fetch detailed COROS activity data: local start time and weekday; the " +
-        "lap/split breakdown (distance, duration, avg/max HR, pace, elevation gain, " +
-        "and the running-form group — cadence, stride length, ground contact time, " +
-        "vertical oscillation, vertical ratio, power), labelled with the " +
-        "structured-workout phase of each lap where the watch recorded one " +
-        "(warm-up/work/recovery/cool-down, or set/rest in the gym); the activity's " +
-        "own HR zone split; grade-adjusted pace; average and peak of every " +
-        "running-form metric; how pace, HR and running form drifted from the first " +
-        "third of the activity to the last; total ascent and descent plus an " +
-        "eight-segment elevation profile showing where the climbing happened; " +
-        "aerobic and anaerobic training effect; VO2max; the weather it was run in; " +
-        "and for a strength session the set-by-set breakdown with reps and load. " +
-        "Use activity_id and sport_type from list_recent_activities or the training " +
-        "snapshot. Prefer this local tool over COROS MCP for lap and split analysis.",
+        "One activity in depth. Always returns the summary: local start and " +
+        "weekday, pace or speed, grade-adjusted pace, HR, ascent/descent, load, " +
+        "aerobic/anaerobic training effect, VO2max, weather, and the average and " +
+        "peak of cadence, stride, ground contact, vertical oscillation/ratio and " +
+        "power. Optional sections: laps (per-lap table with structured-workout " +
+        "phase), zones (this activity's HR zone time), trend (first → last third " +
+        "drift of pace, HR and form), elevation (8-segment profile), strength " +
+        "(sets × reps × load), series (~60-sample table; large). Default: every " +
+        "section except series. Request only the sections the question needs.",
       inputSchema: {
         type: "object",
         properties: {
@@ -99,19 +172,19 @@ export function getChatActivityTools(): CorosMcpTool[] {
           },
           sport_type: {
             type: "number",
-            description: "COROS sport type code from the activity list"
-          },
-          include_series: {
-            type: "boolean",
             description:
-              "Include the downsampled sample-by-sample table (~60 points): elapsed " +
-              "time, distance, HR, pace, power, and whichever of altitude, cadence, " +
-              "stride length, ground contact time, vertical oscillation and vertical " +
-              "ratio the watch recorded. Default false; the summary, form trend and " +
-              "lap table already cover most questions."
+              "COROS sport type code. Optional for an activity already listed by " +
+              "the snapshot or list_recent_activities."
+          },
+          sections: {
+            type: "array",
+            uniqueItems: true,
+            items: { type: "string", enum: [...ACTIVITY_DETAIL_SECTIONS] },
+            description:
+              "Sections to include besides the summary. Omit for all but series."
           }
         },
-        required: ["activity_id", "sport_type"]
+        required: ["activity_id"]
       }
     }
   ];
@@ -134,31 +207,281 @@ export async function handleChatActivityTool(
   return handleGetActivityDetail(args, callbacks);
 }
 
+export interface ActivityListWindow {
+  /** YYYYMMDD, inclusive. */
+  startDay: string;
+  /** YYYYMMDD, inclusive. */
+  endDay: string;
+}
+
+function parseDayArgument(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return undefined;
+  }
+  const day = String(value).trim().replace(/-/g, "");
+  if (!/^\d{8}$/.test(day)) {
+    throw new Error(`${field} must be YYYYMMDD.`);
+  }
+  return day;
+}
+
+/**
+ * The period a dated list covers, or undefined for the plain "most recent"
+ * list. `end_date` alone is not a period — it has no start — so it is refused
+ * rather than guessed at.
+ */
+export function parseActivityListWindow(
+  args: Record<string, unknown>,
+  today: Date = new Date()
+): ActivityListWindow | undefined {
+  const startDay = parseDayArgument(args.start_date ?? args.startDate, "start_date");
+  const endArg = parseDayArgument(args.end_date ?? args.endDate, "end_date");
+  if (!startDay) {
+    if (endArg) {
+      throw new Error("end_date needs a start_date.");
+    }
+    return undefined;
+  }
+  const endDay = endArg ?? dayKey(today);
+  if (endDay < startDay) {
+    throw new Error("end_date is before start_date.");
+  }
+  return { startDay, endDay };
+}
+
+export function parseActivitySportFamily(value: unknown): ActivitySportFamily | undefined {
+  const family = String(value ?? "").trim().toLowerCase();
+  return (ACTIVITY_SPORT_FAMILIES as readonly string[]).includes(family)
+    ? (family as ActivitySportFamily)
+    : undefined;
+}
+
+export function activitySportFamily(
+  sportType: number | undefined,
+  sportName?: string
+): ActivitySportFamily {
+  const name = (sportName ?? "").toLowerCase();
+  if ((sportType !== undefined && sportType >= 100 && sportType <= 103) || /\brun/.test(name)) {
+    return "run";
+  }
+  if (isCyclingActivity(sportType, sportName)) {
+    return "bike";
+  }
+  if (isSwimActivity(sportType, sportName)) {
+    return "swim";
+  }
+  if (sportType === 402 || /strength/.test(name)) {
+    return "strength";
+  }
+  if (sportType === 104 || sportType === 105 || sportType === 900 || /walk|hike/.test(name)) {
+    return "walk_hike";
+  }
+  return "other";
+}
+
+/** Which sections a detail call asked for. Accepts an array or "laps, zones". */
+export function parseActivityDetailSections(
+  args: Record<string, unknown>
+): Set<ActivityDetailSection> {
+  const raw = args.sections;
+  const requested = (
+    Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : []
+  )
+    .map((value) => String(value).trim().toLowerCase())
+    .filter((value): value is ActivityDetailSection =>
+      (ACTIVITY_DETAIL_SECTIONS as readonly string[]).includes(value)
+    );
+  const sections = new Set<ActivityDetailSection>(
+    requested.length > 0 ? requested : DEFAULT_ACTIVITY_DETAIL_SECTIONS
+  );
+  // The pre-sections flag, still honoured for transcripts that carry it.
+  if (args.include_series === true || args.includeSeries === true) {
+    sections.add("series");
+  }
+  return sections;
+}
+
 async function handleListRecentActivities(
   args: Record<string, unknown>,
   unitSystem: UnitSystem
 ): Promise<string> {
-  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
-  const page = Math.max(Number(args.page) || 1, 1);
+  const window = parseActivityListWindow(args);
+  const sport = parseActivitySportFamily(args.sport);
+  const limit = window
+    ? Math.min(Math.max(Number(args.limit) || DEFAULT_DATED_LIMIT, 1), MAX_DATED_LIMIT)
+    : Math.min(Math.max(Number(args.limit) || DEFAULT_UNDATED_LIMIT, 1), MAX_UNDATED_LIMIT);
+  // A sport filter has no page. The filter is applied here, over one COROS
+  // page, so "page 2" would hand back activities 101–200 rather than the next
+  // ten of that sport — dates are how a filtered list is moved.
+  const page = window || sport ? 1 : Math.max(Number(args.page) || 1, 1);
 
   try {
-    const activities = await listTrainingHubActivities(page, limit);
-    if (activities.length === 0) {
-      return "No recent activities found in COROS Training Hub.";
-    }
-
-    const lines = activities.map((activity) =>
-      formatActivityListLine(activity, unitSystem)
-    );
-    return [
-      `Recent activities (${activities.length}):`,
-      "",
-      ...lines,
-      "",
-      "Use get_activity_detail with activity_id and sport_type for lap splits."
-    ].join("\n");
+    // A sport filter is applied here, not by COROS, so an undated filtered list
+    // reads one full page to have enough of that sport to fill `limit`.
+    const fetched = window
+      ? await listTrainingHubActivities(1, MAX_DATED_LIMIT, window.startDay, window.endDay)
+      : await listTrainingHubActivities(page, sport ? MAX_DATED_LIMIT : limit);
+    return formatActivityListForChat(fetched, unitSystem, {
+      ...(window ? { window } : {}),
+      ...(sport ? { sport } : {}),
+      limit,
+      truncatedAtSource: window !== undefined && fetched.length >= MAX_DATED_LIMIT
+    });
   } catch (caught) {
     throw formatActivityToolError("list_recent_activities", caught);
+  }
+}
+
+export interface ActivityListFormatOptions {
+  window?: ActivityListWindow;
+  sport?: ActivitySportFamily;
+  limit: number;
+  /** COROS returned a full page for the period, so there may be more. */
+  truncatedAtSource?: boolean;
+}
+
+/**
+ * The activity list as the coach reads it. A dated list ends with totals per
+ * sport family: "how much did I run last week" is a sum over the rows, and a
+ * sum the tool has already taken is one the model cannot get wrong.
+ */
+export function formatActivityListForChat(
+  fetched: TrainingHubActivity[],
+  unitSystem: UnitSystem,
+  options: ActivityListFormatOptions
+): string {
+  const matching = options.sport
+    ? fetched.filter(
+        (activity) =>
+          activitySportFamily(activity.sportType, activity.sportName) === options.sport
+      )
+    : fetched;
+  const shown = matching.slice(0, options.limit);
+
+  const scope = [
+    options.window
+      ? `${isoFromDayKey(options.window.startDay)} → ${isoFromDayKey(options.window.endDay)}`
+      : "most recent",
+    options.sport ? `${SPORT_FAMILY_LABELS[options.sport]} only` : undefined
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  if (shown.length === 0) {
+    return `No activities found (${scope}).`;
+  }
+
+  const lines = [
+    `Activities (${scope}): ${shown.length}` +
+      (matching.length > shown.length ? ` of ${matching.length} shown` : ""),
+    ...shown.map((activity) => formatActivityListLine(activity, unitSystem))
+  ];
+
+  if (options.truncatedAtSource) {
+    lines.push(
+      "COROS returned a full page for this period, so older activities in it may be " +
+        "missing — narrow the dates to see them."
+    );
+  }
+
+  if (options.window || shown.length > 1) {
+    // A dated list is a period, so its totals are the period's: every activity
+    // in it, not only the rows `limit` let through. An undated list has no
+    // period to total, only the rows on show.
+    const counted = options.window ? matching : shown;
+    lines.push(
+      "",
+      counted.length > shown.length
+        ? `Totals (all ${counted.length} in the period):`
+        : "Totals:",
+      ...formatActivityTotals(counted, unitSystem)
+    );
+  }
+
+  lines.push(
+    "",
+    "get_activity_detail takes an activity_id from this list for laps, zones and form."
+  );
+  return lines.join("\n");
+}
+
+function formatActivityTotals(
+  activities: TrainingHubActivity[],
+  unitSystem: UnitSystem
+): string[] {
+  const groups = new Map<
+    ActivitySportFamily,
+    { count: number; duration: number; distance: number; load: number; climb: number }
+  >();
+  for (const activity of activities) {
+    const family = activitySportFamily(activity.sportType, activity.sportName);
+    const group = groups.get(family) ?? {
+      count: 0,
+      duration: 0,
+      distance: 0,
+      load: 0,
+      climb: 0
+    };
+    group.count += 1;
+    group.duration += activity.duration ?? 0;
+    group.distance += activity.distance ?? 0;
+    group.load += activity.trainingLoad ?? 0;
+    group.climb += activity.elevationGain ?? 0;
+    groups.set(family, group);
+  }
+
+  const describe = (
+    label: string,
+    group: { count: number; duration: number; distance: number; load: number; climb: number },
+    swim: boolean
+  ): string =>
+    [
+      `${label}: ${group.count}`,
+      group.duration > 0 ? formatDurationSeconds(group.duration) : undefined,
+      // Distance is summed within a family only: a pool's metres added to a
+      // ride's kilometres is a number that means nothing.
+      group.distance > 0 && label !== "All"
+        ? formatDistanceValue(group.distance, unitSystem, { swim })
+        : undefined,
+      group.load > 0 ? `load ${Math.round(group.load)}` : undefined,
+      group.climb > 0 ? `+${formatElevationValue(group.climb, unitSystem)}` : undefined
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  const rows = [...groups.entries()]
+    .sort((left, right) => right[1].duration - left[1].duration)
+    .map(([family, group]) =>
+      `- ${describe(SPORT_FAMILY_LABELS[family], group, family === "swim")}`
+    );
+
+  if (groups.size > 1) {
+    const all = [...groups.values()].reduce(
+      (total, group) => ({
+        count: total.count + group.count,
+        duration: total.duration + group.duration,
+        distance: 0,
+        load: total.load + group.load,
+        climb: total.climb + group.climb
+      }),
+      { count: 0, duration: 0, distance: 0, load: 0, climb: 0 }
+    );
+    rows.push(`- ${describe("All", all, false)}`);
+  }
+
+  return rows;
+}
+
+/**
+ * The stored copy of an activity. Every list call — the snapshot, the list tool,
+ * the Training screen — writes one, so a detail request almost never needs to
+ * fetch a page of fifty just to find the row it is about.
+ */
+function storedActivity(activityId: string): TrainingHubActivity | undefined {
+  try {
+    return getStoredTrainingActivity(activityId);
+  } catch {
+    return undefined;
   }
 }
 
@@ -167,26 +490,40 @@ async function handleGetActivityDetail(
   callbacks?: ChatActivityToolCallbacks
 ): Promise<string> {
   const activityId = String(args.activity_id ?? args.activityId ?? "").trim();
-  const sportType = Number(args.sport_type ?? args.sportType);
 
   if (!activityId) {
     throw new Error(
       "activity_id is required. Call list_recent_activities first to find the correct ID."
     );
   }
-  if (!Number.isFinite(sportType)) {
-    throw new Error(
-      "sport_type is required. Copy it from list_recent_activities or the training snapshot."
-    );
-  }
 
-  const includeSeries = args.include_series === true || args.includeSeries === true;
+  const sections = parseActivityDetailSections(args);
+  let listActivity = storedActivity(activityId);
+  // An explicit null or blank is no answer, not sport 0 — `Number(null)` is 0,
+  // and a model that fills every optional field with null would otherwise ask
+  // COROS for the activity under a sport it never was.
+  const sportRaw = args.sport_type ?? args.sportType;
+  const sportArg =
+    sportRaw === undefined || sportRaw === null || String(sportRaw).trim() === ""
+      ? Number.NaN
+      : Number(sportRaw);
 
   try {
-    const listActivities = await listTrainingHubActivities(1, 50);
-    const listActivity = listActivities.find(
-      (activity) => activity.activityId === activityId
-    );
+    // Only an activity no list has ever returned costs the page fetch it used
+    // to cost on every call.
+    if (!listActivity) {
+      listActivity = (await listTrainingHubActivities(1, 50)).find(
+        (activity) => activity.activityId === activityId
+      );
+    }
+    const sportType = Number.isFinite(sportArg) ? sportArg : listActivity?.sportType;
+    if (sportType === undefined || !Number.isFinite(sportType)) {
+      throw new Error(
+        "sport_type is required for an activity not listed yet. Copy it from " +
+          "list_recent_activities or the training snapshot."
+      );
+    }
+
     const detail = await getTrainingHubActivityDetail(
       activityId,
       sportType,
@@ -209,8 +546,9 @@ async function handleGetActivityDetail(
 
     return formatActivityDetailForChat(
       detail,
-      includeSeries,
-      callbacks?.unitSystem ?? "metric"
+      sections.has("series"),
+      callbacks?.unitSystem ?? "metric",
+      sections
     );
   } catch (caught) {
     throw formatActivityToolError("get_activity_detail", caught);
@@ -386,7 +724,13 @@ function isCyclingActivity(sportType: number | undefined, sportName?: string): b
     /bike|cycl|ride/i.test(sportName ?? "");
 }
 
-function formatActivityListLine(
+/**
+ * One activity as a list row — shared by the list tool and the training
+ * snapshot, so an activity reads the same wherever the coach meets it. The
+ * start is local time with the weekday: the snapshot used to date by UTC day,
+ * which filed a 06:00 run in UTC+7 under the day before.
+ */
+export function formatActivityListLine(
   activity: TrainingHubActivity,
   unitSystem: UnitSystem
 ): string {
@@ -404,16 +748,71 @@ function formatActivityListLine(
     activity.duration ? formatDurationSeconds(activity.duration) : undefined,
     activity.avgHr ? `avg HR ${activity.avgHr}` : undefined,
     activity.maxHr ? `max HR ${activity.maxHr}` : undefined,
-    activity.trainingLoad ? `load ${activity.trainingLoad}` : undefined
+    activity.trainingLoad ? `load ${activity.trainingLoad}` : undefined,
+    activity.elevationGain
+      ? `+${formatElevationValue(activity.elevationGain, unitSystem)}`
+      : undefined
   ].filter(Boolean);
   return `- ${parts.join(" · ")}`;
+}
+
+/**
+ * The local dates a list of activities spans, oldest first. "Latest 25" says
+ * nothing on its own — that is a fortnight for one athlete and a season for
+ * another, and the difference decides what a weekly average means.
+ */
+export function formatActivitySpan(activities: TrainingHubActivity[]): string | undefined {
+  const starts = activities
+    .map((activity) => activity.startTime)
+    .filter((start): start is number => start !== undefined && start > 0);
+  if (starts.length === 0) {
+    return undefined;
+  }
+  const first = Math.min(...starts);
+  const last = Math.max(...starts);
+  const days =
+    Math.round(
+      (new Date(formatIsoDate(last)).getTime() - new Date(formatIsoDate(first)).getTime()) /
+        86_400_000
+    ) + 1;
+  return `${formatIsoDate(first)} → ${formatIsoDate(last)}, ${days} day${days === 1 ? "" : "s"}`;
+}
+
+/** Whether an omitted section would have had anything in it. */
+function sectionHasData(
+  detail: TrainingHubActivityDetail,
+  section: ActivityDetailSection
+): boolean {
+  switch (section) {
+    case "laps":
+      return detail.laps.length > 0;
+    case "zones":
+      return (detail.hrZones ?? []).some((zone) => (zone.seconds ?? 0) > 0);
+    case "trend":
+      return (
+        detail.laps.length >= MIN_FORM_TREND_SAMPLES ||
+        (detail.series?.length ?? 0) >= MIN_FORM_TREND_SAMPLES
+      );
+    case "elevation":
+      return (
+        (detail.track?.points ?? []).filter((point) => point.elevation !== undefined)
+          .length >= ELEVATION_PROFILE_SEGMENTS
+      );
+    case "strength":
+      return (detail.strength?.exercises.length ?? 0) > 0;
+    default:
+      return false;
+  }
 }
 
 export function formatActivityDetailForChat(
   detail: TrainingHubActivityDetail,
   includeSeries: boolean,
-  unitSystem: UnitSystem = "metric"
+  unitSystem: UnitSystem = "metric",
+  include: ReadonlySet<ActivityDetailSection> = DEFAULT_ACTIVITY_DETAIL_SECTIONS
 ): string {
+  const wants = (section: ActivityDetailSection): boolean =>
+    section === "series" ? includeSeries || include.has("series") : include.has(section);
   const swim = isSwimActivity(detail.sportType, detail.sportName);
   const cycling = isCyclingActivity(detail.sportType, detail.sportName);
   const performance = detail.distance && detail.duration
@@ -454,33 +853,50 @@ export function formatActivityDetailForChat(
     sections.push("", context.join("\n"));
   }
 
-  const formTrend = formatFormTrend(detail, unitSystem, cycling);
+  const formTrend = wants("trend")
+    ? formatFormTrend(detail, unitSystem, cycling)
+    : undefined;
   if (formTrend) {
     sections.push("", formTrend);
   }
 
-  const zones = formatActivityHrZones(detail.hrZones);
+  const zones = wants("zones") ? formatActivityHrZones(detail.hrZones) : undefined;
   if (zones) {
     sections.push("", zones);
   }
 
-  const elevationProfile = formatElevationProfile(detail, unitSystem, swim);
+  const elevationProfile = wants("elevation")
+    ? formatElevationProfile(detail, unitSystem, swim)
+    : undefined;
   if (elevationProfile) {
     sections.push("", elevationProfile);
   }
 
-  if (detail.laps.length > 0) {
-    sections.push("", formatLapTable(detail.laps, unitSystem, swim, cycling));
-  } else {
-    sections.push("", "Laps: none recorded for this activity.");
+  if (wants("laps")) {
+    if (detail.laps.length > 0) {
+      sections.push("", formatLapTable(detail.laps, unitSystem, swim, cycling));
+    } else {
+      sections.push("", "Laps: none recorded for this activity.");
+    }
   }
 
-  const strength = formatStrengthDetailForChat(detail.strength, unitSystem);
+  const strength = wants("strength")
+    ? formatStrengthDetailForChat(detail.strength, unitSystem)
+    : undefined;
   if (strength) {
     sections.push("", strength);
   }
 
-  if (includeSeries) {
+  // Named so the coach knows the data exists and is one call away, rather than
+  // reading its absence as "COROS did not record it".
+  const omitted = ACTIVITY_DETAIL_SECTIONS.filter(
+    (section) => section !== "series" && !wants(section) && sectionHasData(detail, section)
+  );
+  if (omitted.length > 0) {
+    sections.push("", `Not included this time (request via sections): ${omitted.join(", ")}.`);
+  }
+
+  if (wants("series")) {
     sections.push("");
     if (detail.series && detail.series.length > 0) {
       sections.push(
@@ -1126,10 +1542,6 @@ function formatLapTable(
 
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function padTwo(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
 /**
  * The activity's calendar date in machine-local time.
  *
@@ -1139,8 +1551,7 @@ function padTwo(value: number): string {
  * rest of the app reads it locally, so this does too.
  */
 function formatIsoDate(epochSeconds: number): string {
-  const date = new Date(epochSeconds * 1000);
-  return `${date.getFullYear()}-${padTwo(date.getMonth() + 1)}-${padTwo(date.getDate())}`;
+  return isoDay(new Date(epochSeconds * 1000));
 }
 
 /**

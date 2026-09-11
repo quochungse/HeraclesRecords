@@ -247,8 +247,114 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   it requests one `TrainingLibrarySnapshot`. See [docs/training-library-architecture.md](docs/training-library-architecture.md).
 - **Coach** (`chatService.ts` + four providers: `claudeCodeProvider`, `anthropicChatProvider`,
   `openRouterProvider`, `localChatProvider`) — streaming chat with COROS-data tools
-  (`chatActivityTools`, `chatAnalyticsTools`, `chatWorkoutTools`, `chatInteractionTools`)
-  and MCP servers.
+  (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,
+  `chatInteractionTools`) and MCP servers.
+  The read tools are built to fetch only what a question is about: the activity list takes a
+  date window and a sport family and returns per-sport totals, `get_activity_detail` takes a
+  `sections` list, trends and sleep take `days` and roll up by week past 14, and
+  `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
+  own totals and deltas so the model reads them rather than doing the arithmetic.
+  `get_training_zones` answers with the account's own HR, pace and power tables, so a
+  prescribed target is read off the athlete's thresholds rather than inferred from recent
+  activities; the snapshot carries the thresholds themselves, the body metrics and the
+  all-time personal records, all of which were already being fetched every turn and dropped.
+  `narrowCorosMcpTools` hides two kinds of COROS MCP tool: one a local tool supersedes (only
+  while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
+  devices, COROS's own activity write-up). A new local tool must be placed on one side of
+  `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails, and must be given a
+  source in `LOCAL_CHAT_TOOL_SOURCES` (`chatToolSources.ts`) or `test:chat-tool-sources`
+  fails. The badge under an answer groups the tools a turn called by that source — **DB**
+  (this machine's store), **Coros** (the Training Hub API) or **MCP** (a connected server,
+  recognised by its `server__` prefix). Every call travels as `kind: "mcp"` on the stream,
+  which is why the badge once said "MCP" for a turn that only read the Training Hub API; an
+  unlisted local tool would fall back to that label.
+
+  **A transcript entry is rebuilt field by field in four places, and an unlisted field is
+  dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`
+  (`chatHistoryStore`) restores it off disk, and `toPersistedEntries` / `fromPersistedEntries`
+  (`src/chat/chatTypes.ts`) convert it in each direction. Miss one and the field works
+  perfectly until the conversation is reopened — the same shape of trap as the IPC
+  three-file invariant, minus the test that catches it at build time. This has now caught
+  attribution (5.6) and the per-answer cost footer, whose `usage` and `model` come from
+  `chat:streamDone`; that payload was already sending `usage` before `ChatStreamDone` declared
+  the field, so the renderer could not read what it was being handed. Both leave the turn
+  unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
+  `test:chat-turn-cost` drives the round trip and the formatting.
+
+  **Anything that re-reads the transcript flushes this window's pending save
+  first — it must never cancel it.** Nothing is written during a turn: the
+  autosave is held down while `streaming`, the question is saved at send time
+  and everything else only when the turn ends. So between those two moments the
+  row is the transcript as it was *before* the turn, and a read taken there
+  comes back without it. `reloadTranscript` used to cancel the pending save and
+  then show what it read, which cost an athlete a whole turn in a packaged
+  build: a sync pull defers its re-read to the end of the turn
+  (`syncReloadPendingRef`), landing it in exactly that window, and the turn had
+  ended without final text — so the pending save was the only copy of the
+  charts on screen. They vanished a moment after arriving and reopening the app
+  did not bring them back. Flushing protects both sides, because the save
+  carries the base it was built with and 5.6b's merge still holds back a tail
+  an analysis run appended — which is all the cancel was ever protecting.
+  `test:chat-transcript-race` drives it in a real window and fails on the
+  cancel; `test:coach-analysis-runner` keeps both rules of 5.6b stated together.
+
+  **`foreignTail` decides by content as well as position.** It appends the part of
+  the row past `knownEntryCount`, on the theory that anything there was written
+  behind the window's back. A stale count breaks the theory: the window is then
+  *sending* those entries, and appending them wrote them twice — one conversation
+  replays eight entries of its own history, two chart cards sharing a `previewId`
+  among them, which surfaced as React's "two children with the same key" on
+  opening it. So the longest head of the tail that the caller's (normalized) array
+  holds anywhere past the count is dropped — *anywhere past*, not only at its end,
+  because a stale count is usually followed by newer turns, and an ends-with test
+  finds no overlap there and duplicates the tail one turn later. A run's genuine
+  append matches nothing the window holds and is still kept. Rows written before
+  this are not rewritten, which is why the preview rows key on `previewId` *and*
+  position. `test:chat-history-store` (3b, 3b', 3c) fails on the position-only and
+  the ends-with guard; `test:chat-transcript-race` renders a duplicated row.
+
+  **A turn that errors after producing output keeps it.** `chat:streamError` used to
+  undo the whole turn: the streamed text, any question card it had just asked, and —
+  through `restoreResumedCoachPrompt` — the athlete's choice on the previous card,
+  which went back to unanswered and was persisted that way. Claude Code's
+  `maxTurns: 10` lands on exactly the round after a question, so the loss looked
+  like this: pick a choice, watch the full answer arrive, then see it vanish while
+  the old card reappeared (answered cards are not drawn, so a reset one reads as the
+  coach's next question). Now the partial answer, the new card and a "Coach stopped
+  before finishing" notice are kept and saved, and the answered card stays answered;
+  only a turn that produced nothing is undone. `streamedTextRef` exists for this —
+  `streamingText` is state, stale inside the subscription.
+
+  **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
+  `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:
+  both`, so a row is invisible until its animation runs, and it only runs while the
+  window gets frames. A settle swaps the streaming bubble for freshly mounted rows,
+  so the answer the athlete had just watched arrive was faded in again from
+  nothing — measured over CDP at `opacity: 0` 100 ms after every turn — and on a
+  GNOME Wayland window that had stopped getting frames the whole new turn stayed
+  invisible until a scroll or click produced one. Two details are load-bearing:
+  the marker is **identity** (`settledEntriesRef`, filled by `markSettled` inside
+  the settle's updater), not a flag lowered by an effect, because React flushes
+  the last token render's pending effects before rendering the settle; and the
+  row **holds** it in state from mount, because a class recomputed per render
+  disappears on the next reload and changing `animation` restarts it.
+  `test:chat-transcript-race` fails on either shortcut. When checking a paint bug
+  over CDP, trust `getComputedStyle` read *before* `Page.captureScreenshot` — the
+  capture forces a frame and finishes the animation it was meant to catch.
+
+  **A tool schema is sent on every request round, so the draft schemas do not branch per
+  sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
+  a repeat group carries steps of its own, the step schema appeared twice per branch: 67 kB
+  across the two draft tools, ~33.7k tokens re-sent every round of every conversation,
+  including ones that never mention a workout — 80% of the whole fixed per-turn context.
+  It is now one workout shape with one step definition, and the per-sport rules live where
+  they already were: `validateWorkoutDraftShared` refuses a wrong kind, target, intensity or
+  sport option per step and the draft tools hand those errors back to the model, while
+  `buildCoachSportCapabilityGuide` states the same table as prose in the system prompt.
+  `test:chat-workout-tools` guards the size (< 20 kB per schema) and `test:workout-intensity-codec`
+  asserts the refusals come from the validator. Collapsing the step's last copy needs
+  `$defs`/`$ref`, deliberately not used on the main write path: not every provider resolves a
+  `$ref` well when *writing* arguments.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval

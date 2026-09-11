@@ -100,16 +100,54 @@ const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
  * Turns a Claude model id into something worth showing a person:
  * `claude-sonnet-4-6-20250219` becomes `Sonnet 4.6`. Ids that do not match the
  * family-and-version shape are returned untouched rather than mangled.
+ *
+ * The minor version is bounded to two digits and may not be followed by a
+ * third, so a *date* cannot be read as one. Without that,
+ * `claude-opus-5-20260114` came back as "Opus 5.20260114" — and that is not a
+ * hypothetical id: three of the four models this app offers carry a
+ * single-component version, so every dated form of them wore it. The dated
+ * two-component ids read correctly either way, which is why it went unseen.
+ *
+ * Nothing is required *after* the version: Claude Code reports a 1M-context
+ * run as `claude-opus-5[1m]`, and a Vertex id dates itself with `@`. Requiring
+ * a dash or the end there turned the first into a raw id in the cost footer
+ * and cut the second to "Sonnet 4".
  */
 export function formatClaudeModelName(modelId: string): string {
   const id = modelId.trim();
   const match = new RegExp(
-    `^claude-(${MODEL_FAMILIES.join("|")})-(\\d+)(?:-(\\d+))?`
+    `^claude-(${MODEL_FAMILIES.join("|")})-(\\d+)(?:-(\\d{1,2})(?!\\d))?`
   ).exec(id);
   if (!match) return id;
   const [, family, major, minor] = match;
   const name = family.charAt(0).toUpperCase() + family.slice(1);
   return minor ? `${name} ${major}.${minor}` : `${name} ${major}`;
+}
+
+/**
+ * Names a model id for a person, wherever it came from — the per-answer cost
+ * footer gets an id and no provider, because the provider that answered is not
+ * necessarily the one selected now.
+ *
+ * Claude ids are formatted rather than looked up, so an id no picker lists
+ * (`claude-opus-5-20260114`, or a model added after this build) still reads as
+ * `Opus 5`. Everything else falls back to the picker label with its
+ * parenthetical qualifier dropped: "Opus (most capable)" is a menu row, not a
+ * name to print under an answer. An id nothing recognises is returned as it is,
+ * which is more use than a blank.
+ */
+export function describeChatModel(modelId: string): string {
+  const id = modelId.trim();
+  if (!id) return "";
+  const claude = formatClaudeModelName(id);
+  if (claude !== id) return claude;
+  const listed = [
+    ...ANTHROPIC_MODEL_OPTIONS,
+    ...CLAUDE_MODEL_OPTIONS,
+    ...CHATGPT_MODEL_OPTIONS,
+    ...OPENROUTER_MODEL_OPTIONS
+  ].find((option) => option.value && option.value === id);
+  return listed ? listed.label.replace(/\s*\([^)]*\)$/, "") : id;
 }
 
 /**

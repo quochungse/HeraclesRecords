@@ -6,14 +6,22 @@ import {
   formatWorkoutSport,
   workoutSportFromType
 } from "./workoutCapabilities";
+import { formatPaceSeconds } from "./chatActivityTools";
+import { dateFromDayKey, isoFromDayKey } from "./chatDayKeys";
 import type {
+  CorosProfile,
   TrainingHubActivity,
   TrainingHubDashboard,
+  TrainingHubPersonalRecordGroup,
   UnitSystem,
   WorkoutSport
 } from "./types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "./types";
-import { formatDistanceValue } from "./unitSystem.js";
+import {
+  formatDistanceValue,
+  formatElevationValue,
+  formatWeightValue
+} from "./unitSystem.js";
 
 export function buildCoachInstructions(
   customInstructions?: string,
@@ -113,17 +121,34 @@ export function buildBaseCoachInstructions(): string {
   );
 }
 
+/**
+ * Per-sport rules as prose.
+ *
+ * This carries more weight than it looks: the draft tools' JSON Schema used to
+ * branch over every sport to say the same thing, at tens of thousands of tokens
+ * a round. Now the schema takes any step and the server validates it, so this
+ * guide — a few hundred tokens, sent once per turn — is where the coach learns
+ * which kinds, targets and intensities a sport actually accepts. Keep it in
+ * step with `WORKOUT_SPORT_CAPABILITIES`, which is also what the validator reads.
+ */
 export function buildCoachSportCapabilityGuide(): string {
   return WORKOUT_SPORTS.map((sport) => {
     const capability = WORKOUT_SPORT_CAPABILITIES[sport];
     const targets = [...new Set([...capability.targets, ...capability.restTargets])];
+    // `interval` is accepted wherever `training` is — the schema used to add it
+    // to each sport's enum, and the guide now has to say so instead.
+    const kinds = [...capability.stepKinds] as string[];
+    if (kinds.includes("training") && !kinds.includes("interval")) {
+      kinds.push("interval");
+    }
     const options = [
       capability.supportsPoolLength ? "poolLength option" : undefined,
       capability.supportsGradingSystem ? "gradingSystem option" : undefined,
       capability.requiresExercise ? "training steps require an exercise" : undefined
     ].filter(Boolean);
     return (
-      `- ${capability.label} (sport=${sport}): targets ${targets.join(", ")}; ` +
+      `- ${capability.label} (sport=${sport}): step kinds ${kinds.join(", ")}; ` +
+      `targets ${targets.join(", ")}; ` +
       `intensities ${capability.intensities.map(formatIntensityType).join(", ")}` +
       (options.length > 0 ? `; ${options.join("; ")}` : "")
     );
@@ -219,7 +244,139 @@ export function formatUpcomingWorkoutSport(sportType: number | undefined): strin
   return sport ? formatWorkoutSport(sport) : `Sport type ${sportType}`;
 }
 
-export function formatCoachDashboard(dashboard: TrainingHubDashboard): string {
+/** COROS's all-time record group; the others are 4-week, 12-week and half-year. */
+const ALL_TIME_RECORD_GROUP = 4;
+
+/**
+ * The records worth a line of the snapshot, in the order a runner reads them:
+ * the classic distances, then the two shape records. COROS also files best-pace
+ * and mile-based records, which say little next to these and would double the
+ * length of the line.
+ */
+const SNAPSHOT_RECORD_TYPES = [5, 4, 2, 13, 101, 103];
+
+const RECORD_TYPE_LONGEST_RUN = 101;
+const RECORD_TYPE_ELEVATION_GAIN = 103;
+
+function formatRecordDay(happenDay: string | undefined): string | undefined {
+  return happenDay && /^\d{8}$/.test(happenDay) ? isoFromDayKey(happenDay) : happenDay;
+}
+
+/**
+ * Personal records, which the dashboard has carried on every single turn and
+ * nothing ever showed. Without them "am I getting faster" is answered off the
+ * last few activities, and a PR set in March is invisible.
+ *
+ * The elevation record keeps its metres in `distance` — that is where the
+ * parser puts them — so it is the one record read as a climb, not a distance.
+ */
+export function formatPersonalRecords(
+  // Optional: a dashboard that failed to parse its record list, and every
+  // fixture written before there were records to show, arrives without one.
+  groups: TrainingHubPersonalRecordGroup[] | undefined,
+  unitSystem: UnitSystem
+): string | undefined {
+  const group =
+    (groups ?? []).find((entry) => entry.type === ALL_TIME_RECORD_GROUP) ??
+    (groups ?? [])[0];
+  if (!group?.records) return undefined;
+
+  const byType = new Map(group.records.map((record) => [record.type, record]));
+  const parts = SNAPSHOT_RECORD_TYPES.map((type) => {
+    const record = byType.get(type);
+    if (!record) return undefined;
+
+    const value =
+      type === RECORD_TYPE_ELEVATION_GAIN
+        ? record.distance
+          ? `+${formatElevationValue(record.distance, unitSystem)}`
+          : undefined
+        : type === RECORD_TYPE_LONGEST_RUN
+          ? record.distance
+            ? formatDistanceValue(record.distance, unitSystem)
+            : undefined
+          : record.duration
+            ? formatClockDuration(record.duration)
+            : undefined;
+    // COROS pads a group with empty slots for records never set; those carry a
+    // label and nothing else.
+    if (!value) return undefined;
+
+    const day = formatRecordDay(record.happenDay);
+    return `${record.label} ${value}${day ? ` (${day})` : ""}`;
+  }).filter(Boolean);
+
+  return parts.length > 0
+    ? `- Personal records, all-time: ${parts.join(" · ")}`
+    : undefined;
+}
+
+function ageFromBirthday(birthday: number | undefined, today: Date): number | undefined {
+  if (birthday === undefined || !/^\d{8}$/.test(String(birthday))) return undefined;
+  const born = dateFromDayKey(String(birthday));
+  if (Number.isNaN(born.getTime())) return undefined;
+  const age = today.getFullYear() - born.getFullYear();
+  const beforeBirthday =
+    today.getMonth() < born.getMonth() ||
+    (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+  return beforeBirthday ? age - 1 : age;
+}
+
+/** Height in the athlete's own units; feet and inches read as one value. */
+function formatStature(statureCm: number, unitSystem: UnitSystem): string {
+  if (unitSystem !== "imperial") {
+    return `${Math.round(statureCm)} cm`;
+  }
+  const totalInches = Math.round(statureCm / 2.54);
+  return `${Math.floor(totalInches / 12)}'${totalInches % 12}"`;
+}
+
+/**
+ * Who the athlete is and what their thresholds are.
+ *
+ * Both were on the machine already — `/account/query` is cached for an hour for
+ * the Personal screen — and neither ever reached the coach, so every prescribed
+ * pace and heart rate was inferred from recent activities rather than taken
+ * from the model COROS scores the athlete against. The zone tables stay in
+ * `get_training_zones`; only the anchors belong in a snapshot sent every turn.
+ */
+export function formatAthleteProfile(
+  profile: CorosProfile,
+  unitSystem: UnitSystem,
+  today: Date = new Date()
+): string | undefined {
+  const age = ageFromBirthday(profile.birthday, today);
+  const body = [
+    age !== undefined ? `${age} y` : undefined,
+    profile.statureCm ? formatStature(profile.statureCm, unitSystem) : undefined,
+    profile.weightKg ? formatWeightValue(profile.weightKg, unitSystem) : undefined
+  ].filter(Boolean);
+
+  const { thresholds } = profile;
+  const anchors = [
+    thresholds.maxHr ? `max HR ${thresholds.maxHr} bpm` : undefined,
+    thresholds.restingHr ? `resting HR ${thresholds.restingHr} bpm` : undefined,
+    thresholds.lthr ? `LTHR ${thresholds.lthr} bpm` : undefined,
+    thresholds.thresholdPaceSecondsPerKm
+      ? `threshold pace ${formatPaceSeconds(thresholds.thresholdPaceSecondsPerKm, unitSystem)}`
+      : undefined,
+    thresholds.ftp ? `FTP ${Math.round(thresholds.ftp)} W` : undefined
+  ].filter(Boolean);
+
+  const lines = [
+    body.length > 0 ? `- Body: ${body.join(" · ")}` : undefined,
+    anchors.length > 0
+      ? `- Thresholds: ${anchors.join(" · ")} (zone tables: get_training_zones)`
+      : undefined
+  ].filter(Boolean);
+
+  return lines.length > 0 ? lines.join("\n") : undefined;
+}
+
+export function formatCoachDashboard(
+  dashboard: TrainingHubDashboard,
+  unitSystem: UnitSystem = "metric"
+): string {
   const lines: string[] = [];
   if (dashboard.rhr != null) lines.push(`- Resting HR: ${dashboard.rhr} bpm`);
   if (dashboard.recoveryPct != null) lines.push(`- Recovery: ${dashboard.recoveryPct}%`);
@@ -239,6 +396,10 @@ export function formatCoachDashboard(dashboard: TrainingHubDashboard): string {
     );
   if (predictions.length > 0) {
     lines.push(`- Running race predictions: ${predictions.join(", ")}`);
+  }
+  const records = formatPersonalRecords(dashboard.personalRecords, unitSystem);
+  if (records) {
+    lines.push(records);
   }
   return lines.join("\n");
 }

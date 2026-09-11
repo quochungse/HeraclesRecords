@@ -17,6 +17,7 @@ import type {
   ChatEntryAnalysisMarker,
   ChatProvider,
   ChatSessionSummary,
+  ChatTokenUsage,
   CoachInputChoice,
   CoachInputPrompt,
   FitnessTrendPreview,
@@ -779,6 +780,33 @@ function parseAnalysisMarker(
   return marker as unknown as ChatEntryAnalysisMarker;
 }
 
+/**
+ * What the answer cost, restored for the footer under it. Rebuilt field by
+ * field like everything else in this file, which is the reason it has to exist
+ * at all: an entry is reassembled from the fields named here, so a stored count
+ * nothing reads back is a count the athlete sees once and never again.
+ *
+ * A half-reported pair is dropped rather than half-restored. Zero is kept — a
+ * provider that reported nothing leaves this undefined, so a zero that got here
+ * is a turn someone actually counted as free.
+ */
+function parseTokenUsage(value: unknown): ChatTokenUsage | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const count = (field: "inputTokens" | "outputTokens"): number | null => {
+    const entry = value[field];
+    return typeof entry === "number" && Number.isFinite(entry) && entry >= 0
+      ? entry
+      : null;
+  };
+  const inputTokens = count("inputTokens");
+  const outputTokens = count("outputTokens");
+  return inputTokens === null || outputTokens === null
+    ? undefined
+    : { inputTokens, outputTokens };
+}
+
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -796,12 +824,19 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
       ? value.reasoningSummary
       : undefined;
   const automation = parseAnalysisMarker(value.automation);
+  const usage = parseTokenUsage(value.usage);
+  const model =
+    typeof value.model === "string" && value.model.trim()
+      ? value.model.trim()
+      : undefined;
   return {
     kind: "message",
     role,
     content: value.content,
     ...(source ? { source } : {}),
     ...(reasoningSummary ? { reasoningSummary } : {}),
+    ...(usage ? { usage } : {}),
+    ...(model ? { model } : {}),
     ...(automation ? { automation } : {})
   };
 }
@@ -1062,8 +1097,9 @@ export function createChatSession(
 
 /**
  * The entries a save would silently destroy: everything the row holds past the
- * point the caller knows about. Position is the whole test — the analysis
- * runner only ever appends, so a foreign write is always a tail.
+ * point the caller knows about and is not itself sending. Position finds the
+ * candidates — the analysis runner only ever appends, so a foreign write is
+ * always a tail — and content rules out the ones the caller already holds.
  *
  * A caller that knows nothing (0) therefore keeps everything, which is the
  * safe direction for the accident this guards against.
@@ -1071,7 +1107,7 @@ export function createChatSession(
 function foreignTail(
   storedJson: string,
   knownEntryCount: number | undefined,
-  incomingCount: number
+  incoming: PersistedChatEntry[]
 ): PersistedChatEntry[] {
   if (knownEntryCount === undefined || !Number.isFinite(knownEntryCount)) {
     return [];
@@ -1084,9 +1120,61 @@ function foreignTail(
   // which is the wrong direction for a guard whose whole point is that the
   // accident fails harmlessly.
   const claimed = Math.max(0, Math.floor(knownEntryCount));
-  const known = Math.min(claimed, incomingCount);
+  const known = Math.min(claimed, incoming.length);
   const stored = parseChatTranscriptJson(storedJson);
-  return stored.length > known ? stored.slice(known) : [];
+  if (stored.length <= known) {
+    return [];
+  }
+  const tail = stored.slice(known);
+
+  // The count can understate what the caller holds — a save that never fired
+  // leaves it behind while the timeline keeps growing — and then the "foreign"
+  // tail is not foreign at all: the caller is sending those very entries. The
+  // guard used to append them anyway, which is how one conversation ended up
+  // with eight entries written twice, a repeated stretch of its own history,
+  // and two chart cards sharing a `previewId` — the duplicate React key that
+  // surfaced it.
+  //
+  // So the position test stands, and the content settles it: the longest head
+  // of the tail the caller's array holds anywhere past the entries it accounts
+  // for is dropped. Only an identical run of entries in the same order matches,
+  // so a run's genuine append — a playbook turn and an answer nothing else
+  // wrote — is still kept.
+  //
+  // Anywhere past, not only at the very end: a stale count is followed by more
+  // turns, so the array usually holds the row's entries *and* the new ones
+  // after them. An ends-with test finds no overlap there and appends the whole
+  // tail again — the same duplication, one turn later.
+  //
+  // Compared as they will be stored, not as they were sent: an entry the store
+  // rejects never reaches the row, so leaving it in would put a hole in the
+  // caller's array that no stored entry can match — and the overlap would read
+  // as none.
+  const canonical = (entry: PersistedChatEntry | null): string =>
+    JSON.stringify(entry);
+  const accepted = incoming.map((entry) => parseEntry(entry));
+  const start = accepted.slice(0, known).filter((entry) => entry !== null).length;
+  const incomingText = accepted
+    .filter((entry): entry is PersistedChatEntry => entry !== null)
+    .map(canonical);
+  const tailText = tail.map((entry) => canonical(parseEntry(entry)));
+  let held = 0;
+  for (
+    let offset = start;
+    offset < incomingText.length && held < tailText.length;
+    offset++
+  ) {
+    let length = 0;
+    while (
+      length < tailText.length &&
+      offset + length < incomingText.length &&
+      incomingText[offset + length] === tailText[length]
+    ) {
+      length++;
+    }
+    held = Math.max(held, length);
+  }
+  return tail.slice(held);
 }
 
 /**
@@ -1108,7 +1196,7 @@ export function saveChatSession(
 
   const normalizedEntries = normalizeEntries([
     ...entries,
-    ...foreignTail(row.messages_json, options.knownEntryCount, entries.length)
+    ...foreignTail(row.messages_json, options.knownEntryCount, entries)
   ]);
   const title =
     row.title === DEFAULT_SESSION_TITLE

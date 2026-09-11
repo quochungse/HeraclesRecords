@@ -2,6 +2,7 @@ import type {
   ActivityVisualPreview,
   ChatEntryAnalysisMarker,
   ChatMessage,
+  ChatTokenUsage,
   CoachInputPrompt,
   FitnessTrendPreview,
   HrZonePreview,
@@ -34,6 +35,13 @@ export interface ChatMessageEntry {
    * messages.
    */
   automation?: ChatEntryAnalysisMarker;
+  /**
+   * What this answer cost and which model wrote it, for the footer under it.
+   * Both converters below carry them for the reason stated above: an unlisted
+   * field is dropped, and the drop is invisible until a reload.
+   */
+  usage?: ChatTokenUsage;
+  model?: string;
 }
 
 export interface ChatPlanDraftEntry {
@@ -252,6 +260,8 @@ function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
       ...(entry.reasoningSummary
         ? { reasoningSummary: entry.reasoningSummary }
         : {}),
+      ...(entry.usage ? { usage: entry.usage } : {}),
+      ...(entry.model ? { model: entry.model } : {}),
       ...(entry.automation ? { automation: entry.automation } : {})
     };
   }
@@ -329,6 +339,8 @@ export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[]
       ...(entry.reasoningSummary
         ? { reasoningSummary: entry.reasoningSummary }
         : {}),
+      ...(entry.usage ? { usage: entry.usage } : {}),
+      ...(entry.model ? { model: entry.model } : {}),
       ...(entry.automation ? { automation: entry.automation } : {})
     });
   }

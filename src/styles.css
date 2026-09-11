@@ -20440,6 +20440,15 @@ tr.data-intervals-row-missing {
   animation: chat-row-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* A row that replaces what was already on screen — the answer a turn streamed,
+   the card it asked — is drawn as it is. Both entrances start from opacity 0,
+   and on a window that has stopped getting frames they never finish; see
+   `ChatRow` in ChatView.tsx. */
+.chat-row.is-settled,
+.chat-row.is-settled .chat-avatar {
+  animation: none;
+}
+
 .chat-row-user {
   flex-direction: row-reverse;
 }
@@ -21706,14 +21715,27 @@ tr.data-intervals-row-missing {
   flex-shrink: 0;
 }
 
-.chat-source-mcp {
+/* One pill per source when tools ran — DB, Coros, MCP; the grouping lives in
+   electron/chatToolSources.ts. */
+.chat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chat-sources > .chat-source {
+  margin-top: 0;
+}
+
+.chat-source-tool {
   background: var(--chat-signal-soft);
   border-color: var(--chat-signal-border);
   color: var(--chat-signal-strong);
   box-shadow: 0 2px 12px var(--chat-signal-glow);
 }
 
-.chat-source-mcp svg {
+.chat-source-tool svg {
   color: var(--chat-signal);
 }
 
@@ -21733,6 +21755,18 @@ tr.data-intervals-row-missing {
   background: var(--error-bg);
   border-color: var(--error-border);
   color: var(--error-text);
+}
+
+/* What the answer above cost: model and token total, bottom-right.
+   Deliberately quieter than the source badge beside it — it is a reference
+   number the athlete looks for, not one that should compete with the answer. */
+.chat-turn-cost {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
 }
 
 .chat-bubble-plan {

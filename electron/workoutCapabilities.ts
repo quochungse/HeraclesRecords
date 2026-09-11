@@ -1311,86 +1311,84 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     },
     required: ["kind", "target_type"]
   };
-  const intensityVariants = intensity.oneOf as Array<Record<string, unknown>>;
-  const variantType = (variant: Record<string, unknown>): WorkoutIntensityType | undefined => {
-    const directProperties = variant.properties as Record<string, { const?: string }> | undefined;
-    const nested = variant.oneOf as Array<Record<string, unknown>> | undefined;
-    const nestedProperties = nested?.[0]?.properties as Record<string, { const?: string }> | undefined;
-    return (directProperties?.type?.const ?? nestedProperties?.type?.const) as WorkoutIntensityType | undefined;
+  // One step definition for all nine sports, not one per sport.
+  //
+  // This schema used to branch `oneOf` over every sport, narrowing each one's
+  // step kinds, targets and intensity variants — and because a repeat group
+  // carries steps of its own, the whole step schema appeared twice inside each
+  // branch. Measured on 2026-09-11 that came to 67 kB of JSON across the two
+  // draft tools, roughly 33,700 tokens, re-sent on every request round of every
+  // conversation, including the ones that never mention a workout. It was 93%
+  // of what the local tool definitions cost and about 80% of the whole fixed
+  // per-turn context.
+  //
+  // What the branching bought was refusing, at schema level, a pace target on a
+  // pool swim. That is already refused twice over: `validateWorkoutDraftShared`
+  // checks kind, target, intensity and sport options against the same registry
+  // and the draft tools return its per-step errors to the model, which can fix
+  // them inside the same turn; and `buildCoachSportCapabilityGuide` puts each
+  // sport's kinds, targets and intensities in the system prompt as prose, where
+  // it costs a few hundred tokens once rather than tens of thousands per round.
+  const repeatGroup = {
+    type: "object",
+    properties: {
+      repeat: { type: "integer", minimum: 1, maximum: 99 },
+      name: { type: "string" },
+      steps: { type: "array", minItems: 1, items: step }
+    },
+    required: ["repeat", "steps"]
   };
-  const stepForSport = (sport: WorkoutSport) => {
-    const capability = WORKOUT_SPORT_CAPABILITIES[sport];
-    const kinds = [...capability.stepKinds];
-    if (kinds.includes("training") && !kinds.includes("interval" as RunWorkoutEditorStepKind)) {
-      kinds.push("interval" as RunWorkoutEditorStepKind);
-    }
-    const targets = [...new Set([...capability.targets, ...capability.restTargets])];
-    return {
-      ...step,
-      properties: {
-        ...step.properties,
-        kind: { type: "string", enum: kinds },
-        target_type: { type: "string", enum: targets },
-        intensity: {
-          oneOf: intensityVariants.filter((variant) => {
-            const type = variantType(variant);
-            return Boolean(type && capability.intensities.includes(type));
-          })
-        }
-      }
-    };
-  };
-  const workoutForSport = (sport: WorkoutSport) => {
-    const capability = WORKOUT_SPORT_CAPABILITIES[sport];
-    const sportStep = stepForSport(sport);
-    return {
-      type: "object",
-      properties: {
-        key: { type: "string" },
-        name: { type: "string" },
-        sport: { const: sport, ...(sport === "run" ? { default: "run" } : {}) },
-        ...(capability.supportsPoolLength || capability.supportsGradingSystem
-          ? {
-              sport_options: {
-                type: "object",
-                properties: {
-                  ...(capability.supportsPoolLength
-                    ? { poolLength: { type: "object", properties: { value: { type: "number", exclusiveMinimum: 0 }, unit: { type: "string", enum: ["m", "yd"] } }, required: ["value", "unit"] } }
-                    : {}),
-                  ...(capability.supportsGradingSystem
-                    ? { gradingSystem: { type: "string", enum: Object.keys(CLIMB_SYSTEM_IDS) } }
-                    : {})
-                }
-              }
-            }
-          : {}),
-        distance_km: { type: "number", exclusiveMinimum: 0, description: "Legacy Run/Trail Run shorthand; omit when using steps." },
-        schedule_date: { type: "string", pattern: "^\\d{8}$" },
-        sort_no: { type: "integer", minimum: 1 },
-        save_to_library: { type: "boolean" },
-        steps: {
-          type: "array",
-          minItems: 1,
-          items: {
-            oneOf: [
-              sportStep,
-              { type: "object", properties: { repeat: { type: "integer", minimum: 1, maximum: 99 }, name: { type: "string" }, steps: { type: "array", minItems: 1, items: sportStep } }, required: ["repeat", "steps"] }
-            ]
+  const workout = {
+    type: "object",
+    properties: {
+      key: { type: "string" },
+      name: { type: "string" },
+      sport: {
+        type: "string",
+        enum: [...WORKOUT_SPORTS],
+        default: "run",
+        description:
+          "Whose rules this workout follows. Set it for anything that is not a " +
+          "Run — an omitted sport files the workout as a Run. The capability " +
+          "guide in the system prompt lists the step kinds, targets and " +
+          "intensity types each sport accepts."
+      },
+      sport_options: {
+        type: "object",
+        properties: {
+          poolLength: {
+            type: "object",
+            properties: {
+              value: { type: "number", exclusiveMinimum: 0 },
+              unit: { type: "string", enum: ["m", "yd"] }
+            },
+            required: ["value", "unit"],
+            description: "Pool Swim only."
+          },
+          gradingSystem: {
+            type: "string",
+            enum: Object.keys(CLIMB_SYSTEM_IDS),
+            description: "Indoor Climb and Bouldering only."
           }
         }
       },
-      required: ["key", "name", ...(sport === "run" ? [] : ["sport"])]
-    };
+      distance_km: { type: "number", exclusiveMinimum: 0, description: "Legacy Run/Trail Run shorthand; omit when using steps." },
+      schedule_date: { type: "string", pattern: "^\\d{8}$" },
+      sort_no: { type: "integer", minimum: 1 },
+      save_to_library: { type: "boolean" },
+      steps: {
+        type: "array",
+        minItems: 1,
+        items: { oneOf: [step, repeatGroup] }
+      }
+    },
+    required: ["key", "name"]
   };
   return {
     type: "object",
     properties: {
       name: { type: "string", description: "Plan name" },
-      workouts: {
-        type: "array",
-        minItems: 1,
-        items: { oneOf: WORKOUT_SPORTS.map(workoutForSport) }
-      }
+      workouts: { type: "array", minItems: 1, items: workout }
     },
     required: ["name", "workouts"]
   };
@@ -1402,32 +1400,26 @@ export function buildDraftWorkoutInputSchema(): Record<string, unknown> {
     properties: {
       workouts: {
         items: {
-          oneOf: Array<{
-            type: string;
-            properties: Record<string, unknown>;
-            required: string[];
-          }>;
+          type: string;
+          properties: Record<string, unknown>;
+          required: string[];
         };
       };
     };
   };
-  const workoutVariants = planSchema.properties.workouts.items.oneOf.map(
-    (variant) => {
-      const {
-        schedule_date: _scheduleDate,
-        sort_no: _sortNo,
-        save_to_library: _saveToLibrary,
-        ...properties
-      } = variant.properties;
-      return { ...variant, properties };
-    }
-  );
+  const {
+    schedule_date: _scheduleDate,
+    sort_no: _sortNo,
+    save_to_library: _saveToLibrary,
+    ...properties
+  } = planSchema.properties.workouts.items.properties;
 
   return {
     type: "object",
     properties: {
       workout: {
-        oneOf: workoutVariants,
+        ...planSchema.properties.workouts.items,
+        properties,
         description:
           "One complete standalone workout. Do not include schedule_date or save_to_library; the athlete chooses Workout Library or Calendar from the confirmation card."
       },

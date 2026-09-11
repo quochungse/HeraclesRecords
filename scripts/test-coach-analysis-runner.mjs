@@ -207,7 +207,7 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
   // an earlier save's answer arriving late must not roll the base backwards.
   assert.match(
     chatView,
-    /persistedBaseRef\.current = persisted\.length;\s*\n\s*void api/,
+    /persistedBaseRef\.current = persisted\.length;\s*\n\s*const saved: Promise<void> = api/,
     "the base must advance at send time, not when the save replies"
   );
   assert.equal(
@@ -215,14 +215,25 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
     2,
     "both paths that read the conversation from disk must re-base on it"
   );
-  // A save waiting on the debounce holds the copy the reload is replacing. If
-  // it fired afterwards it would write that copy back with a base that no
-  // longer covers the run's entries, which is the loss the merge exists to
-  // prevent — so the reload cancels it.
+  // A save waiting on the debounce holds entries the row does not have yet, so
+  // a reload has to deal with it before reading. It used to *cancel* it — which
+  // protected the run's answer and destroyed the athlete's own turn: a turn
+  // that ends without final text writes nothing of its own, so that pending
+  // save was the only copy of the charts it had put on screen. Flushing
+  // protects both, because the save carries the base it was built with and
+  // 5.6b's merge still holds back the run's tail.
+  //
+  // The behaviour is driven in `test:chat-transcript-race`; this is here to
+  // keep the two rules of 5.6b stated in one place.
   assert.match(
     chatView,
-    /if \(persistTimeoutRef\.current\) \{\s*\n\s*clearTimeout\(persistTimeoutRef\.current\);\s*\n\s*persistTimeoutRef\.current = null;\s*\n\s*\}\s*\n\s*persistedBaseRef\.current = entries\.length;/,
-    "reloading the transcript must cancel a save still waiting on the debounce"
+    /await flushPendingSave\(\);\s*\n\s*const entries = await api\.getChatSession\(sessionId\);/,
+    "reloading the transcript must flush a pending save before it reads"
+  );
+  assert.doesNotMatch(
+    chatView,
+    /const entries = await api\.getChatSession\(sessionId\);[\s\S]{0,200}?clearTimeout\(persistTimeoutRef\.current\)/,
+    "and must not go back to cancelling it after the read"
   );
 }
 
