@@ -283,6 +283,24 @@ function needsNetwork(days: number, now: number): boolean {
   return false;
 }
 
+/**
+ * One night already on disk, or nothing. Never touches the network: a caller
+ * after a single night should not spend the whole window's fetch to find a row
+ * that is almost always cached, and only the caller knows whether a miss is
+ * worth filling.
+ *
+ * Hydration uses the same retention window `getSleepHistory` does, so calling
+ * this first cannot leave the in-process cache holding a narrower slice than
+ * the next window request expects.
+ */
+export function getCachedSleepNight(
+  happenDay: string,
+  deps: SleepHistoryDeps = createDefaultSleepHistoryDeps()
+): TrainingHubSleepRecord | undefined {
+  hydrate(deps, dayKeyOffset(deps.now(), -HISTORY_RETENTION_DAYS));
+  return cache.entries.get(`${happenDay}:main`)?.record;
+}
+
 export interface SleepHistoryRequest {
   days?: number;
   /** Skip every freshness check and ask COROS. The screen's Refresh button. */

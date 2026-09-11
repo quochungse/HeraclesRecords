@@ -8,6 +8,7 @@ import { deleteSettings, getSetting, setSetting } from "./database";
 import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
+  getCoachCorosProfile,
   getTrainingHubStatus,
   listTrainingHubActivities,
   getTrainingDashboard,
@@ -29,6 +30,8 @@ import {
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
+  formatActivityListLine,
+  formatActivitySpan,
   getChatActivityTools,
   handleChatActivityTool,
   isChatActivityTool,
@@ -40,6 +43,12 @@ import {
   isChatAnalyticsTool,
   type ChatAnalyticsToolName
 } from "./chatAnalyticsTools";
+import {
+  getChatSleepTools,
+  handleChatSleepTool,
+  isChatSleepTool,
+  type ChatSleepToolName
+} from "./chatSleepTools";
 import {
   getChatInteractionTools,
   handleChatInteractionTool,
@@ -108,6 +117,7 @@ import type {
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
+  CorosProfile,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodePermissions,
@@ -135,14 +145,11 @@ import type {
   UnitSystem,
   WorkoutDeletePreview
 } from "./types";
-import {
-  formatDistanceValue,
-  formatElevationValue,
-  normalizeUnitSystem
-} from "./unitSystem.js";
+import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
+  formatAthleteProfile,
   formatCoachDashboard,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
@@ -1954,13 +1961,63 @@ export async function confirmWorkoutDelete(
 }
 
 function getAllChatTools(): CorosMcpTool[] {
-  return [
+  return narrowCorosMcpTools([
     ...getAllMcpTools(),
     ...getChatActivityTools(),
     ...getChatAnalyticsTools(),
+    ...getChatSleepTools(),
     ...getChatWorkoutTools(),
     ...getChatInteractionTools()
-  ];
+  ]);
+}
+
+/**
+ * COROS MCP tools no chat model can act on, hidden unconditionally.
+ *
+ * The two FIT tools answer with a binary resource or an S3 URL, neither of
+ * which a text turn can read. `queryDevices` is firmware and battery.
+ * `analyzeActivityDetail` is COROS's own coach-style write-up: it fetches the
+ * same activity detail underneath, then adds an opinion — and the opinion is
+ * the one thing this app is not short of.
+ */
+const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
+  "analyzeActivityDetail",
+  "queryDevices",
+  "downloadActivityFitFiles",
+  "queryActivityFitFileDownloadUrls"
+]);
+
+/**
+ * COROS MCP tools a local tool answers better, keyed to that local tool.
+ *
+ * Each remote tool costs its schema on every request round and hands the model
+ * a second way to ask the same question — one that is flakier (the lap and
+ * detail tools are the ones `formatToolFailure` already steers away from),
+ * slower (a network round trip where the local tool reads a cache) and, for
+ * sleep, shorter-sighted (COROS keeps ~9 weeks; the local cache keeps 400
+ * days). A remote tool is hidden only while its local counterpart is actually
+ * on offer, so a COROS MCP connection with Training Hub signed out keeps them.
+ */
+const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
+  querySleepData: "get_sleep_summary",
+  getActivityDetail: "get_activity_detail",
+  queryActivityLapData: "get_activity_detail",
+  queryTrainingSchedule: "list_scheduled_workouts"
+};
+
+export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
+  const offered = new Set(tools.map((tool) => tool.name));
+  return tools.filter((tool) => {
+    const remote = splitToolName(tool.name);
+    if (remote?.serverId !== "coros") {
+      return true;
+    }
+    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName)) {
+      return false;
+    }
+    const local = SUPERSEDED_COROS_MCP_TOOLS[remote.toolName];
+    return local === undefined || !offered.has(local);
+  });
 }
 
 const CLAUDE_REMOTE_READ_TOOLS: Record<
@@ -2012,7 +2069,8 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "list_recent_activities",
   "get_activity_detail",
   "get_fitness_trends",
-  "get_hr_zone_summary",
+  "get_training_zones",
+  "get_sleep_summary",
   "list_scheduled_workouts",
   "search_coros_exercises",
   "draft_workout",
@@ -2081,6 +2139,9 @@ export function getClaudeCodeTools(
   const analyticsTools = permissions.trainingMetrics
     ? getChatAnalyticsTools()
     : [];
+  // The sleep permission's first local tool. Its remote list below names tools
+  // the COROS server does not have, so before this the switch reached nothing.
+  const sleepTools = permissions.sleepData ? getChatSleepTools() : [];
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
       tool.name === "upload_training_plan" ||
@@ -2097,13 +2158,14 @@ export function getClaudeCodeTools(
   });
 
   return applyChatToolPolicy(
-    [
+    narrowCorosMcpTools([
       ...remoteTools,
       ...activityTools,
       ...analyticsTools,
+      ...sleepTools,
       ...workoutTools,
       ...getChatInteractionTools()
-    ],
+    ]),
     toolPolicy
   );
 }
@@ -2206,6 +2268,22 @@ async function executeChatTool(
         },
         unitSystem
       });
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : String(caught);
+      send("chat:streamInfo", {
+        requestId,
+        kind: "mcp",
+        tool: name,
+        status: "failed",
+        message
+      });
+      throw caught;
+    }
+  }
+  if (isChatSleepTool(name)) {
+    try {
+      return await handleChatSleepTool(name as ChatSleepToolName, args);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : String(caught);
@@ -2363,6 +2441,7 @@ function withLiveToolInstructions(
   }
   const activityTools = tools.filter((tool) => isChatActivityTool(tool.name));
   const analyticsTools = tools.filter((tool) => isChatAnalyticsTool(tool.name));
+  const sleepTools = tools.filter((tool) => isChatSleepTool(tool.name));
   const interactionTools = tools.filter((tool) =>
     isChatInteractionTool(tool.name)
   );
@@ -2371,6 +2450,7 @@ function withLiveToolInstructions(
       !isChatWorkoutTool(tool.name) &&
       !isChatActivityTool(tool.name) &&
       !isChatAnalyticsTool(tool.name) &&
+      !isChatSleepTool(tool.name) &&
       !isChatInteractionTool(tool.name)
   );
   const corosMcpTools = mcpTools.filter((tool) =>
@@ -2381,29 +2461,41 @@ function withLiveToolInstructions(
   );
   const planTools = tools.filter((tool) => isChatWorkoutTool(tool.name));
   const sections = [instructions, "", "## Live training data and tools"];
-  if (activityTools.length > 0) {
+  const readsData =
+    activityTools.length + analyticsTools.length + sleepTools.length + corosMcpTools.length > 0;
+  // What follows is only what a tool's own schema cannot say: the rules across
+  // all of them, and the mapping from a question to the sections that answer
+  // it. Each tool's arguments, defaults and units stay in its schema, which is
+  // sent on every round anyway — repeating them here cost tokens twice over and
+  // left two places to update whenever a default moved.
+  if (readsData) {
     sections.push(
-      `Local Training Hub tools (preferred for laps/splits): ${activityTools
-        .map((tool) => tool.name)
-        .join(", ")}. ` +
-        "Use list_recent_activities to find activity_id and sport_type, then " +
-        "get_activity_detail for lap tables. Set include_series=true for HR/pace/power trends. " +
-        "Inline activity charts (HR, pace, power, elevation, laps) appear automatically when data is available."
+      "Read before you fetch. The training snapshot above, when present, already " +
+        "holds the latest activities, the athlete's thresholds, fitness and " +
+        "recovery status and the next 14 days of schedule — answer from it when it " +
+        "covers the question. Across every tool below: ask for only the period, " +
+        "sport and sections the question is about, never fetch the same data twice " +
+        "in one answer, read the totals and averages a tool has already computed " +
+        "rather than recomputing them, and say when a value is missing instead of " +
+        "estimating it."
     );
   }
-  if (analyticsTools.length > 0) {
+  if (activityTools.length > 0) {
     sections.push(
-      `Training analytics tools: ${analyticsTools.map((tool) => tool.name).join(", ")}. ` +
-        "Use get_fitness_trends for 7-day load, resting HR, and HRV recovery trends. " +
-        "Use get_hr_zone_summary for threshold heart rate zone distribution. " +
-        "Inline charts are shown automatically when these tools return data."
+      "Which activity sections answer which question: pacing or intervals → laps, " +
+        "trend; intensity → zones; hills → elevation; gym → strength. One or two " +
+        "each is usually enough when comparing several activities, and series only " +
+        "when the lap table and trend cannot answer."
     );
+  }
+  if (activityTools.length + analyticsTools.length > 0) {
+    sections.push("Charts are drawn from these tools automatically.");
   }
   if (corosMcpTools.length > 0) {
     sections.push(
       `COROS MCP tools: ${corosMcpTools.map((tool) => tool.name).join(", ")}. ` +
-        "Use these for sleep, HRV, recovery, and other MCP-only metrics. " +
-        "For lap splits and interval breakdowns, prefer get_activity_detail."
+        "Prefer the local tools above for anything they cover; reach for these " +
+        "only for what they do not, such as daytime stress or a wellness check."
     );
   }
   if (otherMcpTools.length > 0) {
@@ -2530,7 +2622,7 @@ async function buildTrainingContext(
   const includeActivities = permissions?.recentActivities !== false;
   const includeMetrics = permissions?.trainingMetrics !== false;
   const includeUpcoming = permissions?.upcomingWorkouts !== false;
-  const [activities, dashboard, upcoming] = await Promise.allSettled([
+  const [activities, dashboard, upcoming, profile] = await Promise.allSettled([
     includeActivities
       ? listTrainingHubActivities(1, 25)
       : Promise.resolve([] as TrainingHubActivity[]),
@@ -2539,23 +2631,45 @@ async function buildTrainingContext(
       : Promise.resolve(null as TrainingHubDashboard | null),
     includeUpcoming
       ? getUpcomingWorkouts(14)
-      : Promise.resolve([] as TrainingHubUpcomingWorkout[])
+      : Promise.resolve([] as TrainingHubUpcomingWorkout[]),
+    // Body metrics and thresholds ride with the training-metrics permission,
+    // and cost nothing on any turn inside the profile's hour-long cache.
+    includeMetrics
+      ? getCoachCorosProfile()
+      : Promise.resolve(null as CorosProfile | null)
   ]);
 
   const sections: string[] = [coachInstructions, "", unitInstruction, ""];
   let hasData = false;
 
   if (activities.status === "fulfilled" && activities.value.length > 0) {
-    sections.push(`## Recent activity mix (latest ${activities.value.length})`);
+    const span = formatActivitySpan(activities.value);
+    sections.push(
+      `## Recent activity mix (latest ${activities.value.length}${span ? `, ${span}` : ""})`
+    );
     sections.push(formatRecentActivityMix(activities.value, unitSystem));
     sections.push("");
-    sections.push("## Recent activities");
-    sections.push(formatActivities(activities.value.slice(0, 8), unitSystem));
+    sections.push("## Recent activities (latest 8, local time)");
+    sections.push(
+      activities.value
+        .slice(0, 8)
+        .map((activity) => formatActivityListLine(activity, unitSystem))
+        .join("\n")
+    );
     sections.push("");
     hasData = true;
   }
+  if (profile.status === "fulfilled" && profile.value) {
+    const athlete = formatAthleteProfile(profile.value, unitSystem);
+    if (athlete) {
+      sections.push("## Athlete profile");
+      sections.push(athlete);
+      sections.push("");
+      hasData = true;
+    }
+  }
   if (dashboard.status === "fulfilled" && dashboard.value) {
-    const fitness = formatCoachDashboard(dashboard.value);
+    const fitness = formatCoachDashboard(dashboard.value, unitSystem);
     if (fitness) {
       sections.push("## Fitness & recovery");
       sections.push(fitness);
@@ -2578,38 +2692,6 @@ async function buildTrainingContext(
   }
 
   return { text: sections.join("\n").trim(), hasData };
-}
-
-function formatActivities(
-  activities: TrainingHubActivity[],
-  unitSystem: UnitSystem
-): string {
-  return activities
-    .map((activity) => {
-      const parts = [
-        `id=${activity.activityId}`,
-        `sport_type=${activity.sportType}`,
-        activity.startTime ? isoDate(activity.startTime) : "",
-        activity.sportName ?? "",
-        activity.name ?? "",
-        activity.distance
-          ? formatDistanceValue(activity.distance, unitSystem, {
-              swim:
-                activity.sportType === 300 ||
-                activity.sportType === 301 ||
-                /swim/i.test(activity.sportName ?? "")
-            })
-          : "",
-        activity.duration ? formatDurationSeconds(activity.duration) : "",
-        activity.avgHr ? `avg HR ${activity.avgHr}` : "",
-        activity.trainingLoad ? `load ${activity.trainingLoad}` : "",
-        activity.elevationGain
-          ? `+${formatElevationValue(activity.elevationGain, unitSystem)}`
-          : ""
-      ].filter(Boolean);
-      return `- ${parts.join(" · ")}`;
-    })
-    .join("\n");
 }
 
 function formatUpcomingVolume(
@@ -2673,22 +2755,6 @@ function decodeJwtClaims(jwt: string): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
-}
-
-function isoDate(epochSeconds: number): string {
-  // COROS start times are unix seconds.
-  return new Date(epochSeconds * 1000).toISOString().slice(0, 10);
-}
-
-function formatDurationSeconds(value: number): string {
-  const totalSeconds = Math.round(value);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
 function truncate(text: string, max: number): string {

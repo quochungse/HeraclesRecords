@@ -4013,6 +4013,8 @@ export interface ActivityHrTrendPreview {
 export interface FitnessTrendPreview {
   previewId: string;
   trendPoints: TrainingTrendPoint[];
+  /** The window the coach asked for. Absent on cards stored before it could vary: 7. */
+  windowDays?: number;
 }
 
 export interface HrZoneEntry {

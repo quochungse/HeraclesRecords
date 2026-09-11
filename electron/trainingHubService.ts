@@ -1284,8 +1284,42 @@ function storeCorosProfileSnapshot(
   return snapshot;
 }
 
+/**
+ * The profile the coach reads, on a cache of its own.
+ *
+ * It borrows the Personal screen's snapshot while that is warm, and otherwise
+ * reads `/account/query` alone. It deliberately does **not** call
+ * `storeCorosProfileSnapshot`: the other half of that snapshot is the
+ * dashboard, and seeding it from here would hand the Personal screen an hour of
+ * `dashboard: null` and empty its fitness panels.
+ */
+let coachProfileCache: { profile: CorosProfile; expiresAt: number } | null = null;
+
+export async function getCoachCorosProfile(): Promise<CorosProfile | null> {
+  const shared = cachedCorosProfile();
+  if (shared) {
+    return shared;
+  }
+  if (coachProfileCache && Date.now() < coachProfileCache.expiresAt) {
+    return coachProfileCache.profile;
+  }
+  try {
+    const profile = await getCorosProfile();
+    coachProfileCache = {
+      profile,
+      expiresAt: Date.now() + COROS_PROFILE_CACHE_TTL_MS
+    };
+    return profile;
+  } catch {
+    // The snapshot is assembled from several reads and any one of them may
+    // fail; a missing profile costs two lines, not the turn.
+    return null;
+  }
+}
+
 export function invalidateCorosProfileCache(): void {
   corosProfileCache = null;
+  coachProfileCache = null;
 }
 
 /**

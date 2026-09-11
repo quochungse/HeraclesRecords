@@ -1163,7 +1163,12 @@ function describeActivity(activity: CoachActivityRow): string {
     parts.push(sport);
   }
   if (activity.start_time) {
-    parts.push(new Date(activity.start_time * 1000).toISOString().slice(0, 10));
+    // Local, not `toISOString()`: a 06:00 run in UTC+7 is the UTC day before.
+    const start = new Date(activity.start_time * 1000);
+    parts.push(
+      `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-` +
+        `${String(start.getDate()).padStart(2, "0")}`
+    );
   }
   return parts.join(" · ");
 }
@@ -1178,9 +1183,11 @@ function buildPlaybookTurn(
   );
   // A catch-up sequence sends the same playbook once per activity, so each run
   // has to name its own subject or the three answers would be interchangeable.
+  // The sport type rides along so get_activity_detail is the run's first call,
+  // not a list lookup to find it.
   const focus = queued.activity
     ? `\n\nAnalyse this activity specifically: ${describeActivity(queued.activity)}` +
-      ` (activity id ${queued.activity.activity_id}).`
+      ` (activity id ${queued.activity.activity_id}, sport type ${queued.activity.sport_type}).`
     : "";
   return `${body}${focus}\n\n${AUTOMATION_OUTPUT_CONTRACT}`;
 }

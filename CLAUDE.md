@@ -247,8 +247,21 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   it requests one `TrainingLibrarySnapshot`. See [docs/training-library-architecture.md](docs/training-library-architecture.md).
 - **Coach** (`chatService.ts` + four providers: `claudeCodeProvider`, `anthropicChatProvider`,
   `openRouterProvider`, `localChatProvider`) — streaming chat with COROS-data tools
-  (`chatActivityTools`, `chatAnalyticsTools`, `chatWorkoutTools`, `chatInteractionTools`)
-  and MCP servers.
+  (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,
+  `chatInteractionTools`) and MCP servers.
+  The read tools are built to fetch only what a question is about: the activity list takes a
+  date window and a sport family and returns per-sport totals, `get_activity_detail` takes a
+  `sections` list, trends and sleep take `days` and roll up by week past 14, and
+  `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
+  own totals and deltas so the model reads them rather than doing the arithmetic.
+  `get_training_zones` answers with the account's own HR, pace and power tables, so a
+  prescribed target is read off the athlete's thresholds rather than inferred from recent
+  activities; the snapshot carries the thresholds themselves, the body metrics and the
+  all-time personal records, all of which were already being fetched every turn and dropped.
+  `narrowCorosMcpTools` hides two kinds of COROS MCP tool: one a local tool supersedes (only
+  while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
+  devices, COROS's own activity write-up). A new local tool must be placed on one side of
+  `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval

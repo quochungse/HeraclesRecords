@@ -35,9 +35,11 @@ Module._load = function patchedLoad(request, ...rest) {
   if (request === "better-sqlite3") return class FakeDatabase {};
   return originalLoad.call(this, request, ...rest);
 };
-const { applyChatToolPolicy, isToolAllowedUnderPolicy } = require(
-  path.join(repoRoot, "dist-electron", "chatService.js")
-);
+const {
+  applyChatToolPolicy,
+  isToolAllowedUnderPolicy,
+  narrowCorosMcpTools
+} = require(path.join(repoRoot, "dist-electron", "chatService.js"));
 
 // ---------------------------------------------------------------------------
 // Section 6: read-only tool policy (decision 3)
@@ -51,7 +53,7 @@ const everything = named(
   "list_recent_activities",
   "get_activity_detail",
   "get_fitness_trends",
-  "get_hr_zone_summary",
+  "get_training_zones",
   "list_scheduled_workouts",
   "search_coros_exercises",
   "draft_workout",
@@ -74,7 +76,7 @@ assert.deepEqual(readOnly, [
   "list_recent_activities",
   "get_activity_detail",
   "get_fitness_trends",
-  "get_hr_zone_summary",
+  "get_training_zones",
   "list_scheduled_workouts",
   "search_coros_exercises",
   "draft_workout",
@@ -162,18 +164,20 @@ assert.equal(
   const localToolNames = [
     ...dist("chatActivityTools.js").CHAT_ACTIVITY_TOOL_NAMES,
     ...dist("chatAnalyticsTools.js").CHAT_ANALYTICS_TOOL_NAMES,
+    ...dist("chatSleepTools.js").CHAT_SLEEP_TOOL_NAMES,
     ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
     ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
   ];
-  assert.ok(localToolNames.length >= 11, "the tool-name scrape has drifted");
+  assert.ok(localToolNames.length >= 12, "the tool-name scrape has drifted");
 
-  // 6's own lists: eight reads plus `request_coach_input`, which is reachable
+  // 6's own lists: nine reads plus `request_coach_input`, which is reachable
   // and answers "no athlete is available"; the two writes are refused.
   const expectedAllowed = new Set([
     "list_recent_activities",
     "get_activity_detail",
     "get_fitness_trends",
-    "get_hr_zone_summary",
+    "get_training_zones",
+    "get_sleep_summary",
     "list_scheduled_workouts",
     "search_coros_exercises",
     "draft_workout",
@@ -225,6 +229,59 @@ assert.deepEqual(
   namesOf(applyChatToolPolicy(named("draft_workout"), "read-only")),
   ["draft_workout"]
 );
+
+// --- COROS MCP tools a local tool answers better are not offered twice ----
+// Each costs its schema on every request round and offers a flakier, slower
+// second route to the same data. Only while the local counterpart is on offer:
+// COROS MCP connected with Training Hub signed out keeps its own tools.
+{
+  const surface = named(
+    "coros__querySleepData",
+    "coros__getActivityDetail",
+    "coros__queryActivityLapData",
+    "coros__queryTrainingSchedule",
+    "coros__queryStressLevel",
+    "get_sleep_summary",
+    "get_activity_detail",
+    "list_scheduled_workouts",
+    "freddy__querySleepData"
+  );
+  assert.deepEqual(namesOf(narrowCorosMcpTools(surface)), [
+    "coros__queryStressLevel",
+    "get_sleep_summary",
+    "get_activity_detail",
+    "list_scheduled_workouts",
+    "freddy__querySleepData"
+  ]);
+  assert.deepEqual(
+    namesOf(
+      narrowCorosMcpTools(named("coros__querySleepData", "coros__getActivityDetail"))
+    ),
+    ["coros__querySleepData", "coros__getActivityDetail"],
+    "without the local tool the remote one is the only route, so it stays"
+  );
+
+  // The four a chat turn cannot act on at all: two answer with a binary
+  // resource or an S3 URL, one is firmware and battery, and one is COROS's own
+  // coach-style write-up over the detail this app already reads. These go
+  // whether or not any local tool is on offer.
+  assert.deepEqual(
+    namesOf(
+      narrowCorosMcpTools(
+        named(
+          "coros__analyzeActivityDetail",
+          "coros__queryDevices",
+          "coros__downloadActivityFitFiles",
+          "coros__queryActivityFitFileDownloadUrls",
+          "coros__queryStressLevel",
+          "freddy__queryDevices"
+        )
+      )
+    ),
+    ["coros__queryStressLevel", "freddy__queryDevices"],
+    "another server's tool of the same name is not ours to judge"
+  );
+}
 
 // --- the per-name predicate, which executeChatTool enforces --------------
 // Every provider branch converges on this, so a model naming a tool it was

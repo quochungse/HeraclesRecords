@@ -10,6 +10,16 @@ assert.equal(corosSportName(900), "Walk");
 assert.equal(corosSportName(102), "Trail Run");
 assert.equal(corosSportName(100, "Morning Run"), "Morning Run");
 
+// Filled in on 2026-09-11 from the table inside COROS's own MCP
+// `querySportRecords` description. Without them these activities rendered as
+// "Sport type 904" and fell outside every sport filter.
+assert.equal(corosSportName(904), "Yoga");
+assert.equal(corosSportName(906), "Boxing");
+assert.equal(corosSportName(1005), "Tennis");
+assert.equal(corosSportName(1200), "Hybrid Fitness");
+assert.equal(corosSportName(802), "Outdoor Climb");
+assert.equal(corosSportName(712), "Offshore Fishing");
+
 const merged = mergeSportTypeEntries([
   { sportType: 100, sportName: "Outdoor Run" },
   { sportType: 999, sportName: "Custom Sport" }

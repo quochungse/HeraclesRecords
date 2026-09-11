@@ -9,7 +9,14 @@ const distUrl = (file) =>
 const {
   formatActivityDetailForChat,
   buildActivityVisualPreview,
-  buildActivityHrTrendPreview
+  buildActivityHrTrendPreview,
+  formatActivityListForChat,
+  formatActivityListLine,
+  formatActivitySpan,
+  parseActivityListWindow,
+  parseActivityDetailSections,
+  activitySportFamily,
+  DEFAULT_ACTIVITY_DETAIL_SECTIONS
 } = await import(`${distUrl("chatActivityTools.js")}?cacheBust=${Date.now()}`);
 const {
   parseActivityDetail,
@@ -637,5 +644,167 @@ assert.equal(cadenceLapPreview?.sections.laps?.[0]?.avgCadence, 172);
 
 // An activity with no cadence anywhere gains no empty section.
 assert.equal(visualPreview.sections.cadence, undefined);
+
+// --- Sections: the coach asks for what the question needs ---
+//
+// The summary is always there; everything else is on request, so comparing
+// five activities can cost five summaries rather than five lap tables.
+const lapsOnlyText = formatActivityDetailForChat(
+  parseActivityDetail(driftFixture),
+  false,
+  "metric",
+  new Set(["laps"])
+);
+assert.match(lapsOnlyText, /^Activity detail\nName: Long run/);
+assert.match(lapsOnlyText, /Laps:/);
+assert.doesNotMatch(lapsOnlyText, /Trend across the activity/);
+// An omitted section that has data is named, so its absence is not read as
+// "COROS did not record it". Zones, elevation and strength have none here.
+assert.match(lapsOnlyText, /Not included this time \(request via sections\): trend\./);
+assert.doesNotMatch(driftText, /Not included this time/, "the default omits nothing but series");
+
+const trendOnlyText = formatActivityDetailForChat(
+  parseActivityDetail(driftFixture),
+  false,
+  "metric",
+  new Set(["trend"])
+);
+assert.match(trendOnlyText, /Trend across the activity/);
+assert.doesNotMatch(trendOnlyText, /Laps:/);
+assert.doesNotMatch(trendOnlyText, /Laps: none recorded/, "an unasked lap table is not reported as empty");
+
+assert.match(
+  formatActivityDetailForChat(detail, false, "metric", new Set(["series"])),
+  /Time series/,
+  "series can be asked for through sections"
+);
+
+assert.deepEqual([...parseActivityDetailSections({ sections: "laps, zones" })], ["laps", "zones"]);
+assert.deepEqual(
+  [...parseActivityDetailSections({})].sort(),
+  [...DEFAULT_ACTIVITY_DETAIL_SECTIONS].sort()
+);
+assert.equal(parseActivityDetailSections({}).has("series"), false);
+assert.equal(
+  parseActivityDetailSections({ sections: ["bogus"] }).size,
+  DEFAULT_ACTIVITY_DETAIL_SECTIONS.size,
+  "nothing valid asked for means the default, not an empty detail"
+);
+assert.ok(
+  parseActivityDetailSections({ include_series: true }).has("series"),
+  "the pre-sections flag still works for stored transcripts"
+);
+
+// --- The activity list: periods, sport families, totals ---
+const at = (month, day, hour) => new Date(2026, month - 1, day, hour, 0).getTime() / 1000;
+const listFixture = [
+  {
+    activityId: "a1",
+    sportType: 100,
+    sportName: "Run",
+    name: "Easy",
+    startTime: at(9, 7, 6),
+    distance: 10_000,
+    duration: 3_000,
+    avgHr: 145,
+    maxHr: 160,
+    trainingLoad: 80,
+    elevationGain: 40
+  },
+  {
+    activityId: "a2",
+    sportType: 102,
+    sportName: "Trail Run",
+    name: "Hills",
+    startTime: at(9, 5, 7),
+    distance: 15_000,
+    duration: 6_000,
+    trainingLoad: 150,
+    elevationGain: 600
+  },
+  {
+    activityId: "a3",
+    sportType: 402,
+    sportName: "Strength",
+    startTime: at(9, 3, 18),
+    duration: 2_700,
+    trainingLoad: 40
+  },
+  {
+    activityId: "a4",
+    sportType: 300,
+    sportName: "Pool Swim",
+    startTime: at(9, 1, 19),
+    distance: 2_000,
+    duration: 2_400,
+    trainingLoad: 50
+  }
+];
+
+const weekText = formatActivityListForChat(listFixture, "metric", {
+  window: { startDay: "20260901", endDay: "20260907" },
+  limit: 50
+});
+assert.match(weekText, /^Activities \(2026-09-01 → 2026-09-07\): 4\n/);
+// Totals per family, largest first, so "how much did I run" is read off rather
+// than summed by the model. Distance stays inside a family: metres of pool
+// added to kilometres of trail is a number that means nothing.
+assert.match(weekText, /Totals:\n- Run: 2 · 2:30:00 · 25[.0]* km · load 230 · \+640 m\n/);
+assert.match(weekText, /- Strength: 1 · 45:00 · load 40\n/);
+assert.match(weekText, /- Swim: 1 · 40:00 · 2,?000 m · load 50\n/);
+assert.match(weekText, /- All: 4 · 3:55:00 · load 320 · \+640 m\n/);
+assert.doesNotMatch(weekText, /- All: .* km/);
+
+const runsText = formatActivityListForChat(listFixture, "metric", { sport: "run", limit: 10 });
+assert.match(runsText, /^Activities \(most recent, Run only\): 2\n/, "trail counts as a run");
+assert.doesNotMatch(runsText, /Strength|Swim|- All:/);
+
+assert.match(
+  formatActivityListForChat(listFixture, "metric", { limit: 2 }),
+  /^Activities \(most recent\): 2 of 4 shown\n/
+);
+assert.match(
+  formatActivityListForChat([], "metric", {
+    window: { startDay: "20260901", endDay: "20260907" },
+    limit: 50
+  }),
+  /^No activities found \(2026-09-01 → 2026-09-07\)\.$/
+);
+assert.match(
+  formatActivityListForChat(listFixture, "metric", {
+    window: { startDay: "20260901", endDay: "20260907" },
+    limit: 50,
+    truncatedAtSource: true
+  }),
+  /older activities in it may be missing/
+);
+
+// The snapshot and the list tool share this row, climb included.
+assert.match(formatActivityListLine(listFixture[0], "metric"), /· load 80 · \+40 m$/);
+assert.match(formatActivityListLine(listFixture[0], "metric"), /2026-09-07 06:00 \(Mon\)/);
+assert.equal(formatActivitySpan(listFixture), "2026-09-01 → 2026-09-07, 7 days");
+assert.equal(formatActivitySpan([]), undefined);
+
+const listToday = new Date(2026, 8, 11);
+assert.deepEqual(parseActivityListWindow({ start_date: "2026-09-01" }, listToday), {
+  startDay: "20260901",
+  endDay: "20260911"
+});
+assert.equal(parseActivityListWindow({}, listToday), undefined);
+assert.throws(() => parseActivityListWindow({ end_date: "20260901" }, listToday), /needs a start_date/);
+assert.throws(() => parseActivityListWindow({ start_date: "Sept 1" }, listToday), /YYYYMMDD/);
+assert.throws(
+  () => parseActivityListWindow({ start_date: "20260910", end_date: "20260901" }, listToday),
+  /before start_date/
+);
+
+assert.equal(activitySportFamily(101), "run");
+assert.equal(activitySportFamily(103), "run");
+assert.equal(activitySportFamily(98, "Custom Run"), "run");
+assert.equal(activitySportFamily(204), "bike");
+assert.equal(activitySportFamily(301), "swim");
+assert.equal(activitySportFamily(402), "strength");
+assert.equal(activitySportFamily(900), "walk_hike");
+assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
 
 console.log("test-chat-activity-tools: ok");
