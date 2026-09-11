@@ -51,6 +51,7 @@ export function TrainingOverview({
   twoFactorCode,
   activities,
   upcomingWorkouts,
+  sportTypes,
   snapshot,
   rpeBackfill,
   busy,
@@ -439,7 +440,11 @@ export function TrainingOverview({
               </div>
               <div className="training-intelligence-column">
                 <FitnessTrendPanel snapshot={snapshot} activities={activities} />
-                <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
+                <UpcomingWorkoutsPanel
+                  api={api}
+                  workouts={upcomingWorkouts}
+                  sportTypes={sportTypes}
+                />
               </div>
             </div>
           </section>

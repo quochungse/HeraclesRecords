@@ -137,7 +137,6 @@ export interface TrainingHubViewProps {
  */
 export type TrainingOverviewProps = Omit<
   TrainingHubViewProps,
-  | "sportTypes"
   | "activityDetail"
   | "selectedActivity"
   | "onLoadDetail"

@@ -93,6 +93,7 @@
     "test:sleep-series-cache": "npm run build:electron && node scripts/test-sleep-series-cache.mjs",
     "test:daily-health-data-parser": "npm run build:electron && node scripts/test-daily-health-data-parser.mjs",
     "test:training-formatters": "npm run build:electron && node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-training-formatters.mjs",
+    "test:upcoming-workout-match": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-upcoming-workout-match.mjs",
     "test:weekly-activity": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-weekly-activity.mjs",
     "test:units": "npm run build:electron && node scripts/test-unit-system.mjs",
     "test:heatmap-summary": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heatmap-summary.mjs",

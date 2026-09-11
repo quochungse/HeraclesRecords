@@ -2583,6 +2583,7 @@ export default function App() {
                         onCancelTwoFactor={handleTrainingHubCancel2fa}
                         activities={trainingHubActivities}
                         upcomingWorkouts={trainingHubUpcomingWorkouts}
+                        sportTypes={trainingHubSportTypes}
                         snapshot={trainingHubSnapshot}
                         rpeBackfill={rpeBackfill}
                         busy={busy}

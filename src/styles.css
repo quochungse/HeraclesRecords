@@ -15071,7 +15071,28 @@ tr.data-intervals-row-missing {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-muted) 32%, transparent);
 }
 
+/* The today card is a button too, so its copy elements are spans: keep them
+   stacking the way the <h3>/<p> they replaced did. */
+.training-upcoming-today-button {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.training-upcoming-today-button:hover,
+.training-upcoming-today-button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
+}
+
+.training-upcoming-today-button .training-upcoming-chevron {
+  align-self: center;
+}
+
 .training-upcoming-today-copy {
+  flex: 1;
   min-width: 0;
 }
 
@@ -15106,6 +15127,7 @@ tr.data-intervals-row-missing {
 }
 
 .training-upcoming-today-title {
+  display: block;
   margin: 0;
   font-size: 20px;
   font-weight: 700;
@@ -15113,6 +15135,7 @@ tr.data-intervals-row-missing {
 }
 
 .training-upcoming-today-meta {
+  display: block;
   margin: 8px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
@@ -15137,15 +15160,37 @@ tr.data-intervals-row-missing {
   list-style: none;
 }
 
+/* Each row opens the workout's detail slide-over, so it is a real button —
+   the grid lives on it rather than on the <li>, which keeps only the rail's
+   first/last bookkeeping. */
 .training-upcoming-row {
   display: grid;
   grid-template-columns: 12px 52px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
+  width: 100%;
   padding: 14px 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.training-upcoming-row:hover,
+.training-upcoming-row:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.training-upcoming-row:hover .training-upcoming-chevron,
+.training-upcoming-row:focus-visible .training-upcoming-chevron,
+.training-upcoming-today-button:hover .training-upcoming-chevron,
+.training-upcoming-today-button:focus-visible .training-upcoming-chevron {
+  color: var(--text-secondary);
 }
 
 .training-upcoming-rail {
@@ -15169,15 +15214,15 @@ tr.data-intervals-row-missing {
   transform: translateX(-50%);
 }
 
-.training-upcoming-row:first-child .training-upcoming-rail::before {
+.training-upcoming-item:first-child .training-upcoming-rail::before {
   top: 50%;
 }
 
-.training-upcoming-row:last-child .training-upcoming-rail::before {
+.training-upcoming-item:last-child .training-upcoming-rail::before {
   bottom: 50%;
 }
 
-.training-upcoming-row:only-child .training-upcoming-rail::before {
+.training-upcoming-item:only-child .training-upcoming-rail::before {
   display: none;
 }
 
@@ -26767,6 +26812,16 @@ tr.data-intervals-row-missing {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* Overview opens this same slide-over for an upcoming workout; the scheduled
+   lookup that upgrades its structure runs behind an already-open panel. */
+.training-upcoming-detail-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .calendar-detail-delete.is-armed {
