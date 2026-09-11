@@ -1,5 +1,6 @@
 import type {
   TrainingHubActivity,
+  TrainingHubDailyHealthRecord,
   TrainingHubDailyMetric
 } from "../../electron/types";
 import type { UnitSystem } from "../../electron/types";
@@ -172,7 +173,7 @@ function formatDayDisplayValue(
   }
 }
 
-function formatDurationTotal(seconds: number): string {
+export function formatDurationTotal(seconds: number): string {
   if (seconds >= 3600) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.round((seconds % 3600) / 60);
@@ -321,6 +322,57 @@ export function getWeeklyActivityYAxisUnitLabel(
   }
 
   return yAxisUnit;
+}
+
+export interface WeekToDateTotals {
+  trainingLoad?: number;
+  /** Metres. */
+  distance?: number;
+  /** Seconds. */
+  duration?: number;
+  steps?: number;
+}
+
+/**
+ * Monday through `referenceDate`, summed — the same calendar week the weekly
+ * activity chart draws, cut off at today. An empty day list means nothing has
+ * loaded yet and reads as undefined; a loaded list with nothing since Monday is
+ * a real zero. Steps come from the MCP daily-health feed, which can be absent
+ * on its own, so they stay undefined unless a day of this week carried a count.
+ */
+export function buildWeekToDateTotals(
+  dayList: TrainingHubDailyMetric[],
+  healthRecords: TrainingHubDailyHealthRecord[],
+  referenceDate = new Date()
+): WeekToDateTotals {
+  const todayKey = dateToHappenDay(referenceDate);
+  const weekKeys = new Set(
+    getCalendarWeekDateKeys(referenceDate).filter((key) => key <= todayKey)
+  );
+  const isCounted = (value?: number): value is number =>
+    value !== undefined && Number.isFinite(value);
+  const weekDays = dayList.filter((day) => weekKeys.has(day.happenDay));
+  const total = (read: (day: TrainingHubDailyMetric) => number | undefined) =>
+    dayList.length === 0
+      ? undefined
+      : weekDays.reduce((sum, day) => {
+          const value = read(day);
+          return isCounted(value) ? sum + value : sum;
+        }, 0);
+  const weekSteps = healthRecords
+    .filter((record) => weekKeys.has(record.happenDay))
+    .map((record) => record.steps)
+    .filter(isCounted);
+
+  return {
+    trainingLoad: total((day) => day.trainingLoad),
+    distance: total((day) => day.distance),
+    duration: total((day) => day.duration),
+    steps:
+      weekSteps.length > 0
+        ? weekSteps.reduce((sum, value) => sum + value, 0)
+        : undefined
+  };
 }
 
 export const WEEKLY_ACTIVITY_METRICS: WeeklyActivityMetric[] = [

@@ -1,20 +1,20 @@
 import type { ReactNode } from "react";
-import { Flame, Footprints, Heart, Zap } from "lucide-react";
-import {
-  formatOptionalNumber,
-  formatSignedDelta
-} from "../formatters";
+import { Flame, Footprints, Route, Timer } from "lucide-react";
 import { MCP_DAILY_HEALTH_TILE_DETAIL } from "../../mcp/mcpNotice";
-import type { TrainingSummaryMetrics } from "../types";
+import { distanceUnit, metersToDisplayDistance } from "../../units/units";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { formatDurationTotal, type WeekToDateTotals } from "../weeklyActivity";
 
 interface TrainingSummaryTilesProps {
-  summary: TrainingSummaryMetrics;
+  totals: WeekToDateTotals;
+  /** Whether MCP served the daily-health feed the step count comes from. */
+  mcpConnected?: boolean;
   layout?: "row" | "stack";
   metrics?: TrainingSummaryMetric[];
   className?: string;
 }
 
-type TrainingSummaryMetric = "load" | "heart" | "steps" | "calories";
+type TrainingSummaryMetric = "load" | "steps" | "distance" | "duration";
 
 interface StatCardProps {
   icon: ReactNode;
@@ -22,7 +22,7 @@ interface StatCardProps {
   value: string;
   detail: string;
   variant?: "bar" | "widget";
-  tone?: "load" | "heart" | "steps" | "calories";
+  tone?: TrainingSummaryMetric;
 }
 
 function StatCard({
@@ -72,20 +72,23 @@ function formatWholeNumber(value?: number): string {
   return Math.round(value).toLocaleString();
 }
 
+/** Every tile is a Monday-to-today total; see `buildWeekToDateTotals`. */
 export function TrainingSummaryTiles({
-  summary,
+  totals,
+  mcpConnected,
   layout = "row",
-  metrics = ["load", "heart"],
+  metrics = ["load", "steps", "distance", "duration"],
   className
 }: TrainingSummaryTilesProps) {
+  const { unitSystem } = useUnitSystem();
   const variant = layout === "stack" ? "widget" : "bar";
   /** The two wordings every tile carries, picked once rather than per tile. */
   const copy = (widget: string, bar: string) =>
     variant === "widget" ? widget : bar;
-  // Only where the figure is actually missing: a tile still holding
-  // yesterday's step count is not a tile with a problem to report.
-  const needsMcp = (value?: number) =>
-    summary.mcpConnected === false && value === undefined;
+  // Only where the figure is actually missing: a week that already has step
+  // counts in it is not a tile with a problem to report.
+  const stepsNeedMcp = mcpConnected === false && totals.steps === undefined;
+  const unit = distanceUnit(unitSystem);
   const iconSize = variant === "widget" ? 13 : 16;
   const tilesClassName = [
     "training-summary-tiles",
@@ -101,37 +104,10 @@ export function TrainingSummaryTiles({
         <StatCard
           icon={<Flame size={iconSize} />}
           label={copy("Load", "Training Load")}
-          value={formatOptionalNumber(summary.todayLoad)}
-          detail={
-            summary.weekLoadTotal !== undefined
-              ? copy(
-                  `${Math.round(summary.weekLoadTotal)} / 7 days`,
-                  `${Math.round(summary.weekLoadTotal)} load over 7 days`
-                )
-              : copy("today", "today's load")
-          }
+          value={formatWholeNumber(totals.trainingLoad)}
+          detail={copy("this week", "training load this week")}
           variant={variant}
           tone="load"
-        />
-      ) : null}
-
-      {metrics.includes("heart") ? (
-        <StatCard
-          icon={<Heart size={iconSize} />}
-          label="Resting HR"
-          value={
-            summary.latestRhr !== undefined ? `${Math.round(summary.latestRhr)}` : "–"
-          }
-          detail={
-            summary.rhrDelta !== undefined
-              ? copy(
-                  `${formatSignedDelta(summary.rhrDelta, "")} vs avg`,
-                  `${formatSignedDelta(summary.rhrDelta, " bpm")} vs 7-day avg`
-                )
-              : copy("bpm", "beats per minute")
-          }
-          variant={variant}
-          tone="heart"
         />
       ) : null}
 
@@ -139,29 +115,44 @@ export function TrainingSummaryTiles({
         <StatCard
           icon={<Footprints size={iconSize} />}
           label="Steps"
-          value={formatWholeNumber(summary.steps)}
+          value={formatWholeNumber(totals.steps)}
           detail={
-            needsMcp(summary.steps)
+            stepsNeedMcp
               ? MCP_DAILY_HEALTH_TILE_DETAIL
-              : copy("today", "daily step count")
+              : copy("this week", "steps this week")
           }
           variant={variant}
           tone="steps"
         />
       ) : null}
 
-      {metrics.includes("calories") ? (
+      {metrics.includes("distance") ? (
         <StatCard
-          icon={<Zap size={iconSize} />}
-          label="Calories"
-          value={formatWholeNumber(summary.calories)}
-          detail={
-            needsMcp(summary.calories)
-              ? MCP_DAILY_HEALTH_TILE_DETAIL
-              : copy("kcal", "total calories")
+          icon={<Route size={iconSize} />}
+          label="Distance"
+          value={
+            totals.distance !== undefined
+              ? metersToDisplayDistance(totals.distance, unitSystem).toFixed(1)
+              : "–"
           }
+          detail={`${unit} this week`}
           variant={variant}
-          tone="calories"
+          tone="distance"
+        />
+      ) : null}
+
+      {metrics.includes("duration") ? (
+        <StatCard
+          icon={<Timer size={iconSize} />}
+          label="Duration"
+          value={
+            totals.duration !== undefined
+              ? formatDurationTotal(totals.duration)
+              : "–"
+          }
+          detail={copy("this week", "time trained this week")}
+          variant={variant}
+          tone="duration"
         />
       ) : null}
     </div>

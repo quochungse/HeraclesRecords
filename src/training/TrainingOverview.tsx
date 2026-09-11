@@ -22,9 +22,13 @@ import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
-import { Vo2MaxWidget } from "./components/Vo2MaxWidget";
+import { mergeTrainingDayLists } from "./parsers";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
+import {
+  buildWeekToDateTotals,
+  enrichDayListWithActivityTotals
+} from "./weeklyActivity";
 import loginPageBackground from "../../public/assets/training-hub/Login-page-bg.png";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
@@ -97,6 +101,22 @@ export function TrainingOverview({
         mcpConnected: undefined
       },
     [snapshot]
+  );
+  // Built from the same enriched day list as the Weekly Activity chart, so a
+  // tile and that chart's legend total never disagree about the same week.
+  const weekTotals = useMemo(
+    () =>
+      buildWeekToDateTotals(
+        enrichDayListWithActivityTotals(
+          mergeTrainingDayLists(
+            snapshot?.dailyMetrics ?? null,
+            snapshot?.analytics ?? null
+          ),
+          activities
+        ),
+        snapshot?.dailyHealth?.records ?? []
+      ),
+    [snapshot, activities]
   );
 
   return (
@@ -408,19 +428,21 @@ export function TrainingOverview({
               ) : null}
             </div>
             <div className="training-intelligence-grid">
-              <RecoveryRing summary={summary} />
-              <FitnessTrendPanel snapshot={snapshot} activities={activities} />
-              <SleepSummaryPanel
-                sleep={snapshot?.sleep}
-                connecting={sleepConnecting}
-                refreshing={busy === "training-refresh"}
-                onOpenDetails={onOpenSleepDetails}
-              />
-              <Vo2MaxWidget snapshot={snapshot} />
+              <div className="training-intelligence-column">
+                <RecoveryRing summary={summary} weekTotals={weekTotals} />
+                <SleepSummaryPanel
+                  sleep={snapshot?.sleep}
+                  connecting={sleepConnecting}
+                  refreshing={busy === "training-refresh"}
+                  onOpenDetails={onOpenSleepDetails}
+                />
+              </div>
+              <div className="training-intelligence-column">
+                <FitnessTrendPanel snapshot={snapshot} activities={activities} />
+                <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
+              </div>
             </div>
           </section>
-
-          <UpcomingWorkoutsPanel workouts={upcomingWorkouts} />
 
           <div className="training-heatmap-wrap">
             <TrainingHeatmapPanel

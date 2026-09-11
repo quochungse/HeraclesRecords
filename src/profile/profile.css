@@ -411,7 +411,7 @@
 }
 
 
-/* Holds the two Overview panels (fitness scores, race predictor) side by side.
+/* Holds the two Overview panels (fitness scores, VO2 max) side by side.
    Equal columns and a stretch alignment keep both cards the same size however
    much each one has to show. */
 .profile-fitness-grid {

@@ -10,7 +10,9 @@ const weeklyActivityUrl = pathToFileURL(
 const {
   buildWeeklyActivitySeries,
   buildWeeklyActivityYAxisTicks,
+  buildWeekToDateTotals,
   enrichDayListWithActivityTotals,
+  formatDurationTotal,
   formatWeeklyActivityAxisTick,
   getCalendarWeekDateKeys,
   getWeeklyActivityYAxisUnitLabel
@@ -104,5 +106,54 @@ assert.equal(
 );
 assert.equal(getWeeklyActivityYAxisUnitLabel("distance", "km"), "km");
 assert.equal(getWeeklyActivityYAxisUnitLabel("trainingLoad", ""), "Load");
+
+// Week to date: Monday through today, and nothing on either side of that.
+const saturday = new Date(2026, 5, 27);
+const weekTotals = buildWeekToDateTotals(
+  [
+    // Sunday of the week before, and Sunday of this one: both out, the first
+    // for being last week, the second for being later today than today.
+    { happenDay: "20260621", distance: 9000, duration: 3000, trainingLoad: 60 },
+    ...dayList,
+    { happenDay: "20260628", distance: 5000, duration: 1800, trainingLoad: 30 }
+  ],
+  [
+    { happenDay: "20260621", steps: 20000 },
+    { happenDay: "20260622", steps: 8000 },
+    { happenDay: "20260627", steps: 12000 }
+  ],
+  saturday
+);
+
+assert.equal(weekTotals.distance, 25900);
+assert.equal(weekTotals.duration, 9000);
+assert.equal(weekTotals.trainingLoad, 161);
+assert.equal(weekTotals.steps, 20000);
+// The distance total and the chart's legend read the same week.
+assert.equal(
+  buildWeeklyActivitySeries(dayList, "distance", saturday, "metric").weeklyTotal,
+  "25.90 km"
+);
+
+// Nothing loaded reads as unknown; a loaded week with no training is a zero.
+const nothingLoaded = buildWeekToDateTotals([], [], saturday);
+assert.equal(nothingLoaded.distance, undefined);
+assert.equal(nothingLoaded.trainingLoad, undefined);
+assert.equal(nothingLoaded.steps, undefined);
+
+const idleWeek = buildWeekToDateTotals(
+  [{ happenDay: "20260601", distance: 12000, trainingLoad: 70 }],
+  [],
+  saturday
+);
+assert.equal(idleWeek.distance, 0);
+assert.equal(idleWeek.duration, 0);
+assert.equal(idleWeek.trainingLoad, 0);
+// Steps ride on the MCP daily-health feed, which is absent on its own.
+assert.equal(idleWeek.steps, undefined);
+
+assert.equal(formatDurationTotal(9000), "2h 30m");
+assert.equal(formatDurationTotal(3600), "1h");
+assert.equal(formatDurationTotal(0), "0m");
 
 console.log("weekly activity tests passed");

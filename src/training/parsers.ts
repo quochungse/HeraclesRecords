@@ -201,7 +201,13 @@ function buildSummary(
   const racePredictor = dashboard?.racePredictor ?? null;
   const recent = dayList.slice(-7);
   const latest = recent[recent.length - 1];
-  const latestHealth = dailyHealth?.latest;
+  // Today's record, not the feed's latest one: the greeting below says "steps
+  // today", and the feed is asked a week now — its latest day stays yesterday's
+  // until COROS has written today's.
+  const todayKey = recentTrainingHubDateList(1)[0];
+  const todayHealth = dailyHealth?.records.find(
+    (record) => record.happenDay === todayKey
+  );
   const priorRhrValues = recent
     .slice(0, -1)
     .map((day) => day.rhr)
@@ -229,9 +235,9 @@ function buildSummary(
       latestRhr !== undefined && priorRhrAverage !== undefined
         ? latestRhr - priorRhrAverage
         : undefined,
-    steps: latestHealth?.steps,
-    calories: latestHealth?.calories,
-    // Kept, or the two tiles above are blank with no way to say why.
+    steps: todayHealth?.steps,
+    calories: todayHealth?.calories,
+    // Kept, or the step tile is blank with no way to say why.
     mcpConnected: dailyHealth?.mcpConnected
   };
 }
