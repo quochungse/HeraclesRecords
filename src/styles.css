@@ -21735,6 +21735,18 @@ tr.data-intervals-row-missing {
   color: var(--error-text);
 }
 
+/* What the answer above cost: model and token total, bottom-right.
+   Deliberately quieter than the source badge beside it — it is a reference
+   number the athlete looks for, not one that should compete with the answer. */
+.chat-turn-cost {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+
 .chat-bubble-plan {
   padding: 0;
   background: transparent;

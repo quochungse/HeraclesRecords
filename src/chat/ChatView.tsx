@@ -67,6 +67,7 @@ import type {
   ChatProvider,
   ChatSessionSummary,
   ChatSettings,
+  ChatTokenUsage,
   ChatEntryAnalysisMarker,
   ClaudeCodeStatus,
   CoachAnalysisRun,
@@ -130,6 +131,7 @@ import {
   type ChatEntry,
   type SourceInfo
 } from "./chatTypes";
+import { formatTurnCost, formatTurnCostDetail } from "./turnCost";
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -1572,6 +1574,29 @@ function SourceBadge({ source }: { source: SourceInfo }) {
   );
 }
 
+/**
+ * What the answer above cost, bottom-right under the bubble.
+ *
+ * Drawn only when a provider actually reported: an absent count means nobody
+ * said, and a footer reading "0 Tokens" there would be a claim the app cannot
+ * make. Every answer written before this shipped has no count either, so old
+ * conversations stay as they were rather than growing a row of zeroes.
+ */
+function TurnCostFooter({
+  usage,
+  model
+}: {
+  usage?: ChatTokenUsage;
+  model?: string;
+}) {
+  if (!usage) return null;
+  return (
+    <div className="chat-turn-cost" title={formatTurnCostDetail(usage)}>
+      {formatTurnCost(usage, model)}
+    </div>
+  );
+}
+
 function isLatestActivityFileRequest(text: string): boolean {
   const normalized = text.toLowerCase();
   return (
@@ -2554,7 +2579,13 @@ export function ChatView({
         return next;
       });
     };
-    const finishStreaming = (finalText: string, finishReason?: string) => {
+    const finishStreaming = (done: {
+      fullText: string;
+      finishReason?: string;
+      usage?: ChatTokenUsage;
+      model?: string;
+    }) => {
+      const { fullText: finalText, finishReason, usage, model } = done;
       activeRequestIdRef.current = null;
       setStreaming(false);
       setStreamingText("");
@@ -2584,7 +2615,13 @@ export function ChatView({
               role: "assistant",
               content: finalText,
               source,
-              reasoningSummary
+              reasoningSummary,
+              // Stored on the entry, not held in a ref beside the timeline: the
+              // footer has to survive the reload that `persistHistory` below is
+              // preparing for, and a cost the athlete can only see until they
+              // switch conversations is not one they can act on.
+              ...(usage ? { usage } : {}),
+              ...(model ? { model } : {})
             });
           }
           for (const prompt of coachPrompts) {
@@ -2692,7 +2729,7 @@ export function ChatView({
       }),
       api.onChatStreamDone((payload) => {
         if (payload.requestId !== activeRequestIdRef.current) return;
-        finishStreaming(payload.fullText, payload.finishReason);
+        finishStreaming(payload);
         // A turn is the only thing that reveals Claude Code's default model, and
         // the main process saves it behind this window's back.
         if (
@@ -4472,6 +4509,10 @@ function AnalysisSilentChip({
                       {entry.source ? (
                         <SourceBadge source={entry.source} />
                       ) : null}
+                      <TurnCostFooter
+                        usage={entry.usage}
+                        model={entry.model}
+                      />
                     </>
                   ) : (
                     entry.content

@@ -183,7 +183,7 @@ export interface StreamOpenRouterChatOptions
 
 export function streamOpenRouterChatCompletion(
   options: StreamOpenRouterChatOptions
-): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage; model: string }> {
   return streamOpenAiCompatibleChatCompletion(
     {
       instructions: options.instructions,

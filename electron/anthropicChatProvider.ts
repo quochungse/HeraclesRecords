@@ -199,7 +199,7 @@ function createAnthropicClient(apiKey: string): Anthropic {
 
 export async function streamAnthropicChatCompletion(
   options: StreamAnthropicChatOptions
-): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage; model: string }> {
   const apiKey = options.config.apiKey?.trim();
   if (!apiKey) {
     throw new AnthropicProviderError(
@@ -310,7 +310,10 @@ export async function streamAnthropicChatCompletion(
       conversation.push({ role: "user", content: results });
     }
 
-    return { fullText, ...(counted ? { usage } : {}) };
+    // Reported rather than left to the caller to infer: `resolveAnthropicModel`
+    // fills in the default when nothing was chosen, so the config alone does
+    // not say what answered.
+    return { fullText, model, ...(counted ? { usage } : {}) };
   } catch (caught) {
     throw normalizeAnthropicError(caught);
   }

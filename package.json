@@ -49,6 +49,7 @@
     "test:anthropic-provider": "npm run build:electron && node scripts/test-anthropic-provider.mjs",
     "test:chat-history-store": "npm run build:electron && node scripts/test-chat-history-store.mjs",
     "test:chat-style-names": "node scripts/test-chat-style-names.mjs",
+    "test:chat-turn-cost": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-chat-turn-cost.mjs",
     "test:chat-context-compaction": "npm run build:electron && node scripts/test-chat-context-compaction.mjs",
     "test:coach-analysis-store": "npm run build:electron && node scripts/test-coach-analysis-store.mjs",
     "test:coach-analysis-lifecycle": "npm run build:electron && node scripts/test-coach-analysis-lifecycle.mjs",

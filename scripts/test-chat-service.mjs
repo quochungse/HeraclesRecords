@@ -780,6 +780,14 @@ assert.equal(
 assert.equal(formatClaudeModelName("claude-sonnet-4-6-20250219"), "Sonnet 4.6");
 assert.equal(formatClaudeModelName("claude-opus-5"), "Opus 5");
 assert.equal(formatClaudeModelName("claude-haiku-4-5"), "Haiku 4.5");
+// A date is not a minor version. Three of the four models this app offers
+// carry a single-component version, so their dated ids put the date where the
+// minor goes: "Opus 5.20260114" is what the picker and the per-answer cost
+// footer both showed. The two-component ids above read correctly either way,
+// which is why it took a 5-series id to surface it.
+assert.equal(formatClaudeModelName("claude-opus-5-20260114"), "Opus 5");
+assert.equal(formatClaudeModelName("claude-fable-5-1-20260114"), "Fable 5.1");
+assert.equal(formatClaudeModelName("claude-opus-5-10-20260114"), "Opus 5.10");
 // Anything that is not a family-and-version id is passed through untouched.
 assert.equal(formatClaudeModelName("sonnet"), "sonnet");
 assert.equal(formatClaudeModelName(""), "");

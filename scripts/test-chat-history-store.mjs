@@ -515,6 +515,61 @@ const extraFields = parseChatTranscriptJson(
 );
 assert.deepEqual(extraFields[0].automation, marker);
 
+// --- what the answer cost, restored for the footer under it ----------------
+// Same hazard as the marker above and the reason it is worth a test: an entry
+// is rebuilt from the fields this file names, so a count nobody reads back is
+// one the athlete sees until the next reload and never again.
+{
+  const priced = parseChatTranscriptJson(
+    JSON.stringify([
+      {
+        kind: "message",
+        role: "assistant",
+        content: "hi",
+        model: "claude-opus-5",
+        usage: { inputTokens: 18_200, outputTokens: 900 }
+      }
+    ])
+  );
+  assert.deepEqual(priced[0].usage, { inputTokens: 18_200, outputTokens: 900 });
+  assert.equal(priced[0].model, "claude-opus-5");
+
+  // A half-reported pair is dropped rather than half-restored: the footer adds
+  // the two, so one missing number would print a total that is simply wrong.
+  // Zero is not half-reported — a turn someone counted as free stays free.
+  const brokenCases = [
+    { inputTokens: 900 },
+    { outputTokens: 900 },
+    { inputTokens: 900, outputTokens: -40 },
+    { inputTokens: "900", outputTokens: 40 },
+    { inputTokens: Number.NaN, outputTokens: 40 },
+    "18200",
+    null
+  ];
+  for (const usage of brokenCases) {
+    const parsed = parseChatTranscriptJson(
+      JSON.stringify([{ kind: "message", role: "assistant", content: "hi", usage }])
+    );
+    assert.equal(parsed.length, 1, `message dropped for ${JSON.stringify(usage)}`);
+    assert.equal(
+      parsed[0].usage,
+      undefined,
+      `uncountable usage kept for ${JSON.stringify(usage)}`
+    );
+  }
+  const free = parseChatTranscriptJson(
+    JSON.stringify([
+      {
+        kind: "message",
+        role: "assistant",
+        content: "hi",
+        usage: { inputTokens: 0, outputTokens: 0 }
+      }
+    ])
+  );
+  assert.deepEqual(free[0].usage, { inputTokens: 0, outputTokens: 0 });
+}
+
 // --- the silent-run trace survives a round-trip (section 5.5) --------------
 // A run that found nothing writes no answer, so this one-line entry is the
 // only record the conversation keeps of it. Same hazard as the marker above:

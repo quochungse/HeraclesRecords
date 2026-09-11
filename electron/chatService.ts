@@ -1069,6 +1069,7 @@ export function createCollectorSink(
   let failure: string | undefined;
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
+  let tokenModel: string | undefined;
 
   const reset = () => {
     pendingCoachPrompts = [];
@@ -1221,6 +1222,9 @@ export function createCollectorSink(
   const handleDone = (payload: Record<string, unknown>) => {
     isFinished = true;
     recordUsage(payload.usage);
+    if (typeof payload.model === "string" && payload.model.trim()) {
+      tokenModel = payload.model.trim();
+    }
     // ChatView reads the final text off the done payload; fall back to the
     // accumulated tokens so a provider that omits it cannot lose the answer.
     const fullText =
@@ -1246,6 +1250,11 @@ export function createCollectorSink(
         content: fullText,
         ...(turnSource ? { source: turnSource } : {}),
         ...(reasoningSummary ? { reasoningSummary } : {}),
+        // Stored on the entry so an analysis's answer carries its own cost into
+        // the conversation, the same as one the athlete asked for: a headless
+        // run is the turn whose price nobody watched being spent.
+        ...(tokenUsage ? { usage: tokenUsage } : {}),
+        ...(tokenModel ? { model: tokenModel } : {}),
         // `automation` is the *stored* key on a transcript entry, not a rename
         // that was missed — see `ChatEntryAnalysisMarker`.
         ...(marker ? { automation: marker } : {})
@@ -1335,8 +1344,36 @@ export async function streamChat(
       outputTokens: (usage?.outputTokens ?? 0) + counted.outputTokens
     };
   };
+  /**
+   * Which model actually answered, which none of the four providers can be read
+   * off the settings for: Claude Code resolves "Default model" per account, a
+   * router picks per request, and the ChatGPT path walks a candidate list until
+   * one is accepted. Left undefined when nobody said, so the footer names no
+   * model rather than naming the wrong one.
+   */
+  let answeredModel: string | undefined;
+  const noteModel = (value: string | undefined) => {
+    const name = value?.trim();
+    if (name) answeredModel = name;
+  };
   const send = (channel: string, payload: unknown) => {
     sink.emit(channel, payload);
+  };
+  /**
+   * The one way this turn reports that it finished, cancellation included.
+   * A function for the same reason `sendStreamError` is one: five exits reach
+   * it, the cost and the model belong on all five, and leaving either off one
+   * of them type-checks and compiles into an answer whose footer is quietly
+   * missing.
+   */
+  const sendStreamDone = (finishReason?: string): void => {
+    send("chat:streamDone", {
+      requestId,
+      fullText,
+      ...(finishReason ? { finishReason } : {}),
+      ...(usage ? { usage } : {}),
+      ...(answeredModel ? { model: answeredModel } : {})
+    });
   };
   /**
    * The one way this turn reports a failure. Everything it spent before it
@@ -1417,6 +1454,10 @@ export async function streamChat(
         effort: runtime.effort ?? settings.claudeCode.effort,
         configDir: claudeConfigDir,
         onModelResolved: (model) => {
+          // Noted first and unconditionally: this is the only place Claude Code
+          // says what it ran, and the answer is named after it whether or not
+          // the run also gets to update the saved default below.
+          noteModel(model);
           // An analysis's override says nothing about the interactive
           // default, so never let one overwrite the saved defaultModel.
           if (runtime.model?.trim() || settings.claudeCode.model?.trim()) return;
@@ -1474,7 +1515,7 @@ export async function streamChat(
         checkedAt: new Date().toISOString(),
         message: "Claude Code is connected and ready for Coach conversations."
       });
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      sendStreamDone();
       return;
     }
 
@@ -1554,7 +1595,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1638,7 +1680,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1730,7 +1773,8 @@ export async function streamChat(
       });
       fullText = result.fullText;
       addUsage(result.usage);
-      send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+      noteModel(result.model);
+      sendStreamDone();
       return;
     }
 
@@ -1780,6 +1824,7 @@ export async function streamChat(
         sendStreamError({ message: opened.error, authError: opened.authError });
         return;
       }
+      noteModel(opened.model);
 
       const reader = opened.response.body!.getReader();
       const decoder = new TextDecoder();
@@ -1891,15 +1936,10 @@ export async function streamChat(
       }
     }
 
-    send("chat:streamDone", { requestId, fullText, ...(usage ? { usage } : {}) });
+    sendStreamDone();
   } catch (error) {
     if (controller.signal.aborted) {
-      send("chat:streamDone", {
-        requestId,
-        fullText,
-        finishReason: "cancelled",
-        ...(usage ? { usage } : {})
-      });
+      sendStreamDone("cancelled");
     } else {
       if (getChatSettings().provider === "claude-code") {
         const current = getChatSettings().claudeCode;
@@ -2331,7 +2371,9 @@ async function resolveModelAndOpenStream(
   tools: Record<string, unknown>[],
   signal: AbortSignal,
   selectedModel?: string
-): Promise<{ response: Response } | { error: string; authError: boolean }> {
+): Promise<
+  { response: Response; model: string } | { error: string; authError: boolean }
+> {
   const cached = getSetting(SETTINGS.model);
   const candidates = getChatGptModelCandidates(selectedModel, cached);
 
@@ -2376,7 +2418,10 @@ async function resolveModelAndOpenStream(
 
     if (response.ok && response.body) {
       if (model !== cached) setSetting(SETTINGS.model, model);
-      return { response };
+      // Named here rather than at the call site: on "Auto" this walks the
+      // candidate list, so the accepted model is the only one worth reporting
+      // and it is known nowhere else.
+      return { response, model };
     }
 
     if (response.status === 401 || response.status === 403) {

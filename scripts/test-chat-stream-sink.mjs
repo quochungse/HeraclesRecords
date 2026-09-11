@@ -409,6 +409,45 @@ assert.deepEqual(persisted[1].automation, marker);
   assert.deepEqual(free.usage(), { inputTokens: 0, outputTokens: 0 });
 }
 
+// --- the cost rides on the entry, not just on the sink ----------------------
+// `usage()` is what the month's budget reads; the entry is what the athlete
+// reads. An analysis run writes its answer straight into the conversation from
+// the main process, so the footer under it can only come from here — the
+// renderer never sees that turn's `chat:streamDone`.
+{
+  const priced = createCollectorSink();
+  runStream(priced, [
+    ["chat:streamToken", { requestId: "r", delta: "Eight easy kilometres." }],
+    [
+      "chat:streamDone",
+      {
+        requestId: "r",
+        fullText: "Eight easy kilometres.",
+        model: "claude-opus-5-20260114",
+        usage: { inputTokens: 18_200, outputTokens: 900 }
+      }
+    ]
+  ]);
+  const answer = priced.entries()[0];
+  assert.deepEqual(answer.usage, { inputTokens: 18_200, outputTokens: 900 });
+  assert.equal(answer.model, "claude-opus-5-20260114");
+  assert.deepEqual(
+    parseChatTranscriptJson(JSON.stringify(priced.entries()))[0],
+    answer,
+    "and both survive the store, or the footer lasts until the next reload"
+  );
+
+  // A provider that says nothing leaves both off rather than writing zeroes:
+  // the footer is drawn on the presence of a count, so a zero here would put
+  // "0 Tokens" under an answer nobody priced.
+  const unpriced = createCollectorSink();
+  runStream(unpriced, [
+    ["chat:streamDone", { requestId: "r", fullText: "No idea what that cost." }]
+  ]);
+  assert.equal(unpriced.entries()[0].usage, undefined);
+  assert.equal(unpriced.entries()[0].model, undefined);
+}
+
 // --- and the emitting half, which no suite can execute ----------------------
 // Genuinely about source: driving `streamChat` to a real provider failure needs
 // a provider, a database and a network, and the collector above *is* the stub
@@ -428,6 +467,22 @@ assert.deepEqual(persisted[1].automation, marker);
   );
   assert.equal(
     (source.match(/send\("chat:streamError"/g) ?? []).length,
+    1,
+    "and it must be the only one, or the rule is back to being remembered"
+  );
+
+  // The success half, which had the same shape of hole: five exits send
+  // `chat:streamDone` — four providers plus the cancel path — and the cost and
+  // the model belong on all five. Spelled out at each site, leaving one off
+  // type-checks and compiles into an answer with no footer, so it is one
+  // function here too.
+  assert.match(
+    source,
+    /const sendStreamDone = \([\s\S]{0,320}?\.\.\.\(usage \? \{ usage \} : \{\}\),\s*\n\s*\.\.\.\(answeredModel \? \{ model: answeredModel \} : \{\}\)/,
+    "the one done send must carry the cost and the model that answered"
+  );
+  assert.equal(
+    (source.match(/send\("chat:streamDone"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );

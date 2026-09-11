@@ -332,7 +332,7 @@ export async function testLocalChatConnectionRequest(
 
 export async function streamLocalChatCompletion(
   options: StreamLocalChatOptions
-): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage; model: string }> {
   return streamOpenAiCompatibleChatCompletion(
     {
       instructions: options.instructions,
@@ -361,7 +361,7 @@ export async function streamLocalChatCompletion(
 export async function streamOpenAiCompatibleChatCompletion(
   options: StreamOpenAiCompatibleChatOptions,
   transport: OpenAiCompatibleChatTransport
-): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
+): Promise<{ fullText: string; usage?: ChatTokenUsage; model: string }> {
   const baseUrl = transport.baseUrl.replace(/\/+$/, "");
   const model = options.model.trim();
   if (!model) {
@@ -370,6 +370,11 @@ export async function streamOpenAiCompatibleChatCompletion(
 
   let fullText = "";
   let counted = false;
+  // Starts as the model asked for and is replaced by whatever the server names,
+  // so a router reports what it routed to rather than "openrouter/auto". The
+  // last round wins: routing is decided per request, and the round that wrote
+  // the answer is the one worth naming.
+  let resolvedModel = model;
   const usage: ChatTokenUsage = { inputTokens: 0, outputTokens: 0 };
   let input = buildLocalInputMessages(options.instructions, options.messages);
   let tools = options.toolsEnabled
@@ -401,12 +406,16 @@ export async function streamOpenAiCompatibleChatCompletion(
     const {
       delta,
       functionCalls: rawFunctionCalls,
-      usage: roundUsage
+      usage: roundUsage,
+      model: roundModel
     } = await readLocalChatStream(
       opened.response,
       options.signal,
       options.onToken
     );
+    if (roundModel) {
+      resolvedModel = roundModel;
+    }
     if (roundUsage) {
       counted = true;
       usage.inputTokens += roundUsage.inputTokens;
@@ -454,9 +463,9 @@ export async function streamOpenAiCompatibleChatCompletion(
   if (toolsDisabled && fullText.length === 0) {
     // The retry should normally produce content; this keeps the failure mode
     // explicit if the local server accepts the no-tool request but emits nothing.
-    return { fullText, ...(counted ? { usage } : {}) };
+    return { fullText, model: resolvedModel, ...(counted ? { usage } : {}) };
   }
-  return { fullText, ...(counted ? { usage } : {}) };
+  return { fullText, model: resolvedModel, ...(counted ? { usage } : {}) };
 }
 
 async function fetchLocalModels(
@@ -609,6 +618,17 @@ function parseLocalChatUsage(event: unknown): ChatTokenUsage | undefined {
   return inputTokens || outputTokens ? { inputTokens, outputTokens } : undefined;
 }
 
+/**
+ * Which model actually answered. Worth reading rather than assuming the one
+ * that was asked for: OpenRouter's routers are selected *as* "openrouter/auto"
+ * and name the model they picked on every chunk, and a local server is free to
+ * answer with a different quantisation of the name it was given.
+ */
+function parseLocalChatModel(event: unknown): string | undefined {
+  const value = (event as { model?: unknown })?.model;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 async function readLocalChatStream(
   response: Response,
   signal: AbortSignal,
@@ -617,6 +637,7 @@ async function readLocalChatStream(
   delta: string;
   functionCalls: LocalToolCall[];
   usage?: ChatTokenUsage;
+  model?: string;
 }> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
@@ -624,6 +645,7 @@ async function readLocalChatStream(
   let fullDelta = "";
   let buffer = "";
   let usage: ChatTokenUsage | undefined;
+  let model: string | undefined;
 
   for (;;) {
     if (signal.aborted) break;
@@ -652,13 +674,15 @@ async function readLocalChatStream(
       }
       accumulator.addEvent(event);
       usage = parseLocalChatUsage(event) ?? usage;
+      model = parseLocalChatModel(event) ?? model;
     }
   }
 
   return {
     delta: fullDelta,
     functionCalls: accumulator.toCalls(),
-    ...(usage ? { usage } : {})
+    ...(usage ? { usage } : {}),
+    ...(model ? { model } : {})
   };
 }
 

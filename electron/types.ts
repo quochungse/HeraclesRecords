@@ -2709,6 +2709,17 @@ export interface PersistedChatMessageEntry {
    * rendered as a chip rather than an athlete bubble.
    */
   automation?: ChatEntryAnalysisMarker;
+  /**
+   * What this answer cost and which model produced it, stored so the footer
+   * survives a reload — a number the athlete can only see while the window
+   * that streamed it stays open is not a number they can act on.
+   *
+   * Both are absent on every entry written before this existed and on any turn
+   * whose provider reported nothing, so the footer is drawn only when they are
+   * there rather than reading a missing count as zero.
+   */
+  usage?: ChatTokenUsage;
+  model?: string;
 }
 
 /**
@@ -3529,6 +3540,21 @@ export interface ChatStreamDone {
   requestId: string;
   fullText: string;
   finishReason?: string;
+  /**
+   * What the turn cost, summed across its tool rounds. Undefined when no
+   * provider reported — see `ChatTokenUsage` for why that is not zero.
+   *
+   * The main process has always sent this; the field was missing here, so the
+   * renderer could not read what it was being handed. Both sinks in
+   * `chatService` depend on it, and so does the per-answer cost footer.
+   */
+  usage?: ChatTokenUsage;
+  /**
+   * The model id that actually answered, which is not always the one that was
+   * asked for: Claude Code resolves "Default model" per account and a router
+   * picks per request. Undefined when the provider never said.
+   */
+  model?: string;
 }
 
 export interface ChatStreamError {
@@ -3536,6 +3562,8 @@ export interface ChatStreamError {
   message: string;
   /** True when the failure is an expired/invalid session (drop to login gate). */
   authError?: boolean;
+  /** What the rounds that completed before the break cost (13). */
+  usage?: ChatTokenUsage;
 }
 
 /**

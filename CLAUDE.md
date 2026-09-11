@@ -263,6 +263,18 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   devices, COROS's own activity write-up). A new local tool must be placed on one side of
   `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails.
 
+  **A transcript entry is rebuilt field by field in four places, and an unlisted field is
+  dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`
+  (`chatHistoryStore`) restores it off disk, and `toPersistedEntries` / `fromPersistedEntries`
+  (`src/chat/chatTypes.ts`) convert it in each direction. Miss one and the field works
+  perfectly until the conversation is reopened — the same shape of trap as the IPC
+  three-file invariant, minus the test that catches it at build time. This has now caught
+  attribution (5.6) and the per-answer cost footer, whose `usage` and `model` come from
+  `chat:streamDone`; that payload was already sending `usage` before `ChatStreamDone` declared
+  the field, so the renderer could not read what it was being handed. Both leave the turn
+  unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
+  `test:chat-turn-cost` drives the round trip and the formatting.
+
   **A tool schema is sent on every request round, so the draft schemas do not branch per
   sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
   a repeat group carries steps of its own, the step schema appeared twice per branch: 67 kB

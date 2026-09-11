@@ -17,6 +17,7 @@ import type {
   ChatEntryAnalysisMarker,
   ChatProvider,
   ChatSessionSummary,
+  ChatTokenUsage,
   CoachInputChoice,
   CoachInputPrompt,
   FitnessTrendPreview,
@@ -779,6 +780,33 @@ function parseAnalysisMarker(
   return marker as unknown as ChatEntryAnalysisMarker;
 }
 
+/**
+ * What the answer cost, restored for the footer under it. Rebuilt field by
+ * field like everything else in this file, which is the reason it has to exist
+ * at all: an entry is reassembled from the fields named here, so a stored count
+ * nothing reads back is a count the athlete sees once and never again.
+ *
+ * A half-reported pair is dropped rather than half-restored. Zero is kept — a
+ * provider that reported nothing leaves this undefined, so a zero that got here
+ * is a turn someone actually counted as free.
+ */
+function parseTokenUsage(value: unknown): ChatTokenUsage | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const count = (field: "inputTokens" | "outputTokens"): number | null => {
+    const entry = value[field];
+    return typeof entry === "number" && Number.isFinite(entry) && entry >= 0
+      ? entry
+      : null;
+  };
+  const inputTokens = count("inputTokens");
+  const outputTokens = count("outputTokens");
+  return inputTokens === null || outputTokens === null
+    ? undefined
+    : { inputTokens, outputTokens };
+}
+
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -796,12 +824,19 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
       ? value.reasoningSummary
       : undefined;
   const automation = parseAnalysisMarker(value.automation);
+  const usage = parseTokenUsage(value.usage);
+  const model =
+    typeof value.model === "string" && value.model.trim()
+      ? value.model.trim()
+      : undefined;
   return {
     kind: "message",
     role,
     content: value.content,
     ...(source ? { source } : {}),
     ...(reasoningSummary ? { reasoningSummary } : {}),
+    ...(usage ? { usage } : {}),
+    ...(model ? { model } : {}),
     ...(automation ? { automation } : {})
   };
 }
