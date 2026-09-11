@@ -459,10 +459,6 @@ export function TrainingOverview({
               rpeBackfill={rpeBackfill}
             />
           </div>
-          <TrainingTrendCharts
-            points={snapshot?.trendPoints ?? []}
-            mcpConnected={snapshot?.sleep?.mcpConnected}
-          />
           <TrainingZoneDistributionCharts
             hrZoneModel={hrZoneModel}
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
@@ -472,6 +468,10 @@ export function TrainingOverview({
           <Suspense fallback={null}>
             <LazyStrengthDistributionSection api={api} status={status} />
           </Suspense>
+          <TrainingTrendCharts
+            points={snapshot?.trendPoints ?? []}
+            mcpConnected={snapshot?.sleep?.mcpConnected}
+          />
         </>
       ) : null}
     </div>
