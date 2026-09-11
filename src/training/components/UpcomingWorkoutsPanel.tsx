@@ -18,7 +18,7 @@ import {
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
 
 interface UpcomingWorkoutsPanelProps {
-  api: CorosLinkApi | undefined;
+  api: CorosLinkApi;
   workouts: TrainingHubUpcomingWorkout[];
   sportTypes: TrainingHubSportType[];
 }

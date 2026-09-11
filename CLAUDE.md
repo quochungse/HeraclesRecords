@@ -105,16 +105,17 @@ defeat the ESM module cache between fixtures. Keep that when adding tests.
 > opens a window from a tool call. Prefix GUI launches with `env -u ELECTRON_RUN_AS_NODE`.
 > Leave scripts that set or clear the variable themselves alone.
 
-> **This machine's Node cannot run the 28 tests launched by plain `node
+> **This machine's Node cannot run the 27 tests launched by plain `node
 > --experimental-strip-types`.** (Recount with `grep -c '"test:[a-z0-9-]*": "node
 > --experimental-strip-types' package.json` rather than trusting this number.)
 > `/usr/bin/node` v22.22.1 is a distro build compiled without Amaro
 > (`node_use_amaro: false`), so every one of them fails with `ERR_NO_TYPESCRIPT` —
 > including `test:sport-colors`, `test:strength-*`, `test:watchface-studio`, and
 > `test:mcp-*`. The `dist-electron` and Electron-runtime modes are unaffected, which is
-> why a handful of strip-types suites are launched through Electron instead
-> (`test:sync-preferences`, `test:training-load-bars`, `test:distance-zones`,
-> `test:globe-framing`, `test:hr-zone-model`). Fix by installing an official Node 22+
+> why a growing set of strip-types suites are launched through Electron instead —
+> list them with `grep -o '"test:[a-z0-9-]*": "cross-env ELECTRON_RUN_AS_NODE=1
+> electron --experimental-strip-types' package.json`, and say so in the test's own
+> header when that is the reason. Fix by installing an official Node 22+
 > build (nodejs.org tarball or nvm), which ships Amaro; the distro package does not.
 
 Hardware-free watch detection: set `COROS_WATCH_PATH=/path/to/mock-watch` (containing a

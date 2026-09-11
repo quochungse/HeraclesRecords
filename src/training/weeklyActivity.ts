@@ -212,13 +212,18 @@ function formatDayDisplayValue(
 }
 
 export function formatDurationTotal(seconds: number): string {
-  if (seconds >= 3600) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.round((seconds % 3600) / 60);
+  // Round to whole minutes once, up front. Rounding the remainder on its own
+  // loses the carry: 21,576s is 5h 59.6m, and `Math.round` turned that into
+  // "5h 60m" — a reachable reading for a week's duration total.
+  const totalMinutes = Math.round(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
 
-  return `${Math.round(seconds / 60)}m`;
+  return `${minutes}m`;
 }
 
 function formatWeeklyTotal(
@@ -303,14 +308,21 @@ function readActivityMetricRaw(
   }
 }
 
+/**
+ * The week's activities, bucketed by day and in start order. `activities` is the
+ * whole history — thousands of rows for a long-standing account — and the chart
+ * draws seven days of it, so days outside the week are dropped before anything
+ * is allocated or sorted for them.
+ */
 function groupActivitiesByDay(
-  activities: TrainingHubActivity[]
+  activities: TrainingHubActivity[],
+  days: ReadonlySet<string>
 ): Map<string, TrainingHubActivity[]> {
   const byDay = new Map<string, TrainingHubActivity[]>();
 
   for (const activity of activities) {
     const happenDay = happenDayFromTimestamp(activity.startTime);
-    if (!happenDay) {
+    if (!happenDay || !days.has(happenDay)) {
       continue;
     }
 
@@ -337,9 +349,9 @@ export function buildWeeklyActivitySeries(
   activities: TrainingHubActivity[] = []
 ): WeeklyActivitySeries {
   const dayMap = new Map(dayList.map((day) => [day.happenDay, day]));
-  const activitiesByDay = groupActivitiesByDay(activities);
   const epsilon = SEGMENT_EPSILON[metric];
   const weekKeys = getCalendarWeekDateKeys(referenceDate);
+  const activitiesByDay = groupActivitiesByDay(activities, new Set(weekKeys));
   const todayKey = dateToHappenDay(referenceDate);
   let totalRaw = 0;
   let hasData = false;
@@ -439,23 +451,20 @@ export function buildWeeklyActivitySeries(
 /**
  * Legend for a week's columns: the sports actually present, in the canonical
  * order the colour settings list them, plus the residual entry when one is
- * drawn. Takes one day array per metric on the chart, since the sports shown
- * are the union across them.
+ * drawn. One metric is on the chart at a time, so one day array says it all.
  */
 export function weeklyActivitySportLegend(
-  dayGroups: readonly (readonly WeeklyActivityDay[])[]
+  days: readonly WeeklyActivityDay[]
 ): WeeklyActivityLegendEntry[] {
   const present = new Set<SportColorCategory>();
   let hasResidual = false;
 
-  for (const days of dayGroups) {
-    for (const day of days) {
-      for (const segment of day.segments) {
-        if (segment.category) {
-          present.add(segment.category);
-        } else {
-          hasResidual = true;
-        }
+  for (const day of days) {
+    for (const segment of day.segments) {
+      if (segment.category) {
+        present.add(segment.category);
+      } else {
+        hasResidual = true;
       }
     }
   }

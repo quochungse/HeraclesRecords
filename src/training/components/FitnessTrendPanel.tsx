@@ -189,7 +189,7 @@ export function FitnessTrendPanel({
   );
   // Columns are coloured by sport, so the week needs a key naming them.
   const sportLegend = useMemo(
-    () => weeklyActivitySportLegend([series.days]),
+    () => weeklyActivitySportLegend(series.days),
     [series]
   );
 

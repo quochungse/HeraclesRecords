@@ -226,17 +226,13 @@ function buildSummary(
   const latestRhr = latest?.rhr ?? dashboard?.rhr;
 
   return {
-    staminaLevel: racePredictor?.staminaLevel ?? latest?.staminaLevel,
     recoveryPct: racePredictor?.recoveryPct ?? dashboard?.recoveryPct,
-    todayLoad: latest?.trainingLoad,
     weekLoadTotal: weekLoadTotal > 0 ? weekLoadTotal : undefined,
-    latestRhr,
     rhrDelta:
       latestRhr !== undefined && priorRhrAverage !== undefined
         ? latestRhr - priorRhrAverage
         : undefined,
     steps: todayHealth?.steps,
-    calories: todayHealth?.calories,
     // Kept, or the step tile is blank with no way to say why.
     mcpConnected: dailyHealth?.mcpConnected
   };

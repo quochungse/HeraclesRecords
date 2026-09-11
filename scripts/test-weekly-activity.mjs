@@ -1,3 +1,11 @@
+/**
+ * The Overview weekly-activity chart: the calendar week it draws, the per-sport
+ * blocks inside a column, its legend, and the Monday-to-today tile totals.
+ *
+ * Run through Electron (`ELECTRON_RUN_AS_NODE=1 electron
+ * --experimental-strip-types`): this machine's Node is built without Amaro, so
+ * plain `node --experimental-strip-types` fails with ERR_NO_TYPESCRIPT.
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -299,21 +307,27 @@ assert.equal(strengthDay.days[4].value, 0);
 // The legend names the sports actually on the chart, in canonical order, with
 // the residual entry last when one is drawn.
 assert.deepEqual(
-  weeklyActivitySportLegend([stacked.days]).map((entry) => entry.key),
+  weeklyActivitySportLegend(stacked.days).map((entry) => entry.key),
   ["run", "bike"]
 );
 assert.deepEqual(
-  weeklyActivitySportLegend([withResidual.days]).map((entry) => entry.key),
+  weeklyActivitySportLegend(withResidual.days).map((entry) => entry.key),
   ["run", "bike", WEEKLY_ACTIVITY_RESIDUAL_KEY]
 );
-assert.equal(weeklyActivitySportLegend([emptySeries.days]).length, 0);
+assert.equal(weeklyActivitySportLegend(emptySeries.days).length, 0);
 assert.equal(
-  weeklyActivitySportLegend([stacked.days])[0].label,
+  weeklyActivitySportLegend(stacked.days)[0].label,
   "Running"
 );
 
 assert.equal(formatDurationTotal(9000), "2h 30m");
 assert.equal(formatDurationTotal(3600), "1h");
 assert.equal(formatDurationTotal(0), "0m");
+// The minute carry: rounding the hour remainder on its own printed "5h 60m"
+// and "60m" for the two readings either side of a whole hour.
+assert.equal(formatDurationTotal(21576), "6h");
+assert.equal(formatDurationTotal(21546), "5h 59m");
+assert.equal(formatDurationTotal(3599), "1h");
+assert.equal(formatDurationTotal(3569), "59m");
 
 console.log("weekly activity tests passed");

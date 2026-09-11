@@ -93,18 +93,17 @@ export function TrainingOverview({
   const summary = useMemo(
     () =>
       snapshot?.summary ?? {
-        staminaLevel: undefined,
         recoveryPct: undefined,
-        todayLoad: undefined,
         weekLoadTotal: undefined,
-        latestRhr: undefined,
         rhrDelta: undefined,
+        steps: undefined,
         mcpConnected: undefined
       },
     [snapshot]
   );
-  // Built from the same enriched day list as the Weekly Activity chart, so a
-  // tile and that chart's legend total never disagree about the same week.
+  // Built from the same enriched day list the Weekly Activity chart draws, so a
+  // tile and the columns beside it are reading one set of days — the chart shows
+  // Monday to Sunday, the tiles stop at today.
   const weekTotals = useMemo(
     () =>
       buildWeekToDateTotals(

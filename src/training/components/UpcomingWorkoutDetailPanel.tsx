@@ -16,7 +16,7 @@ import {
 } from "../upcomingWorkoutMatch";
 
 interface UpcomingWorkoutDetailPanelProps {
-  api: CorosLinkApi | undefined;
+  api: CorosLinkApi;
   workout: TrainingHubUpcomingWorkout | null;
   sportTypes: TrainingHubSportType[];
   onClose: () => void;
@@ -59,10 +59,6 @@ export function UpcomingWorkoutDetailPanel({
     // scheduled entry's raw program when it lands.
     const fallback = scheduledEntryFromUpcoming(workout);
     setEntry(fallback);
-
-    if (!api) {
-      return;
-    }
 
     const cached = cacheRef.current.get(workout.happenDay);
     if (cached) {

@@ -28,16 +28,21 @@ export interface TrainingTrendPoint {
   sleepScore?: number;
 }
 
+/**
+ * What Overview's recovery panel and the greeting read. Only those two consume
+ * it, so a figure with no reader on either is not carried: the weekly tiles are
+ * built from {@link WeekToDateTotals} instead, and the profile reads the COROS
+ * dashboard directly.
+ */
 export interface TrainingSummaryMetrics {
-  staminaLevel?: number;
   recoveryPct?: number;
-  todayLoad?: number;
+  /** Training load over the last seven days — the greeting's line. */
   weekLoadTotal?: number;
-  latestRhr?: number;
+  /** Today's resting HR against the prior six days' average. */
   rhrDelta?: number;
+  /** Today's step count, from the MCP daily-health feed. */
   steps?: number;
-  calories?: number;
-  /** Whether MCP served the feed `steps` and `calories` came from. */
+  /** Whether MCP served the feed `steps` came from. */
   mcpConnected?: boolean;
 }
 
