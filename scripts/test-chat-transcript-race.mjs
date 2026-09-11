@@ -278,6 +278,205 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // A settled turn is drawn as it is, not faded in from nothing
+  // -------------------------------------------------------------------------
+  // Reported: the moment the coach finished, the new answer vanished, and came
+  // back on the first scroll or click in the transcript. Measured over CDP in
+  // the running app: 100 ms after the end, the answer row and the card it asked
+  // were both at `opacity: 0` under `chat-row-enter` — the streaming bubble had
+  // been swapped for freshly mounted rows, which faded in again from nothing,
+  // and on a window getting no frames the fade never ran.
+  {
+    const nextCard = {
+      promptId: "card-next",
+      question: "Muốn xem gì tiếp?",
+      allowCustom: false,
+      choices: [
+        { id: "n1", label: "Khối lượng tuần", response: "Khối lượng tuần" },
+        { id: "n2", label: "Buổi Easy T6", response: "Buổi Easy T6" }
+      ]
+    };
+    await harness("mount", "ChatView", {}, BASE_SCRIPT);
+    await waitFor(
+      () => harness("exists", ".chat-composer textarea"),
+      "ChatView renders its composer"
+    );
+    await harness("setValue", ".chat-composer textarea", "Tuần này thế nào?");
+    await harness("click", ".chat-send");
+    const sent = await waitFor(
+      async () => (await harness("calls", "sendChat"))[0],
+      "the turn reaches main"
+    );
+    const requestId = sent.args[0];
+    await harness("emit", "onChatStreamStart", { requestId });
+    await harness("emit", "onChatStreamToken", { requestId, delta: "Tuần này ổn định." });
+    await harness("emit", "onChatStreamInfo", { requestId, kind: "coachPrompt", prompt: nextCard });
+    await harness("emit", "onChatStreamDone", { requestId, fullText: "Tuần này ổn định." });
+    await settle();
+
+    assert.equal(
+      await harness("count", ".chat-row.is-settled"),
+      2,
+      "the answer and the card it asked replace the bubble in place"
+    );
+    assert.equal(
+      await harness("exists", ".chat-row-user.is-settled"),
+      false,
+      "the athlete's own message still makes its entrance"
+    );
+
+    // Held, not recomputed: the re-read below replaces every entry object, and
+    // a row that lost the marker would have its animation restarted — the blink
+    // this exists to remove, one reload later.
+    await harness("emit", "onSyncChanged", { tables: ["chat_sessions"], pulled: 1, applied: 1 });
+    await settle();
+    assert.match(
+      (await harness("text", ".chat-transcript")) ?? "",
+      /Tuần này ổn định\./,
+      "the re-read keeps the answer"
+    );
+    assert.equal(
+      await harness("count", ".chat-row.is-settled"),
+      2,
+      "and the rows stay drawn in place across it"
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // A turn that fails after answering keeps the answer
+  // -------------------------------------------------------------------------
+  // Reported: ask → answer and a question card → pick a choice → the coach
+  // answers and asks again → the second answer vanishes, and the first card is
+  // back to unanswered, which looked like the coach's next question. Stored
+  // that way, so reopening the app did not bring it back.
+  //
+  // The turn had ended in `chat:streamError` after its answer had streamed in
+  // full — Claude Code's turn cap lands on exactly the round after a question —
+  // and the error handler threw the whole turn away and reset the card.
+  const pickCard = {
+    kind: "coachPrompt",
+    prompt: {
+      promptId: "card-1",
+      question: "Bạn muốn mình phân tích tiếp phần nào?",
+      allowCustom: false,
+      choices: [
+        { id: "c1", label: "Buổi Strength T4", response: "Buổi Strength T4" },
+        { id: "c2", label: "Tổng kết khối lượng chạy", response: "Tổng kết khối lượng chạy" }
+      ]
+    }
+  };
+  const openingRow = [
+    { kind: "message", role: "user", content: "Phân tích buổi tập gần đây của tôi" },
+    { kind: "message", role: "assistant", content: "Câu trả lời thứ nhất." },
+    pickCard
+  ];
+
+  {
+    await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: openingRow });
+    await waitFor(
+      () => harness("exists", ".chat-coach-prompt-choice"),
+      "the question card offers its choices"
+    );
+    await harness("click", ".chat-coach-prompt-choice");
+    const sent = await waitFor(
+      async () => (await harness("calls", "sendChat"))[0],
+      "picking a choice resumes the turn"
+    );
+    const requestId = sent.args[0];
+
+    await harness("emit", "onChatStreamStart", { requestId });
+    await harness("emit", "onChatStreamToken", {
+      requestId,
+      delta: "Câu trả lời thứ hai: buổi Strength T4 nhẹ."
+    });
+    await harness("emit", "onChatStreamInfo", {
+      requestId,
+      kind: "coachPrompt",
+      prompt: {
+        promptId: "card-2",
+        question: "Tiếp theo muốn xem gì?",
+        allowCustom: false,
+        choices: [
+          { id: "d1", label: "Khối lượng tuần", response: "Khối lượng tuần" },
+          { id: "d2", label: "Buổi Easy T6", response: "Buổi Easy T6" }
+        ]
+      }
+    });
+    await harness("emit", "onChatStreamError", {
+      requestId,
+      message: "error_max_turns",
+      usage: { inputTokens: 40_000, outputTokens: 1_200 }
+    });
+    await settle();
+
+    const onScreen = (await harness("text", ".chat-transcript")) ?? "";
+    assert.match(
+      onScreen,
+      /Câu trả lời thứ hai: buổi Strength T4 nhẹ\./,
+      "an answer that streamed in full must survive an error that lands after it"
+    );
+    assert.match(onScreen, /Tiếp theo muốn xem gì\?/, "and so must the card it asked");
+    assert.match(onScreen, /Coach stopped before finishing/, "with the cut-off said out loud");
+    // An answered card is not drawn at all, so "stays answered" reads on screen
+    // as "is gone". The first card coming back is precisely what the athlete
+    // saw: the reset card reappearing looked like the coach's next question.
+    assert.equal(
+      await harness("count", ".chat-coach-prompt"),
+      1,
+      "only the new card is waiting — the one the athlete answered stays answered"
+    );
+    assert.doesNotMatch(
+      onScreen,
+      /Bạn muốn mình phân tích tiếp phần nào\?/,
+      "the answered card must not come back as if it were a new question"
+    );
+
+    const saves = await harness("calls", "saveChatSession");
+    const stored = saves[saves.length - 1].args[1];
+    assert.ok(
+      stored.some((entry) => entry.content === "Câu trả lời thứ hai: buổi Strength T4 nhẹ."),
+      "and it is what reached the row, or a reload takes it away again"
+    );
+    assert.equal(
+      stored.find((entry) => entry.prompt?.promptId === "card-1")?.prompt.answer,
+      "Buổi Strength T4",
+      "with the athlete's choice still on the card"
+    );
+  }
+
+  // The other half: an error before anything reached the athlete still undoes
+  // the turn, so the card is theirs to answer again rather than a dead end.
+  {
+    await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: openingRow });
+    await waitFor(
+      () => harness("exists", ".chat-coach-prompt-choice"),
+      "the question card offers its choices"
+    );
+    await harness("click", ".chat-coach-prompt-choice");
+    const sent = await waitFor(
+      async () => (await harness("calls", "sendChat"))[0],
+      "picking a choice resumes the turn"
+    );
+    await harness("emit", "onChatStreamStart", { requestId: sent.args[0] });
+    await harness("emit", "onChatStreamError", {
+      requestId: sent.args[0],
+      message: "connection reset"
+    });
+    await settle();
+    assert.match(
+      (await harness("text", ".chat-transcript")) ?? "",
+      /Bạn muốn mình phân tích tiếp phần nào\?/,
+      "with nothing produced, the card goes back to waiting for an answer"
+    );
+    assert.equal(await harness("exists", ".chat-coach-prompt-choice"), true);
+    assert.doesNotMatch(
+      (await harness("text", ".chat-transcript")) ?? "",
+      /Coach stopped before finishing/,
+      "and there is no truncated answer to put a notice under"
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // A row that already carries a duplicated card still renders
   // -------------------------------------------------------------------------
   // The store no longer writes duplicates, but rows written before it stopped

@@ -20440,6 +20440,15 @@ tr.data-intervals-row-missing {
   animation: chat-row-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* A row that replaces what was already on screen — the answer a turn streamed,
+   the card it asked — is drawn as it is. Both entrances start from opacity 0,
+   and on a window that has stopped getting frames they never finish; see
+   `ChatRow` in ChatView.tsx. */
+.chat-row.is-settled,
+.chat-row.is-settled .chat-avatar {
+  animation: none;
+}
+
 .chat-row-user {
   flex-direction: row-reverse;
 }

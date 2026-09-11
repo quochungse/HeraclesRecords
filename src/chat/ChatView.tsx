@@ -1582,6 +1582,43 @@ function SourceBadge({ source }: { source: SourceInfo }) {
  * make. Every answer written before this shipped has no count either, so old
  * conversations stay as they were rather than growing a row of zeroes.
  */
+/**
+ * A transcript row that decides once, when it mounts, whether to play the
+ * entrance animation.
+ *
+ * `chat-row-enter` starts from `opacity: 0` and fills backwards, so a row is
+ * invisible until the animation runs — and it only runs while the window is
+ * producing frames. When a turn settles, the streaming bubble is swapped for
+ * rows built from the transcript, so an answer the athlete had just watched
+ * arrive in full was re-mounted and faded in again from nothing: a blink on
+ * every turn (measured over CDP at `opacity: 0` 100 ms after the end) and, on
+ * a GNOME Wayland window that had stopped getting frames, the whole new turn
+ * left invisible until a scroll or a click produced one. Rows the settle mounts
+ * are therefore drawn as they are.
+ *
+ * Held in state rather than computed per render: changing an element's
+ * `animation` restarts it, so a row that lost its marker on the next reload
+ * would blink after all.
+ */
+function ChatRow({
+  settled,
+  className,
+  children,
+  ...rest
+}: {
+  settled: boolean;
+  className: string;
+  children: ReactNode;
+  "data-chat-entry-index"?: number;
+}) {
+  const [inPlace] = useState(settled);
+  return (
+    <div className={inPlace ? `${className} is-settled` : className} {...rest}>
+      {children}
+    </div>
+  );
+}
+
 function TurnCostFooter({
   usage,
   model
@@ -1919,6 +1956,28 @@ export function ChatView({
   // Accumulates source info across the current stream's info events.
   const sourceRef = useRef<SourceInfo | null>(null);
   const thinkingRef = useRef("");
+  /**
+   * The answer text streamed so far this turn, readable from an IPC handler.
+   * `streamingText` is state, so the error handler would see whatever it held
+   * when the subscription was made — and the error handler is the one place
+   * that needs it: a turn that fails after writing its answer must keep it.
+   */
+  const streamedTextRef = useRef("");
+  /**
+   * The entries a turn's settle put on screen, by identity — see `ChatRow`.
+   * Identity rather than a flag raised around the commit: React flushes the
+   * last token render's pending effects before rendering the settle, so a flag
+   * lowered by an effect can be down again before the rows it was for mount.
+   * A WeakSet because every reload replaces the entry objects, and a row only
+   * asks once, when it mounts.
+   */
+  const settledEntriesRef = useRef(new WeakSet<ChatEntry>());
+  const markSettled = (prev: ChatEntry[], next: ChatEntry[]) => {
+    const before = new Set(prev);
+    for (const entry of next) {
+      if (!before.has(entry)) settledEntriesRef.current.add(entry);
+    }
+  };
   // Interaction cards are appended after the assistant's final text so the
   // question and its choices stay in a natural reading order.
   const pendingCoachPromptsRef = useRef<CoachInputPrompt[]>([]);
@@ -2635,6 +2694,7 @@ export function ChatView({
     }) => {
       const { fullText: finalText, finishReason, usage, model } = done;
       activeRequestIdRef.current = null;
+      streamedTextRef.current = "";
       setStreaming(false);
       setStreamingText("");
       setThinkingText("");
@@ -2675,6 +2735,7 @@ export function ChatView({
           for (const prompt of coachPrompts) {
             next = upsertCoachPromptEntry(next, prompt);
           }
+          markSettled(prev, next);
           persistHistory(activeSessionIdRef.current, next, true);
           return next;
         });
@@ -2690,6 +2751,7 @@ export function ChatView({
           return;
         }
         if (payload.requestId !== activeRequestIdRef.current) return;
+        streamedTextRef.current = "";
         setStreamingText("");
         setThinkingText("");
         thinkingRef.current = "";
@@ -2710,6 +2772,7 @@ export function ChatView({
         }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setActiveTool(null);
+        streamedTextRef.current += payload.delta;
         setStreamingText((prev) => prev + payload.delta);
       }),
       api.onChatStreamInfo((payload) => {
@@ -2793,6 +2856,14 @@ export function ChatView({
       api.onChatStreamError((payload) => {
         if (payload.requestId !== activeRequestIdRef.current) return;
         activeRequestIdRef.current = null;
+        // What the turn already put in front of the athlete, taken before the
+        // resets below clear it.
+        const partialText = streamedTextRef.current.trim();
+        streamedTextRef.current = "";
+        const coachPrompts = pendingCoachPromptsRef.current;
+        pendingCoachPromptsRef.current = [];
+        const source = sourceRef.current ?? undefined;
+        const reasoningSummary = thinkingRef.current.trim() || undefined;
         setStreaming(false);
         setStreamingText("");
         setThinkingText("");
@@ -2800,8 +2871,50 @@ export function ChatView({
         setActiveTool(null);
         setCurrentSource(null);
         sourceRef.current = null;
-        pendingCoachPromptsRef.current = [];
-        restoreResumedCoachPrompt();
+        if (partialText || coachPrompts.length > 0) {
+          // A failure that lands after the answer is not a failed answer. This
+          // used to throw the whole turn away: the streamed text, the question
+          // card the coach had just asked, and — through the restore below —
+          // the athlete's choice on the previous card, which went back to
+          // unanswered. It was persisted that way, so the answer the athlete
+          // had watched arrive in full was gone for good, and the reset card
+          // read as the coach asking its next question. Claude Code's turn
+          // cap is reached exactly there, on the round after a question.
+          //
+          // So what was produced is kept, the card the athlete answered stays
+          // answered because the coach acted on it, and a notice under the
+          // answer says it was cut short — the banner alone is gone by the
+          // next reload, and the athlete should not take a truncated answer
+          // for a finished one.
+          resumedCoachPromptRef.current = null;
+          setTimeline((prev) => {
+            let next: ChatEntry[] = [...prev];
+            if (partialText) {
+              next.push({
+                kind: "message",
+                role: "assistant",
+                content: partialText,
+                source,
+                reasoningSummary,
+                ...(payload.usage ? { usage: payload.usage } : {})
+              });
+            }
+            for (const prompt of coachPrompts) {
+              next = upsertCoachPromptEntry(next, prompt);
+            }
+            next.push({
+              kind: "toolNotice",
+              message: `Coach stopped before finishing: ${payload.message}`
+            });
+            markSettled(prev, next);
+            persistHistory(activeSessionIdRef.current, next, true);
+            return next;
+          });
+        } else {
+          // Nothing reached the athlete, so the turn is simply undone: the
+          // card goes back to waiting for an answer they can give again.
+          restoreResumedCoachPrompt();
+        }
         onError(payload.message);
         if (payload.authError) {
           setAuthStatus({ signedIn: false });
@@ -4374,8 +4487,9 @@ function AnalysisSilentChip({
 
             if (entry.kind === "toolNotice") {
               return (
-                <div
+                <ChatRow
                   key={`tool-notice-${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4384,7 +4498,7 @@ function AnalysisSilentChip({
                   <div className="chat-bubble chat-bubble-tool-notice">
                     {entry.message}
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4393,8 +4507,9 @@ function AnalysisSilentChip({
                 return null;
               }
               return (
-                <div
+                <ChatRow
                   key={entry.prompt.promptId}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4410,7 +4525,7 @@ function AnalysisSilentChip({
                       onCustom={handleCustomCoachAnswer}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4535,8 +4650,9 @@ function AnalysisSilentChip({
             }
 
             return (
-              <div
+              <ChatRow
                 key={`message-${index}`}
+                settled={settledEntriesRef.current.has(entry)}
                 className={`chat-row chat-row-${entry.role}${
                   highlightedChatEntryIndex === index
                     ? " is-chat-jump-target"
@@ -4573,7 +4689,7 @@ function AnalysisSilentChip({
                     entry.content
                   )}
                 </div>
-              </div>
+              </ChatRow>
             );
           })}
 

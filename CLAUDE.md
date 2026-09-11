@@ -304,6 +304,35 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   rows key on `previewId` *and* position. `test:chat-history-store` (3b, 3c) fails
   on the position-only guard; `test:chat-transcript-race` renders a duplicated row.
 
+  **A turn that errors after producing output keeps it.** `chat:streamError` used to
+  undo the whole turn: the streamed text, any question card it had just asked, and —
+  through `restoreResumedCoachPrompt` — the athlete's choice on the previous card,
+  which went back to unanswered and was persisted that way. Claude Code's
+  `maxTurns: 10` lands on exactly the round after a question, so the loss looked
+  like this: pick a choice, watch the full answer arrive, then see it vanish while
+  the old card reappeared (answered cards are not drawn, so a reset one reads as the
+  coach's next question). Now the partial answer, the new card and a "Coach stopped
+  before finishing" notice are kept and saved, and the answered card stays answered;
+  only a turn that produced nothing is undone. `streamedTextRef` exists for this —
+  `streamingText` is state, stale inside the subscription.
+
+  **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
+  `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:
+  both`, so a row is invisible until its animation runs, and it only runs while the
+  window gets frames. A settle swaps the streaming bubble for freshly mounted rows,
+  so the answer the athlete had just watched arrive was faded in again from
+  nothing — measured over CDP at `opacity: 0` 100 ms after every turn — and on a
+  GNOME Wayland window that had stopped getting frames the whole new turn stayed
+  invisible until a scroll or click produced one. Two details are load-bearing:
+  the marker is **identity** (`settledEntriesRef`, filled by `markSettled` inside
+  the settle's updater), not a flag lowered by an effect, because React flushes
+  the last token render's pending effects before rendering the settle; and the
+  row **holds** it in state from mount, because a class recomputed per render
+  disappears on the next reload and changing `animation` restarts it.
+  `test:chat-transcript-race` fails on either shortcut. When checking a paint bug
+  over CDP, trust `getComputedStyle` read *before* `Page.captureScreenshot` — the
+  capture forces a frame and finishes the animation it was meant to catch.
+
   **A tool schema is sent on every request round, so the draft schemas do not branch per
   sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
   a repeat group carries steps of its own, the step schema appeared twice per branch: 67 kB
