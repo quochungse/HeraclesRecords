@@ -120,17 +120,34 @@ export function buildBaseCoachInstructions(): string {
   );
 }
 
+/**
+ * Per-sport rules as prose.
+ *
+ * This carries more weight than it looks: the draft tools' JSON Schema used to
+ * branch over every sport to say the same thing, at tens of thousands of tokens
+ * a round. Now the schema takes any step and the server validates it, so this
+ * guide — a few hundred tokens, sent once per turn — is where the coach learns
+ * which kinds, targets and intensities a sport actually accepts. Keep it in
+ * step with `WORKOUT_SPORT_CAPABILITIES`, which is also what the validator reads.
+ */
 export function buildCoachSportCapabilityGuide(): string {
   return WORKOUT_SPORTS.map((sport) => {
     const capability = WORKOUT_SPORT_CAPABILITIES[sport];
     const targets = [...new Set([...capability.targets, ...capability.restTargets])];
+    // `interval` is accepted wherever `training` is — the schema used to add it
+    // to each sport's enum, and the guide now has to say so instead.
+    const kinds = [...capability.stepKinds] as string[];
+    if (kinds.includes("training") && !kinds.includes("interval")) {
+      kinds.push("interval");
+    }
     const options = [
       capability.supportsPoolLength ? "poolLength option" : undefined,
       capability.supportsGradingSystem ? "gradingSystem option" : undefined,
       capability.requiresExercise ? "training steps require an exercise" : undefined
     ].filter(Boolean);
     return (
-      `- ${capability.label} (sport=${sport}): targets ${targets.join(", ")}; ` +
+      `- ${capability.label} (sport=${sport}): step kinds ${kinds.join(", ")}; ` +
+      `targets ${targets.join(", ")}; ` +
       `intensities ${capability.intensities.map(formatIntensityType).join(", ")}` +
       (options.length > 0 ? `; ${options.join("; ")}` : "")
     );

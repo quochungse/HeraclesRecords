@@ -116,22 +116,57 @@ assert.equal(preview.entries[0]?.sport, "run");
 assert.equal(preview.entries[0]?.stepsSummary, stepsSummary);
 assert.match(preview.entries[0]?.stepsSummary ?? "", /training/);
 
+// --- One workout schema for every sport, not one branch per sport ---
+//
+// The schema used to `oneOf` over all nine sports, and since a repeat group
+// carries steps of its own, the step schema appeared twice in each branch: 67 kB
+// across the two draft tools, ~33,700 tokens re-sent on every request round of
+// every conversation. The per-sport rules live in the capability guide and in
+// `validateWorkoutDraftShared`, which the draft tools run and whose errors go
+// back to the model.
 const schema = buildDraftTrainingPlanInputSchema();
-const sportSchemas = schema.properties.workouts.items.oneOf;
-assert.equal(sportSchemas.length, 9);
+const workoutItem = schema.properties.workouts.items;
+assert.equal(workoutItem.oneOf, undefined, "one workout shape, not nine branches");
 assert.deepEqual(
-  new Set(sportSchemas.map((item) => item.properties.sport.const)),
+  new Set(workoutItem.properties.sport.enum),
   new Set(["run", "trailRun", "bike", "swim", "strength", "xcSki", "indoorClimb", "bouldering", "hyrox"])
+);
+assert.equal(workoutItem.properties.sport.default, "run");
+// Both sport-specific option blocks stay reachable; the validator refuses the
+// ones that do not belong to the chosen sport.
+assert.ok(workoutItem.properties.sport_options.properties.poolLength);
+assert.ok(workoutItem.properties.sport_options.properties.gradingSystem);
+// A step and a repeat group, and the repeat group's items are steps.
+const stepVariants = workoutItem.properties.steps.items.oneOf;
+assert.equal(stepVariants.length, 2);
+assert.ok(stepVariants[0].properties.intensity.oneOf.length > 5, "every intensity type is offered");
+assert.deepEqual(stepVariants[1].required, ["repeat", "steps"]);
+assert.deepEqual(
+  Object.keys(stepVariants[1].properties.steps.items.properties),
+  Object.keys(stepVariants[0].properties)
 );
 
 const workoutSchema = buildDraftWorkoutInputSchema();
-const workoutSportSchemas = workoutSchema.properties.workout.oneOf;
-assert.equal(workoutSportSchemas.length, 9);
+assert.equal(workoutSchema.properties.workout.oneOf, undefined);
 assert.equal(workoutSchema.properties.calendar_date.pattern, "^\\d{8}$");
-for (const sportSchema of workoutSportSchemas) {
-  assert.equal("schedule_date" in sportSchema.properties, false);
-  assert.equal("save_to_library" in sportSchema.properties, false);
-  assert.equal("sort_no" in sportSchema.properties, false);
+for (const field of ["schedule_date", "save_to_library", "sort_no"]) {
+  assert.equal(field in workoutSchema.properties.workout.properties, false);
+  assert.equal(field in schema.properties.workouts.items.properties, true, "the plan keeps them");
+}
+
+// The regression guard: this is what the duplication cost, and what it must not
+// cost again. Measured after the rewrite at 15.4 kB for the plan and 15.3 kB for
+// the single workout, against 67 kB before. What is left is the step schema,
+// which still appears twice — once on its own and once inside the repeat group —
+// and is 81% intensity variants. Collapsing that last copy needs `$defs`/`$ref`,
+// which not every provider resolves well when *writing* arguments, so it is
+// deliberately not done on the app's main write path.
+for (const [label, built] of [["plan", schema], ["workout", workoutSchema]]) {
+  const size = JSON.stringify(built).length;
+  assert.ok(
+    size < 20_000,
+    `the ${label} schema is ${size} chars; it was 67,000 when it branched per sport`
+  );
 }
 
 // Representative typed result for: “Create a 5 km run at 135–145 bpm.”

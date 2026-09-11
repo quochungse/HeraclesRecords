@@ -249,23 +249,24 @@ assert.throws(() => builder.buildWorkoutPayload("bad recovery", [{ kind: "traini
 assert.throws(() => builder.buildWorkoutPayload("bad hyrox function", [{ kind: "training", target_type: "reps", target_reps: 10, exercise_id: "sled", exercise_kind: 4, intensity: { type: "pace", lowSecondsPerKm: 300, highSecondsPerKm: 320, displayUnit: "km" } }], "hyrox"), /does not support/);
 assert.throws(() => builder.buildWorkoutPayload("duplicate", [{ kind: "training", target_type: "time", target_duration_seconds: 60, pace: "5:00\/km", intensity: { type: "heartRate", lowBpm: 130, highBpm: 140 } }], "run"), /both typed intensity and legacy/);
 
+// The schema offers one workout shape and every intensity type; which of them a
+// given sport may use is the validator's ruling, which the `does not support`
+// assertions above exercise — including this exact pair, swimStroke on a bike.
 const schema = codec.buildDraftTrainingPlanInputSchema();
-const workoutSchemas = schema.properties.workouts.items.oneOf;
+const workoutSchema = schema.properties.workouts.items;
+assert.equal(workoutSchema.oneOf, undefined);
 assert.deepEqual(
-  workoutSchemas.map((workout) => workout.properties.sport.const).sort(),
+  [...workoutSchema.properties.sport.enum].sort(),
   [...codec.WORKOUT_SPORTS].sort()
 );
-const strengthWorkoutSchema = workoutSchemas.find((workout) => workout.properties.sport.const === "strength");
-const strengthStepSchema = strengthWorkoutSchema.properties.steps.items.oneOf[0];
-assert.equal(strengthStepSchema.properties.sets.maximum, 99);
-assert.deepEqual(strengthStepSchema.properties.rest_type.enum, [1]);
-assert.equal(strengthStepSchema.properties.rest_value.maximum, 3600);
-const bikeSchema = workoutSchemas.find((workout) => workout.properties.sport.const === "bike");
-const bikeStepSchema = bikeSchema.properties.steps.items.oneOf[0];
-assert.match(JSON.stringify(bikeStepSchema.properties.intensity), /ftpPercent/);
-assert.doesNotMatch(JSON.stringify(bikeStepSchema.properties.intensity), /swimStroke/);
-assert.ok(JSON.stringify(schema).includes("heartRatePercent"));
-assert.ok(JSON.stringify(schema).includes("climbGrade"));
+const stepSchema = workoutSchema.properties.steps.items.oneOf[0];
+assert.equal(stepSchema.properties.sets.maximum, 99);
+assert.deepEqual(stepSchema.properties.rest_type.enum, [1]);
+assert.equal(stepSchema.properties.rest_value.maximum, 3600);
+const intensitySchema = JSON.stringify(stepSchema.properties.intensity);
+for (const type of ["ftpPercent", "swimStroke", "heartRatePercent", "climbGrade"]) {
+  assert.match(intensitySchema, new RegExp(type));
+}
 
 assert.throws(
   () => builder.buildWorkoutPayload("bad options", [{ kind: "training", target_type: "time", target_duration_seconds: 60, intensity: { type: "none" } }], "run", { poolLength: { value: 25, unit: "m" } }),

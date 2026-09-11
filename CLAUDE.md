@@ -262,6 +262,20 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
   devices, COROS's own activity write-up). A new local tool must be placed on one side of
   `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails.
+
+  **A tool schema is sent on every request round, so the draft schemas do not branch per
+  sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
+  a repeat group carries steps of its own, the step schema appeared twice per branch: 67 kB
+  across the two draft tools, ~33.7k tokens re-sent every round of every conversation,
+  including ones that never mention a workout — 80% of the whole fixed per-turn context.
+  It is now one workout shape with one step definition, and the per-sport rules live where
+  they already were: `validateWorkoutDraftShared` refuses a wrong kind, target, intensity or
+  sport option per step and the draft tools hand those errors back to the model, while
+  `buildCoachSportCapabilityGuide` states the same table as prose in the system prompt.
+  `test:chat-workout-tools` guards the size (< 20 kB per schema) and `test:workout-intensity-codec`
+  asserts the refusals come from the validator. Collapsing the step's last copy needs
+  `$defs`/`$ref`, deliberately not used on the main write path: not every provider resolves a
+  `$ref` well when *writing* arguments.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval
