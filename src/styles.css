@@ -11025,7 +11025,12 @@ td span {
     "icon label"
     "value value"
     "detail detail";
-  grid-template-columns: auto minmax(0, 1fr);
+  /* The icon track is a fixed 28px, matching the icon, and deliberately not
+     `auto`: the value and detail rows span both columns, so an intrinsic track
+     absorbs their min-content width. A wide figure ("20,643", "2h 50m") pulled
+     the icon column out to its own width and left the label beside it 11px to
+     render "DURATION" in — an ellipsis at every narrow window. */
+  grid-template-columns: 28px minmax(0, 1fr);
   align-content: start;
   gap: 8px 10px;
   min-height: 104px;
@@ -11092,10 +11097,13 @@ td span {
   white-space: nowrap;
 }
 
+/* `grid-area` alone, and no `grid-row`/`grid-column: auto` beside it: those
+   undid the named area and auto-placed the figure into the icon cell, where it
+   sized that column to itself. The base rule they were there to cancel
+   (`grid-column: 3`, the bar variant's layout) is cancelled by this shorthand
+   just as well. */
 .training-stat-card.is-widget .training-stat-card__value {
   grid-area: value;
-  grid-row: auto;
-  grid-column: auto;
   align-self: auto;
   color: var(--text-primary);
   font-size: clamp(1.45rem, 2vw, 1.75rem);
