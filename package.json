@@ -62,6 +62,7 @@
     "test:coach-analysis-sql": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-coach-analysis-sql.mjs",
     "build:renderer-harness": "node scripts/build-renderer-harness.mjs",
     "test:coach-analysis-renderer": "npm run build:renderer-harness && cross-env ELECTRON_RUN_AS_NODE= electron scripts/test-coach-analysis-renderer.mjs",
+    "test:chat-transcript-race": "npm run build:renderer-harness && cross-env ELECTRON_RUN_AS_NODE= electron scripts/test-chat-transcript-race.mjs",
     "test:coach-analysis-plan-draft": "npm run build:electron && node scripts/test-coach-analysis-plan-draft.mjs",
     "test:renderer-ready": "node scripts/test-renderer-ready.mjs",
     "test:ipc-surface": "node scripts/test-ipc-surface.mjs",

@@ -1106,7 +1106,7 @@ export function createChatSession(
 function foreignTail(
   storedJson: string,
   knownEntryCount: number | undefined,
-  incomingCount: number
+  incoming: PersistedChatEntry[]
 ): PersistedChatEntry[] {
   if (knownEntryCount === undefined || !Number.isFinite(knownEntryCount)) {
     return [];
@@ -1119,9 +1119,50 @@ function foreignTail(
   // which is the wrong direction for a guard whose whole point is that the
   // accident fails harmlessly.
   const claimed = Math.max(0, Math.floor(knownEntryCount));
-  const known = Math.min(claimed, incomingCount);
+  const known = Math.min(claimed, incoming.length);
   const stored = parseChatTranscriptJson(storedJson);
-  return stored.length > known ? stored.slice(known) : [];
+  if (stored.length <= known) {
+    return [];
+  }
+  const tail = stored.slice(known);
+
+  // The count can understate what the caller holds — a save that never fired
+  // leaves it behind while the timeline keeps growing — and then the "foreign"
+  // tail is not foreign at all: the caller is sending those very entries. The
+  // guard used to append them anyway, which is how one conversation ended up
+  // with eight entries written twice, a repeated stretch of its own history,
+  // and two chart cards sharing a `previewId` — the duplicate React key that
+  // surfaced it.
+  //
+  // So the position test stands, and the content settles it: whatever of the
+  // tail the caller's array already ends with is dropped. Only an identical run
+  // of entries in the same order matches, so a run's genuine append — a
+  // playbook turn and an answer nothing else wrote — is still kept.
+  //
+  // Compared as they will be stored, not as they were sent: an entry the store
+  // rejects never reaches the row, so leaving it in would put a hole at the end
+  // of the caller's array that no stored entry can match — and the overlap
+  // would read as none.
+  const canonical = (entry: PersistedChatEntry | null): string =>
+    JSON.stringify(entry);
+  const incomingText = incoming
+    .map((entry) => parseEntry(entry))
+    .filter((entry): entry is PersistedChatEntry => entry !== null)
+    .map(canonical);
+  const tailText = tail.map((entry) => canonical(parseEntry(entry)));
+  for (let length = Math.min(tail.length, incomingText.length); length > 0; length--) {
+    let matches = true;
+    for (let index = 0; index < length; index++) {
+      if (incomingText[incomingText.length - length + index] !== tailText[index]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return tail.slice(length);
+    }
+  }
+  return tail;
 }
 
 /**
@@ -1143,7 +1184,7 @@ export function saveChatSession(
 
   const normalizedEntries = normalizeEntries([
     ...entries,
-    ...foreignTail(row.messages_json, options.knownEntryCount, entries.length)
+    ...foreignTail(row.messages_json, options.knownEntryCount, entries)
   ]);
   const title =
     row.title === DEFAULT_SESSION_TITLE

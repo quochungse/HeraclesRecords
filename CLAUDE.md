@@ -275,6 +275,35 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
   `test:chat-turn-cost` drives the round trip and the formatting.
 
+  **Anything that re-reads the transcript flushes this window's pending save
+  first — it must never cancel it.** Nothing is written during a turn: the
+  autosave is held down while `streaming`, the question is saved at send time
+  and everything else only when the turn ends. So between those two moments the
+  row is the transcript as it was *before* the turn, and a read taken there
+  comes back without it. `reloadTranscript` used to cancel the pending save and
+  then show what it read, which cost an athlete a whole turn in a packaged
+  build: a sync pull defers its re-read to the end of the turn
+  (`syncReloadPendingRef`), landing it in exactly that window, and the turn had
+  ended without final text — so the pending save was the only copy of the
+  charts on screen. They vanished a moment after arriving and reopening the app
+  did not bring them back. Flushing protects both sides, because the save
+  carries the base it was built with and 5.6b's merge still holds back a tail
+  an analysis run appended — which is all the cancel was ever protecting.
+  `test:chat-transcript-race` drives it in a real window and fails on the
+  cancel; `test:coach-analysis-runner` keeps both rules of 5.6b stated together.
+
+  **`foreignTail` decides by content as well as position.** It appends the part of
+  the row past `knownEntryCount`, on the theory that anything there was written
+  behind the window's back. A stale count breaks the theory: the window is then
+  *sending* those entries, and appending them wrote them twice — one conversation
+  replays eight entries of its own history, two chart cards sharing a `previewId`
+  among them, which surfaced as React's "two children with the same key" on
+  opening it. So whatever of the tail the caller's (normalized) array already ends
+  with is dropped; a run's genuine append matches nothing the window holds and is
+  still kept. Rows written before this are not rewritten, which is why the preview
+  rows key on `previewId` *and* position. `test:chat-history-store` (3b, 3c) fails
+  on the position-only guard; `test:chat-transcript-race` renders a duplicated row.
+
   **A tool schema is sent on every request round, so the draft schemas do not branch per
   sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
   a repeat group carries steps of its own, the step schema appeared twice per branch: 67 kB

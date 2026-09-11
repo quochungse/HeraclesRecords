@@ -21,6 +21,7 @@
 import { StrictMode, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
+import { ThemeProvider } from "../../src/theme/ThemeProvider";
 import { ChatView } from "../../src/chat/ChatView";
 import { ConversationAnalyses } from "../../src/chat/analyses/ConversationAnalyses";
 import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
@@ -78,6 +79,31 @@ function scriptedAnswer(method: string, args: unknown[]): unknown {
  * carry on, not take the harness down — the same as a preload that is one
  * version behind.
  */
+/**
+ * The transcript row, for tests about the window racing its own writes.
+ *
+ * Opt-in via `__persistChatSessions`, because most tests want a fixed answer
+ * from `getChatSession` and would be confused by one that moves. With it on,
+ * `saveChatSession` keeps what it was given and `getChatSession` hands it back
+ * — which is the one property of the real store those races turn on: a read
+ * taken before a write lands does not see the write.
+ */
+const chatRows = new Map<string, unknown[]>();
+
+function chatRowAnswer(method: string, args: unknown[]): unknown | undefined {
+  if (script.__persistChatSessions !== true) return undefined;
+  const id = typeof args[0] === "string" ? args[0] : null;
+  if (!id) return undefined;
+  if (method === "saveChatSession") {
+    chatRows.set(id, (args[1] as unknown[]) ?? []);
+    return { id, title: "row", updatedAt: new Date().toISOString() };
+  }
+  if (method === "getChatSession") {
+    return chatRows.get(id) ?? (scriptedAnswer(method, args) as unknown[]) ?? [];
+  }
+  return undefined;
+}
+
 function createStubApi(): CorosLinkApi {
   const cache = new Map<string, unknown>();
   return new Proxy({} as CorosLinkApi, {
@@ -99,6 +125,8 @@ function createStubApi(): CorosLinkApi {
           }
         : (...args: unknown[]) => {
             calls.push({ method: property, args });
+            const row = chatRowAnswer(property, args);
+            if (row !== undefined) return Promise.resolve(row);
             const answer = scriptedAnswer(property, args);
             if (answer === "__pending") {
               return new Promise((resolve) => pending.set(property, resolve));
@@ -208,17 +236,24 @@ function findByText(selector: string, text: string): HTMLElement | undefined {
  * that never unsubscribes and an effect that is not idempotent both announce
  * themselves.
  *
- * `UnitSystemProvider` is the app's own, not a stub. It is the only context
- * these components read, and every one of them throws without it — which is the
- * harness earning its keep before it has asserted anything.
+ * Both providers are the app's own, not stubs. They are the contexts these
+ * components read, and they throw without them — which is the harness earning
+ * its keep before it has asserted anything.
+ *
+ * `ThemeProvider` is here because the chart cards read the theme to pick their
+ * colours. Without it a transcript carrying one renders as
+ * "useTheme must be used within a ThemeProvider" and takes the whole transcript
+ * down with it, which reads in a test as the entries never having arrived.
  */
 function renderMounted() {
   if (!root || !mounted) return;
   root.render(
     <StrictMode>
-      <UnitSystemProvider>
-        {MOUNTS[mounted.name](mounted.options)}
-      </UnitSystemProvider>
+      <ThemeProvider>
+        <UnitSystemProvider>
+          {MOUNTS[mounted.name](mounted.options)}
+        </UnitSystemProvider>
+      </ThemeProvider>
     </StrictMode>
   );
 }
@@ -230,6 +265,7 @@ const harness = {
     script = next;
     calls.length = 0;
     consoleErrors.length = 0;
+    chatRows.clear();
     const container = document.getElementById("root") as HTMLElement;
     pending.clear();
     mounted = { name, options };
@@ -304,14 +340,21 @@ const harness = {
   text: (selector: string): string | null =>
     query(selector)[0]?.textContent?.trim() ?? null,
 
-  /** Types into a controlled input the way React's onChange expects. */
+  /** Types into a controlled input or textarea the way React's onChange expects. */
   setValue(selector: string, value: string): boolean {
     const element = query(selector)[0] as HTMLInputElement | undefined;
     if (!element) return false;
     // React installs its own value setter on the element; going through the
     // prototype's is what makes it notice the change rather than swallow it.
+    //
+    // Which prototype is not a detail: a textarea's `value` setter lives on
+    // `HTMLTextAreaElement`, and calling the input one on it throws "Illegal
+    // invocation" rather than doing nothing — which is how the chat composer,
+    // the only multi-line field on any of these screens, was unreachable.
     const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
+      element instanceof window.HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype,
       "value"
     )?.set;
     setter?.call(element, value);

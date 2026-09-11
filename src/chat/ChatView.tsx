@@ -1906,6 +1906,16 @@ export function ChatView({
   /** A conversation a sync pull rewrote while `chatBusyRef` was up, waiting for
    *  the turn to end before it is re-read. */
   const syncReloadPendingRef = useRef<string | null>(null);
+  /**
+   * Saves this window has started and not yet heard back about, and the one
+   * still sitting on the debounce.
+   *
+   * Both exist so a re-read can wait for them. A reload reads the row and puts
+   * what it finds on screen, so reading it before this window's own writes have
+   * landed shows a transcript that is missing them — see `flushPendingSave`.
+   */
+  const inFlightSavesRef = useRef(new Set<Promise<unknown>>());
+  const pendingSaveRef = useRef<(() => void) | null>(null);
   // Accumulates source info across the current stream's info events.
   const sourceRef = useRef<SourceInfo | null>(null);
   const thinkingRef = useRef("");
@@ -1969,13 +1979,14 @@ export function ChatView({
   ) => {
     if (!api || !sessionId) return;
     const run = () => {
+      pendingSaveRef.current = null;
       const persisted = toPersistedEntries(entries);
       const knownEntryCount = persistedBaseRef.current;
       // Advanced at send time, not on the reply. Handlers run in send order, so
       // the row ends up holding this array; waiting for the reply would let an
       // earlier save's answer roll the base backwards.
       persistedBaseRef.current = persisted.length;
-      void api
+      const saved: Promise<void> = api
         .saveChatSession(sessionId, persisted, { knownEntryCount })
         .then((summary) => {
           if (!summary) return;
@@ -1994,17 +2005,50 @@ export function ChatView({
             return next;
           });
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          inFlightSavesRef.current.delete(saved);
+        });
+      inFlightSavesRef.current.add(saved);
     };
     if (persistTimeoutRef.current) {
       clearTimeout(persistTimeoutRef.current);
       persistTimeoutRef.current = null;
     }
+    pendingSaveRef.current = run;
     if (immediate) {
       run();
       return;
     }
     persistTimeoutRef.current = setTimeout(run, 300);
+  };
+
+  /**
+   * Everything this window has to say about the open conversation, on disk.
+   *
+   * Anything that re-reads the row has to go through here first. Between the
+   * end of a turn and the save landing there is a window — a debounce plus an
+   * IPC round trip — in which the row still holds the transcript as it was
+   * *before* the turn: the athlete's question is saved at send time, the answer
+   * and the charts only at the end. A read taken inside that window comes back
+   * without the turn, and `reloadTranscript` then puts that on screen.
+   *
+   * That is the bug this exists for, and it was reached by a sync pull rather
+   * than by anything the athlete did: the pull defers its re-read to the end of
+   * the turn (`syncReloadPendingRef`), which lands it precisely inside the
+   * window. The answer and its charts came off the screen a moment after
+   * arriving, and reopening the app did not bring them back — the reload also
+   * cancelled the pending save that held them, so the only copy was dropped.
+   */
+  const flushPendingSave = async (): Promise<void> => {
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current);
+      persistTimeoutRef.current = null;
+      pendingSaveRef.current?.();
+    }
+    if (inFlightSavesRef.current.size > 0) {
+      await Promise.allSettled([...inFlightSavesRef.current]);
+    }
   };
 
   const refreshSessionAttention = useCallback(async () => {
@@ -2039,6 +2083,11 @@ export function ChatView({
   const loadSession = async (sessionId: string) => {
     if (!api) return;
     try {
+      // The conversation being left may still owe the row a save, and that
+      // save carries `persistedBaseRef` — which is about to start describing a
+      // different conversation. Letting it land afterwards would file one
+      // transcript's length against another's row.
+      await flushPendingSave();
       const entries = await api.getChatSession(sessionId);
       persistedBaseRef.current = entries.length;
       setTimeline(fromPersistedEntries(entries));
@@ -2063,17 +2112,16 @@ export function ChatView({
   const reloadTranscript = async (sessionId: string) => {
     if (!api) return;
     try {
+      // Before the read, never after: the row is about to become what is on
+      // screen, so anything this window has not written yet would be read as
+      // never having existed. Flushing rather than cancelling is what keeps
+      // both copies — the save carries the base it was built with, so 5.6b's
+      // merge still holds back the tail an analysis run appended, which is
+      // what the cancel here used to be protecting.
+      await flushPendingSave();
       const entries = await api.getChatSession(sessionId);
       // The athlete may have switched conversations while this was in flight.
       if (activeSessionIdRef.current !== sessionId) return;
-      // A save waiting on the debounce holds the copy this reload is replacing,
-      // and the base is about to move past it. Letting it fire would write the
-      // pre-run transcript back over the answer with a base that no longer
-      // covers it — the exact loss 5.6b's merge exists to prevent.
-      if (persistTimeoutRef.current) {
-        clearTimeout(persistTimeoutRef.current);
-        persistTimeoutRef.current = null;
-      }
       persistedBaseRef.current = entries.length;
       setTimeline(fromPersistedEntries(entries));
     } catch {
@@ -4406,8 +4454,15 @@ function AnalysisSilentChip({
 
             if (entry.kind === "activityVisual") {
               return (
+                // Position as well as id. A `previewId` is unique by
+                // construction and duplicates are always a bug elsewhere — but
+                // this list also renders rows merged in from another machine,
+                // and React's answer to a repeated key is to drop or duplicate
+                // the row rather than to show what the transcript holds. The
+                // id still carries identity across an in-place upsert, which is
+                // what it is here for.
                 <div
-                  key={entry.preview.previewId}
+                  key={`${entry.preview.previewId}#${index}`}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4423,7 +4478,7 @@ function AnalysisSilentChip({
             if (entry.kind === "fitnessTrend") {
               return (
                 <div
-                  key={entry.preview.previewId}
+                  key={`${entry.preview.previewId}#${index}`}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4439,7 +4494,7 @@ function AnalysisSilentChip({
             if (entry.kind === "hrZoneSummary") {
               return (
                 <div
-                  key={entry.preview.previewId}
+                  key={`${entry.preview.previewId}#${index}`}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">

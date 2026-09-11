@@ -722,6 +722,70 @@ assert.deepEqual(
     deleteChatSession(session.id, db);
   }
 
+  // 3b. A stale count must not turn the window's own entries into a foreign
+  // tail. This is the shape that actually corrupted a conversation: the count
+  // fell behind — a save that never fired leaves it where it was while the
+  // timeline keeps growing — so the window sent an array that already held
+  // everything in the row while claiming to account for only the first entry.
+  // Position alone reads the rest as somebody else's and appended it, and the
+  // conversation ended up replaying a stretch of its own history, with two
+  // chart cards carrying one `previewId` — the duplicate React key that is how
+  // anyone noticed.
+  {
+    const session = race();
+    // A card the store accepts. It has to be: a preview `parseEntry` rejects is
+    // dropped on the way in, and a test built on one passes against the broken
+    // guard too — this one did, until it was mutated.
+    const chart = {
+      kind: "fitnessTrend",
+      preview: {
+        previewId: "fitness-trends:af53b193",
+        trendPoints: [{ date: "2026-09-10", label: "Thu", trainingLoad: 240 }]
+      }
+    };
+    const whole = [athleteOpening, athleteReply, chart];
+    saveChatSession(session.id, whole, db, { knownEntryCount: 1 });
+    assert.equal(getChatSession(session.id, db).length, 3, "the card is stored");
+    // The count is now stale by two, and the array is the whole row again.
+    saveChatSession(session.id, whole, db, { knownEntryCount: 1 });
+
+    const stored = getChatSession(session.id, db);
+    assert.deepEqual(
+      stored.map((entry) => entry.content ?? entry.preview.previewId),
+      ["Morning.", "Thanks.", "fitness-trends:af53b193"],
+      "an array that already holds the row must not have the row appended to it"
+    );
+    const previewIds = stored
+      .filter((entry) => entry.preview)
+      .map((entry) => entry.preview.previewId);
+    assert.deepEqual(
+      previewIds,
+      [...new Set(previewIds)],
+      "and no two cards may end up sharing a previewId"
+    );
+    deleteChatSession(session.id, db);
+  }
+
+  // 3c. The overlap test is content, not position, so a run's genuine append
+  // still survives a stale count — the entries it added are not ones the window
+  // is holding, however far behind its count is.
+  {
+    const session = race();
+    saveChatSession(session.id, [athleteOpening, ...runEntries], db);
+    // Stale by one: the window accounts for the opening alone and is sending
+    // the athlete's reply on top of it. The run's two entries are nowhere in
+    // that array, so they are genuinely foreign and must survive.
+    saveChatSession(session.id, [athleteOpening, athleteReply], db, {
+      knownEntryCount: 1
+    });
+    assert.deepEqual(
+      getChatSession(session.id, db).map((entry) => entry.content),
+      ["Morning.", "Thanks.", "Debrief the session.", "Easy week, hold it there."],
+      "a tail the window does not hold is still foreign, whatever it claims to know"
+    );
+    deleteChatSession(session.id, db);
+  }
+
   // 4. Nothing foreign to keep: a window that is up to date replaces its own
   // entries freely, which is what editing a card in place needs.
   {
