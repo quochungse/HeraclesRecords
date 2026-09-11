@@ -4,6 +4,7 @@ import {
   upsertSleepNights,
   type SleepNightRow
 } from "./database";
+import { isCorosMcpUsable } from "./corosMcpService";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
 import type {
@@ -78,6 +79,8 @@ export interface SleepHistoryDeps {
   readCache: (fromDay: string) => SleepNightRow[];
   writeCache: (rows: SleepNightRow[]) => void;
   pruneCache: (beforeDay: string) => void;
+  /** For answers returned without asking COROS. See `isCorosMcpUsable`. */
+  mcpUsable: () => boolean;
 }
 
 export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
@@ -93,7 +96,8 @@ export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
     },
     readCache: listSleepNights,
     writeCache: upsertSleepNights,
-    pruneCache: pruneSleepNights
+    pruneCache: pruneSleepNights,
+    mcpUsable: isCorosMcpUsable
   };
 }
 
@@ -297,7 +301,11 @@ export async function getSleepHistory(
 
   const wantsNetwork = request.refresh === true || needsNetwork(days, now);
 
-  let mcpConnected = true;
+  // A cache hit skips the network, and a flat `true` there reported a server
+  // that had gone away as fine — for as long as the cache stayed fresh, which
+  // is exactly when the screen has old nights on it and none arriving. An
+  // attempt below overwrites this: having tried beats having asked.
+  let mcpConnected = deps.mcpUsable();
   let error: string | undefined;
   let filled = false;
 

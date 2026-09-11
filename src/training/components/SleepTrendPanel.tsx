@@ -14,6 +14,7 @@ import { useChartColors } from "../useChartColors";
 import type { TrainingTrendPoint } from "../types";
 import { SleepTrendChart } from "../../sleep/components/SleepTrendChart";
 import { EmptyChartNotice, TrendWindowToggle } from "./trendChartParts";
+import { MCP_SLEEP_TREND_NOTICE, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
 const SLEEP_WINDOW_PREFERENCE = defineSelectionPreference<TrainingTrendWindow>({
@@ -64,7 +65,13 @@ function SleepTrendLegend() {
  * `mergeSleepIntoTrendPoints`. Bars are not wired to open a night here: this
  * panel sits on a screen that has nowhere to open one.
  */
-export function SleepTrendPanel({ points }: { points: TrainingTrendPoint[] }) {
+export function SleepTrendPanel({
+  points,
+  mcpConnected
+}: {
+  points: TrainingTrendPoint[];
+  mcpConnected?: McpConnectionState;
+}) {
   const { metrics } = useChartColors();
   const [trendWindow, setTrendWindow] = useSelectionPreference(
     SLEEP_WINDOW_PREFERENCE
@@ -111,10 +118,14 @@ export function SleepTrendPanel({ points }: { points: TrainingTrendPoint[] }) {
         <EmptyChartNotice
           icon={MoonStar}
           palette={metrics.sleep}
-          title="No sleep trend yet"
+          title={mcpTextOr(mcpConnected, "Sleep needs MCP", "No sleep trend yet")}
         >
-          A trend needs more than one night. Sync sleep from COROS and it fills
-          in here.
+          {/* No nights to trend: "sync your watch" sends them nowhere. */}
+          {mcpTextOr(
+            mcpConnected,
+            MCP_SLEEP_TREND_NOTICE,
+            "A trend needs more than one night. Sync sleep from COROS and it fills in here."
+          )}
         </EmptyChartNotice>
       )}
     </section>

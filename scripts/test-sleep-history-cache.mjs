@@ -49,7 +49,8 @@ function harness({
   rows = [],
   fail = false,
   heartRate = [],
-  heartRateFails = false
+  heartRateFails = false,
+  mcpUsable = true
 } = {}) {
   const state = {
     now,
@@ -92,7 +93,8 @@ function harness({
           state.table.delete(key);
         }
       }
-    }
+    },
+    mcpUsable: () => mcpUsable
   };
 
   return { state, deps };
@@ -335,6 +337,27 @@ clearSleepHistoryCache();
   assert.equal(snapshot.records.length, 1, "a failed heart-rate call costs no nights");
   assert.equal(snapshot.records[0].avgHr, undefined);
   assert.equal(snapshot.error, undefined, "and is not reported as a failure of the screen");
+}
+
+clearSleepHistoryCache();
+{
+  // A cache hit asks COROS nothing, and used to report a flat `true` for it.
+  const { state, deps } = harness({ records: [night(0)] });
+
+  const filled = await getSleepHistory({ days: 30 }, deps);
+  assert.equal(state.fetches, 1);
+  assert.equal(filled.mcpConnected, true, "a live fetch reports what it found");
+
+  // Same process, same cache: the nights are in memory, so this read is free.
+  const gone = harness({ rows: [], mcpUsable: false });
+  const cached = await getSleepHistory({ days: 30 }, gone.deps);
+  assert.equal(gone.state.fetches, 0, "the window was fresh, so nothing was fetched");
+  assert.equal(
+    cached.mcpConnected,
+    false,
+    "a cache hit reports the server as it is now, not as it was when fetched"
+  );
+  assert.ok(cached.records.length > 0, "and still serves the nights it holds");
 }
 
 console.log("sleep history cache: all assertions passed");

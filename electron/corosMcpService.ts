@@ -18,6 +18,24 @@ import type { CorosMcpStatus, CorosMcpTool } from "./types";
 
 const COROS = "coros";
 
+/**
+ * Whether COROS data can be served — an open client *or* the means to open one.
+ *
+ * Not `status.connected` alone: that is `rt.client !== null`, false for the
+ * whole of every launch until something calls `ensureCorosMcpConnected()`, so a
+ * surface reading it would tell every cold start to connect a server whose
+ * tokens are sitting right there. A token COROS has since rejected shows up
+ * only when something tries, which is why an attempt overwrites this.
+ */
+export function isCorosMcpUsable(): boolean {
+  const status = getMcpServerStatus(COROS);
+  if (!status?.enabled) {
+    return false;
+  }
+
+  return status.connected || status.authenticated;
+}
+
 export function getCorosMcpStatus(): CorosMcpStatus {
   const status = getMcpServerStatus(COROS);
   return {

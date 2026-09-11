@@ -87,7 +87,8 @@ function harness({
   stress = [],
   connected = true,
   tools = ["querySleepHrv", "queryStressTimeSeries"],
-  failTool = null
+  failTool = null,
+  mcpUsable = true
 } = {}) {
   const state = {
     now,
@@ -130,7 +131,8 @@ function harness({
           state.table.delete(key);
         }
       }
-    }
+    },
+    mcpUsable: () => mcpUsable
   };
 
   return { state, deps };
@@ -411,6 +413,25 @@ clearSleepSeriesCache();
   assert.equal(state.calls.length, 0);
   assert.equal(series.hrv.length, 0);
   assert.equal(series.stress.length, 0);
+}
+
+clearSleepSeriesCache();
+{
+  // Same rule as the night cache: a hit re-answers rather than replays.
+  const day = dayKey(-1);
+  const first = harness({ nights: [night(-1)], hrv: [[day, 60]], stress: [[day, 20]] });
+  const fetched = await getSleepNightSeries({ happenDay: day }, first.deps);
+  assert.equal(fetched.mcpConnected, true);
+
+  const gone = harness({ nights: [night(-1)], mcpUsable: false });
+  const cached = await getSleepNightSeries({ happenDay: day }, gone.deps);
+  assert.equal(gone.state.calls.length, 0, "the night was settled, so nothing was fetched");
+  assert.equal(cached.source, "cache");
+  assert.equal(
+    cached.mcpConnected,
+    false,
+    "a cache hit reports the server as it is now"
+  );
 }
 
 console.log("sleep series cache: all assertions passed");

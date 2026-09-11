@@ -37,6 +37,8 @@ export interface TrainingSummaryMetrics {
   rhrDelta?: number;
   steps?: number;
   calories?: number;
+  /** Whether MCP served the feed `steps` and `calories` came from. */
+  mcpConnected?: boolean;
 }
 
 export interface TrainingHubSnapshot {

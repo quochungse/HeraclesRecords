@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { TrainingSummaryTiles } from "./TrainingSummaryTiles";
 import { recoveryTone } from "../parsers";
+import { MCP_DAILY_HEALTH_NOTICE } from "../../mcp/mcpNotice";
 import type { TrainingSummaryMetrics } from "../types";
 
 interface RecoveryRingProps {
@@ -46,6 +47,11 @@ export function RecoveryRing({ summary }: RecoveryRingProps) {
   const targetOffset = circumference - (percent / 100) * circumference;
   const tone = hasData ? recoveryTone(percent) : "neutral";
   const { label, message } = readinessCopy(tone);
+  // A tile's one line can say a figure needs MCP but not where to connect it,
+  // so that is said once underneath. Either figure missing counts — one feed.
+  const dailyHealthNeedsMcp =
+    summary.mcpConnected === false &&
+    (summary.steps === undefined || summary.calories === undefined);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setIsReady(true));
@@ -91,6 +97,12 @@ export function RecoveryRing({ summary }: RecoveryRingProps) {
           metrics={["load", "heart", "steps", "calories"]}
           className="training-ring-metrics"
         />
+
+        {dailyHealthNeedsMcp ? (
+          <p className="training-ring-message is-quiet">
+            {MCP_DAILY_HEALTH_NOTICE}
+          </p>
+        ) : null}
       </div>
     </section>
   );

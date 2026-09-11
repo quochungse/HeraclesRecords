@@ -905,6 +905,31 @@ export default function App() {
     }
   }, [api, ensureTrainingHubMcp]);
 
+  // Coming back to Overview after a load MCP was down for: run it again, so a
+  // server connected in Settings fills the panels rather than only correcting
+  // their copy. Nothing pushes an MCP status change (`mcp:*` is all invoke).
+  //
+  // Either feed is enough to trigger it, and it has to be: daily health always
+  // attempts a connection, so its flag reports a failed attempt, while sleep is
+  // often served from cache and answers with `isCorosMcpUsable()` — which reads
+  // true on stored tokens COROS may since have rejected. Gating on sleep alone
+  // meant the retry never ran in exactly the case that needs it: steps and
+  // calories saying "connect MCP" while sleep called the server fine.
+  //
+  // No loop: a still-dead retry writes the same flags, and those values are the
+  // deps. The Sleep screen needs none of this — its hook fetches on mount.
+  const wellnessMissedMcp =
+    trainingHubSleepData?.mcpConnected === false ||
+    trainingHubDailyHealthData?.mcpConnected === false;
+
+  useEffect(() => {
+    if (!api || activeView !== "overview" || !wellnessMissedMcp) {
+      return;
+    }
+
+    void loadTrainingHubWellnessData();
+  }, [api, activeView, wellnessMissedMcp, loadTrainingHubWellnessData]);
+
   // A COROS failure the athlete should see, or the wreckage of a load that was
   // doomed before it started.
   //

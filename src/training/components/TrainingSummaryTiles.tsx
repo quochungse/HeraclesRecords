@@ -4,6 +4,7 @@ import {
   formatOptionalNumber,
   formatSignedDelta
 } from "../formatters";
+import { MCP_DAILY_HEALTH_TILE_DETAIL } from "../../mcp/mcpNotice";
 import type { TrainingSummaryMetrics } from "../types";
 
 interface TrainingSummaryTilesProps {
@@ -78,6 +79,13 @@ export function TrainingSummaryTiles({
   className
 }: TrainingSummaryTilesProps) {
   const variant = layout === "stack" ? "widget" : "bar";
+  /** The two wordings every tile carries, picked once rather than per tile. */
+  const copy = (widget: string, bar: string) =>
+    variant === "widget" ? widget : bar;
+  // Only where the figure is actually missing: a tile still holding
+  // yesterday's step count is not a tile with a problem to report.
+  const needsMcp = (value?: number) =>
+    summary.mcpConnected === false && value === undefined;
   const iconSize = variant === "widget" ? 13 : 16;
   const tilesClassName = [
     "training-summary-tiles",
@@ -92,16 +100,15 @@ export function TrainingSummaryTiles({
       {metrics.includes("load") ? (
         <StatCard
           icon={<Flame size={iconSize} />}
-          label={variant === "widget" ? "Load" : "Training Load"}
+          label={copy("Load", "Training Load")}
           value={formatOptionalNumber(summary.todayLoad)}
           detail={
             summary.weekLoadTotal !== undefined
-              ? variant === "widget"
-                ? `${Math.round(summary.weekLoadTotal)} / 7 days`
-                : `${Math.round(summary.weekLoadTotal)} load over 7 days`
-              : variant === "widget"
-                ? "today"
-                : "today's load"
+              ? copy(
+                  `${Math.round(summary.weekLoadTotal)} / 7 days`,
+                  `${Math.round(summary.weekLoadTotal)} load over 7 days`
+                )
+              : copy("today", "today's load")
           }
           variant={variant}
           tone="load"
@@ -117,12 +124,11 @@ export function TrainingSummaryTiles({
           }
           detail={
             summary.rhrDelta !== undefined
-              ? variant === "widget"
-                ? `${formatSignedDelta(summary.rhrDelta, "")} vs avg`
-                : `${formatSignedDelta(summary.rhrDelta, " bpm")} vs 7-day avg`
-              : variant === "widget"
-                ? "bpm"
-                : "beats per minute"
+              ? copy(
+                  `${formatSignedDelta(summary.rhrDelta, "")} vs avg`,
+                  `${formatSignedDelta(summary.rhrDelta, " bpm")} vs 7-day avg`
+                )
+              : copy("bpm", "beats per minute")
           }
           variant={variant}
           tone="heart"
@@ -134,7 +140,11 @@ export function TrainingSummaryTiles({
           icon={<Footprints size={iconSize} />}
           label="Steps"
           value={formatWholeNumber(summary.steps)}
-          detail={variant === "widget" ? "today" : "daily step count"}
+          detail={
+            needsMcp(summary.steps)
+              ? MCP_DAILY_HEALTH_TILE_DETAIL
+              : copy("today", "daily step count")
+          }
           variant={variant}
           tone="steps"
         />
@@ -145,7 +155,11 @@ export function TrainingSummaryTiles({
           icon={<Zap size={iconSize} />}
           label="Calories"
           value={formatWholeNumber(summary.calories)}
-          detail={variant === "widget" ? "kcal" : "total calories"}
+          detail={
+            needsMcp(summary.calories)
+              ? MCP_DAILY_HEALTH_TILE_DETAIL
+              : copy("kcal", "total calories")
+          }
           variant={variant}
           tone="calories"
         />

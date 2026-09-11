@@ -1,4 +1,10 @@
-import { callCorosMcpTool, ensureCorosMcpConnected, getCorosMcpTools, listCorosMcpTools } from "./corosMcpService";
+import {
+  callCorosMcpTool,
+  ensureCorosMcpConnected,
+  getCorosMcpTools,
+  isCorosMcpUsable,
+  listCorosMcpTools
+} from "./corosMcpService";
 import {
   listSleepNightSeries,
   pruneSleepNightSeries,
@@ -67,6 +73,8 @@ export interface SleepSeriesDeps {
   readCache: () => SleepNightSeriesRow[];
   writeCache: (row: SleepNightSeriesRow) => void;
   pruneCache: (beforeDay: string) => void;
+  /** Whether COROS could be reached at all, for cache hits that do not try. */
+  mcpUsable: () => boolean;
 }
 
 export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
@@ -90,7 +98,8 @@ export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
     },
     readCache: listSleepNightSeries,
     writeCache: upsertSleepNightSeries,
-    pruneCache: pruneSleepNightSeries
+    pruneCache: pruneSleepNightSeries,
+    mcpUsable: isCorosMcpUsable
   };
 }
 
@@ -220,7 +229,13 @@ export async function getSleepNightSeries(
     (isSettled(happenDay, now) || now - cached.fetchedAt < UNSETTLED_SERIES_TTL_MS);
 
   if (cached && cacheUsable) {
-    return { ...cached.series, source: "cache", fetchedAt: cached.fetchedAt };
+    // The samples are from when they were fetched; reachability is about now.
+    return {
+      ...cached.series,
+      source: "cache",
+      fetchedAt: cached.fetchedAt,
+      mcpConnected: deps.mcpUsable()
+    };
   }
 
   const connected = await deps.ensureConnected();

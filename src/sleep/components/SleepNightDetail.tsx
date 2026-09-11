@@ -13,6 +13,7 @@ import {
 } from "../sleepStages";
 import { SleepNightCurve } from "./SleepNightCurve";
 import { SleepStageDonut } from "./SleepStageDonut";
+import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import type {
   SleepNightSeries,
   TrainingHubSleepRecord
@@ -27,6 +28,8 @@ interface SleepNightDetailProps {
   /** False when COROS returned no nights at all — a different empty to a
    *  night simply not being picked. */
   hasNights?: boolean;
+  /** `false` explains the "no nights" case. */
+  mcpConnected?: McpConnectionState;
 }
 
 /**
@@ -66,19 +69,22 @@ export function SleepNightDetail({
   series,
   seriesLoading,
   pending = false,
-  hasNights = true
+  hasNights = true,
+  mcpConnected
 }: SleepNightDetailProps) {
   if (!record) {
+    const empty = hasNights
+      ? "Pick a night on the left to see how it broke down."
+      : mcpTextOr(
+          mcpConnected,
+          `No nights to show. ${MCP_UNAVAILABLE_SHORT}`,
+          "Once a night syncs from your watch it shows up here."
+        );
+
     return (
       <div className="sleep-detail-empty">
         <Moon size={28} aria-hidden="true" />
-        <p>
-          {pending
-            ? "Loading your nights…"
-            : hasNights
-              ? "Pick a night on the left to see how it broke down."
-              : "Once a night syncs from your watch it shows up here."}
-        </p>
+        <p>{pending ? "Loading your nights…" : empty}</p>
       </div>
     );
   }

@@ -17,6 +17,7 @@ import {
 import { useChartColors } from "../useChartColors";
 import { HrvBaselineChart } from "./HrvBaselineChart";
 import { SleepTrendPanel } from "./SleepTrendPanel";
+import type { McpConnectionState } from "../../mcp/mcpNotice";
 import {
   EmptyChartNotice,
   TrendChartAxes,
@@ -42,6 +43,11 @@ import type { TrainingHubActivity } from "../../../electron/types";
 
 interface TrainingTrendChartsProps {
   points: TrainingTrendPoint[];
+  /**
+   * Only the sleep panel below reads it: load, HRV and RHR are web-API series
+   * and are unaffected by an MCP server being down.
+   */
+  mcpConnected?: McpConnectionState;
   /**
    * Full activity history. The load chart splits each day's column into one
    * block per activity, which is the only place the per-session breakdown
@@ -415,7 +421,8 @@ function TrainingLoadTooltip({
 
 export function TrainingTrendCharts({
   points,
-  activities = []
+  activities = [],
+  mcpConnected
 }: TrainingTrendChartsProps) {
   const reducedMotion = usePrefersReducedMotion();
   const { colors, metrics, loadBlock } = useChartColors();
@@ -609,7 +616,7 @@ export function TrainingTrendCharts({
 
       <HrvBaselineChart points={points} />
 
-      <SleepTrendPanel points={points} />
+      <SleepTrendPanel points={points} mcpConnected={mcpConnected} />
     </div>
   );
 }

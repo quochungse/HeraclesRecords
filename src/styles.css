@@ -13113,6 +13113,14 @@ td span {
   text-wrap: balance;
 }
 
+/* Why steps and calories are empty. Quieter than the readiness line above:
+   it reports a setting, not a training state. */
+.training-ring-message.is-quiet {
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .training-ring-metrics.training-summary-tiles.is-stack {
   display: grid;
   width: 100%;

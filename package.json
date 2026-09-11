@@ -81,6 +81,7 @@
     "test:activity-detail": "npm run build:electron && node scripts/test-activity-detail.mjs",
     "test:chat-activity-tools": "npm run build:electron && node scripts/test-chat-activity-tools.mjs",
     "test:chat-analytics-tools": "npm run build:electron && node scripts/test-chat-analytics-tools.mjs",
+    "test:mcp-notice": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-mcp-notice.mjs",
     "test:sleep-data-parser": "npm run build:electron && node scripts/test-sleep-data-parser.mjs",
     "test:sleep-freshness": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-sleep-freshness.mjs",
     "test:sleep-history-cache": "npm run build:electron && node scripts/test-sleep-history-cache.mjs",

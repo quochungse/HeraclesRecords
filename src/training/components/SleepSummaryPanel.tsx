@@ -12,6 +12,7 @@ import {
   formatSleepPercent
 } from "../formatters";
 import { pickLastNightSleep } from "../../sleep/sleepFreshness";
+import { MCP_SLEEP_NOTICE, mcpTextOr } from "../../mcp/mcpNotice";
 import { sleepScoreLabel, sleepScoreTone } from "../../sleep/sleepScore";
 import { drawableStages } from "../../sleep/sleepStages";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
@@ -261,9 +262,14 @@ export function SleepSummaryPanel({
       {!isLoading && !lastNight ? (
         <div className="sleep-panel-empty">
           <p className="sleep-panel-message">
-            {sleep?.mcpConnected
-              ? "No sleep recorded for last night yet. Sync your watch to see it here."
-              : "Connect COROS data access to view sleep metrics."}
+            {/* Two empties that look alike and need opposite things doing:
+                MCP down is the athlete's to fix, a missing night is the
+                watch's. */}
+            {mcpTextOr(
+              sleep?.mcpConnected,
+              MCP_SLEEP_NOTICE,
+              "No sleep recorded for last night yet. Sync your watch to see it here."
+            )}
           </p>
           {staleNight ? (
             <p className="sleep-panel-stale">

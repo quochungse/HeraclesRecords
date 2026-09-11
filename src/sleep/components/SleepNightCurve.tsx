@@ -12,6 +12,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { trainingChartMargin } from "../../training/chartConfig";
 import { useChartColors } from "../../training/useChartColors";
+import { MCP_UNAVAILABLE_SHORT, mcpTextOr } from "../../mcp/mcpNotice";
 import type { SleepNightSeries, SleepSeriesPoint } from "../../../electron/types";
 
 interface SleepNightCurveProps {
@@ -193,8 +194,14 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
     return (
       <div className="sleep-curve is-empty">
         <p>
+          {/* This night's own error first, then the server, then the
+              seven-day limit COROS keeps these under. */}
           {series?.error ??
-            "No overnight HRV or stress samples for this night. COROS keeps them for about a week."}
+            mcpTextOr(
+              series?.mcpConnected,
+              `No overnight samples. ${MCP_UNAVAILABLE_SHORT}`,
+              "No overnight HRV or stress samples for this night. COROS keeps them for about a week."
+            )}
         </p>
       </div>
     );

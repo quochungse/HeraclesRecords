@@ -93,7 +93,8 @@ export function TrainingOverview({
         todayLoad: undefined,
         weekLoadTotal: undefined,
         latestRhr: undefined,
-        rhrDelta: undefined
+        rhrDelta: undefined,
+        mcpConnected: undefined
       },
     [snapshot]
   );
@@ -431,6 +432,7 @@ export function TrainingOverview({
           <TrainingTrendCharts
             points={snapshot?.trendPoints ?? []}
             activities={activities}
+            mcpConnected={snapshot?.sleep?.mcpConnected}
           />
           <TrainingZoneDistributionCharts
             hrZoneModel={hrZoneModel}

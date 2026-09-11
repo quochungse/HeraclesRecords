@@ -5,6 +5,7 @@ import {
   formatSleepDurationMinutes
 } from "../../training/formatters";
 import { sleepScoreTone } from "../sleepScore";
+import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import { drawableStages } from "../sleepStages";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
@@ -13,6 +14,8 @@ interface SleepNightListProps {
   selectedDay: string | null;
   onSelect: (happenDay: string) => void;
   loading: boolean;
+  /** `false` turns the empty line from a watch problem into an MCP one. */
+  mcpConnected?: McpConnectionState;
 }
 
 /**
@@ -24,7 +27,8 @@ export function SleepNightList({
   records,
   selectedDay,
   onSelect,
-  loading
+  loading,
+  mcpConnected
 }: SleepNightListProps) {
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
@@ -40,7 +44,11 @@ export function SleepNightList({
       <p className="sleep-night-list-empty">
         {loading
           ? "Loading nights…"
-          : "No nights on file yet. Sync your watch and refresh."}
+          : mcpTextOr(
+              mcpConnected,
+              `No nights on file. ${MCP_UNAVAILABLE_SHORT}`,
+              "No nights on file yet. Sync your watch and refresh."
+            )}
       </p>
     );
   }

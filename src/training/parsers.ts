@@ -230,7 +230,9 @@ function buildSummary(
         ? latestRhr - priorRhrAverage
         : undefined,
     steps: latestHealth?.steps,
-    calories: latestHealth?.calories
+    calories: latestHealth?.calories,
+    // Kept, or the two tiles above are blank with no way to say why.
+    mcpConnected: dailyHealth?.mcpConnected
   };
 }
 

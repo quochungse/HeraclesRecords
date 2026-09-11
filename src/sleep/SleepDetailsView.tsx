@@ -6,6 +6,7 @@ import { SleepTrendChart } from "./components/SleepTrendChart";
 import { useSleepHistory } from "./useSleepHistory";
 import { useSleepNightSeries } from "./useSleepNightSeries";
 import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
+import { MCP_SLEEP_NOTICE } from "../mcp/mcpNotice";
 import type { CorosLinkApi } from "../coroslink-api";
 import type { TrainingTrendPoint } from "../training/types";
 import "./sleep.css";
@@ -48,6 +49,8 @@ export function SleepDetailsView({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const records = useMemo(() => snapshot?.records ?? [], [snapshot]);
+  // Re-answered on every read, cache hits included — as current as the screen.
+  const mcpConnected = snapshot?.mcpConnected;
 
   // Follow the newest night until the athlete picks one, and let go of a
   // selection whose night has fallen out of the window.
@@ -149,11 +152,10 @@ export function SleepDetailsView({
         </p>
       ) : null}
 
-      {snapshot && !snapshot.mcpConnected ? (
-        <p className="sleep-details-error">
-          COROS data access is not connected, so no new nights can arrive.
-          Connect it from Coach settings.
-        </p>
+      {/* The one place here that says where to connect; the empties inside
+          name the cause and stop. */}
+      {mcpConnected === false ? (
+        <p className="sleep-details-error">{MCP_SLEEP_NOTICE}</p>
       ) : null}
 
       <section className="panel sleep-details-panel">
@@ -166,6 +168,7 @@ export function SleepDetailsView({
                 selectedDay={selectedDay}
                 onSelect={setSelectedDay}
                 loading={loading}
+                mcpConnected={mcpConnected}
               />
             </div>
           </div>
@@ -177,6 +180,7 @@ export function SleepDetailsView({
               seriesLoading={seriesLoading}
               pending={loading && records.length === 0}
               hasNights={records.length > 0}
+              mcpConnected={mcpConnected}
             />
           </div>
         </div>
@@ -188,6 +192,7 @@ export function SleepDetailsView({
           records={records}
           selectedDay={selectedDay ?? undefined}
           onSelectDay={setSelectedDay}
+          mcpConnected={mcpConnected}
         />
       </section>
 
