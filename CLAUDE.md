@@ -282,6 +282,17 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
   `test:chat-turn-cost` drives the round trip and the formatting.
 
+  The same paragraph has a second edge: a field an entry *may* carry has to be
+  **optional in the parser too**. `parseAnalysisMarker` demanded all five marker fields
+  including `bindingId`, which named an attachment and which `runAnalysis` deliberately stopped
+  writing — so every analysis answer lost its marker in the same statement that stored it
+  (`normalizeEntries` runs on every save, not only on reload). The chip never appeared, and
+  the synthetic playbook turn that opens a run rendered as the athlete's own bubble. Every
+  fixture in the suites carried a `bindingId`, which is exactly why nothing caught it: none
+  of them was the shape the runner actually writes. `test:chat-history-store` now drives the
+  four-field marker, and `bindingId` keeps its old key position so a transcript holding one
+  does not look rewritten on its next save.
+
   **Anything that re-reads the transcript flushes this window's pending save
   first — it must never cancel it.** Nothing is written during a turn: the
   autosave is held down while `streaming`, the question is saved at send time
@@ -525,6 +536,34 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     calls it so the loop stops. **This is a guard between machines and files, not a data
     partition**: the tables have no owner column, so switching accounts on one machine leaves
     the previous account's records in place. Closing that means giving every row an owner.
+  - **A pull resolves over the whole log but never writes back an entry this device
+    itself wrote.** The merge compares entries against each other and never against the
+    database — SQLite keeps no HLC per row and `SqliteSyncTarget.upsertRow` is an
+    unconditional `INSERT OR REPLACE` — so the only thing standing between a stale entry and
+    a newer local row is `SyncLoop`'s `#merged` map, which lives in memory and is empty on
+    the first pull after every launch. An own entry is a *notification* about a write that
+    already happened, built by reading the row, so the database holds that state or something
+    newer and applying it can only rewind. Own entries still take part in
+    last-writer-wins — drop them from `resolve()` and a foreign entry this device already
+    superseded would win and undo the local write — so the skip belongs in `isApplied`, not
+    in what is handed to `applyEntries`. This cost an athlete a coach's answer: a pull is a
+    full read of the log over the network, a headless analysis run finished 18 seconds into
+    one and wrote both its answer and its activity watermark, and the pull landed carrying
+    the pre-run copy of both rows and put them back — so the next poll re-analysed the same
+    activity and the conversation came back holding a *different* answer to the one that was
+    lost. `npm run test:sync-twoway` fails in two places against the old shape.
+  - **Quit waits for the queue, and only when there is one.** A change sits out
+    `FLUSH_DEBOUNCE_MS` before it is even attempted, so a turn written and an app closed in
+    the same breath never reached the vault — and by the rule above, the next launch then
+    pulls a *foreign* copy of that record over the newer local one. `before-quit` therefore
+    cancels the quit, flushes and quits again. `SyncLoop.hasUnpushedChanges` is what keeps
+    that off the ordinary quit: with nothing queued the handler returns immediately and the
+    app closes as fast as it ever did. It counts the upload in the air as well as the
+    queue — `flush` takes `#pending` before it awaits, so in between those two moments the
+    batch exists nowhere else. `flushBeforeQuit` makes exactly **one** attempt: offline it
+    returns instantly with the queue intact, and `QUIT_FLUSH_TIMEOUT_MS` bounds a link that
+    neither answers nor fails. What does not get out is lost with the process, which is the
+    right trade against a window that will not close.
   - **A device only ever writes inside its own `oplog/<deviceId>/` directory**, which is why
     the storage layer needs no locking. Exclusivity is needed for two things only, and each
     takes a `Lease`: running a scheduled analysis (`electron/sync/automationLease.ts`,

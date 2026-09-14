@@ -181,6 +181,16 @@ export class SyncLoop {
   /** Work started by a timer, so callers (and the suite) can wait for it
    *  instead of guessing how many ticks a filesystem write takes. */
   #background = new Set<Promise<unknown>>();
+  /**
+   * The upload currently in the air, if any.
+   *
+   * Tracked separately from `#background` and `#inFlight` because quit asks a
+   * narrower question than "is anything happening": a pull can be abandoned
+   * without losing anything, an upload cannot. `flush` takes the queue before
+   * it awaits, so between those two moments `#pending` is empty and the only
+   * copy of those entries is inside this promise.
+   */
+  #uploading: Promise<FlushResult> | null = null;
 
   constructor(deps: SyncLoopDeps) {
     this.#deps = deps;
@@ -196,6 +206,44 @@ export class SyncLoop {
 
   get pendingCount(): number {
     return this.#pending.length;
+  }
+
+  /**
+   * Whether this device is holding changes the vault has no copy of.
+   *
+   * The question quit asks, and the reason it is a getter rather than a flush
+   * everyone calls: with nothing outstanding — the ordinary case — the caller
+   * skips the whole thing and the app closes as fast as it ever did.
+   *
+   * Both halves count. `#pending` is the debounce window, which is the wide
+   * one: a change waits `FLUSH_DEBOUNCE_MS` before it is even attempted, so a
+   * turn written and an app closed in the same breath never reached the vault.
+   * `#uploading` is the narrow one, and it is the same loss a moment later —
+   * `flush` empties the queue before it awaits, so those entries exist nowhere
+   * else until the upload returns.
+   */
+  get hasUnpushedChanges(): boolean {
+    return this.#pending.length > 0 || this.#uploading !== null;
+  }
+
+  /**
+   * Last chance to get queued changes into the vault, on the way out.
+   *
+   * Deliberately **one** attempt at the queue, plus whatever was already in the
+   * air. A retry loop here would be a loop with no exit on the two cases that
+   * reach it most — offline, where `flush` returns instantly and leaves the
+   * queue exactly as it found it, and a vault that is refusing writes — and
+   * hanging the quit forever is worse than losing the batch. What is not pushed
+   * stays in the queue and is simply lost with the process; the caller bounds
+   * this with a timeout as well, for a link that neither answers nor fails.
+   */
+  async flushBeforeQuit(): Promise<void> {
+    // Before the queue, not after: this upload is holding entries that are no
+    // longer in `#pending`, and a `flush` that raced it would push the *next*
+    // batch while the older one was still unaccounted for.
+    await this.#uploading?.catch(() => undefined);
+    if (this.#pending.length === 0) return;
+    await this.flush().catch(() => undefined);
   }
 
   nextHlc = (): string => {
@@ -257,6 +305,20 @@ export class SyncLoop {
     this.#pending = [];
     this.#firstPendingAt = null;
 
+    // Published before the first await, so `hasUnpushedChanges` never reads
+    // false in the gap between the queue being taken and the upload starting.
+    const upload = this.#upload(batch);
+    this.#uploading = upload;
+    try {
+      return await upload;
+    } finally {
+      // Only if it is still ours: two flushes can overlap, each with its own
+      // batch, and the later one is the one still outstanding.
+      if (this.#uploading === upload) this.#uploading = null;
+    }
+  }
+
+  async #upload(batch: OpEntry[]): Promise<FlushResult> {
     try {
       const written = await appendBatch(
         this.#deps.provider(),
@@ -283,7 +345,8 @@ export class SyncLoop {
     const entries = await readAllEntries(provider);
 
     const mine = this.#deps.deviceId();
-    const foreign = entries.filter((entry) => !entry.hlc.endsWith(`-${mine}`));
+    const authoredHere = (entry: OpEntry) => entry.hlc.endsWith(`-${mine}`);
+    const foreign = entries.filter((entry) => !authoredHere(entry));
 
     // Fold every remote timestamp into the clock before issuing another, so
     // anything this device does next sorts after what it has just seen.
@@ -298,8 +361,35 @@ export class SyncLoop {
       this.#noteActivity();
     }
 
+    // Resolved over the whole log, written back only where the winner came
+    // from somewhere else.
+    //
+    // Both halves are load-bearing, and the asymmetry is the point. Own entries
+    // have to take part in last-writer-wins or a foreign entry this device has
+    // already superseded would win and undo the newer local write. But an own
+    // entry must never be *applied*: it was built by reading the local row at
+    // the moment of the write, so the database already holds that state or
+    // something newer, and writing it back can only ever rewind.
+    //
+    // The engine has no way to notice that on its own. `applyEntries` compares
+    // entries against each other and never against what the database currently
+    // holds — SQLite stores no HLC per row — and `SqliteSyncTarget.upsertRow`
+    // is an unconditional `INSERT OR REPLACE`. The only thing that used to stop
+    // a stale own entry landing was `#merged`, which lives in memory and is
+    // therefore empty on the first pull after every launch.
+    //
+    // That is a data-loss bug, not a tidiness one, and it was measured: a pull
+    // is a full read of the log over the network and takes as long as the link
+    // does. A headless analysis run finished 18 seconds into one, wrote its
+    // answer into the conversation and moved its activity watermark; the pull
+    // then landed carrying the pre-run copy of both rows and put them back. The
+    // answer the athlete had just watched arrive was gone from the row, and the
+    // restored watermark made the next poll re-analyse the same activity — so
+    // reopening the app showed a *different* answer to the one that was lost.
     const result = applyEntries(this.#deps.target, entries, {
-      isApplied: (entry) => this.#merged.get(entryIdentity(entry)) === entry.hlc
+      isApplied: (entry) =>
+        authoredHere(entry) ||
+        this.#merged.get(entryIdentity(entry)) === entry.hlc
     });
     for (const entry of result.merged) {
       this.#merged.set(entryIdentity(entry), entry.hlc);

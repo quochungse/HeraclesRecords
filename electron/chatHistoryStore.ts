@@ -758,8 +758,19 @@ function parseHrZonePreview(value: unknown): HrZonePreview | null {
 
 /**
  * Attribution is rebuilt field by field like everything else here: a marker
- * missing any of its five fields is dropped rather than half-restored, so the
- * UI never renders an analysis chip it cannot attribute.
+ * missing any of the four fields an analysis actually carries is dropped rather
+ * than half-restored, so the UI never renders an analysis chip it cannot
+ * attribute.
+ *
+ * **`bindingId` is optional, and it has to be.** It named an attachment, which
+ * no longer exists — `runAnalysis` deliberately stops writing it, and
+ * `ChatEntryAnalysisMarker` has declared it optional ever since. This parser
+ * went on demanding it, and every entry is rebuilt through here on the way both
+ * in and out (`normalizeEntries` runs on every save), so a run's own answer lost
+ * its marker in the same statement that stored it: the chip never appeared, and
+ * the synthetic playbook turn that opens a run rendered as the athlete saying
+ * "Một hoạt động mới vừa được đồng bộ…" in their own bubble. Entries written
+ * while attachments existed still carry one and still parse.
  */
 function parseAnalysisMarker(
   value: unknown
@@ -768,11 +779,18 @@ function parseAnalysisMarker(
     return undefined;
   }
 
+  // `bindingId` keeps its old position rather than being appended last, because
+  // `foreignTail` compares entries as `JSON.stringify` of what this parser
+  // built and `saveChatSession` skips a write when the serialized row is
+  // unchanged. Reordering a key would make every transcript holding one look
+  // rewritten on its next save.
+  const optional = new Set(["bindingId"]);
   const fields = ["runId", "automationId", "bindingId", "name", "triggerLabel"] as const;
   const marker: Record<string, string> = {};
   for (const field of fields) {
     const entry = value[field];
     if (typeof entry !== "string" || !entry.trim()) {
+      if (optional.has(field)) continue;
       return undefined;
     }
     marker[field] = entry;

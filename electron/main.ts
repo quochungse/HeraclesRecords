@@ -1010,10 +1010,55 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
+/**
+ * How long quit will wait for the sync queue before giving up on it.
+ *
+ * A ceiling, not a budget: the ordinary quit pays none of it, because a device
+ * with nothing outstanding never gets here. It exists for the link that neither
+ * answers nor fails — a captive portal, a VPN half-way down — where the upload
+ * would otherwise hold the window open until TCP gave up on its own.
+ */
+const QUIT_FLUSH_TIMEOUT_MS = 5_000;
+
+/** Whether the flush below has already been asked for. `app.quit()` re-fires
+ *  `before-quit`, so without this the second pass would start a second one. */
+let quitFlushStarted = false;
+
+app.on("before-quit", (event) => {
+  // Idempotent, all three, which is what lets the quit be cancelled and retried
+  // below without them running against half-torn-down state.
   stopRouteShare();
   stopCoachActivityWatcher();
   stopCoachAnalysisScheduler();
+
+  const loop = syncLoopInstance;
+  // The fast path, and the common one: nothing queued, nothing in the air, so
+  // the app closes exactly as quickly as it did before this existed.
+  if (quitFlushStarted || !loop?.hasUnpushedChanges) return;
+  quitFlushStarted = true;
+
+  // A change waits `FLUSH_DEBOUNCE_MS` before it is even attempted, so a turn
+  // written and an app closed in the same breath used to reach the vault never.
+  // That is not merely "the other machine is behind": the merge writes the
+  // vault's winner into SQLite without asking what the row currently holds, so
+  // the *next launch* would pull a foreign copy of that record straight over
+  // the local one — see the pull rule in CLAUDE.md. Getting the queue out is
+  // what keeps the vault's copy the newest one.
+  event.preventDefault();
+  loop.stop();
+  void (async () => {
+    try {
+      await Promise.race([
+        loop.flushBeforeQuit(),
+        new Promise((resolve) => setTimeout(resolve, QUIT_FLUSH_TIMEOUT_MS))
+      ]);
+    } catch (error) {
+      console.warn("[sync] could not flush the queue on quit", error);
+    }
+    // A macrotask, so Electron has finished processing the cancelled quit
+    // before a second one is asked for.
+    setImmediate(() => app.quit());
+  })();
 });
 
 // Built on first use, because it reads settings and so needs the database to be

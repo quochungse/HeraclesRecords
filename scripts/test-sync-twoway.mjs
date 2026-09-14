@@ -104,8 +104,48 @@ function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
     },
     pendingTimers: () => timers.size,
     builder: () =>
-      new ChangeBuilder({ nextHlc: loop.nextHlc })
+      new ChangeBuilder({ nextHlc: loop.nextHlc }),
+    /**
+     * A local write, as the app actually makes one.
+     *
+     * The row lands in this device's own store *first*, and the oplog entry is
+     * built from it afterwards (`notifySyncedRow`). The entry is a notification
+     * about a write that already happened, never the write itself — which is
+     * exactly why a pull must never apply this device's own entries back, and
+     * why a device's own state has to be put here rather than arriving through
+     * its target on the next pull.
+     */
+    write(fill) {
+      const builder = new ChangeBuilder({ nextHlc: loop.nextHlc });
+      fill(builder);
+      for (const entry of builder.entries) applyLocally(target, entry);
+      loop.enqueue(builder.entries);
+      return builder.entries;
+    }
   };
+}
+
+/** What a local write does to this device's own store, before any sync. */
+function applyLocally(target, entry) {
+  // Mirrors `stringValue` in syncEngine: a scalar travels under `value`.
+  const scalar = () => {
+    const value = entry.payload?.value;
+    return typeof value === "string" ? value : JSON.stringify(value ?? null);
+  };
+  const remove = entry.op === "delete";
+  switch (entry.scope) {
+    case "table":
+      if (remove) target.deleteRow(entry.key, entry.recordId);
+      else target.upsertRow(entry.key, entry.recordId, entry.payload ?? {});
+      return;
+    case "setting":
+      if (remove) target.deleteSetting(entry.key);
+      else target.setSetting(entry.key, scalar());
+      return;
+    case "localStorage":
+      if (remove) target.deleteLocalStorage(entry.key);
+      else target.setLocalStorage(entry.key, scalar());
+  }
 }
 
 // ===========================================================================
@@ -266,6 +306,125 @@ function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
   assert.equal((await provider.list("oplog")).length, 1);
 }
 
+// ===========================================================================
+// Quitting: what is queued still gets out
+// ===========================================================================
+//
+// The window a change spends on the debounce is the window an app closed in
+// the same breath loses it in, and losing it is not merely "the other machine
+// is behind": the merge writes the vault's winner into SQLite without asking
+// what the row currently holds, so the next launch pulls a foreign copy of
+// that record straight over the local one.
+{
+  const root = tempDir("quit-flush");
+  const device = makeDevice(root, "1111111111111111");
+  device.loop.start();
+
+  assert.equal(
+    device.loop.hasUnpushedChanges,
+    false,
+    "an idle loop has nothing to hold quit up for"
+  );
+  // The fast path has to stay honest: with nothing queued this is the whole
+  // cost of the check, and quit pays no more than it did before.
+  await device.loop.flushBeforeQuit();
+  assert.equal((await new LocalFolderProvider({ root }).list("oplog")).length, 0);
+
+  device.write((builder) => {
+    builder.setting("chat.provider", "written just before quit");
+  });
+  assert.equal(
+    device.loop.hasUnpushedChanges,
+    true,
+    "a change still on the debounce is a change the vault has no copy of"
+  );
+
+  // Quit, without ever letting the debounce elapse.
+  await device.loop.flushBeforeQuit();
+  assert.equal(device.loop.pendingCount, 0, "the queue went out on the way out");
+
+  const reader = makeDevice(root, "2222222222222222");
+  await reader.loop.pull();
+  assert.equal(
+    reader.target.settings.get("chat.provider"),
+    "written just before quit",
+    "and another device can read it"
+  );
+}
+
+// Offline, quit must not hang: one attempt, the queue kept, no waiting.
+{
+  const root = tempDir("quit-offline");
+  const device = makeDevice(root, "3333333333333333", { online: false });
+  device.write((builder) => {
+    builder.setting("chat.provider", "no link");
+  });
+
+  await device.loop.flushBeforeQuit();
+  assert.equal(
+    device.loop.pendingCount,
+    1,
+    "an offline quit keeps the work rather than dropping it, and returns at once"
+  );
+  assert.equal((await new LocalFolderProvider({ root }).list("oplog")).length, 0);
+}
+
+// An upload already in the air counts as unpushed, and quit waits for it.
+// `flush` takes the queue before it awaits, so between those two moments
+// `pendingCount` is zero and that batch exists nowhere else.
+{
+  const root = tempDir("quit-inflight");
+  let release;
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  const inner = new LocalFolderProvider({ root });
+  const slow = new SyncLoop({
+    provider: () => ({
+      name: "slow",
+      list: (prefix) => inner.list(prefix),
+      get: (path) => inner.get(path),
+      put: async (path, body) => {
+        await held;
+        return inner.put(path, body);
+      },
+      remove: (path) => inner.remove(path)
+    }),
+    target: fakeTarget(),
+    deviceId: () => "4444444444444444",
+    deviceName: () => "slow",
+    getSetting: () => undefined,
+    setSetting: () => {},
+    now: () => 1_700_000_000_000,
+    setTimer: () => 1,
+    clearTimer: () => {},
+    conditions: () => ({ appActive: true, online: true })
+  });
+
+  const builder = new ChangeBuilder({ nextHlc: slow.nextHlc });
+  builder.setting("chat.provider", "mid-upload");
+  slow.enqueue(builder.entries);
+
+  const flushing = slow.flush();
+  await Promise.resolve();
+  assert.equal(slow.pendingCount, 0, "the queue is taken before the await");
+  assert.equal(
+    slow.hasUnpushedChanges,
+    true,
+    "but the batch is still this device's only copy, so quit must wait for it"
+  );
+
+  const quitting = slow.flushBeforeQuit();
+  release();
+  await Promise.all([flushing, quitting]);
+  assert.equal(
+    slow.hasUnpushedChanges,
+    false,
+    "and once the upload lands there is nothing left to wait for"
+  );
+  assert.equal((await inner.list("oplog")).length, 1);
+}
+
 // A failed write puts the entries back rather than losing them.
 {
   const root = tempDir("failing");
@@ -321,10 +480,10 @@ function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
   const a = makeDevice(root, "aaaaaaaaaaaaaaaa");
   const b = makeDevice(root, "bbbbbbbbbbbbbbbb", { wallOffset: -4 * 60 * 1000 });
 
-  const fromA = a.builder();
-  fromA.row("chat_sessions", "s1", { id: "s1", title: "from A" });
-  fromA.setting("chat.provider", "claude-code");
-  a.loop.enqueue(fromA.entries);
+  a.write((builder) => {
+    builder.row("chat_sessions", "s1", { id: "s1", title: "from A" });
+    builder.setting("chat.provider", "claude-code");
+  });
   await a.loop.flush();
 
   // B catches up, then edits the same record afterwards.
@@ -335,10 +494,10 @@ function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
     "B receives what A wrote"
   );
 
-  const fromB = b.builder();
-  fromB.row("chat_sessions", "s1", { id: "s1", title: "from B, later" });
-  fromB.row("chat_sessions", "s2", { id: "s2", title: "B only" });
-  b.loop.enqueue(fromB.entries);
+  b.write((builder) => {
+    builder.row("chat_sessions", "s1", { id: "s1", title: "from B, later" });
+    builder.row("chat_sessions", "s2", { id: "s2", title: "B only" });
+  });
   await b.loop.flush();
 
   await a.loop.pull();
@@ -643,6 +802,179 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   );
 }
 
+// ===========================================================================
+// A pull never writes back what this device itself wrote
+// ===========================================================================
+//
+// `applyEntries` resolves entries against each other and never against what the
+// database currently holds — SQLite stores no HLC per row, and the target is an
+// unconditional INSERT OR REPLACE. The only thing that kept a device's own
+// entries from landing on top of its own newer rows was `#merged`, which lives
+// in memory and is therefore empty on the first pull after every launch.
+//
+// A pull is a full read of the log over the network and takes as long as the
+// link does. A headless analysis run finished 18 seconds into one, wrote its
+// answer into the conversation and moved its activity watermark; the pull then
+// landed carrying the pre-run copy of both rows and put them back. The answer
+// the athlete had watched arrive was gone, and the restored watermark had the
+// next poll re-analyse the same activity — so reopening the app showed a
+// different answer to the one that was lost.
+
+{
+  const root = tempDir("own-entries");
+  const mine = "cccccccccccccccc";
+
+  // What this device published earlier: the conversation as it was before the
+  // run, plus an analysis whose watermark has not moved yet.
+  const publisher = makeDevice(root, mine);
+  const published = publisher.builder();
+  published.row("chat_sessions", "s1", {
+    id: "s1",
+    provider: "claude-code",
+    title: "FM Trainer",
+    messages_json: JSON.stringify([{ kind: "message", role: "user", content: "hi" }]),
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-14T01:00:00Z"
+  });
+  published.row("coach_analyses", "a1", {
+    id: "a1",
+    session_id: "s1",
+    name: "Post-activity debrief",
+    playbook: "…",
+    enabled: 1,
+    last_activity_at: null,
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-14T01:00:00Z"
+  });
+  publisher.loop.enqueue(published.entries);
+  await publisher.loop.flush();
+
+  // The same device, relaunched: a new loop, so nothing is remembered as
+  // merged. Its database has meanwhile moved on — the run landed while the
+  // pull was in flight — and the pull must leave that alone.
+  const relaunched = makeDevice(root, mine);
+  const first = await relaunched.loop.pull();
+  assert.equal(
+    first.applied,
+    0,
+    "a device's own entries are never written back, not even on the first pull"
+  );
+  assert.equal(
+    relaunched.target.rows.has("chat_sessions:s1"),
+    false,
+    "and nothing reaches the target for them"
+  );
+
+  // Another machine's entry still lands, whichever side of this device's own
+  // timestamps it sits on. Newer wins and is applied…
+  const newer = makeDevice(root, "dddddddddddddddd", { wallOffset: 60_000 });
+  const newerBuilder = newer.builder();
+  newerBuilder.row("chat_sessions", "s1", {
+    id: "s1",
+    provider: "claude-code",
+    title: "Renamed over there",
+    messages_json: "[]",
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-14T01:30:00Z"
+  });
+  newer.loop.enqueue(newerBuilder.entries);
+  await newer.loop.flush();
+
+  await relaunched.loop.pull();
+  assert.equal(
+    relaunched.target.rows.get("chat_sessions:s1")?.title,
+    "Renamed over there",
+    "a foreign entry newer than this device's own still merges"
+  );
+
+  // …and older loses, which is why the fix cannot be "only resolve foreign
+  // entries". Own entries have to take part in last-writer-wins or a foreign
+  // entry this device already superseded would win and undo the local write.
+  const older = makeDevice(root, "eeeeeeeeeeeeeeee", { wallOffset: -3_600_000 });
+  const olderBuilder = older.builder();
+  olderBuilder.row("chat_sessions", "s1", {
+    id: "s1",
+    provider: "claude-code",
+    title: "Stale copy from a laptop that was asleep",
+    messages_json: "[]",
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-13T00:00:00Z"
+  });
+  older.loop.enqueue(olderBuilder.entries);
+  await older.loop.flush();
+
+  const afterStale = makeDevice(root, mine);
+  await afterStale.loop.pull();
+  assert.equal(
+    afterStale.target.rows.get("chat_sessions:s1")?.title,
+    "Renamed over there",
+    "an entry older than what the log already holds must not be applied"
+  );
+}
+
+// The same thing against the real database, which is where it cost data: the
+// row and the analysis row both moved on locally after this device published
+// them, and a pull must not put either back.
+{
+  const db = database.requireDatabase();
+  const root = tempDir("own-entries-sqlite");
+  const mine = "ffffffffffffffff";
+
+  const publisher = makeDevice(root, mine);
+  const published = publisher.builder();
+  published.row("chat_sessions", "incident", {
+    id: "incident",
+    provider: "claude-code",
+    title: "FM Trainer",
+    messages_json: JSON.stringify([{ kind: "message", role: "user", content: "before the run" }]),
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-14T02:00:00Z"
+  });
+  publisher.loop.enqueue(published.entries);
+  await publisher.loop.flush();
+
+  // The run appended its answer here, after the entry above was published and
+  // while the pull below was already reading the log.
+  const afterRun = JSON.stringify([
+    { kind: "message", role: "user", content: "before the run" },
+    { kind: "message", role: "user", content: "A new activity synced." },
+    { kind: "message", role: "assistant", content: "Heart rate ran high." }
+  ]);
+  db.prepare(
+    `INSERT OR REPLACE INTO chat_sessions
+       (id, provider, title, messages_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    "incident",
+    "claude-code",
+    "FM Trainer",
+    afterRun,
+    "2026-09-14T01:00:00Z",
+    "2026-09-14T02:03:15Z"
+  );
+
+  const relaunched = new SyncLoop({
+    provider: () => new LocalFolderProvider({ root }),
+    target: new SqliteSyncTarget(),
+    deviceId: () => mine,
+    deviceName: () => "local",
+    getSetting: database.getSetting,
+    setSetting: database.setSetting,
+    now: () => Date.now(),
+    setTimer: () => 1,
+    clearTimer: () => {},
+    conditions: () => ({ appActive: true, online: true })
+  });
+  await relaunched.pull();
+
+  assert.equal(
+    db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get("incident")
+      .messages_json,
+    afterRun,
+    "the run's answer survives a pull carrying this device's own older copy"
+  );
+}
+
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
@@ -650,5 +982,7 @@ await Promise.all(
 console.log(
   "sync two-way OK — debounce batches bursts, offline queue survives, " +
     "devices converge across clock skew, presence expires, SQLite pull lands, " +
+    "a device never writes its own entries back over newer local rows, " +
+    "quit flushes what is queued and skips the wait when nothing is, " +
     "compaction is interval-gated and one device at a time"
 );

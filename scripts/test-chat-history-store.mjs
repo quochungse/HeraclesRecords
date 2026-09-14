@@ -515,6 +515,51 @@ const extraFields = parseChatTranscriptJson(
 );
 assert.deepEqual(extraFields[0].automation, marker);
 
+// The shape `runAnalysis` actually writes: four fields, no `bindingId`.
+//
+// Every fixture above carries one because attachments existed when they were
+// written, which is precisely why nothing caught this — the parser demanded a
+// field the runner had stopped writing, so a run's own answer lost its marker
+// in the same statement that stored it (`normalizeEntries` runs on every save).
+// The chip never appeared, and the synthetic playbook turn that opens a run
+// rendered as the athlete's own bubble.
+const currentMarker = {
+  runId: "run-2",
+  automationId: "analysis-2",
+  name: "Post-activity debrief",
+  triggerLabel: "After Run, Indoor Run"
+};
+const unbound = createChatSession("local", db);
+saveChatSession(
+  unbound.id,
+  [
+    { kind: "message", role: "user", content: "A new activity synced.", automation: currentMarker },
+    { kind: "message", role: "assistant", content: "Heart rate ran high.", automation: currentMarker }
+  ],
+  db
+);
+const unboundRows = getChatSession(unbound.id, db);
+assert.deepEqual(
+  unboundRows[0].automation,
+  currentMarker,
+  "a marker without bindingId keeps its attribution"
+);
+assert.deepEqual(unboundRows[1].automation, currentMarker);
+// Through the row, not just the in-memory array: the save normalizes too.
+assert.deepEqual(
+  parseChatTranscriptJson(db.getSession(unbound.id).messages_json)[1].automation,
+  currentMarker
+);
+// An entry written while attachments existed still parses, and `bindingId`
+// keeps its stored position so the row does not look rewritten on next save.
+assert.deepEqual(
+  parseChatTranscriptJson(
+    JSON.stringify([{ kind: "message", role: "assistant", content: "hi", automation: marker }])
+  )[0].automation,
+  marker
+);
+deleteChatSession(unbound.id, db);
+
 // --- what the answer cost, restored for the footer under it ----------------
 // Same hazard as the marker above and the reason it is worth a test: an entry
 // is rebuilt from the fields this file names, so a count nobody reads back is
