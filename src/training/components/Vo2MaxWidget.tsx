@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
-import { formatHappenDayLabel, formatSignedDelta } from "../formatters";
+import {
+  formatHappenDayLabel,
+  formatSignedDelta,
+  getLocalHappenDayKey
+} from "../formatters";
 import { mergeTrainingDayLists } from "../parsers";
+import {
+  buildVo2Trend,
+  formatHappenDayNumeric,
+  formatPlateauDuration,
+  formatTrendSpan,
+  type Vo2Reading,
+  type Vo2Trend
+} from "../vo2Trend";
 import type { TrainingHubSnapshot } from "../types";
 
 interface Vo2MaxWidgetProps {
   snapshot: TrainingHubSnapshot | null;
-}
-
-interface Vo2Reading {
-  happenDay: string;
-  value: number;
 }
 
 interface Vo2Band {
@@ -31,6 +38,25 @@ const VO2_BANDS: Vo2Band[] = [
   { min: 35, max: 45, color: "#3ee88e" },
   { min: 45, max: 60, color: "#4aa3ff" }
 ];
+
+/**
+ * Smallest share of the bar that still fits "47 · 33d" under a segment. A
+ * narrower plateau keeps its color and its tooltip and drops the caption,
+ * rather than rendering one that collides with its neighbour.
+ */
+const PLATEAU_LABEL_MIN_SHARE = 0.14;
+
+/** Tone share for the lowest level on the bar, so it stays legible. */
+const PLATEAU_DIM = 0.32;
+
+/**
+ * A tooltip is centred on its segment, except near the ends of the bar: the
+ * panel clips its overflow, so one centred on a segment whose middle sits
+ * inside these margins would be cut off. Those anchor to the bar's edge
+ * instead. Decided from the segment's own centre rather than `:first-child`,
+ * which covers only the outermost two however many plateaus there are.
+ */
+const PLATEAU_TIP_EDGE = 0.28;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -107,19 +133,95 @@ function latestVo2Readings(snapshot: TrainingHubSnapshot | null): Vo2Reading[] {
     );
 }
 
+/**
+ * The bar is a picture of duration, not of magnitude: a segment's width is the
+ * days the level held, so a long plateau reads as a long block. Height carries
+ * nothing, which is why the level is told by opacity -- dimmest at the lowest
+ * value observed, full at the highest -- rather than by a second axis.
+ */
+function Vo2PlateauBar({ trend }: { trend: Vo2Trend }) {
+  const values = trend.plateaus.map((plateau) => plateau.value);
+  const lowest = Math.min(...values);
+  const highest = Math.max(...values);
+  const span = highest - lowest;
+
+  return (
+    <div className="vo2-plateaus">
+      <div className="vo2-plateaus-head">
+        <span>Last {formatTrendSpan(trend.spanDays)}</span>
+        <strong
+          className={`vo2-plateaus-delta${trend.delta > 0 ? " is-up" : trend.delta < 0 ? " is-down" : ""}`}
+        >
+          {formatSignedDelta(trend.delta)}
+        </strong>
+      </div>
+
+      <div className="vo2-plateaus-bar">
+        {trend.plateaus.map((plateau, index) => {
+          const strength =
+            span > 0
+              ? PLATEAU_DIM + ((plateau.value - lowest) / span) * (1 - PLATEAU_DIM)
+              : 1;
+          // Running centre of this segment across the bar, 0..1.
+          const centre =
+            trend.plateaus
+              .slice(0, index)
+              .reduce((sum, earlier) => sum + earlier.share, 0) +
+            plateau.share / 2;
+          const range = `${formatHappenDayNumeric(plateau.startDay)} - ${formatHappenDayNumeric(plateau.endDay)}`;
+
+          return (
+            <span
+              key={`${plateau.startDay}-${plateau.value}`}
+              className={`vo2-plateau${index === trend.plateaus.length - 1 ? " is-current" : ""}`}
+              style={{
+                flexGrow: plateau.share,
+                ["--plateau-strength" as string]: `${(strength * 100).toFixed(1)}%`
+              }}
+              data-tip-anchor={
+                centre < PLATEAU_TIP_EDGE
+                  ? "start"
+                  : centre > 1 - PLATEAU_TIP_EDGE
+                    ? "end"
+                    : "centre"
+              }
+              tabIndex={0}
+              role="img"
+              aria-label={`VO2 Max ${plateau.value}, ${plateau.days} days, ${range}`}
+            >
+              <span className="vo2-plateau-tip" role="tooltip">
+                VO2 Max <strong>{plateau.value}</strong> · {range}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+
+      <div className="vo2-plateaus-scale" aria-hidden="true">
+        {trend.plateaus.map((plateau) => (
+          <span
+            key={`${plateau.startDay}-label`}
+            className="vo2-plateau-label"
+            style={{ flexGrow: plateau.share }}
+          >
+            {plateau.share >= PLATEAU_LABEL_MIN_SHARE
+              ? `${plateau.value} · ${formatPlateauDuration(plateau.days)}`
+              : ""}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
   const [isReady, setIsReady] = useState(false);
   const readings = latestVo2Readings(snapshot);
   const latest = readings.at(-1);
-  const previous = readings.at(-2);
-  const value = latest?.value;
-  const displayValue = value;
+  const trend = buildVo2Trend(readings, getLocalHappenDayKey());
+  const displayValue = latest?.value;
   const needle = pointOnArc(displayValue ?? VO2_MIN, VO2_RADIUS - 18);
   const status = vo2Status(displayValue);
-  const delta =
-    value !== undefined && previous?.value !== undefined
-      ? value - previous.value
-      : undefined;
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setIsReady(true));
@@ -186,8 +288,12 @@ export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
           <strong>{status.label}</strong>
         </div>
         <div>
-          <span>Change</span>
-          <strong>{formatSignedDelta(delta)}</strong>
+          <span>Last step</span>
+          <strong>
+            {trend?.lastStep === undefined
+              ? "-"
+              : `${formatSignedDelta(trend.lastStep)} · ${formatPlateauDuration(trend.daysAtCurrent)} ago`}
+          </strong>
         </div>
         <div>
           <span>Updated</span>
@@ -196,6 +302,8 @@ export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
           </strong>
         </div>
       </div>
+
+      {trend ? <Vo2PlateauBar trend={trend} /> : null}
     </section>
   );
 }

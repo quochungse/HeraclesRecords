@@ -11416,6 +11416,212 @@ td span {
   white-space: nowrap;
 }
 
+/*
+ * VO2max plateau bar. Width is days held, never magnitude -- the value is told
+ * by opacity instead, so a bar with one long block reads as a long plateau
+ * rather than as a big number. Segment and caption carry the same flex-grow so
+ * a caption stays centred under the block it names.
+ */
+.vo2-plateaus {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 12px;
+}
+
+.vo2-plateaus-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vo2-plateaus-head > span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vo2-plateaus-delta {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vo2-plateaus-delta.is-up {
+  color: var(--vo2-tone);
+}
+
+.vo2-plateaus-delta.is-down {
+  color: var(--warning-text);
+}
+
+.vo2-plateaus-bar,
+.vo2-plateaus-scale {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+}
+
+/*
+ * No entrance animation on purpose. An `opacity: 0` keyframe with `fill-mode:
+ * both` leaves the element invisible until the animation actually runs, and it
+ * only runs while the window is getting frames -- on this project's GNOME
+ * Wayland target a panel mounted into a stalled window keeps whatever the
+ * first frame froze. The gauge above already shows that (its bands sit part-way
+ * through `vo2-band-reveal` in a stalled window); the bar carries the numbers,
+ * so it is drawn outright instead.
+ */
+.vo2-plateaus-bar {
+  height: 10px;
+}
+
+/*
+ * The coloured block lives in `::before`, not on the element itself, so the
+ * hover lift can scale it while `.vo2-plateau` -- the hit area and the
+ * tooltip's positioning context -- stays the size it was. Scaling the element
+ * would scale the tooltip inside it too, and an inverse transform on the child
+ * still squashes it for the length of the transition.
+ *
+ * The level is carried by how much tone the block is mixed with, not by
+ * `opacity`: an inline opacity cannot be lifted on hover without `!important`,
+ * and a dim segment has to reach full strength while it is the one being read.
+ */
+.vo2-plateau {
+  position: relative;
+  flex: 0 1 0;
+  /* A one-day plateau still has to be visible; flex-grow alone would round it away. */
+  min-width: 4px;
+}
+
+.vo2-plateau::before {
+  position: absolute;
+  content: "";
+  inset: 0;
+  border-radius: 3px;
+  background: color-mix(
+    in srgb,
+    var(--vo2-tone) var(--plateau-strength, 100%),
+    transparent
+  );
+  transition:
+    transform 0.16s cubic-bezier(0.34, 1.4, 0.64, 1),
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.vo2-plateau.is-current::before {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--vo2-tone) 45%, transparent);
+}
+
+.vo2-plateau:focus-visible {
+  outline: none;
+}
+
+/*
+ * Grown on the cross axis only: the bar's widths are days, so widening a
+ * segment would say the plateau lasted longer than it did.
+ */
+.vo2-plateau:hover,
+.vo2-plateau:focus-visible {
+  z-index: 3;
+}
+
+.vo2-plateau:hover::before,
+.vo2-plateau:focus-visible::before {
+  transform: scaleY(1.7);
+  background: var(--vo2-tone);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.45),
+    0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
+}
+
+/*
+ * Shown straight off `:hover` rather than through a `title`, whose ~1s browser
+ * delay is the whole reason this exists -- the fade has no `transition-delay`,
+ * so it starts on the first frame of the hover. `pointer-events: none` keeps it
+ * from stealing the hover that is drawing it.
+ */
+.vo2-plateau-tip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  z-index: 6;
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  background: rgba(18, 18, 20, 0.96);
+  box-shadow: var(--shadow-soft);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+
+/*
+ * The panel clips its overflow, so a tooltip centred on a segment near either
+ * end would be cut off. Those anchor to the bar's edge instead.
+ */
+.vo2-plateau[data-tip-anchor="start"] .vo2-plateau-tip {
+  left: 0;
+  transform: translate(0, 4px);
+}
+
+.vo2-plateau[data-tip-anchor="end"] .vo2-plateau-tip {
+  right: 0;
+  left: auto;
+  transform: translate(0, 4px);
+}
+
+.vo2-plateau:hover .vo2-plateau-tip,
+.vo2-plateau:focus-visible .vo2-plateau-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.vo2-plateau[data-tip-anchor="start"]:hover .vo2-plateau-tip,
+.vo2-plateau[data-tip-anchor="start"]:focus-visible .vo2-plateau-tip,
+.vo2-plateau[data-tip-anchor="end"]:hover .vo2-plateau-tip,
+.vo2-plateau[data-tip-anchor="end"]:focus-visible .vo2-plateau-tip {
+  transform: translate(0, 0);
+}
+
+.vo2-plateau-tip strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.vo2-plateau-label {
+  flex: 0 1 0;
+  overflow: hidden;
+  min-width: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* ── Sleep summary panel ───────────────────────────────────────────── */
 .sleep-panel {
   --sleep-tone: rgba(120, 146, 255, 0.72);
@@ -16926,6 +17132,8 @@ tr.data-intervals-row-missing {
   .vo2-gauge-needle,
   .vo2-gauge-pin,
   .vo2-gauge-value,
+  .vo2-plateau::before,
+  .vo2-plateau-tip,
   .vo2-widget-footer {
     transition: none;
   }
@@ -25324,6 +25532,26 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .vo2-widget-footer {
   border-top-color: var(--glass-border);
+}
+
+:root[data-theme="paper"] .vo2-plateaus {
+  border-top-color: var(--glass-border);
+}
+
+:root[data-theme="paper"] .vo2-plateau.is-current::before {
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] .vo2-plateau:hover::before,
+:root[data-theme="paper"] .vo2-plateau:focus-visible::before {
+  box-shadow:
+    0 3px 10px rgba(38, 34, 28, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
+}
+
+:root[data-theme="paper"] .vo2-plateau-tip {
+  border-color: var(--glass-border);
+  background: rgba(252, 250, 246, 0.98);
 }
 
 :root[data-theme="paper"] .training-stat-card.is-widget:hover {
