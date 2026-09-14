@@ -82,6 +82,10 @@
 .training-map {
   container-type: inline-size;
   position: relative;
+  /* Its own screen now, so it is a direct child of `.content`'s column flex.
+     Without this the default shrink squeezes the card to whatever height is
+     left over and `overflow: hidden` clips the map instead of scrolling. */
+  flex: 0 0 auto;
   width: 100%;
   max-width: 1800px;
   min-width: 0;
@@ -122,7 +126,7 @@
   padding: 2px 4px 0;
 }
 
-.training-map-header .training-map-eyebrow {
+.training-map-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -134,7 +138,7 @@
   text-transform: uppercase;
 }
 
-.training-map-header .training-map-eyebrow::before {
+.training-map-eyebrow::before {
   content: "";
   flex: 0 0 auto;
   width: 16px;
@@ -156,6 +160,38 @@
 .training-map-header > p:last-child {
   margin: 7px 0 0;
   color: var(--map-text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* The screen before a COROS session exists: the same title the card wears, over
+   the connect panel the other COROS-backed screens show. */
+.training-map-disconnected {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 18px;
+  align-content: start;
+}
+
+.training-map-page-header {
+  display: grid;
+  gap: 4px;
+  padding: 4px 2px 0;
+}
+
+.training-map-page-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.training-map-page-header > p:last-child {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
   font-size: 13.5px;
   line-height: 1.5;
 }

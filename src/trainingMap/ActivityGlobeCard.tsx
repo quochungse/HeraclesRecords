@@ -96,6 +96,9 @@ function isIsoDateOrEmpty(value: unknown): value is string {
   return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }
 
+// The key keeps its `overview.` spelling after the map moved off Overview into
+// its own screen: it is already in every athlete's localStorage, and renaming it
+// would silently reset the period they had chosen.
 const ACTIVITY_PERIOD_PREFERENCE =
   defineSelectionPreference<ActivityPeriodPreference>({
     key: "overview.activityPeriod",

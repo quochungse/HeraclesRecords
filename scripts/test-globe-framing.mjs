@@ -17,7 +17,7 @@ import {
   surfacePixelsPerDegree,
   pickSpacedPlaces,
   sphericalCenter
-} from "../src/overview/globeFraming.ts";
+} from "../src/trainingMap/globeFraming.ts";
 
 /** The training globe panel is wider than it is tall. */
 const WIDE = 1.6;

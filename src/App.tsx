@@ -216,9 +216,9 @@ const LazyProfileView = lazy(() =>
     default: ProfileView,
   })),
 );
-const LazyActivityGlobeCard = lazy(() =>
-  import("./overview/ActivityGlobeCard").then(({ ActivityGlobeCard }) => ({
-    default: ActivityGlobeCard,
+const LazyTrainingMapView = lazy(() =>
+  import("./trainingMap/TrainingMapView").then(({ TrainingMapView }) => ({
+    default: TrainingMapView,
   })),
 );
 
@@ -2634,7 +2634,6 @@ export default function App() {
                 watchConnected={Boolean(watchStatus?.connected)}
                 trainingConnected={Boolean(trainingHubStatus?.authenticated)}
                 trainingActivities={trainingHubActivities}
-                trainingActivityDetail={trainingHubActivityDetail}
                 trainingUpcomingWorkouts={trainingHubUpcomingWorkouts}
                 trainingSnapshot={trainingHubSnapshot}
                 trainingSportTypes={trainingHubSportTypes}
@@ -2642,7 +2641,6 @@ export default function App() {
                 onTransfer={handleTransfer}
                 onDeleteDownload={handleDeleteDownload}
                 onOpenLibrary={() => openMediaTab("library")}
-                onSelectTrainingActivity={handleTrainingHubActivityDetail}
               />
             ) : null}
             {activeView === "media" ? (
@@ -2843,6 +2841,19 @@ export default function App() {
                   onOpenOverview={() => setActiveView("overview")}
                   onMessage={setMessage}
                   onError={setError}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "places" ? (
+              <Suspense
+                fallback={<DeferredSurfaceFallback label="training map" />}
+              >
+                <LazyTrainingMapView
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  detail={trainingHubActivityDetail}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>
             ) : null}
@@ -3396,7 +3407,6 @@ interface MediaOverviewTabProps {
   /** Drives the spinner; also true while the same refresh runs from Settings. */
   refreshing: boolean;
   trainingActivities: TrainingHubActivity[];
-  trainingActivityDetail: TrainingHubActivityDetail | null;
   /** Feeds the contextual subtitle only — the panels get their own copies. */
   trainingUpcomingWorkouts: TrainingHubUpcomingWorkout[];
   trainingSnapshot: TrainingHubSnapshot | null;
@@ -3405,7 +3415,6 @@ interface MediaOverviewTabProps {
   onTransfer: (id: string) => void;
   onDeleteDownload: (track: LocalTrack) => void;
   onOpenLibrary: () => void;
-  onSelectTrainingActivity: (activity: TrainingHubActivity) => void;
 }
 
 function MediaOverviewTab({
@@ -3417,7 +3426,6 @@ function MediaOverviewTab({
   onRefresh,
   refreshing,
   trainingActivities,
-  trainingActivityDetail,
   trainingUpcomingWorkouts,
   trainingSnapshot,
   trainingSportTypes,
@@ -3425,7 +3433,6 @@ function MediaOverviewTab({
   onTransfer,
   onDeleteDownload,
   onOpenLibrary,
-  onSelectTrainingActivity,
 }: MediaOverviewTabProps) {
   const greeting = useTimeOfDayGreeting();
   const { unitSystem } = useUnitSystem();
@@ -3526,28 +3533,6 @@ function MediaOverviewTab({
             onDeleteDownload={onDeleteDownload}
           />
         </section>
-      ) : null}
-
-      {/* Signed out, the map has nothing to draw and stands there saying so —
-          next to the sign-in panel Training already shows, which says it
-          better. So it waits for a session, the way every other training
-          panel does, and its chunk stays unfetched until there is one. A
-          start-up restore reads as signed out here on purpose: the panel
-          above is telling the athlete to sit tight, and a map is not what
-          they are waiting on. */}
-      {trainingConnected ? (
-        <div className="overview-globe-section dashboard-block">
-          <Suspense
-            fallback={<DeferredSurfaceFallback label="activity globe" />}
-          >
-            <LazyActivityGlobeCard
-              activities={trainingActivities}
-              connected={trainingConnected}
-              detail={trainingActivityDetail}
-              onSelectActivity={onSelectTrainingActivity}
-            />
-          </Suspense>
-        </div>
       ) : null}
     </div>
   );

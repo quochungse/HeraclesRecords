@@ -8,6 +8,7 @@ import {
   Flame,
   Footprints,
   Gauge,
+  Globe,
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
@@ -34,6 +35,7 @@ export type PrimaryView =
   | "maps"
   | "watchfaces"
   | "coach"
+  | "places"
   | "settings";
 
 export type PrimaryNavGroupId = "training-group" | "coros-connect";
@@ -121,6 +123,10 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       },
     ],
   }),
+  // The training map used to be the last block on Overview. It is a screen the
+  // athlete opens to browse rather than to check, so it reads as a destination
+  // of its own rather than the tail of the morning dashboard.
+  item({ id: "places", label: "Where you’ve been", icon: Globe }),
   item({
     id: "settings",
     label: "Settings",

@@ -2397,14 +2397,6 @@ input::placeholder {
   padding: 26px 28px 24px;
 }
 
-.overview-globe-section .activity-globe-card {
-  min-height: clamp(460px, 52vh, 600px);
-}
-
-.overview-globe-section .activity-globe-stage {
-  min-height: 340px;
-}
-
 .activity-globe-card::before {
   content: "";
   position: absolute;
@@ -17403,14 +17395,6 @@ tr.data-intervals-row-missing {
   .activity-globe-stage {
     min-height: 230px;
     margin-inline: -8px;
-  }
-
-  .overview-globe-section .activity-globe-card {
-    min-height: 430px;
-  }
-
-  .overview-globe-section .activity-globe-stage {
-    min-height: 230px;
   }
 
   .activity-globe-heroes {
