@@ -78,27 +78,34 @@ function group(entry: PrimaryNavGroup): PrimaryNavEntry {
 export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
   item({ id: "overview", label: "Overview", icon: LayoutGrid }),
   item({ id: "profile", label: "Personal", icon: User }),
-  item({ id: "calendar", label: "Calendar", icon: CalendarDays }),
   item({
     id: "coach",
     label: "Coach",
     icon: MessageCircle,
     showActivity: true,
   }),
+  item({ id: "calendar", label: "Calendar", icon: CalendarDays }),
+  // The library is what an athlete reaches for while planning the calendar
+  // above it, so it reads as a peer of that screen rather than a drawer inside
+  // the group of things already done.
+  item({ id: "library", label: "Training Library", icon: BookOpen }),
   group({
     id: "training-group",
-    label: "Training",
+    label: "Your Training",
     icon: Flame,
     items: [
       { id: "training", label: "Activities", icon: Activity },
       { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
-      { id: "library", label: "Training Library", icon: BookOpen },
     ],
   }),
   // Sleep sits beside Training rather than inside it: it is recovery, it is
   // reached from the Overview card, and burying it a level down made the one
   // screen an athlete opens every morning the hardest one to find.
   item({ id: "sleep", label: "Sleep", icon: Moon }),
+  // The training map used to be the last block on Overview. It is a screen the
+  // athlete opens to browse rather than to check, so it reads as a destination
+  // of its own rather than the tail of the morning dashboard.
+  item({ id: "places", label: "Where you’ve been", icon: Globe }),
   group({
     id: "coros-connect",
     label: "Coros Connect",
@@ -123,10 +130,6 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       },
     ],
   }),
-  // The training map used to be the last block on Overview. It is a screen the
-  // athlete opens to browse rather than to check, so it reads as a destination
-  // of its own rather than the tail of the morning dashboard.
-  item({ id: "places", label: "Where you’ve been", icon: Globe }),
   item({
     id: "settings",
     label: "Settings",
