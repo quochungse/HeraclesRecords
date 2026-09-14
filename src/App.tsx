@@ -86,7 +86,10 @@ import {
   TRAINING_TREND_MAX_DAYS
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
-import type { TrainingHubSnapshot } from "./training/types";
+import type {
+  TrainingHubLoadStatus,
+  TrainingHubSnapshot,
+} from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
 import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
@@ -447,6 +450,8 @@ export default function App() {
   const [trainingHubActivities, setTrainingHubActivities] = useState<
     TrainingHubActivity[]
   >([]);
+  const [trainingHubActivitiesStatus, setTrainingHubActivitiesStatus] =
+    useState<TrainingHubLoadStatus>("pending");
   const [trainingHubAnalytics, setTrainingHubAnalytics] =
     useState<TrainingHubAnalytics | null>(null);
   const [trainingHubDashboard, setTrainingHubDashboard] =
@@ -760,6 +765,7 @@ export default function App() {
     trainingCoreLoadSequenceRef.current += 1;
     trainingWellnessLoadSequenceRef.current += 1;
     setTrainingHubActivities([]);
+    setTrainingHubActivitiesStatus("pending");
     setTrainingHubAnalytics(null);
     setTrainingHubDashboard(null);
     setTrainingHubDailyMetrics(null);
@@ -809,8 +815,14 @@ export default function App() {
     const results = await Promise.allSettled([
       publish(
         listAllTrainingHubActivities(api),
-        setTrainingHubActivities,
-        () => setTrainingHubActivities([]),
+        (activities) => {
+          setTrainingHubActivities(activities);
+          setTrainingHubActivitiesStatus("ready");
+        },
+        () => {
+          setTrainingHubActivities([]);
+          setTrainingHubActivitiesStatus("failed");
+        },
       ),
       publish(
         api.getTrainingAnalytics(),
@@ -1959,6 +1971,29 @@ export default function App() {
     }
   }
 
+  /**
+   * Running's "Try again", after the activity list failed to arrive.
+   *
+   * Not `handleTrainingHubRefresh`, whose success message is only withheld when
+   * *every* COROS request fails. The list failing while something else loads
+   * therefore reads "analytics refreshed" — shown beside a panel still saying
+   * the activities did not load. The screen shows the outcome itself (the list,
+   * or the same panel again), so this reports failures and claims nothing.
+   */
+  async function handleRunningActivitiesRetry() {
+    setBusy("training-refresh");
+    setError(null);
+    setMessage(null);
+
+    try {
+      await refreshTrainingHub();
+    } catch (caught) {
+      await reportTrainingHubError(caught);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleTrainingHubRefresh() {
     setBusy("training-refresh");
     setError(null);
@@ -2826,9 +2861,11 @@ export default function App() {
                   activities={trainingHubActivities}
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   restoring={Boolean(trainingHubStatus?.restoring)}
+                  activitiesStatus={trainingHubActivitiesStatus}
                   detail={trainingHubActivityDetail}
                   snapshot={trainingHubSnapshot}
                   busy={busy}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
                   onSelectActivity={handleTrainingHubActivityDetail}
                   onOpenOverview={() => setActiveView("overview")}
                 />

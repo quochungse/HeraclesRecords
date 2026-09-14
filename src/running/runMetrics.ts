@@ -1,5 +1,6 @@
 import type {
   TrainingHubActivity,
+  TrainingHubActivityPause,
   TrainingHubActivitySeriesPoint,
   TrainingHubThresholdZone
 } from "../../electron/types";
@@ -29,6 +30,19 @@ function startedAtMs(activity: TrainingHubActivity): number | undefined {
 }
 
 /**
+ * How long a run took, in the sense every figure on this screen means: time
+ * spent running. COROS's `duration` is start to finish with the pauses in it,
+ * so a real 10.2 km run with two pauses totalling 48 minutes read 11:36 /km
+ * against the 6:51 it was actually run at. Falls back to `duration` only where
+ * COROS sent no activity time, which is the same number on a run never paused.
+ */
+export function runSeconds(
+  activity: Pick<TrainingHubActivity, "duration" | "activeDuration">
+): number | undefined {
+  return positive(activity.activeDuration) ?? positive(activity.duration);
+}
+
+/**
  * Seconds per kilometre, or nothing.
  *
  * A session that recorded no distance is not a 0:00 run and must not be given a
@@ -39,7 +53,7 @@ export function paceSecondsPerKm(
   activity: TrainingHubActivity
 ): number | undefined {
   const distance = positive(activity.distance);
-  const duration = positive(activity.duration);
+  const duration = runSeconds(activity);
   if (distance === undefined || duration === undefined) {
     return undefined;
   }
@@ -60,7 +74,7 @@ export function efficiencyIndex(
   activity: TrainingHubActivity
 ): number | undefined {
   const distance = positive(activity.distance);
-  const duration = positive(activity.duration);
+  const duration = runSeconds(activity);
   const avgHr = positive(activity.avgHr);
   if (distance === undefined || duration === undefined || avgHr === undefined) {
     return undefined;
@@ -86,7 +100,7 @@ export function elevationPerKm(
 export function verticalSpeed(
   activity: TrainingHubActivity
 ): number | undefined {
-  const duration = positive(activity.duration);
+  const duration = runSeconds(activity);
   if (duration === undefined || activity.elevationGain === undefined) {
     return undefined;
   }
@@ -143,7 +157,7 @@ function emptySurfaceDistances(): Record<RunSurface, number> {
 function addToTotals(totals: RunTotals, activity: TrainingHubActivity): void {
   totals.count += 1;
   totals.distance += positive(activity.distance) ?? 0;
-  totals.duration += positive(activity.duration) ?? 0;
+  totals.duration += runSeconds(activity) ?? 0;
   totals.trainingLoad += positive(activity.trainingLoad) ?? 0;
   totals.elevationGain += positive(activity.elevationGain) ?? 0;
 }
@@ -436,6 +450,52 @@ export function paceHrDecoupling(
   };
 }
 
+/**
+ * Where a wall-clock moment lands on the activity clock: the time elapsed less
+ * every pause that had begun by then. A moment inside a pause lands on the
+ * instant it began, so the line resumes where it stopped instead of leaving a
+ * gap the width of the wait. `pauses` must be in order, as the parser leaves them.
+ */
+export function activeElapsed(
+  elapsed: number,
+  pauses: readonly TrainingHubActivityPause[]
+): number {
+  let paused = 0;
+  for (const pause of pauses) {
+    if (pause.start >= elapsed) {
+      break;
+    }
+    paused += Math.min(pause.duration, elapsed - pause.start);
+  }
+  return elapsed - paused;
+}
+
+/**
+ * A run's samples on activity time.
+ *
+ * The series is stamped by the wall clock and simply stops while the watch is
+ * paused, so plotted as sent a pause is a flat stretch as long as the wait, the
+ * laps — which COROS times without pauses — drift off their own boundaries, and
+ * a selection across it reports a duration nobody ran.
+ */
+export function withPausesRemoved(
+  series: readonly TrainingHubActivitySeriesPoint[],
+  pauses: readonly TrainingHubActivityPause[] | undefined
+): TrainingHubActivitySeriesPoint[] {
+  const ordered = (pauses ?? [])
+    .filter((pause) => pause.start >= 0 && pause.duration > 0)
+    .sort((left, right) => left.start - right.start);
+  if (ordered.length === 0) {
+    return [...series];
+  }
+
+  return series.map((point) =>
+    point.elapsed === undefined
+      ? point
+      : { ...point, elapsed: activeElapsed(point.elapsed, ordered) }
+  );
+}
+
 /** Distance per surface across a whole list, for the surface mix panel. */
 export function distanceBySurface(
   activities: readonly TrainingHubActivity[]
@@ -518,7 +578,7 @@ export function buildRunEfficiencyWeeks(
     if (surface === null || at === undefined || value === undefined) {
       continue;
     }
-    if ((positive(activity.duration) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
+    if ((runSeconds(activity) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
       continue;
     }
     if (zones.length > 0 && runIntensity(activity.avgHr, zones) !== "easy") {
@@ -600,7 +660,7 @@ export function runIntensityMix(
     }
     const bucket = mix[runIntensity(activity.avgHr, zones) ?? "unrated"];
     bucket.count += 1;
-    bucket.duration += positive(activity.duration) ?? 0;
+    bucket.duration += runSeconds(activity) ?? 0;
   }
 
   return mix;

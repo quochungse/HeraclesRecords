@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { LockKeyhole } from "lucide-react";
+import { CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
-import type { TrainingHubSnapshot } from "../training/types";
+import type {
+  TrainingHubLoadStatus,
+  TrainingHubSnapshot
+} from "../training/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -17,6 +20,7 @@ import { RunEfficiencyChart } from "./RunEfficiencyChart";
 import { RunIntensityPanel } from "./RunIntensityPanel";
 import { RunningHero, runningThresholdZones } from "./RunningHero";
 import { RunSurfacePanel } from "./RunSurfacePanel";
+import { RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
 import { summariseRuns, surfacesPresent } from "./runMetrics";
@@ -34,11 +38,15 @@ export interface RunningViewProps {
   connected: boolean;
   /** A start-up re-login in flight: signed out now, probably not in a moment. */
   restoring?: boolean;
+  /** Whether `activities` has arrived — an empty list alone cannot say. */
+  activitiesStatus: TrainingHubLoadStatus;
   detail: TrainingHubActivityDetail | null;
   /** Account-level figures the blocks read: VO2max, thresholds, zones. */
   snapshot: TrainingHubSnapshot | null;
   busy: string | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
+  /** Reloads the COROS data after the activity list failed to arrive. */
+  onRetryActivities: () => void;
   onOpenOverview: () => void;
 }
 
@@ -118,10 +126,12 @@ export function RunningView({
   activities,
   connected,
   restoring = false,
+  activitiesStatus,
   detail,
   snapshot,
   busy,
   onSelectActivity,
+  onRetryActivities,
   onOpenOverview
 }: RunningViewProps) {
   const { unitSystem } = useUnitSystem();
@@ -156,6 +166,13 @@ export function RunningView({
   );
 
   const totals = useMemo(() => summariseRuns(runs), [runs]);
+
+  // Asked of the whole history, not the period: "nothing in the last four
+  // weeks" and "never run at all" are different screens.
+  const hasAnyRun = useMemo(
+    () => activities.some((activity) => isRunSportType(activity.sportType)),
+    [activities]
+  );
 
   // Every run of the chosen surface, whatever the period: the year-ago
   // comparison is explicitly about a window the period filter excludes.
@@ -274,11 +291,7 @@ export function RunningView({
   if (!connected) {
     return (
       <section className="running-view running-view-disconnected">
-        <header className="running-page-header">
-          <p className="running-eyebrow">Your training</p>
-          <h1>Running</h1>
-          <p>Every run you have logged, read down the time axis.</p>
-        </header>
+        <RunningPageHeader />
 
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
@@ -307,7 +320,68 @@ export function RunningView({
         detail={detail?.activityId === selectedRun.activityId ? detail : null}
         loading={busy === `training-detail:${selectedRun.activityId}`}
         onBack={closeRun}
+        onRetry={() => onSelectActivity(selectedRun)}
       />
+    );
+  }
+
+  // Signed in, but the list has not arrived. Every figure below would be a
+  // zero, and a zero reads as a fact — so nothing is shown until it lands.
+  // Data already on screen from an earlier load is kept instead: only an empty
+  // list waits on this.
+  if (!hasAnyRun && activitiesStatus === "pending") {
+    return (
+      <section className="running-view" ref={pageRef}>
+        <RunningPageHeader />
+        <RunningPageSkeleton />
+      </section>
+    );
+  }
+
+  if (!hasAnyRun && activitiesStatus === "failed") {
+    const retrying = busy === "training-refresh";
+    return (
+      <section className="running-view" ref={pageRef}>
+        <RunningPageHeader />
+        <section className="panel running-empty running-state-panel">
+          <CloudOff size={22} aria-hidden="true" />
+          <div>
+            <h3>Your activities did not load</h3>
+            <p>
+              COROS did not return the activity list. This is usually the
+              connection; nothing on this machine was lost.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={retrying}
+            onClick={onRetryActivities}
+          >
+            <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
+            {retrying ? "Loading" : "Try again"}
+          </button>
+        </section>
+      </section>
+    );
+  }
+
+  if (!hasAnyRun) {
+    return (
+      <section className="running-view" ref={pageRef}>
+        <RunningPageHeader />
+        <section className="panel running-empty running-state-panel">
+          <RunnerIcon size={22} aria-hidden="true" />
+          <div>
+            <h3>No runs yet</h3>
+            <p>
+              Road, trail, track and treadmill runs from your COROS watch land
+              here once they sync. Everything else you record stays under
+              Activities.
+            </p>
+          </div>
+        </section>
+      </section>
     );
   }
 
@@ -318,17 +392,16 @@ export function RunningView({
 
   return (
     <section className="running-view" ref={pageRef}>
-      <header className="running-page-header">
-        <p className="running-eyebrow">Your training</p>
-        <h1>Running</h1>
-        <p>Every run you have logged, read down the time axis.</p>
-      </header>
+      <RunningPageHeader />
 
       <div className="running-controls">
-        <div className="running-switch" role="group" aria-label="Surface">
+        {/* The same chips as the load heatmap on Training Overview, class for
+            class, so a filter reads the same wherever it sits in the app. */}
+        <div className="training-metric-toggle" role="group" aria-label="Surface">
           <button
             type="button"
-            className={surface === null ? "is-active" : undefined}
+            className={`training-metric-option${surface === null ? " is-active" : ""}`}
+            aria-pressed={surface === null}
             onClick={() => setSurface(null)}
           >
             All
@@ -337,7 +410,8 @@ export function RunningView({
             <button
               key={option}
               type="button"
-              className={surface === option ? "is-active" : undefined}
+              className={`training-metric-option${surface === option ? " is-active" : ""}`}
+              aria-pressed={surface === option}
               onClick={() => setSurface(option)}
             >
               {RUN_SURFACE_LABELS[option]}
@@ -345,12 +419,19 @@ export function RunningView({
           ))}
         </div>
 
-        <div className="running-switch running-period" role="group" aria-label="Period">
+        <div
+          className="training-metric-toggle running-period"
+          role="group"
+          aria-label="Period"
+        >
           {PERIOD_OPTIONS.map((option) => (
             <button
               key={option.label}
               type="button"
-              className={periodDays === option.days ? "is-active" : undefined}
+              className={`training-metric-option${
+                periodDays === option.days ? " is-active" : ""
+              }`}
+              aria-pressed={periodDays === option.days}
               onClick={() => setPeriodDays(option.days)}
             >
               {option.label}
@@ -435,5 +516,15 @@ export function RunningView({
         )}
       </div>
     </section>
+  );
+}
+
+function RunningPageHeader() {
+  return (
+    <header className="running-page-header">
+      <p className="running-eyebrow">Your training</p>
+      <h1>Running</h1>
+      <p>Every run you have logged, read down the time axis.</p>
+    </header>
   );
 }

@@ -46,6 +46,18 @@ export interface TrainingSummaryMetrics {
   mcpConnected?: boolean;
 }
 
+/**
+ * Whether the activity list has arrived.
+ *
+ * The list itself cannot say: it starts as `[]`, a failed load resets it to
+ * `[]`, and an athlete who has never run also has `[]`. A screen reading only
+ * the array tells all three apart by guessing, and the guess it made was "no
+ * runs" — shown, with a row of zeros, for every launch until COROS answered.
+ * `pending` holds until the first load of a session settles; a later refresh
+ * does not go back to it, so data already on screen stays there meanwhile.
+ */
+export type TrainingHubLoadStatus = "pending" | "ready" | "failed";
+
 export interface TrainingHubSnapshot {
   summary: TrainingSummaryMetrics;
   trendPoints: TrainingTrendPoint[];

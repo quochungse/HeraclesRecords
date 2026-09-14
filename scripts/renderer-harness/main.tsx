@@ -26,6 +26,7 @@ import { ChatView } from "../../src/chat/ChatView";
 import { ConversationAnalyses } from "../../src/chat/analyses/ConversationAnalyses";
 import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
 import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
+import { RunningView } from "../../src/running/RunningView";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -154,7 +155,53 @@ const spy = (name: string) => (...args: unknown[]) => {
   calls.push({ method: `prop:${name}`, args });
 };
 
+/**
+ * The app stylesheet, loaded only by mounts that assert on layout.
+ *
+ * Every other suite here has always run without it, and pulling it in for all
+ * of them would change the ground their assertions stand on. It is imported
+ * lazily, the first time such a mount is asked for, and the driver waits on
+ * `appStylesReady` before it measures anything.
+ */
+let appStylesReady = false;
+function loadAppStyles() {
+  if (appStylesReady) return;
+  void import("../../src/styles.css").then(() => {
+    appStylesReady = true;
+  });
+}
+
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
+  // Inside the same column the app gives it — `.content.content-fill` clips, so
+  // the page has to scroll itself — at a fixed height, because every layout
+  // trap this screen has hit only exists in a column that cannot grow.
+  RunningView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          // The column's width, not the window's: a hidden window ignores being
+          // resized, and the column is what this layout responds to anyway.
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <RunningView
+          activities={(options.activities as never) ?? []}
+          connected={(options.connected as boolean | undefined) ?? true}
+          restoring={false}
+          activitiesStatus={(options.activitiesStatus as never) ?? "ready"}
+          detail={(options.detail as never) ?? null}
+          snapshot={(options.snapshot as never) ?? null}
+          busy={(options.busy as string | null | undefined) ?? null}
+          onSelectActivity={spy("onSelectActivity")}
+          onRetryActivities={spy("onRetryActivities")}
+          onOpenOverview={spy("onOpenOverview")}
+        />
+      </main>
+    );
+  },
   ChatView: (options) => (
     <ChatView
       api={api}
@@ -388,6 +435,33 @@ const harness = {
 
   /** What the page shouted while nobody was reading it. */
   consoleErrors: (): string[] => [...consoleErrors],
+
+  /** Whether a layout mount's stylesheet has finished loading. */
+  appStylesReady: (): boolean => appStylesReady,
+
+  /** Sets a scroll position, for tests about where a page returns to. */
+  scrollTo(selector: string, top: number): number | null {
+    const element = query(selector)[0];
+    if (!element) return null;
+    element.scrollTop = top;
+    return element.scrollTop;
+  },
+
+  scrollTop: (selector: string): number | null => query(selector)[0]?.scrollTop ?? null,
+
+  /** A box, rounded, for assertions about how big something ended up. */
+  rect(selector: string): { width: number; height: number; top: number } | null {
+    const box = query(selector)[0]?.getBoundingClientRect();
+    return box
+      ? { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top) }
+      : null;
+  },
+
+  /** How far an element's content runs past its own box, horizontally. */
+  overflowX(selector: string): number | null {
+    const element = query(selector)[0];
+    return element ? element.scrollWidth - element.clientWidth : null;
+  },
 
   /** Proves the driver is talking to the dev build, so React's warnings exist. */
   dev: (): boolean => import.meta.env.DEV

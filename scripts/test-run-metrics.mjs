@@ -20,6 +20,7 @@ const {
 } = await import(moduleUrl("runSurface.ts"));
 
 const {
+  activeElapsed,
   buildRunEfficiencyWeeks,
   buildRunWeeks,
   runIntensityMix,
@@ -32,9 +33,11 @@ const {
   paceSecondsPerKm,
   runIntensity,
   runLoadBalance,
+  runSeconds,
   startOfRunWeekMs,
   summariseRuns,
-  verticalSpeed
+  verticalSpeed,
+  withPausesRemoved
 } = await import(moduleUrl("runMetrics.ts"));
 
 // 14 Sep 2026 is a Monday; every fixture below is built in local time because
@@ -120,6 +123,65 @@ assert.equal(elevationPerKm(run({ elevationGain: undefined })), undefined);
 assert.equal(verticalSpeed(run({ duration: 3600, elevationGain: 600 })), 600);
 assert.equal(verticalSpeed(run({ elevationGain: 0 })), 0);
 assert.equal(verticalSpeed(run({ elevationGain: undefined })), undefined);
+
+// ---------------------------------------------------------------------------
+// Activity time. COROS's `duration` runs start to finish with the pauses in it;
+// every figure here is about time spent running. The numbers are a real road
+// run's: 10.2 km, 7 102 s start to finish, 4 190 s of it running.
+// ---------------------------------------------------------------------------
+
+const paused = run({ distance: 10_200, duration: 7102, activeDuration: 4190, avgHr: 150 });
+assert.equal(runSeconds(paused), 4190);
+assert.equal(runSeconds(run({ duration: 3000 })), 3000, "no activity time sent: the one clock there is");
+assert.equal(runSeconds(run({ duration: 3000, activeDuration: 0 })), 3000, "a zero is not a reading");
+assert.ok(
+  Math.abs(paceSecondsPerKm(paused) - 4190 / 10.2) < 1e-9,
+  "6:51 /km, not the 11:36 the pauses would make it"
+);
+assert.ok(Math.abs(efficiencyIndex(paused) - 10_200 / (4190 / 60) / 150) < 1e-9);
+assert.equal(verticalSpeed(run({ duration: 7200, activeDuration: 3600, elevationGain: 600 })), 600);
+assert.equal(summariseRuns([paused, run({ duration: 1000 })]).duration, 5190);
+assert.equal(
+  runIntensityMix([paused], [{ index: 0, hr: 140 }, { index: 1, hr: 155 }, { index: 2, hr: 170 }]).easy.duration,
+  4190
+);
+assert.equal(
+  buildRunEfficiencyWeeks(
+    [run({ startTime: secondsAgo(1), duration: 1800, activeDuration: 1100 })],
+    { weeks: 1, nowMs: NOW }
+  )[0].count,
+  0,
+  "18 minutes of running is too short for efficiency, however long the stops were"
+);
+
+// Pauses sit on the wall clock; the samples go quiet through them.
+const pauses = [
+  { start: 1120, duration: 694 },
+  { start: 2524, duration: 2218 }
+];
+assert.equal(activeElapsed(0, pauses), 0);
+assert.equal(activeElapsed(1120, pauses), 1120, "the moment of the press");
+assert.equal(activeElapsed(1500, pauses), 1120, "inside a pause lands where it began");
+assert.equal(activeElapsed(1814, pauses), 1120, "and resumes from there");
+assert.equal(activeElapsed(1820, pauses), 1126);
+assert.equal(activeElapsed(7102, pauses), 7102 - 694 - 2218, "the end is the activity time");
+
+const wallClock = [
+  { elapsed: 0, hr: 110 },
+  { elapsed: 1120, hr: 155 },
+  { elapsed: 1813, hr: 112 },
+  { distance: 500 },
+  { elapsed: 7102, hr: 169 }
+];
+const onActivityTime = withPausesRemoved(wallClock, [...pauses].reverse());
+assert.deepEqual(
+  onActivityTime.map((point) => point.elapsed),
+  [0, 1120, 1120, undefined, 4190],
+  "order-independent, and a point with no clock is left alone"
+);
+assert.equal(onActivityTime[2].hr, 112, "only the clock moves");
+assert.deepEqual(withPausesRemoved(wallClock, undefined), wallClock);
+assert.notEqual(withPausesRemoved(wallClock, []), wallClock, "a copy, never the caller's array");
 
 // ---------------------------------------------------------------------------
 // Weekly buckets. Monday-start, and a week nobody ran is a zero bar rather than

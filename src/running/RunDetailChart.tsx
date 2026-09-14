@@ -61,6 +61,11 @@ interface RunDetailChartProps {
   /** Set from the lap table; focuses the chart on one lap. */
   focusLapIndex: number | null;
   onFocusLapHandled: () => void;
+  /**
+   * COROS's own activity time (`workoutTime`), stated for the whole run so the
+   * unselected segment reads it directly rather than from the sample clock.
+   */
+  activeDuration?: number;
 }
 
 interface ChartRow extends TrainingHubActivitySeriesPoint {
@@ -147,7 +152,8 @@ export function RunDetailChart({
   laps,
   hrZones,
   focusLapIndex,
-  onFocusLapHandled
+  onFocusLapHandled,
+  activeDuration
 }: RunDetailChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
@@ -256,9 +262,11 @@ export function RunDetailChart({
         ? last.distance - first.distance
         : undefined;
     const duration =
-      typeof first.elapsed === "number" && typeof last.elapsed === "number"
-        ? last.elapsed - first.elapsed
-        : undefined;
+      range === null && activeDuration !== undefined
+        ? activeDuration
+        : typeof first.elapsed === "number" && typeof last.elapsed === "number"
+          ? last.elapsed - first.elapsed
+          : undefined;
 
     return {
       distance,
@@ -273,7 +281,7 @@ export function RunDetailChart({
       hr: mean("hr"),
       cadence: mean("cadence")
     };
-  }, [visible]);
+  }, [activeDuration, range, visible]);
 
   if (rows.length < 2) {
     return (
@@ -293,11 +301,16 @@ export function RunDetailChart({
     <section className="panel run-detail-panel run-chart-panel">
       <div className="run-chart-head">
         <p className="running-eyebrow">Channels</p>
-        <div className="running-switch run-chart-axis" role="group" aria-label="X axis">
+        <div
+          className="training-metric-toggle run-chart-axis"
+          role="group"
+          aria-label="X axis"
+        >
           <button
             type="button"
             disabled={!hasElapsed}
-            className={axis === "elapsed" ? "is-active" : undefined}
+            className={`training-metric-option${axis === "elapsed" ? " is-active" : ""}`}
+            aria-pressed={axis === "elapsed"}
             onClick={() => setAxis("elapsed")}
           >
             Time
@@ -305,7 +318,8 @@ export function RunDetailChart({
           <button
             type="button"
             disabled={!hasDistance}
-            className={axis === "distance" ? "is-active" : undefined}
+            className={`training-metric-option${axis === "distance" ? " is-active" : ""}`}
+            aria-pressed={axis === "distance"}
             onClick={() => setAxis("distance")}
           >
             Distance
@@ -324,6 +338,7 @@ export function RunDetailChart({
               key={channel.key}
               type="button"
               className={`run-chip${active ? " is-active" : ""}`}
+              aria-pressed={active}
               style={
                 active
                   ? { borderColor: color.stroke, background: color.fill, color: color.stroke }

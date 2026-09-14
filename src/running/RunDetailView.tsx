@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, CloudOff, RefreshCw } from "lucide-react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
-import { ActivityRouteMap } from "../training/components/ActivityRouteMap";
+import {
+  ActivityRouteCover,
+  hasActivityRoute
+} from "../training/components/ActivityRouteMap";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -15,8 +18,18 @@ import {
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunDetailChart } from "./RunDetailChart";
-import { paceHrDecoupling, paceSecondsPerKm } from "./runMetrics";
-import { RUN_SURFACE_LABELS, classifyRunSurface } from "./runSurface";
+import { RunDetailSkeleton } from "./RunningSkeleton";
+import {
+  paceHrDecoupling,
+  paceSecondsPerKm,
+  runSeconds,
+  withPausesRemoved
+} from "./runMetrics";
+import {
+  RUN_SURFACE_LABELS,
+  classifyRunSurface,
+  isOutdoorRunSurface
+} from "./runSurface";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -24,7 +37,24 @@ interface RunDetailViewProps {
   detail: TrainingHubActivityDetail | null;
   loading: boolean;
   onBack: () => void;
+  /** Fetches this run's detail again after a failed load. */
+  onRetry: () => void;
 }
+
+/**
+ * How much longer start-to-finish has to be than the running itself before it
+ * earns a stat of its own. COROS rounds the two separately, so a run that never
+ * stopped still comes back a second or two apart, and a "Total time" one second
+ * over "Time" is a figure that says nothing.
+ */
+const MIN_PAUSED_SECONDS_SHOWN = 60;
+
+/**
+ * The band at the top of the route cover the heading leaves clear, as a
+ * fraction of the page width: 15%, the title's offset in running.css. The route
+ * is fitted into it, however tall the stats below make the cover.
+ */
+const COVER_VISIBLE_BAND = 0.15;
 
 interface Stat {
   label: string;
@@ -42,13 +72,19 @@ export function RunDetailView({
   activity,
   detail,
   loading,
-  onBack
+  onBack,
+  onRetry
 }: RunDetailViewProps) {
   const { unitSystem } = useUnitSystem();
   const surface = classifyRunSurface(activity.sportType);
 
   const laps = detail?.laps ?? [];
-  const series = detail?.series ?? [];
+  // On activity time, which is what the laps, the headline and every figure
+  // read off the chart are stated in. See `withPausesRemoved`.
+  const series = useMemo(
+    () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
+    [detail]
+  );
 
   // Set from a lap row below, consumed by the chart, then cleared — a lap stays
   // selectable a second time, and the chart is not re-focused on every render.
@@ -62,6 +98,10 @@ export function RunDetailView({
    */
   const decoupling = useMemo(() => paceHrDecoupling(series), [series]);
 
+  const hasRoute = useMemo(() => hasActivityRoute(detail?.track), [detail]);
+  const awaitingRoute =
+    loading && detail === null && surface !== null && isOutdoorRunSurface(surface);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -74,18 +114,39 @@ export function RunDetailView({
 
   const headline = useMemo<Stat[]>(() => {
     const distance = detail?.distance ?? activity.distance;
-    const duration = detail?.duration ?? activity.duration;
+    const total = detail?.duration ?? activity.duration;
+    const active = runSeconds({
+      activeDuration: detail?.activeDuration ?? activity.activeDuration,
+      duration: total
+    });
     const pace = paceSecondsPerKm({
       ...activity,
-      ...(distance !== undefined ? { distance } : {}),
-      ...(duration !== undefined ? { duration } : {})
+      distance,
+      duration: total,
+      activeDuration: active
     });
 
     const stats: Stat[] = [
       { label: "Distance", value: formatDistanceMeters(distance, unitSystem) },
-      { label: "Time", value: formatDurationSeconds(duration) },
+      {
+        label: "Time",
+        value: formatDurationSeconds(active),
+        title: "Activity time — the pauses are not in it"
+      },
       { label: "Pace", value: formatPaceSecondsPerKm(pace, unitSystem) }
     ];
+
+    if (
+      total !== undefined &&
+      active !== undefined &&
+      total - active >= MIN_PAUSED_SECONDS_SHOWN
+    ) {
+      stats.push({
+        label: "Total time",
+        value: formatDurationSeconds(total),
+        title: `Start to finish, including ${formatDurationSeconds(total - active)} paused`
+      });
+    }
 
     if (detail?.adjustedPace !== undefined) {
       stats.push({
@@ -187,42 +248,74 @@ export function RunDetailView({
 
   return (
     <section className="running-view run-detail">
-      <header className="run-detail-header">
-        <button type="button" className="run-detail-back" onClick={onBack}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>Running</span>
-        </button>
-        <div>
-          <p className="running-eyebrow">
-            {surface ? RUN_SURFACE_LABELS[surface] : "Run"} ·{" "}
-            {formatTrainingTimestamp(activity.startTime)}
-          </p>
-          <h1>{activity.name?.trim() || (surface ? `${RUN_SURFACE_LABELS[surface]} run` : "Run")}</h1>
-        </div>
-      </header>
+      {/* The route sits under the heading as a cover rather than in a panel of
+          its own. An outdoor run whose detail is still on its way keeps the
+          cover's space, so the heading does not jump when the map lands. */}
+      <div
+        className={`run-detail-hero${
+          hasRoute || awaitingRoute ? " has-cover" : ""
+        }`}
+      >
+        <div className="run-detail-hero-content">
+          <header className="run-detail-header">
+            <button type="button" className="run-detail-back" onClick={onBack}>
+              <ArrowLeft size={16} aria-hidden="true" />
+              <span>Running</span>
+            </button>
+            <div className="run-detail-title">
+              <p className="running-eyebrow">
+                {surface ? RUN_SURFACE_LABELS[surface] : "Run"} ·{" "}
+                {formatTrainingTimestamp(activity.startTime)}
+              </p>
+              <h1>
+                {activity.name?.trim() ||
+                  (surface ? `${RUN_SURFACE_LABELS[surface]} run` : "Run")}
+              </h1>
+            </div>
+          </header>
 
-      <div className="run-detail-stats">
-        {[...headline, ...(decouplingStat ? [decouplingStat] : [])].map((stat) => (
-          <div className="running-stat" key={stat.label} title={stat.title}>
-            <span>{stat.label}</span>
-            <strong>{stat.value}</strong>
+          <div className="run-detail-stats">
+            {[...headline, ...(decouplingStat ? [decouplingStat] : [])].map((stat) => (
+              <div className="running-stat" key={stat.label} title={stat.title}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {hasRoute ? (
+          <ActivityRouteCover
+            track={detail?.track}
+            className="run-detail-cover"
+            visibleBand={COVER_VISIBLE_BAND}
+          />
+        ) : awaitingRoute ? (
+          <div className="run-detail-cover run-skeleton" aria-hidden="true" />
+        ) : null}
       </div>
 
-      {loading ? (
-        <section className="panel run-detail-loading">
-          <Loader2 size={18} className="spin" aria-hidden="true" />
-          <p>Loading this run from COROS…</p>
-        </section>
-      ) : null}
+      {/* A detail already on screen stays while it is fetched again; only a
+          run with nothing to show yet gets the placeholder. */}
+      {loading && detail === null ? <RunDetailSkeleton /> : null}
 
+      {/* The detail call always resolves to an object, so a settled request
+          with nothing for this run is a failed one — not COROS having nothing
+          to say, which is what this used to claim. */}
       {!loading && detail === null ? (
-        <section className="panel run-detail-loading">
-          <p>
-            COROS returned no detail for this run. The summary above is what the
-            activity list carries.
-          </p>
+        <section className="panel running-empty running-state-panel">
+          <CloudOff size={22} aria-hidden="true" />
+          <div>
+            <h3>This run's detail did not load</h3>
+            <p>
+              The summary above comes from the activity list. The chart, laps and
+              route need a second request to COROS, and that one failed.
+            </p>
+          </div>
+          <button type="button" className="primary-button" onClick={onRetry}>
+            <RefreshCw size={14} aria-hidden="true" />
+            Try again
+          </button>
         </section>
       ) : null}
 
@@ -261,19 +354,17 @@ export function RunDetailView({
           hrZones={detail?.hrZones ?? []}
           focusLapIndex={focusLapIndex}
           onFocusLapHandled={clearFocusLap}
+          activeDuration={detail?.activeDuration ?? activity.activeDuration}
         />
-      ) : null}
-
-      {detail?.track ? (
-        <section className="panel run-detail-panel run-detail-map">
-          <p className="running-eyebrow">Route</p>
-          <ActivityRouteMap track={detail.track} />
-        </section>
       ) : null}
 
       {laps.length > 0 ? (
         <section className="panel run-detail-panel">
           <p className="running-eyebrow">Laps</p>
+          {/* Seven columns do not fit the narrowest column the window allows;
+              a secondary table scrolls inside its panel rather than taking the
+              page sideways. */}
+          <div className="run-table-scroll">
           <table className="run-list run-lap-table">
             <thead>
               <tr>
@@ -301,7 +392,8 @@ export function RunDetailView({
                     }
                   }}
                 >
-                  <td>{lap.index + 1}</td>
+                  {/* Already counted from one by the parser. */}
+                  <td>{lap.index}</td>
                   <td className="is-numeric">
                     {formatDistanceMeters(lap.distance, unitSystem)}
                   </td>
@@ -322,6 +414,7 @@ export function RunDetailView({
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       ) : null}
     </section>

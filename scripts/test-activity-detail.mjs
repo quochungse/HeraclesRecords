@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  mapTrainingHubActivity,
   mergeActivityDetailWithList,
   parseActivityDetail
 } from "../dist-electron/trainingHubService.js";
@@ -762,5 +763,92 @@ assert.equal(live[2]?.distance, 5955, "centimetres to metres");
 // A stopped sample has no pace, and must not be read as an infinitely fast one.
 assert.equal(live[1]?.pace, undefined);
 assert.equal(live[1]?.adjustedPace, undefined);
+
+// ---------------------------------------------------------------------------
+// Pauses, recorded from a live road run paused twice (2026-09-14). `totalTime`
+// is start to finish, `workoutTime` is the running, and `pauseList` places each
+// stop on the same hundredths-of-a-second clock as the samples, which go quiet
+// for exactly as long: 693 s and 2 216 s between neighbouring timestamps.
+// ---------------------------------------------------------------------------
+
+const pausedRun = parseActivityDetail({
+  summary: {
+    sportType: 100,
+    totalTime: 710202,
+    workoutTime: 419028,
+    pauseTime: 291174,
+    startTimestamp: 178497352146,
+    endTimestamp: 178498062348,
+    distance: 1020014
+  },
+  pauseList: [
+    // Out of order on purpose: nothing promises COROS sends them sorted.
+    { duration: 221755, startTimestamp: 178497604551, endTimestamp: 178497826306, type: 0 },
+    { duration: 69419, startTimestamp: 178497464162, endTimestamp: 178497533581, type: 0 }
+  ],
+  frequencyList: [
+    { distance: 0, heart: 115, timestamp: 178497352100 },
+    { distance: 264200, heart: 155, speed: 414, timestamp: 178497464100 },
+    // First sample after resuming: no distance yet, which is COROS's zero.
+    { distance: 0, timestamp: 178497533400 },
+    { distance: 435500, heart: 157, speed: 377, timestamp: 178497604500 },
+    { distance: 1020000, heart: 169, speed: 385, timestamp: 178498062300 }
+  ]
+});
+
+assert.equal(pausedRun.duration, 7102, "start to finish");
+assert.equal(pausedRun.activeDuration, 4190, "the running alone");
+assert.deepEqual(pausedRun.pauses, [
+  { start: 1120, duration: 694 },
+  { start: 2524, duration: 2218 }
+]);
+assert.deepEqual(
+  pausedRun.series.map((point) => point.elapsed),
+  [0, 1120, 1813, 2524, 7102],
+  "the series stays on the wall clock — scaled against the duration it spans"
+);
+
+// A run that never stopped carries neither a pause nor a second clock to show.
+const unpaused = parseActivityDetail({
+  summary: { totalTime: 514870, workoutTime: 514870, startTimestamp: 178920983092 },
+  pauseList: []
+});
+assert.equal(unpaused.activeDuration, 5149);
+assert.equal("pauses" in unpaused, false);
+
+// No start to measure from means nowhere to put a pause, not a guess at one.
+assert.equal(
+  "pauses" in
+    parseActivityDetail({
+      summary: { totalTime: 1000 },
+      pauseList: [{ duration: 1000, startTimestamp: 5000, endTimestamp: 6000 }]
+    }),
+  false
+);
+
+// The list states both clocks in whole seconds.
+const listed = mapTrainingHubActivity({
+  labelId: "479152092915728389",
+  sportType: 100,
+  startTime: 1784973521,
+  endTime: 1784980623,
+  totalTime: 7102,
+  workoutTime: 4190,
+  distance: 10200.14
+});
+assert.equal(listed.duration, 7102);
+assert.equal(listed.activeDuration, 4190);
+assert.equal(
+  mapTrainingHubActivity({ labelId: "x", totalTime: 60, workoutTime: 0 }).activeDuration,
+  undefined,
+  "zero is COROS's not-recorded"
+);
+
+// A detail that came back without activity time borrows the list's.
+assert.equal(
+  mergeActivityDetailWithList({ laps: [], hrZones: [], raw: {}, duration: 7102 }, listed)
+    .activeDuration,
+  4190
+);
 
 console.log("Activity detail parser tests passed.");

@@ -16380,6 +16380,51 @@ tr.data-intervals-row-missing {
   background: rgba(13, 16, 20, 0.88);
 }
 
+/* The tile credit shows for five seconds, then folds into the (i) in the
+   bottom-right corner — the collapse the OSM attribution guidelines allow. */
+.activity-route-modal-map .leaflet-bottom.leaflet-right {
+  right: 34px;
+}
+
+.activity-route-modal-map .leaflet-control-attribution {
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  transition:
+    opacity 0.25s ease,
+    visibility 0.25s ease;
+}
+
+.activity-route-modal-map:not(.is-credit-open) .leaflet-control-attribution {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.activity-route-credit-toggle {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  z-index: 800;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: rgba(13, 16, 20, 0.88);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.activity-route-credit-toggle:hover,
+.activity-route-credit-toggle[aria-expanded="true"] {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .activity-route-credit-toggle {
+  background: rgba(255, 255, 255, 0.86);
+}
+
 .activity-route-legend {
   display: inline-flex;
   align-items: center;

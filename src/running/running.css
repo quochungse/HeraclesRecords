@@ -14,8 +14,28 @@
 /* The page is its own scroll container — `.content-fill` clips the column, so
    something inside has to scroll — and it is the *whole* page that scrolls,
    title and filters included, rather than a region under a pinned header. */
+/*
+ * Every single-column grid on this screen declares its column as
+ * `minmax(0, 1fr)` rather than leaving it implicit.
+ *
+ * An implicit column is `auto`, and an `auto` track is floored at its items'
+ * automatic minimum width — which is their *content's* minimum. So one wide
+ * table three grids down still widened the column of every grid above it: a
+ * surface table that already scrolled inside its own panel pushed the page,
+ * header and filters included, 172px past a 620px column. Each grid on the way
+ * down has to refuse that for itself; one `min-width: 0` at the top does not
+ * reach the grids nested inside.
+ */
 .running-view {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* The page is its own scroller with a fixed height, and in a grid like that an
+     `auto` row gives way to the item's minimum size rather than its content:
+     any panel whose minimum is zero — `overflow` other than visible, or
+     `min-height: 0` — is squeezed to its padding while its content spills over
+     whatever comes next. That has happened twice, to the run list and to the
+     route map. Rows sized to their content cannot be squeezed. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 18px;
   min-height: 0;
@@ -78,38 +98,10 @@
   align-items: center;
 }
 
-.running-switch {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--run-hairline);
-  border-radius: var(--radius-md);
-  background: var(--run-well);
-}
-
-.running-switch button {
-  padding: 7px 14px;
-  border: none;
-  border-radius: calc(var(--radius-md) - 3px);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+/* The switches themselves are `.training-metric-toggle` from styles.css — the
+   load heatmap's chips — so nothing about their look is restated here. */
+.running-controls .training-metric-option {
   white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    color 0.16s ease;
-}
-
-.running-switch button:hover {
-  color: var(--text-primary);
-  background: var(--run-raised);
-}
-
-.running-switch button.is-active {
-  background: var(--accent);
-  color: #ffffff;
 }
 
 .running-period {
@@ -123,6 +115,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
+}
+
+/* Five totals split three and two in the narrowest window rather than four and
+   a lone one; wide, they still sit in a single row. */
+.running-totals {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .running-stat {
@@ -158,6 +156,7 @@
    collapse the same way the list panel once did. */
 .running-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 18px;
   padding-bottom: 8px;
@@ -195,8 +194,13 @@
   border-bottom-right-radius: calc(var(--radius-md) - 1px);
 }
 
+/* `min-width: 0` cancels the global `table { min-width: 720px }` in styles.css,
+   as every table in the app has to. Without it no column could ever be hidden
+   narrow enough to matter: the list stayed 720px wide in a 549px panel and
+   spread its four remaining columns across the difference. */
 .run-list {
   width: 100%;
+  min-width: 0;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -391,25 +395,229 @@
   color: var(--text-primary);
 }
 
+/* --------------------------------------------------------- route cover -- */
+
+/*
+ * The heading and the route share one grid cell rather than the map being
+ * positioned out of flow. So the hero is always at least as tall as its cover
+ * and at least as tall as its content, with nothing measured in script — an
+ * absolutely placed map would hang past the hero whenever the stats fit on
+ * one row, and slide under the panel below.
+ */
+.run-detail-hero {
+  /* A size container so the cover can state its fade in the hero's width. */
+  container-type: inline-size;
+  --run-cover-tail: 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  isolation: isolate;
+}
+
+.run-detail-hero > * {
+  grid-area: 1 / 1;
+}
+
+.run-detail-hero-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 18px;
+}
+
+/* Over a cover, the empty stretches of the heading let a click through to the
+   map; the back button and the stat cards still take their own. */
+.run-detail-hero.has-cover .run-detail-hero-content {
+  pointer-events: none;
+}
+
+.run-detail-hero.has-cover .run-detail-back,
+.run-detail-hero.has-cover .running-stat {
+  pointer-events: auto;
+}
+
+/* The back button keeps its place at the very top; the title is what moves,
+   down to 45% of the cover. A percentage margin is taken from the width, and
+   the cover's height is a third of the width: 15% of the width is 45% of the
+   cover, less the back button's row above the title. */
+.run-detail-hero.has-cover .run-detail-title {
+  margin-top: max(20px, calc(15% - 44px));
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--bg-base) 85%, transparent);
+}
+
+.run-detail-hero.has-cover .run-detail-back,
+.run-detail-hero.has-cover .running-stat {
+  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.run-detail-cover {
+  position: relative;
+  z-index: 0;
+  align-self: start;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 3 / 1;
+  /* Three to one at the least, and taller when the stats wrap: never shorter
+     than the heading it sits under, plus a little so the last row of stats is
+     still over the map. A percentage here is of the grid area, i.e. the hero. */
+  min-height: calc(100% + var(--run-cover-tail));
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: zoom-in;
+  /* Faded out by transparency, not painted over with the page colour: the page
+     behind is a glow, not a flat --bg-base, and a fade to a flat colour left a
+     visible edge running through the first row of stats. */
+  /* The fade is kept to the part below the heading, so the stats sit over solid
+     map all the way down. That part is the tail when the stats set the height,
+     and the last 10% of the width when three-to-one does (see margin-bottom). */
+  --run-cover-fade: max(var(--run-cover-tail), 10cqw);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 calc(100% - var(--run-cover-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 calc(100% - var(--run-cover-fade)),
+    transparent 100%
+  );
+  /* The faded tail lies under whatever follows instead of holding it down. On a
+     wide window the stats fit one row and the heading ends well above the
+     cover's bottom; counting the whole cover left a band of nothing there.
+     -10% of the width is the last 30% of a three-to-one cover. Only what the
+     cover *contributes* to the row shrinks; `min-height` above still sizes it. */
+  margin-bottom: -10%;
+}
+
+.run-detail-cover.run-skeleton {
+  cursor: default;
+}
+
+.run-detail-cover .activity-route-cover-map,
+.run-detail-cover .activity-route-map-canvas {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+/* A picture, not a map: every click lands on the cover and opens the real one. */
+.run-detail-cover .activity-route-cover-map * {
+  pointer-events: none !important;
+}
+
+/* Dims the map where the heading sits over it, and the top edge just enough for
+   the back button. The mask above does the fading out.
+
+   Lighter on the dark theme: its base map is near-black already, and the
+   paper-strength scrim left the cover reading as an empty black band with a
+   route in it. The text keeps its contrast from its own shadow and the glass
+   behind the stats, not from darkening the map. */
+.run-detail-cover {
+  --run-cover-scrim-top: 12%;
+  --run-cover-scrim-mid: 18%;
+  --run-cover-scrim-end: 32%;
+}
+
+:root[data-theme="paper"] .run-detail-cover {
+  --run-cover-scrim-top: 28%;
+  --run-cover-scrim-mid: 50%;
+  --run-cover-scrim-end: 70%;
+}
+
+.run-detail-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-base) var(--run-cover-scrim-top), transparent) 0%,
+    transparent 22%,
+    color-mix(in srgb, var(--bg-base) var(--run-cover-scrim-mid), transparent) 60%,
+    color-mix(in srgb, var(--bg-base) var(--run-cover-scrim-end), transparent) 100%
+  );
+}
+
+.run-detail-cover .activity-route-cover-open {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.run-detail-cover .activity-route-cover-open:hover {
+  color: var(--text-primary);
+}
+
+/* The tile credit moves up out of the fade, below the Full map button and left
+   of its (i), in the page's glass rather than Leaflet's white. It shows for the
+   first five seconds and folds away after — the (i) brings it back. */
+.run-detail-cover .leaflet-top.leaflet-right {
+  top: 46px;
+  right: 42px;
+}
+
+.run-detail-cover .leaflet-control-attribution.leaflet-control {
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  color: var(--text-muted);
+  transition:
+    opacity 0.25s ease,
+    visibility 0.25s ease;
+}
+
+.run-detail-cover:not(.is-credit-open) .leaflet-control-attribution.leaflet-control {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.run-detail-cover .activity-route-cover-credit {
+  position: absolute;
+  top: 46px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--run-hairline);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.run-detail-cover .activity-route-cover-credit:hover,
+.run-detail-cover .activity-route-cover-credit[aria-expanded="true"] {
+  color: var(--text-primary);
+}
+
 .run-detail-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-}
-
-.run-detail-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.run-detail-loading p {
-  margin: 0;
-}
-
-.run-detail-map {
-  min-height: 0;
 }
 
 /* Same reason as `.running-list-panel`: a grid item that clips has no minimum
@@ -444,17 +652,38 @@
   background: transparent;
 }
 
-@media (max-width: 720px) {
-  .running-period {
-    margin-left: 0;
+/*
+ * The run list narrows with its panel, not with the window.
+ *
+ * The window never goes below 900px (main.ts), so a viewport media query here
+ * never fired — while the panel itself, beside an expanded sidebar, is barely
+ * 560px wide at that size. `inline-size` containment also stops the table's
+ * min-content width from reaching the grid track above it, which is what used
+ * to push the whole page, header included, 173px past its column.
+ *
+ * Columns leave in order of what the charts already say: climb per km and
+ * efficiency first, then time, which distance and pace imply.
+ */
+.running-list-panel {
+  container-type: inline-size;
+}
+
+@container (max-width: 760px) {
+  .running-list-panel .run-list th:nth-child(5),
+  .running-list-panel .run-list td:nth-child(5),
+  .running-list-panel .run-list th:nth-child(7),
+  .running-list-panel .run-list td:nth-child(7) {
+    display: none;
   }
 
-  /* Climb per km and EF are the first to go: both are read off the charts
-     anyway, and a table that scrolls sideways is a table nobody reads. */
-  .run-list th:nth-child(5),
-  .run-list td:nth-child(5),
-  .run-list th:nth-child(7),
-  .run-list td:nth-child(7) {
+  .running-list-panel .run-list-when strong {
+    max-width: 200px;
+  }
+}
+
+@container (max-width: 560px) {
+  .running-list-panel .run-list th:nth-child(3),
+  .running-list-panel .run-list td:nth-child(3) {
     display: none;
   }
 }
@@ -472,14 +701,13 @@
   gap: 12px;
 }
 
-.run-chart-axis button {
-  padding: 6px 12px;
-  font-size: 11.5px;
-}
-
-.run-chart-axis button:disabled {
+.run-chart-axis .training-metric-option:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.run-chart-axis .training-metric-option:disabled:hover {
+  color: var(--text-secondary);
 }
 
 .run-chart-chips {
@@ -567,9 +795,11 @@
 
 /* ------------------------------------------------------------------ hero -- */
 
+/* Four cards: a row of four when there is room, two by two when there is not.
+   At 180px the narrowest window fitted three and stranded the fourth. */
 .run-hero {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 
@@ -664,6 +894,7 @@
 
 .run-block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 14px;
 }
@@ -887,4 +1118,138 @@
   border-radius: 0;
   -webkit-mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 7px);
   mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 7px);
+}
+
+/* ---------------------------------------------------------------- states -- */
+
+/* A state that replaces the page rather than sitting inside it: loading failed,
+   or nothing to show. It keeps the panel's surface that `.running-empty` strips
+   for its in-list use, and puts the action at the far end of the row. */
+.running-empty.running-state-panel {
+  border: 1px solid var(--run-hairline);
+  background: var(--run-well);
+  flex-wrap: wrap;
+}
+
+.running-state-panel > div {
+  flex: 1 1 260px;
+}
+
+.running-state-panel .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* -------------------------------------------------------------- skeleton -- */
+
+/* Visible without motion: the gradient itself is the placeholder, and the
+   shimmer is only layered on for people who have not asked for less movement.
+   `body.is-backgrounded` already pauses it with every other animation. */
+.run-skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-primary) 5%, transparent),
+    color-mix(in srgb, var(--text-primary) 11%, transparent),
+    color-mix(in srgb, var(--text-primary) 5%, transparent)
+  );
+  background-size: 220% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .run-skeleton {
+    animation: run-skeleton-shimmer 1.35s ease-in-out infinite;
+  }
+}
+
+@keyframes run-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.run-skeleton-label {
+  width: 72px;
+  height: 10px;
+}
+
+.run-skeleton-value {
+  width: 58%;
+  height: 28px;
+  margin-top: 4px;
+}
+
+.run-skeleton-foot {
+  width: 40%;
+  height: 10px;
+  margin-top: 4px;
+}
+
+.run-skeleton-title {
+  width: 160px;
+  height: 20px;
+}
+
+.run-skeleton-plot {
+  width: 100%;
+  height: 200px;
+  border-radius: 10px;
+}
+
+.run-skeleton-plot-tall {
+  height: 320px;
+}
+
+.run-skeleton-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.run-skeleton-chip-wide {
+  width: 96px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+}
+
+.run-skeleton-list {
+  display: grid;
+}
+
+.run-skeleton-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) repeat(3, 64px);
+  align-items: center;
+  gap: 14px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--run-hairline);
+}
+
+.run-skeleton-row:last-child {
+  border-bottom: none;
+}
+
+.run-skeleton-chip {
+  height: 18px;
+  border-radius: var(--radius-pill);
+}
+
+.run-skeleton-name {
+  width: min(220px, 100%);
+  height: 12px;
+}
+
+.run-skeleton-cell {
+  height: 12px;
+}
+
+.run-detail-skeleton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
 }

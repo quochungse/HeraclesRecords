@@ -1997,7 +1997,14 @@ export interface TrainingHubActivity {
   sportName?: string;
   startTime?: number;
   endTime?: number;
+  /** Seconds from start to finish, pauses included — COROS `totalTime`. */
   duration?: number;
+  /**
+   * Seconds actually recorded, pauses taken out — COROS `workoutTime`, which the
+   * watch calls activity time. Equal to `duration` on a run that never stopped;
+   * 70 minutes against 118 on one that waited out two rain showers.
+   */
+  activeDuration?: number;
   distance?: number;
   avgHr?: number;
   maxHr?: number;
@@ -2368,13 +2375,30 @@ export interface HevySettingsInput {
   includeWarmups: boolean;
 }
 
+/** One stretch the watch spent paused, placed on the activity's own clock. */
+export interface TrainingHubActivityPause {
+  /** Seconds from the activity's start to the press of pause. */
+  start: number;
+  /** Seconds it stayed paused. */
+  duration: number;
+}
+
 export interface TrainingHubActivityDetail {
   activityId?: string;
   name?: string;
   sportType?: number;
   sportName?: string;
   startTime?: number;
+  /** Seconds from start to finish, pauses included. */
   duration?: number;
+  /** Seconds recorded, pauses taken out. See `TrainingHubActivity.activeDuration`. */
+  activeDuration?: number;
+  /**
+   * Pauses in the order they happened. Series `elapsed` runs on the wall clock
+   * straight through them — the samples simply stop — so a reader that wants
+   * activity time subtracts these; laps already come without them.
+   */
+  pauses?: TrainingHubActivityPause[];
   distance?: number;
   avgHr?: number;
   maxHr?: number;

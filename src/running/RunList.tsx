@@ -8,7 +8,12 @@ import {
   formatTrainingTableWhen
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { efficiencyIndex, elevationPerKm, paceSecondsPerKm } from "./runMetrics";
+import {
+  efficiencyIndex,
+  elevationPerKm,
+  paceSecondsPerKm,
+  runSeconds
+} from "./runMetrics";
 import {
   RUN_SURFACE_LABELS,
   classifyRunSurface,
@@ -107,7 +112,7 @@ function buildRow(activity: TrainingHubActivity): RunRow | null {
     surface,
     when: activity.startTime,
     distance: activity.distance,
-    duration: activity.duration,
+    duration: runSeconds(activity),
     pace: paceSecondsPerKm(activity),
     elevationPerKm: elevationPerKm(activity),
     avgHr: activity.avgHr,
