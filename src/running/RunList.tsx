@@ -4,7 +4,6 @@ import type { TrainingHubActivity } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
-  formatOptionalNumber,
   formatPaceSecondsPerKm,
   formatTrainingTableWhen
 } from "../training/formatters";
@@ -236,9 +235,10 @@ export function RunList({ runs, sort, onSortChange, onOpenRun }: RunListProps) {
               {row.avgHr === undefined ? "—" : `${row.avgHr}`}
             </td>
             <td className="is-numeric">
-              {row.efficiency === undefined
-                ? "—"
-                : formatOptionalNumber(Math.round(row.efficiency * 100) / 100)}
+              {/* Two decimals, not one: efficiency moves in hundredths, so a
+                  single decimal rounds a block's whole progress into three
+                  values and the column stops saying anything. */}
+              {row.efficiency === undefined ? "—" : row.efficiency.toFixed(2)}
             </td>
           </tr>
         ))}

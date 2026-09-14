@@ -20,7 +20,10 @@ const {
 } = await import(moduleUrl("runSurface.ts"));
 
 const {
+  buildRunEfficiencyWeeks,
   buildRunWeeks,
+  runIntensityMix,
+  runSurfaceBreakdown,
   distanceBySurface,
   efficiencyIndex,
   elevationPerKm,
@@ -239,6 +242,31 @@ assert.equal(runIntensity(200, zones), "hard");
 assert.equal(runIntensity(150, zones.slice(0, 2)), undefined, "too few zones to judge");
 assert.equal(runIntensity(undefined, zones), undefined);
 
+// The shape COROS actually sends, read off a live account: six ceilings whose
+// `index` starts at **zero**, as percentages of a 168 bpm threshold. Position in
+// the sorted list is the zone number either way, which is what makes the easy /
+// moderate / hard mapping survive both a five- and a six-zone model.
+const liveZones = [
+  { index: 0, hr: 134, ratio: 80 },
+  { index: 1, hr: 151, ratio: 90 },
+  { index: 2, hr: 160, ratio: 95 },
+  { index: 3, hr: 171, ratio: 102 },
+  { index: 4, hr: 178, ratio: 106 },
+  { index: 5, hr: 218, ratio: 130 }
+];
+
+assert.equal(heartRateZoneIndex(130, liveZones), 1, "a zero-based index is still zone 1");
+assert.equal(heartRateZoneIndex(151, liveZones), 2);
+assert.equal(heartRateZoneIndex(152, liveZones), 3);
+assert.equal(heartRateZoneIndex(172, liveZones), 5);
+assert.equal(runIntensity(140, liveZones), "easy");
+assert.equal(
+  runIntensity(158, liveZones),
+  "moderate",
+  "the grey zone this account lives in reads as moderate, not easy"
+);
+assert.equal(runIntensity(169, liveZones), "hard");
+
 // ---------------------------------------------------------------------------
 // Decoupling. Same heart rate, slower second half: the run cost more as it went
 // on, which is what the figure is meant to catch.
@@ -285,5 +313,134 @@ const bySurface = distanceBySurface(weekFixtures);
 assert.equal(bySurface.trail, 8_000);
 assert.equal(bySurface.road, 54_000);
 assert.equal(bySurface.treadmill, 0);
+
+// ---------------------------------------------------------------------------
+// Efficiency by week. Only steady running counts: a ten-minute shakeout spends
+// most of its length with the pulse still climbing, and would read as a jump in
+// fitness that never happened.
+// ---------------------------------------------------------------------------
+
+const efficiencyFixtures = [
+  // Easy, long enough, last week: 10 km in 50 min at 140 bpm -> 200/140.
+  run({
+    activityId: "ef-easy",
+    startTime: secondsAt(2026, 8, 9),
+    distance: 10_000,
+    duration: 3000,
+    avgHr: 140
+  }),
+  // Same week, same numbers, but a hard effort — excluded once zones are known.
+  run({
+    activityId: "ef-hard",
+    startTime: secondsAt(2026, 8, 10),
+    distance: 10_000,
+    duration: 3000,
+    avgHr: 170
+  }),
+  // Easy but only 15 minutes: too short for an average to mean anything.
+  run({
+    activityId: "ef-short",
+    startTime: secondsAt(2026, 8, 11),
+    distance: 3_000,
+    duration: 900,
+    avgHr: 120
+  }),
+  // Trail, easy, long enough — its own surface line.
+  run({
+    activityId: "ef-trail",
+    startTime: secondsAt(2026, 8, 12),
+    sportType: 102,
+    distance: 8_000,
+    duration: 3200,
+    avgHr: 140
+  })
+];
+
+const efficiencyWeeks = buildRunEfficiencyWeeks(efficiencyFixtures, {
+  weeks: 3,
+  nowMs: NOW,
+  zones
+});
+assert.equal(efficiencyWeeks.length, 3);
+
+const efLastWeek = efficiencyWeeks[1];
+assert.equal(efLastWeek.count, 2, "the hard run and the short run are both out");
+assert.ok(Math.abs(efLastWeek.bySurface.road - 200 / 140) < 1e-9);
+assert.ok(Math.abs(efLastWeek.bySurface.trail - (8000 / (3200 / 60)) / 140) < 1e-9);
+assert.equal(
+  efLastWeek.bySurface.track,
+  undefined,
+  "a surface with no run that week has no figure, not a zero"
+);
+
+// Without zones there is no way to tell easy from hard, so every long enough
+// run counts — the caller is expected to say which of the two it is showing.
+const efficiencyNoZones = buildRunEfficiencyWeeks(efficiencyFixtures, {
+  weeks: 3,
+  nowMs: NOW
+});
+assert.equal(efficiencyNoZones[1].count, 3, "hard running is counted, the shakeout is not");
+
+// ---------------------------------------------------------------------------
+// Intensity mix. Counted both ways because they disagree, and the disagreement
+// is the point: the 80/20 rule is stated about time, not about sessions.
+// ---------------------------------------------------------------------------
+
+const mix = runIntensityMix(
+  [
+    run({ activityId: "m1", avgHr: 120, duration: 3600 }),
+    run({ activityId: "m2", avgHr: 125, duration: 5400 }),
+    run({ activityId: "m3", avgHr: 150, duration: 1800 }),
+    run({ activityId: "m4", avgHr: 170, duration: 900 }),
+    run({ activityId: "m5", avgHr: 172, duration: 900 }),
+    run({ activityId: "m6", avgHr: undefined, duration: 1200 }),
+    run({ activityId: "m7", sportType: 200, avgHr: 120, duration: 7200 })
+  ],
+  zones
+);
+assert.equal(mix.easy.count, 2);
+assert.equal(mix.easy.duration, 9000);
+assert.equal(mix.moderate.count, 1);
+assert.equal(mix.hard.count, 2);
+assert.equal(mix.hard.duration, 1800);
+assert.equal(mix.unrated.count, 1, "a run with no heart rate is placed nowhere");
+assert.equal(
+  mix.easy.count + mix.moderate.count + mix.hard.count + mix.unrated.count,
+  6,
+  "the bike ride is not a run"
+);
+
+// ---------------------------------------------------------------------------
+// Surface breakdown. A treadmill reports no terrain, so it gets no climb
+// figures rather than zeros that would drag the outdoor numbers down beside it.
+// ---------------------------------------------------------------------------
+
+const breakdown = runSurfaceBreakdown([
+  run({ activityId: "s1", sportType: 100, distance: 10_000, duration: 3000, elevationGain: 50 }),
+  run({ activityId: "s2", sportType: 102, distance: 5_000, duration: 2400, elevationGain: 300 }),
+  run({ activityId: "s3", sportType: 101, distance: 5_000, duration: 1800, elevationGain: 0 }),
+  run({ activityId: "s4", sportType: 200, distance: 40_000, duration: 3600 })
+]);
+
+assert.deepEqual(
+  breakdown.map((entry) => entry.surface),
+  ["road", "trail", "treadmill"],
+  "render order, and a surface with no runs is left out"
+);
+
+const road = breakdown[0];
+assert.equal(road.distance, 10_000);
+assert.equal(road.pace, 300);
+assert.equal(road.elevationPerKm, 5);
+assert.ok(Math.abs(road.share - 0.5) < 1e-9, "the bike ride is not in the denominator");
+
+const trail = breakdown[1];
+assert.equal(trail.elevationPerKm, 60);
+assert.equal(trail.verticalSpeed, 450, "300 m in 40 minutes is 450 m an hour");
+
+const treadmill = breakdown[2];
+assert.equal(treadmill.elevationPerKm, undefined);
+assert.equal(treadmill.verticalSpeed, undefined);
+assert.equal(treadmill.pace, 360);
 
 console.log("run metrics: OK");

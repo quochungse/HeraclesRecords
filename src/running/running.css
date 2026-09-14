@@ -11,11 +11,15 @@
  * out of --text-primary, so both themes are covered by the same rules.
  */
 
+/* The page is its own scroll container — `.content-fill` clips the column, so
+   something inside has to scroll — and it is the *whole* page that scrolls,
+   title and filters included, rather than a region under a pinned header. */
 .running-view {
   display: grid;
   align-content: start;
   gap: 18px;
   min-height: 0;
+  overflow-y: auto;
 
   --run-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --run-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
@@ -149,14 +153,46 @@
 
 /* ------------------------------------------------------------------ list -- */
 
-/* The list is the only thing that scrolls: the header, filters and totals stay
-   put, so changing a filter does not move the numbers being compared. */
-.running-list-scroll {
-  min-height: 0;
-  overflow-y: auto;
+/* A plain column now, not a scroller: `.running-view` scrolls the page. It must
+   stay unclipped — as a grid item that clips it would lose its minimum size and
+   collapse the same way the list panel once did. */
+.running-body {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding-bottom: 8px;
+}
+
+/*
+ * No `overflow: hidden` here, tempting as it is for clipping the table to the
+ * panel's corners.
+ *
+ * This is a grid item, and any `overflow` other than `visible` drops a grid
+ * item's automatic minimum size to zero. The moment the page grid overflows its
+ * container — which it always does here — the track is free to shrink to that
+ * zero, and a 1 774px table renders two pixels tall: the borders, and nothing
+ * between them. The corners are rounded on the table's own end cells instead.
+ */
+.running-list-panel {
   border: 1px solid var(--run-hairline);
   border-radius: var(--radius-md);
   background: var(--run-well);
+}
+
+.running-list-panel .run-list thead th:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+}
+
+.running-list-panel .run-list thead th:last-child {
+  border-top-right-radius: calc(var(--radius-md) - 1px);
+}
+
+.running-list-panel .run-list tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radius-md) - 1px);
+}
+
+.running-list-panel .run-list tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radius-md) - 1px);
 }
 
 .run-list {
@@ -311,8 +347,8 @@
 
 /* ---------------------------------------------------------------- detail -- */
 
+/* Scrolls through `.running-view` like the list page, back button included. */
 .run-detail {
-  overflow-y: auto;
   padding-bottom: 12px;
 }
 
@@ -376,10 +412,28 @@
   min-height: 0;
 }
 
+/* Same reason as `.running-list-panel`: a grid item that clips has no minimum
+   size of its own, and this one sits in a grid too. The end cells carry the
+   radius instead, so the sticky header does not paint square over the corner. */
 .run-lap-table {
   border: 1px solid var(--run-hairline);
   border-radius: var(--radius-md);
-  overflow: hidden;
+}
+
+.run-lap-table thead th:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+}
+
+.run-lap-table thead th:last-child {
+  border-top-right-radius: calc(var(--radius-md) - 1px);
+}
+
+.run-lap-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radius-md) - 1px);
+}
+
+.run-lap-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radius-md) - 1px);
 }
 
 .run-lap-table tbody tr {
@@ -509,4 +563,328 @@
 .run-lap-table tbody tr.run-lap-row:focus-visible {
   background: var(--run-raised);
   outline: none;
+}
+
+/* ------------------------------------------------------------------ hero -- */
+
+.run-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.run-hero-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  background: var(--run-well);
+}
+
+.run-hero-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.run-hero-value {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Only the load ratio is coloured. Every other hero figure is a fact; this one
+   is the single reading on the screen worth reacting to. */
+.run-hero-value.tone-low {
+  color: var(--text-secondary);
+}
+.run-hero-value.tone-steady {
+  color: var(--success-text);
+}
+.run-hero-value.tone-high {
+  color: var(--warning-text);
+}
+.run-hero-value.tone-spike {
+  color: var(--error-text);
+}
+
+.run-hero-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.run-hero-note {
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: help;
+}
+
+.run-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.run-delta.tone-up {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.run-delta.tone-down {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+.run-delta.tone-flat {
+  background: var(--run-raised);
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------- blocks -- */
+
+.run-block {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.run-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.run-block-head h3 {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.run-block-sub {
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.run-block-aside {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.run-block-aside .tone-up {
+  color: var(--success-text);
+}
+.run-block-aside .tone-down {
+  color: var(--warning-text);
+}
+
+.run-block-plot {
+  min-width: 0;
+}
+
+/* Two plots side by side on a wide screen; stacked the moment either would be
+   narrower than its own axis labels. */
+.run-block-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.run-block-empty,
+.run-block-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.run-block-note {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.run-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.run-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-legend i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.running-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+/* A grid item's automatic minimum size is its *content's* minimum, which a
+   seven-column table happily reports as wider than the track. Without this the
+   column grows past `1fr`, the row grows with it and the whole page gains a
+   horizontal scrollbar. */
+.running-columns > * {
+  min-width: 0;
+}
+
+/* Where a table still cannot fit, it scrolls inside its own panel rather than
+   taking the page sideways with it. */
+.run-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* ------------------------------------------------------------ intensity -- */
+
+.run-intensity-row {
+  display: grid;
+  gap: 7px;
+}
+
+.run-intensity-title {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.run-intensity-bar {
+  display: flex;
+  gap: 3px;
+  height: 26px;
+}
+
+.run-intensity-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4px;
+  border-radius: 5px;
+  color: var(--bg-base);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Easy, moderate, hard: a green-to-red ramp that carries its own meaning, not
+   the sport palette — these are efforts, not surfaces. */
+.run-intensity-seg.tone-easy,
+.run-intensity-legend i.tone-easy {
+  background: #2fbe91;
+}
+.run-intensity-seg.tone-moderate,
+.run-intensity-legend i.tone-moderate {
+  background: #d89b22;
+}
+.run-intensity-seg.tone-hard,
+.run-intensity-legend i.tone-hard {
+  background: #e5484d;
+}
+
+.run-intensity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.run-intensity-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-intensity-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* -------------------------------------------------------------- surface -- */
+
+.run-surface-bar {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+}
+
+.run-surface-bar > div {
+  border-radius: 3px;
+  min-width: 6px;
+}
+
+.run-surface-table {
+  font-size: 12.5px;
+}
+
+.run-surface-table tbody tr {
+  cursor: default;
+}
+
+.run-surface-table tbody tr:hover {
+  background: transparent;
+}
+
+.run-surface-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+
+.run-legend i.is-bar {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* A dashed rule matching the mark it stands for. Masked rather than bordered,
+   so the swatch keeps the colour the chart passes in as a background. */
+.run-legend i.is-dashed {
+  width: 14px;
+  height: 2px;
+  border-radius: 0;
+  -webkit-mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 7px);
+  mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 7px);
 }

@@ -2827,6 +2827,7 @@ export default function App() {
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   restoring={Boolean(trainingHubStatus?.restoring)}
                   detail={trainingHubActivityDetail}
+                  snapshot={trainingHubSnapshot}
                   busy={busy}
                   onSelectActivity={handleTrainingHubActivityDetail}
                   onOpenOverview={() => setActiveView("overview")}

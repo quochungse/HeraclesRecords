@@ -4,6 +4,7 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
+import type { TrainingHubSnapshot } from "../training/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -12,6 +13,11 @@ import {
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunDetailView } from "./RunDetailView";
+import { RunEfficiencyChart } from "./RunEfficiencyChart";
+import { RunIntensityPanel } from "./RunIntensityPanel";
+import { RunningHero, runningThresholdZones } from "./RunningHero";
+import { RunSurfacePanel } from "./RunSurfacePanel";
+import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
 import { summariseRuns, surfacesPresent } from "./runMetrics";
 import { RunnerIcon } from "./runnerIcon";
@@ -29,6 +35,8 @@ export interface RunningViewProps {
   /** A start-up re-login in flight: signed out now, probably not in a moment. */
   restoring?: boolean;
   detail: TrainingHubActivityDetail | null;
+  /** Account-level figures the blocks read: VO2max, thresholds, zones. */
+  snapshot: TrainingHubSnapshot | null;
   busy: string | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
   onOpenOverview: () => void;
@@ -53,7 +61,33 @@ const PERIOD_OPTIONS: readonly PeriodOption[] = [
 ];
 
 const DEFAULT_PERIOD_DAYS = 90;
+
+/** Keys that scroll a page — the ones that mean the athlete took over. */
+const SCROLL_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " "
+]);
 const MS_PER_DAY = 86_400_000;
+
+/**
+ * Weeks the charts draw for a period.
+ *
+ * "All" is capped rather than unbounded: an athlete with six years of history
+ * would get three hundred bars two pixels wide, which is a texture rather than
+ * a chart, and the years before last are not what this screen is for.
+ */
+const MAX_ALL_TIME_WEEKS = 104;
+
+function weeksForPeriod(days: number | null): number {
+  return days === null
+    ? MAX_ALL_TIME_WEEKS
+    : Math.max(1, Math.ceil(days / 7));
+}
 
 function withinPeriod(
   activities: readonly TrainingHubActivity[],
@@ -85,6 +119,7 @@ export function RunningView({
   connected,
   restoring = false,
   detail,
+  snapshot,
   busy,
   onSelectActivity,
   onOpenOverview
@@ -94,8 +129,11 @@ export function RunningView({
   const [periodDays, setPeriodDays] = useState<number | null>(DEFAULT_PERIOD_DAYS);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [sort, setSort] = useState<RunSort>(DEFAULT_RUN_SORT);
-  const listRef = useRef<HTMLDivElement>(null);
-  const listScrollTop = useRef(0);
+  // The whole page is one scroll, title and filters included, so nothing sits
+  // pinned over the content. The position is kept so the drill-down returns to
+  // exactly where it left.
+  const pageRef = useRef<HTMLElement>(null);
+  const pageScrollTop = useRef(0);
 
   // Every activity list call pushes a new array, so the clock is pinned to that
   // rather than read per render — otherwise "the last 90 days" moves under the
@@ -119,6 +157,25 @@ export function RunningView({
 
   const totals = useMemo(() => summariseRuns(runs), [runs]);
 
+  // Every run of the chosen surface, whatever the period: the year-ago
+  // comparison is explicitly about a window the period filter excludes.
+  const runsAllTime = useMemo(
+    () => runsOnSurface(activities, surface),
+    [activities, surface]
+  );
+
+  // The load ratio asks about the whole leg, not one surface — a trail-only
+  // ramp still lands on the same body — so it is the one figure the surface
+  // filter does not narrow, and the hero labels it when a filter is on.
+  const allRunsInPeriod = useMemo(() => runsOnSurface(runsInPeriod, null), [runsInPeriod]);
+
+  const chartWeeks = useMemo(() => weeksForPeriod(periodDays), [periodDays]);
+  const zones = useMemo(() => runningThresholdZones(snapshot), [snapshot]);
+  const stackedSurfaces = useMemo(
+    () => (surface === null ? availableSurfaces : [surface]),
+    [availableSurfaces, surface]
+  );
+
   // A surface that has no runs in the newly chosen period would otherwise leave
   // the screen filtered to nothing with no chip left to un-press.
   useEffect(() => {
@@ -137,7 +194,7 @@ export function RunningView({
 
   const openRun = useCallback(
     (activity: TrainingHubActivity) => {
-      listScrollTop.current = listRef.current?.scrollTop ?? 0;
+      pageScrollTop.current = pageRef.current?.scrollTop ?? 0;
       setSelectedRunId(activity.activityId);
       onSelectActivity(activity);
     },
@@ -149,9 +206,69 @@ export function RunningView({
   // Restoring the scroll is what makes a full-page detail feel like a drill-down
   // rather than a trip back to the top of the list.
   useLayoutEffect(() => {
-    if (selectedRun === null && listRef.current) {
-      listRef.current.scrollTop = listScrollTop.current;
+    const page = pageRef.current;
+    if (selectedRun !== null || !page) {
+      return;
     }
+
+    const target = pageScrollTop.current;
+    page.scrollTop = target;
+    if (page.scrollTop >= target - 1) {
+      return;
+    }
+
+    // The remounted page can still be growing at this moment, and a position
+    // past its current end is clamped short — seen once in a real window as a
+    // run opened at 2000px coming back at 798px. So the position is re-applied
+    // until it lands, the athlete scrolls on their own, or a second has passed.
+    // Never longer: fighting a scroll the athlete started is worse than landing
+    // a little high.
+    //
+    // A timer, not a ResizeObserver. An observer only reports during a rendering
+    // frame, and a window that is not being given frames — an occluded GNOME
+    // Wayland window, which this app has met before — never reports, so the
+    // restore quietly gave up. Writing `scrollTop` forces layout synchronously,
+    // so a timer lands whether or not anything is being painted.
+    const pageEvents = ["wheel", "touchstart", "pointerdown"] as const;
+    let finished = false;
+    const interval = window.setInterval(() => {
+      page.scrollTop = target;
+      if (page.scrollTop >= target - 1) {
+        finish();
+      }
+    }, 50);
+    const deadline = window.setTimeout(finish, 1000);
+
+    // Only keys that scroll count. Escape is what closes the detail page, and
+    // its keydown is still travelling up to the window when this effect runs —
+    // listening for any key here would catch the very press that brought the
+    // athlete back and cancel the restore on arrival.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(event.key)) {
+        finish();
+      }
+    };
+
+    function finish() {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      window.clearInterval(interval);
+      window.clearTimeout(deadline);
+      for (const type of pageEvents) {
+        page?.removeEventListener(type, finish);
+      }
+      window.removeEventListener("keydown", onKeyDown);
+    }
+
+    for (const type of pageEvents) {
+      page.addEventListener(type, finish, { passive: true });
+    }
+    // Keyboard scrolling reaches the window, not the page, when focus sits on
+    // the document body.
+    window.addEventListener("keydown", onKeyDown);
+    return finish;
   }, [selectedRun]);
 
   if (!connected) {
@@ -200,7 +317,7 @@ export function RunningView({
       : undefined;
 
   return (
-    <section className="running-view">
+    <section className="running-view" ref={pageRef}>
       <header className="running-page-header">
         <p className="running-eyebrow">Your training</p>
         <h1>Running</h1>
@@ -242,30 +359,58 @@ export function RunningView({
         </div>
       </div>
 
-      <div className="running-totals">
-        <div className="running-stat">
-          <span>Runs</span>
-          <strong>{totals.count}</strong>
-        </div>
-        <div className="running-stat">
-          <span>Distance</span>
-          <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
-        </div>
-        <div className="running-stat">
-          <span>Time</span>
-          <strong>{formatDurationSeconds(totals.duration)}</strong>
-        </div>
-        <div className="running-stat">
-          <span>Avg pace</span>
-          <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
-        </div>
-        <div className="running-stat">
-          <span>Climb</span>
-          <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
-        </div>
-      </div>
+      <div className="running-body">
+        <RunningHero
+          runs={runs}
+          allRuns={allRunsInPeriod}
+          snapshot={snapshot}
+          filtered={surface !== null}
+        />
 
-      <div className="running-list-scroll" ref={listRef}>
+        <div className="running-totals">
+          <div className="running-stat">
+            <span>Runs</span>
+            <strong>{totals.count}</strong>
+          </div>
+          <div className="running-stat">
+            <span>Distance</span>
+            <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
+          </div>
+          <div className="running-stat">
+            <span>Time</span>
+            <strong>{formatDurationSeconds(totals.duration)}</strong>
+          </div>
+          <div className="running-stat">
+            <span>Avg pace</span>
+            <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
+          </div>
+          <div className="running-stat">
+            <span>Climb</span>
+            <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
+          </div>
+        </div>
+
+        {runs.length > 0 ? (
+          <>
+            <RunVolumeChart
+              runs={runs}
+              runsAllTime={runsAllTime}
+              weeks={chartWeeks}
+              surfaces={stackedSurfaces}
+            />
+            <RunEfficiencyChart
+              runs={runs}
+              weeks={chartWeeks}
+              surfaces={stackedSurfaces}
+              zones={zones}
+            />
+            <div className="running-columns">
+              <RunIntensityPanel runs={runs} zones={zones} />
+              <RunSurfacePanel runs={runsInPeriod} />
+            </div>
+          </>
+        ) : null}
+
         {runs.length === 0 ? (
           <section className="panel running-empty">
             <RunnerIcon size={22} aria-hidden="true" />
@@ -279,12 +424,14 @@ export function RunningView({
             </div>
           </section>
         ) : (
-          <RunList
-            runs={runs}
-            sort={sort}
-            onSortChange={setSort}
-            onOpenRun={openRun}
-          />
+          <div className="running-list-panel">
+            <RunList
+              runs={runs}
+              sort={sort}
+              onSortChange={setSort}
+              onOpenRun={openRun}
+            />
+          </div>
         )}
       </div>
     </section>

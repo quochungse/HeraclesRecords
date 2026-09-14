@@ -6,6 +6,7 @@ import type {
 import {
   RUN_SURFACES,
   classifyRunSurface,
+  isOutdoorRunSurface,
   isRunSportType,
   type RunSurface
 } from "./runSurface";
@@ -464,4 +465,211 @@ export function surfacesPresent(
   return RUN_SURFACES.filter(
     (surface) => seen.has(surface) || totals[surface] > 0
   );
+}
+
+/**
+ * A run long enough for its average heart rate to mean something.
+ *
+ * Efficiency is a steady-state figure. A ten-minute shakeout spends most of its
+ * length with the pulse still climbing, so its average sits well under the
+ * effort actually being made and the week it lands in reads as a jump in
+ * fitness that never happened.
+ */
+const MIN_EFFICIENCY_DURATION_SECONDS = 1200;
+
+export interface RunEfficiencyWeek {
+  weekStartMs: number;
+  label: string;
+  /** Mean efficiency index per surface, absent where the week had no run. */
+  bySurface: Partial<Record<RunSurface, number>>;
+  /** Mean across every qualifying run that week. */
+  overall?: number;
+  count: number;
+}
+
+export interface BuildRunEfficiencyOptions extends BuildRunWeeksOptions {
+  /**
+   * Threshold heart-rate zones. Given them, only easy running counts — which is
+   * the whole point, since efficiency compares like with like. Without them
+   * every long enough run counts and the caller should say so.
+   */
+  zones?: readonly TrainingHubThresholdZone[];
+}
+
+/**
+ * Efficiency index by week and surface.
+ *
+ * Kept apart from {@link buildRunWeeks} rather than folded into it: that one
+ * counts every run because volume is volume, and this one counts a deliberately
+ * narrow slice, because a trail climb and a road cruise at the same heart rate
+ * are not evidence about each other.
+ */
+export function buildRunEfficiencyWeeks(
+  activities: readonly TrainingHubActivity[],
+  { weeks, nowMs = Date.now(), zones = [] }: BuildRunEfficiencyOptions
+): RunEfficiencyWeek[] {
+  const skeleton = buildRunWeeks([], { weeks, nowMs });
+  const samples = new Map<number, { surface: RunSurface; value: number }[]>();
+
+  for (const activity of activities) {
+    const surface = classifyRunSurface(activity.sportType);
+    const at = startedAtMs(activity);
+    const value = efficiencyIndex(activity);
+    if (surface === null || at === undefined || value === undefined) {
+      continue;
+    }
+    if ((positive(activity.duration) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
+      continue;
+    }
+    if (zones.length > 0 && runIntensity(activity.avgHr, zones) !== "easy") {
+      continue;
+    }
+
+    const weekStart = startOfRunWeekMs(at);
+    const bucket = samples.get(weekStart);
+    if (bucket) {
+      bucket.push({ surface, value });
+    } else {
+      samples.set(weekStart, [{ surface, value }]);
+    }
+  }
+
+  const mean = (values: number[]): number =>
+    values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  return skeleton.map((week) => {
+    const bucket = samples.get(week.weekStartMs) ?? [];
+    const bySurface: Partial<Record<RunSurface, number>> = {};
+
+    for (const surface of RUN_SURFACES) {
+      const values = bucket
+        .filter((sample) => sample.surface === surface)
+        .map((sample) => sample.value);
+      if (values.length > 0) {
+        bySurface[surface] = mean(values);
+      }
+    }
+
+    return {
+      weekStartMs: week.weekStartMs,
+      label: week.label,
+      bySurface,
+      ...(bucket.length > 0
+        ? { overall: mean(bucket.map((sample) => sample.value)) }
+        : {}),
+      count: bucket.length
+    };
+  });
+}
+
+export interface RunIntensityBucket {
+  count: number;
+  /** Seconds. */
+  duration: number;
+}
+
+export interface RunIntensityMix {
+  easy: RunIntensityBucket;
+  moderate: RunIntensityBucket;
+  hard: RunIntensityBucket;
+  /** Runs with no heart rate — no zone can place them, and none is guessed. */
+  unrated: RunIntensityBucket;
+}
+
+/**
+ * The easy/moderate/hard split, by session count and by time.
+ *
+ * Both, because they disagree and the disagreement is the point: six short hard
+ * sessions and two long easy ones is 75% hard by count and mostly easy by the
+ * clock. The 80/20 rule is stated about time.
+ */
+export function runIntensityMix(
+  activities: readonly TrainingHubActivity[],
+  zones: readonly TrainingHubThresholdZone[]
+): RunIntensityMix {
+  const mix: RunIntensityMix = {
+    easy: { count: 0, duration: 0 },
+    moderate: { count: 0, duration: 0 },
+    hard: { count: 0, duration: 0 },
+    unrated: { count: 0, duration: 0 }
+  };
+
+  for (const activity of activities) {
+    if (!isRunSportType(activity.sportType)) {
+      continue;
+    }
+    const bucket = mix[runIntensity(activity.avgHr, zones) ?? "unrated"];
+    bucket.count += 1;
+    bucket.duration += positive(activity.duration) ?? 0;
+  }
+
+  return mix;
+}
+
+export interface RunSurfaceTotals extends RunTotals {
+  surface: RunSurface;
+  /** Share of the list's distance, 0..1. */
+  share: number;
+  /** Aggregate seconds per kilometre — total time over total distance. */
+  pace?: number;
+  /** Metres climbed per kilometre. Absent indoors, where there is no terrain. */
+  elevationPerKm?: number;
+  /** Metres climbed per hour. Absent indoors. */
+  verticalSpeed?: number;
+}
+
+/** Per-surface totals, in render order, skipping surfaces with no runs. */
+export function runSurfaceBreakdown(
+  activities: readonly TrainingHubActivity[]
+): RunSurfaceTotals[] {
+  const totals = new Map<RunSurface, RunTotals>();
+  for (const activity of activities) {
+    const surface = classifyRunSurface(activity.sportType);
+    if (surface === null) {
+      continue;
+    }
+    const bucket = totals.get(surface) ?? emptyTotals();
+    addToTotals(bucket, activity);
+    totals.set(surface, bucket);
+  }
+
+  const overall = [...totals.values()].reduce(
+    (sum, bucket) => sum + bucket.distance,
+    0
+  );
+
+  return RUN_SURFACES.flatMap((surface) => {
+    const bucket = totals.get(surface);
+    if (!bucket || bucket.count === 0) {
+      return [];
+    }
+
+    const pace =
+      bucket.distance > 0 && bucket.duration > 0
+        ? bucket.duration / (bucket.distance / METERS_PER_KM)
+        : undefined;
+
+    // A treadmill reports no terrain, so a zero here would be a measurement of
+    // nothing dragging the outdoor figures down beside it.
+    const outdoor = isOutdoorRunSurface(surface);
+    const elevationPerKm =
+      outdoor && bucket.distance > 0
+        ? bucket.elevationGain / (bucket.distance / METERS_PER_KM)
+        : undefined;
+    const climbRate =
+      outdoor && bucket.duration > 0
+        ? bucket.elevationGain / (bucket.duration / SECONDS_PER_HOUR)
+        : undefined;
+
+    return [
+      {
+        surface,
+        ...bucket,
+        share: overall > 0 ? bucket.distance / overall : 0,
+        ...(pace !== undefined ? { pace } : {}),
+        ...(elevationPerKm !== undefined ? { elevationPerKm } : {}),
+        ...(climbRate !== undefined ? { verticalSpeed: climbRate } : {})
+      }
+    ];
+  });
 }
