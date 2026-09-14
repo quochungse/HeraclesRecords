@@ -1082,21 +1082,23 @@ export default function App() {
 
   // Decorative animations and polling stay hot even when nobody is looking;
   // flag the backgrounded state so CSS can pause them and refreshes can skip.
+  //
+  // The condition is *hidden*, never unfocused. Dozens of enter animations run
+  // `fill-mode: both` from `opacity: 0`, so an element is invisible until its
+  // animation actually plays — and pausing on blur froze every one of them
+  // where it started. A window a desktop opens behind the terminal that
+  // launched it (GNOME/Wayland routinely does) therefore came up with nothing
+  // painted but the background, and only clicking it lifted the class and let
+  // the first frame run, which read as the app refusing to start until it was
+  // activated. A hidden window has nothing to reveal, so pausing there is free.
   useEffect(() => {
     const update = () => {
-      document.body.classList.toggle(
-        "is-backgrounded",
-        document.hidden || !document.hasFocus(),
-      );
+      document.body.classList.toggle("is-backgrounded", document.hidden);
     };
     update();
     document.addEventListener("visibilitychange", update);
-    window.addEventListener("focus", update);
-    window.addEventListener("blur", update);
     return () => {
       document.removeEventListener("visibilitychange", update);
-      window.removeEventListener("focus", update);
-      window.removeEventListener("blur", update);
     };
   }, []);
 

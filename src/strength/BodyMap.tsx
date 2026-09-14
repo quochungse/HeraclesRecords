@@ -794,8 +794,9 @@ function createWorld(
   );
   intersectionObserver.observe(container);
 
-  /* The app pauses decorative motion by class on blur; picking the window back
-     up has to restart the loop, or the figure stays frozen. */
+  /* A hidden window stops the loop (and a compositor can stop handing out
+     frames on its own); picking the window back up has to restart it, or the
+     figure stays frozen. */
   const onVisibility = () => {
     if (!document.hidden) {
       start();

@@ -32625,9 +32625,11 @@ button.settings-about-link {
   }
 }
 
-/* When the window is hidden or unfocused, freeze all CSS animations so the
-   renderer and GPU process stop repainting decorative effects nobody can see.
-   The class is toggled on <body> from App.tsx (visibilitychange/focus/blur). */
+/* When the window is hidden, freeze all CSS animations so the renderer and GPU
+   process stop repainting decorative effects nobody can see. The class is
+   toggled on <body> from App.tsx, on visibilitychange alone: enter animations
+   here run `fill-mode: both` from `opacity: 0`, so pausing a merely unfocused
+   window leaves the whole screen blank until it is clicked. */
 body.is-backgrounded *,
 body.is-backgrounded *::before,
 body.is-backgrounded *::after {
