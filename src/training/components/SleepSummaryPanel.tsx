@@ -98,16 +98,28 @@ function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
 function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
   // The same breakdown the Sleep screen draws, so one night cannot read as two
   // different splits depending on which surface you are looking at.
-  const segments = drawableStages(record).map((stage) => ({
-    key: stage.key,
-    label: stage.label,
-    className: stage.className,
-    value: stage.weight,
-    detail:
-      stage.percent !== undefined
-        ? formatSleepPercent(stage.percent)
-        : formatSleepDurationMinutes(stage.minutes)
-  }));
+  const segments = drawableStages(record).map((stage) => {
+    const percent =
+      stage.percent !== undefined ? formatSleepPercent(stage.percent) : undefined;
+    const duration =
+      stage.minutes !== undefined ? formatSleepDurationMinutes(stage.minutes) : undefined;
+
+    return {
+      key: stage.key,
+      label: stage.label,
+      className: stage.className,
+      value: stage.weight,
+      // The legend stays a share: four percentages down one row compare at a
+      // glance in a way four durations do not.
+      detail: percent ?? duration ?? "\u2013",
+      // Hover answers the question the share raises — 25% of what — so the
+      // duration leads and the share stays beside it.
+      hover:
+        duration !== undefined && percent !== undefined
+          ? `${duration} (${percent})`
+          : duration ?? percent ?? "\u2013"
+    };
+  });
 
   if (segments.length === 0) {
     return <p className="sleep-panel-empty-stages">Stage breakdown unavailable.</p>;
@@ -125,8 +137,8 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
             key={segment.key}
             className={`sleep-stage-segment ${segment.className}`}
             style={{ flexGrow: segment.value }}
-            aria-label={`${segment.label}: ${segment.detail}`}
-            data-stage-label={`${segment.label}: ${segment.detail}`}
+            aria-label={`${segment.label}: ${segment.hover}`}
+            data-stage-label={`${segment.label}: ${segment.hover}`}
             role="listitem"
             tabIndex={0}
           />
