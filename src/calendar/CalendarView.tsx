@@ -70,6 +70,9 @@ interface CalendarViewProps {
   onError: (message: string | null) => void;
   onOpenTraining: () => void;
   onOpenCoach: (prompt: string) => void;
+  /** Raised after every write to the COROS calendar, so surfaces outside this
+      view that read the same schedule can re-read it. */
+  onScheduleChanged: () => void;
 }
 
 function describeDayForCoach(
@@ -150,7 +153,8 @@ export function CalendarView({
   onMessage,
   onError,
   onOpenTraining,
-  onOpenCoach
+  onOpenCoach,
+  onScheduleChanged
 }: CalendarViewProps) {
   const { unitSystem } = useUnitSystem();
   const [mode, setMode] = useSelectionPreference(CALENDAR_MODE_PREFERENCE);
@@ -184,13 +188,30 @@ export function CalendarView({
   );
 
   const authenticated = Boolean(status?.authenticated);
-  const { weeks, loading, error, reload, applyOptimisticMove } = useCalendarData({
+  const {
+    weeks,
+    loading,
+    error,
+    reload: reloadCalendarRange,
+    applyOptimisticMove
+  } = useCalendarData({
     api,
     authenticated,
     weekKeys,
     refreshToken,
     isInMonth
   });
+
+  // Every write here funnels through reload(), so this is the one place that
+  // knows the COROS calendar just changed. Overview's "Training Calendar" card
+  // reads the same schedule from App state, which is loaded once per launch --
+  // without this hand-off a workout added here only showed up over there after
+  // its Refresh button. It rides on the range reload rather than each call site
+  // so a new mutation cannot forget it.
+  const reload = useCallback(() => {
+    reloadCalendarRange();
+    onScheduleChanged();
+  }, [onScheduleChanged, reloadCalendarRange]);
 
   const selectableWorkouts = useMemo(() => {
     const entries = new Map<string, TrainingHubScheduledWorkoutEntry>();

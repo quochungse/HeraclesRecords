@@ -843,6 +843,35 @@ export default function App() {
     }
   }, [api]);
 
+  // The calendar writes straight to COROS, so nothing in the core load above
+  // hears about it -- and that load runs once per launch. Only the upcoming
+  // workouts move, so re-read that one slice instead of the whole set; the
+  // sequence guard is shared with loadTrainingHubData so a logout or a full
+  // reload started meanwhile still has the last word.
+  const refreshUpcomingWorkouts = useCallback(async () => {
+    if (!api) {
+      return;
+    }
+
+    const loadSequence = trainingCoreLoadSequenceRef.current;
+    try {
+      const workouts = await fetchUpcomingWorkouts(api, 14);
+      if (trainingCoreLoadSequenceRef.current === loadSequence) {
+        setTrainingHubUpcomingWorkouts(workouts);
+      }
+    } catch {
+      // Keep whatever the panel last read: the calendar itself already
+      // reported the write, and blanking the card would be the louder lie.
+    }
+  }, [api]);
+
+  // A calendar write made outside the Calendar view has to reach both readers:
+  // Overview's card off App state, and the Calendar's own range cache.
+  const handleExternalScheduleChange = useCallback(() => {
+    void refreshUpcomingWorkouts();
+    setCalendarRefreshToken((token) => token + 1);
+  }, [refreshUpcomingWorkouts]);
+
   const ensureTrainingHubMcp = useCallback(async () => {
     if (!api || mcpAutoConnectAttemptedRef.current) {
       return;
@@ -2778,6 +2807,7 @@ export default function App() {
                     onPendingPlanConsumed={() => setPendingCoachPlan(null)}
                     onMessage={setMessage}
                     onError={setError}
+                    onScheduleChanged={handleExternalScheduleChange}
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
@@ -2858,6 +2888,7 @@ export default function App() {
                     setCoachPrefill(prompt);
                     setActiveView("coach");
                   }}
+                  onScheduleChanged={refreshUpcomingWorkouts}
                 />
               </Suspense>
             ) : null}

@@ -76,6 +76,9 @@ interface TrainingLibraryViewProps {
   onPendingPlanConsumed?: () => void;
   onMessage: (message: string) => void;
   onError: (message: string | null) => void;
+  /** Raised after a write to the COROS calendar, so surfaces outside this view
+      that read the same schedule can re-read it. */
+  onScheduleChanged: () => void;
 }
 
 type LibrarySection = "workouts" | "plans" | "templates" | "adherence";
@@ -168,7 +171,8 @@ export function TrainingLibraryView({
   pendingPlan,
   onPendingPlanConsumed,
   onMessage,
-  onError
+  onError,
+  onScheduleChanged
 }: TrainingLibraryViewProps) {
   const [section, setSection] = useSelectionPreference(
     LIBRARY_SECTION_PREFERENCE
@@ -459,6 +463,7 @@ export function TrainingLibraryView({
               onRefresh={load}
               onMessage={onMessage}
               onError={onError}
+              onScheduleChanged={onScheduleChanged}
             />
           ) : null}
         </>
@@ -481,6 +486,7 @@ export function TrainingLibraryView({
         if (result.failures.length) onMessage(`Updated ${result.scheduledCount + result.removedCount} calendar workout${result.scheduledCount + result.removedCount === 1 ? "" : "s"}; ${result.failures.length} need retry.`);
         else if (result.scheduledCount) onMessage(`Added ${result.scheduledCount} workouts from "${result.plan.name}" to the COROS calendar.`);
         else onMessage(`Removed ${result.removedCount} future workouts owned by "${result.plan.name}".`);
+        onScheduleChanged();
         void load();
       }} /> : null}
 
@@ -1206,9 +1212,17 @@ interface AdherenceSectionProps {
   onRefresh: () => Promise<void>;
   onMessage: (message: string) => void;
   onError: (message: string | null) => void;
+  onScheduleChanged: () => void;
 }
 
-function AdherenceSection({ api, matches, onRefresh, onMessage, onError }: AdherenceSectionProps) {
+function AdherenceSection({
+  api,
+  matches,
+  onRefresh,
+  onMessage,
+  onError,
+  onScheduleChanged
+}: AdherenceSectionProps) {
   const { unitSystem } = useUnitSystem();
   const [activities, setActivities] = useState<TrainingHubActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1491,6 +1505,7 @@ function AdherenceSection({ api, matches, onRefresh, onMessage, onError }: Adher
                               )
                               .then(() => {
                                 onMessage("Rescheduled the session.");
+                                onScheduleChanged();
                                 return refresh();
                               })
                               .catch((cause: unknown) =>
