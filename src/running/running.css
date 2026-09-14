@@ -1,0 +1,406 @@
+/*
+ * Running view.
+ *
+ * Surfaces borrow the app's own sport tokens where they map one to one — road
+ * is the run colour, trail is the trail colour — so an athlete who recoloured
+ * their sports in Settings sees their palette here too. Track and treadmill
+ * have no token of their own and are mixed off the run colour, which keeps the
+ * four readable as one family without inventing a fifth hue.
+ *
+ * Everything else is built from three surfaces (hairline, well, raised) mixed
+ * out of --text-primary, so both themes are covered by the same rules.
+ */
+
+.running-view {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 0;
+
+  --run-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  --run-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --run-raised: color-mix(in srgb, var(--text-primary) 7%, transparent);
+
+  --run-road: var(--sport-run, #2fbe91);
+  --run-trail: var(--sport-trail, #4c8dff);
+  --run-track: color-mix(in srgb, var(--sport-run, #2fbe91) 55%, var(--accent-gold, #d89b22));
+  --run-treadmill: color-mix(in srgb, var(--sport-run, #2fbe91) 35%, var(--text-secondary));
+}
+
+.running-view.running-view-disconnected {
+  align-content: start;
+}
+
+/* ---------------------------------------------------------------- header -- */
+
+.running-page-header {
+  display: grid;
+  gap: 4px;
+  padding: 4px 2px 0;
+}
+
+.running-page-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.running-page-header > p:last-child {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.running-eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------- controls -- */
+
+.running-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.running-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  background: var(--run-well);
+}
+
+.running-switch button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.running-switch button:hover {
+  color: var(--text-primary);
+  background: var(--run-raised);
+}
+
+.running-switch button.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.running-period {
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- totals -- */
+
+.running-totals,
+.run-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.running-stat {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  background: var(--run-well);
+}
+
+.running-stat > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.running-stat > strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ list -- */
+
+/* The list is the only thing that scrolls: the header, filters and totals stay
+   put, so changing a filter does not move the numbers being compared. */
+.running-list-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  background: var(--run-well);
+}
+
+.run-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.run-list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0;
+  background: var(--surface, var(--bg-base));
+  border-bottom: 1px solid var(--run-hairline);
+  text-align: left;
+  font-weight: 600;
+}
+
+.run-list thead th button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.run-list thead th.is-numeric button {
+  justify-content: flex-end;
+}
+
+.run-list thead th button:hover,
+.run-list thead th.is-sorted button {
+  color: var(--text-primary);
+}
+
+.run-list tbody tr {
+  border-bottom: 1px solid var(--run-hairline);
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.run-list tbody tr:last-child {
+  border-bottom: none;
+}
+
+.run-list tbody tr:hover,
+.run-list tbody tr:focus-visible {
+  background: var(--run-raised);
+  outline: none;
+}
+
+.run-list td {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.run-list td.is-numeric,
+.run-list th.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-list-when {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.run-list-when > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.run-list-when strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-list-when > div > span {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.run-surface-chip {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.run-surface-road {
+  background: color-mix(in srgb, var(--run-road) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-road) 45%, transparent);
+}
+
+.run-surface-trail {
+  background: color-mix(in srgb, var(--run-trail) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-trail) 45%, transparent);
+}
+
+.run-surface-track {
+  background: color-mix(in srgb, var(--run-track) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-track) 45%, transparent);
+}
+
+.run-surface-treadmill {
+  background: color-mix(in srgb, var(--run-treadmill) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-treadmill) 45%, transparent);
+}
+
+.running-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.running-empty h3 {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.running-empty p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- detail -- */
+
+.run-detail {
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.run-detail-header {
+  display: grid;
+  gap: 10px;
+  padding: 4px 2px 0;
+}
+
+.run-detail-header h1 {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.8vw, 32px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.run-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  padding: 6px 12px 6px 9px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--run-well);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.run-detail-back:hover {
+  background: var(--run-raised);
+  color: var(--text-primary);
+}
+
+.run-detail-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.run-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.run-detail-loading p {
+  margin: 0;
+}
+
+.run-detail-map {
+  min-height: 0;
+}
+
+.run-lap-table {
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.run-lap-table tbody tr {
+  cursor: default;
+}
+
+.run-lap-table tbody tr:hover {
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .running-period {
+    margin-left: 0;
+  }
+
+  /* Climb per km and EF are the first to go: both are read off the charts
+     anyway, and a table that scrolls sideways is a table nobody reads. */
+  .run-list th:nth-child(5),
+  .run-list td:nth-child(5),
+  .run-list th:nth-child(7),
+  .run-list td:nth-child(7) {
+    display: none;
+  }
+}

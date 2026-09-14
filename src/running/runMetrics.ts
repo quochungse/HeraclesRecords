@@ -1,0 +1,467 @@
+import type {
+  TrainingHubActivity,
+  TrainingHubActivitySeriesPoint,
+  TrainingHubThresholdZone
+} from "../../electron/types";
+import {
+  RUN_SURFACES,
+  classifyRunSurface,
+  isRunSportType,
+  type RunSurface
+} from "./runSurface";
+
+const MS_PER_DAY = 86_400_000;
+const METERS_PER_KM = 1000;
+const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_MINUTE = 60;
+
+function positive(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
+/** COROS sends epoch seconds on the activity list. */
+function startedAtMs(activity: TrainingHubActivity): number | undefined {
+  const seconds = positive(activity.startTime);
+  return seconds === undefined ? undefined : seconds * 1000;
+}
+
+/**
+ * Seconds per kilometre, or nothing.
+ *
+ * A session that recorded no distance is not a 0:00 run and must not be given a
+ * pace — an indoor run with the foot pod off comes back exactly like that, and
+ * a zero would sit at the fast end of every pace chart it reached.
+ */
+export function paceSecondsPerKm(
+  activity: TrainingHubActivity
+): number | undefined {
+  const distance = positive(activity.distance);
+  const duration = positive(activity.duration);
+  if (distance === undefined || duration === undefined) {
+    return undefined;
+  }
+
+  return duration / (distance / METERS_PER_KM);
+}
+
+/**
+ * Metres covered per minute per heartbeat — how much ground one beat buys.
+ *
+ * The one fitness signal on this screen that costs nothing to compute and still
+ * moves week to week: at a fixed effort, a rising figure is the aerobic system
+ * getting better. It only means that on steady running, so the caller filters
+ * to easy sessions before averaging; computed here per activity so the filter
+ * stays the caller's decision.
+ */
+export function efficiencyIndex(
+  activity: TrainingHubActivity
+): number | undefined {
+  const distance = positive(activity.distance);
+  const duration = positive(activity.duration);
+  const avgHr = positive(activity.avgHr);
+  if (distance === undefined || duration === undefined || avgHr === undefined) {
+    return undefined;
+  }
+
+  const metersPerMinute = distance / (duration / SECONDS_PER_MINUTE);
+  return metersPerMinute / avgHr;
+}
+
+/** Climb per kilometre. Absent when COROS recorded no climb for the session. */
+export function elevationPerKm(
+  activity: TrainingHubActivity
+): number | undefined {
+  const distance = positive(activity.distance);
+  if (distance === undefined || activity.elevationGain === undefined) {
+    return undefined;
+  }
+
+  return activity.elevationGain / (distance / METERS_PER_KM);
+}
+
+/** Metres climbed per hour — the number trail running is actually paced by. */
+export function verticalSpeed(
+  activity: TrainingHubActivity
+): number | undefined {
+  const duration = positive(activity.duration);
+  if (duration === undefined || activity.elevationGain === undefined) {
+    return undefined;
+  }
+
+  // Zero climb is a reading, not a gap: a flat run really did climb nothing,
+  // and turning that into "no data" would hide every road run from the mix.
+  return activity.elevationGain / (duration / SECONDS_PER_HOUR);
+}
+
+/** Monday-start weeks, matching every other weekly figure in the app. */
+export function startOfRunWeekMs(timestampMs: number): number {
+  const date = new Date(timestampMs);
+  date.setHours(0, 0, 0, 0);
+  // getDay() is 0 on Sunday; shift so weeks start on Monday.
+  const offset = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - offset);
+  return date.getTime();
+}
+
+export interface RunTotals {
+  count: number;
+  /** Metres. */
+  distance: number;
+  /** Seconds. */
+  duration: number;
+  trainingLoad: number;
+  /** Metres. */
+  elevationGain: number;
+}
+
+export interface RunWeek extends RunTotals {
+  weekStartMs: number;
+  label: string;
+  /** Metres of the week's single longest run. */
+  longestRunMeters: number;
+  /** Metres per surface, so a filtered chart can still stack the whole week. */
+  distanceBySurface: Record<RunSurface, number>;
+}
+
+function emptyTotals(): RunTotals {
+  return {
+    count: 0,
+    distance: 0,
+    duration: 0,
+    trainingLoad: 0,
+    elevationGain: 0
+  };
+}
+
+function emptySurfaceDistances(): Record<RunSurface, number> {
+  return { road: 0, trail: 0, track: 0, treadmill: 0 };
+}
+
+function addToTotals(totals: RunTotals, activity: TrainingHubActivity): void {
+  totals.count += 1;
+  totals.distance += positive(activity.distance) ?? 0;
+  totals.duration += positive(activity.duration) ?? 0;
+  totals.trainingLoad += positive(activity.trainingLoad) ?? 0;
+  totals.elevationGain += positive(activity.elevationGain) ?? 0;
+}
+
+/** Every run in the list added up, ignoring dates. */
+export function summariseRuns(
+  activities: readonly TrainingHubActivity[]
+): RunTotals {
+  const totals = emptyTotals();
+  for (const activity of activities) {
+    if (isRunSportType(activity.sportType)) {
+      addToTotals(totals, activity);
+    }
+  }
+  return totals;
+}
+
+function weekLabel(weekStartMs: number): string {
+  return new Date(weekStartMs).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+}
+
+export interface BuildRunWeeksOptions {
+  /** How many weeks back to build, the current week included. */
+  weeks: number;
+  /** Defaults to now; injected by tests. */
+  nowMs?: number;
+}
+
+/**
+ * One bucket per week, oldest first, with **no gaps**.
+ *
+ * A week nobody ran is a zero bar, not a missing one: dropping it slides every
+ * later bar leftwards and turns a fortnight off into a chart that looks like
+ * uninterrupted training.
+ */
+export function buildRunWeeks(
+  activities: readonly TrainingHubActivity[],
+  { weeks, nowMs = Date.now() }: BuildRunWeeksOptions
+): RunWeek[] {
+  if (weeks <= 0) {
+    return [];
+  }
+
+  const currentWeekStart = startOfRunWeekMs(nowMs);
+  const buckets = new Map<number, RunWeek>();
+
+  for (let index = weeks - 1; index >= 0; index -= 1) {
+    // Step a whole week back through the local calendar rather than
+    // subtracting 7 × 86 400 000, which lands an hour out across a DST change
+    // and silently drops a Monday into the week before.
+    const cursor = new Date(currentWeekStart);
+    cursor.setDate(cursor.getDate() - index * 7);
+    const weekStartMs = cursor.getTime();
+    buckets.set(weekStartMs, {
+      weekStartMs,
+      label: weekLabel(weekStartMs),
+      longestRunMeters: 0,
+      distanceBySurface: emptySurfaceDistances(),
+      ...emptyTotals()
+    });
+  }
+
+  for (const activity of activities) {
+    const surface = classifyRunSurface(activity.sportType);
+    const at = startedAtMs(activity);
+    if (surface === null || at === undefined) {
+      continue;
+    }
+
+    const bucket = buckets.get(startOfRunWeekMs(at));
+    if (!bucket) {
+      continue;
+    }
+
+    addToTotals(bucket, activity);
+    const distance = positive(activity.distance) ?? 0;
+    bucket.distanceBySurface[surface] += distance;
+    bucket.longestRunMeters = Math.max(bucket.longestRunMeters, distance);
+  }
+
+  return [...buckets.values()].sort(
+    (left, right) => left.weekStartMs - right.weekStartMs
+  );
+}
+
+export interface RunLoadBalance {
+  /** Training load over the last 7 days. */
+  acute: number;
+  /** Weekly-equivalent load over the last 28 days. */
+  chronic: number;
+  /** acute ÷ chronic. Absent while there is nothing to divide by. */
+  ratio?: number;
+  /**
+   * How far back the oldest run inside the 28-day window is. Under ~21 days the
+   * chronic figure is averaging over history that does not exist, so the ratio
+   * reads high and the screen should say so rather than raise an alarm.
+   */
+  oldestRunDaysAgo?: number;
+}
+
+/**
+ * Acute-to-chronic load, running only.
+ *
+ * COROS ships a `trainingLoadRatio` of its own, but it is taken across every
+ * sport — a heavy week of lifting moves it. The question this screen answers is
+ * whether *running* volume has jumped, so it is tallied here from run load
+ * alone.
+ */
+export function runLoadBalance(
+  activities: readonly TrainingHubActivity[],
+  nowMs: number = Date.now()
+): RunLoadBalance {
+  let acute = 0;
+  let chronicTotal = 0;
+  let oldestAt: number | undefined;
+
+  for (const activity of activities) {
+    const at = startedAtMs(activity);
+    if (at === undefined || !isRunSportType(activity.sportType) || at > nowMs) {
+      continue;
+    }
+
+    const daysAgo = (nowMs - at) / MS_PER_DAY;
+    if (daysAgo > 28) {
+      continue;
+    }
+
+    const load = positive(activity.trainingLoad) ?? 0;
+    chronicTotal += load;
+    if (daysAgo <= 7) {
+      acute += load;
+    }
+    if (oldestAt === undefined || at < oldestAt) {
+      oldestAt = at;
+    }
+  }
+
+  const chronic = chronicTotal / 4;
+  return {
+    acute,
+    chronic,
+    ...(chronic > 0 ? { ratio: acute / chronic } : {}),
+    ...(oldestAt !== undefined
+      ? { oldestRunDaysAgo: (nowMs - oldestAt) / MS_PER_DAY }
+      : {})
+  };
+}
+
+export type RunIntensity = "easy" | "moderate" | "hard";
+
+/**
+ * Which zone a heart rate lands in, 1-based.
+ *
+ * COROS states a zone by its ceiling and caps the top one with a sentinel well
+ * above any real pulse, so "the first ceiling this reaches" is the whole rule.
+ */
+export function heartRateZoneIndex(
+  bpm: number | undefined,
+  zones: readonly TrainingHubThresholdZone[]
+): number | undefined {
+  const beats = positive(bpm);
+  if (beats === undefined || zones.length === 0) {
+    return undefined;
+  }
+
+  const sorted = [...zones].sort((left, right) => left.index - right.index);
+  const position = sorted.findIndex(
+    (zone) => zone.hr !== undefined && beats <= zone.hr
+  );
+  return position === -1 ? sorted.length : position + 1;
+}
+
+/**
+ * Easy / moderate / hard from a session's **average** heart rate.
+ *
+ * Deliberately coarse: an interval session averages into the middle and reads
+ * "moderate" when it was neither. That is the known cost of classifying from
+ * the activity list, which is all this screen has until per-activity zone
+ * buckets are cached; it is right about the steady running that makes up most
+ * of the week, which is the mix the 80/20 check is asking about.
+ */
+export function runIntensity(
+  avgHr: number | undefined,
+  zones: readonly TrainingHubThresholdZone[]
+): RunIntensity | undefined {
+  if (zones.length < 3) {
+    return undefined;
+  }
+
+  const zone = heartRateZoneIndex(avgHr, zones);
+  if (zone === undefined) {
+    return undefined;
+  }
+
+  if (zone <= 2) {
+    return "easy";
+  }
+  return zone === 3 ? "moderate" : "hard";
+}
+
+export interface RunDecoupling {
+  /** Metres per minute per beat over the first half. */
+  firstHalf: number;
+  secondHalf: number;
+  /** Percent the ratio fell by. Positive means drift — the run cost more. */
+  percent: number;
+}
+
+/** Samples needed in each half before a decoupling figure means anything. */
+const MIN_DECOUPLING_SAMPLES_PER_HALF = 10;
+
+function halfEfficiency(
+  points: readonly TrainingHubActivitySeriesPoint[]
+): number | undefined {
+  let speedTotal = 0;
+  let hrTotal = 0;
+  let samples = 0;
+
+  for (const point of points) {
+    const pace = positive(point.pace);
+    const hr = positive(point.hr);
+    if (pace === undefined || hr === undefined) {
+      continue;
+    }
+    // pace is seconds per km, so metres per minute is 1000 / (pace / 60).
+    speedTotal += (METERS_PER_KM * SECONDS_PER_MINUTE) / pace;
+    hrTotal += hr;
+    samples += 1;
+  }
+
+  if (samples < MIN_DECOUPLING_SAMPLES_PER_HALF) {
+    return undefined;
+  }
+
+  return speedTotal / samples / (hrTotal / samples);
+}
+
+/**
+ * Aerobic decoupling: how much further apart pace and heart rate drifted over
+ * the run. Above roughly 5% the athlete was running beyond what they could hold.
+ *
+ * Split on elapsed time where the channel exists, because splitting an array in
+ * half splits on *samples* — and a watch that samples on distance puts more of
+ * them in the fast half.
+ */
+export function paceHrDecoupling(
+  series: readonly TrainingHubActivitySeriesPoint[] | undefined
+): RunDecoupling | undefined {
+  if (!series || series.length < MIN_DECOUPLING_SAMPLES_PER_HALF * 2) {
+    return undefined;
+  }
+
+  // Zero is a real elapsed reading — the first sample of every activity — so
+  // this cannot go through `positive`, which would drop it and pull the
+  // midpoint late enough to hand the first half a slice of the second.
+  const elapsed = series
+    .map((point) => point.elapsed)
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0
+    );
+
+  let first: readonly TrainingHubActivitySeriesPoint[];
+  let second: readonly TrainingHubActivitySeriesPoint[];
+
+  if (elapsed.length >= series.length / 2) {
+    const midpoint =
+      (Math.min(...elapsed) + Math.max(...elapsed)) / 2;
+    first = series.filter((point) => (point.elapsed ?? 0) <= midpoint);
+    second = series.filter((point) => (point.elapsed ?? 0) > midpoint);
+  } else {
+    const cut = Math.floor(series.length / 2);
+    first = series.slice(0, cut);
+    second = series.slice(cut);
+  }
+
+  const firstHalf = halfEfficiency(first);
+  const secondHalf = halfEfficiency(second);
+  if (firstHalf === undefined || secondHalf === undefined || firstHalf <= 0) {
+    return undefined;
+  }
+
+  return {
+    firstHalf,
+    secondHalf,
+    percent: ((firstHalf - secondHalf) / firstHalf) * 100
+  };
+}
+
+/** Distance per surface across a whole list, for the surface mix panel. */
+export function distanceBySurface(
+  activities: readonly TrainingHubActivity[]
+): Record<RunSurface, number> {
+  const totals = emptySurfaceDistances();
+  for (const activity of activities) {
+    const surface = classifyRunSurface(activity.sportType);
+    if (surface !== null) {
+      totals[surface] += positive(activity.distance) ?? 0;
+    }
+  }
+  return totals;
+}
+
+/** The surfaces actually present in a list, in render order. */
+export function surfacesPresent(
+  activities: readonly TrainingHubActivity[]
+): RunSurface[] {
+  const totals = distanceBySurface(activities);
+  const seen = new Set<RunSurface>();
+  for (const activity of activities) {
+    const surface = classifyRunSurface(activity.sportType);
+    if (surface !== null) {
+      seen.add(surface);
+    }
+  }
+  return RUN_SURFACES.filter(
+    (surface) => seen.has(surface) || totals[surface] > 0
+  );
+}

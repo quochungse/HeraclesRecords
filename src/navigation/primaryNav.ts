@@ -19,6 +19,7 @@ import {
   Watch,
   type LucideIcon,
 } from "lucide-react";
+import { RunnerIcon } from "../running/runnerIcon";
 
 export type PrimaryView =
   | "overview"
@@ -26,6 +27,7 @@ export type PrimaryView =
   | "coros-overview"
   | "media"
   | "training"
+  | "running"
   | "gear"
   | "library"
   | "strength"
@@ -95,6 +97,13 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
     icon: Flame,
     items: [
       { id: "training", label: "Activities", icon: Activity },
+      // One screen per sport, under the list that holds every sport. Running
+      // and cycling are read through different numbers, so they are separate
+      // destinations rather than a filter on Activities.
+      //
+      // The icon is ours rather than lucide's: lucide draws no running figure,
+      // and Footprints — the nearest thing — already belongs to Gear.
+      { id: "running", label: "Running", icon: RunnerIcon },
       { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
     ],
   }),

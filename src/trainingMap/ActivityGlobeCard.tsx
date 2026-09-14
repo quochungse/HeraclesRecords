@@ -6,7 +6,6 @@ import {
   CircleAlert,
   Clock3,
   Flame,
-  Footprints,
   Gauge,
   Hand,
   LockKeyhole,

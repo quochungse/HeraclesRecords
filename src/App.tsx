@@ -193,6 +193,11 @@ const LazyTrainingLibraryView = lazy(() =>
     default: TrainingLibraryView,
   })),
 );
+const LazyRunningView = lazy(() =>
+  import("./running/RunningView").then(({ RunningView }) => ({
+    default: RunningView,
+  })),
+);
 const LazyStrengthView = lazy(() =>
   import("./strength/StrengthView").then(({ StrengthView }) => ({
     default: StrengthView,
@@ -1024,7 +1029,12 @@ export default function App() {
 
   useEffect(() => {
     // Overview hosts the sign-in surface now, so both screens want a fresh status.
-    if (!api || (activeView !== "training" && activeView !== "overview")) {
+    if (
+      !api ||
+      (activeView !== "training" &&
+        activeView !== "overview" &&
+        activeView !== "running")
+    ) {
       return;
     }
     void api
@@ -2570,7 +2580,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training") && "content-fill",
+            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2809,6 +2819,19 @@ export default function App() {
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
+            ) : null}
+            {activeView === "running" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="running" />}>
+                <LazyRunningView
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  restoring={Boolean(trainingHubStatus?.restoring)}
+                  detail={trainingHubActivityDetail}
+                  busy={busy}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                />
+              </Suspense>
             ) : null}
             {activeView === "strength" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="strength" />}>
