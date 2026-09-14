@@ -2238,7 +2238,10 @@ export interface TrainingHubActivitySeriesPoint {
   elapsed?: number;
   distance?: number;
   hr?: number;
+  /** Seconds per kilometre. */
   pace?: number;
+  /** Grade-adjusted pace, seconds per kilometre. Absent on ungraded sports. */
+  adjustedPace?: number;
   power?: number;
   /** Metres above sea level. */
   altitude?: number;

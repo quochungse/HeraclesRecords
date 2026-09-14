@@ -638,8 +638,10 @@ assert.equal(
   true
 );
 
-// A sparse channel is left out entirely rather than compacted onto the wrong
-// samples: dropping the missing entries would shift power onto earlier points.
+// A sparse channel keeps its gap rather than being compacted onto the wrong
+// samples — and rather than being thrown away, which is what used to happen.
+// Holes preserve alignment exactly; it is dropping the missing entries that
+// would shift power onto earlier points.
 const sparseDetail = parseActivityDetail({
   summary: { totalTime: 100000, distance: 300000 },
   frequencyList: [
@@ -648,9 +650,117 @@ const sparseDetail = parseActivityDetail({
     { distance: 300000, heartRate: 150, power: 220 }
   ]
 });
+assert.equal(sparseDetail.series?.[0]?.power, 200);
 assert.equal(
-  sparseDetail.series?.every((point) => point.power === undefined),
-  true
+  sparseDetail.series?.[1]?.power,
+  undefined,
+  "the sample that carried no power reads as a gap"
 );
+assert.equal(
+  sparseDetail.series?.[2]?.power,
+  220,
+  "the reading after the gap stays on its own sample"
+);
+
+// ---------------------------------------------------------------------------
+// The shape `/activity/detail/query` actually returns, recorded from a live
+// road run on 2026-09-14: per-sample objects under a top-level `frequencyList`,
+// an absolute `timestamp` in hundredths of a second, `heart` rather than any
+// camel-cased spelling, and `speed` holding seconds per kilometre. The warm-up
+// samples carry almost nothing, which is what makes this the shape to test —
+// every channel but distance used to be discarded over those first few rows.
+// ---------------------------------------------------------------------------
+
+const STAMP_BASE = 178920983100;
+const liveShapeDetail = parseActivityDetail({
+  summary: { totalTime: 514870, distance: 1221694, adjustedPace: 421 },
+  frequencyList: [
+    {
+      timestamp: STAMP_BASE,
+      distance: 0,
+      gpsLat: 0,
+      gpsLon: 0,
+      heart: 100,
+      level: 2,
+      levelMap: { heart: 2 }
+    },
+    {
+      timestamp: STAMP_BASE + 100,
+      distance: 0,
+      heart: 100,
+      speed: 0,
+      adjustedPace: 0,
+      level: 2
+    },
+    {
+      timestamp: STAMP_BASE + 250000,
+      distance: 595500,
+      gpsLat: 107476389,
+      gpsLon: 1067228648,
+      heart: 162,
+      heartLevel: 3,
+      speed: 433,
+      adjustedPace: 408,
+      altitude: 4,
+      cadence: 169,
+      cadenceLength: 82,
+      groundTime: 291,
+      verticalStrideRatio: 98,
+      verticalVibration: 82,
+      power: 176,
+      slope: 0
+    },
+    {
+      timestamp: STAMP_BASE + 514800,
+      distance: 1221400,
+      heart: 158,
+      heartLevel: 3,
+      speed: 420,
+      adjustedPace: 415,
+      altitude: 6,
+      cadence: 171,
+      cadenceLength: 84,
+      groundTime: 288,
+      verticalStrideRatio: 96,
+      verticalVibration: 80,
+      power: 170
+    }
+  ]
+});
+
+const live = liveShapeDetail.series ?? [];
+assert.equal(live.length, 4);
+
+// An absolute stamp rebased on the first sample, then scaled against the
+// activity's own duration — 514 800 hundredths is 5 148 seconds.
+assert.deepEqual(
+  live.map((point) => point.elapsed),
+  [0, 1, 2500, 5148]
+);
+
+// Every channel survives its own gaps. Each of these used to be undefined on
+// every sample, because the first row of a real run carries none of them.
+assert.equal(live[0]?.hr, 100, "`heart` is the per-sample heart rate");
+assert.equal(live[0]?.cadence, undefined, "the first sample really has none");
+assert.equal(live[2]?.cadence, 169);
+assert.equal(live[2]?.hr, 162);
+assert.notEqual(
+  live[2]?.hr,
+  3,
+  "`heartLevel` is a zone index sitting beside `heart`, not a pulse"
+);
+assert.equal(live[2]?.pace, 433, "`speed` holds seconds per kilometre here");
+assert.equal(live[2]?.adjustedPace, 408);
+assert.equal(live[2]?.power, 176);
+assert.equal(live[2]?.altitude, 4);
+assert.equal(live[2]?.strideLength, 0.82, "cadenceLength is centimetres");
+assert.equal(live[2]?.groundTime, 291);
+assert.equal(live[2]?.verticalOscillation, 8.2, "millimetres to centimetres");
+assert.equal(live[2]?.verticalRatio, 9.8, "tenths of a percent");
+assert.equal(live[2]?.distance, 5955, "centimetres to metres");
+
+// A stopped sample has no pace, and must not be read as an infinitely fast one.
+assert.equal(live[1]?.pace, undefined);
+assert.equal(live[1]?.adjustedPace, undefined);
 
 console.log("Activity detail parser tests passed.");

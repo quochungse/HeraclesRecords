@@ -5949,6 +5949,8 @@ interface ActivitySeriesChannels {
   distance?: number[];
   hr?: number[];
   pace?: number[];
+  /** Grade-adjusted pace, sent per sample on runs the watch graded. */
+  adjustedPace?: number[];
   power?: number[];
   altitude?: number[];
   cadence?: number[];
@@ -5963,6 +5965,7 @@ const SERIES_CHANNEL_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
   distance: ["distanceList", "distance"],
   hr: ["heartRateList", "hrList", "heartRates", "heartRate", "avgHrList"],
   pace: ["paceList", "speedList", "avgPaceList"],
+  adjustedPace: ["adjustedPaceList"],
   power: ["powerList", "wattsList", "avgPowerList"],
   altitude: ["altitudeList", "altitude", "elevationList", "elevation"],
   cadence: ["cadenceList", "cadence", "avgCadenceList"],
@@ -6022,7 +6025,7 @@ function mergeSeriesArrays(
   const points: TrainingHubActivitySeriesPoint[] = [];
   for (let index = 0; index < length; index += 1) {
     const point: TrainingHubActivitySeriesPoint = {};
-    const { elapsed, distance, hr, pace, power } = channels;
+    const { elapsed, distance, hr, pace, adjustedPace, power } = channels;
 
     // Left in the payload's own units; `scaleSeriesElapsed` converts the whole
     // channel once it can be checked against the activity duration.
@@ -6039,6 +6042,13 @@ function mergeSeriesArrays(
       const normalized = normalizeActivityDuration(pace[index]!) ?? pace[index]!;
       if (isPlausiblePaceSecondsPerKm(normalized)) {
         point.pace = normalized;
+      }
+    }
+    if (adjustedPace && adjustedPace[index] !== undefined) {
+      const normalized =
+        normalizeActivityDuration(adjustedPace[index]!) ?? adjustedPace[index]!;
+      if (isPlausiblePaceSecondsPerKm(normalized)) {
+        point.adjustedPace = normalized;
       }
     }
     if (power && power[index] !== undefined) {
@@ -6105,8 +6115,16 @@ function assignFormSample(
 const FREQUENCY_POINT_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
   elapsed: ["time", "elapsed", "second", "duration"],
   distance: ["distance", "totalDistance"],
-  hr: ["heartRate", "hr", "avgHr"],
+  // `heart` is what COROS actually calls it here, verified against a live run;
+  // the camel-cased spellings below it are other endpoints'. Note that the same
+  // sample also carries `heartLevel`, which is a zone index and not a pulse —
+  // only an exact key match keeps the two apart.
+  hr: ["heart", "heartRate", "hr", "avgHr"],
+  // `speed` is seconds per kilometre here despite the name: a live sample reads
+  // 433 against a run averaging 421 s/km. `isPlausiblePaceSecondsPerKm` in
+  // `mergeSeriesArrays` is what refuses the reading if a payload ever means it.
   pace: ["pace", "speed", "avgPace"],
+  adjustedPace: ["adjustedPace"],
   power: ["power", "watts", "avgPower"],
   altitude: ["altitude", "elevation", "elev"],
   cadence: ["cadence", "avgCadence"],
@@ -6117,9 +6135,16 @@ const FREQUENCY_POINT_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
 };
 
 /**
- * A channel is only collected when every sample object carries it, so the
- * arrays stay index-aligned with each other. Dropping absent samples instead
- * would shift a sparse channel onto the wrong points.
+ * Read every channel out of an array of sample objects.
+ *
+ * A channel is kept when **any** sample carries it, and an absent reading stays
+ * as a hole at its own index. Alignment is what matters, and holes preserve it
+ * exactly — it is *dropping* absent samples that would shift a sparse channel
+ * onto the wrong points. Requiring every sample to carry a channel was the
+ * stricter reading of that rule and it threw nearly everything away: a live run
+ * carried heart rate, pace, cadence, power and the whole running-form group on
+ * 5 135 of 5 149 samples, and each was discarded over its first few readings,
+ * leaving a 5 139-point series with distance alone.
  */
 function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
   const points = list.filter(
@@ -6130,12 +6155,8 @@ function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
     return {};
   }
 
-  const channels: ActivitySeriesChannels = {};
-  for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
-    keyof ActivitySeriesChannels,
-    string[]
-  ][]) {
-    const values = points.map((point) => {
+  const readChannel = (keys: string[]): (number | undefined)[] =>
+    points.map((point) => {
       for (const key of keys) {
         const value = toOptionalNumber(point[key]);
         if (value !== undefined) {
@@ -6145,8 +6166,30 @@ function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
       return undefined;
     });
 
-    if (values.every((value) => value !== undefined)) {
+  const channels: ActivitySeriesChannels = {};
+  for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
+    keyof ActivitySeriesChannels,
+    string[]
+  ][]) {
+    const values = readChannel(keys);
+    if (values.some((value) => value !== undefined)) {
       channels[channel] = values as number[];
+    }
+  }
+
+  // No elapsed column under any of its own names, but the samples are stamped:
+  // COROS writes an absolute `timestamp` in hundredths of a second. Rebased on
+  // the first stamped sample it becomes an elapsed channel like any other, and
+  // `scaleSeriesElapsed` then checks the units against the activity's duration
+  // rather than trusting this. Kept separate from the loop above because the
+  // rebase is only ever right for an absolute clock.
+  if (channels.elapsed === undefined) {
+    const stamps = readChannel(["timestamp"]);
+    const base = stamps.find((value) => value !== undefined);
+    if (base !== undefined) {
+      channels.elapsed = stamps.map((value) =>
+        value === undefined ? undefined : value - base
+      ) as number[];
     }
   }
 
@@ -6246,79 +6289,12 @@ export function parseActivitySeries(
   return scaleSeriesElapsed(best, durationSeconds);
 }
 
-const SERIES_LAST_VALUE_CHANNELS = [
-  "elapsed",
-  "distance",
-  "altitude"
-] as const satisfies readonly (keyof TrainingHubActivitySeriesPoint)[];
-
-const SERIES_MEAN_CHANNELS = [
-  ["hr", 0],
-  ["pace", 0],
-  ["power", 0],
-  ["cadence", 0],
-  ["strideLength", 2],
-  ["groundTime", 0],
-  ["verticalOscillation", 1],
-  ["verticalRatio", 1]
-] as const satisfies readonly [keyof TrainingHubActivitySeriesPoint, number][];
-
-export function downsampleActivitySeries(
-  points: TrainingHubActivitySeriesPoint[],
-  maxPoints = 60
-): TrainingHubActivitySeriesPoint[] {
-  if (points.length <= maxPoints) {
-    return points;
-  }
-
-  const bucketSize = points.length / maxPoints;
-  const sampled: TrainingHubActivitySeriesPoint[] = [];
-
-  for (let index = 0; index < maxPoints; index += 1) {
-    const start = Math.floor(index * bucketSize);
-    const end = Math.min(points.length, Math.floor((index + 1) * bucketSize));
-    const bucket = points.slice(start, end);
-    if (bucket.length === 0) {
-      continue;
-    }
-
-    const point: TrainingHubActivitySeriesPoint = {};
-
-    // Cumulative channels take the last value in the bucket so the axis still
-    // reads as a progression; measured ones take the bucket mean. Altitude is
-    // cumulative in neither sense but is a position, not a rate, so the last
-    // reading is the one that belongs at the bucket's distance.
-    for (const channel of SERIES_LAST_VALUE_CHANNELS) {
-      const value = bucketChannel(bucket, channel).at(-1);
-      if (value !== undefined) {
-        point[channel] = value;
-      }
-    }
-
-    for (const [channel, decimals] of SERIES_MEAN_CHANNELS) {
-      const values = bucketChannel(bucket, channel);
-      if (values.length > 0) {
-        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-        point[channel] = roundTo(mean, decimals);
-      }
-    }
-
-    if (Object.values(point).some((value) => value !== undefined)) {
-      sampled.push(point);
-    }
-  }
-
-  return sampled;
-}
-
-function bucketChannel(
-  bucket: TrainingHubActivitySeriesPoint[],
-  channel: keyof TrainingHubActivitySeriesPoint
-): number[] {
-  return bucket
-    .map((item) => item[channel])
-    .filter((value): value is number => value !== undefined);
-}
+/**
+ * Re-exported so every caller that already reaches for it here keeps working.
+ * The implementation moved to `activitySeries` when the Running chart became a
+ * second reader — see the header there for why the bucket rules are shared.
+ */
+export { downsampleActivitySeries } from "./activitySeries";
 
 interface SeriesColumn {
   header: string;

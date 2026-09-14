@@ -404,3 +404,109 @@
     display: none;
   }
 }
+
+/* ----------------------------------------------------------------- chart -- */
+
+.run-chart-panel {
+  gap: 14px;
+}
+
+.run-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-chart-axis button {
+  padding: 6px 12px;
+  font-size: 11.5px;
+}
+
+.run-chart-axis button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.run-chart-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.run-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--run-well);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.run-chip:hover {
+  color: var(--text-primary);
+}
+
+/* The dot keeps a channel's colour legible while its chip is off, so the chips
+   double as the chart's legend whether or not the line is drawn. */
+.run-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.run-chart-plot {
+  /* Recharts measures its own width; without a floor the container collapses to
+     nothing on the first paint and the chart never lays out. */
+  min-width: 0;
+  min-height: 340px;
+}
+
+.run-chart-segment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--run-hairline);
+  border-radius: var(--radius-md);
+  background: var(--run-well);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-chart-segment-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.run-chart-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.run-lap-row {
+  cursor: pointer;
+}
+
+.run-lap-table tbody tr.run-lap-row:hover,
+.run-lap-table tbody tr.run-lap-row:focus-visible {
+  background: var(--run-raised);
+  outline: none;
+}

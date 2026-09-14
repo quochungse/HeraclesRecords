@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type {
   TrainingHubActivity,
@@ -14,7 +14,8 @@ import {
   formatTrainingTimestamp
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { paceSecondsPerKm } from "./runMetrics";
+import { RunDetailChart } from "./RunDetailChart";
+import { paceHrDecoupling, paceSecondsPerKm } from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface } from "./runSurface";
 
 interface RunDetailViewProps {
@@ -45,6 +46,21 @@ export function RunDetailView({
 }: RunDetailViewProps) {
   const { unitSystem } = useUnitSystem();
   const surface = classifyRunSurface(activity.sportType);
+
+  const laps = detail?.laps ?? [];
+  const series = detail?.series ?? [];
+
+  // Set from a lap row below, consumed by the chart, then cleared — a lap stays
+  // selectable a second time, and the chart is not re-focused on every render.
+  const [focusLapIndex, setFocusLapIndex] = useState<number | null>(null);
+  const clearFocusLap = useCallback(() => setFocusLapIndex(null), []);
+
+  /**
+   * How far pace and heart rate drifted apart over the run. Above roughly 5%
+   * the effort was beyond what the athlete could hold — the one thing a single
+   * run can say about aerobic durability.
+   */
+  const decoupling = useMemo(() => paceHrDecoupling(series), [series]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -101,6 +117,19 @@ export function RunDetailView({
     return stats;
   }, [activity, detail, unitSystem]);
 
+  const decouplingStat = useMemo<Stat | null>(
+    () =>
+      decoupling === null || decoupling === undefined
+        ? null
+        : {
+            label: "Decoupling",
+            value: `${decoupling.percent > 0 ? "+" : ""}${decoupling.percent.toFixed(1)}%`,
+            title:
+              "How far pace and heart rate drifted apart between the first and second half. Under 5% is a run held together."
+          },
+    [decoupling]
+  );
+
   const dynamics = useMemo<Stat[]>(() => {
     const source = detail?.dynamics;
     if (!source) {
@@ -155,7 +184,6 @@ export function RunDetailView({
     return stats;
   }, [detail]);
 
-  const laps = detail?.laps ?? [];
 
   return (
     <section className="running-view run-detail">
@@ -174,7 +202,7 @@ export function RunDetailView({
       </header>
 
       <div className="run-detail-stats">
-        {headline.map((stat) => (
+        {[...headline, ...(decouplingStat ? [decouplingStat] : [])].map((stat) => (
           <div className="running-stat" key={stat.label} title={stat.title}>
             <span>{stat.label}</span>
             <strong>{stat.value}</strong>
@@ -226,6 +254,16 @@ export function RunDetailView({
         </section>
       ) : null}
 
+      {series.length > 0 ? (
+        <RunDetailChart
+          series={series}
+          laps={laps}
+          hrZones={detail?.hrZones ?? []}
+          focusLapIndex={focusLapIndex}
+          onFocusLapHandled={clearFocusLap}
+        />
+      ) : null}
+
       {detail?.track ? (
         <section className="panel run-detail-panel run-detail-map">
           <p className="running-eyebrow">Route</p>
@@ -250,7 +288,19 @@ export function RunDetailView({
             </thead>
             <tbody>
               {laps.map((lap) => (
-                <tr key={lap.index}>
+                <tr
+                  key={lap.index}
+                  tabIndex={0}
+                  className="run-lap-row"
+                  title="Focus the chart on this lap"
+                  onClick={() => setFocusLapIndex(lap.index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setFocusLapIndex(lap.index);
+                    }
+                  }}
+                >
                   <td>{lap.index + 1}</td>
                   <td className="is-numeric">
                     {formatDistanceMeters(lap.distance, unitSystem)}
