@@ -62,6 +62,13 @@ function supportsWebgl(): boolean {
 /** The raster style stood in for a vector one when WebGL is unavailable. */
 const VECTOR_FALLBACK: RouteBaseLayer = "street";
 
+/**
+ * Marks a map that is showing the raster stand-in rather than the vector style
+ * it asked for. Every keyless raster style is a light one, so the dark theme
+ * has to tone the tiles itself — see `.is-basemap-fallback` in styles.css.
+ */
+export const BASEMAP_FALLBACK_CLASS = "is-basemap-fallback";
+
 function resolveBaseLayerConfig(config: BaseLayerConfig): BaseLayerConfig {
   if (config.kind === "vector" && !supportsWebgl()) {
     return ROUTE_BASE_LAYERS[VECTOR_FALLBACK];
@@ -101,6 +108,9 @@ function fixOnewayArrowsWhenReady(layer: L.MaplibreGL): void {
 export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
   const pane = ensureBasemapPane(map);
   const resolved = resolveBaseLayerConfig(config);
+  map
+    .getContainer()
+    .classList.toggle(BASEMAP_FALLBACK_CLASS, resolved !== config);
 
   // Leaflet reads a zoom limit off a layer in exactly one place —
   // `GridLayer.beforeAdd` — so a raster base map bounded the map for free

@@ -13,6 +13,7 @@
  * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
  */
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -105,4 +106,40 @@ for (const id of ["light", "dark"]) {
   );
 }
 
-console.log(`base layers ok — ${ids.length} styles, all keyless`);
+// ---------------------------------------------------------------------------
+// What happens when the vector styles cannot be drawn.
+//
+// Both theme-matched styles are vector, so a machine whose WebGL is refused
+// ("WebGL2 blocklisted" — a real Linux/NVIDIA case) falls back to raster. Every
+// keyless raster style is a daylight one, so the dark theme showed a bright
+// white map with nothing anywhere saying why. Two things stop that, and each is
+// one line somebody could delete without a test noticing.
+// ---------------------------------------------------------------------------
+
+const read = (file) =>
+  fs.readFileSync(path.join(repoRoot, file), "utf8");
+
+assert.match(
+  read("electron/main.ts"),
+  /appendSwitch\("enable-unsafe-swiftshader"\)/,
+  "main must let WebGL fall back to software rendering, or a blocklisted GPU costs every map its style"
+);
+
+const baseLayerSource = read("src/maps/routes/baseLayers.ts");
+assert.match(
+  baseLayerSource,
+  /BASEMAP_FALLBACK_CLASS = "is-basemap-fallback"/,
+  "a map showing the raster stand-in must say so on its container"
+);
+assert.match(
+  baseLayerSource,
+  /classList\.toggle\(\s*BASEMAP_FALLBACK_CLASS,\s*resolved !== config\s*\)/,
+  "the mark goes on when the style was swapped and off when it was not"
+);
+assert.match(
+  read("src/styles.css"),
+  /:root:not\(\[data-theme="paper"\]\) \.is-basemap-fallback \.leaflet-heraclesBasemap-pane/,
+  "the dark theme must tone the raster stand-in, or the fallback is a white map in a dark app"
+);
+
+console.log(`base layers ok — ${ids.length} styles, all keyless, fallback marked and toned`);

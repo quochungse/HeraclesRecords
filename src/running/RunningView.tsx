@@ -15,6 +15,8 @@ import {
   formatElevationMeters,
   formatPaceSecondsPerKm
 } from "../training/formatters";
+import type { CorosLinkApi } from "../coroslink-api";
+import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunDetailView } from "./RunDetailView";
 import { RunEfficiencyChart } from "./RunEfficiencyChart";
@@ -34,6 +36,7 @@ import {
 import "./running.css";
 
 export interface RunningViewProps {
+  api: CorosLinkApi | null;
   activities: TrainingHubActivity[];
   connected: boolean;
   /** A start-up re-login in flight: signed out now, probably not in a moment. */
@@ -125,6 +128,7 @@ function withinPeriod(
  * while a run is open, and hands them back on the way out.
  */
 export function RunningView({
+  api,
   activities,
   connected,
   restoring = false,
@@ -191,7 +195,15 @@ export function RunningView({
 
 
   const chartWeeks = useMemo(() => weeksForPeriod(periodDays), [periodDays]);
-  const zones = useMemo(() => runningThresholdZones(snapshot), [snapshot]);
+  // The zones the account is actually scored against — the model picked on the
+  // Personal screen. The dashboard only ever carries LTHR zones, and reading
+  // those for an account on heart-rate reserve put a run COROS scored as 83%
+  // zone 2 into "hard".
+  const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
+  const zones = useMemo(
+    () => zoneModel?.zones ?? runningThresholdZones(snapshot),
+    [snapshot, zoneModel]
+  );
   const stackedSurfaces = useMemo(
     () => (surface === null ? availableSurfaces : [surface]),
     [availableSurfaces, surface]
@@ -500,7 +512,11 @@ export function RunningView({
               nowMs={nowMs}
             />
             <div className="running-columns">
-              <RunIntensityPanel runs={runs} zones={zones} />
+              <RunIntensityPanel
+                runs={runs}
+                zones={zones}
+                zoneModelLabel={zoneModel?.title}
+              />
               <RunSurfacePanel runs={runsInPeriod} />
             </div>
           </>

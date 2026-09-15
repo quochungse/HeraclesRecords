@@ -2883,6 +2883,7 @@ export default function App() {
             {activeView === "running" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="running" />}>
                 <LazyRunningView
+                  api={api}
                   activities={trainingHubActivities}
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   restoring={Boolean(trainingHubStatus?.restoring)}

@@ -236,6 +236,26 @@
   justify-content: flex-end;
 }
 
+/* The lap and surface tables do not sort, so their headers hold text rather
+   than a button — and the zero padding above, meant for the button to fill,
+   left their labels touching ("SHAREDISTANCE"). Same look as a sort button.
+   Neither wraps: both tables scroll inside their panel instead. */
+.run-lap-table thead th,
+.run-surface-table thead th {
+  padding: 11px 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.run-lap-table td,
+.run-surface-table td {
+  white-space: nowrap;
+}
+
 .run-list thead th button:hover,
 .run-list thead th.is-sorted button {
   color: var(--text-primary);

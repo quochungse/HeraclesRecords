@@ -856,6 +856,23 @@ if (!hasSingleInstanceLock) {
   });
 }
 
+/**
+ * Let WebGL fall back to software rendering when the GPU cannot serve it.
+ *
+ * The map styles this app ships are vector ones, drawn by MapLibre through
+ * WebGL, and `createBaseLayer` drops to a raster street map when WebGL is
+ * missing — a *light* map, because no keyless dark raster style exists. So on a
+ * machine whose driver Chromium refuses ("WebGL2 blocklisted", seen on a Linux
+ * box with an NVIDIA card under Wayland), every map in the app turned bright
+ * white in the dark theme, with no error anywhere to say why.
+ *
+ * Since Chrome 127 that fallback is off unless asked for. Asking for it costs
+ * nothing where a GPU works — Chromium still prefers the real one — and where
+ * it does not, a slow correct map beats a fast wrong-coloured one. Must be set
+ * before `whenReady`.
+ */
+app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
   if (process.defaultApp && process.argv[1]) {

@@ -338,9 +338,9 @@ export function heartRateZoneIndex(
  *
  * Deliberately coarse: an interval session averages into the middle and reads
  * "moderate" when it was neither. That is the known cost of classifying from
- * the activity list, which is all this screen has until per-activity zone
- * buckets are cached; it is right about the steady running that makes up most
- * of the week, which is the mix the 80/20 check is asking about.
+ * the activity list, which is all this screen has: it is right about the steady
+ * running that makes up most of the week, which is the mix the 80/20 check is
+ * asking about.
  */
 export function runIntensity(
   avgHr: number | undefined,
@@ -404,7 +404,8 @@ function halfEfficiency(
  *
  * Split on elapsed time where the channel exists, because splitting an array in
  * half splits on *samples* — and a watch that samples on distance puts more of
- * them in the fast half.
+ * them in the fast half. Pass the series on activity time
+ * (`withPausesRemoved`): on the wall clock a long stop moves the midpoint.
  */
 export function paceHrDecoupling(
   series: readonly TrainingHubActivitySeriesPoint[] | undefined
@@ -415,20 +416,26 @@ export function paceHrDecoupling(
 
   // Zero is a real elapsed reading — the first sample of every activity — so
   // this cannot go through `positive`, which would drop it and pull the
-  // midpoint late enough to hand the first half a slice of the second.
-  const elapsed = series
-    .map((point) => point.elapsed)
-    .filter(
-      (value): value is number =>
-        typeof value === "number" && Number.isFinite(value) && value >= 0
-    );
+  // midpoint late enough to hand the first half a slice of the second. A loop,
+  // not `Math.min(...values)`: a long ultra is tens of thousands of samples,
+  // past what a spread can pass as arguments.
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let stamped = 0;
+  for (const point of series) {
+    const value = point.elapsed;
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      stamped += 1;
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    }
+  }
 
   let first: readonly TrainingHubActivitySeriesPoint[];
   let second: readonly TrainingHubActivitySeriesPoint[];
 
-  if (elapsed.length >= series.length / 2) {
-    const midpoint =
-      (Math.min(...elapsed) + Math.max(...elapsed)) / 2;
+  if (stamped >= series.length / 2) {
+    const midpoint = (min + max) / 2;
     first = series.filter((point) => (point.elapsed ?? 0) <= midpoint);
     second = series.filter((point) => (point.elapsed ?? 0) > midpoint);
   } else {

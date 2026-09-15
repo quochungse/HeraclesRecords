@@ -16239,6 +16239,20 @@ tr.data-intervals-row-missing {
   min-height: 200px;
 }
 
+/*
+ * A map showing the raster stand-in for a vector style, on the dark theme.
+ *
+ * Every keyless raster style is a daylight one, so a machine without WebGL was
+ * handed a bright white map in a dark app. Inverting and rotating the hue back
+ * turns it into a serviceable dark map — land dark, water blue, labels light.
+ * Only the base map's own pane is touched, so the route line, the markers and
+ * the trail overlays above it keep their real colours.
+ */
+:root:not([data-theme="paper"]) .is-basemap-fallback .leaflet-heraclesBasemap-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.86) contrast(1.06)
+    saturate(0.85);
+}
+
 .activity-route-map-canvas {
   position: relative;
   z-index: 0;

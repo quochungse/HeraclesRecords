@@ -21,11 +21,7 @@ import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, secondsPerKmToDisplayPace } from "../units/units";
-import {
-  buildRunEfficiencyWeeks,
-  efficiencyIndex,
-  paceSecondsPerKm
-} from "./runMetrics";
+import { buildRunEfficiencyWeeks, paceSecondsPerKm } from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
 

@@ -188,6 +188,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         }}
       >
         <RunningView
+          api={api}
           activities={(options.activities as never) ?? []}
           connected={(options.connected as boolean | undefined) ?? true}
           restoring={false}

@@ -9,6 +9,8 @@ import { runIntensityMix, type RunIntensityMix } from "./runMetrics";
 interface RunIntensityPanelProps {
   runs: readonly TrainingHubActivity[];
   zones: readonly TrainingHubThresholdZone[];
+  /** The account's zone model, named — "Heart Rate Reserve". */
+  zoneModelLabel?: string;
 }
 
 type Band = "easy" | "moderate" | "hard";
@@ -37,14 +39,18 @@ function shares(mix: RunIntensityMix, by: "count" | "duration") {
 /**
  * How the week's running splits between easy and hard.
  *
- * Read from each session's **average** heart rate, which is a deliberately
- * coarse instrument: an interval session averages into the middle and lands
- * under "moderate" when it was neither. It is right about the steady running
- * that makes up most of a week — which is the mix the 80/20 rule is asking
- * about — and per-session zone buckets are what would sharpen it, once a run's
- * detail is cached rather than fetched.
+ * Read from each session's **average** heart rate, against the zones the
+ * account is actually scored on — a deliberately coarse instrument: an interval
+ * session averages into the middle and lands under "moderate" when it was
+ * neither. It is right about the steady running that makes up most of a week,
+ * which is the mix the 80/20 rule is asking about, and per-session zone time is
+ * what would sharpen it.
  */
-export function RunIntensityPanel({ runs, zones }: RunIntensityPanelProps) {
+export function RunIntensityPanel({
+  runs,
+  zones,
+  zoneModelLabel
+}: RunIntensityPanelProps) {
   const mix = useMemo(() => runIntensityMix(runs, zones), [runs, zones]);
   const byTime = useMemo(() => shares(mix, "duration"), [mix]);
   const byCount = useMemo(() => shares(mix, "count"), [mix]);
@@ -102,12 +108,15 @@ export function RunIntensityPanel({ runs, zones }: RunIntensityPanelProps) {
         format={(value) => `${value} ${value === 1 ? "run" : "runs"}`}
       />
 
-      {mix.unrated.count > 0 ? (
-        <p className="run-block-note">
-          {mix.unrated.count} {mix.unrated.count === 1 ? "run" : "runs"} recorded
-          no heart rate and {mix.unrated.count === 1 ? "is" : "are"} left out.
-        </p>
-      ) : null}
+      <p className="run-block-note">
+        {zoneModelLabel ? `${zoneModelLabel} zones. ` : ""}
+        Each run is placed by its average heart rate.
+        {mix.unrated.count > 0
+          ? ` ${mix.unrated.count} ${mix.unrated.count === 1 ? "run" : "runs"} recorded no heart rate and ${
+              mix.unrated.count === 1 ? "is" : "are"
+            } left out.`
+          : ""}
+      </p>
     </section>
   );
 }

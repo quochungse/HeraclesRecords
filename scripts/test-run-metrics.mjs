@@ -471,6 +471,16 @@ assert.equal(
   6,
   "the bike ride is not a run"
 );
+// A run long enough to count, placed by its average: zones decide easy from
+// hard, and this week's Monday keeps it inside the single week asked for.
+assert.equal(
+  buildRunEfficiencyWeeks(
+    [run({ activityId: "grey", startTime: secondsAt(2026, 8, 14, 7), avgHr: 165, duration: 3600 })],
+    { weeks: 1, nowMs: NOW, zones }
+  )[0].count,
+  0,
+  "hard running is not efficiency data"
+);
 
 // ---------------------------------------------------------------------------
 // Surface breakdown. A treadmill reports no terrain, so it gets no climb
