@@ -1,15 +1,11 @@
 import { useMemo } from "react";
-import type {
-  ActivityDetailSummary,
-  TrainingHubActivity,
-  TrainingHubThresholdZone
-} from "../../electron/types";
+import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
 import { formatDurationSeconds } from "../training/formatters";
-import { runIntensityMix, type RunIntensityMix } from "./runMetrics";
+import { runIntensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
 
 interface RunIntensityPanelProps {
   runs: readonly TrainingHubActivity[];
-  zones: readonly TrainingHubThresholdZone[];
+  zoneScale: RunZoneScale;
   /** The account's zone model, named — "Heart Rate Reserve". */
   zoneModelLabel?: string;
   /** COROS's own time-in-zone per run, where it has been fetched. */
@@ -52,18 +48,18 @@ function shares(mix: RunIntensityMix, by: "count" | "duration") {
  */
 export function RunIntensityPanel({
   runs,
-  zones,
+  zoneScale,
   zoneModelLabel,
   summaries
 }: RunIntensityPanelProps) {
   const mix = useMemo(
-    () => runIntensityMix(runs, zones, summaries),
-    [runs, summaries, zones]
+    () => runIntensityMix(runs, zoneScale, summaries),
+    [runs, summaries, zoneScale]
   );
   const byTime = useMemo(() => shares(mix, "duration"), [mix]);
   const byCount = useMemo(() => shares(mix, "count"), [mix]);
 
-  if (zones.length < 3) {
+  if (zoneScale.zones.length < 3) {
     return (
       <section className="panel run-block">
         <p className="running-eyebrow">Intensity mix</p>

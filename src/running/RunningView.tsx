@@ -26,7 +26,12 @@ import { RunSurfacePanel } from "./RunSurfacePanel";
 import { RunBlockSkeleton, RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
-import { runWindowStartMs, summariseRuns, surfacesPresent } from "./runMetrics";
+import {
+  runWindowStartMs,
+  summariseRuns,
+  surfacesPresent,
+  type RunZoneScale
+} from "./runMetrics";
 import { useRunDetailSummaries } from "./useRunDetailSummaries";
 import { RunnerIcon } from "./runnerIcon";
 import {
@@ -211,8 +216,9 @@ export function RunningView({
     api,
     corosConnected: connected
   });
-  const zones = useMemo(
-    () => zoneModel?.zones ?? runningThresholdZones(snapshot),
+  // The dashboard's zones are LTHR, so that is the model they are banded by.
+  const zoneScale = useMemo<RunZoneScale>(
+    () => zoneModel ?? { family: "lthr", zones: runningThresholdZones(snapshot) },
     [snapshot, zoneModel]
   );
   const stackedSurfaces = useMemo(
@@ -530,7 +536,7 @@ export function RunningView({
                 runs={runs}
                 weeks={chartWeeks}
                 surfaces={stackedSurfaces}
-                zones={zones}
+                zoneScale={zoneScale}
                 nowMs={nowMs}
               />
             ) : (
@@ -540,7 +546,7 @@ export function RunningView({
               {zonesSettled ? (
                 <RunIntensityPanel
                   runs={runs}
-                  zones={zones}
+                  zoneScale={zoneScale}
                   zoneModelLabel={zoneModel?.title}
                   summaries={summaries}
                 />

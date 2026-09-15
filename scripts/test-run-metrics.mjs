@@ -143,7 +143,10 @@ assert.ok(
 assert.ok(Math.abs(efficiencyIndex(paused) - 10_200 / (4190 / 60) / 150) < 1e-9);
 assert.equal(summariseRuns([paused, run({ duration: 1000 })]).duration, 5190);
 assert.equal(
-  runIntensityMix([paused], [{ index: 0, hr: 140 }, { index: 1, hr: 155 }, { index: 2, hr: 170 }]).easy.duration,
+  runIntensityMix([paused], {
+    family: "lthr",
+    zones: [{ index: 0, hr: 140 }, { index: 1, hr: 155 }, { index: 2, hr: 170 }]
+  }).easy.duration,
   4190
 );
 assert.equal(
@@ -312,6 +315,7 @@ const zones = [
   { index: 4, hr: 175 },
   { index: 5, hr: 404 }
 ];
+const scale = { family: "lthr", zones };
 
 assert.equal(heartRateZoneIndex(120, zones), 1);
 assert.equal(heartRateZoneIndex(130, zones), 1, "the ceiling belongs to its zone");
@@ -321,13 +325,13 @@ assert.equal(heartRateZoneIndex(200, zones), 5);
 assert.equal(heartRateZoneIndex(undefined, zones), undefined);
 assert.equal(heartRateZoneIndex(150, []), undefined);
 
-assert.equal(runIntensity(120, zones), "easy");
-assert.equal(runIntensity(140, zones), "easy");
-assert.equal(runIntensity(150, zones), "moderate");
-assert.equal(runIntensity(170, zones), "hard");
-assert.equal(runIntensity(200, zones), "hard");
-assert.equal(runIntensity(150, zones.slice(0, 2)), undefined, "too few zones to judge");
-assert.equal(runIntensity(undefined, zones), undefined);
+assert.equal(runIntensity(120, scale), "easy");
+assert.equal(runIntensity(140, scale), "easy");
+assert.equal(runIntensity(150, scale), "moderate");
+assert.equal(runIntensity(170, scale), "hard");
+assert.equal(runIntensity(200, scale), "hard");
+assert.equal(runIntensity(150, { family: "lthr", zones: zones.slice(0, 2) }), undefined, "too few zones to judge");
+assert.equal(runIntensity(undefined, scale), undefined);
 
 // The shape COROS actually sends, read off a live account: six ceilings whose
 // `index` starts at **zero**, as percentages of a 168 bpm threshold. Position in
@@ -342,17 +346,19 @@ const liveZones = [
   { index: 5, hr: 218, ratio: 130 }
 ];
 
+const liveScale = { family: "lthr", zones: liveZones };
+
 assert.equal(heartRateZoneIndex(130, liveZones), 1, "a zero-based index is still zone 1");
 assert.equal(heartRateZoneIndex(151, liveZones), 2);
 assert.equal(heartRateZoneIndex(152, liveZones), 3);
 assert.equal(heartRateZoneIndex(172, liveZones), 5);
-assert.equal(runIntensity(140, liveZones), "easy");
+assert.equal(runIntensity(140, liveScale), "easy");
 assert.equal(
-  runIntensity(158, liveZones),
+  runIntensity(158, liveScale),
   "moderate",
   "the grey zone this account lives in reads as moderate, not easy"
 );
-assert.equal(runIntensity(169, liveZones), "hard");
+assert.equal(runIntensity(169, liveScale), "hard");
 
 // ---------------------------------------------------------------------------
 // Decoupling. Same heart rate, slower second half: the run cost more as it went
@@ -487,7 +493,7 @@ const efficiencyFixtures = [
 const efficiencyWeeks = buildRunEfficiencyWeeks(efficiencyFixtures, {
   weeks: 3,
   nowMs: NOW,
-  zones
+  zoneScale: scale
 });
 assert.equal(efficiencyWeeks.length, 3);
 
@@ -524,7 +530,7 @@ const mix = runIntensityMix(
     run({ activityId: "m6", avgHr: undefined, duration: 1200 }),
     run({ activityId: "m7", sportType: 200, avgHr: 120, duration: 7200 })
   ],
-  zones
+  scale
 );
 assert.equal(mix.easy.count, 2);
 assert.equal(mix.easy.duration, 9000);
@@ -542,7 +548,7 @@ assert.equal(
 assert.equal(
   buildRunEfficiencyWeeks(
     [run({ activityId: "grey", startTime: secondsAt(2026, 8, 14, 7), avgHr: 165, duration: 3600 })],
-    { weeks: 1, nowMs: NOW, zones }
+    { weeks: 1, nowMs: NOW, zoneScale: scale }
   )[0].count,
   0,
   "hard running is not efficiency data"
@@ -627,23 +633,70 @@ const summaryOf = (activity, zoneSeconds) =>
     ]
   ]);
 
-const dropout = runIntensityMix([strapped], zones, summaryOf(strapped, [0, 0, 0, 0, 0, 300]));
+const dropout = runIntensityMix([strapped], scale, summaryOf(strapped, [0, 0, 0, 0, 0, 300]));
 assert.equal(dropout.zoneTimed, 0, "five scored minutes of an hour are not a split");
 assert.equal(dropout.easy.duration, 3600, "so the average places it, and 128 bpm is easy");
 
 const covered = runIntensityMix(
   [strapped],
-  zones,
+  scale,
   summaryOf(strapped, [0, 1800, 900, 300, 0, 0])
 );
 assert.equal(covered.zoneTimed, 1, "50 of 60 minutes scored: the split is the better reading");
 assert.ok(
-  Math.abs(covered.easy.duration - 3240) < 1e-6,
-  "2700 of 3000 scored seconds, scaled onto the 3600 run"
+  Math.abs(covered.easy.duration - 2160) < 1e-6,
+  "1800 of 3000 scored seconds, scaled onto the 3600 run"
 );
-assert.ok(Math.abs(covered.moderate.duration - 360) < 1e-6);
-assert.equal(covered.hard.duration, 0);
+assert.ok(Math.abs(covered.moderate.duration - 1080) < 1e-6);
+assert.ok(Math.abs(covered.hard.duration - 360) < 1e-6);
 assert.equal(covered.easy.count, 1, "the session counts once, where it spent the most time");
+
+// Time in zone and the average make the same cut. Bucket k is time inside zone
+// entry k's range, so a run spent wholly in one bucket lands in the band its
+// average would. A table beside the mix once sat a zone off: 155–168 bpm on this
+// heart-rate-reserve account was moderate by average and easy by the clock.
+const ceilings = (list) => list.map((hr, index) => ({ index, hr }));
+const reserveScale = { family: "restingHr", zones: ceilings([133, 154, 168, 173, 183, 404]) };
+// Max heart rate steps in tens: 50/60/70/80/90/100% of a 190 bpm max.
+const maxHrScale = { family: "maxHr", zones: ceilings([95, 114, 133, 152, 171, 190]) };
+for (const [zoneScale, bucketHr] of [
+  [reserveScale, [120, 150, 160, 171, 180, 190]],
+  [maxHrScale, [90, 105, 125, 145, 160, 180]]
+]) {
+  bucketHr.forEach((avgHr, bucket) => {
+    const steadyRun = run({ activityId: `bucket-${bucket}`, duration: 3600, avgHr });
+    const seconds = [0, 0, 0, 0, 0, 0];
+    seconds[bucket] = 3600;
+    const byClock = runIntensityMix([steadyRun], zoneScale, summaryOf(steadyRun, seconds));
+    const band = ["easy", "moderate", "hard"].find((key) => byClock[key].duration > 0);
+    assert.equal(
+      band,
+      runIntensity(avgHr, zoneScale),
+      `${zoneScale.family} bucket ${bucket} (${avgHr} bpm) reads the same by time as by average`
+    );
+  });
+}
+
+// Under max heart rate the second ceiling is 60% of max — a walk for most
+// runners — so easy reaches one zone further there, to 70%, and nowhere else.
+assert.equal(runIntensity(125, maxHrScale), "easy", "66% of max is easy running");
+assert.equal(runIntensity(133, maxHrScale), "easy", "70% is the top of easy");
+assert.equal(runIntensity(145, maxHrScale), "moderate", "70–80% of max");
+assert.equal(runIntensity(160, maxHrScale), "hard", "above 80% of max");
+assert.equal(
+  runIntensity(125, { family: "lthr", zones: maxHrScale.zones }),
+  "moderate",
+  "the same ceilings read as threshold zones keep the stricter cut"
+);
+assert.equal(
+  runIntensityMix(
+    [run({ activityId: "max-hr", duration: 3600, avgHr: 128 })],
+    maxHrScale,
+    summaryOf(run({ activityId: "max-hr" }), [0, 600, 2400, 600, 0, 0])
+  ).easy.duration,
+  3000,
+  "time in the 60–70% zone is easy time under max heart rate"
+);
 
 // ---------------------------------------------------------------------------
 // The efficiency line and its scatter draw one population.
@@ -651,7 +704,7 @@ assert.equal(covered.easy.count, 1, "the session counts once, where it spent the
 
 assert.equal(countsForEfficiency(run({ duration: 600 })), false, "a shakeout is too short to mean anything");
 assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 })), true, "no zones: every long run");
-assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 }), zones), false, "zone 3 is not easy");
-assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), zones), true);
+assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 }), scale), false, "zone 3 is not easy");
+assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), scale), true);
 
 console.log("run metrics: OK");

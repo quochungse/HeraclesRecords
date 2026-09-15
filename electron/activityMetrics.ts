@@ -20,7 +20,7 @@ import type {
 const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
 
-/** COROS's HR distribution has six buckets: below zone 1, then zones 1-5. */
+/** COROS's HR distribution has six buckets, one per entry in the zone list. */
 const HR_BUCKET_COUNT = 6;
 
 /**
@@ -208,9 +208,14 @@ export function withPausesRemoved(
 /**
  * The six HR buckets as plain seconds, or nothing when COROS scored none.
  *
- * Indexed by COROS's own `zoneIndex`, so bucket 0 is the time below zone 1 and
- * the rest are zones 1-5. Scored against the model the *account* uses, which is
- * the whole reason this is worth keeping: the dashboard only ever carries LTHR
+ * Indexed by COROS's own `zoneIndex`, which is the index of the zone entry whose
+ * range the time was spent in: bucket k runs from entry k−1's ceiling (exclusive)
+ * to entry k's — so on a heart-rate-reserve account with ceilings 133/154/168,
+ * bucket 2 is 155–168 bpm. Counting "bucket 0 is below zone 1" from there is how
+ * a band table once landed a zone off.
+ *
+ * Scored against the model the *account* uses, which is the whole reason this
+ * is worth keeping: the dashboard only ever carries LTHR
  * zones, so an account on heart-rate reserve cannot be placed from the list.
  */
 export function hrZoneSeconds(

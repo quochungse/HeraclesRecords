@@ -1,5 +1,6 @@
 import type {
   ActivityDetailSummary,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubThresholdZone
 } from "../../electron/types";
@@ -327,6 +328,17 @@ export function runLoadBalance(
 export type RunIntensity = "easy" | "moderate" | "hard";
 
 /**
+ * A zone list and the model it belongs to, which travel together because the
+ * band a zone takes depends on both: the same position is a different effort
+ * under max heart rate than under reserve or threshold. `HeartRateZoneModel`
+ * is one as it stands.
+ */
+export interface RunZoneScale {
+  family: CorosProfileZoneFamily;
+  zones: readonly TrainingHubThresholdZone[];
+}
+
+/**
  * Which zone a heart rate lands in, 1-based.
  *
  * COROS states a zone by its ceiling and caps the top one with a sentinel well
@@ -359,21 +371,42 @@ export function heartRateZoneIndex(
  */
 export function runIntensity(
   avgHr: number | undefined,
-  zones: readonly TrainingHubThresholdZone[]
+  scale: RunZoneScale
 ): RunIntensity | undefined {
-  if (zones.length < 3) {
+  if (scale.zones.length < 3) {
     return undefined;
   }
 
-  const zone = heartRateZoneIndex(avgHr, zones);
-  if (zone === undefined) {
-    return undefined;
-  }
+  const zone = heartRateZoneIndex(avgHr, scale.zones);
+  return zone === undefined ? undefined : intensityForZone(zone, scale.family);
+}
 
-  if (zone <= 2) {
+/**
+ * Zones the easy band reaches past the second, per model.
+ *
+ * COROS sends six ceilings under every model, but they do not sit at the same
+ * efforts. Reserve (59/74/84/88/95%) and threshold (80/90/95/102/106%) put the
+ * second ceiling at the top of aerobic running — 74% HRR, 90% LTHR — and the
+ * third at tempo. Max heart rate steps in tens (50/60/70/80/90/100%), so its
+ * second ceiling is 60%, a walk for most runners, and an easy run at 72% of max
+ * read as hard. One zone further brings it to 70% easy, 70–80% moderate.
+ */
+const MAX_HR_EASY_ZONE_SHIFT = 1;
+
+/**
+ * Easy / moderate / hard for a 1-based position in the account's zone list —
+ * the one cut every reading of a run makes, from an average or from time in
+ * zone. It lived in two places once, a table beside `runIntensityMix` a zone
+ * off from this: 155–168 bpm on a heart-rate-reserve account was moderate by
+ * average and easy by the clock, so the intensity panel called most of the
+ * running easy while the efficiency chart beside it left those runs out.
+ */
+function intensityForZone(zone: number, family: CorosProfileZoneFamily): RunIntensity {
+  const position = zone - (family === "maxHr" ? MAX_HR_EASY_ZONE_SHIFT : 0);
+  if (position <= 2) {
     return "easy";
   }
-  return zone === 3 ? "moderate" : "hard";
+  return position === 3 ? "moderate" : "hard";
 }
 
 /** The surfaces actually present in a list, in render order. */
@@ -409,12 +442,16 @@ const MIN_EFFICIENCY_DURATION_SECONDS = 1200;
  */
 export function countsForEfficiency(
   activity: TrainingHubActivity,
-  zones: readonly TrainingHubThresholdZone[] = []
+  scale?: RunZoneScale
 ): boolean {
   if ((runSeconds(activity) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
     return false;
   }
-  return zones.length === 0 || runIntensity(activity.avgHr, zones) === "easy";
+  return (
+    scale === undefined ||
+    scale.zones.length === 0 ||
+    runIntensity(activity.avgHr, scale) === "easy"
+  );
 }
 
 export interface RunEfficiencyWeek {
@@ -429,11 +466,11 @@ export interface RunEfficiencyWeek {
 
 export interface BuildRunEfficiencyOptions extends BuildRunWeeksOptions {
   /**
-   * Threshold heart-rate zones. Given them, only easy running counts — which is
-   * the whole point, since efficiency compares like with like. Without them
-   * every long enough run counts and the caller should say so.
+   * The account's heart-rate zones. Given them, only easy running counts —
+   * which is the whole point, since efficiency compares like with like. Without
+   * them every long enough run counts and the caller should say so.
    */
-  zones?: readonly TrainingHubThresholdZone[];
+  zoneScale?: RunZoneScale;
 }
 
 /**
@@ -446,7 +483,7 @@ export interface BuildRunEfficiencyOptions extends BuildRunWeeksOptions {
  */
 export function buildRunEfficiencyWeeks(
   activities: readonly TrainingHubActivity[],
-  { weeks, nowMs = Date.now(), zones = [] }: BuildRunEfficiencyOptions
+  { weeks, nowMs = Date.now(), zoneScale }: BuildRunEfficiencyOptions
 ): RunEfficiencyWeek[] {
   const skeleton = buildRunWeeks([], { weeks, nowMs });
   const samples = new Map<number, { surface: RunSurface; value: number }[]>();
@@ -459,7 +496,7 @@ export function buildRunEfficiencyWeeks(
       surface === null ||
       at === undefined ||
       value === undefined ||
-      !countsForEfficiency(activity, zones)
+      !countsForEfficiency(activity, zoneScale)
     ) {
       continue;
     }
@@ -523,20 +560,6 @@ export interface RunIntensityMix {
 const MIN_ZONE_TIME_COVERAGE = 0.8;
 
 /**
- * Which band each of COROS's six HR buckets belongs to. Bucket 0 is the time
- * below zone 1, so it reads as easy alongside zones 1 and 2 — the same cut
- * `runIntensity` makes from an average.
- */
-const BUCKET_BANDS: readonly RunIntensity[] = [
-  "easy",
-  "easy",
-  "easy",
-  "moderate",
-  "hard",
-  "hard"
-];
-
-/**
  * The easy/moderate/hard split, by session count and by time.
  *
  * Both, because they disagree and the disagreement is the point: six short hard
@@ -553,7 +576,7 @@ const BUCKET_BANDS: readonly RunIntensity[] = [
  */
 export function runIntensityMix(
   activities: readonly TrainingHubActivity[],
-  zones: readonly TrainingHubThresholdZone[],
+  zoneScale: RunZoneScale,
   summaries?: ReadonlyMap<string, ActivityDetailSummary>
 ): RunIntensityMix {
   const mix: RunIntensityMix = {
@@ -592,8 +615,11 @@ export function runIntensityMix(
         moderate: 0,
         hard: 0
       };
+      // Bucket k is the time spent inside zone entry k's range — checked
+      // against a real run's samples, bucket by bucket — so it takes the band
+      // that entry's position does.
       zoneSeconds.forEach((seconds, index) => {
-        banded[BUCKET_BANDS[index] ?? "hard"] += seconds;
+        banded[intensityForZone(index + 1, zoneScale.family)] += seconds;
       });
       for (const band of ["easy", "moderate", "hard"] as const) {
         mix[band].duration += banded[band] * scale;
@@ -609,7 +635,7 @@ export function runIntensityMix(
       continue;
     }
 
-    const bucket = mix[runIntensity(activity.avgHr, zones) ?? "unrated"];
+    const bucket = mix[runIntensity(activity.avgHr, zoneScale) ?? "unrated"];
     bucket.count += 1;
     bucket.duration += duration;
   }

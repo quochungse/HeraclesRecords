@@ -12,11 +12,7 @@ import {
   ZAxis
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
-import type {
-  TrainingHubActivity,
-  TrainingHubThresholdZone,
-  UnitSystem
-} from "../../electron/types";
+import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -24,7 +20,8 @@ import { distanceUnit, secondsPerKmToDisplayPace } from "../units/units";
 import {
   buildRunEfficiencyWeeks,
   countsForEfficiency,
-  paceSecondsPerKm
+  paceSecondsPerKm,
+  type RunZoneScale
 } from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
@@ -37,8 +34,6 @@ interface ScatterPoint {
   name: string;
 }
 
-const NO_ZONES: readonly TrainingHubThresholdZone[] = [];
-
 /** First and last weeks with a reading must be at least three weeks apart
  *  before their difference is called a trend, so a four-week period still shows
  *  one when both its ends were run. Twenty days rather than twenty-one: week
@@ -50,7 +45,7 @@ interface RunEfficiencyChartProps {
   runs: readonly TrainingHubActivity[];
   weeks: number;
   surfaces: readonly RunSurface[];
-  zones: readonly TrainingHubThresholdZone[];
+  zoneScale: RunZoneScale;
   nowMs: number;
 }
 
@@ -77,7 +72,7 @@ export function RunEfficiencyChart({
   runs,
   weeks,
   surfaces,
-  zones,
+  zoneScale,
   nowMs
 }: RunEfficiencyChartProps) {
   const { unitSystem } = useUnitSystem();
@@ -93,16 +88,17 @@ export function RunEfficiencyChart({
    * would hide their efficiency trend as a side effect of that, so the filter
    * relaxes and the header says which of the two is being drawn.
    */
+  const hasZones = zoneScale.zones.length > 0;
   const { rows, easyOnly } = useMemo(() => {
-    const easy = buildRunEfficiencyWeeks(runs, { weeks, nowMs, zones });
-    if (zones.length === 0 || easy.some((row) => row.count > 0)) {
-      return { rows: easy, easyOnly: zones.length > 0 };
+    const easy = buildRunEfficiencyWeeks(runs, { weeks, nowMs, zoneScale });
+    if (zoneScale.zones.length === 0 || easy.some((row) => row.count > 0)) {
+      return { rows: easy, easyOnly: zoneScale.zones.length > 0 };
     }
     return { rows: buildRunEfficiencyWeeks(runs, { weeks, nowMs }), easyOnly: false };
-  }, [nowMs, runs, weeks, zones]);
+  }, [nowMs, runs, weeks, zoneScale]);
 
   // The zones the line was actually filtered by, for the scatter to match.
-  const appliedZones = easyOnly ? zones : NO_ZONES;
+  const appliedScale = easyOnly ? zoneScale : undefined;
 
   const hasAny = rows.some((row) => row.count > 0);
 
@@ -142,7 +138,7 @@ export function RunEfficiencyChart({
         pace === undefined ||
         activity.avgHr === undefined ||
         surface === null ||
-        !countsForEfficiency(activity, appliedZones)
+        !countsForEfficiency(activity, appliedScale)
       ) {
         continue;
       }
@@ -160,7 +156,7 @@ export function RunEfficiencyChart({
       }
     }
     return grouped;
-  }, [appliedZones, runs, unitSystem]);
+  }, [appliedScale, runs, unitSystem]);
 
   const latest = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -205,7 +201,7 @@ export function RunEfficiencyChart({
         </div>
         <p className="run-block-aside">
           {easyOnly ? "Easy runs" : "All runs"} over 20 minutes
-          {zones.length > 0 && !easyOnly ? " · no easy sessions to compare" : ""}
+          {hasZones && !easyOnly ? " · no easy sessions to compare" : ""}
           {trend ? (
             <>
               {" · "}
