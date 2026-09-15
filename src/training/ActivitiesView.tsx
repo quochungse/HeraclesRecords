@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { CloudOff, Loader2, LockKeyhole, RefreshCw, SearchX } from "lucide-react";
-import { ActivityDetailPanel } from "./components/ActivityDetailPanel";
+import { ActivityDetailPane } from "./components/ActivityDetailPane";
 import { ActivitiesFilterBar } from "./components/ActivitiesFilterBar";
 import { ActivitiesSummary } from "./components/ActivitiesSummary";
 import { ActivityJournalList } from "./components/ActivityJournalList";
@@ -32,7 +32,8 @@ export function ActivitiesView({
   onLoadDetail,
   onExportFile,
   onConnect,
-  onRetry
+  onRetry,
+  onOpenSportScreen
 }: ActivitiesViewProps) {
   const connected = Boolean(status?.authenticated);
   const [filters, setFilters] = useState<ActivityFilters>(
@@ -216,15 +217,14 @@ export function ActivitiesView({
         <div className="training-activities-split">
           <div className="training-activities-list">{renderList()}</div>
           <div className="training-activities-detail">
-            <ActivityDetailPanel
+            <ActivityDetailPane
               api={api}
               detail={activityDetail}
               listActivity={selectedActivity}
               sportTypes={sportTypes}
               detailRequest={detailRequest}
-              busy={busy}
               onRetry={onLoadDetail}
-              embedded
+              onOpenSportScreen={onOpenSportScreen}
             />
           </div>
         </div>

@@ -18,28 +18,29 @@ import type {
   TrainingHubActivitySeriesPoint,
   TrainingHubActivityZoneBucket,
   UnitSystem
-} from "../../electron/types";
-import { downsampleActivitySeries } from "../../electron/activitySeries";
-import { useTheme } from "../theme/ThemeProvider";
-import { useUnitSystem } from "../units/UnitSystemProvider";
+} from "../../../electron/types";
+import { downsampleActivitySeries } from "../../../electron/activitySeries";
+import { useTheme } from "../../theme/ThemeProvider";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   distanceUnit,
   elevationUnit,
   metersToDisplayDistance,
   metersToElevation,
   secondsPerKmToDisplayPace
-} from "../units/units";
-import { formatDurationSeconds } from "../training/formatters";
-import { trainingChartTooltipStyle } from "../training/chartConfig";
-import { useChartColors } from "../training/useChartColors";
+} from "../../units/units";
+import { formatDurationSeconds } from "../formatters";
+import { trainingChartTooltipStyle } from "../chartConfig";
+import { useChartColors } from "../useChartColors";
+import "../activityChart.css";
 import {
-  availableRunChannels,
+  availableActivityChannels,
   defaultSelectedChannels,
-  runChannel,
-  runChannelColors,
-  toggleRunChannel,
-  type RunChannelKey
-} from "./runChannels";
+  activityChannel,
+  activityChannelColors,
+  toggleActivityChannel,
+  type ActivityChannelKey
+} from "../activityChannels";
 
 /**
  * How many points reach recharts.
@@ -51,9 +52,9 @@ import {
  */
 const CHART_POINTS = 400;
 
-export type RunChartAxis = "elapsed" | "distance";
+export type ActivitySeriesAxis = "elapsed" | "distance";
 
-interface RunDetailChartProps {
+interface ActivitySeriesChartProps {
   series: readonly TrainingHubActivitySeriesPoint[];
   laps: readonly TrainingHubActivityLap[];
   /** This run's own HR zone buckets, shaded behind the heart-rate line. */
@@ -80,11 +81,11 @@ function formatPaceTick(secondsPerKm: number, unitSystem: UnitSystem): string {
 }
 
 function formatChannelValue(
-  key: RunChannelKey,
+  key: ActivityChannelKey,
   value: number,
   unitSystem: UnitSystem
 ): string {
-  const definition = runChannel(key);
+  const definition = activityChannel(key);
 
   if (key === "pace" || key === "adjustedPace") {
     return `${formatPaceTick(value, unitSystem)} /${distanceUnit(unitSystem)}`;
@@ -97,7 +98,7 @@ function formatChannelValue(
 }
 
 function formatAxisTick(
-  key: RunChannelKey,
+  key: ActivityChannelKey,
   value: number,
   unitSystem: UnitSystem
 ): string {
@@ -107,11 +108,11 @@ function formatAxisTick(
   if (key === "altitude") {
     return String(Math.round(metersToElevation(value, unitSystem)));
   }
-  return value.toFixed(runChannel(key).decimals);
+  return value.toFixed(activityChannel(key).decimals);
 }
 
 function formatXTick(
-  axis: RunChartAxis,
+  axis: ActivitySeriesAxis,
   value: number,
   unitSystem: UnitSystem
 ): string {
@@ -130,7 +131,7 @@ function formatXTick(
  */
 function lapBoundaries(
   laps: readonly TrainingHubActivityLap[],
-  axis: RunChartAxis
+  axis: ActivitySeriesAxis
 ): { index: number; from: number; to: number }[] {
   const boundaries: { index: number; from: number; to: number }[] = [];
   let cursor = 0;
@@ -147,31 +148,31 @@ function lapBoundaries(
   return boundaries;
 }
 
-export function RunDetailChart({
+export function ActivitySeriesChart({
   series,
   laps,
   hrZones,
   focusLapIndex,
   onFocusLapHandled,
   activityTime
-}: RunDetailChartProps) {
+}: ActivitySeriesChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
   const { colors } = useChartColors();
-  const palette = useMemo(() => runChannelColors(theme), [theme]);
+  const palette = useMemo(() => activityChannelColors(theme), [theme]);
 
   const points = useMemo(
     () => downsampleActivitySeries([...series], CHART_POINTS),
     [series]
   );
 
-  const available = useMemo(() => availableRunChannels(points), [points]);
+  const available = useMemo(() => availableActivityChannels(points), [points]);
   const hasAltitude = available.some((channel) => channel.key === "altitude");
   const hasDistance = points.some((point) => typeof point.distance === "number");
   const hasElapsed = points.some((point) => typeof point.elapsed === "number");
 
-  const [axis, setAxis] = useState<RunChartAxis>("elapsed");
-  const [selected, setSelected] = useState<RunChannelKey[]>([]);
+  const [axis, setAxis] = useState<ActivitySeriesAxis>("elapsed");
+  const [selected, setSelected] = useState<ActivityChannelKey[]>([]);
   const [showAltitude, setShowAltitude] = useState(true);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
 
@@ -254,7 +255,7 @@ export function RunDetailChart({
     }
     const first = visible[0]!;
     const last = visible[visible.length - 1]!;
-    const mean = (key: RunChannelKey) => {
+    const mean = (key: ActivityChannelKey) => {
       const values = visible
         .map((row) => row[key])
         .filter((value): value is number => typeof value === "number");
@@ -293,7 +294,7 @@ export function RunDetailChart({
     return (
       <section className="panel run-detail-panel">
         <p className="running-eyebrow">Channels</p>
-        <p className="run-chart-empty">
+        <p className="activity-chart-empty">
           COROS returned no per-sample readings for this run, so there is nothing
           to plot. The summary above is everything it sent.
         </p>
@@ -301,14 +302,14 @@ export function RunDetailChart({
     );
   }
 
-  const axisChannels = selected.map(runChannel);
+  const axisChannels = selected.map(activityChannel);
 
   return (
-    <section className="panel run-detail-panel run-chart-panel">
-      <div className="run-chart-head">
+    <section className="panel run-detail-panel activity-chart-panel">
+      <div className="activity-chart-head">
         <p className="running-eyebrow">Channels</p>
         <div
-          className="training-metric-toggle run-chart-axis"
+          className="training-metric-toggle activity-chart-axis"
           role="group"
           aria-label="X axis"
         >
@@ -333,7 +334,7 @@ export function RunDetailChart({
         </div>
       </div>
 
-      <div className="run-chart-chips">
+      <div className="activity-chart-chips">
         {available.map((channel) => {
           const active = channel.background
             ? showAltitude
@@ -343,7 +344,7 @@ export function RunDetailChart({
             <button
               key={channel.key}
               type="button"
-              className={`run-chip${active ? " is-active" : ""}`}
+              className={`activity-chart-chip${active ? " is-active" : ""}`}
               aria-pressed={active}
               style={
                 active
@@ -353,17 +354,17 @@ export function RunDetailChart({
               onClick={() =>
                 channel.background
                   ? setShowAltitude((previous) => !previous)
-                  : setSelected((previous) => toggleRunChannel(previous, channel.key))
+                  : setSelected((previous) => toggleActivityChannel(previous, channel.key))
               }
             >
-              <span className="run-chip-dot" style={{ background: color.stroke }} />
+              <span className="activity-chart-chip-dot" style={{ background: color.stroke }} />
               {channel.label}
             </button>
           );
         })}
       </div>
 
-      <div className="run-chart-plot">
+      <div className="activity-chart-plot">
         <ResponsiveContainer width="100%" height={340}>
           <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
             <defs>
@@ -516,8 +517,8 @@ export function RunDetailChart({
       </div>
 
       {segment ? (
-        <div className="run-chart-segment">
-          <span className="run-chart-segment-label">
+        <div className="activity-chart-segment">
+          <span className="activity-chart-segment-label">
             {range === null ? "Whole run" : "Selection"}
           </span>
           {segment.distance !== undefined ? (
@@ -545,10 +546,10 @@ export function RunDetailChart({
 }
 
 interface RunChartTooltipProps extends TooltipContentProps {
-  axis: RunChartAxis;
+  axis: ActivitySeriesAxis;
   unitSystem: UnitSystem;
   showAltitude: boolean;
-  palette: Record<RunChannelKey, { stroke: string; fill: string }>;
+  palette: Record<ActivityChannelKey, { stroke: string; fill: string }>;
 }
 
 function RunChartTooltip({
@@ -570,7 +571,7 @@ function RunChartTooltip({
   }
 
   const keys = payload
-    .map((entry) => entry.dataKey as RunChannelKey)
+    .map((entry) => entry.dataKey as ActivityChannelKey)
     .filter((key) => key !== "altitude");
 
   return (

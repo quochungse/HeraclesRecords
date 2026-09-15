@@ -2862,6 +2862,7 @@ export default function App() {
                   onExportFile={handleTrainingHubExport}
                   onConnect={() => setActiveView("overview")}
                   onRetry={() => void handleRunningActivitiesRetry()}
+                  onOpenSportScreen={(view) => setActiveView(view)}
                 />
               </Suspense>
             ) : null}

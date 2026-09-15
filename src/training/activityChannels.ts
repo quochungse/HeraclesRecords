@@ -2,15 +2,20 @@ import type { Theme } from "../theme/theme";
 import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
 
 /**
- * The channels a run's chart can draw, and what each one is.
+ * The channels an activity's chart can draw, and what each one is.
  *
  * Every entry here was verified present on a live COROS road run before it was
  * offered: `frequencyList` carries all of them, at very nearly full coverage,
  * once the parser stops discarding a channel over its warm-up gaps. A chip is
- * still only shown when *this* run has the readings, because a wrist-only easy
- * run carries heart rate and pace and none of the running-form group.
+ * still only shown when *this* activity has the readings, which is also what
+ * makes the list sport-agnostic: a ride offers power and no stride length, a
+ * wrist-only easy run offers heart rate and pace and none of the form group,
+ * and a strength session offers heart rate alone.
+ *
+ * It lived under `src/running/` and only Running drew it, while the Activities
+ * detail pane — reading the same payload — drew elevation and nothing else.
  */
-export type RunChannelKey =
+export type ActivityChannelKey =
   | "pace"
   | "adjustedPace"
   | "hr"
@@ -22,8 +27,8 @@ export type RunChannelKey =
   | "verticalRatio"
   | "altitude";
 
-export interface RunChannelDefinition {
-  key: RunChannelKey;
+export interface ActivityChannelDefinition {
+  key: ActivityChannelKey;
   label: string;
   /** Metric unit as parsed; pace and altitude are converted at render time. */
   unit: string;
@@ -41,7 +46,7 @@ export interface RunChannelDefinition {
   background?: boolean;
 }
 
-const RUN_CHANNELS: readonly RunChannelDefinition[] = [
+const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
   { key: "pace", label: "Pace", unit: "/km", decimals: 0, reversed: true },
   {
     key: "adjustedPace",
@@ -65,8 +70,8 @@ const RUN_CHANNELS: readonly RunChannelDefinition[] = [
   { key: "altitude", label: "Elevation", unit: "m", decimals: 0, background: true }
 ];
 
-export function runChannel(key: RunChannelKey): RunChannelDefinition {
-  return RUN_CHANNELS.find((channel) => channel.key === key) ?? RUN_CHANNELS[0]!;
+export function activityChannel(key: ActivityChannelKey): ActivityChannelDefinition {
+  return ACTIVITY_CHANNELS.find((channel) => channel.key === key) ?? ACTIVITY_CHANNELS[0]!;
 }
 
 /**
@@ -92,7 +97,7 @@ const MIN_ALTITUDE_RANGE_METERS = 10;
 
 function channelRange(
   series: readonly TrainingHubActivitySeriesPoint[],
-  key: RunChannelKey
+  key: ActivityChannelKey
 ): number {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -109,7 +114,7 @@ function channelRange(
 /** How many samples a channel actually has in this run. */
 function countChannelSamples(
   series: readonly TrainingHubActivitySeriesPoint[],
-  key: RunChannelKey
+  key: ActivityChannelKey
 ): number {
   let count = 0;
   for (const point of series) {
@@ -121,10 +126,10 @@ function countChannelSamples(
 }
 
 /** The channels this run can actually draw, in the order they are offered. */
-export function availableRunChannels(
+export function availableActivityChannels(
   series: readonly TrainingHubActivitySeriesPoint[]
-): RunChannelDefinition[] {
-  return RUN_CHANNELS.filter((channel) => {
+): ActivityChannelDefinition[] {
+  return ACTIVITY_CHANNELS.filter((channel) => {
     if (countChannelSamples(series, channel.key) < MIN_CHANNEL_SAMPLES) {
       return false;
     }
@@ -140,11 +145,11 @@ export function availableRunChannels(
  * the run went the way it was meant to. Falls back to whatever the watch did
  * record, so an indoor run with no pace still opens on something.
  */
-const PREFERRED_CHANNELS: readonly RunChannelKey[] = ["pace", "hr"];
+const PREFERRED_CHANNELS: readonly ActivityChannelKey[] = ["pace", "hr"];
 
 export function defaultSelectedChannels(
-  available: readonly RunChannelDefinition[]
-): RunChannelKey[] {
+  available: readonly ActivityChannelDefinition[]
+): ActivityChannelKey[] {
   const axisKeys = available
     .filter((channel) => !channel.background)
     .map((channel) => channel.key);
@@ -171,10 +176,10 @@ export function defaultSelectedChannels(
  * rather than refusing the press. A chip that does nothing when clicked reads
  * as broken; one that quietly replaces what it has to is understood at once.
  */
-export function toggleRunChannel(
-  selected: readonly RunChannelKey[],
-  key: RunChannelKey
-): RunChannelKey[] {
+export function toggleActivityChannel(
+  selected: readonly ActivityChannelKey[],
+  key: ActivityChannelKey
+): ActivityChannelKey[] {
   if (selected.includes(key)) {
     return selected.filter((entry) => entry !== key);
   }
@@ -185,13 +190,13 @@ export function toggleRunChannel(
     : next;
 }
 
-export interface RunChannelColors {
+export interface ActivityChannelColors {
   stroke: string;
   /** Translucent fill for the elevation backdrop. */
   fill: string;
 }
 
-const DARK_CHANNEL_COLORS: Record<RunChannelKey, RunChannelColors> = {
+const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
   pace: { stroke: "#74c08f", fill: "rgba(116, 192, 143, 0.18)" },
   adjustedPace: { stroke: "#4fd1c5", fill: "rgba(79, 209, 197, 0.18)" },
   hr: { stroke: "#f87171", fill: "rgba(248, 113, 113, 0.18)" },
@@ -204,7 +209,7 @@ const DARK_CHANNEL_COLORS: Record<RunChannelKey, RunChannelColors> = {
   altitude: { stroke: "rgba(255, 255, 255, 0.22)", fill: "rgba(255, 255, 255, 0.07)" }
 };
 
-const PAPER_CHANNEL_COLORS: Record<RunChannelKey, RunChannelColors> = {
+const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
   pace: { stroke: "#1f7a55", fill: "rgba(31, 122, 85, 0.16)" },
   adjustedPace: { stroke: "#0f766e", fill: "rgba(15, 118, 110, 0.16)" },
   hr: { stroke: "#c2410c", fill: "rgba(194, 65, 12, 0.16)" },
@@ -217,6 +222,6 @@ const PAPER_CHANNEL_COLORS: Record<RunChannelKey, RunChannelColors> = {
   altitude: { stroke: "rgba(60, 50, 35, 0.2)", fill: "rgba(60, 50, 35, 0.08)" }
 };
 
-export function runChannelColors(theme: Theme): Record<RunChannelKey, RunChannelColors> {
+export function activityChannelColors(theme: Theme): Record<ActivityChannelKey, ActivityChannelColors> {
   return theme === "paper" ? PAPER_CHANNEL_COLORS : DARK_CHANNEL_COLORS;
 }

@@ -18,7 +18,7 @@ import {
   formatTrainingTimestamp
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { RunDetailChart } from "./RunDetailChart";
+import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import {
   paceHrDecoupling,
@@ -342,7 +342,7 @@ export function RunDetailView({
       ) : null}
 
       {series.length > 0 ? (
-        <RunDetailChart
+        <ActivitySeriesChart
           series={series}
           laps={laps}
           hrZones={detail?.hrZones ?? []}

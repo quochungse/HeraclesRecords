@@ -200,6 +200,12 @@ export type ActivitiesViewProps = Pick<
   onConnect: () => void;
   /** Reloads the COROS data after the activity list failed to arrive. */
   onRetry: () => void;
+  /**
+   * Hands a session to the screen built for its sport. Activities is the log
+   * every sport lands in; the depth belongs on Running and Strength, and this
+   * is the door between them.
+   */
+  onOpenSportScreen?: (view: "running" | "strength") => void;
 };
 
 export type { TrainingHubDailyMetric };

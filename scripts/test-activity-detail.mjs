@@ -869,7 +869,7 @@ assert.equal(
 
 // A detail that came back without the elapsed clock borrows the list's.
 assert.equal(
-  mergeActivityDetailWithList({ laps: [], hrZones: [], raw: {}, duration: 4190 }, listed)
+  mergeActivityDetailWithList({ laps: [], hrZones: [], duration: 4190 }, listed)
     .elapsedDuration,
   7102
 );

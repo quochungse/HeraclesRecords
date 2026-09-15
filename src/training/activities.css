@@ -536,3 +536,331 @@
 .activities-view .training-activities-list {
   gap: 0;
 }
+
+/* --- Detail pane ---------------------------------------------------------- */
+
+.activity-detail-pane {
+  display: grid;
+  /*
+   * `minmax(0, 1fr)` rather than an implicit `auto` column: an auto track is
+   * floored at its content's minimum width, and the global
+   * `table { min-width: 720px }` in styles.css then pushes the whole pane wider
+   * than the split gives it. That is what put a horizontal scrollbar under the
+   * strength set table.
+   */
+  grid-template-columns: minmax(0, 1fr);
+  /*
+   * Rows sized to their content. In a grid with a fixed height an `auto` row
+   * gives way to its item's *minimum* size, and any item with `overflow` other
+   * than visible has a minimum of zero — so the figures grid below, which
+   * clips for its rounded corners, rendered as a two-pixel line between the
+   * headline and the zones. The same trap the Running view documents.
+   */
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  /* The pane is the one scroller. Nothing inside it scrolls on its own. */
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.activity-detail-pane.is-blank {
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.activity-detail-pane.is-blank p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.activity-detail-pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.activity-detail-pane-title {
+  min-width: 0;
+}
+
+.activity-detail-pane-title h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.activity-detail-pane-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.activity-detail-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.activity-detail-pane-actions .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+/* --- Figures -------------------------------------------------------------- */
+
+.activity-detail-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.activity-detail-headline > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-raised);
+}
+
+.activity-detail-headline span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-detail-headline strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * Everything the headline did not take, at half the weight.
+ *
+ * The rules between cells are drawn by the cells rather than by a 1px grid gap
+ * over a coloured container: the last row rarely fills, and a gap-drawn grid
+ * leaves that trailing space a different tone from the cells beside it.
+ */
+.activity-detail-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-heading);
+}
+
+.activity-detail-figures > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 9px 12px;
+  box-shadow:
+    inset -1px 0 0 var(--ax-edge),
+    inset 0 -1px 0 var(--ax-edge);
+}
+
+.activity-detail-figures span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.activity-detail-figures strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Zones ---------------------------------------------------------------- */
+
+.activity-zones {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-zones h3,
+.activity-detail-block h3 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.activity-zones-bar {
+  display: flex;
+  overflow: hidden;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activity-zones-bar i {
+  min-width: 2px;
+  background: var(--zone-color);
+}
+
+/*
+ * One compact entry per zone. The band's name and its bpm bounds are on the
+ * entry's `title` rather than in the line: spelled out, four zones took three
+ * wrapped rows and read as a paragraph rather than a legend.
+ */
+.activity-zones-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-zones-legend li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activity-zones-legend i {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--zone-color);
+}
+
+.activity-zones-name {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.activity-zones-legend strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.activity-zones-share {
+  color: var(--text-muted);
+}
+
+/*
+ * Cool to hot across the six bands. Scoped like the sport colours above,
+ * because renderer CSS has no scope.
+ */
+.activities-view [data-zone="0"] { --zone-color: #6b7280; }
+.activities-view [data-zone="1"] { --zone-color: #7fb0d8; }
+.activities-view [data-zone="2"] { --zone-color: #3fb27f; }
+.activities-view [data-zone="3"] { --zone-color: #d8b13a; }
+.activities-view [data-zone="4"] { --zone-color: #e08a3c; }
+.activities-view [data-zone="5"] { --zone-color: #dd5f4b; }
+.activities-view [data-zone="6"] { --zone-color: #b4405c; }
+
+/* --- Blocks --------------------------------------------------------------- */
+
+.activity-detail-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.activity-detail-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/*
+ * `styles.css` floors every table at 720px. The strength set table comes from
+ * a shared component and inherits it, so the pane cancels it for anything
+ * inside — the split gives this pane less than 720px on any window under
+ * about 1 500, and the table pushed a horizontal scrollbar under the whole
+ * detail rather than wrapping.
+ */
+.activity-detail-pane table {
+  min-width: 0;
+}
+
+.activity-lap-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-lap-table th,
+.activity-lap-table td {
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--ax-edge);
+  text-align: left;
+}
+
+.activity-lap-table th {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-lap-table .is-numeric {
+  text-align: right;
+}
+
+.activity-lap-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.activity-lap-table tbody tr.is-pickable {
+  cursor: pointer;
+}
+
+.activity-lap-table tbody tr.is-pickable:hover td {
+  background: var(--ax-raised);
+}
+
+/*
+ * The route was a 400×190 postcard in a pane twice that wide, with a zoom
+ * control bigger than the streets. The pane is where a route is actually
+ * looked at, so it gets the room.
+ */
+.activity-detail-block .activity-route-map-canvas {
+  height: 300px;
+}
+
+.activity-detail-block .activity-elevation-chart-shell {
+  height: 180px;
+}
