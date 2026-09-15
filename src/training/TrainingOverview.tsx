@@ -70,7 +70,7 @@ export function TrainingOverview({
   const connected = Boolean(status?.authenticated);
   // The zone distribution is labelled with whichever heart-rate model the
   // Personal screen has selected, not LTHR by default.
-  const hrZoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
+  const { model: hrZoneModel } = useHeartRateZoneModel({ api, corosConnected: connected });
   // Signed out because a start-up re-login is still in the air, which is a very
   // different thing to say than "sign in": nobody has to do anything, and it
   // resolves on its own in a second or two.

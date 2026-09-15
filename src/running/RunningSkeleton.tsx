@@ -43,6 +43,20 @@ export function RunningPageSkeleton() {
   );
 }
 
+/**
+ * Stands in for a block that sorts runs by heart-rate zone while the account's
+ * zones are still on their way — see `HeartRateZoneModelState.settled`.
+ */
+export function RunBlockSkeleton({ label }: { label: string }) {
+  return (
+    <section className="panel run-block" aria-busy="true" aria-label={label}>
+      <i className="run-skeleton run-skeleton-label" />
+      <i className="run-skeleton run-skeleton-title" />
+      <i className="run-skeleton run-skeleton-plot" />
+    </section>
+  );
+}
+
 /** Stands in for the channel chart and the tables under it. */
 export function RunDetailSkeleton() {
   return (

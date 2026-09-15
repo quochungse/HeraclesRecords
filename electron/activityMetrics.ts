@@ -29,7 +29,7 @@ const HR_BUCKET_COUNT = 6;
  * read — a drift percentage from a formula nobody uses any more is worse than
  * no drift percentage, because nothing about it looks wrong.
  */
-export const ACTIVITY_SUMMARY_VERSION = 1;
+export const ACTIVITY_SUMMARY_VERSION = 2;
 
 function positive(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
@@ -47,6 +47,19 @@ export interface RunDecoupling {
 
 /** Samples needed in each half before a decoupling figure means anything. */
 const MIN_DECOUPLING_SAMPLES_PER_HALF = 10;
+
+/**
+ * The opening stretch a decoupling figure leaves out. Heart rate lags the pace
+ * at the start of every run, so a first half that includes it buys more ground
+ * per beat than the running did. On real 10–15 km runs the first ten minutes
+ * averaged 10–19 bpm under the rest, and a run that held within 2.4% read as
+ * 7.8% drift with them in.
+ */
+const DECOUPLING_WARMUP_SECONDS = 600;
+
+/** Running left after the warm-up before two halves of it say anything — the
+ *  same twenty minutes the efficiency chart asks of a run. */
+const MIN_DECOUPLING_SPAN_SECONDS = 1200;
 
 function halfEfficiency(
   points: readonly TrainingHubActivitySeriesPoint[]
@@ -78,10 +91,11 @@ function halfEfficiency(
  * Aerobic decoupling: how much further apart pace and heart rate drifted over
  * the run. Above roughly 5% the athlete was running beyond what they could hold.
  *
- * Split on elapsed time where the channel exists, because splitting an array in
- * half splits on *samples* — and a watch that samples on distance puts more of
- * them in the fast half. Pass the series on activity time
- * (`withPausesRemoved`): on the wall clock a long stop moves the midpoint.
+ * Measured after the warm-up (`DECOUPLING_WARMUP_SECONDS`) and split on elapsed
+ * time, because splitting an array in half splits on *samples* — and a watch
+ * that samples on distance puts more of them in the fast half. Pass the series
+ * on activity time (`withPausesRemoved`): on the wall clock a long stop moves
+ * both the warm-up's end and the midpoint.
  */
 export function paceHrDecoupling(
   series: readonly TrainingHubActivitySeriesPoint[] | undefined
@@ -91,10 +105,9 @@ export function paceHrDecoupling(
   }
 
   // Zero is a real elapsed reading — the first sample of every activity — so
-  // this cannot go through `positive`, which would drop it and pull the
-  // midpoint late enough to hand the first half a slice of the second. A loop,
-  // not `Math.min(...values)`: a long ultra is tens of thousands of samples,
-  // past what a spread can pass as arguments.
+  // this cannot go through `positive`, which would drop it and start the
+  // warm-up late. A loop, not `Math.min(...values)`: a long ultra is tens of
+  // thousands of samples, past what a spread can pass as arguments.
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   const stamped: TrainingHubActivitySeriesPoint[] = [];
@@ -107,21 +120,30 @@ export function paceHrDecoupling(
     }
   }
 
-  let first: readonly TrainingHubActivitySeriesPoint[];
-  let second: readonly TrainingHubActivitySeriesPoint[];
+  // Without a clock over most of the run there is no telling where the warm-up
+  // ends, and a figure with it left in is the one this function exists to not
+  // give. Up to half may be missing — the parser keeps a channel any sample
+  // carries, so a timestamp that drops out over the closing kilometres leaves
+  // holes — and those samples sit out rather than land at elapsed 0, which
+  // scored the end of the run into its first half.
+  if (stamped.length < series.length / 2) {
+    return undefined;
+  }
 
-  if (stamped.length >= series.length / 2) {
-    // Only the stamped samples take part. Up to half the series may have no
-    // clock — the parser keeps a channel any sample carries, so a timestamp
-    // that drops out over the closing kilometres leaves holes — and reading
-    // those as elapsed 0 scored the end of the run into its first half.
-    const midpoint = (min + max) / 2;
-    first = stamped.filter((point) => (point.elapsed as number) <= midpoint);
-    second = stamped.filter((point) => (point.elapsed as number) > midpoint);
-  } else {
-    const cut = Math.floor(series.length / 2);
-    first = series.slice(0, cut);
-    second = series.slice(cut);
+  const warmupEnd = min + DECOUPLING_WARMUP_SECONDS;
+  if (max - warmupEnd < MIN_DECOUPLING_SPAN_SECONDS) {
+    return undefined;
+  }
+
+  const midpoint = (warmupEnd + max) / 2;
+  const first: TrainingHubActivitySeriesPoint[] = [];
+  const second: TrainingHubActivitySeriesPoint[] = [];
+  for (const point of stamped) {
+    const value = point.elapsed as number;
+    if (value < warmupEnd) {
+      continue;
+    }
+    (value <= midpoint ? first : second).push(point);
   }
 
   const firstHalf = halfEfficiency(first);

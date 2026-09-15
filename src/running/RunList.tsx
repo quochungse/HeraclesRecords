@@ -102,7 +102,7 @@ const COLUMNS: readonly ColumnDefinition[] = [
     label: "Drift",
     numeric: true,
     title:
-      "Aerobic decoupling — how much further apart pace and heart rate moved over the run. Under 5% is a session held together."
+      "Aerobic decoupling — how much further apart pace and heart rate moved after the first ten minutes. Under 5% is a session held together; runs under 30 minutes get none."
   }
 ];
 

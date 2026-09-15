@@ -10,6 +10,20 @@ interface UseHeartRateZoneModelOptions {
   corosConnected: boolean;
 }
 
+export interface HeartRateZoneModelState {
+  model: HeartRateZoneModel | null;
+  /**
+   * Whether `model` is the answer rather than the wait for one. A null model
+   * means both "the profile has not come back yet" and "the account has none",
+   * and a caller that falls back on the dashboard's LTHR zones must not do it
+   * for the first: on an account scored on heart-rate reserve that fallback
+   * draws a different population for the moment the request is in the air, and
+   * the Running screen's efficiency headline changed number and meaning every
+   * time the screen mounted.
+   */
+  settled: boolean;
+}
+
 /**
  * The heart-rate zones the account is scored against, read off the Personal
  * profile. Served from the main process's hour-long profile cache, so the
@@ -19,17 +33,24 @@ interface UseHeartRateZoneModelOptions {
  *
  * A failure stays silent on purpose: the zones only label a chart, and the
  * caller has the dashboard's LTHR zones to fall back on. Surfacing a COROS
- * error here would also mean shouting over a start-up re-login.
+ * error here would also mean shouting over a start-up re-login. A failure does
+ * settle, so a caller waiting on `settled` falls back rather than waits forever.
  */
 export function useHeartRateZoneModel({
   api,
   corosConnected
-}: UseHeartRateZoneModelOptions): HeartRateZoneModel | null {
-  const [model, setModel] = useState<HeartRateZoneModel | null>(null);
+}: UseHeartRateZoneModelOptions): HeartRateZoneModelState {
+  // Null until the request this connection made has answered. Cleared on
+  // disconnect, so a reconnect waits for its own answer instead of reading the
+  // last one.
+  const [answer, setAnswer] = useState<{ model: HeartRateZoneModel | null } | null>(
+    null
+  );
+  const active = Boolean(api) && corosConnected;
 
   useEffect(() => {
     if (!api || !corosConnected) {
-      setModel(null);
+      setAnswer(null);
       return;
     }
 
@@ -39,12 +60,12 @@ export function useHeartRateZoneModel({
       .getCorosProfileSnapshot()
       .then((snapshot) => {
         if (!cancelled) {
-          setModel(heartRateZoneModelFromProfile(snapshot.profile));
+          setAnswer({ model: heartRateZoneModelFromProfile(snapshot.profile) });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setModel(null);
+          setAnswer({ model: null });
         }
       });
 
@@ -53,5 +74,8 @@ export function useHeartRateZoneModel({
     };
   }, [api, corosConnected]);
 
-  return model;
+  return {
+    model: active ? (answer?.model ?? null) : null,
+    settled: !active || answer !== null
+  };
 }

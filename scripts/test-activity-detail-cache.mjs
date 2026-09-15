@@ -194,10 +194,11 @@ assert.ok(
 // ---------------------------------------------------------------------------
 
 // A run that drifts: the second half holds the same pace at a higher heart
-// rate, which is what decoupling is measuring.
+// rate, which is what decoupling is measuring. The halves are taken after a
+// ten-minute warm-up, so over this 59.5-minute run they meet at 34.75 minutes.
 const drifting = Array.from({ length: 120 }, (_, index) => ({
   time: index * 30,
-  heart: index < 60 ? 150 : 165,
+  heart: index < 70 ? 150 : 165,
   speed: 420
 }));
 

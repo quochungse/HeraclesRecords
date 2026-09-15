@@ -359,10 +359,12 @@ assert.equal(runIntensity(169, liveZones), "hard");
 // on, which is what the figure is meant to catch.
 // ---------------------------------------------------------------------------
 
+// A sample every 100 s over 65 minutes. The first ten are warm-up and sit out,
+// so the halves meet at 37.5 minutes.
 const drifting = Array.from({ length: 40 }, (_, index) => ({
   elapsed: index * 100,
   hr: 150,
-  pace: index < 20 ? 300 : 330
+  pace: index * 100 <= 2250 ? 300 : 330
 }));
 
 const decoupling = paceHrDecoupling(drifting);
@@ -379,6 +381,32 @@ const steady = Array.from({ length: 40 }, (_, index) => ({
   pace: 300
 }));
 assert.ok(Math.abs(paceHrDecoupling(steady).percent) < 1e-9);
+
+// Heart rate lags the pace for the opening minutes of every run. Scored into
+// the first half, that lag bought more ground per beat than the running did, and
+// a run held perfectly together read as drifting.
+const warmingUp = steady.map((point) =>
+  point.elapsed < 600 ? { ...point, hr: 120 } : point
+);
+assert.ok(
+  Math.abs(paceHrDecoupling(warmingUp).percent) < 1e-9,
+  "a warm-up's low heart rate is not drift"
+);
+
+// Twenty minutes must be left once the warm-up is out, or the halves are too
+// short to compare — a nine-minute shakeout used to get a figure of its own.
+const minutes = (count) =>
+  Array.from({ length: count + 1 }, (_, index) => ({ elapsed: index * 60, hr: 150, pace: 300 }));
+assert.equal(paceHrDecoupling(minutes(29)), undefined, "29 minutes is 19 after the warm-up");
+assert.ok(paceHrDecoupling(minutes(30)), "30 minutes leaves the twenty it needs");
+
+// No clock, no telling where the warm-up ends: nothing, rather than a figure
+// with it left in.
+assert.equal(
+  paceHrDecoupling(drifting.map(({ hr, pace }) => ({ hr, pace }))),
+  undefined,
+  "a series with no elapsed channel gets no decoupling"
+);
 
 // Samples with no clock sit out rather than land at elapsed 0. Up to half the
 // series may lack a timestamp, and scoring them into the first half moved the

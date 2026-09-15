@@ -184,7 +184,7 @@ export function RunDetailView({
             label: "Decoupling",
             value: `${decoupling.percent > 0 ? "+" : ""}${decoupling.percent.toFixed(1)}%`,
             title:
-              "How far pace and heart rate drifted apart between the first and second half. Under 5% is a run held together."
+              "How far pace and heart rate drifted apart between the first and second half, with the first ten minutes left out as warm-up. Under 5% is a run held together."
           },
     [decoupling]
   );

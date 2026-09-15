@@ -23,7 +23,7 @@ import { RunEfficiencyChart } from "./RunEfficiencyChart";
 import { RunIntensityPanel } from "./RunIntensityPanel";
 import { RunningHero, runningThresholdZones } from "./RunningHero";
 import { RunSurfacePanel } from "./RunSurfacePanel";
-import { RunningPageSkeleton } from "./RunningSkeleton";
+import { RunBlockSkeleton, RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
 import { runWindowStartMs, summariseRuns, surfacesPresent } from "./runMetrics";
@@ -203,8 +203,14 @@ export function RunningView({
   // The zones the account is actually scored against — the model picked on the
   // Personal screen. The dashboard only ever carries LTHR zones, and reading
   // those for an account on heart-rate reserve put a run COROS scored as 83%
-  // zone 2 into "hard".
-  const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
+  // zone 2 into "hard". Until the profile answers, the blocks that sort runs by
+  // zone wait rather than draw from LTHR: this view remounts on every visit, and
+  // on such an account the fallback found no easy runs, so the efficiency
+  // headline switched to "All runs" and back each time.
+  const { model: zoneModel, settled: zonesSettled } = useHeartRateZoneModel({
+    api,
+    corosConnected: connected
+  });
   const zones = useMemo(
     () => zoneModel?.zones ?? runningThresholdZones(snapshot),
     [snapshot, zoneModel]
@@ -519,20 +525,28 @@ export function RunningView({
               surfaces={stackedSurfaces}
               nowMs={nowMs}
             />
-            <RunEfficiencyChart
-              runs={runs}
-              weeks={chartWeeks}
-              surfaces={stackedSurfaces}
-              zones={zones}
-              nowMs={nowMs}
-            />
-            <div className="running-columns">
-              <RunIntensityPanel
+            {zonesSettled ? (
+              <RunEfficiencyChart
                 runs={runs}
+                weeks={chartWeeks}
+                surfaces={stackedSurfaces}
                 zones={zones}
-                zoneModelLabel={zoneModel?.title}
-                summaries={summaries}
+                nowMs={nowMs}
               />
+            ) : (
+              <RunBlockSkeleton label="Loading your heart-rate zones" />
+            )}
+            <div className="running-columns">
+              {zonesSettled ? (
+                <RunIntensityPanel
+                  runs={runs}
+                  zones={zones}
+                  zoneModelLabel={zoneModel?.title}
+                  summaries={summaries}
+                />
+              ) : (
+                <RunBlockSkeleton label="Loading your heart-rate zones" />
+              )}
               <RunSurfacePanel runs={runsInPeriod} />
             </div>
           </>

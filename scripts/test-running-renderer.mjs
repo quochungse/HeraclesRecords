@@ -884,6 +884,76 @@ async function main() {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // The blocks that sort runs by zone wait for the account's own zones. This
+  // view remounts on every visit, and the dashboard's LTHR zones it drew from
+  // in the meantime are a different population: on a heart-rate-reserve account
+  // with no run under the LTHR easy ceiling, the efficiency headline read "All
+  // runs" and then switched to "Easy runs" once the profile answered.
+  // -------------------------------------------------------------------------
+  {
+    // Every fixture run averages 150 bpm: moderate on these, easy on the next.
+    const lthrOnly = {
+      dashboard: {
+        lthrZones: [134, 145, 160, 171, 178, 218].map((hr, index) => ({ index, hr }))
+      }
+    };
+    const reserveProfile = {
+      profile: {
+        hrZoneType: 2,
+        thresholds: {
+          zones: {
+            maxHr: [],
+            restingHr: [133, 154, 168, 173, 183, 404].map((bpm, index) => ({ index, bpm })),
+            lthr: []
+          },
+          ranges: {}
+        }
+      },
+      dashboard: null,
+      cachedAt: new Date().toISOString()
+    };
+    const noSummaries = {
+      getActivityDetailSummaries: [],
+      syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0, summaries: [] }
+    };
+
+    await mountRunning(
+      { activities: RUNS, activitiesStatus: "ready", snapshot: lthrOnly },
+      { ...noSummaries, getCorosProfileSnapshot: "__pending" }
+    );
+    assert.equal(
+      await hasText("Aerobic efficiency"),
+      false,
+      "no efficiency figure while the account's zones are on their way"
+    );
+    assert.equal(await hasText("Intensity mix"), false, "nor an intensity split");
+    assert.equal(
+      await harness("count", '[aria-label="Loading your heart-rate zones"]'),
+      2,
+      "both zone-sorted blocks hold their place"
+    );
+
+    assert.equal(await harness("resolvePending", "getCorosProfileSnapshot", reserveProfile), true);
+    await waitFor(() => hasText("Aerobic efficiency"), "the efficiency block draws once the zones land");
+    assert.equal(
+      await hasText("Easy runs over 20 minutes"),
+      true,
+      "scored on the account's own zones, never first on the dashboard's"
+    );
+    assert.equal(await hasText("no easy sessions to compare"), false);
+    assert.equal(await hasText("Heart Rate Reserve zones."), true);
+
+    // A profile that cannot be read settles too — onto the dashboard's zones,
+    // rather than a skeleton that never resolves.
+    await mountRunning(
+      { activities: RUNS, activitiesStatus: "ready", snapshot: lthrOnly },
+      noSummaries
+    );
+    await waitFor(() => hasText("Aerobic efficiency"), "a failed profile read still draws the block");
+    assert.equal(await hasText("no easy sessions to compare"), true, "from the LTHR fallback");
+  }
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors, [], "the page logged errors");
 
