@@ -20,18 +20,15 @@ import type { TrainingHubStatus } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { StrengthHero } from "./StrengthHero";
 import { ExerciseExplorer } from "./ExerciseExplorer";
-import { explorerExerciseName } from "./exerciseExplorerData";
 import { StrengthOverviewPanels } from "./StrengthOverviewPanels";
+import { AGGREGATE_SELECTION, StrengthSessionList } from "./StrengthSessionList";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
 import {
   cadencePhrase,
   durationParts,
-  formatSessionDate,
   formatSpan,
   formatSyncTime,
-  formatTotalWeight,
   liftWeightParts,
-  sessionSourceLabel,
   totalWeightParts,
   type FigurePart
 } from "./strengthFormat";
@@ -41,6 +38,7 @@ import {
   toErrorMessage,
   useStrengthData
 } from "./useStrengthData";
+import { useStrengthSessionIndex } from "./useStrengthSessionIndex";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -52,9 +50,6 @@ interface StrengthViewProps {
   /** Dev view unlocks the generated sample history. */
   showDevelopmentTools?: boolean;
 }
-
-/** Sessions in the recent-sessions list. */
-const MAX_RECENT_SESSIONS = 6;
 
 function Figure({ parts }: { parts: FigurePart[] }) {
   return (
@@ -106,6 +101,7 @@ export function StrengthView({
   const [hevyBusy, setHevyBusy] = useState(false);
   const [hevyDialogError, setHevyDialogError] = useState<string | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
+  const [pickedSelection, setPickedSelection] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hevyDialogOpen) return;
@@ -186,13 +182,23 @@ export function StrengthView({
   // counting sets rather than showing a column of zeroes.
   const usesWeights = summary.volumeKg > 0;
 
-  const recentSessions = useMemo(
+  const sessionIndex = useStrengthSessionIndex(sessions);
+  const newestSession = useMemo(
     () =>
-      [...sessions]
-        .sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0))
-        .slice(0, MAX_RECENT_SESSIONS),
+      sessions.reduce<(typeof sessions)[number] | undefined>(
+        (newest, session) =>
+          (session.startTime ?? 0) > (newest?.startTime ?? -1) ? session : newest,
+        undefined
+      ),
     [sessions]
   );
+  // A pick that the window or source has since dropped falls back to the newest
+  // session, without an effect racing the reload that dropped it.
+  const selection =
+    pickedSelection === AGGREGATE_SELECTION ||
+    (pickedSelection !== null && sessionIndex.byId.has(pickedSelection))
+      ? pickedSelection
+      : newestSession?.activityId ?? AGGREGATE_SELECTION;
 
   const summaryItems: { key: string; label: string; parts: FigurePart[]; caption: string }[] = [
     {
@@ -615,72 +621,19 @@ export function StrengthView({
           <section className="panel strength-card strength-sessions-card">
             <div className="strength-card-head">
               <div>
-                <h3>Recent sessions</h3>
-                <p>Your last few times in the gym.</p>
+                <h3>Sessions</h3>
+                <p>Every time you trained in {activeWindow.phrase}, newest first.</p>
               </div>
             </div>
 
-            <ul className="strength-session-list">
-              {recentSessions.map((session) => {
-                const detail = session.detail.summary;
-                const volume = session.detail.exercises.reduce(
-                  (total, exercise) =>
-                    total +
-                    exercise.entries.reduce(
-                      (sum, entry) => sum + entry.reps * entry.weightKg,
-                      0
-                    ),
-                  0
-                );
-                return (
-                  <li key={session.activityId}>
-                    <div className="strength-session-head">
-                      <strong>{session.name?.trim() || "Strength session"}</strong>
-                      <div className="strength-session-meta">
-                        {sessionSourceLabel(session) ? (
-                          <span className="strength-session-source">
-                            {sessionSourceLabel(session)}
-                          </span>
-                        ) : null}
-                        <span>{formatSessionDate(session.startTime)}</span>
-                      </div>
-                    </div>
-                    <p className="strength-session-facts">
-                      <span>{detail.sets} sets</span>
-                      <span>
-                        {volume > 0
-                          ? formatTotalWeight(volume, unitSystem)
-                          : "Bodyweight"}
-                      </span>
-                      <span>{formatSpan(detail.durationSec)}</span>
-                    </p>
-                    <div className="strength-session-chips">
-                      {session.detail.exercises.slice(0, 3).map((exercise, index) => {
-                        const name = explorerExerciseName(
-                          exercise.nameKey,
-                          exercise.rawName
-                        );
-                        return (
-                          <button
-                            type="button"
-                            className="strength-session-chip-button"
-                            key={`${exercise.nameKey}-${index}`}
-                            onClick={() => openExercise(name)}
-                          >
-                            {exercise.sets}× {name}
-                          </button>
-                        );
-                      })}
-                      {session.detail.exercises.length > 3 ? (
-                        <span className="is-more">
-                          +{session.detail.exercises.length - 3} more
-                        </span>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <StrengthSessionList
+              sessions={sessions}
+              index={sessionIndex}
+              selected={selection}
+              onSelect={setPickedSelection}
+              windowLabel={activeWindow.label}
+              showSource={source === "combined"}
+            />
           </section>
         </>
       )}

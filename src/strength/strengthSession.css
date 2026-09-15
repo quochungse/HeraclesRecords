@@ -1,0 +1,190 @@
+/* ---------- Session list ---------- */
+
+.strength-session-nav {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.strength-session-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.strength-session-row:hover {
+  background: var(--sx-well);
+}
+
+.strength-session-row[aria-current="true"] {
+  border-color: var(--sx-edge);
+  background: var(--sx-raised);
+  box-shadow: var(--sx-lift);
+}
+
+.strength-session-row:focus-visible {
+  outline: 2px solid var(--sx-ember);
+  outline-offset: 1px;
+}
+
+.strength-session-row-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--sx-well);
+  color: var(--sx-ember);
+}
+
+.strength-session-row-date {
+  display: grid;
+  justify-items: center;
+  padding-top: 1px;
+  line-height: 1;
+}
+
+.strength-session-row-date em {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strength-session-row-date strong {
+  margin-top: 4px;
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.strength-session-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.strength-session-row-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.strength-session-row-title strong,
+.strength-session-row-main > strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strength-session-row.is-aggregate .strength-session-row-main {
+  align-self: center;
+}
+
+.strength-session-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-session-row-facts > span + span::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--text-muted);
+}
+
+.strength-session-row-source {
+  color: var(--text-muted);
+}
+
+/* The session's push / pull / legs / core split, as a hairline under its facts. */
+.strength-session-row-mix {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.strength-session-row-mix > i {
+  min-width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--pattern-color);
+  opacity: 0.85;
+}
+
+.strength-record-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--sx-record) 16%, transparent);
+  color: var(--sx-record);
+  font-size: 9.5px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+}
+
+.strength-session-week {
+  display: grid;
+  gap: 2px;
+}
+
+.strength-session-week ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Sticks to the top of whatever scrolls the list, so a long history never
+   loses track of which week it is showing. */
+.strength-session-week-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 2px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-base) 72%, transparent);
+  backdrop-filter: blur(12px);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strength-sessions-card .strength-session-nav {
+  max-height: 560px;
+  margin: 0 -12px;
+  padding: 0 4px;
+  overflow-y: auto;
+}
