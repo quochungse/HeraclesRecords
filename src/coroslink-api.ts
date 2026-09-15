@@ -153,7 +153,9 @@ import type {
   IntervalsStatus,
   IntervalsActivityWithStatus,
   DeleteWorkoutResult,
-  ManualActivityInput
+  ManualActivityInput,
+  ActivityDetailSummary,
+  ActivityDetailSummarySync
 } from "../electron/types";
 import type {
   CorosLegacy614aCarrierExportResult,
@@ -508,6 +510,17 @@ export interface CorosLinkApi {
     sportType: number,
     listActivity?: TrainingHubActivity
   ) => Promise<TrainingHubActivityDetail>;
+  /** Stored summaries for these activities — only the ones still valid for the
+   *  activity as COROS describes it now. Answers from SQLite; asks nothing. */
+  getActivityDetailSummaries: (
+    activityIds: string[]
+  ) => Promise<ActivityDetailSummary[]>;
+  /** Compute the missing ones, a few per call. Call again while `remaining`
+   *  is above zero. */
+  syncActivityDetailSummaries: (
+    activityIds: string[],
+    limit?: number
+  ) => Promise<ActivityDetailSummarySync>;
   exportTrainingHubActivityFile: (
     activityId: string,
     sportType: number,

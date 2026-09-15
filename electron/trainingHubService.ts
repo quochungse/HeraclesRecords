@@ -17,11 +17,23 @@ import {
   mergeSportTypeEntries
 } from "./corosSportTypes";
 import {
+  activityDetailFingerprint,
+  readCachedActivityDetail,
+  writeCachedActivityDetail
+} from "./activityDetailCache";
+import {
+  ACTIVITY_SUMMARY_VERSION,
+  summarizeActivityDetail
+} from "./activityMetrics";
+import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
   countTrainingActivitiesSince,
   deleteSettings,
+  getActivityDetailSummaries,
   getSetting,
+  getStoredTrainingActivities,
+  getStoredTrainingActivity,
   listStoredStrengthSessions,
   listStoredTrainingActivities,
   listStrengthActivitiesMissingDetail,
@@ -29,11 +41,14 @@ import {
   listTrainingActivityRpeInputs,
   setSetting,
   setTrainingActivityFeelType,
+  upsertActivityDetailSummary,
   upsertStrengthSessionDetail,
   upsertTrainingActivities
 } from "./database";
 import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
+  ActivityDetailSummary,
+  ActivityDetailSummarySync,
   ActivityPaceBaseline,
   ActivityPaceBaselines,
   CorosProfile,
@@ -53,6 +68,7 @@ import type {
   TrainingHubActivityZoneBucket,
   TrainingHubActivityFileType,
   TrainingHubActivityLap,
+  TrainingHubActivityPause,
   TrainingHubLapPhase,
   TrainingHubExportFormat,
   TrainingHubActivityTrack,
@@ -280,7 +296,10 @@ interface RawTrainingHubActivity {
   sport_name?: string;
   startTime?: number;
   endTime?: number;
+  /** Seconds, start to finish. */
   totalTime?: number;
+  /** Seconds, pauses excluded. Never more than `totalTime`. */
+  workoutTime?: number;
   distance?: number;
   avgHr?: number;
   maxHr?: number;
@@ -1529,11 +1548,104 @@ export async function listTrainingHubActivities(
   return activities;
 }
 
-export async function getTrainingHubActivityDetail(
+/**
+ * The activity as COROS last described it, hashed — or null when this machine
+ * has no description to hash, which is the one case a detail cannot be cached.
+ *
+ * **The stored mirror decides, not the caller's list row.** Both are written
+ * from the same reply, but only one of them is available to every reader: the
+ * summary check and the three sweeps have no list row at all. When the two
+ * disagree — a renderer still holding the array from before a correction landed
+ * — hashing the caller's copy writes a file under a fingerprint nothing else
+ * computes, and the next sweep reads it, sees a mismatch and *deletes* the file
+ * it cannot refill. A stale row costs one refetch; two sources cost a fight.
+ */
+function activityFingerprintFor(
+  activityId: string,
+  listActivity?: TrainingHubActivity
+): string | null {
+  let stored: TrainingHubActivity | undefined;
+  try {
+    stored = getStoredTrainingActivity(activityId);
+  } catch {
+    // No database in this process; the cache simply does not apply.
+    return null;
+  }
+
+  const source =
+    stored ??
+    (listActivity?.activityId === activityId ? listActivity : undefined);
+
+  return source ? activityDetailFingerprint(source) : null;
+}
+
+/**
+ * Whether a payload is worth keeping.
+ *
+ * COROS answers a request it cannot serve with an empty object often enough to
+ * matter, and `parseTrainingHubApiResponse` reads that as success — data did
+ * arrive. Cached, it is permanent: the file serves an empty detail until the
+ * activity is edited, and the summary computed from it carries the current
+ * fingerprint and version, so it reads as a run COROS genuinely scored nothing
+ * for and the sweep never looks at it again.
+ */
+function isUsableActivityDetail(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return false;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  return ["summary", "lapList", "frequencyList", "graphList", "zoneList"].some(
+    (key) => payload[key] !== undefined && payload[key] !== null
+  );
+}
+
+interface RawActivityDetailOptions {
+  listActivity?: TrainingHubActivity;
+  /**
+   * Whether a fetched payload is written to the local cache. False for the
+   * backfills, which read one activity after another to keep a few numbers and
+   * would otherwise fill the directory with details nobody asked to see.
+   */
+  persist?: boolean;
+  /**
+   * Skip the cached file and ask COROS. For a reader after something the
+   * fingerprint cannot see change: the end-of-activity feeling is set in the
+   * COROS app days later and moves no figure on the activity list, so a cached
+   * file would answer "still unrated" for as long as it lives.
+   */
+  fresh?: boolean;
+}
+
+interface RawActivityDetail {
+  raw: Record<string, unknown>;
+  /** null when the activity could not be fingerprinted — nothing was cached. */
+  fingerprint: string | null;
+}
+
+/**
+ * One activity detail, from the local file if it is still valid for the
+ * activity and from COROS otherwise.
+ *
+ * Every path that reads `/activity/detail/query` goes through here — the run
+ * screen, the calendar, the globe, the coach's tools and the two backfills — so
+ * there is one answer to "is this cached", one place that decides when a file
+ * is stale, and no screen that quietly bypasses it.
+ */
+async function loadActivityDetailRaw(
   activityId: string,
   sportType: number,
-  listActivity?: TrainingHubActivity
-): Promise<TrainingHubActivityDetail> {
+  options: RawActivityDetailOptions = {}
+): Promise<RawActivityDetail> {
+  const fingerprint = activityFingerprintFor(activityId, options.listActivity);
+
+  if (fingerprint !== null && options.fresh !== true) {
+    const cached = readCachedActivityDetail(activityId, fingerprint);
+    if (cached) {
+      return { raw: cached, fingerprint };
+    }
+  }
+
   const auth = getStoredAuth();
   const raw = await trainingHubRequest<Record<string, unknown>>(
     "/activity/detail/query",
@@ -1547,9 +1659,62 @@ export async function getTrainingHubActivityDetail(
     }
   );
 
+  if (
+    fingerprint !== null &&
+    options.persist !== false &&
+    isUsableActivityDetail(raw)
+  ) {
+    writeCachedActivityDetail(activityId, fingerprint, raw);
+  }
+
+  return { raw, fingerprint };
+}
+
+/**
+ * Keep the few figures a run list can show. Silent on failure: a summary is an
+ * optimisation, and no screen is worse off for the absence of one than it was
+ * before there were any.
+ */
+function cacheActivityDetailSummary(
+  activityId: string,
+  fingerprint: string | null,
+  detail: TrainingHubActivityDetail,
+  raw: Record<string, unknown>
+): ActivityDetailSummary | null {
+  if (fingerprint === null || !isUsableActivityDetail(raw)) {
+    return null;
+  }
+
+  try {
+    const summary = summarizeActivityDetail({
+      activityId,
+      fingerprint,
+      detail,
+      raw
+    });
+    upsertActivityDetailSummary(summary);
+    return summary;
+  } catch {
+    return null;
+  }
+}
+
+export async function getTrainingHubActivityDetail(
+  activityId: string,
+  sportType: number,
+  listActivity?: TrainingHubActivity
+): Promise<TrainingHubActivityDetail> {
+  const { raw, fingerprint } = await loadActivityDetailRaw(
+    activityId,
+    sportType,
+    { listActivity }
+  );
+
   let detail = parseActivityDetail(raw);
   // Opportunistically cache the end-of-activity feeling while we have the detail.
   cacheFeelTypeFromDetail(activityId, raw);
+  // And the list-level figures, so opening a run is also what fills its row.
+  cacheActivityDetailSummary(activityId, fingerprint, detail, raw);
   if (listActivity) {
     detail = mergeActivityDetailWithList(detail, listActivity);
   }
@@ -1570,17 +1735,202 @@ export async function getTrainingHubActivityDetail(
       (point) => point.lat !== undefined && point.lon !== undefined
     ).length ?? 0;
 
-  if (gpsPointCount < 2) {
+  if (gpsPointCount < 2 && !knownTrackless(activityId, fingerprint)) {
     const gpxTrack = await fetchActivityTrackFromGpx(activityId, sportType);
     if (gpxTrack) {
       detail = {
         ...detail,
         track: mergeActivityTracks(detail.track, gpxTrack)
       };
+    } else {
+      rememberTrackless(activityId, fingerprint);
     }
   }
 
   return detail;
+}
+
+/**
+ * Activities whose GPX was asked for and came back with nothing.
+ *
+ * A payload with no GPS is normal — every strength session and treadmill run —
+ * and the fallback above is two requests: a signed URL, then the file. Once the
+ * payload itself is served from disk those two are the *only* network calls
+ * left on the path, so an indoor session reopened offline would sit through
+ * both timing out to end up exactly where it started.
+ *
+ * Keyed by fingerprint, so an upload COROS was still processing is asked again
+ * the moment its figures change — and held in memory only, because "COROS had
+ * no track for this a minute ago" is not worth a row.
+ */
+const tracklessActivities = new Set<string>();
+
+function tracklessKey(activityId: string, fingerprint: string | null): string {
+  return `${activityId}:${fingerprint ?? ""}`;
+}
+
+function knownTrackless(activityId: string, fingerprint: string | null): boolean {
+  return tracklessActivities.has(tracklessKey(activityId, fingerprint));
+}
+
+function rememberTrackless(activityId: string, fingerprint: string | null): void {
+  tracklessActivities.add(tracklessKey(activityId, fingerprint));
+}
+
+/**
+ * Summaries still valid for the activities named.
+ *
+ * "Valid" is two things: computed by this version of the summariser, and
+ * fingerprinted against the activity as COROS describes it *now*. A row whose
+ * activity has since been renamed or corrected is left out rather than shown —
+ * the backfill will replace it, and a stale drift figure looks exactly like a
+ * current one.
+ */
+export function readActivityDetailSummaries(
+  activityIds: readonly string[]
+): ActivityDetailSummary[] {
+  const stored = storedActivityIndex(activityIds);
+  return validSummaries(activityIds, stored);
+}
+
+/**
+ * The stored rows for a list of ids, in one query rather than one each.
+ *
+ * The sweep below walks the same list on every pass, and a season of running is
+ * a few hundred activities: a prepared statement per row per pass adds up to
+ * tens of thousands of them for one backfill.
+ */
+function storedActivityIndex(
+  activityIds: readonly string[]
+): Map<string, TrainingHubActivity> {
+  return new Map(
+    getStoredTrainingActivities(activityIds).map((activity) => [
+      activity.activityId,
+      activity
+    ])
+  );
+}
+
+function validSummaries(
+  activityIds: readonly string[],
+  stored: ReadonlyMap<string, TrainingHubActivity>
+): ActivityDetailSummary[] {
+  const fingerprints = new Map<string, string>();
+  for (const [activityId, activity] of stored) {
+    fingerprints.set(activityId, activityDetailFingerprint(activity));
+  }
+
+  return getActivityDetailSummaries(activityIds).filter(
+    (summary) =>
+      summary.summaryVersion === ACTIVITY_SUMMARY_VERSION &&
+      summary.fingerprint === fingerprints.get(summary.activityId)
+  );
+}
+
+/** Paced like the feel backfill, and for the same reason: this is a sweep over
+ *  activities nobody is waiting on, sharing a connection with ones they are. */
+const SUMMARY_BACKFILL_DELAY_MS = 400;
+const SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES = 3;
+
+/** Activities being summarised right now, so two callers — React's development
+ *  double-invoke among them — cannot fetch the same 2.5 MB payload twice. */
+const summaryBackfillInFlight = new Set<string>();
+/** Activities that failed this session. Retried on the next launch, not sooner. */
+const summaryBackfillFailedIds = new Set<string>();
+
+/**
+ * Fill in missing summaries, a few at a time.
+ *
+ * The payload is fetched, reduced and dropped — no file is written. That is the
+ * deliberate shape of it: a backfill is the app deciding to read a run the
+ * athlete has not asked for, and it should cost disk in proportion to what it
+ * keeps, which is 130 bytes. Opening the run is what earns it a file.
+ */
+export async function syncActivityDetailSummaries(
+  activityIds: readonly string[],
+  limit = 6
+): Promise<ActivityDetailSummarySync> {
+  const stored = storedActivityIndex(activityIds);
+  const valid = new Set(
+    validSummaries(activityIds, stored).map((summary) => summary.activityId)
+  );
+
+  // Both brakes count **attempts**, not successes. Counting successes lets a
+  // pass that keeps failing quietly — a summary the database refuses to store,
+  // say — run the whole list at full speed: the limit is never reached, the
+  // pause between fetches never happens, and one call pulls a payload for every
+  // activity on screen.
+  let attempted = 0;
+  const written: ActivityDetailSummary[] = [];
+  let failed = 0;
+  let remaining = 0;
+  let consecutiveFailures = 0;
+
+  for (const activityId of activityIds) {
+    if (valid.has(activityId) || summaryBackfillFailedIds.has(activityId)) {
+      continue;
+    }
+    if (summaryBackfillInFlight.has(activityId)) {
+      remaining += 1;
+      continue;
+    }
+    if (
+      attempted >= limit ||
+      consecutiveFailures >= SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES
+    ) {
+      remaining += 1;
+      continue;
+    }
+
+    const activity = stored.get(activityId);
+    if (!activity) {
+      // Not in the local mirror, so there is nothing to fingerprint a payload
+      // against — and a summary that cannot be validated is not worth fetching.
+      continue;
+    }
+
+    // Between fetches, never before the first: a screen waiting on its first
+    // summary should not sit through a pause that exists to be polite to COROS
+    // about the second.
+    if (attempted > 0) {
+      await delay(SUMMARY_BACKFILL_DELAY_MS);
+    }
+
+    attempted += 1;
+    summaryBackfillInFlight.add(activityId);
+    try {
+      const { raw, fingerprint } = await loadActivityDetailRaw(
+        activityId,
+        activity.sportType,
+        { listActivity: activity, persist: false }
+      );
+      const summary = cacheActivityDetailSummary(
+        activityId,
+        fingerprint,
+        parseActivityDetail(raw),
+        raw
+      );
+      if (summary) {
+        written.push(summary);
+        consecutiveFailures = 0;
+      } else {
+        // Fetched, and nothing came of it — an unusable payload, or a write the
+        // database refused. Either way this activity is not worth asking for
+        // again this session, and it counts against the brakes above.
+        summaryBackfillFailedIds.add(activityId);
+        failed += 1;
+        consecutiveFailures += 1;
+      }
+    } catch {
+      summaryBackfillFailedIds.add(activityId);
+      failed += 1;
+      consecutiveFailures += 1;
+    } finally {
+      summaryBackfillInFlight.delete(activityId);
+    }
+  }
+
+  return { computed: written.length, remaining, failed, summaries: written };
 }
 
 export async function getTrainingHubActivityFileUrl(
@@ -1749,7 +2099,6 @@ export async function backfillFeelTypes(): Promise<void> {
   feelBackfillRunning = true;
   try {
     const since = heatmapWindowStartEpochSeconds();
-    const userId = getStoredAuth()?.userId;
     // Every activity touched this run, success or failure — filtered out of
     // each re-query so a row that stays NULL can't wedge the loop.
     const attempted = new Set<string>();
@@ -1770,17 +2119,16 @@ export async function backfillFeelTypes(): Promise<void> {
       for (const { activityId, sportType } of pending) {
         attempted.add(activityId);
         try {
-          const raw = await trainingHubRequest<Record<string, unknown>>(
-            "/activity/detail/query",
-            {
-              method: "POST",
-              params: {
-                labelId: activityId,
-                sportType,
-                ...(userId ? { userId } : {})
-              }
-            }
-          );
+          // Neither reads nor writes the cache. It writes nothing because this
+          // pass wants one field out of 2.5 MB; it reads nothing because that
+          // field is the one thing the fingerprint cannot see move. A feeling
+          // is set in the COROS app days after the run and changes no figure on
+          // the activity list, so a cached file would answer "still unrated"
+          // for as long as it lives and this sweep would never finish.
+          const { raw } = await loadActivityDetailRaw(activityId, sportType, {
+            persist: false,
+            fresh: true
+          });
           cacheFeelTypeFromDetail(activityId, raw);
           consecutiveFailures = 0;
         } catch {
@@ -1878,7 +2226,6 @@ export async function syncStrengthHistory(
     await refreshStrengthActivityIndex(days);
   }
 
-  const userId = getStoredAuth()?.userId;
   const missing = listStrengthActivitiesMissingDetail(
     since,
     STRENGTH_SPORT_TYPES,
@@ -1889,17 +2236,11 @@ export async function syncStrengthHistory(
   let consecutiveFailures = 0;
   for (const { activityId, sportType } of missing) {
     try {
-      const raw = await trainingHubRequest<Record<string, unknown>>(
-        "/activity/detail/query",
-        {
-          method: "POST",
-          params: {
-            labelId: activityId,
-            sportType,
-            ...(userId ? { userId } : {})
-          }
-        }
-      );
+      // Same rule as the feel backfill: read a file if there is one, write
+      // none — what this keeps is the parsed set list, already a row of its own.
+      const { raw } = await loadActivityDetailRaw(activityId, sportType, {
+        persist: false
+      });
       upsertStrengthSessionDetail(
         activityId,
         sportType,
@@ -3806,7 +4147,7 @@ function resolveWorkoutSetCount(
   }, 0);
 }
 
-function mapTrainingHubActivity(
+export function mapTrainingHubActivity(
   raw: RawTrainingHubActivity
 ): TrainingHubActivity {
   const activityId = raw.labelId ?? raw.activityId ?? "";
@@ -3819,6 +4160,13 @@ function mapTrainingHubActivity(
     startTime: raw.startTime,
     endTime: raw.endTime,
     duration: raw.totalTime,
+    // Verified live: `totalTime` is `endTime - startTime` to the second, and
+    // `workoutTime` is that less the pauses — 7 102 s against 4 190 s on a run
+    // with two of them. Both arrive in whole seconds on this endpoint.
+    activeDuration:
+      raw.workoutTime !== undefined && raw.workoutTime > 0
+        ? raw.workoutTime
+        : undefined,
     distance: raw.distance,
     avgHr: raw.avgHr,
     maxHr: raw.maxHr,
@@ -5949,6 +6297,8 @@ interface ActivitySeriesChannels {
   distance?: number[];
   hr?: number[];
   pace?: number[];
+  /** Grade-adjusted pace, sent per sample on runs the watch graded. */
+  adjustedPace?: number[];
   power?: number[];
   altitude?: number[];
   cadence?: number[];
@@ -5963,6 +6313,7 @@ const SERIES_CHANNEL_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
   distance: ["distanceList", "distance"],
   hr: ["heartRateList", "hrList", "heartRates", "heartRate", "avgHrList"],
   pace: ["paceList", "speedList", "avgPaceList"],
+  adjustedPace: ["adjustedPaceList"],
   power: ["powerList", "wattsList", "avgPowerList"],
   altitude: ["altitudeList", "altitude", "elevationList", "elevation"],
   cadence: ["cadenceList", "cadence", "avgCadenceList"],
@@ -6022,7 +6373,7 @@ function mergeSeriesArrays(
   const points: TrainingHubActivitySeriesPoint[] = [];
   for (let index = 0; index < length; index += 1) {
     const point: TrainingHubActivitySeriesPoint = {};
-    const { elapsed, distance, hr, pace, power } = channels;
+    const { elapsed, distance, hr, pace, adjustedPace, power } = channels;
 
     // Left in the payload's own units; `scaleSeriesElapsed` converts the whole
     // channel once it can be checked against the activity duration.
@@ -6039,6 +6390,13 @@ function mergeSeriesArrays(
       const normalized = normalizeActivityDuration(pace[index]!) ?? pace[index]!;
       if (isPlausiblePaceSecondsPerKm(normalized)) {
         point.pace = normalized;
+      }
+    }
+    if (adjustedPace && adjustedPace[index] !== undefined) {
+      const normalized =
+        normalizeActivityDuration(adjustedPace[index]!) ?? adjustedPace[index]!;
+      if (isPlausiblePaceSecondsPerKm(normalized)) {
+        point.adjustedPace = normalized;
       }
     }
     if (power && power[index] !== undefined) {
@@ -6105,8 +6463,16 @@ function assignFormSample(
 const FREQUENCY_POINT_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
   elapsed: ["time", "elapsed", "second", "duration"],
   distance: ["distance", "totalDistance"],
-  hr: ["heartRate", "hr", "avgHr"],
+  // `heart` is what COROS actually calls it here, verified against a live run;
+  // the camel-cased spellings below it are other endpoints'. Note that the same
+  // sample also carries `heartLevel`, which is a zone index and not a pulse —
+  // only an exact key match keeps the two apart.
+  hr: ["heart", "heartRate", "hr", "avgHr"],
+  // `speed` is seconds per kilometre here despite the name: a live sample reads
+  // 433 against a run averaging 421 s/km. `isPlausiblePaceSecondsPerKm` in
+  // `mergeSeriesArrays` is what refuses the reading if a payload ever means it.
   pace: ["pace", "speed", "avgPace"],
+  adjustedPace: ["adjustedPace"],
   power: ["power", "watts", "avgPower"],
   altitude: ["altitude", "elevation", "elev"],
   cadence: ["cadence", "avgCadence"],
@@ -6117,9 +6483,16 @@ const FREQUENCY_POINT_KEYS: Record<keyof ActivitySeriesChannels, string[]> = {
 };
 
 /**
- * A channel is only collected when every sample object carries it, so the
- * arrays stay index-aligned with each other. Dropping absent samples instead
- * would shift a sparse channel onto the wrong points.
+ * Read every channel out of an array of sample objects.
+ *
+ * A channel is kept when **any** sample carries it, and an absent reading stays
+ * as a hole at its own index. Alignment is what matters, and holes preserve it
+ * exactly — it is *dropping* absent samples that would shift a sparse channel
+ * onto the wrong points. Requiring every sample to carry a channel was the
+ * stricter reading of that rule and it threw nearly everything away: a live run
+ * carried heart rate, pace, cadence, power and the whole running-form group on
+ * 5 135 of 5 149 samples, and each was discarded over its first few readings,
+ * leaving a 5 139-point series with distance alone.
  */
 function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
   const points = list.filter(
@@ -6130,12 +6503,8 @@ function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
     return {};
   }
 
-  const channels: ActivitySeriesChannels = {};
-  for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
-    keyof ActivitySeriesChannels,
-    string[]
-  ][]) {
-    const values = points.map((point) => {
+  const readChannel = (keys: string[]): (number | undefined)[] =>
+    points.map((point) => {
       for (const key of keys) {
         const value = toOptionalNumber(point[key]);
         if (value !== undefined) {
@@ -6145,8 +6514,30 @@ function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
       return undefined;
     });
 
-    if (values.every((value) => value !== undefined)) {
+  const channels: ActivitySeriesChannels = {};
+  for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
+    keyof ActivitySeriesChannels,
+    string[]
+  ][]) {
+    const values = readChannel(keys);
+    if (values.some((value) => value !== undefined)) {
       channels[channel] = values as number[];
+    }
+  }
+
+  // No elapsed column under any of its own names, but the samples are stamped:
+  // COROS writes an absolute `timestamp` in hundredths of a second. Rebased on
+  // the first stamped sample it becomes an elapsed channel like any other, and
+  // `scaleSeriesElapsed` then checks the units against the activity's duration
+  // rather than trusting this. Kept separate from the loop above because the
+  // rebase is only ever right for an absolute clock.
+  if (channels.elapsed === undefined) {
+    const stamps = readChannel(["timestamp"]);
+    const base = stamps.find((value) => value !== undefined);
+    if (base !== undefined) {
+      channels.elapsed = stamps.map((value) =>
+        value === undefined ? undefined : value - base
+      ) as number[];
     }
   }
 
@@ -6246,79 +6637,12 @@ export function parseActivitySeries(
   return scaleSeriesElapsed(best, durationSeconds);
 }
 
-const SERIES_LAST_VALUE_CHANNELS = [
-  "elapsed",
-  "distance",
-  "altitude"
-] as const satisfies readonly (keyof TrainingHubActivitySeriesPoint)[];
-
-const SERIES_MEAN_CHANNELS = [
-  ["hr", 0],
-  ["pace", 0],
-  ["power", 0],
-  ["cadence", 0],
-  ["strideLength", 2],
-  ["groundTime", 0],
-  ["verticalOscillation", 1],
-  ["verticalRatio", 1]
-] as const satisfies readonly [keyof TrainingHubActivitySeriesPoint, number][];
-
-export function downsampleActivitySeries(
-  points: TrainingHubActivitySeriesPoint[],
-  maxPoints = 60
-): TrainingHubActivitySeriesPoint[] {
-  if (points.length <= maxPoints) {
-    return points;
-  }
-
-  const bucketSize = points.length / maxPoints;
-  const sampled: TrainingHubActivitySeriesPoint[] = [];
-
-  for (let index = 0; index < maxPoints; index += 1) {
-    const start = Math.floor(index * bucketSize);
-    const end = Math.min(points.length, Math.floor((index + 1) * bucketSize));
-    const bucket = points.slice(start, end);
-    if (bucket.length === 0) {
-      continue;
-    }
-
-    const point: TrainingHubActivitySeriesPoint = {};
-
-    // Cumulative channels take the last value in the bucket so the axis still
-    // reads as a progression; measured ones take the bucket mean. Altitude is
-    // cumulative in neither sense but is a position, not a rate, so the last
-    // reading is the one that belongs at the bucket's distance.
-    for (const channel of SERIES_LAST_VALUE_CHANNELS) {
-      const value = bucketChannel(bucket, channel).at(-1);
-      if (value !== undefined) {
-        point[channel] = value;
-      }
-    }
-
-    for (const [channel, decimals] of SERIES_MEAN_CHANNELS) {
-      const values = bucketChannel(bucket, channel);
-      if (values.length > 0) {
-        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-        point[channel] = roundTo(mean, decimals);
-      }
-    }
-
-    if (Object.values(point).some((value) => value !== undefined)) {
-      sampled.push(point);
-    }
-  }
-
-  return sampled;
-}
-
-function bucketChannel(
-  bucket: TrainingHubActivitySeriesPoint[],
-  channel: keyof TrainingHubActivitySeriesPoint
-): number[] {
-  return bucket
-    .map((item) => item[channel])
-    .filter((value): value is number => value !== undefined);
-}
+/**
+ * Re-exported so every caller that already reaches for it here keeps working.
+ * The implementation moved to `activitySeries` when the Running chart became a
+ * second reader — see the header there for why the bucket rules are shared.
+ */
+export { downsampleActivitySeries } from "./activitySeries";
 
 interface SeriesColumn {
   header: string;
@@ -6577,6 +6901,10 @@ export function mergeActivityDetailWithList(
       ),
     startTime: detail.startTime ?? listActivity.startTime,
     duration: coalesceActivityMetric(detail.duration, listActivity.duration),
+    activeDuration: coalesceActivityMetric(
+      detail.activeDuration,
+      listActivity.activeDuration
+    ),
     distance: coalesceActivityMetric(detail.distance, listActivity.distance),
     avgHr: coalesceActivityMetric(detail.avgHr, listActivity.avgHr),
     maxHr: coalesceActivityMetric(detail.maxHr, listActivity.maxHr),
@@ -6874,6 +7202,51 @@ function parseAdjustedPace(summary: Record<string, unknown>): number | undefined
   return isPlausiblePaceSecondsPerKm(normalized) ? normalized : undefined;
 }
 
+/**
+ * `pauseList`, moved onto the activity's own clock.
+ *
+ * Each entry carries absolute `startTimestamp`/`endTimestamp` and a `duration`,
+ * all in hundredths of a second like every other time in this payload; the
+ * activity's `summary.startTimestamp` is on the same clock, so the offset needs
+ * no unit guess. Verified live against a run paused twice: 694 s and 2 218 s,
+ * which is exactly the jump in its `frequencyList` timestamps at both points
+ * and exactly `totalTime - workoutTime`.
+ */
+function parseActivityPauses(
+  raw: Record<string, unknown>,
+  summary: Record<string, unknown>
+): TrainingHubActivityPause[] {
+  const activityStart =
+    toOptionalNumber(summary.startTimestamp) ?? toOptionalNumber(raw.startTimestamp);
+  const entries = pickArray(raw, ["pauseList"]) ?? [];
+  if (activityStart === undefined || entries.length === 0) {
+    return [];
+  }
+
+  const pauses: TrainingHubActivityPause[] = [];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const pause = entry as Record<string, unknown>;
+    const startStamp = toOptionalNumber(pause.startTimestamp);
+    const endStamp = toOptionalNumber(pause.endTimestamp);
+    if (startStamp === undefined || startStamp < activityStart) {
+      continue;
+    }
+    const duration = normalizeCorosDetailDurationSeconds(
+      toOptionalNumber(pause.duration) ??
+        (endStamp !== undefined ? endStamp - startStamp : undefined)
+    );
+    if (duration === undefined) {
+      continue;
+    }
+    pauses.push({ start: Math.round((startStamp - activityStart) / 100), duration });
+  }
+
+  return pauses.sort((left, right) => left.start - right.start);
+}
+
 export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubActivityDetail {
   const summary = pickObject(raw, ["summaryInfo", "summary", "activitySummary"]) ?? raw;
   const laps = extractActivityLaps(raw);
@@ -6898,6 +7271,10 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     "elevLoss"
   ]);
   const duration = normalizeCorosDetailDurationSeconds(durationRaw);
+  const activeDuration = normalizeCorosDetailDurationSeconds(
+    pickActivityNumber(raw, summary, ["workoutTime"])
+  );
+  const pauses = parseActivityPauses(raw, summary);
 
   return {
     activityId:
@@ -6915,6 +7292,8 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
         toOptionalNumber(summary.startTimestamp)
     ),
     duration,
+    ...(activeDuration !== undefined ? { activeDuration } : {}),
+    ...(pauses.length > 0 ? { pauses } : {}),
     distance: normalizeActivityDistanceMeters(distanceRaw),
     avgHr:
       toOptionalNumber(raw.avgHr) ??

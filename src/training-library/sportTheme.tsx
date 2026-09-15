@@ -9,7 +9,6 @@ import {
   Bike,
   Dumbbell,
   Flame,
-  Footprints,
   Hand,
   HandGrab,
   Mountain,
@@ -20,6 +19,7 @@ import {
 import type { CSSProperties } from "react";
 import type { TrainingPlanDocument, WorkoutSport } from "../../electron/types";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
+import { RunnerIcon } from "../running/runnerIcon";
 
 export interface SportTheme {
   /** CSS colour — a customizable --sport-* token where one exists. */
@@ -28,7 +28,7 @@ export interface SportTheme {
 }
 
 export const WORKOUT_SPORT_THEME: Record<WorkoutSport, SportTheme> = {
-  run: { color: "var(--sport-run)", icon: Footprints },
+  run: { color: "var(--sport-run)", icon: RunnerIcon },
   trailRun: { color: "var(--sport-trail)", icon: Mountain },
   bike: { color: "var(--sport-bike)", icon: Bike },
   swim: { color: "#38b6e8", icon: Waves },

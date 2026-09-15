@@ -1,8 +1,8 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Maximize2, X } from "lucide-react";
+import { Info, MapPin, Maximize2, X } from "lucide-react";
 import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
   ROUTE_BASE_LAYERS,
@@ -27,7 +27,6 @@ interface ActivityRouteMapProps {
 
 interface RouteGeometry {
   latLngs: [number, number][];
-  bounds: { minLat: number; maxLat: number; minLon: number; maxLon: number };
 }
 
 const ROUTE_COLOR = "#74c08f";
@@ -133,17 +132,11 @@ function buildRouteGeometry(
     return null;
   }
 
-  const lats = routePoints.map((point) => point.lat!);
-  const lons = routePoints.map((point) => point.lon!);
-
+  // No bounds here: the map fits `L.latLngBounds(latLngs)`, and the
+  // `Math.min(...lats)` this used to carry was both unread and the one spread
+  // over a whole track in this file — past the argument limit on an ultra.
   return {
-    latLngs: routePoints.map((point) => [point.lat!, point.lon!]),
-    bounds: {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLon: Math.min(...lons),
-      maxLon: Math.max(...lons)
-    }
+    latLngs: routePoints.map((point) => [point.lat!, point.lon!])
   };
 }
 
@@ -171,12 +164,27 @@ function resolveMapStyle(theme: string, baseLayer?: RouteBaseLayer): MapStyle {
 function RouteMapCanvas({
   route,
   scrollWheelZoom = false,
+  interactive = true,
+  visibleBand,
   baseLayer,
   overlays,
   ariaLabel
 }: {
   route: RouteGeometry;
   scrollWheelZoom?: boolean;
+  /**
+   * False for a map that is only a picture: no panning, zooming or controls,
+   * and the route is fitted again whenever the box changes size, since nobody
+   * can move it back into view by hand.
+   */
+  interactive?: boolean;
+  /**
+   * Height of the band left showing at the top, as a fraction of the map's
+   * **width**; everything below it has something drawn over it, and the route
+   * is fitted into the band. Taken from the width because a cover grows taller
+   * with what is laid over it while the part left clear stays put.
+   */
+  visibleBand?: number;
   baseLayer?: RouteBaseLayer;
   overlays?: RouteOverlayId[];
   ariaLabel: string;
@@ -208,10 +216,24 @@ function RouteMapCanvas({
     );
 
     const map = L.map(container, {
-      zoomControl: true,
-      attributionControl: true,
-      scrollWheelZoom
+      zoomControl: interactive,
+      // A picture still credits its tiles. The corner is moved up for it,
+      // because the bottom of a cover is under whatever is drawn over it.
+      attributionControl: interactive,
+      scrollWheelZoom: interactive && scrollWheelZoom,
+      dragging: interactive,
+      touchZoom: interactive,
+      doubleClickZoom: interactive,
+      boxZoom: interactive,
+      keyboard: interactive
     });
+    // No "Leaflet" prefix: that link is a courtesy, not a licence term. The
+    // tile credits after it are required and stay.
+    if (interactive) {
+      map.attributionControl.setPrefix(false);
+    } else {
+      L.control.attribution({ position: "topright", prefix: false }).addTo(map);
+    }
 
     const tileLayer = createBaseLayer(map, tile).addTo(map);
 
@@ -242,7 +264,18 @@ function RouteMapCanvas({
       weight: 2
     }).addTo(map);
 
-    map.fitBounds(L.latLngBounds(route.latLngs), { padding: [24, 24] });
+    const fitRoute = () => {
+      const band =
+        visibleBand === undefined
+          ? container.clientHeight
+          : Math.max(96, Math.round(container.clientWidth * visibleBand));
+      const covered = Math.max(0, container.clientHeight - band);
+      map.fitBounds(L.latLngBounds(route.latLngs), {
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, 24 + covered]
+      });
+    };
+    fitRoute();
     mapRef.current = map;
     tileLayerRef.current = tileLayer;
     ghostLineRef.current = ghostLine;
@@ -284,6 +317,9 @@ function RouteMapCanvas({
 
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
+      if (!interactive) {
+        fitRoute();
+      }
     });
     resizeObserver.observe(container);
 
@@ -297,7 +333,7 @@ function RouteMapCanvas({
       routeLineRef.current = null;
       overlayLayersRef.current.clear();
     };
-  }, [route, theme, scrollWheelZoom]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand]);
 
   // Swap the base tile layer in place so zoom/pan and the route animation
   // survive a layer change.
@@ -324,7 +360,10 @@ function RouteMapCanvas({
     appliedBaseLayerRef.current = baseLayer;
   }, [baseLayer, theme]);
 
-  // Sync Waymarked Trails overlays with the selection.
+  // Sync Waymarked Trails overlays with the selection. The dependency list
+  // carries every one of the init effect's, because that effect's cleanup
+  // empties `overlayLayersRef`: a rebuild this one did not follow would leave
+  // the overlays gone with nothing to put them back.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) {
@@ -357,7 +396,7 @@ function RouteMapCanvas({
       layer.addTo(map);
       active.set(id, layer);
     }
-  }, [overlays, route, theme, scrollWheelZoom]);
+  }, [overlays, route, theme, scrollWheelZoom, interactive, visibleBand]);
 
   return (
     <div
@@ -379,9 +418,67 @@ function RouteLegend() {
   );
 }
 
-export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
+/**
+ * How long the tile credit stays spelled out before folding into its (i)
+ * button. The OSM Foundation's attribution guidelines allow a credit to
+ * collapse after five seconds provided it can still be found from an (i) in
+ * the corner — which is what this does. It cannot be left out altogether:
+ * OpenStreetMap, OpenMapTiles and OpenFreeMap all require it.
+ */
+const CREDIT_VISIBLE_MS = 5000;
+
+/** Credit shown for five seconds from `key` changing, then toggled by an (i). */
+function useFoldingCredit(key: unknown): [boolean, () => void] {
+  const [open, setOpen] = useState(true);
+
+  useEffect(() => {
+    setOpen(true);
+    const timer = window.setTimeout(() => setOpen(false), CREDIT_VISIBLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [key]);
+
+  const toggle = useCallback(() => setOpen((current) => !current), []);
+  return [open, toggle];
+}
+
+function CreditButton({
+  open,
+  onToggle,
+  className
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      aria-label="Map data credits"
+      aria-expanded={open}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      <Info size={13} aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * The route on the whole window, with the layer picker. One component for
+ * every way in — the Expand link under the side-panel map and a route cover —
+ * so the two cannot drift apart.
+ */
+function RouteMapModal({
+  route,
+  onClose
+}: {
+  route: RouteGeometry;
+  onClose: () => void;
+}) {
   const { theme } = useTheme();
-  const [expanded, setExpanded] = useState(false);
   const [baseLayer, setBaseLayer] = useSelectionPreference(
     ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE,
     themeBaseLayer(theme)
@@ -389,25 +486,110 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
   const [overlays, setOverlays] = useSelectionPreference(
     ACTIVITY_ROUTE_OVERLAYS_PREFERENCE
   );
+  const [creditOpen, toggleCredit] = useFoldingCredit(route);
+
+  useEffect(() => {
+    // Captured on the window and stopped there: the screen underneath may
+    // answer Escape itself — a run's page goes back to the list on it — and one
+    // key press should close one thing.
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="activity-route-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="activity-route-modal-title"
+      onClick={onClose}
+    >
+      <section
+        className="panel activity-route-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="activity-route-modal-header">
+          <div className="activity-route-modal-title">
+            <MapPin size={16} aria-hidden="true" />
+            <h2 id="activity-route-modal-title">Route</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close expanded map"
+            onClick={onClose}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="activity-route-modal-body">
+          <div
+            className={`activity-route-modal-map${creditOpen ? " is-credit-open" : ""}`}
+          >
+            <RouteMapCanvas
+              route={route}
+              scrollWheelZoom
+              baseLayer={baseLayer}
+              overlays={overlays}
+              ariaLabel="Expanded activity route map"
+            />
+            <MapLayerControl
+              value={baseLayer}
+              onChange={setBaseLayer}
+              overlays={overlays}
+              onToggleOverlay={(id) =>
+                setOverlays((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((overlay) => overlay !== id)
+                    : [...prev, id]
+                )
+              }
+            />
+            <CreditButton
+              open={creditOpen}
+              onToggle={toggleCredit}
+              className="activity-route-credit-toggle"
+            />
+          </div>
+          <div className="activity-route-footer">
+            <RouteLegend />
+          </div>
+        </div>
+      </section>
+    </div>,
+    document.body
+  );
+}
+
+/**
+ * Whether a track has enough located points to draw a route at all — the same
+ * test `buildRouteGeometry` applies, without building the geometry the cover
+ * is about to build anyway.
+ */
+export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
+  let located = 0;
+  for (const point of track?.points ?? []) {
+    if (point.lat !== undefined && point.lon !== undefined && ++located >= 2) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
+  const [expanded, setExpanded] = useState(false);
+  const closeExpanded = useCallback(() => setExpanded(false), []);
   const route = useMemo(
     () => (track?.points ? buildRouteGeometry(track.points) : null),
     [track]
   );
-
-  useEffect(() => {
-    if (!expanded) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setExpanded(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [expanded]);
 
   if (!route) {
     return (
@@ -432,63 +614,80 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
           Expand
         </button>
       </div>
-      {expanded &&
-        createPortal(
-          <div
-            className="activity-route-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="activity-route-modal-title"
-            onClick={() => setExpanded(false)}
-          >
-            <section
-              className="panel activity-route-modal"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <header className="activity-route-modal-header">
-                <div className="activity-route-modal-title">
-                  <MapPin size={16} aria-hidden="true" />
-                  <h2 id="activity-route-modal-title">Route</h2>
-                </div>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Close expanded map"
-                  onClick={() => setExpanded(false)}
-                >
-                  <X size={18} aria-hidden="true" />
-                </button>
-              </header>
-              <div className="activity-route-modal-body">
-                <div className="activity-route-modal-map">
-                  <RouteMapCanvas
-                    route={route}
-                    scrollWheelZoom
-                    baseLayer={baseLayer}
-                    overlays={overlays}
-                    ariaLabel="Expanded activity route map"
-                  />
-                  <MapLayerControl
-                    value={baseLayer}
-                    onChange={setBaseLayer}
-                    overlays={overlays}
-                    onToggleOverlay={(id) =>
-                      setOverlays((prev) =>
-                        prev.includes(id)
-                          ? prev.filter((overlay) => overlay !== id)
-                          : [...prev, id]
-                      )
-                    }
-                  />
-                </div>
-                <div className="activity-route-footer">
-                  <RouteLegend />
-                </div>
-              </div>
-            </section>
-          </div>,
-          document.body
-        )}
+      {expanded ? <RouteMapModal route={route} onClose={closeExpanded} /> : null}
     </div>
+  );
+}
+
+interface ActivityRouteCoverProps {
+  track?: TrainingHubActivityTrack;
+  className?: string;
+  /** See `RouteMapCanvas`: the band at the top the page leaves clear. */
+  visibleBand?: number;
+}
+
+/**
+ * The route as a picture behind a page's heading: nothing to drag or zoom, and
+ * a click anywhere on it opens the full map. Renders nothing without a route —
+ * the caller decides what the heading looks like then.
+ */
+export function ActivityRouteCover({
+  track,
+  className,
+  visibleBand
+}: ActivityRouteCoverProps) {
+  const [expanded, setExpanded] = useState(false);
+  const closeExpanded = useCallback(() => setExpanded(false), []);
+  const route = useMemo(
+    () => (track?.points ? buildRouteGeometry(track.points) : null),
+    [track]
+  );
+
+  const [creditOpen, toggleCredit] = useFoldingCredit(route);
+
+  if (!route) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* The map itself is decorative; the button is the way in for a
+          keyboard, and the whole picture is the way in for a pointer. */}
+      <div
+        className={`activity-route-cover${creditOpen ? " is-credit-open" : ""}${
+          className ? ` ${className}` : ""
+        }`}
+        onClick={() => setExpanded(true)}
+      >
+        <div className="activity-route-cover-map" aria-hidden="true">
+          <RouteMapCanvas
+            route={route}
+            interactive={false}
+            visibleBand={visibleBand}
+            ariaLabel="Route"
+          />
+        </div>
+        <button
+          type="button"
+          className="activity-route-cover-open"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(true);
+          }}
+        >
+          <Maximize2 size={13} aria-hidden="true" />
+          Full map
+        </button>
+        <CreditButton
+          open={creditOpen}
+          onToggle={toggleCredit}
+          className="activity-route-cover-credit"
+        />
+      </div>
+      {/* A sibling, not a child: a portal still bubbles React events through
+          its parent, and a backdrop click that closed the map would reach the
+          cover's own click and open it again. */}
+      {expanded ? <RouteMapModal route={route} onClose={closeExpanded} /> : null}
+    </>
   );
 }

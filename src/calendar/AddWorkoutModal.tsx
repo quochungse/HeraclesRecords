@@ -53,6 +53,7 @@ import type {
 import type { CorosLinkApi } from "../coroslink-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { RunnerIcon } from "../running/runnerIcon";
 import {
   displayDistanceToMeters,
   distanceUnit,
@@ -110,7 +111,7 @@ const DEFAULT_LOG_SPORT_OPTION: LogSportOption = {
   label: "Run",
   uploadSport: "run",
   distanceUnit: "km",
-  Icon: Footprints
+  Icon: RunnerIcon
 };
 
 function quickWorkoutDuration(
@@ -240,7 +241,10 @@ function inferSportIcon(label: string): LucideIcon {
   if (includesSportTerm(normalized, ["yoga", "pilates", "stretch", "mobility"])) {
     return PersonStanding;
   }
-  if (includesSportTerm(normalized, [...RUN_TERMS, ...WALK_TERMS])) {
+  if (includesSportTerm(normalized, RUN_TERMS)) {
+    return RunnerIcon;
+  }
+  if (includesSportTerm(normalized, WALK_TERMS)) {
     return Footprints;
   }
   if (includesSportTerm(normalized, HIKE_TERMS)) {
@@ -302,7 +306,7 @@ interface BuilderRow {
  * strength get their own hue, everything else falls back to "other".
  */
 const BUILDER_SPORT_META: Record<WorkoutSport, { Icon: LucideIcon; colorVar: string }> = {
-  run: { Icon: Footprints, colorVar: "var(--sport-run)" },
+  run: { Icon: RunnerIcon, colorVar: "var(--sport-run)" },
   bike: { Icon: Bike, colorVar: "var(--sport-bike)" },
   swim: { Icon: Waves, colorVar: "var(--sport-other)" },
   strength: { Icon: Dumbbell, colorVar: "var(--sport-strength)" },
@@ -2315,7 +2319,7 @@ export function AddWorkoutModal({
                 </header>
 
                 <div className="calendar-quick-preview-title">
-                  <span aria-hidden="true"><Footprints size={20} /></span>
+                  <span aria-hidden="true"><RunnerIcon size={20} /></span>
                   <div>
                     <strong>{quickName.trim() || "Quick Run"}</strong>
                     <small>Distance workout</small>

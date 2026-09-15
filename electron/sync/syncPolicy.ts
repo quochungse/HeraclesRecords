@@ -101,6 +101,13 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
 
   // --- Reproducible from an upstream API -----------------------------------
   training_activities: "derived",
+  // ~130 bytes an activity, computed from a detail payload COROS still holds,
+  // so the other machine recomputes rather than receives — same reading as the
+  // activity rows it is computed beside. Nothing about the cached *file* is in
+  // this row and nothing may be added: a column saying "cached, 131 KB" would
+  // reach another machine as a promise it cannot keep, were this ever
+  // reclassified — the trap `coach_analysis_local_triggers` exists to avoid.
+  training_activity_summaries: "derived",
   strength_sessions: "derived",
   hevy_workouts: "derived",
   hevy_exercise_templates: "derived",

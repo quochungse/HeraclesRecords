@@ -55,6 +55,10 @@ import {
 import type { RestoreMode } from "./backup/backupTypes";
 import { deviceId as syncDeviceId } from "./sync/deviceIdentity";
 import {
+  initializeActivityDetailCache,
+  sweepActivityDetailCache
+} from "./activityDetailCache";
+import {
   clearDownloadTransferredByFileName,
   deleteDownload,
   getDownloadById,
@@ -110,6 +114,8 @@ import {
   getTrainingDashboard,
   fetchTrainingHubActivityFile,
   getTrainingHubActivityDetail,
+  readActivityDetailSummaries,
+  syncActivityDetailSummaries,
   getCorosProfileSnapshot,
   getTrainingHubStatus,
   getUpcomingWorkouts,
@@ -856,6 +862,23 @@ if (!hasSingleInstanceLock) {
   });
 }
 
+/**
+ * Let WebGL fall back to software rendering when the GPU cannot serve it.
+ *
+ * The map styles this app ships are vector ones, drawn by MapLibre through
+ * WebGL, and `createBaseLayer` drops to a raster street map when WebGL is
+ * missing — a *light* map, because no keyless dark raster style exists. So on a
+ * machine whose driver Chromium refuses ("WebGL2 blocklisted", seen on a Linux
+ * box with an NVIDIA card under Wayland), every map in the app turned bright
+ * white in the dark theme, with no error anywhere to say why.
+ *
+ * Since Chrome 127 that fallback is off unless asked for. Asking for it costs
+ * nothing where a GPU works — Chromium still prefers the real one — and where
+ * it does not, a slow correct map beats a fast wrong-coloured one. Must be set
+ * before `whenReady`.
+ */
+app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
   if (process.defaultApp && process.argv[1]) {
@@ -904,6 +927,14 @@ app.whenReady().then(() => {
     }
   });
   initializeDatabase(app.getPath("userData"));
+  // Activity details are files beside the database, not rows in it: 2.5 MB
+  // each, 98% sample series, and the rows sync.
+  initializeActivityDetailCache(app.getPath("userData"));
+  // Once per launch, because nothing else reclaims anything: the cap is only
+  // checked when a detail is written, so an athlete who fills the directory and
+  // then stops opening runs — or signs out — keeps whatever is there for good.
+  // A scan of a few thousand files costs a millisecond or two.
+  sweepActivityDetailCache();
   hydratePlanDraftStoreFromDatabase();
   prunePlanDraftStore();
   pruneDeleteRequestStore();
@@ -2608,6 +2639,21 @@ function registerIpcHandlers(): void {
       sportType: number,
       listActivity?: TrainingHubActivity
     ) => getTrainingHubActivityDetail(activityId, sportType, listActivity)
+  );
+
+  // The list-level figures that only a detail payload knows. Two channels
+  // rather than one: a read that answers from SQLite in a millisecond, and a
+  // sweep that goes to COROS and is meant to be called again until it reports
+  // nothing left.
+  ipcMain.handle(
+    "trainingHub:getActivityDetailSummaries",
+    (_event, activityIds: string[]) => readActivityDetailSummaries(activityIds)
+  );
+
+  ipcMain.handle(
+    "trainingHub:syncActivityDetailSummaries",
+    (_event, activityIds: string[], limit?: number) =>
+      syncActivityDetailSummaries(activityIds, limit)
   );
 
   ipcMain.handle(

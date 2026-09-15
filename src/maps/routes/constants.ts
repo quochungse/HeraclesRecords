@@ -3,9 +3,9 @@ import type {
   RouteElevationPreference
 } from "../../../electron/types";
 import type { LucideIcon } from "lucide-react";
+import { RunnerIcon } from "../../running/runnerIcon";
 import {
   Bike,
-  Footprints,
   Mountain,
   MountainSnow,
   PersonStanding
@@ -191,7 +191,7 @@ export interface ActivityOption {
 }
 
 export const ROUTE_ACTIVITY_OPTIONS: ActivityOption[] = [
-  { value: "running", label: "Running", shortLabel: "Run", icon: Footprints },
+  { value: "running", label: "Running", shortLabel: "Run", icon: RunnerIcon },
   {
     value: "walking",
     label: "Walking",

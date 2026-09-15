@@ -1997,7 +1997,14 @@ export interface TrainingHubActivity {
   sportName?: string;
   startTime?: number;
   endTime?: number;
+  /** Seconds from start to finish, pauses included — COROS `totalTime`. */
   duration?: number;
+  /**
+   * Seconds actually recorded, pauses taken out — COROS `workoutTime`, which the
+   * watch calls activity time. Equal to `duration` on a run that never stopped;
+   * 70 minutes against 118 on one that waited out two rain showers.
+   */
+  activeDuration?: number;
   distance?: number;
   avgHr?: number;
   maxHr?: number;
@@ -2238,7 +2245,10 @@ export interface TrainingHubActivitySeriesPoint {
   elapsed?: number;
   distance?: number;
   hr?: number;
+  /** Seconds per kilometre. */
   pace?: number;
+  /** Grade-adjusted pace, seconds per kilometre. Absent on ungraded sports. */
+  adjustedPace?: number;
   power?: number;
   /** Metres above sea level. */
   altitude?: number;
@@ -2365,13 +2375,70 @@ export interface HevySettingsInput {
   includeWarmups: boolean;
 }
 
+/** One stretch the watch spent paused, placed on the activity's own clock. */
+export interface TrainingHubActivityPause {
+  /** Seconds from the activity's start to the press of pause. */
+  start: number;
+  /** Seconds it stayed paused. */
+  duration: number;
+}
+
+/**
+ * What is kept of an activity detail once the payload is gone.
+ *
+ * A detail is ~2.5 MB and 98% of it is the sample series, so it is cached as a
+ * file rather than a row (`electron/activityDetailCache.ts`) and only this much
+ * reaches SQLite — about 130 bytes, which is what lets a whole run list carry
+ * figures that would otherwise need a request each. `fingerprint` is what ties
+ * it to the activity as COROS last described it: see
+ * `activityDetailFingerprint`.
+ */
+export interface ActivityDetailSummary {
+  activityId: string;
+  /** The list-row fingerprint these figures were computed from. */
+  fingerprint: string;
+  summaryVersion: number;
+  /** Seconds per HR bucket, six of them. Absent when COROS scored none. */
+  zoneSeconds?: number[];
+  /** Pace:HR drift across the run, percent. Positive means it cost more. */
+  decouplingPercent?: number;
+  /** COROS's own upload stamp, epoch seconds — informational. */
+  lastUploadTime?: number;
+  /** Epoch milliseconds. */
+  computedAt: number;
+}
+
+/** What one pass of the summary backfill did. `remaining` is the caller's cue
+ *  to come back: the sweep does a few at a time so it never holds the
+ *  connection for a screen the athlete is waiting on. */
+export interface ActivityDetailSummarySync {
+  computed: number;
+  remaining: number;
+  failed: number;
+  /**
+   * The summaries this pass wrote. Handed back so the caller can merge them
+   * rather than re-read the whole list after every few — which on a long
+   * history is the entire summary table crossing IPC once per pass.
+   */
+  summaries: ActivityDetailSummary[];
+}
+
 export interface TrainingHubActivityDetail {
   activityId?: string;
   name?: string;
   sportType?: number;
   sportName?: string;
   startTime?: number;
+  /** Seconds from start to finish, pauses included. */
   duration?: number;
+  /** Seconds recorded, pauses taken out. See `TrainingHubActivity.activeDuration`. */
+  activeDuration?: number;
+  /**
+   * Pauses in the order they happened. Series `elapsed` runs on the wall clock
+   * straight through them — the samples simply stop — so a reader that wants
+   * activity time subtracts these; laps already come without them.
+   */
+  pauses?: TrainingHubActivityPause[];
   distance?: number;
   avgHr?: number;
   maxHr?: number;

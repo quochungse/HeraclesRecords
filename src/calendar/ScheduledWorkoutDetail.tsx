@@ -5,7 +5,6 @@ import {
   Clock,
   Dumbbell,
   Flame,
-  Footprints,
   Gauge,
   Layers,
   ListChecks,
@@ -27,6 +26,7 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { RunnerIcon } from "../running/runnerIcon";
 import {
   POUNDS_PER_KILOGRAM,
   formatWeightValue
@@ -94,7 +94,7 @@ const SPORT_VIEW: Record<
   WorkoutSport,
   { category: SportColorCategory; icon: LucideIcon }
 > = {
-  run: { category: "run", icon: Footprints },
+  run: { category: "run", icon: RunnerIcon },
   trailRun: { category: "trail", icon: Mountain },
   bike: { category: "bike", icon: Bike },
   swim: { category: "other", icon: Waves },

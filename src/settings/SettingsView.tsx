@@ -11,7 +11,6 @@ import {
   Ellipsis,
   ExternalLink,
   FolderOpen,
-  Footprints,
   Globe2,
   HardDrive,
   Link2,
@@ -37,6 +36,7 @@ import { ResourcesMenu } from "../components/ResourcesMenu";
 import { StartupViewMenu } from "../components/StartupViewMenu";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { getPrimaryViewIcon } from "../navigation/startupView";
+import { RunnerIcon } from "../running/runnerIcon";
 import {
   coachModelsSummaryLine,
   summarizeCoachModels,
@@ -124,8 +124,10 @@ const SPORT_COLOR_DETAILS: Record<
     icon: Mountain,
   },
   run: {
+    // The Running screen's own figure, so the colour an athlete picks here is
+    // shown against the mark they will see it on.
+    icon: RunnerIcon,
     description: "Outdoor runs, track runs, intervals",
-    icon: Footprints,
   },
   bike: {
     description: "Road cycling, indoor cycling, e-bike",

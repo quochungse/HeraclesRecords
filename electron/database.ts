@@ -12,6 +12,7 @@ import {
 } from "./sync/syncBridge";
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
+  ActivityDetailSummary,
   CachedCorosMapPackage,
   CoachAnalysisRunQuery,
   GeneratedRoute,
@@ -226,6 +227,21 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       training_load REAL,
       elevation_gain REAL,
       synced_at TEXT NOT NULL
+    );
+
+    -- What survives of an activity detail once its 2.5 MB payload is gone.
+    -- The payload itself is a file (activityDetailCache.ts); this is the part
+    -- small enough to sync and to read for a whole list at once. fingerprint
+    -- ties the row to the activity as COROS last described it, so an edited
+    -- run's figures are recomputed rather than shown from before the edit.
+    CREATE TABLE IF NOT EXISTS training_activity_summaries (
+      activity_id TEXT PRIMARY KEY,
+      fingerprint TEXT NOT NULL,
+      summary_version INTEGER NOT NULL,
+      zone_seconds TEXT,
+      decoupling_percent REAL,
+      last_upload_time INTEGER,
+      computed_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS strength_sessions (
@@ -2337,6 +2353,157 @@ export function getStoredTrainingActivity(
     .get(activityId) as TrainingActivityRow | undefined;
 
   return row ? enrichActivitiesWithSportNames([toTrainingActivity(row)])[0] : undefined;
+}
+
+/**
+ * Many stored activities at once, for a caller holding a whole list of ids.
+ *
+ * `getStoredTrainingActivity` in a loop is a prepared statement per row, and
+ * the detail-summary sweep walks the same list on every pass — a few hundred
+ * runs then cost tens of thousands of statements over one sweep.
+ */
+export function getStoredTrainingActivities(
+  activityIds: readonly string[]
+): TrainingHubActivity[] {
+  if (activityIds.length === 0) {
+    return [];
+  }
+
+  const database = requireDatabase();
+  const rows: TrainingActivityRow[] = [];
+  for (let index = 0; index < activityIds.length; index += SUMMARY_QUERY_CHUNK) {
+    const chunk = activityIds.slice(index, index + SUMMARY_QUERY_CHUNK);
+    rows.push(
+      ...(database
+        .prepare(
+          `SELECT activity_id, name, sport_type, sport_name, start_time, end_time,
+                  duration, distance, avg_hr, max_hr, calories, training_load,
+                  elevation_gain
+           FROM training_activities
+           WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
+        )
+        .all(...chunk) as TrainingActivityRow[])
+    );
+  }
+
+  return enrichActivitiesWithSportNames(rows.map(toTrainingActivity));
+}
+
+/** Every activity id the local mirror holds. The detail cache uses it to tell
+ *  a file worth keeping from one whose run is no longer anywhere. */
+export function listStoredTrainingActivityIds(): string[] {
+  const rows = requireDatabase()
+    .prepare(`SELECT activity_id FROM training_activities`)
+    .all() as { activity_id: string }[];
+  return rows.map((row) => row.activity_id);
+}
+
+interface ActivitySummaryRow {
+  activity_id: string;
+  fingerprint: string;
+  summary_version: number;
+  zone_seconds: string | null;
+  decoupling_percent: number | null;
+  last_upload_time: number | null;
+  computed_at: number;
+}
+
+function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary {
+  let zoneSeconds: number[] | undefined;
+  if (row.zone_seconds) {
+    try {
+      const parsed: unknown = JSON.parse(row.zone_seconds);
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((value) => typeof value === "number")
+      ) {
+        zoneSeconds = parsed as number[];
+      }
+    } catch {
+      // A row this old or this broken is worth exactly as much as none.
+    }
+  }
+
+  return {
+    activityId: row.activity_id,
+    fingerprint: row.fingerprint,
+    summaryVersion: row.summary_version,
+    ...(zoneSeconds ? { zoneSeconds } : {}),
+    ...(row.decoupling_percent === null
+      ? {}
+      : { decouplingPercent: row.decoupling_percent }),
+    ...(row.last_upload_time === null
+      ? {}
+      : { lastUploadTime: row.last_upload_time }),
+    computedAt: row.computed_at
+  };
+}
+
+/** SQLite binds at most 999 parameters per statement. */
+const SUMMARY_QUERY_CHUNK = 500;
+
+/**
+ * Stored summaries for these activities, in no particular order and missing
+ * whichever have none. Says nothing about whether they are still valid — the
+ * fingerprint travels with each row and the caller checks it.
+ */
+export function getActivityDetailSummaries(
+  activityIds: readonly string[]
+): ActivityDetailSummary[] {
+  if (activityIds.length === 0) {
+    return [];
+  }
+
+  const database = requireDatabase();
+  const found: ActivityDetailSummary[] = [];
+  for (let index = 0; index < activityIds.length; index += SUMMARY_QUERY_CHUNK) {
+    const chunk = activityIds.slice(index, index + SUMMARY_QUERY_CHUNK);
+    const rows = database
+      .prepare(
+        `SELECT activity_id, fingerprint, summary_version, zone_seconds,
+                decoupling_percent, last_upload_time, computed_at
+         FROM training_activity_summaries
+         WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
+      )
+      .all(...chunk) as ActivitySummaryRow[];
+    for (const row of rows) {
+      found.push(toActivityDetailSummary(row));
+    }
+  }
+
+  return found;
+}
+
+export function upsertActivityDetailSummary(
+  summary: ActivityDetailSummary
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO training_activity_summaries (
+         activity_id, fingerprint, summary_version, zone_seconds,
+         decoupling_percent, last_upload_time, computed_at
+       )
+       VALUES (@activityId, @fingerprint, @summaryVersion, @zoneSeconds,
+               @decouplingPercent, @lastUploadTime, @computedAt)
+       ON CONFLICT(activity_id) DO UPDATE SET
+         fingerprint = excluded.fingerprint,
+         summary_version = excluded.summary_version,
+         zone_seconds = excluded.zone_seconds,
+         decoupling_percent = excluded.decoupling_percent,
+         last_upload_time = excluded.last_upload_time,
+         computed_at = excluded.computed_at`
+    )
+    .run({
+      activityId: summary.activityId,
+      fingerprint: summary.fingerprint,
+      summaryVersion: summary.summaryVersion,
+      zoneSeconds: summary.zoneSeconds
+        ? JSON.stringify(summary.zoneSeconds)
+        : null,
+      decouplingPercent: summary.decouplingPercent ?? null,
+      lastUploadTime: summary.lastUploadTime ?? null,
+      computedAt: summary.computedAt
+    });
 }
 
 /**

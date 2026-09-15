@@ -86,7 +86,11 @@ import {
   TRAINING_TREND_MAX_DAYS
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
-import type { TrainingHubSnapshot } from "./training/types";
+import type {
+  TrainingHubDetailRequest,
+  TrainingHubLoadStatus,
+  TrainingHubSnapshot,
+} from "./training/types";
 import type { CorosLinkApi } from "./coroslink-api";
 import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
@@ -191,6 +195,11 @@ const LazyGearView = IS_DEVELOPMENT_BUILD
 const LazyTrainingLibraryView = lazy(() =>
   import("./training-library/TrainingLibraryView").then(({ TrainingLibraryView }) => ({
     default: TrainingLibraryView,
+  })),
+);
+const LazyRunningView = lazy(() =>
+  import("./running/RunningView").then(({ RunningView }) => ({
+    default: RunningView,
   })),
 );
 const LazyStrengthView = lazy(() =>
@@ -442,6 +451,8 @@ export default function App() {
   const [trainingHubActivities, setTrainingHubActivities] = useState<
     TrainingHubActivity[]
   >([]);
+  const [trainingHubActivitiesStatus, setTrainingHubActivitiesStatus] =
+    useState<TrainingHubLoadStatus>("pending");
   const [trainingHubAnalytics, setTrainingHubAnalytics] =
     useState<TrainingHubAnalytics | null>(null);
   const [trainingHubDashboard, setTrainingHubDashboard] =
@@ -459,6 +470,11 @@ export default function App() {
     useState<TrainingHubUpcomingWorkout[]>([]);
   const [trainingHubActivityDetail, setTrainingHubActivityDetail] =
     useState<TrainingHubActivityDetail | null>(null);
+  const [trainingHubDetailRequest, setTrainingHubDetailRequest] =
+    useState<TrainingHubDetailRequest | null>(null);
+  // The activity whose detail was asked for last. A reply for any other one is
+  // stale — the athlete has moved on — and is dropped rather than shown.
+  const latestDetailRequestRef = useRef<string | null>(null);
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
   const [trainingHubSleepData, setTrainingHubSleepData] =
@@ -755,12 +771,15 @@ export default function App() {
     trainingCoreLoadSequenceRef.current += 1;
     trainingWellnessLoadSequenceRef.current += 1;
     setTrainingHubActivities([]);
+    setTrainingHubActivitiesStatus("pending");
     setTrainingHubAnalytics(null);
     setTrainingHubDashboard(null);
     setTrainingHubDailyMetrics(null);
     setTrainingHubSportTypes([]);
     setTrainingHubUpcomingWorkouts([]);
     setTrainingHubActivityDetail(null);
+    setTrainingHubDetailRequest(null);
+    latestDetailRequestRef.current = null;
     setSelectedTrainingHubActivity(null);
     setTrainingHubSleepData(null);
     setTrainingHubDailyHealthData(null);
@@ -804,8 +823,14 @@ export default function App() {
     const results = await Promise.allSettled([
       publish(
         listAllTrainingHubActivities(api),
-        setTrainingHubActivities,
-        () => setTrainingHubActivities([]),
+        (activities) => {
+          setTrainingHubActivities(activities);
+          setTrainingHubActivitiesStatus("ready");
+        },
+        () => {
+          setTrainingHubActivities([]);
+          setTrainingHubActivitiesStatus("failed");
+        },
       ),
       publish(
         api.getTrainingAnalytics(),
@@ -1024,7 +1049,12 @@ export default function App() {
 
   useEffect(() => {
     // Overview hosts the sign-in surface now, so both screens want a fresh status.
-    if (!api || (activeView !== "training" && activeView !== "overview")) {
+    if (
+      !api ||
+      (activeView !== "training" &&
+        activeView !== "overview" &&
+        activeView !== "running")
+    ) {
       return;
     }
     void api
@@ -1064,23 +1094,40 @@ export default function App() {
         return;
       }
 
-      setBusy(`training-detail:${activity.activityId}`);
+      const { activityId } = activity;
+      const busyKey = `training-detail:${activityId}`;
+      latestDetailRequestRef.current = activityId;
+      setBusy(busyKey);
       setError(null);
       setMessage(null);
       setSelectedTrainingHubActivity(activity);
+      setTrainingHubDetailRequest({ activityId, status: "pending" });
 
+      // Two requests can be in flight at once — open one run, go back, open
+      // another — and they need not land in order. The older reply used to
+      // overwrite the newer detail, and its `setBusy(null)` cleared the busy
+      // flag the newer request still held, which Running read as "finished
+      // with nothing" and answered with a failure panel mid-load.
+      const isLatest = () => latestDetailRequestRef.current === activityId;
       try {
-        setTrainingHubActivityDetail(
-          await api.getTrainingHubActivityDetail(
-            activity.activityId,
-            activity.sportType,
-            activity,
-          ),
+        const detail = await api.getTrainingHubActivityDetail(
+          activityId,
+          activity.sportType,
+          activity,
         );
+        if (isLatest()) {
+          setTrainingHubActivityDetail(detail);
+          setTrainingHubDetailRequest({ activityId, status: "ready" });
+        }
       } catch (caught) {
-        setError(toErrorMessage(caught));
+        if (isLatest()) {
+          setError(toErrorMessage(caught));
+          setTrainingHubDetailRequest({ activityId, status: "failed" });
+        }
       } finally {
-        setBusy(null);
+        // Only this request's own flag: anything else started meanwhile — a
+        // newer detail, a refresh — owns `busy` now.
+        setBusy((current) => (current === busyKey ? null : current));
       }
     },
     [api],
@@ -1949,6 +1996,29 @@ export default function App() {
     }
   }
 
+  /**
+   * Running's "Try again", after the activity list failed to arrive.
+   *
+   * Not `handleTrainingHubRefresh`, whose success message is only withheld when
+   * *every* COROS request fails. The list failing while something else loads
+   * therefore reads "analytics refreshed" — shown beside a panel still saying
+   * the activities did not load. The screen shows the outcome itself (the list,
+   * or the same panel again), so this reports failures and claims nothing.
+   */
+  async function handleRunningActivitiesRetry() {
+    setBusy("training-refresh");
+    setError(null);
+    setMessage(null);
+
+    try {
+      await refreshTrainingHub();
+    } catch (caught) {
+      await reportTrainingHubError(caught);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleTrainingHubRefresh() {
     setBusy("training-refresh");
     setError(null);
@@ -2570,7 +2640,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training") && "content-fill",
+            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2809,6 +2879,24 @@ export default function App() {
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
+            ) : null}
+            {activeView === "running" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="running" />}>
+                <LazyRunningView
+                  api={api}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  restoring={Boolean(trainingHubStatus?.restoring)}
+                  activitiesStatus={trainingHubActivitiesStatus}
+                  detail={trainingHubActivityDetail}
+                  detailRequest={trainingHubDetailRequest}
+                  snapshot={trainingHubSnapshot}
+                  busy={busy}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                />
+              </Suspense>
             ) : null}
             {activeView === "strength" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="strength" />}>

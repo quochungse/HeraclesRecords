@@ -21,6 +21,7 @@ import type {
 } from "../../../electron/types";
 import type { CorosLinkApi } from "../../coroslink-api";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { RunnerIcon } from "../../running/runnerIcon";
 import {
   formatDistanceMeters,
   formatTrainingTimestamp
@@ -70,7 +71,10 @@ function activityTypeIcon(type: string) {
   if (normalized.includes("hike") || normalized.includes("climb")) {
     return Mountain;
   }
-  if (normalized.includes("run") || normalized.includes("walk")) {
+  if (normalized.includes("run")) {
+    return RunnerIcon;
+  }
+  if (normalized.includes("walk")) {
     return Footprints;
   }
   if (

@@ -1,4 +1,4 @@
-import { Footprints, Mountain, Route } from "lucide-react";
+import { Mountain, Route } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type {
   TrainingHubDashboard,
@@ -12,6 +12,7 @@ import {
   isPersonalRecordVisible
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { RunnerIcon } from "../../running/runnerIcon";
 import { formatDistanceValue } from "../../units/units";
 import {
   defineSelectionPreference,
@@ -41,7 +42,7 @@ function recordIcon(type: number) {
     return Mountain;
   }
 
-  return Footprints;
+  return RunnerIcon;
 }
 
 /** Split "12.01km" / "84m" into a bold value and a muted unit. */
