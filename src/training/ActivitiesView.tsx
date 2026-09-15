@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CloudOff, Loader2, LockKeyhole, RefreshCw, SearchX } from "lucide-react";
 import { ActivityDetailPanel } from "./components/ActivityDetailPanel";
 import { ActivitiesFilterBar } from "./components/ActivitiesFilterBar";
 import { ActivitiesSummary } from "./components/ActivitiesSummary";
-import { TrainingActivityTable } from "./components/TrainingActivityTable";
+import { ActivityJournalList } from "./components/ActivityJournalList";
 import {
   ACTIVITY_PERIOD_OPTIONS,
   DEFAULT_ACTIVITY_FILTERS,
@@ -15,6 +15,9 @@ import {
 import { resolveSportName } from "./sportTypes";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
+
+/** Rows built per page. See `limit` below for why there is a page at all. */
+const PAGE_SIZE = 200;
 
 export function ActivitiesView({
   api,
@@ -35,6 +38,24 @@ export function ActivitiesView({
   const [filters, setFilters] = useState<ActivityFilters>(
     DEFAULT_ACTIVITY_FILTERS
   );
+  /*
+   * How many rows are built at once.
+   *
+   * There is no windowing here and no virtual-list dependency to reach for, so
+   * the cap is the thing standing between a six-year history on "All" and
+   * several thousand rows with an export menu each. The period filter is the
+   * real answer; this is what stops the screen locking up before the athlete
+   * reaches for it.
+   */
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}`;
+  const lastFilterKey = useRef(filterKey);
+  if (lastFilterKey.current !== filterKey) {
+    // Narrowing the list and keeping a limit from the wider one would leave the
+    // athlete scrolled past the end of a much shorter result.
+    lastFilterKey.current = filterKey;
+    setLimit(PAGE_SIZE);
+  }
 
   // Every activity list call pushes a new array holding the same activities, so
   // the clock is pinned to that rather than read per render — otherwise "the
@@ -60,6 +81,8 @@ export function ActivitiesView({
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
+  const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
+  const hidden = visible.length - shown.length;
 
   const periodLabel =
     ACTIVITY_PERIOD_OPTIONS.find((option) => option.days === filters.periodDays)
@@ -92,14 +115,32 @@ export function ActivitiesView({
   function renderList() {
     if (visible.length > 0) {
       return (
-        <TrainingActivityTable
-          activities={visible}
-          sportTypes={sportTypes}
-          selectedActivityId={selectedActivity?.activityId ?? null}
-          busy={busy}
-          onLoadDetail={onLoadDetail}
-          onExportFile={onExportFile}
-        />
+        <>
+          <ActivityJournalList
+            activities={shown}
+            sportTypes={sportTypes}
+            selectedActivityId={selectedActivity?.activityId ?? null}
+            busy={busy}
+            nowMs={nowMs}
+            onLoadDetail={onLoadDetail}
+            onExportFile={onExportFile}
+          />
+          {hidden > 0 ? (
+            <div className="activity-journal-more">
+              <p>
+                {hidden.toLocaleString()} older{" "}
+                {hidden === 1 ? "session" : "sessions"} not shown
+              </p>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setLimit((current) => current + PAGE_SIZE)}
+              >
+                Show more
+              </button>
+            </div>
+          ) : null}
+        </>
       );
     }
 

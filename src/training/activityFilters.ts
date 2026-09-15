@@ -257,3 +257,92 @@ export function sportsPresent(
     (category) => present.has(category)
   );
 }
+
+export interface ActivityWeekGroup {
+  /** Epoch ms of the Monday, or undefined for activities with no start time. */
+  weekStartMs?: number;
+  activities: TrainingHubActivity[];
+  /** Sessions and time in this week, for the heading. */
+  count: number;
+  /** Seconds. */
+  duration: number;
+  /** Share of this week's time per sport, busiest first. */
+  sports: ActivitySportTotal[];
+}
+
+/**
+ * Newest week first, newest activity first within it; undated activities last.
+ *
+ * The input is expected already filtered and sorted — `filterActivities` does
+ * both — so this only cuts it, and an unsorted list would produce a group per
+ * run rather than per week.
+ */
+export function groupActivitiesByWeek(
+  activities: readonly TrainingHubActivity[]
+): ActivityWeekGroup[] {
+  const groups: ActivityWeekGroup[] = [];
+  const undated: TrainingHubActivity[] = [];
+
+  for (const activity of activities) {
+    const at = activityStartTimeMs(activity);
+    if (at === undefined) {
+      undated.push(activity);
+      continue;
+    }
+
+    const weekStartMs = startOfWeekMs(at);
+    const last = groups[groups.length - 1];
+    if (last?.weekStartMs === weekStartMs) {
+      last.activities.push(activity);
+    } else {
+      groups.push({ weekStartMs, activities: [activity], count: 0, duration: 0, sports: [] });
+    }
+  }
+
+  if (undated.length > 0) {
+    groups.push({ activities: undated, count: 0, duration: 0, sports: [] });
+  }
+
+  for (const group of groups) {
+    const totals = summariseActivities(group.activities);
+    group.count = totals.count;
+    group.duration = totals.duration;
+    group.sports = totals.sports;
+  }
+
+  return groups;
+}
+
+/**
+ * "This week", "Last week", "Week of 25 Aug" — and "Undated" for the group
+ * holding activities COROS sent without a start time.
+ */
+export function activityWeekHeading(
+  weekStartMs: number | undefined,
+  nowMs: number
+): string {
+  if (weekStartMs === undefined) {
+    return "Undated";
+  }
+
+  const thisWeek = startOfWeekMs(nowMs);
+  if (weekStartMs === thisWeek) {
+    return "This week";
+  }
+
+  // Stepped through the calendar rather than by subtracting seven days, so a
+  // DST change inside the week cannot make last week miss by an hour.
+  const lastWeek = new Date(thisWeek);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  if (weekStartMs === lastWeek.getTime()) {
+    return "Last week";
+  }
+
+  const date = new Date(weekStartMs);
+  const sameYear = date.getFullYear() === new Date(nowMs).getFullYear();
+  return `Week of ${date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" })
+  })}`;
+}

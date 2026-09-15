@@ -8,16 +8,18 @@ export const FOUR_WEEKS_MS = 28 * 24 * 60 * 60 * 1000;
  * rather than assumed: anything below 10_000_000_000 cannot be a millisecond
  * timestamp inside any plausible date range.
  */
-export function activityStartTimeMs(
-  activity: TrainingHubActivity
-): number | undefined {
-  if (!Number.isFinite(activity.startTime) || !activity.startTime) {
+export function epochMsFromCorosTime(value?: number): number | undefined {
+  if (!Number.isFinite(value) || !value) {
     return undefined;
   }
 
-  return activity.startTime < 10_000_000_000
-    ? activity.startTime * 1000
-    : activity.startTime;
+  return value < 10_000_000_000 ? value * 1000 : value;
+}
+
+export function activityStartTimeMs(
+  activity: TrainingHubActivity
+): number | undefined {
+  return epochMsFromCorosTime(activity.startTime);
 }
 
 /**

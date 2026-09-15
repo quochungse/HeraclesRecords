@@ -16,12 +16,14 @@
   --ax-edge: color-mix(in srgb, var(--text-primary) 11%, transparent);
   --ax-raised: color-mix(in srgb, var(--text-primary) 5%, transparent);
   --ax-well: color-mix(in srgb, #000 22%, transparent);
+  --ax-heading: color-mix(in srgb, var(--bg-base) 82%, var(--text-primary));
 }
 
 :root[data-theme="paper"] .activities-view {
   --ax-edge: rgba(38, 34, 28, 0.11);
   --ax-raised: #ffffff;
   --ax-well: rgba(38, 34, 28, 0.05);
+  --ax-heading: #f7f4ee;
 }
 
 .activities-view > .activities-head,
@@ -308,4 +310,229 @@
 
 .activities-filters-status button:hover {
   text-decoration: underline;
+}
+
+/* --- The journal list ----------------------------------------------------- */
+
+.activity-journal {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* The rows have their own hairlines; a border here would double the first
+   * and last of them against the pane edge. */
+  padding-right: 4px;
+}
+
+.activity-journal-week {
+  margin-bottom: 10px;
+}
+
+.activity-journal-week-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 120px);
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 6px;
+  padding: 7px 4px 6px;
+  /*
+   * Opaque, because rows scroll under it — but mixed towards the panel rather
+   * than set to `--bg-base`, which is the page behind the glass and reads as a
+   * black band cut through the card.
+   */
+  background: var(--ax-heading);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-journal-week-facts {
+  display: inline-flex;
+  gap: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.activity-journal-week-mix {
+  display: flex;
+  overflow: hidden;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activity-journal-week-mix i {
+  min-width: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activity-journal-week ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  position: relative;
+  border-radius: var(--radius-sm);
+}
+
+.activity-row-open {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  /* Room on the right for the actions, which sit outside this button. */
+  padding: 8px 46px 8px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.activity-row-open:hover {
+  background: var(--ax-raised);
+}
+
+.activity-row.is-selected .activity-row-open {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.activity-row.is-loading .activity-row-open {
+  opacity: 0.6;
+}
+
+.activity-row-date {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 2px 0;
+  border-radius: var(--radius-sm);
+  background: var(--ax-well);
+  line-height: 1.1;
+}
+
+.activity-row-date em {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-row-date strong {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row-date i {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.activity-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.activity-row-title strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-row-title .sport-chip {
+  flex: 0 0 auto;
+}
+
+.activity-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * A vertical rule between figures instead of a separator character, so a
+ * wrapped line does not start with a stray bullet.
+ */
+.activity-row-facts span + span {
+  padding-left: 10px;
+  border-left: 1px solid var(--ax-edge);
+}
+
+.activity-row-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 1;
+  transform: translateY(-50%);
+  /*
+   * Present for the keyboard and for screen readers, but out of the way of the
+   * eye until the row is wanted: a column of download icons used to be the
+   * loudest thing on the screen and the rarest action on it.
+   */
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.activity-row:hover .activity-row-actions,
+.activity-row:focus-within .activity-row-actions,
+.activity-row.is-selected .activity-row-actions {
+  opacity: 1;
+}
+
+.activity-journal-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 8px;
+  border-top: 1px solid var(--ax-edge);
+}
+
+.activity-journal-more p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* The pane is a flex column; the list takes the height and scrolls itself. */
+.activities-view .training-activities-list {
+  gap: 0;
 }

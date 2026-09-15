@@ -13,8 +13,14 @@ import path from "node:path";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const bust = `?cacheBust=${Date.now()}`;
 
+const { activityRowFacts } = await import(
+  pathToFileURL(path.join(repoRoot, "src/training/activityFacts.ts")).href + bust
+);
+
 const {
   ACTIVITY_PERIOD_OPTIONS,
+  activityWeekHeading,
+  groupActivitiesByWeek,
   DEFAULT_ACTIVITY_FILTERS,
   activityPeriodStartMs,
   filterActivities,
@@ -275,6 +281,146 @@ assert.equal(
   ACTIVITY_PERIOD_OPTIONS.filter((option) => option.days === null).length,
   1,
   "exactly one option means the whole history"
+);
+
+// ---------------------------------------------------------------------------
+// 8. Weeks
+// ---------------------------------------------------------------------------
+
+const across = filterActivities({
+  activities: [
+    activity({ activityId: "thisWeek", startTime: at(MONDAY + DAY), duration: 1800 }),
+    activity({ activityId: "lastWeekA", startTime: at(MONDAY - 2 * DAY), duration: 3600 }),
+    activity({
+      activityId: "lastWeekB",
+      sportType: 402,
+      startTime: at(MONDAY - 3 * DAY),
+      duration: 3600
+    }),
+    activity({ activityId: "older", startTime: at(MONDAY - 20 * DAY), duration: 600 }),
+    activity({ activityId: "undated" })
+  ],
+  filters: { ...DEFAULT_ACTIVITY_FILTERS, periodDays: null },
+  nowMs: NOW
+});
+
+const weeks = groupActivitiesByWeek(across);
+
+assert.deepEqual(
+  weeks.map((group) => group.activities.map((row) => row.activityId)),
+  [["thisWeek"], ["lastWeekA", "lastWeekB"], ["older"], ["undated"]],
+  "newest week first, undated last"
+);
+assert.equal(weeks[1].count, 2);
+assert.equal(weeks[1].duration, 7200);
+assert.deepEqual(
+  weeks[1].sports.map((sport) => sport.category).sort(),
+  ["run", "strength"],
+  "a week carries its own mix"
+);
+assert.equal(
+  weeks[3].weekStartMs,
+  undefined,
+  "activities with no start time get a group of their own, not week zero"
+);
+
+assert.equal(activityWeekHeading(MONDAY, NOW), "This week");
+assert.equal(activityWeekHeading(MONDAY - 7 * DAY, NOW), "Last week");
+assert.equal(activityWeekHeading(undefined, NOW), "Undated");
+assert.match(
+  activityWeekHeading(MONDAY - 21 * DAY, NOW),
+  /^Week of /,
+  "anything older is dated rather than counted backwards"
+);
+
+// An unsorted input would cut a group per activity rather than per week, which
+// is why grouping states that it expects `filterActivities` to have sorted.
+assert.equal(
+  groupActivitiesByWeek([
+    activity({ activityId: "a", startTime: at(MONDAY + DAY) }),
+    activity({ activityId: "b", startTime: at(MONDAY - 2 * DAY) }),
+    activity({ activityId: "c", startTime: at(MONDAY + 2 * DAY) })
+  ]).length,
+  3
+);
+
+// ---------------------------------------------------------------------------
+// 9. Row facts are chosen per sport
+// ---------------------------------------------------------------------------
+
+const factValues = (row) => activityRowFacts(row, "metric").map((fact) => fact.value);
+
+assert.deepEqual(
+  factValues(
+    activity({
+      sportType: 100,
+      duration: 3600,
+      distance: 10_000,
+      avgHr: 148,
+      trainingLoad: 210
+    })
+  ),
+  ["1h", "10.0 km", "6:00 /km", "148 bpm"],
+  "a run is read by pace"
+);
+
+assert.deepEqual(
+  factValues(
+    activity({
+      sportType: 200,
+      duration: 3600,
+      distance: 30_000,
+      avgHr: 132,
+      trainingLoad: 150
+    })
+  ),
+  ["1h", "30.0 km", "30.0 km/h", "132 bpm"],
+  "a ride is read by speed, not by pace"
+);
+
+// The case the old table answered with a column of "0 km".
+assert.deepEqual(
+  factValues(
+    activity({ sportType: 402, duration: 4500, avgHr: 118, trainingLoad: 40 })
+  ),
+  ["1h 15m", "118 bpm", "40 TL"],
+  "a strength session carries no distance and no pace"
+);
+
+assert.deepEqual(
+  factValues(activity({ sportType: 100, duration: 1800, distance: 5000 })),
+  ["30m", "5.00 km", "6:00 /km"],
+  "a figure COROS did not send is left out, not shown as a dash"
+);
+
+const factKeys = (row) => activityRowFacts(row, "metric").map((fact) => fact.key);
+
+// Every flat road run carries a few metres of GPS noise; a "4 m" on every row
+// is four characters of nothing.
+assert.deepEqual(
+  factKeys(activity({ sportType: 100, duration: 1800, elevationGain: 4 })),
+  ["duration"],
+  "a handful of metres of climb is not a fact"
+);
+assert.deepEqual(
+  factKeys(activity({ sportType: 100, duration: 1800, elevationGain: 420 })),
+  ["duration", "climb"],
+  "a real climb is"
+);
+
+assert.ok(
+  activityRowFacts(
+    activity({
+      sportType: 100,
+      duration: 3600,
+      distance: 10_000,
+      avgHr: 148,
+      elevationGain: 600,
+      trainingLoad: 210
+    }),
+    "metric"
+  ).length <= 4,
+  "four figures at most — a fifth is what makes the line wrap"
 );
 
 console.log("activity filter tests passed");
