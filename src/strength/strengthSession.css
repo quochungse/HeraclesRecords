@@ -575,3 +575,255 @@
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
+
+/* ---------- Weekly sets per muscle ---------- */
+
+/* One series, one colour: the page's ember, one step deeper on dark so the bar
+   sits inside the lightness band a chart mark should (validated, not picked). */
+.strength-view {
+  --sx-volume-bar: #dc7430;
+}
+
+:root[data-theme="paper"] .strength-view {
+  --sx-volume-bar: #cf6a2a;
+}
+
+.strength-volume-summary {
+  display: flex;
+  flex-shrink: 0;
+  gap: 16px;
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.strength-volume-summary strong {
+  margin-right: 4px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.strength-volume-chart {
+  --volume-label: 108px;
+  --volume-value: 76px;
+}
+
+.strength-volume-scale,
+.strength-volume-row {
+  display: grid;
+  grid-template-columns: var(--volume-label) minmax(0, 1fr) var(--volume-value);
+  align-items: center;
+  gap: 14px;
+}
+
+.strength-volume-ticks {
+  position: relative;
+  height: 18px;
+}
+
+.strength-volume-ticks i {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-ticks i:first-child {
+  transform: none;
+}
+
+.strength-volume-ticks i:last-child {
+  transform: translateX(-100%);
+}
+
+.strength-volume-ticks i[data-landmark] {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.strength-volume-rows {
+  display: grid;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strength-volume-row {
+  position: relative;
+  padding: 3px 0;
+  border-radius: 8px;
+  outline: none;
+}
+
+.strength-volume-row[data-region-start] {
+  margin-top: 10px;
+}
+
+.strength-volume-row:hover,
+.strength-volume-row:focus-visible {
+  background: var(--sx-well);
+}
+
+.strength-volume-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--sx-ember);
+}
+
+.strength-volume-name {
+  overflow: hidden;
+  padding-left: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The row is the hit target; the track only needs to be tall enough to read. */
+.strength-volume-track {
+  position: relative;
+  height: 22px;
+}
+
+.strength-volume-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px solid var(--sx-edge);
+  border-left: 1px solid var(--sx-edge);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.strength-volume-bar {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: var(--sx-volume-bar);
+}
+
+.strength-volume-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-value strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.strength-volume-value em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.strength-volume-row[data-status="below"] .strength-volume-value strong {
+  color: var(--text-secondary);
+}
+
+/* Anchored at the bar's end, and held inside the track so it never runs off
+   the card on a long bar. */
+.strength-volume-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: min(var(--tip-at, 0%), calc(100% - 220px));
+  z-index: 4;
+  display: flex;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--sx-edge);
+  border-radius: 10px;
+  background: var(--sx-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+}
+
+.strength-volume-row:hover .strength-volume-tip,
+.strength-volume-row:focus-visible .strength-volume-tip {
+  opacity: 1;
+}
+
+/* One tooltip at a time: the row under the pointer wins over the focused one. */
+.strength-volume-rows:hover .strength-volume-row:focus-visible:not(:hover) .strength-volume-tip {
+  opacity: 0;
+}
+
+.strength-volume-tip span {
+  display: grid;
+  gap: 2px;
+}
+
+.strength-volume-tip strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-tip em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.strength-volume-note {
+  margin: 18px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.strength-volume-table {
+  margin-top: 12px;
+}
+
+.strength-volume-table summary {
+  width: fit-content;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.strength-volume-table-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+/* The global table rule sets min-width: 720px. */
+.strength-volume-table table {
+  min-width: 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-table th,
+.strength-volume-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--sx-hairline);
+  text-align: right;
+}
+
+.strength-volume-table th:first-child {
+  text-align: left;
+}
+
+@media (max-width: 700px) {
+  .strength-volume-card .strength-card-head {
+    flex-direction: column;
+  }
+
+  .strength-volume-chart {
+    --volume-label: 84px;
+    --volume-value: 58px;
+  }
+}
