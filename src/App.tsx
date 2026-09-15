@@ -1133,8 +1133,16 @@ export default function App() {
     [api],
   );
 
+  /*
+   * Open the Activities screen on something rather than on an empty pane.
+   *
+   * Gated on that screen being the one in front: a detail is a ~2.2 MB payload
+   * to parse and this used to fire the moment the activity list landed, on
+   * every launch, whatever the athlete was actually looking at. Running and the
+   * globe each choose their own activity, so neither is waiting on this.
+   */
   useEffect(() => {
-    if (!api || trainingHubActivities.length === 0) {
+    if (!api || activeView !== "training" || trainingHubActivities.length === 0) {
       return;
     }
 
@@ -1151,6 +1159,7 @@ export default function App() {
     void handleTrainingHubActivityDetail(trainingHubActivities[0]);
   }, [
     api,
+    activeView,
     trainingHubActivities,
     selectedTrainingHubActivity?.activityId,
     handleTrainingHubActivityDetail,
@@ -2840,15 +2849,19 @@ export default function App() {
             {activeView === "training" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="activities" />}>
                 <LazyActivitiesView
+                  api={api}
                   status={trainingHubStatus}
                   activities={trainingHubActivities}
+                  activitiesStatus={trainingHubActivitiesStatus}
                   sportTypes={trainingHubSportTypes}
                   activityDetail={trainingHubActivityDetail}
                   selectedActivity={selectedTrainingHubActivity}
+                  detailRequest={trainingHubDetailRequest}
                   busy={busy}
                   onLoadDetail={handleTrainingHubActivityDetail}
                   onExportFile={handleTrainingHubExport}
                   onConnect={() => setActiveView("overview")}
+                  onRetry={() => void handleRunningActivitiesRetry()}
                 />
               </Suspense>
             ) : null}

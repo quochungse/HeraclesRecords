@@ -510,6 +510,12 @@ export interface CorosLinkApi {
     sportType: number,
     listActivity?: TrainingHubActivity
   ) => Promise<TrainingHubActivityDetail>;
+  /** The unparsed COROS payload — ~2.2 MB, for the development build's raw
+   *  JSON modal alone. Deliberately not carried on the detail above. */
+  getTrainingHubActivityDetailRaw: (
+    activityId: string,
+    sportType: number
+  ) => Promise<Record<string, unknown>>;
   /** Stored summaries for these activities — only the ones still valid for the
    *  activity as COROS describes it now. Answers from SQLite; asks nothing. */
   getActivityDetailSummaries: (

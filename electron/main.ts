@@ -114,6 +114,7 @@ import {
   getTrainingDashboard,
   fetchTrainingHubActivityFile,
   getTrainingHubActivityDetail,
+  getTrainingHubActivityDetailRaw,
   readActivityDetailSummaries,
   syncActivityDetailSummaries,
   getCorosProfileSnapshot,
@@ -2639,6 +2640,14 @@ function registerIpcHandlers(): void {
       sportType: number,
       listActivity?: TrainingHubActivity
     ) => getTrainingHubActivityDetail(activityId, sportType, listActivity)
+  );
+
+  // The unparsed payload, on its own channel: it is ~2.2 MB and only the
+  // development build's raw-JSON modal asks for it.
+  ipcMain.handle(
+    "trainingHub:getActivityDetailRaw",
+    (_event, activityId: string, sportType: number) =>
+      getTrainingHubActivityDetailRaw(activityId, sportType)
   );
 
   // The list-level figures that only a detail payload knows. Two channels

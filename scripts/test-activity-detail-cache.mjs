@@ -663,8 +663,9 @@ assert.equal(
 );
 assert.equal(
   serviceSource.split("loadActivityDetailRaw(").length - 1,
-  5,
-  "the definition plus four callers: the detail handler, the summary sweep, " +
+  6,
+  "the definition plus five callers: the detail handler, the raw-payload " +
+    "handler behind the development build's JSON modal, the summary sweep, " +
     "the feel backfill and the strength sync"
 );
 assert.equal(

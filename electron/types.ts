@@ -2428,6 +2428,16 @@ export interface ActivityDetailSummarySync {
   summaries: ActivityDetailSummary[];
 }
 
+/**
+ * One activity, parsed.
+ *
+ * The COROS payload this is read from is ~2.2 MB — measured, uncompressed —
+ * and it used to travel here whole under a `raw` field, crossing the context
+ * bridge on every row an athlete clicked so that a development-only "Show raw
+ * JSON" modal could exist. Nothing else ever read it. The payload now stays in
+ * the main process; `trainingHub:getActivityDetailRaw` fetches it on demand
+ * for that one modal.
+ */
 export interface TrainingHubActivityDetail {
   activityId?: string;
   name?: string;
@@ -2463,7 +2473,6 @@ export interface TrainingHubActivityDetail {
   track?: TrainingHubActivityTrack;
   series?: TrainingHubActivitySeriesPoint[];
   strength?: StrengthDetail;
-  raw: Record<string, unknown>;
 }
 
 export interface TrainingHubScheduledExercise {

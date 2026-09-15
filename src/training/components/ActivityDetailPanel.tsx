@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Braces, Loader2, X } from "lucide-react";
+import { Braces, CloudOff, Loader2, RefreshCw, X } from "lucide-react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -15,6 +15,8 @@ import {
   formatTrainingTimestamp
 } from "../formatters";
 import { isCyclingSportType, isSwimSportType, resolveSportName } from "../sportTypes";
+import type { CorosLinkApi } from "../../coroslink-api";
+import type { TrainingHubDetailRequest } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
@@ -27,6 +29,21 @@ interface ActivityDetailPanelProps {
   sportTypes: TrainingHubSportType[];
   busy?: string | null;
   embedded?: boolean;
+  /**
+   * Where the latest detail request stands. Optional because the Calendar's day
+   * pane fetches its own detail and tracks it locally; without it the panel
+   * falls back to reading `busy`, which cannot tell a failure from a load that
+   * is still running.
+   */
+  detailRequest?: TrainingHubDetailRequest | null;
+  /** Retries the activity whose detail failed. */
+  onRetry?: (activity: TrainingHubActivity) => void;
+  /**
+   * Only the raw-JSON modal needs this, and only on a development build: the
+   * payload is ~2.2 MB and no longer rides along on `detail`. Without an api
+   * the button is not offered.
+   */
+  api?: CorosLinkApi | null;
 }
 
 function DetailStat({ label, value }: { label: string; value: string }) {
@@ -51,10 +68,38 @@ export function ActivityDetailPanel({
   listActivity,
   sportTypes,
   busy = null,
-  embedded = false
+  embedded = false,
+  detailRequest = null,
+  onRetry,
+  api = null
 }: ActivityDetailPanelProps) {
   const { unitSystem } = useUnitSystem();
   const [showRaw, setShowRaw] = useState(false);
+  const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
+  const rawAvailable = import.meta.env.DEV && Boolean(api);
+  const detailActivityId = detail?.activityId ?? listActivity?.activityId;
+  const detailSportType = detail?.sportType ?? listActivity?.sportType;
+
+  const openRaw = useCallback(async () => {
+    if (!api || detailActivityId === undefined) {
+      return;
+    }
+
+    setShowRaw(true);
+    setRaw(null);
+    setRawError(null);
+    try {
+      setRaw(
+        await api.getTrainingHubActivityDetailRaw(
+          detailActivityId,
+          detailSportType ?? 0
+        )
+      );
+    } catch (caught) {
+      setRawError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, [api, detailActivityId, detailSportType]);
   const sportName = useMemo(() => {
     if (detail) {
       return resolveSportName(detail, sportTypes);
@@ -82,14 +127,47 @@ export function ActivityDetailPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showRaw]);
 
-  const isLoading =
-    listActivity &&
-    busy === `training-detail:${listActivity.activityId}` &&
-    !detail;
+  const request =
+    detailRequest && detailRequest.activityId === listActivity?.activityId
+      ? detailRequest
+      : null;
+  const isLoading = listActivity
+    ? request
+      ? request.status === "pending" && !detail
+      : busy === `training-detail:${listActivity.activityId}` && !detail
+    : false;
+  const hasFailed = Boolean(listActivity) && request?.status === "failed";
 
   const panelClassName = embedded
     ? "training-activities-detail-inner"
     : "panel training-detail-panel";
+
+  if (hasFailed && listActivity) {
+    return (
+      <div className={panelClassName}>
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">Activity Detail</p>
+            <h2>{listActivity.name ?? "Selected activity"}</h2>
+          </div>
+        </div>
+        <div className="training-empty-state">
+          <CloudOff size={20} aria-hidden="true" />
+          <p>This activity&apos;s detail did not arrive.</p>
+          {onRetry ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onRetry(listActivity)}
+            >
+              <RefreshCw size={14} aria-hidden="true" />
+              Try again
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -241,15 +319,17 @@ export function ActivityDetailPanel({
         </>
       )}
 
-      <div className="training-raw-toggle">
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => setShowRaw(true)}
-        >
-          Show raw JSON
-        </button>
-      </div>
+      {rawAvailable ? (
+        <div className="training-raw-toggle">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void openRaw()}
+          >
+            Show raw JSON
+          </button>
+        </div>
+      ) : null}
 
       {showRaw &&
         createPortal(
@@ -279,9 +359,18 @@ export function ActivityDetailPanel({
                 </button>
               </header>
               <div className="training-raw-modal-body">
-                <pre className="training-raw-json">
-                  {JSON.stringify(detail.raw, null, 2)}
-                </pre>
+                {rawError ? (
+                  <p className="training-raw-json">{rawError}</p>
+                ) : raw ? (
+                  <pre className="training-raw-json">
+                    {JSON.stringify(raw, null, 2)}
+                  </pre>
+                ) : (
+                  <div className="training-detail-loading">
+                    <Loader2 className="spin" size={18} aria-hidden="true" />
+                    <p>Fetching payload…</p>
+                  </div>
+                )}
               </div>
             </section>
           </div>,

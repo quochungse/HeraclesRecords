@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, FileDown, Loader2 } from "lucide-react";
 import type { KeyboardEvent } from "react";
@@ -13,6 +13,7 @@ import {
   formatDurationSeconds,
   formatTrainingTableWhen
 } from "../formatters";
+import { sportColorCategory } from "../sportColors";
 import { isSwimSportType, resolveSportName } from "../sportTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 
@@ -28,10 +29,6 @@ interface TrainingActivityTableProps {
   ) => void;
 }
 
-function sportChipClass(sportType: number): string {
-  const palette = sportType % 5;
-  return `sport-chip sport-chip-${palette}`;
-}
 
 function handleRowKeyDown(
   event: KeyboardEvent<HTMLTableRowElement>,
@@ -201,17 +198,12 @@ export function TrainingActivityTable({
   onExportFile
 }: TrainingActivityTableProps) {
   const { unitSystem } = useUnitSystem();
-  const sportTypeMap = new Map(
-    sportTypes.map((item) => [item.sportType, item.sportName])
+  // Rebuilt only when the sport table itself changes: this component renders
+  // one row per activity in the athlete's whole history.
+  const sportTypeMap = useMemo(
+    () => new Map(sportTypes.map((item) => [item.sportType, item.sportName])),
+    [sportTypes]
   );
-
-  if (activities.length === 0) {
-    return (
-      <div className="training-empty-state">
-        <p>No Training Hub activities loaded.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="table-shell training-activity-table-shell">
@@ -252,7 +244,10 @@ export function TrainingActivityTable({
                 <td className="training-activity-cell">
                   <div className="training-activity-name">
                     <strong title={activityName}>{activityName}</strong>
-                    <span className={sportChipClass(activity.sportType)}>
+                    <span
+                      className="sport-chip"
+                      data-sport={sportColorCategory(activity.sportType)}
+                    >
                       {sportName}
                     </span>
                   </div>

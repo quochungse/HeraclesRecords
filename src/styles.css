@@ -16119,34 +16119,37 @@ tr.data-intervals-row-missing {
   text-transform: uppercase;
 }
 
-.sport-chip-0 {
-  border-color: rgba(110, 231, 168, 0.2);
-  background: rgba(45, 154, 116, 0.15);
-  color: #6ee7a8;
+/*
+ * Tinted from the athlete's own palette rather than from `sportType % 5`, which
+ * gave Run and Bike the same colour while splitting Run from Indoor Run, and
+ * ignored the colours chosen in Settings. `--sport-*` is written by
+ * `applySportColors`; sportColors.ts is the source of truth for the defaults.
+ */
+.sport-chip[data-sport] {
+  --sport-chip-color: var(--sport-other);
+  border-color: color-mix(in srgb, var(--sport-chip-color) 34%, transparent);
+  background: color-mix(in srgb, var(--sport-chip-color) 16%, transparent);
+  color: color-mix(in srgb, var(--sport-chip-color) 84%, var(--text-primary));
 }
 
-.sport-chip-1 {
-  border-color: rgba(165, 180, 252, 0.18);
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
+.sport-chip[data-sport="strength"] {
+  --sport-chip-color: var(--sport-strength);
 }
 
-.sport-chip-2 {
-  border-color: rgba(251, 191, 36, 0.2);
-  background: rgba(216, 155, 34, 0.15);
-  color: #fbbf24;
+.sport-chip[data-sport="trail"] {
+  --sport-chip-color: var(--sport-trail);
 }
 
-.sport-chip-3 {
-  border-color: rgba(249, 168, 212, 0.18);
-  background: rgba(236, 72, 153, 0.15);
-  color: #f9a8d4;
+.sport-chip[data-sport="run"] {
+  --sport-chip-color: var(--sport-run);
 }
 
-.sport-chip-4 {
-  border-color: rgba(94, 234, 212, 0.18);
-  background: rgba(20, 184, 166, 0.15);
-  color: #5eead4;
+.sport-chip[data-sport="bike"] {
+  --sport-chip-color: var(--sport-bike);
+}
+
+.sport-chip[data-sport="other"] {
+  --sport-chip-color: var(--sport-other);
 }
 
 .icon-button.training-action-button {
@@ -25664,26 +25667,12 @@ tr.data-intervals-row-missing {
   border-bottom-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-/* Sport chips use pale pastel text tuned for dark rows; darken each so the
- * label reads on the light pastel fill. */
-:root[data-theme="paper"] .sport-chip-0 {
-  color: #0f7f5f;
-}
-
-:root[data-theme="paper"] .sport-chip-1 {
-  color: #4338ca;
-}
-
-:root[data-theme="paper"] .sport-chip-2 {
-  color: #9a6b12;
-}
-
-:root[data-theme="paper"] .sport-chip-3 {
-  color: #be185d;
-}
-
-:root[data-theme="paper"] .sport-chip-4 {
-  color: #0f766e;
+/* The dark theme lightens the sport colour to read on a dark row; on paper the
+ * fill is pale, so the same colour has to be darkened instead. */
+:root[data-theme="paper"] .sport-chip[data-sport] {
+  border-color: color-mix(in srgb, var(--sport-chip-color) 40%, transparent);
+  background: color-mix(in srgb, var(--sport-chip-color) 14%, transparent);
+  color: color-mix(in srgb, var(--sport-chip-color) 62%, #171310);
 }
 
 /* --- Recovery ring -------------------------------------------------------- */

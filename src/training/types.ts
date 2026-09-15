@@ -174,9 +174,10 @@ export type TrainingOverviewProps = Omit<
   | "onRefresh"
 >;
 
-/** The Activities screen: the recent-activity list plus its detail pane. */
+/** The Activities screen: the activity list plus its detail pane. */
 export type ActivitiesViewProps = Pick<
   TrainingHubViewProps,
+  | "api"
   | "status"
   | "activities"
   | "sportTypes"
@@ -186,8 +187,19 @@ export type ActivitiesViewProps = Pick<
   | "onLoadDetail"
   | "onExportFile"
 > & {
+  /**
+   * Whether `activities` has arrived. `busy` cannot say: it is one string for
+   * the whole app, and an empty array is equally "still loading", "load
+   * failed" and "never trained" — the screen used to answer all three with
+   * "No Training Hub activities loaded."
+   */
+  activitiesStatus: TrainingHubLoadStatus;
+  /** Where the latest detail request stands, and which activity it was for. */
+  detailRequest: TrainingHubDetailRequest | null;
   /** Sends the disconnected state to Overview, where signing in lives. */
   onConnect: () => void;
+  /** Reloads the COROS data after the activity list failed to arrive. */
+  onRetry: () => void;
 };
 
 export type { TrainingHubDailyMetric };
