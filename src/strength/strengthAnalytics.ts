@@ -239,14 +239,22 @@ export function canonicalExerciseDisplayName(name: string): string {
   return base || name;
 }
 
-function exerciseDisplayName(nameKey: string, rawName: string | undefined): string {
+/**
+ * The name an exercise gets when neither COROS's code nor the payload says what
+ * it was. Many different movements share it, so it identifies no one lift.
+ */
+export const UNNAMED_EXERCISE = "Unnamed exercise";
+
+/** The display name an exercise is grouped under everywhere on the Strength screen. */
+export function exerciseDisplayName(nameKey: string, rawName: string | undefined): string {
   const resolved = resolveExerciseName(nameKey, rawName);
   return /^[TS]\d/.test(resolved)
-    ? "Unnamed exercise"
+    ? UNNAMED_EXERCISE
     : canonicalExerciseDisplayName(resolved);
 }
 
-function exerciseTargets(exercise: StrengthExercise, name: string) {
+/** Muscle targets from the name rules, falling back to the provider's own muscle metadata. */
+export function exerciseTargets(exercise: StrengthExercise, name: string) {
   const named = resolveCorosExerciseTargets(exercise.nameKey, name);
   if (named.mobility || named.generic || named.activations.length > 0) return named;
   return resolveProviderMuscleTargets(
