@@ -22,7 +22,14 @@ import { StrengthHero } from "./StrengthHero";
 import { ExerciseExplorer } from "./ExerciseExplorer";
 import { StrengthOverviewPanels } from "./StrengthOverviewPanels";
 import { AGGREGATE_SELECTION, StrengthSessionList } from "./StrengthSessionList";
-import { StrengthAggregateDetail, StrengthSessionDetail } from "./StrengthSessionDetail";
+import {
+  StrengthAggregateHeader,
+  StrengthAggregateRecords,
+  StrengthSessionCoverage,
+  StrengthSessionExercises,
+  StrengthSessionHeader
+} from "./StrengthSessionDetail";
+import { sessionHeat } from "./sessionAnalytics";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
 import {
   cadencePhrase,
@@ -39,7 +46,11 @@ import {
   toErrorMessage,
   useStrengthData
 } from "./useStrengthData";
-import { useStrengthSessionIndex } from "./useStrengthSessionIndex";
+import {
+  STRENGTH_HEAT_SCOPE_PREFERENCE,
+  useStrengthSessionIndex
+} from "./useStrengthSessionIndex";
+import { useSelectionPreference } from "../preferences/selectionPreferences";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -103,6 +114,7 @@ export function StrengthView({
   const [hevyDialogError, setHevyDialogError] = useState<string | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
   const [pickedSelection, setPickedSelection] = useState<string | null>(null);
+  const [heatScope, setHeatScope] = useSelectionPreference(STRENGTH_HEAT_SCOPE_PREFERENCE);
 
   useEffect(() => {
     if (!hevyDialogOpen) return;
@@ -588,12 +600,6 @@ export function StrengthView({
         <div className="strength-sample-cta">{sampleButton}</div>
       ) : null}
 
-      <StrengthHero
-        analytics={analytics}
-        source={source}
-        showDevelopmentTools={showDevelopmentTools}
-      />
-
       {!hasSessions ? (
         <section className="panel strength-card strength-blank">
           <h3>No strength sessions in {activeWindow.phrase}</h3>
@@ -626,22 +632,82 @@ export function StrengthView({
               />
             </aside>
             <div className="strength-split-detail">
-              {selectedEntry ? (
-                <StrengthSessionDetail
-                  entry={selectedEntry}
-                  explorable={explorable}
-                  onOpenExercise={openExercise}
-                  showSource={source === "combined"}
+              {/*
+               * Four slots in a fixed order. Only the first and last change type
+               * between a session and "All sessions", so the body map in the
+               * second keeps its WebGL renderer across every selection.
+               */}
+              <article
+                className="strength-session-detail"
+                aria-label={selectedEntry ? "Session detail" : "All sessions"}
+              >
+                {selectedEntry ? (
+                  <StrengthSessionHeader
+                    entry={selectedEntry}
+                    showSource={source === "combined"}
+                  />
+                ) : (
+                  <StrengthAggregateHeader
+                    sessionCount={sessions.length}
+                    windowLabel={activeWindow.label}
+                    windowPhrase={activeWindow.phrase}
+                  />
+                )}
+                <StrengthHero
+                  analytics={selectedEntry?.analytics ?? analytics}
+                  source={source}
+                  showDevelopmentTools={showDevelopmentTools}
+                  scope={selectedEntry ? "session" : "window"}
+                  resolveHeat={
+                    selectedEntry
+                      ? (metric) => sessionHeat(selectedEntry, sessionIndex, metric, heatScope)
+                      : undefined
+                  }
+                  scaleControl={
+                    selectedEntry?.attribution === "attributed" ? (
+                      <div
+                        className="strength-segmented is-quiet"
+                        role="group"
+                        aria-label="Colour scale"
+                      >
+                        <button
+                          type="button"
+                          className={heatScope === "session" ? "is-active" : ""}
+                          aria-pressed={heatScope === "session"}
+                          title="The session's busiest muscle is the hottest"
+                          onClick={() => setHeatScope("session")}
+                        >
+                          This session
+                        </button>
+                        <button
+                          type="button"
+                          className={heatScope === "window" ? "is-active" : ""}
+                          aria-pressed={heatScope === "window"}
+                          title={`Against the hardest single session in ${activeWindow.phrase}`}
+                          onClick={() => setHeatScope("window")}
+                        >
+                          vs {activeWindow.label}
+                        </button>
+                      </div>
+                    ) : null
+                  }
                 />
-              ) : (
-                <StrengthAggregateDetail
-                  sessions={sessions}
-                  index={sessionIndex}
-                  windowLabel={activeWindow.label}
-                  windowPhrase={activeWindow.phrase}
-                  onSelectSession={setPickedSelection}
-                />
-              )}
+                {selectedEntry ? <StrengthSessionCoverage entry={selectedEntry} /> : null}
+                {selectedEntry ? (
+                  <StrengthSessionExercises
+                    entry={selectedEntry}
+                    explorable={explorable}
+                    onOpenExercise={openExercise}
+                  />
+                ) : (
+                  <StrengthAggregateRecords
+                    sessions={sessions}
+                    index={sessionIndex}
+                    windowPhrase={activeWindow.phrase}
+                    onSelectSession={setPickedSelection}
+                  />
+                )}
+              </article>
             </div>
           </div>
 

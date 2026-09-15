@@ -201,8 +201,18 @@
   overscroll-behavior: contain;
 }
 
+/* The body map and its muscle panel sit side by side in a wide pane and stack
+   in a narrow one; that depends on the pane, not the window, so it is a
+   container query rather than the viewport breakpoint the Overview uses. */
 .strength-split-detail {
   min-width: 0;
+  container-type: inline-size;
+}
+
+@container (max-width: 700px) {
+  .strength-session-detail .strength-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 1040px) {
@@ -549,4 +559,19 @@
   .strength-session-exercise-facts {
     display: none;
   }
+}
+
+/* The session's colour-scale switch, stacked on the legend it redefines. */
+.strength-body-scale {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.strength-body-scale .strength-segmented {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }

@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { ArrowUpRight, ChevronRight, Trophy } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowUpRight, ChevronRight, Info, Trophy } from "lucide-react";
 import type { StrengthSession, UnitSystem } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
@@ -199,141 +199,195 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
   );
 }
 
-interface StrengthSessionDetailProps {
+/**
+ * The detail pane is assembled in StrengthView from the pieces below, around a
+ * body map that keeps one position in the tree. Swapping between a session and
+ * "All sessions" then swaps the header and the body, and leaves the WebGL figure
+ * mounted instead of rebuilding its renderer and reloading the model.
+ */
+
+interface StrengthSessionHeaderProps {
   entry: SessionAnalytics;
-  /** The body map, drawn between the header and the exercises. */
-  figure?: ReactNode;
-  /** Exercise names the Exercise Explorer has a history for. */
-  explorable: ReadonlySet<string>;
-  onOpenExercise: (name: string) => void;
   showSource: boolean;
 }
 
-/** One session: what it was, how much work it held, what records it set, and every set. */
-export function StrengthSessionDetail({
-  entry,
-  figure,
-  explorable,
-  onOpenExercise,
-  showSource
-}: StrengthSessionDetailProps) {
+/** What the session was, how much work it held, and the records it set. */
+export function StrengthSessionHeader({ entry, showSource }: StrengthSessionHeaderProps) {
   const { unitSystem } = useUnitSystem();
   const { session } = entry;
   const stats = useMemo(() => buildSessionStats(session), [session]);
-  const rows = useMemo(() => buildExerciseRows(entry), [entry]);
   const recordGroups = useMemo(() => groupRecords(entry.records), [entry.records]);
   const source = showSource ? sessionSourceLabel(session) : undefined;
 
   return (
-    <article className="strength-session-detail" aria-label="Session detail">
-      <header className="panel strength-card strength-session-detail-head">
-        <p className="eyebrow">
-          {formatSessionDate(session.startTime)}
-          {source ? ` · ${source}` : ""}
-        </p>
-        <h3>{session.name?.trim() || "Strength session"}</h3>
+    <header className="panel strength-card strength-session-detail-head">
+      <p className="eyebrow">
+        {formatSessionDate(session.startTime)}
+        {source ? ` · ${source}` : ""}
+      </p>
+      <h3>{session.name?.trim() || "Strength session"}</h3>
 
-        <div className="strength-session-stats">
-          <Stat label="Duration" value={formatSpan(stats.durationSec)} />
+      <div className="strength-session-stats">
+        <Stat label="Duration" value={formatSpan(stats.durationSec)} />
+        <Stat
+          label="Working sets"
+          value={String(stats.workingSets)}
+          caption={
+            stats.warmupSets > 0
+              ? `+ ${stats.warmupSets} warm-up`
+              : `${stats.reps.toLocaleString()} reps`
+          }
+        />
+        <Stat
+          label="Weight lifted"
+          value={stats.volumeKg > 0 ? formatTotalWeight(stats.volumeKg, unitSystem) : "Bodyweight"}
+        />
+        {stats.densityKgPerMin !== undefined ? (
           <Stat
-            label="Working sets"
-            value={String(stats.workingSets)}
-            caption={
-              stats.warmupSets > 0
-                ? `+ ${stats.warmupSets} warm-up`
-                : `${stats.reps.toLocaleString()} reps`
-            }
+            label="Density"
+            value={`${formatLiftWeight(Math.round(stats.densityKgPerMin), unitSystem)}/min`}
           />
-          <Stat
-            label="Weight lifted"
-            value={stats.volumeKg > 0 ? formatTotalWeight(stats.volumeKg, unitSystem) : "Bodyweight"}
-          />
-          {stats.densityKgPerMin !== undefined ? (
-            <Stat
-              label="Density"
-              value={`${formatLiftWeight(Math.round(stats.densityKgPerMin), unitSystem)}/min`}
-            />
-          ) : null}
-          {stats.restPerWork !== undefined ? (
-            <Stat
-              label="Work : rest"
-              value={`1 : ${stats.restPerWork.toFixed(1)}`}
-              caption="Rest per second of work"
-            />
-          ) : null}
-          {stats.avgHr !== undefined ? (
-            <Stat
-              label="Heart rate"
-              value={`${Math.round(stats.avgHr)} bpm`}
-              caption={stats.maxHr !== undefined ? `Max ${Math.round(stats.maxHr)}` : "Average"}
-            />
-          ) : null}
-          {stats.trainingLoad !== undefined ? (
-            <Stat label="Training load" value={String(Math.round(stats.trainingLoad))} />
-          ) : null}
-          {stats.calories !== undefined ? (
-            <Stat label="Calories" value={`${Math.round(stats.calories).toLocaleString()} kcal`} />
-          ) : null}
-        </div>
-
-        {recordGroups.length > 0 ? (
-          <ul className="strength-session-records" aria-label="Records set in this session">
-            {recordGroups.map((group) => (
-              <li key={group.exercise}>
-                <Trophy size={14} aria-hidden="true" />
-                <strong>{group.exercise}</strong>
-                <RecordFigures group={group} unitSystem={unitSystem} />
-              </li>
-            ))}
-          </ul>
         ) : null}
-      </header>
-
-      {figure}
-
-      <section className="panel strength-card strength-session-exercise-card">
-        <div className="strength-card-head">
-          <div>
-            <h3>Exercises</h3>
-            <p>
-              {rows.length} exercise{rows.length === 1 ? "" : "s"}, in the order you did them.
-            </p>
-          </div>
-        </div>
-        {rows.length === 0 ? (
-          <p className="strength-empty">This session has no sets recorded.</p>
-        ) : (
-          <ExerciseTable
-            key={session.activityId}
-            rows={rows}
-            explorable={explorable}
-            onOpenExercise={onOpenExercise}
-            unitSystem={unitSystem}
+        {stats.restPerWork !== undefined ? (
+          <Stat
+            label="Work : rest"
+            value={`1 : ${stats.restPerWork.toFixed(1)}`}
+            caption="Rest per second of work"
           />
-        )}
-      </section>
-    </article>
+        ) : null}
+        {stats.avgHr !== undefined ? (
+          <Stat
+            label="Heart rate"
+            value={`${Math.round(stats.avgHr)} bpm`}
+            caption={stats.maxHr !== undefined ? `Max ${Math.round(stats.maxHr)}` : "Average"}
+          />
+        ) : null}
+        {stats.trainingLoad !== undefined ? (
+          <Stat label="Training load" value={String(Math.round(stats.trainingLoad))} />
+        ) : null}
+        {stats.calories !== undefined ? (
+          <Stat label="Calories" value={`${Math.round(stats.calories).toLocaleString()} kcal`} />
+        ) : null}
+      </div>
+
+      {recordGroups.length > 0 ? (
+        <ul className="strength-session-records" aria-label="Records set in this session">
+          {recordGroups.map((group) => (
+            <li key={group.exercise}>
+              <Trophy size={14} aria-hidden="true" />
+              <strong>{group.exercise}</strong>
+              <RecordFigures group={group} unitSystem={unitSystem} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </header>
   );
 }
 
-interface StrengthAggregateDetailProps {
-  sessions: StrengthSession[];
-  index: StrengthSessionIndex;
+/**
+ * How much of a partly attributed session the map could place. A session with
+ * no attribution at all says so inside the muscle panel instead, and one fully
+ * attributed needs no note.
+ */
+export function StrengthSessionCoverage({ entry }: { entry: SessionAnalytics }) {
+  const { attributed, generic, unmapped, working } = entry.coverage;
+  if (attributed <= 0 || attributed >= working) {
+    return null;
+  }
+  const left = [
+    generic > 0 ? `${generic} COROS recorded only as Full Body` : "",
+    unmapped > 0 ? `${unmapped} from exercises we don't recognise` : ""
+  ].filter(Boolean);
+  return (
+    <p className="strength-notice is-attribution" role="note">
+      <Info size={15} aria-hidden="true" />
+      <span>
+        The map places {attributed} of {working} working sets on specific muscles. The other{" "}
+        {working - attributed} {working - attributed === 1 ? "is" : "are"} left out: {left.join(", ")}.
+      </span>
+    </p>
+  );
+}
+
+interface StrengthSessionExercisesProps {
+  entry: SessionAnalytics;
+  /** Exercise names the Exercise Explorer has a history for. */
+  explorable: ReadonlySet<string>;
+  onOpenExercise: (name: string) => void;
+}
+
+/** Every exercise in the session, with its sets. */
+export function StrengthSessionExercises({
+  entry,
+  explorable,
+  onOpenExercise
+}: StrengthSessionExercisesProps) {
+  const { unitSystem } = useUnitSystem();
+  const rows = useMemo(() => buildExerciseRows(entry), [entry]);
+
+  return (
+    <section className="panel strength-card strength-session-exercise-card">
+      <div className="strength-card-head">
+        <div>
+          <h3>Exercises</h3>
+          <p>
+            {rows.length} exercise{rows.length === 1 ? "" : "s"}, in the order you did them.
+          </p>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="strength-empty">This session has no sets recorded.</p>
+      ) : (
+        <ExerciseTable
+          key={entry.session.activityId}
+          rows={rows}
+          explorable={explorable}
+          onOpenExercise={onOpenExercise}
+          unitSystem={unitSystem}
+        />
+      )}
+    </section>
+  );
+}
+
+interface StrengthAggregateHeaderProps {
+  sessionCount: number;
   windowLabel: string;
   windowPhrase: string;
-  figure?: ReactNode;
+}
+
+export function StrengthAggregateHeader({
+  sessionCount,
+  windowLabel,
+  windowPhrase
+}: StrengthAggregateHeaderProps) {
+  return (
+    <header className="panel strength-card strength-session-detail-head">
+      <p className="eyebrow">{windowLabel}</p>
+      <h3>All sessions</h3>
+      <p className="strength-session-detail-sub">
+        {sessionCount} session{sessionCount === 1 ? "" : "s"} in {windowPhrase}, muscle by muscle.
+        Pick one to see what it trained.
+      </p>
+    </header>
+  );
+}
+
+interface StrengthAggregateRecordsProps {
+  sessions: StrengthSession[];
+  index: StrengthSessionIndex;
+  windowPhrase: string;
   onSelectSession: (activityId: string) => void;
 }
 
-/** The window as a whole: the body map across every session, and every record set in it. */
-export function StrengthAggregateDetail({
+/** Every record set in the window, newest first; each opens the session that set it. */
+export function StrengthAggregateRecords({
   sessions,
   index,
-  windowLabel,
   windowPhrase,
-  figure,
   onSelectSession
-}: StrengthAggregateDetailProps) {
+}: StrengthAggregateRecordsProps) {
   const { unitSystem } = useUnitSystem();
   const recordRows = useMemo(
     () =>
@@ -349,44 +403,33 @@ export function StrengthAggregateDetail({
   );
 
   return (
-    <article className="strength-session-detail" aria-label="All sessions">
-      <header className="panel strength-card strength-session-detail-head">
-        <p className="eyebrow">{windowLabel}</p>
-        <h3>All sessions</h3>
-        <p className="strength-session-detail-sub">
-          {sessions.length} session{sessions.length === 1 ? "" : "s"} in {windowPhrase}. Pick one
-          to see what it trained.
-        </p>
-      </header>
-
-      {figure}
-
-      <section className="panel strength-card strength-session-records-card">
-        <div className="strength-card-head">
-          <div>
-            <h3>Records</h3>
-            <p>Lifts that beat every earlier session of the same exercise in {windowPhrase}.</p>
-          </div>
+    <section className="panel strength-card strength-session-records-card">
+      <div className="strength-card-head">
+        <div>
+          <h3>Records</h3>
+          <p>Lifts that beat every earlier session of the same exercise in {windowPhrase}.</p>
         </div>
-        {recordRows.length === 0 ? (
-          <p className="strength-empty">
-            None yet — a record needs an earlier session of the same lift to beat.
-          </p>
-        ) : (
-          <ul className="strength-session-records is-list">
-            {recordRows.map(({ session, group }) => (
-              <li key={`${session.activityId}-${group.exercise}`}>
-                <button type="button" onClick={() => onSelectSession(session.activityId)}>
-                  <Trophy size={14} aria-hidden="true" />
-                  <strong>{group.exercise}</strong>
-                  <RecordFigures group={group} unitSystem={unitSystem} />
-                  <span className="strength-session-record-date">{formatSessionDate(session.startTime)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </article>
+      </div>
+      {recordRows.length === 0 ? (
+        <p className="strength-empty">
+          None yet — a record needs an earlier session of the same lift to beat.
+        </p>
+      ) : (
+        <ul className="strength-session-records is-list">
+          {recordRows.map(({ session, group }) => (
+            <li key={`${session.activityId}-${group.exercise}`}>
+              <button type="button" onClick={() => onSelectSession(session.activityId)}>
+                <Trophy size={14} aria-hidden="true" />
+                <strong>{group.exercise}</strong>
+                <RecordFigures group={group} unitSystem={unitSystem} />
+                <span className="strength-session-record-date">
+                  {formatSessionDate(session.startTime)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
