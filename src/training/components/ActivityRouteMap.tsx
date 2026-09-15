@@ -572,9 +572,19 @@ function RouteMapModal({
   );
 }
 
-/** Whether a track has enough located points to draw a route at all. */
+/**
+ * Whether a track has enough located points to draw a route at all — the same
+ * test `buildRouteGeometry` applies, without building the geometry the cover
+ * is about to build anyway.
+ */
 export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
-  return Boolean(track?.points && buildRouteGeometry(track.points));
+  let located = 0;
+  for (const point of track?.points ?? []) {
+    if (point.lat !== undefined && point.lon !== undefined && ++located >= 2) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
@@ -619,8 +629,6 @@ interface ActivityRouteCoverProps {
   /** See `RouteMapCanvas`: the band at the top the page leaves clear. */
   visibleBand?: number;
 }
-
-
 
 /**
  * The route as a picture behind a page's heading: nothing to drag or zoom, and

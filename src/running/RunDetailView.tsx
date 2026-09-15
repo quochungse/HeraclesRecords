@@ -4,6 +4,7 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
+import type { TrainingHubLoadStatus } from "../training/types";
 import {
   ActivityRouteCover,
   hasActivityRoute
@@ -35,7 +36,8 @@ interface RunDetailViewProps {
   activity: TrainingHubActivity;
   /** Null until the fetch for *this* run lands. */
   detail: TrainingHubActivityDetail | null;
-  loading: boolean;
+  /** This run's own detail request — never inferred from the app's `busy`. */
+  detailStatus: TrainingHubLoadStatus;
   onBack: () => void;
   /** Fetches this run's detail again after a failed load. */
   onRetry: () => void;
@@ -71,7 +73,7 @@ interface Stat {
 export function RunDetailView({
   activity,
   detail,
-  loading,
+  detailStatus,
   onBack,
   onRetry
 }: RunDetailViewProps) {
@@ -99,12 +101,16 @@ export function RunDetailView({
   const decoupling = useMemo(() => paceHrDecoupling(series), [series]);
 
   const hasRoute = useMemo(() => hasActivityRoute(detail?.track), [detail]);
+  const loading = detailStatus === "pending" && detail === null;
+  const failed = detailStatus === "failed" && detail === null;
   const awaitingRoute =
-    loading && detail === null && surface !== null && isOutdoorRunSurface(surface);
+    loading && surface !== null && isOutdoorRunSurface(surface);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      // Something above this page — a menu, a dialog — may already have
+      // answered this Escape; one press closes one thing.
+      if (event.key === "Escape" && !event.defaultPrevented) {
         onBack();
       }
     };
@@ -180,7 +186,7 @@ export function RunDetailView({
 
   const decouplingStat = useMemo<Stat | null>(
     () =>
-      decoupling === null || decoupling === undefined
+      decoupling === undefined
         ? null
         : {
             label: "Decoupling",
@@ -245,7 +251,6 @@ export function RunDetailView({
     return stats;
   }, [detail]);
 
-
   return (
     <section className="running-view run-detail">
       {/* The route sits under the heading as a cover rather than in a panel of
@@ -297,12 +302,9 @@ export function RunDetailView({
 
       {/* A detail already on screen stays while it is fetched again; only a
           run with nothing to show yet gets the placeholder. */}
-      {loading && detail === null ? <RunDetailSkeleton /> : null}
+      {loading ? <RunDetailSkeleton /> : null}
 
-      {/* The detail call always resolves to an object, so a settled request
-          with nothing for this run is a failed one — not COROS having nothing
-          to say, which is what this used to claim. */}
-      {!loading && detail === null ? (
+      {failed ? (
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>

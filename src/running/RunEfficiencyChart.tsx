@@ -34,6 +34,7 @@ interface RunEfficiencyChartProps {
   weeks: number;
   surfaces: readonly RunSurface[];
   zones: readonly TrainingHubThresholdZone[];
+  nowMs: number;
 }
 
 /**
@@ -59,7 +60,8 @@ export function RunEfficiencyChart({
   runs,
   weeks,
   surfaces,
-  zones
+  zones,
+  nowMs
 }: RunEfficiencyChartProps) {
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
@@ -75,12 +77,12 @@ export function RunEfficiencyChart({
    * relaxes and the header says which of the two is being drawn.
    */
   const { rows, easyOnly } = useMemo(() => {
-    const easy = buildRunEfficiencyWeeks(runs, { weeks, zones });
+    const easy = buildRunEfficiencyWeeks(runs, { weeks, nowMs, zones });
     if (zones.length === 0 || easy.some((row) => row.count > 0)) {
       return { rows: easy, easyOnly: zones.length > 0 };
     }
-    return { rows: buildRunEfficiencyWeeks(runs, { weeks }), easyOnly: false };
-  }, [runs, weeks, zones]);
+    return { rows: buildRunEfficiencyWeeks(runs, { weeks, nowMs }), easyOnly: false };
+  }, [nowMs, runs, weeks, zones]);
 
   const hasAny = rows.some((row) => row.count > 0);
 
@@ -123,7 +125,7 @@ export function RunEfficiencyChart({
             pace: secondsPerKmToDisplayPace(pace, unitSystem),
             hr: activity.avgHr,
             surface,
-            name: activity.name ?? RUN_SURFACE_LABELS[surface]
+            name: activity.name?.trim() || RUN_SURFACE_LABELS[surface]
           }
         ];
       }),

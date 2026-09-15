@@ -435,22 +435,19 @@
 .run-detail-hero.has-cover .run-detail-back,
 .run-detail-hero.has-cover .running-stat {
   pointer-events: auto;
-}
-
-/* The back button keeps its place at the very top; the title is what moves,
-   down to 45% of the cover. A percentage margin is taken from the width, and
-   the cover's height is a third of the width: 15% of the width is 45% of the
-   cover, less the back button's row above the title. */
-.run-detail-hero.has-cover .run-detail-title {
-  margin-top: max(20px, calc(15% - 44px));
-  text-shadow: 0 1px 14px color-mix(in srgb, var(--bg-base) 85%, transparent);
-}
-
-.run-detail-hero.has-cover .run-detail-back,
-.run-detail-hero.has-cover .running-stat {
   background: color-mix(in srgb, var(--bg-base) 76%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+}
+
+/* The back button keeps its place at the very top; the title is what moves,
+   down to 15% of the width — 45% of a three-to-one cover — less the back
+   button's row above it. A percentage margin is taken from the width, which is
+   what keeps the clear band at the top the same however tall the cover grows.
+   `COVER_VISIBLE_BAND` in RunDetailView fits the route into that band. */
+.run-detail-hero.has-cover .run-detail-title {
+  margin-top: max(20px, calc(15% - 44px));
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--bg-base) 85%, transparent);
 }
 
 .run-detail-cover {
@@ -467,12 +464,16 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   cursor: zoom-in;
+  /* Scrim strengths, dark first; see `::after` below. */
+  --run-cover-scrim-top: 12%;
+  --run-cover-scrim-mid: 18%;
+  --run-cover-scrim-end: 32%;
   /* Faded out by transparency, not painted over with the page colour: the page
      behind is a glow, not a flat --bg-base, and a fade to a flat colour left a
-     visible edge running through the first row of stats. */
-  /* The fade is kept to the part below the heading, so the stats sit over solid
-     map all the way down. That part is the tail when the stats set the height,
-     and the last 10% of the width when three-to-one does (see margin-bottom). */
+     visible edge running through the first row of stats. The fade is kept to
+     the part below the heading, so the stats sit over solid map all the way
+     down: the tail when the stats set the height, and the last 10% of the
+     width when three-to-one does (see margin-bottom). */
   --run-cover-fade: max(var(--run-cover-tail), 10cqw);
   -webkit-mask-image: linear-gradient(
     180deg,
@@ -517,12 +518,6 @@
    paper-strength scrim left the cover reading as an empty black band with a
    route in it. The text keeps its contrast from its own shadow and the glass
    behind the stats, not from darkening the map. */
-.run-detail-cover {
-  --run-cover-scrim-top: 12%;
-  --run-cover-scrim-mid: 18%;
-  --run-cover-scrim-end: 32%;
-}
-
 :root[data-theme="paper"] .run-detail-cover {
   --run-cover-scrim-top: 28%;
   --run-cover-scrim-mid: 50%;

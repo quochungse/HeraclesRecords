@@ -193,6 +193,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           restoring={false}
           activitiesStatus={(options.activitiesStatus as never) ?? "ready"}
           detail={(options.detail as never) ?? null}
+          detailRequest={(options.detailRequest as never) ?? null}
           snapshot={(options.snapshot as never) ?? null}
           busy={(options.busy as string | null | undefined) ?? null}
           onSelectActivity={spy("onSelectActivity")}

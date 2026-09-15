@@ -25,8 +25,6 @@ export type RunChannelKey =
 export interface RunChannelDefinition {
   key: RunChannelKey;
   label: string;
-  /** Axis label — short enough to sit in a 40px gutter. */
-  short: string;
   /** Metric unit as parsed; pace and altitude are converted at render time. */
   unit: string;
   decimals: number;
@@ -43,30 +41,28 @@ export interface RunChannelDefinition {
   background?: boolean;
 }
 
-export const RUN_CHANNELS: readonly RunChannelDefinition[] = [
-  { key: "pace", label: "Pace", short: "Pace", unit: "/km", decimals: 0, reversed: true },
+const RUN_CHANNELS: readonly RunChannelDefinition[] = [
+  { key: "pace", label: "Pace", unit: "/km", decimals: 0, reversed: true },
   {
     key: "adjustedPace",
     label: "Grade-adjusted pace",
-    short: "GAP",
     unit: "/km",
     decimals: 0,
     reversed: true
   },
-  { key: "hr", label: "Heart rate", short: "bpm", unit: "bpm", decimals: 0 },
-  { key: "cadence", label: "Cadence", short: "spm", unit: "spm", decimals: 0 },
-  { key: "power", label: "Power", short: "W", unit: "W", decimals: 0 },
-  { key: "strideLength", label: "Stride length", short: "m", unit: "m", decimals: 2 },
-  { key: "groundTime", label: "Ground contact", short: "ms", unit: "ms", decimals: 0 },
+  { key: "hr", label: "Heart rate", unit: "bpm", decimals: 0 },
+  { key: "cadence", label: "Cadence", unit: "spm", decimals: 0 },
+  { key: "power", label: "Power", unit: "W", decimals: 0 },
+  { key: "strideLength", label: "Stride length", unit: "m", decimals: 2 },
+  { key: "groundTime", label: "Ground contact", unit: "ms", decimals: 0 },
   {
     key: "verticalOscillation",
     label: "Vertical oscillation",
-    short: "cm",
     unit: "cm",
     decimals: 1
   },
-  { key: "verticalRatio", label: "Vertical ratio", short: "%", unit: "%", decimals: 1 },
-  { key: "altitude", label: "Elevation", short: "m", unit: "m", decimals: 0, background: true }
+  { key: "verticalRatio", label: "Vertical ratio", unit: "%", decimals: 1 },
+  { key: "altitude", label: "Elevation", unit: "m", decimals: 0, background: true }
 ];
 
 export function runChannel(key: RunChannelKey): RunChannelDefinition {
@@ -78,7 +74,7 @@ export function runChannel(key: RunChannelKey): RunChannelDefinition {
  * around it, and three differently-scaled lines on shared gridlines cannot be
  * read against each other anyway — which is the only reason to overlay them.
  */
-export const MAX_SELECTED_CHANNELS = 2;
+const MAX_SELECTED_CHANNELS = 2;
 
 /** A channel with fewer readings than this cannot be drawn as a line. */
 const MIN_CHANNEL_SAMPLES = 2;
@@ -111,7 +107,7 @@ function channelRange(
 }
 
 /** How many samples a channel actually has in this run. */
-export function countChannelSamples(
+function countChannelSamples(
   series: readonly TrainingHubActivitySeriesPoint[],
   key: RunChannelKey
 ): number {

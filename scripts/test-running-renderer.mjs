@@ -270,6 +270,7 @@ async function main() {
     await mountRunning({
       activities: RUNS,
       activitiesStatus: "ready",
+      detailRequest: { activityId: target.activityId, status: "pending" },
       busy: `training-detail:${target.activityId}`
     });
     await harness("scrollTo", ".running-view", 1200);
@@ -289,9 +290,28 @@ async function main() {
     );
     assert.equal(await hasText("did not load"), false);
 
-    // The request settled and nothing arrived for this run: the detail call
-    // always resolves to an object, so this is a failure.
+    // `busy` is one string for the whole app: something else clearing or
+    // replacing it says nothing about this run's request, which is still out.
     await harness("setProps", { busy: null });
+    await settle();
+    assert.equal(
+      await harness("exists", ".run-detail-skeleton"),
+      true,
+      "a cleared busy flag is not a finished request"
+    );
+    assert.equal(await hasText("did not load"), false);
+
+    // A reply for a run opened earlier is not this run's, whatever it says.
+    await harness("setProps", {
+      detailRequest: { activityId: RUNS[5].activityId, status: "failed" }
+    });
+    await settle();
+    assert.equal(await hasText("did not load"), false, "another run's failure is not this one's");
+
+    // This run's request failed.
+    await harness("setProps", {
+      detailRequest: { activityId: target.activityId, status: "failed" }
+    });
     await settle();
     assert.equal(await harness("exists", ".run-detail-skeleton"), false);
     assert.equal(await hasText("detail did not load"), true);

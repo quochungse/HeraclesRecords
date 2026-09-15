@@ -27,6 +27,7 @@ interface RunVolumeChartProps {
   weeks: number;
   /** Surfaces present in the period, so the stack only holds real ones. */
   surfaces: readonly RunSurface[];
+  nowMs: number;
 }
 
 /** Weeks the trailing average is taken over. */
@@ -78,12 +79,12 @@ export function RunVolumeChart({
   runs,
   runsAllTime,
   weeks,
-  surfaces
+  surfaces,
+  nowMs
 }: RunVolumeChartProps) {
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const palette = useMemo(() => runSurfaceColors(), []);
-  const nowMs = useMemo(() => Date.now(), [runsAllTime]);
 
   const weekBuckets = useMemo(
     () => buildRunWeeks(runs, { weeks, nowMs }),
@@ -113,9 +114,12 @@ export function RunVolumeChart({
     [surfaces, unitSystem, weekBuckets]
   );
 
+  // What the bars add up to, not every run in the period: under "All" the
+  // chart stops at two years, and a heading counting six years of runs "over
+  // 104 weeks" was a figure no bar on the chart could account for.
   const total = useMemo(
-    () => runs.reduce((sum, run) => sum + (run.distance ?? 0), 0),
-    [runs]
+    () => weekBuckets.reduce((sum, week) => sum + week.distance, 0),
+    [weekBuckets]
   );
 
   const lastYear = useMemo(

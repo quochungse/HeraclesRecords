@@ -58,6 +58,18 @@ export interface TrainingSummaryMetrics {
  */
 export type TrainingHubLoadStatus = "pending" | "ready" | "failed";
 
+/**
+ * Where the most recent activity-detail request stands, and for which activity.
+ *
+ * `busy` cannot answer this: it is one string for the whole app, so a refresh
+ * started while a detail loads overwrites it, and a screen that reads "not
+ * busy" as "finished" then reports a load that is still running as failed.
+ */
+export interface TrainingHubDetailRequest {
+  activityId: string;
+  status: TrainingHubLoadStatus;
+}
+
 export interface TrainingHubSnapshot {
   summary: TrainingSummaryMetrics;
   trendPoints: TrainingTrendPoint[];

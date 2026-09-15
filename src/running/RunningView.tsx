@@ -5,6 +5,7 @@ import type {
   TrainingHubActivityDetail
 } from "../../electron/types";
 import type {
+  TrainingHubDetailRequest,
   TrainingHubLoadStatus,
   TrainingHubSnapshot
 } from "../training/types";
@@ -27,7 +28,6 @@ import { summariseRuns, surfacesPresent } from "./runMetrics";
 import { RunnerIcon } from "./runnerIcon";
 import {
   RUN_SURFACE_LABELS,
-  isRunSportType,
   runsOnSurface,
   type RunSurface
 } from "./runSurface";
@@ -41,6 +41,8 @@ export interface RunningViewProps {
   /** Whether `activities` has arrived — an empty list alone cannot say. */
   activitiesStatus: TrainingHubLoadStatus;
   detail: TrainingHubActivityDetail | null;
+  /** Where the latest detail request stands, and which run it was for. */
+  detailRequest: TrainingHubDetailRequest | null;
   /** Account-level figures the blocks read: VO2max, thresholds, zones. */
   snapshot: TrainingHubSnapshot | null;
   busy: string | null;
@@ -128,6 +130,7 @@ export function RunningView({
   restoring = false,
   activitiesStatus,
   detail,
+  detailRequest,
   snapshot,
   busy,
   onSelectActivity,
@@ -150,9 +153,14 @@ export function RunningView({
   // filter while nobody is touching it.
   const nowMs = useMemo(() => Date.now(), [activities]);
 
+  // The load ratio asks about the whole leg, not one surface — a trail-only
+  // ramp still lands on the same body — so it is the one figure the surface
+  // filter does not narrow, and the hero labels it when a filter is on.
+  const allRuns = useMemo(() => runsOnSurface(activities, null), [activities]);
+
   const runsInPeriod = useMemo(
-    () => withinPeriod(activities.filter((a) => isRunSportType(a.sportType)), periodDays, nowMs),
-    [activities, nowMs, periodDays]
+    () => withinPeriod(allRuns, periodDays, nowMs),
+    [allRuns, nowMs, periodDays]
   );
 
   const availableSurfaces = useMemo(
@@ -169,22 +177,18 @@ export function RunningView({
 
   // Asked of the whole history, not the period: "nothing in the last four
   // weeks" and "never run at all" are different screens.
-  const hasAnyRun = useMemo(
-    () => activities.some((activity) => isRunSportType(activity.sportType)),
-    [activities]
-  );
+  const hasAnyRun = allRuns.length > 0;
 
-  // Every run of the chosen surface, whatever the period: the year-ago
-  // comparison is explicitly about a window the period filter excludes.
+  // Every run of the chosen surface, whatever the period. The year-ago
+  // comparison is about a window the period filter excludes, and the hero's
+  // "this week" and load ratio look back a fixed four weeks — fed only the
+  // period, a "4 weeks" filter cut the oldest of those short and inflated the
+  // week-on-baseline change.
   const runsAllTime = useMemo(
     () => runsOnSurface(activities, surface),
     [activities, surface]
   );
 
-  // The load ratio asks about the whole leg, not one surface — a trail-only
-  // ramp still lands on the same body — so it is the one figure the surface
-  // filter does not narrow, and the hero labels it when a filter is on.
-  const allRunsInPeriod = useMemo(() => runsOnSurface(runsInPeriod, null), [runsInPeriod]);
 
   const chartWeeks = useMemo(() => weeksForPeriod(periodDays), [periodDays]);
   const zones = useMemo(() => runningThresholdZones(snapshot), [snapshot]);
@@ -314,11 +318,18 @@ export function RunningView({
   }
 
   if (selectedRun) {
+    const ownDetail = detail?.activityId === selectedRun.activityId ? detail : null;
+    // A request for another run, or none yet, means this one is about to be
+    // asked for: `openRun` requests in the same tick it selects.
+    const detailStatus =
+      detailRequest?.activityId === selectedRun.activityId
+        ? detailRequest.status
+        : "pending";
     return (
       <RunDetailView
         activity={selectedRun}
-        detail={detail?.activityId === selectedRun.activityId ? detail : null}
-        loading={busy === `training-detail:${selectedRun.activityId}`}
+        detail={ownDetail}
+        detailStatus={detailStatus}
         onBack={closeRun}
         onRetry={() => onSelectActivity(selectedRun)}
       />
@@ -442,10 +453,11 @@ export function RunningView({
 
       <div className="running-body">
         <RunningHero
-          runs={runs}
-          allRuns={allRunsInPeriod}
+          runs={runsAllTime}
+          allRuns={allRuns}
           snapshot={snapshot}
           filtered={surface !== null}
+          nowMs={nowMs}
         />
 
         <div className="running-totals">
@@ -478,12 +490,14 @@ export function RunningView({
               runsAllTime={runsAllTime}
               weeks={chartWeeks}
               surfaces={stackedSurfaces}
+              nowMs={nowMs}
             />
             <RunEfficiencyChart
               runs={runs}
               weeks={chartWeeks}
               surfaces={stackedSurfaces}
               zones={zones}
+              nowMs={nowMs}
             />
             <div className="running-columns">
               <RunIntensityPanel runs={runs} zones={zones} />

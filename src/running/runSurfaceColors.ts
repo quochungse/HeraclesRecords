@@ -1,5 +1,5 @@
 import { readStoredSportColors } from "../training/sportColors";
-import { RUN_SURFACES, type RunSurface } from "./runSurface";
+import type { RunSurface } from "./runSurface";
 
 /**
  * Surface colours as concrete hex, for the charts.
@@ -32,7 +32,7 @@ function toHex(channels: [number, number, number]): string {
 }
 
 /** `ratio` is how much of `from` survives; the rest comes from `to`. */
-export function mixHex(from: string, to: string, ratio: number): string {
+function mixHex(from: string, to: string, ratio: number): string {
   const left = parseHex(from);
   const right = parseHex(to);
   if (!left || !right) {
@@ -53,14 +53,4 @@ export function runSurfaceColors(): Record<RunSurface, string> {
     track: mixHex(sport.run, "#d89b22", 0.55),
     treadmill: mixHex(sport.run, "#8a8a90", 0.35)
   };
-}
-
-/** The colours of the surfaces present, in render order. */
-export function orderedSurfaceColors(
-  surfaces: readonly RunSurface[]
-): { surface: RunSurface; color: string }[] {
-  const colors = runSurfaceColors();
-  return RUN_SURFACES.filter((surface) => surfaces.includes(surface)).map(
-    (surface) => ({ surface, color: colors[surface] })
-  );
 }

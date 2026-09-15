@@ -87,6 +87,7 @@ import {
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type {
+  TrainingHubDetailRequest,
   TrainingHubLoadStatus,
   TrainingHubSnapshot,
 } from "./training/types";
@@ -469,6 +470,11 @@ export default function App() {
     useState<TrainingHubUpcomingWorkout[]>([]);
   const [trainingHubActivityDetail, setTrainingHubActivityDetail] =
     useState<TrainingHubActivityDetail | null>(null);
+  const [trainingHubDetailRequest, setTrainingHubDetailRequest] =
+    useState<TrainingHubDetailRequest | null>(null);
+  // The activity whose detail was asked for last. A reply for any other one is
+  // stale — the athlete has moved on — and is dropped rather than shown.
+  const latestDetailRequestRef = useRef<string | null>(null);
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
   const [trainingHubSleepData, setTrainingHubSleepData] =
@@ -772,6 +778,8 @@ export default function App() {
     setTrainingHubSportTypes([]);
     setTrainingHubUpcomingWorkouts([]);
     setTrainingHubActivityDetail(null);
+    setTrainingHubDetailRequest(null);
+    latestDetailRequestRef.current = null;
     setSelectedTrainingHubActivity(null);
     setTrainingHubSleepData(null);
     setTrainingHubDailyHealthData(null);
@@ -1086,23 +1094,40 @@ export default function App() {
         return;
       }
 
-      setBusy(`training-detail:${activity.activityId}`);
+      const { activityId } = activity;
+      const busyKey = `training-detail:${activityId}`;
+      latestDetailRequestRef.current = activityId;
+      setBusy(busyKey);
       setError(null);
       setMessage(null);
       setSelectedTrainingHubActivity(activity);
+      setTrainingHubDetailRequest({ activityId, status: "pending" });
 
+      // Two requests can be in flight at once — open one run, go back, open
+      // another — and they need not land in order. The older reply used to
+      // overwrite the newer detail, and its `setBusy(null)` cleared the busy
+      // flag the newer request still held, which Running read as "finished
+      // with nothing" and answered with a failure panel mid-load.
+      const isLatest = () => latestDetailRequestRef.current === activityId;
       try {
-        setTrainingHubActivityDetail(
-          await api.getTrainingHubActivityDetail(
-            activity.activityId,
-            activity.sportType,
-            activity,
-          ),
+        const detail = await api.getTrainingHubActivityDetail(
+          activityId,
+          activity.sportType,
+          activity,
         );
+        if (isLatest()) {
+          setTrainingHubActivityDetail(detail);
+          setTrainingHubDetailRequest({ activityId, status: "ready" });
+        }
       } catch (caught) {
-        setError(toErrorMessage(caught));
+        if (isLatest()) {
+          setError(toErrorMessage(caught));
+          setTrainingHubDetailRequest({ activityId, status: "failed" });
+        }
       } finally {
-        setBusy(null);
+        // Only this request's own flag: anything else started meanwhile — a
+        // newer detail, a refresh — owns `busy` now.
+        setBusy((current) => (current === busyKey ? null : current));
       }
     },
     [api],
@@ -2863,6 +2888,7 @@ export default function App() {
                   restoring={Boolean(trainingHubStatus?.restoring)}
                   activitiesStatus={trainingHubActivitiesStatus}
                   detail={trainingHubActivityDetail}
+                  detailRequest={trainingHubDetailRequest}
                   snapshot={trainingHubSnapshot}
                   busy={busy}
                   onRetryActivities={() => void handleRunningActivitiesRetry()}

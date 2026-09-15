@@ -16,13 +16,19 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { buildRunWeeks, runLoadBalance } from "./runMetrics";
 
 interface RunningHeroProps {
-  /** Runs matching the surface filter — what "this week" is counted from. */
+  /**
+   * Runs matching the surface filter, over the whole history — "this week" and
+   * its four-week baseline look back a fixed span the period filter must not
+   * cut short.
+   */
   runs: readonly TrainingHubActivity[];
   /** Every run, whatever the filter: the load ratio is about the whole leg. */
   allRuns: readonly TrainingHubActivity[];
   snapshot: TrainingHubSnapshot | null;
   /** Whether a surface filter is narrowing the figures above the ratio. */
   filtered: boolean;
+  /** The page's clock, so every block agrees on which week is "this" one. */
+  nowMs: number;
 }
 
 /** Weeks the baseline averages over, plus the current one being compared. */
@@ -67,11 +73,11 @@ export function runningThresholdZones(
   return snapshot?.dashboard?.lthrZones ?? [];
 }
 
-export function RunningHero({ runs, allRuns, snapshot, filtered }: RunningHeroProps) {
+export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: RunningHeroProps) {
   const { unitSystem } = useUnitSystem();
 
   const thisWeek = useMemo(() => {
-    const weeks = buildRunWeeks(runs, { weeks: BASELINE_WEEKS + 1 });
+    const weeks = buildRunWeeks(runs, { weeks: BASELINE_WEEKS + 1, nowMs });
     const current = weeks[weeks.length - 1];
     const past = weeks.slice(0, -1);
     if (!current) {
@@ -92,9 +98,9 @@ export function RunningHero({ runs, allRuns, snapshot, filtered }: RunningHeroPr
         ? { deltaRatio: (current.distance - baseline) / baseline }
         : {})
     };
-  }, [runs]);
+  }, [nowMs, runs]);
 
-  const balance = useMemo(() => runLoadBalance(allRuns), [allRuns]);
+  const balance = useMemo(() => runLoadBalance(allRuns, nowMs), [allRuns, nowMs]);
 
   const vo2 = useMemo(() => {
     const readings = mergeTrainingDayLists(
