@@ -54,7 +54,7 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
     return null;
   }
 
-  const ordered = [...scored].sort((a, b) => a.index - b.index);
+  const ordered = scored.sort((a, b) => a.index - b.index);
 
   return (
     <section className="activity-zones">

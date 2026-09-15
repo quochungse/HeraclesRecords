@@ -7,6 +7,7 @@ import {
   RefreshCw,
   SearchX
 } from "lucide-react";
+import type { TrainingHubActivity } from "../../electron/types";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { ActivityDetailPane } from "./components/ActivityDetailPane";
 import { ActivitiesFilterBar } from "./components/ActivitiesFilterBar";
@@ -135,8 +136,12 @@ export function ActivitiesView({
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
+  /**
+   * Opening a session, as opposed to merely having one selected. The narrow
+   * layout needs the difference; the wide one is unaffected.
+   */
   const openActivity = useCallback(
-    (activity: Parameters<typeof onLoadDetail>[0]) => {
+    (activity: TrainingHubActivity) => {
       setDetailOpen(true);
       onLoadDetail(activity);
     },
@@ -287,11 +292,7 @@ export function ActivitiesView({
   }
 
   return (
-    <div
-      className={`stack stack-fill training-dashboard activities-view${
-        narrow ? " is-narrow" : ""
-      }`}
-    >
+    <div className="stack stack-fill training-dashboard activities-view">
       <header className="activities-head">
         <div>
           <p className="eyebrow">Activities</p>

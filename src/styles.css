@@ -15911,79 +15911,6 @@ tr.data-intervals-row-missing {
   font-size: 18px;
 }
 
-.training-activity-table-shell {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  overflow: auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.16);
-}
-
-.training-activity-table-shell table {
-  min-width: 0;
-  width: 100%;
-  table-layout: fixed;
-}
-
-.training-activity-table-shell th,
-.training-activity-table-shell td {
-  padding: 8px 6px;
-  font-size: 12px;
-}
-
-.training-activity-table-shell th {
-  font-size: 10px;
-  letter-spacing: 0.03em;
-}
-
-.training-activity-table-shell th:first-child,
-.training-activity-table-shell .training-activity-cell {
-  width: 42%;
-}
-
-.training-activity-table-shell th:nth-child(2),
-.training-activity-table-shell .training-activity-when {
-  width: 24%;
-}
-
-.training-activity-table-shell th:nth-child(3),
-.training-activity-table-shell th:nth-child(4),
-.training-activity-table-shell .training-activity-metric {
-  width: 12%;
-  white-space: nowrap;
-}
-
-.training-activity-table-shell th:last-child,
-.training-activity-table-shell .training-activity-export {
-  width: 52px;
-  padding-right: 4px;
-  text-align: center;
-}
-
-.training-activity-when {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.training-activity-metric {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.training-activity-export .row-actions {
-  justify-content: center;
-}
-
-.training-activity-export .training-action-button {
-  width: auto;
-  min-width: 30px;
-  height: 30px;
-  padding: 0 5px;
-  gap: 1px;
-}
 
 .training-export-menu {
   position: relative;
@@ -16043,62 +15970,6 @@ tr.data-intervals-row-missing {
   font-size: 11px;
 }
 
-.training-table-row {
-  animation: training-row-enter 0.42s ease both;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.training-table-row:hover:not(.is-selected) {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.training-table-row.is-loading {
-  opacity: 0.82;
-}
-
-.training-table-row:nth-child(2) {
-  animation-delay: 0.03s;
-}
-
-.training-table-row:nth-child(3) {
-  animation-delay: 0.06s;
-}
-
-.training-table-row:nth-child(4) {
-  animation-delay: 0.09s;
-}
-
-.training-table-row:nth-child(5) {
-  animation-delay: 0.12s;
-}
-
-.training-table-row:nth-child(6) {
-  animation-delay: 0.15s;
-}
-
-.training-activity-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.training-activity-name strong {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.training-activity-name .sport-chip {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  font-size: 9px;
-}
 
 .sport-chip {
   display: inline-flex;
@@ -16482,14 +16353,6 @@ tr.data-intervals-row-missing {
   height: 160px;
 }
 
-.training-table-row.is-selected {
-  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
-}
-
-.training-table-row.is-selected td {
-  border-top-color: color-mix(in srgb, var(--accent-muted) 18%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--accent-muted) 18%, transparent);
-}
 
 .training-laps-section {
   display: grid;
@@ -17153,7 +17016,6 @@ tr.data-intervals-row-missing {
   .training-heatmap-panel,
   .training-ring-panel,
   .training-stat-card,
-  .training-table-row,
   .training-chart-shell .recharts-wrapper,
   .training-chart-tooltip,
   .training-zone-donut .recharts-wrapper,
@@ -25620,13 +25482,6 @@ tr.data-intervals-row-missing {
  * Dark sticky headers and white-alpha row/scrollbar treatments invert to
  * light on paper so rows and the sticky header stay legible. */
 
-/* The activity table shell paints a black-alpha overlay (rgba(0,0,0,0.16))
- * that reads as a flat grey wash over the white panel — make it a clean white
- * surface with a warm-ink border. */
-:root[data-theme="paper"] .training-activity-table-shell {
-  background: var(--glass-bg-elevated);
-  border-color: var(--glass-border);
-}
 
 :root[data-theme="paper"] .training-activities-detail {
   border-left-color: var(--glass-border);
@@ -25649,19 +25504,6 @@ tr.data-intervals-row-missing {
   background: rgba(38, 34, 28, 0.05);
 }
 
-:root[data-theme="paper"] .training-table-row:hover:not(.is-selected) {
-  background: rgba(38, 34, 28, 0.05);
-}
-
-/* Selected row: a clean accent tint instead of the muddy grey-green. */
-:root[data-theme="paper"] .training-table-row.is-selected {
-  background: var(--accent-soft);
-}
-
-:root[data-theme="paper"] .training-table-row.is-selected td {
-  border-top-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--accent) 28%, transparent);
-}
 
 /* The dark theme lightens the sport colour to read on a dark row; on paper the
  * fill is pale, so the same colour has to be darkened instead. */

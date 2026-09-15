@@ -174,16 +174,23 @@ export interface ActivityTotals {
   sports: ActivitySportTotal[];
 }
 
-export const EMPTY_ACTIVITY_TOTALS: ActivityTotals = {
-  count: 0,
-  duration: 0,
-  distance: 0,
-  elevationGain: 0,
-  trainingLoad: 0,
-  activeDays: 0,
-  weeks: 0,
-  sports: []
-};
+/**
+ * A fresh zero total, rather than one shared constant handed back to every
+ * caller: `sports` is an array the caller owns, and a module-level one would be
+ * the same array in every empty result in the process.
+ */
+function emptyActivityTotals(): ActivityTotals {
+  return {
+    count: 0,
+    duration: 0,
+    distance: 0,
+    elevationGain: 0,
+    trainingLoad: 0,
+    activeDays: 0,
+    weeks: 0,
+    sports: []
+  };
+}
 
 /**
  * What a filtered stretch of training adds up to.
@@ -196,7 +203,7 @@ export function summariseActivities(
   activities: readonly TrainingHubActivity[]
 ): ActivityTotals {
   if (activities.length === 0) {
-    return EMPTY_ACTIVITY_TOTALS;
+    return emptyActivityTotals();
   }
 
   const bySport = new Map<SportColorCategory, ActivitySportTotal>();

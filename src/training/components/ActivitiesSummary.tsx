@@ -23,15 +23,21 @@ interface SummaryTile {
   caption: string;
 }
 
-/** "3.4 a week", "one every 5 days" — a rate the athlete can picture. */
-function perWeekPhrase(total: number, weeks: number, noun: string): string {
+/** "3.4 sessions a week", "One every 5 days" — a rate the athlete can picture. */
+function perWeekPhrase(
+  total: number,
+  weeks: number,
+  singular: string,
+  plural: string
+): string {
   if (weeks <= 0 || total <= 0) {
     return "Nothing logged yet";
   }
 
   const perWeek = total / weeks;
   if (perWeek >= 1) {
-    return `${perWeek.toFixed(1).replace(/\.0$/, "")} ${noun} a week`;
+    const rounded = perWeek.toFixed(1).replace(/\.0$/, "");
+    return `${rounded} ${rounded === "1" ? singular : plural} a week`;
   }
 
   return `One every ${Math.round(7 / perWeek)} days`;
@@ -58,7 +64,7 @@ export function ActivitiesSummary({
       key: "sessions",
       label: "Sessions",
       value: String(totals.count),
-      caption: perWeekPhrase(totals.count, totals.weeks, "sessions")
+      caption: perWeekPhrase(totals.count, totals.weeks, "session", "sessions")
     },
     {
       key: "time",
@@ -67,7 +73,7 @@ export function ActivitiesSummary({
       caption:
         totals.weeks > 0 && totals.duration > 0
           ? `${formatDurationSpan(totals.duration / totals.weeks)} a week`
-          : periodLabel
+          : "Nothing logged yet"
     },
     // A lifting-only history has no distance to show, and a column of "0 km"
     // is what the old table put in its place. Climb is the figure that still
@@ -80,13 +86,13 @@ export function ActivitiesSummary({
           caption:
             totals.elevationGain > 0
               ? `${formatElevationMeters(totals.elevationGain, unitSystem)} climbed`
-              : periodLabel
+              : `In ${periodLabel.toLowerCase()}`
         }
       : {
           key: "days",
           label: "Days trained",
           value: String(totals.activeDays),
-          caption: perWeekPhrase(totals.activeDays, totals.weeks, "days")
+          caption: perWeekPhrase(totals.activeDays, totals.weeks, "day", "days")
         },
     {
       key: "load",

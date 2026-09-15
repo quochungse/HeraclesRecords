@@ -210,6 +210,13 @@ The maths a summary is built from lives in `electron/activityMetrics.ts`, which 
 imports directly (like `unitSystem.ts`), so the drift in a list column and the drift on the
 page it opens cannot disagree. **It must stay free of `node:` imports** or the renderer build
 breaks; the suite asserts that too.
+**The parsed detail does not carry the payload it was parsed from.** `raw` used to ride along
+on `TrainingHubActivityDetail`, so ~2.2 MB of JSON — measured, uncompressed — crossed the
+context bridge every time a row was selected, for a development-only "Show raw JSON" modal that
+was its only reader. That modal has its own channel now,
+`trainingHub:getActivityDetailRaw`, which goes through `loadActivityDetailRaw` like every other
+read and so adds no COROS request; `test:activity-detail-cache` counts its callers and names
+each one. Do not put the payload back on the detail to save a round trip.
 
 ### Feature domains
 
@@ -284,6 +291,21 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
 - **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) — workouts,
   plans, templates, plan↔activity adherence matching. React never calls COROS directly;
   it requests one `TrainingLibrarySnapshot`. See [docs/training-library-architecture.md](docs/training-library-architecture.md).
+- **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
+  has, in one list, with a detail pane beside it. It is the only screen some sports ever
+  reach — Running covers sport codes 100–103 and Strength 400/402, so a ride, a hike, a swim
+  or a Hybrid Fitness session has no other home — and the only one that can compare sports
+  against each other, which is what the summary's mix bar is for. Depth per sport belongs on
+  Running and Strength; this screen links out to them rather than growing its own.
+  The arithmetic is out of the view on purpose, because it is the only part a test can reach:
+  `activityFilters.ts` (periods cut at a Monday, sport categories, search, week grouping,
+  totals), `activityFacts.ts` (which figures a row shows, per sport) and `activityDetail.ts`
+  (whether a loaded detail belongs to the current selection). `npm run test:activity-filters`
+  covers all three.
+  `ActivitySeriesChart` + `activityChannels.ts` + `useActivityDetailSummaries.ts` are shared
+  with Running and were moved out of `src/running/` for that — none of them ever asked what
+  sport they were reading. Anything else that both screens need goes the same way rather than
+  being copied.
 - **Coach** (`chatService.ts` + four providers: `claudeCodeProvider`, `anthropicChatProvider`,
   `openRouterProvider`, `localChatProvider`) — streaming chat with COROS-data tools
   (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,

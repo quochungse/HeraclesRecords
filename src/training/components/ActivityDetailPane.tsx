@@ -23,8 +23,15 @@ import {
   formatPaceSecondsPerKm,
   formatTrainingTimestamp
 } from "../formatters";
+import { detailMatchesActivity } from "../activityDetail";
 import { sportColorCategory } from "../sportColors";
-import { isCyclingSportType, isSwimSportType, resolveSportName } from "../sportTypes";
+import {
+  isCyclingSportType,
+  isStrengthSportType,
+  isSwimSportType,
+  resolveSportName
+} from "../sportTypes";
+import { isRunSportType } from "../../running/runSurface";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
@@ -65,7 +72,7 @@ const ELEVATION_PROFILE_MIN_GAIN_M = 30;
 const PAUSE_NOTICE_S = 60;
 
 export function ActivityDetailPane({
-  detail,
+  detail: incomingDetail,
   listActivity,
   sportTypes,
   detailRequest,
@@ -74,6 +81,12 @@ export function ActivityDetailPane({
   onOpenSportScreen
 }: ActivityDetailPaneProps) {
   const { unitSystem } = useUnitSystem();
+  // A detail belonging to some other session is no detail at all — see
+  // `detailMatchesActivity` for the window in which that happens.
+  const detail = detailMatchesActivity(incomingDetail, listActivity)
+    ? incomingDetail
+    : null;
+
   const [showRaw, setShowRaw] = useState(false);
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [rawError, setRawError] = useState<string | null>(null);
@@ -121,7 +134,9 @@ export function ActivityDetailPane({
   }, [showRaw]);
 
   // A new activity's chart must not inherit the previous one's focused lap.
-  useEffect(() => setFocusLapIndex(null), [activityId]);
+  useEffect(() => {
+    setFocusLapIndex(null);
+  }, [activityId]);
 
   const request =
     detailRequest && detailRequest.activityId === listActivity?.activityId
@@ -376,12 +391,18 @@ export function ActivityDetailPane({
     gpsPoints > 1 &&
     (detail.elevationGain ?? 0) >= ELEVATION_PROFILE_MIN_GAIN_M;
 
-  const sportScreen =
-    sportType !== undefined && sportType >= 100 && sportType <= 103
-      ? ("running" as const)
-      : sportType === 400 || sportType === 402
-        ? ("strength" as const)
-        : null;
+  /*
+   * Which screen, if any, is built for this sport. Both answers are taken from
+   * the module that owns them rather than re-decided here — `isRunSportType`
+   * is where the deliberate exclusion of hikes and mountain climbs is written
+   * down, and a door that disagrees with the room behind it is worse than no
+   * door.
+   */
+  const sportScreen = isRunSportType(sportType)
+    ? ("running" as const)
+    : isStrengthSportType(sportType)
+      ? ("strength" as const)
+      : null;
 
   return (
     <div className="activity-detail-pane">

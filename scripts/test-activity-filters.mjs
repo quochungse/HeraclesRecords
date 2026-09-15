@@ -13,6 +13,10 @@ import path from "node:path";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const bust = `?cacheBust=${Date.now()}`;
 
+const { detailMatchesActivity } = await import(
+  pathToFileURL(path.join(repoRoot, "src/training/activityDetail.ts")).href + bust
+);
+
 const { activityRowFacts } = await import(
   pathToFileURL(path.join(repoRoot, "src/training/activityFacts.ts")).href + bust
 );
@@ -524,6 +528,38 @@ assert.deepEqual(
     }
   ).map((fact) => fact.key),
   ["duration", "distance", "pace", "avgHr", "drift"]
+);
+
+// ---------------------------------------------------------------------------
+// 12. A detail belongs to exactly one selection
+// ---------------------------------------------------------------------------
+
+const selected = activity({ activityId: "b" });
+const detailOf = (activityId) => ({ activityId, laps: [], hrZones: [] });
+
+assert.equal(
+  detailMatchesActivity(detailOf("b"), selected),
+  true
+);
+assert.equal(
+  detailMatchesActivity(detailOf("a"), selected),
+  false,
+  "the previous session's payload is not this session's detail"
+);
+assert.equal(detailMatchesActivity(null, selected), false);
+assert.equal(
+  detailMatchesActivity(detailOf("a"), null),
+  true,
+  "nothing selected, nothing to disagree with"
+);
+
+// COROS does not always send an id; `mergeActivityDetailWithList` fills it from
+// the list row so this check has something to compare. Refusing a detail that
+// still has none would blank the pane for a payload that arrived perfectly
+// well.
+assert.equal(
+  detailMatchesActivity({ laps: [], hrZones: [] }, selected),
+  true
 );
 
 console.log("activity filter tests passed");

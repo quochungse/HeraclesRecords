@@ -87,6 +87,15 @@ export function isSwimSportType(sportType?: number): boolean {
   return sportType === 300 || sportType === 301;
 }
 
+/**
+ * The codes the Strength screen reads, matching `STRENGTH_SPORT_TYPES` in
+ * `electron/trainingHubService.ts` — 400 Gym Cardio and 402 Strength. Keep the
+ * two in step: this is what decides whether a session has a screen to open in.
+ */
+export function isStrengthSportType(sportType?: number): boolean {
+  return sportType === 400 || sportType === 402;
+}
+
 export function isCyclingSportType(sportType?: number): boolean {
   return sportType !== undefined && sportType >= 200 && sportType <= 299;
 }
