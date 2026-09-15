@@ -1,5 +1,13 @@
-import { useMemo, useRef, useState } from "react";
-import { CloudOff, Loader2, LockKeyhole, RefreshCw, SearchX } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CloudOff,
+  Loader2,
+  LockKeyhole,
+  RefreshCw,
+  SearchX
+} from "lucide-react";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { ActivityDetailPane } from "./components/ActivityDetailPane";
 import { ActivitiesFilterBar } from "./components/ActivitiesFilterBar";
 import { ActivitiesSummary } from "./components/ActivitiesSummary";
@@ -20,6 +28,17 @@ import "./activities.css";
 
 /** Rows built per page. See `limit` below for why there is a page at all. */
 const PAGE_SIZE = 200;
+
+/**
+ * Below this, the two panes stop being a split and become two screens.
+ *
+ * Stacked, they were three scrollers inside each other — the page, the list and
+ * the detail — and the detail sat a full list-length below the fold, so
+ * clicking a session appeared to do nothing at all. Running already solves this
+ * by opening a session as a page of its own; this is the same move, taken only
+ * when the width forces it.
+ */
+const SPLIT_MIN_WIDTH_QUERY = "(max-width: 1199px)";
 
 export function ActivitiesView({
   api,
@@ -51,6 +70,15 @@ export function ActivitiesView({
    * reaches for it.
    */
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const narrow = useMediaQuery(SPLIT_MIN_WIDTH_QUERY);
+  /*
+   * Whether the narrow layout is showing the detail rather than the list. It
+   * is not the selection: the screen auto-selects the newest session so the
+   * wide layout opens on something, and reading that as "the athlete opened a
+   * session" would land every narrow launch inside a detail they never asked
+   * for.
+   */
+  const [detailOpen, setDetailOpen] = useState(false);
   const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}|${filters.unratedOnly}`;
   const lastFilterKey = useRef(filterKey);
   if (lastFilterKey.current !== filterKey) {
@@ -107,6 +135,14 @@ export function ActivitiesView({
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
+  const openActivity = useCallback(
+    (activity: Parameters<typeof onLoadDetail>[0]) => {
+      setDetailOpen(true);
+      onLoadDetail(activity);
+    },
+    [onLoadDetail]
+  );
+
   const periodLabel =
     ACTIVITY_PERIOD_OPTIONS.find((option) => option.days === filters.periodDays)
       ?.label ?? "All";
@@ -147,7 +183,7 @@ export function ActivitiesView({
             nowMs={nowMs}
             feel={feel}
             summaries={summaries}
-            onLoadDetail={onLoadDetail}
+            onLoadDetail={openActivity}
             onExportFile={onExportFile}
           />
           {hidden > 0 ? (
@@ -214,8 +250,48 @@ export function ActivitiesView({
     );
   }
 
+  const detailPane = (
+    <ActivityDetailPane
+      api={api}
+      detail={activityDetail}
+      listActivity={selectedActivity}
+      sportTypes={sportTypes}
+      detailRequest={detailRequest}
+      onRetry={onLoadDetail}
+      onOpenSportScreen={onOpenSportScreen}
+    />
+  );
+
+  /*
+   * Narrow: one screen at a time. The summary and the filters belong to the
+   * list, so they go with it rather than sitting above an open session.
+   */
+  if (narrow && detailOpen && selectedActivity) {
+    return (
+      <div className="stack stack-fill training-dashboard activities-view is-narrow-detail">
+        <header className="activities-head">
+          <button
+            type="button"
+            className="secondary-button activities-back"
+            onClick={() => setDetailOpen(false)}
+          >
+            <ArrowLeft size={14} aria-hidden="true" />
+            All sessions
+          </button>
+        </header>
+        <section className="panel panel-flex training-activities-split-panel">
+          <div className="training-activities-detail">{detailPane}</div>
+        </section>
+      </div>
+    );
+  }
+
   return (
-    <div className="stack stack-fill training-dashboard activities-view">
+    <div
+      className={`stack stack-fill training-dashboard activities-view${
+        narrow ? " is-narrow" : ""
+      }`}
+    >
       <header className="activities-head">
         <div>
           <p className="eyebrow">Activities</p>
@@ -245,17 +321,9 @@ export function ActivitiesView({
       <section className="panel panel-flex training-activities-split-panel">
         <div className="training-activities-split">
           <div className="training-activities-list">{renderList()}</div>
-          <div className="training-activities-detail">
-            <ActivityDetailPane
-              api={api}
-              detail={activityDetail}
-              listActivity={selectedActivity}
-              sportTypes={sportTypes}
-              detailRequest={detailRequest}
-              onRetry={onLoadDetail}
-              onOpenSportScreen={onOpenSportScreen}
-            />
-          </div>
+          {narrow ? null : (
+            <div className="training-activities-detail">{detailPane}</div>
+          )}
         </div>
       </section>
     </div>

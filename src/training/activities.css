@@ -915,3 +915,26 @@
   color: var(--text-muted);
   font-size: 11px;
 }
+
+/* --- Narrow layout -------------------------------------------------------- */
+
+/*
+ * One pane at a time. The split panel keeps `flex: 1` either way, so whichever
+ * pane is rendered fills the screen and is the only thing that scrolls.
+ */
+.activities-view.is-narrow-detail > .activities-head {
+  padding-bottom: 2px;
+}
+
+.activities-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* The detail pane has no sibling to be divided from at this width. */
+.activities-view.is-narrow-detail .training-activities-detail {
+  border-left: 0;
+  padding-left: 0;
+}

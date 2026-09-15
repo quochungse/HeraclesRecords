@@ -18,6 +18,7 @@ import {
   type PrimaryView,
   visiblePrimaryNavTree,
 } from "../navigation/primaryNav";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const SIDEBAR_COLLAPSED_KEY = "coroslink.sidebarCollapsed";
 const SIDEBAR_COLLAPSED_GROUPS_KEY = "coroslink.sidebarCollapsedGroups";
@@ -120,28 +121,6 @@ function writeCollapsedGroups(groupIds: PrimaryNavGroupId[]): void {
   } catch {
     // Ignore storage failures in restricted environments.
   }
-}
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const handleChange = () => setMatches(media.matches);
-
-    handleChange();
-    media.addEventListener("change", handleChange);
-
-    return () => media.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
 }
 
 function useReducedMotion(): boolean {

@@ -14378,22 +14378,18 @@ td span {
   grid-template-rows: minmax(0, 1fr);
 }
 
-/* Under 1200px the panes stack, so hand scrolling back to the screen. */
-@media (max-width: 1200px) {
-  .stack.stack-fill.activities-view {
-    overflow-y: auto;
-  }
-
-  .stack.stack-fill.activities-view > .panel.training-activities-split-panel {
-    --training-activities-pane-height: clamp(460px, 58vh, 760px);
-    flex: 0 0 auto;
-  }
-
+/*
+ * Under 1200px the Activities screen renders one pane at a time rather than
+ * stacking them — see `SPLIT_MIN_WIDTH_QUERY` in ActivitiesView — so the split
+ * collapses to a single column and the pane that is there takes the height.
+ * Stacking put the detail a full list-length below the fold and gave the screen
+ * three scrollers inside each other.
+ */
+@media (max-width: 1199px) {
   .activities-view
     > .training-activities-split-panel
     > .training-activities-split {
-    flex: 0 0 auto;
-    grid-template-rows: none;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
