@@ -1,7 +1,6 @@
 import type {
+  ActivityDetailSummary,
   TrainingHubActivity,
-  TrainingHubActivityPause,
-  TrainingHubActivitySeriesPoint,
   TrainingHubThresholdZone
 } from "../../electron/types";
 import {
@@ -11,6 +10,17 @@ import {
   isRunSportType,
   type RunSurface
 } from "./runSurface";
+
+// The series maths is shared with the main process, which computes the same
+// figures once per run and stores them — see `electron/activityMetrics.ts`.
+// Re-exported here so this module stays the one import the run screens reach
+// for, and so a call site never has to know which side computed the number.
+export {
+  activeElapsed,
+  paceHrDecoupling,
+  withPausesRemoved,
+  type RunDecoupling
+} from "../../electron/activityMetrics";
 
 const MS_PER_DAY = 86_400_000;
 const METERS_PER_KM = 1000;
@@ -361,148 +371,6 @@ export function runIntensity(
   return zone === 3 ? "moderate" : "hard";
 }
 
-export interface RunDecoupling {
-  /** Metres per minute per beat over the first half. */
-  firstHalf: number;
-  secondHalf: number;
-  /** Percent the ratio fell by. Positive means drift — the run cost more. */
-  percent: number;
-}
-
-/** Samples needed in each half before a decoupling figure means anything. */
-const MIN_DECOUPLING_SAMPLES_PER_HALF = 10;
-
-function halfEfficiency(
-  points: readonly TrainingHubActivitySeriesPoint[]
-): number | undefined {
-  let speedTotal = 0;
-  let hrTotal = 0;
-  let samples = 0;
-
-  for (const point of points) {
-    const pace = positive(point.pace);
-    const hr = positive(point.hr);
-    if (pace === undefined || hr === undefined) {
-      continue;
-    }
-    // pace is seconds per km, so metres per minute is 1000 / (pace / 60).
-    speedTotal += (METERS_PER_KM * SECONDS_PER_MINUTE) / pace;
-    hrTotal += hr;
-    samples += 1;
-  }
-
-  if (samples < MIN_DECOUPLING_SAMPLES_PER_HALF) {
-    return undefined;
-  }
-
-  return speedTotal / samples / (hrTotal / samples);
-}
-
-/**
- * Aerobic decoupling: how much further apart pace and heart rate drifted over
- * the run. Above roughly 5% the athlete was running beyond what they could hold.
- *
- * Split on elapsed time where the channel exists, because splitting an array in
- * half splits on *samples* — and a watch that samples on distance puts more of
- * them in the fast half. Pass the series on activity time
- * (`withPausesRemoved`): on the wall clock a long stop moves the midpoint.
- */
-export function paceHrDecoupling(
-  series: readonly TrainingHubActivitySeriesPoint[] | undefined
-): RunDecoupling | undefined {
-  if (!series || series.length < MIN_DECOUPLING_SAMPLES_PER_HALF * 2) {
-    return undefined;
-  }
-
-  // Zero is a real elapsed reading — the first sample of every activity — so
-  // this cannot go through `positive`, which would drop it and pull the
-  // midpoint late enough to hand the first half a slice of the second. A loop,
-  // not `Math.min(...values)`: a long ultra is tens of thousands of samples,
-  // past what a spread can pass as arguments.
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
-  let stamped = 0;
-  for (const point of series) {
-    const value = point.elapsed;
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      stamped += 1;
-      min = Math.min(min, value);
-      max = Math.max(max, value);
-    }
-  }
-
-  let first: readonly TrainingHubActivitySeriesPoint[];
-  let second: readonly TrainingHubActivitySeriesPoint[];
-
-  if (stamped >= series.length / 2) {
-    const midpoint = (min + max) / 2;
-    first = series.filter((point) => (point.elapsed ?? 0) <= midpoint);
-    second = series.filter((point) => (point.elapsed ?? 0) > midpoint);
-  } else {
-    const cut = Math.floor(series.length / 2);
-    first = series.slice(0, cut);
-    second = series.slice(cut);
-  }
-
-  const firstHalf = halfEfficiency(first);
-  const secondHalf = halfEfficiency(second);
-  if (firstHalf === undefined || secondHalf === undefined || firstHalf <= 0) {
-    return undefined;
-  }
-
-  return {
-    firstHalf,
-    secondHalf,
-    percent: ((firstHalf - secondHalf) / firstHalf) * 100
-  };
-}
-
-/**
- * Where a wall-clock moment lands on the activity clock: the time elapsed less
- * every pause that had begun by then. A moment inside a pause lands on the
- * instant it began, so the line resumes where it stopped instead of leaving a
- * gap the width of the wait. `pauses` must be in order, as the parser leaves them.
- */
-export function activeElapsed(
-  elapsed: number,
-  pauses: readonly TrainingHubActivityPause[]
-): number {
-  let paused = 0;
-  for (const pause of pauses) {
-    if (pause.start >= elapsed) {
-      break;
-    }
-    paused += Math.min(pause.duration, elapsed - pause.start);
-  }
-  return elapsed - paused;
-}
-
-/**
- * A run's samples on activity time.
- *
- * The series is stamped by the wall clock and simply stops while the watch is
- * paused, so plotted as sent a pause is a flat stretch as long as the wait, the
- * laps — which COROS times without pauses — drift off their own boundaries, and
- * a selection across it reports a duration nobody ran.
- */
-export function withPausesRemoved(
-  series: readonly TrainingHubActivitySeriesPoint[],
-  pauses: readonly TrainingHubActivityPause[] | undefined
-): TrainingHubActivitySeriesPoint[] {
-  const ordered = (pauses ?? [])
-    .filter((pause) => pause.start >= 0 && pause.duration > 0)
-    .sort((left, right) => left.start - right.start);
-  if (ordered.length === 0) {
-    return [...series];
-  }
-
-  return series.map((point) =>
-    point.elapsed === undefined
-      ? point
-      : { ...point, elapsed: activeElapsed(point.elapsed, ordered) }
-  );
-}
-
 /** Distance per surface across a whole list, for the surface mix panel. */
 export function distanceBySurface(
   activities: readonly TrainingHubActivity[]
@@ -641,7 +509,23 @@ export interface RunIntensityMix {
   hard: RunIntensityBucket;
   /** Runs with no heart rate — no zone can place them, and none is guessed. */
   unrated: RunIntensityBucket;
+  /** Runs split by COROS's own time in zone rather than by their average. */
+  zoneTimed: number;
 }
+
+/**
+ * Which band each of COROS's six HR buckets belongs to. Bucket 0 is the time
+ * below zone 1, so it reads as easy alongside zones 1 and 2 — the same cut
+ * `runIntensity` makes from an average.
+ */
+const BUCKET_BANDS: readonly RunIntensity[] = [
+  "easy",
+  "easy",
+  "easy",
+  "moderate",
+  "hard",
+  "hard"
+];
 
 /**
  * The easy/moderate/hard split, by session count and by time.
@@ -649,25 +533,66 @@ export interface RunIntensityMix {
  * Both, because they disagree and the disagreement is the point: six short hard
  * sessions and two long easy ones is 75% hard by count and mostly easy by the
  * clock. The 80/20 rule is stated about time.
+ *
+ * A run whose detail has been summarised is split by **time in zone**, which is
+ * the honest reading: an interval session lands partly in each band instead of
+ * averaging into the middle and reading "moderate" when it was neither. The
+ * rest are placed by their average heart rate, which is all the list carries.
+ * Zone seconds are scaled onto the run's own duration so the bar still totals
+ * the time the screen says was run — COROS scores only the samples that carried
+ * a heart rate, and the difference would otherwise go missing from the total.
  */
 export function runIntensityMix(
   activities: readonly TrainingHubActivity[],
-  zones: readonly TrainingHubThresholdZone[]
+  zones: readonly TrainingHubThresholdZone[],
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>
 ): RunIntensityMix {
   const mix: RunIntensityMix = {
     easy: { count: 0, duration: 0 },
     moderate: { count: 0, duration: 0 },
     hard: { count: 0, duration: 0 },
-    unrated: { count: 0, duration: 0 }
+    unrated: { count: 0, duration: 0 },
+    zoneTimed: 0
   };
 
   for (const activity of activities) {
     if (!isRunSportType(activity.sportType)) {
       continue;
     }
+
+    const duration = runSeconds(activity) ?? 0;
+    const zoneSeconds = summaries?.get(activity.activityId)?.zoneSeconds;
+    const scored = zoneSeconds?.reduce((sum, value) => sum + value, 0) ?? 0;
+
+    if (zoneSeconds && scored > 0) {
+      const scale = duration > 0 ? duration / scored : 1;
+      let leader: RunIntensity = "easy";
+      let leaderSeconds = -1;
+      const banded: Record<RunIntensity, number> = {
+        easy: 0,
+        moderate: 0,
+        hard: 0
+      };
+      zoneSeconds.forEach((seconds, index) => {
+        banded[BUCKET_BANDS[index] ?? "hard"] += seconds;
+      });
+      for (const band of ["easy", "moderate", "hard"] as const) {
+        mix[band].duration += banded[band] * scale;
+        if (banded[band] > leaderSeconds) {
+          leader = band;
+          leaderSeconds = banded[band];
+        }
+      }
+      // One run is one session wherever it is counted, so the count goes to
+      // the band it spent the most time in rather than being split three ways.
+      mix[leader].count += 1;
+      mix.zoneTimed += 1;
+      continue;
+    }
+
     const bucket = mix[runIntensity(activity.avgHr, zones) ?? "unrated"];
     bucket.count += 1;
-    bucket.duration += runSeconds(activity) ?? 0;
+    bucket.duration += duration;
   }
 
   return mix;

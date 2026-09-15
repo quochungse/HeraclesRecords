@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type {
+  ActivityDetailSummary,
   TrainingHubActivity,
   TrainingHubThresholdZone
 } from "../../electron/types";
@@ -11,6 +12,8 @@ interface RunIntensityPanelProps {
   zones: readonly TrainingHubThresholdZone[];
   /** The account's zone model, named — "Heart Rate Reserve". */
   zoneModelLabel?: string;
+  /** COROS's own time-in-zone per run, where it has been fetched. */
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
 }
 
 type Band = "easy" | "moderate" | "hard";
@@ -39,19 +42,24 @@ function shares(mix: RunIntensityMix, by: "count" | "duration") {
 /**
  * How the week's running splits between easy and hard.
  *
- * Read from each session's **average** heart rate, against the zones the
- * account is actually scored on — a deliberately coarse instrument: an interval
- * session averages into the middle and lands under "moderate" when it was
- * neither. It is right about the steady running that makes up most of a week,
- * which is the mix the 80/20 rule is asking about, and per-session zone time is
- * what would sharpen it.
+ * A run whose detail has been summarised is split by COROS's own time in each
+ * zone, so an interval session lands partly in each band. The rest are read
+ * from the session **average** against the zones the account is actually scored
+ * on, which is a coarser instrument — that same interval session averages into
+ * the middle and reads "moderate" when it was neither — but it is all the
+ * activity list carries, and it is right about the steady running that makes up
+ * most of a week.
  */
 export function RunIntensityPanel({
   runs,
   zones,
-  zoneModelLabel
+  zoneModelLabel,
+  summaries
 }: RunIntensityPanelProps) {
-  const mix = useMemo(() => runIntensityMix(runs, zones), [runs, zones]);
+  const mix = useMemo(
+    () => runIntensityMix(runs, zones, summaries),
+    [runs, summaries, zones]
+  );
   const byTime = useMemo(() => shares(mix, "duration"), [mix]);
   const byCount = useMemo(() => shares(mix, "count"), [mix]);
 
@@ -81,6 +89,8 @@ export function RunIntensityPanel({
 
   const easyTimeShare = byTime.values[0]?.share ?? 0;
   const offTarget = Math.round((easyTimeShare - EASY_TIME_TARGET) * 100);
+  // Counted against the rated runs only: an unrated one is in neither method.
+  const placed = Math.min(mix.zoneTimed, byCount.total);
 
   return (
     <section className="panel run-block">
@@ -110,7 +120,11 @@ export function RunIntensityPanel({
 
       <p className="run-block-note">
         {zoneModelLabel ? `${zoneModelLabel} zones. ` : ""}
-        Each run is placed by its average heart rate.
+        {placed === 0
+          ? "Each run is placed by its average heart rate."
+          : placed === byCount.total
+            ? "Every run is split by its time in each zone."
+            : `${placed} of ${byCount.total} runs are split by their time in each zone; the rest are placed by their average heart rate.`}
         {mix.unrated.count > 0
           ? ` ${mix.unrated.count} ${mix.unrated.count === 1 ? "run" : "runs"} recorded no heart rate and ${
               mix.unrated.count === 1 ? "is" : "are"

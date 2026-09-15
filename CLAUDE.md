@@ -173,6 +173,36 @@ data dir). Schema is a `CREATE TABLE IF NOT EXISTS` block; **later columns are a
 NULL on a freshly migrated one. New tables are additive. Two hand-written migrations exist
 for table rewrites (`migrateChatSessionProviderConstraint`, `migrateChatTranscriptsToSessions`).
 
+**An activity detail is a file, not a row, and it is validated by fingerprint.** One COROS
+detail is ~2.5 MB of JSON — 98% of it the sample series — so `activityDetailCache.ts` writes
+it to `<userData>/activity-details/<owner fingerprint>/<activityId>.json.br` (brotli quality
+5: 131 KB in 25 ms against gzip 9's 139 KB in 70 ms, measured on a real run) and only the
+~130-byte summary reaches SQLite. Three rules hold it up.
+**COROS's activity list carries no version field of any kind** — probed field by field on
+the live API; the one upload stamp that exists, `lastUploadTime`, is inside the detail, so
+reading it costs the request the cache exists to avoid. What the list does carry is every
+summary figure COROS recomputes on an edit, so `activityDetailFingerprint` hashes those —
+`name` included, because renaming a run rewrites the payload — and the hash is stored inside
+the file. `sportName` is excluded: the app fills that in locally, so including it would
+re-fetch every detail on every launch.
+**Every detail read goes through `loadActivityDetailRaw`**: the run screen, the calendar, the
+globe, the coach's tools and the three backfills. A second call site would be both uncached
+and unvalidated, so `test:activity-detail-cache` asserts `/activity/detail/query` appears
+exactly once in the service. The backfills pass `persist: false` — they read one field out of
+2.5 MB, and opening a run is what earns it a file.
+**Nothing about the file may enter the row.** `training_activity_summaries` is `derived`, and
+a column saying "cached, 131 KB" would reach another machine as a promise it cannot keep if
+it were ever reclassified — the trap `coach_analysis_local_triggers` exists to avoid. The
+directory is its own bookkeeping: size from `stat`, last use from `mtime` (touched on every
+hit, because relatime makes `atime` useless), and a 500 MB cap swept oldest-first with
+orphans — files whose run is in no list — taken first. A run deleted at COROS is therefore
+collected rather than detected: `1001 Service exceptions` is what COROS answers both for an
+activity that is gone and for one it could not serve this minute.
+The maths a summary is built from lives in `electron/activityMetrics.ts`, which the renderer
+imports directly (like `unitSystem.ts`), so the drift in a list column and the drift on the
+page it opens cannot disagree. **It must stay free of `node:` imports** or the renderer build
+breaks; the suite asserts that too.
+
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy

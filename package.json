@@ -82,6 +82,7 @@
     "test:sync-preferences": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-sync-preferences.mjs",
     "test:lease": "npm run build:electron && node scripts/test-lease.mjs",
     "test:chat-session-groups": "node --experimental-strip-types scripts/test-chat-session-groups.mjs",
+    "test:activity-detail-cache": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-activity-detail-cache.mjs",
     "test:activity-detail": "npm run build:electron && node scripts/test-activity-detail.mjs",
     "test:chat-activity-tools": "npm run build:electron && node scripts/test-chat-activity-tools.mjs",
     "test:chat-analytics-tools": "npm run build:electron && node scripts/test-chat-analytics-tools.mjs",

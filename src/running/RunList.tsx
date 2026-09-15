@@ -1,6 +1,9 @@
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import type { TrainingHubActivity } from "../../electron/types";
+import type {
+  ActivityDetailSummary,
+  TrainingHubActivity
+} from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -24,6 +27,12 @@ import { elevationUnit, metersToElevation } from "../units/units";
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
   /**
+   * Per-run figures out of the detail payload, by activity id. Arrive after the
+   * list does and fill in as they are computed, so the column reads "—" rather
+   * than holding the table back.
+   */
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
+  /**
    * Sort lives in the parent for the same reason the scroll position does: this
    * component unmounts while a run is open, and a choice that survives the trip
    * out but not the trip back is worse than no choice at all.
@@ -45,7 +54,8 @@ export type SortKey =
   | "pace"
   | "elevationPerKm"
   | "avgHr"
-  | "efficiency";
+  | "efficiency"
+  | "drift";
 
 interface RunRow {
   activity: TrainingHubActivity;
@@ -57,6 +67,7 @@ interface RunRow {
   elevationPerKm: number | undefined;
   avgHr: number | undefined;
   efficiency: number | undefined;
+  drift: number | undefined;
 }
 
 interface ColumnDefinition {
@@ -85,6 +96,13 @@ const COLUMNS: readonly ColumnDefinition[] = [
     numeric: true,
     title:
       "Efficiency index — metres per minute per heartbeat. Higher is more ground for the same effort."
+  },
+  {
+    key: "drift",
+    label: "Drift",
+    numeric: true,
+    title:
+      "Aerobic decoupling — how much further apart pace and heart rate moved over the run. Under 5% is a session held together."
   }
 ];
 
@@ -98,10 +116,16 @@ const FIRST_DIRECTION: Record<SortKey, "asc" | "desc"> = {
   pace: "asc",
   elevationPerKm: "desc",
   avgHr: "desc",
-  efficiency: "desc"
+  efficiency: "desc",
+  // Least drift first: the question this column answers is which runs held
+  // together, and the worst one leading is the answer to a different one.
+  drift: "asc"
 };
 
-function buildRow(activity: TrainingHubActivity): RunRow | null {
+function buildRow(
+  activity: TrainingHubActivity,
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>
+): RunRow | null {
   const surface = classifyRunSurface(activity.sportType);
   if (surface === null) {
     return null;
@@ -116,7 +140,8 @@ function buildRow(activity: TrainingHubActivity): RunRow | null {
     pace: paceSecondsPerKm(activity),
     elevationPerKm: elevationPerKm(activity),
     avgHr: activity.avgHr,
-    efficiency: efficiencyIndex(activity)
+    efficiency: efficiencyIndex(activity),
+    drift: summaries?.get(activity.activityId)?.decouplingPercent
   };
 }
 
@@ -146,16 +171,22 @@ function compareRows(left: RunRow, right: RunRow, key: SortKey, descending: bool
 
 export const DEFAULT_RUN_SORT: RunSort = { key: "when", descending: true };
 
-export function RunList({ runs, sort, onSortChange, onOpenRun }: RunListProps) {
+export function RunList({
+  runs,
+  summaries,
+  sort,
+  onSortChange,
+  onOpenRun
+}: RunListProps) {
   const { unitSystem } = useUnitSystem();
   const { key: sortKey, descending } = sort;
 
   const rows = useMemo(() => {
     const built = runs
-      .map(buildRow)
+      .map((activity) => buildRow(activity, summaries))
       .filter((row): row is RunRow => row !== null);
     return built.sort((left, right) => compareRows(left, right, sortKey, descending));
-  }, [descending, runs, sortKey]);
+  }, [descending, runs, sortKey, summaries]);
 
   const toggleSort = (key: SortKey) => {
     onSortChange(
@@ -244,6 +275,14 @@ export function RunList({ runs, sort, onSortChange, onOpenRun }: RunListProps) {
                   single decimal rounds a block's whole progress into three
                   values and the column stops saying anything. */}
               {row.efficiency === undefined ? "—" : row.efficiency.toFixed(2)}
+            </td>
+            <td className="is-numeric">
+              {/* Signed, because a negative reading is a real result — the
+                  second half cost less than the first — and an unsigned 3%
+                  would read as drift the run did not have. */}
+              {row.drift === undefined
+                ? "—"
+                : `${row.drift > 0 ? "+" : ""}${row.drift.toFixed(1)}%`}
             </td>
           </tr>
         ))}

@@ -2383,6 +2383,40 @@ export interface TrainingHubActivityPause {
   duration: number;
 }
 
+/**
+ * What is kept of an activity detail once the payload is gone.
+ *
+ * A detail is ~2.5 MB and 98% of it is the sample series, so it is cached as a
+ * file rather than a row (`electron/activityDetailCache.ts`) and only this much
+ * reaches SQLite — about 130 bytes, which is what lets a whole run list carry
+ * figures that would otherwise need a request each. `fingerprint` is what ties
+ * it to the activity as COROS last described it: see
+ * `activityDetailFingerprint`.
+ */
+export interface ActivityDetailSummary {
+  activityId: string;
+  /** The list-row fingerprint these figures were computed from. */
+  fingerprint: string;
+  summaryVersion: number;
+  /** Seconds per HR bucket, six of them. Absent when COROS scored none. */
+  zoneSeconds?: number[];
+  /** Pace:HR drift across the run, percent. Positive means it cost more. */
+  decouplingPercent?: number;
+  /** COROS's own upload stamp, epoch seconds — informational. */
+  lastUploadTime?: number;
+  /** Epoch milliseconds. */
+  computedAt: number;
+}
+
+/** What one pass of the summary backfill did. `remaining` is the caller's cue
+ *  to come back: the sweep does a few at a time so it never holds the
+ *  connection for a screen the athlete is waiting on. */
+export interface ActivityDetailSummarySync {
+  computed: number;
+  remaining: number;
+  failed: number;
+}
+
 export interface TrainingHubActivityDetail {
   activityId?: string;
   name?: string;

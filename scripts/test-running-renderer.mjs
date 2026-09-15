@@ -62,6 +62,23 @@ const RIDE = {
   distance: 30_000
 };
 
+/**
+ * Zone ceilings, as the dashboard sends them. Without these the intensity panel
+ * says it has no zones and draws nothing — which is its own correct behaviour,
+ * and not what the summary block below is about.
+ */
+const SNAPSHOT_WITH_ZONES = {
+  dashboard: {
+    lthrZones: [
+      { index: 1, hr: 133 },
+      { index: 2, hr: 154 },
+      { index: 3, hr: 168 },
+      { index: 4, hr: 173 },
+      { index: 5, hr: 183 }
+    ]
+  }
+};
+
 let win;
 /** Where the back button sits on a run with no route, for the cover to match. */
 let backOffsetWithoutCover;
@@ -97,8 +114,8 @@ async function settle() {
   }
 }
 
-async function mountRunning(options) {
-  await harness("mount", "RunningView", options, {});
+async function mountRunning(options, script = {}) {
+  await harness("mount", "RunningView", options, script);
   await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
   await waitFor(() => harness("exists", ".running-page-header"), "the page renders");
   await settle();
@@ -661,6 +678,74 @@ async function main() {
     );
     assert.equal(chipColours.length, 2);
     assert.ok(chipColours.every(Boolean), "a pressed channel chip wears its channel's colour");
+  }
+
+  // -------------------------------------------------------------------------
+  // Detail summaries: the two figures a run list cannot get from the list.
+  //
+  // They arrive after the rows do — a detail is 2.5 MB, so they are computed
+  // once and kept as a row per run — which is exactly why the screen must be
+  // complete without them and must not wait.
+  // -------------------------------------------------------------------------
+  {
+    const summarised = RUNS.slice(0, 2).map((activity, index) => ({
+      activityId: activity.activityId,
+      fingerprint: "fp",
+      summaryVersion: 1,
+      // Mostly zone 1-2 on the first, mostly zone 4 on the second.
+      zoneSeconds: index === 0 ? [0, 1800, 1500, 300, 0, 0] : [0, 0, 300, 600, 2400, 300],
+      decouplingPercent: index === 0 ? 4.25 : -1.5,
+      computedAt: Date.now()
+    }));
+
+    await mountRunning(
+      { activities: RUNS, activitiesStatus: "ready", snapshot: SNAPSHOT_WITH_ZONES },
+      {
+        getActivityDetailSummaries: summarised,
+        syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0 }
+      }
+    );
+    await settle();
+
+    assert.equal(await hasText("Drift"), true, "the list carries a drift column");
+    const drift = await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".running-list-panel tbody tr")].map(
+         (row) => row.lastElementChild.textContent
+       )`,
+      true
+    );
+    assert.equal(drift.length, RUNS.length);
+    assert.equal(drift[0], "+4.3%", "a run that drifted reads with its sign");
+    assert.equal(drift[1], "-1.5%", "and one that did not is not shown as drift");
+    assert.equal(
+      drift.filter((value) => value === "—").length,
+      RUNS.length - 2,
+      "every run without a summary reads as a dash rather than a zero"
+    );
+
+    // The backfill is asked for, and for the runs on screen.
+    const sweeps = await harness("calls", "syncActivityDetailSummaries");
+    assert.ok(sweeps.length > 0, "missing summaries are asked for");
+    assert.equal(
+      sweeps[0].args[0].length,
+      RUNS.length,
+      "the sweep covers the list on screen"
+    );
+
+    assert.equal(
+      await hasText("2 of 30 runs are split by their time in each zone"),
+      true,
+      "the intensity panel says which reading each run got"
+    );
+
+    // Zone time and average heart rate disagree on purpose: all 30 runs average
+    // 150 bpm, which is easy, and the one summarised as mostly zone 4 must move
+    // its time out of the easy band.
+    const hard = await win.webContents.executeJavaScript(
+      `document.querySelector(".run-intensity-row .run-intensity-seg.tone-hard") !== null`,
+      true
+    );
+    assert.equal(hard, true, "a run scored into zone 4 shows up as hard time");
   }
 
   const errors = await harness("consoleErrors");

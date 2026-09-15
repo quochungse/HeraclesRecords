@@ -54,6 +54,7 @@ import {
 } from "./backup/backupService";
 import type { RestoreMode } from "./backup/backupTypes";
 import { deviceId as syncDeviceId } from "./sync/deviceIdentity";
+import { initializeActivityDetailCache } from "./activityDetailCache";
 import {
   clearDownloadTransferredByFileName,
   deleteDownload,
@@ -110,6 +111,8 @@ import {
   getTrainingDashboard,
   fetchTrainingHubActivityFile,
   getTrainingHubActivityDetail,
+  readActivityDetailSummaries,
+  syncActivityDetailSummaries,
   getCorosProfileSnapshot,
   getTrainingHubStatus,
   getUpcomingWorkouts,
@@ -921,6 +924,9 @@ app.whenReady().then(() => {
     }
   });
   initializeDatabase(app.getPath("userData"));
+  // Activity details are files beside the database, not rows in it: 2.5 MB
+  // each, 98% sample series, and the rows sync.
+  initializeActivityDetailCache(app.getPath("userData"));
   hydratePlanDraftStoreFromDatabase();
   prunePlanDraftStore();
   pruneDeleteRequestStore();
@@ -2625,6 +2631,21 @@ function registerIpcHandlers(): void {
       sportType: number,
       listActivity?: TrainingHubActivity
     ) => getTrainingHubActivityDetail(activityId, sportType, listActivity)
+  );
+
+  // The list-level figures that only a detail payload knows. Two channels
+  // rather than one: a read that answers from SQLite in a millisecond, and a
+  // sweep that goes to COROS and is meant to be called again until it reports
+  // nothing left.
+  ipcMain.handle(
+    "trainingHub:getActivityDetailSummaries",
+    (_event, activityIds: string[]) => readActivityDetailSummaries(activityIds)
+  );
+
+  ipcMain.handle(
+    "trainingHub:syncActivityDetailSummaries",
+    (_event, activityIds: string[], limit?: number) =>
+      syncActivityDetailSummaries(activityIds, limit)
   );
 
   ipcMain.handle(

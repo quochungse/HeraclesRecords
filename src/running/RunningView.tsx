@@ -27,6 +27,7 @@ import { RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
 import { summariseRuns, surfacesPresent } from "./runMetrics";
+import { useRunDetailSummaries } from "./useRunDetailSummaries";
 import { RunnerIcon } from "./runnerIcon";
 import {
   RUN_SURFACE_LABELS,
@@ -224,6 +225,16 @@ export function RunningView({
         : (activities.find((a) => a.activityId === selectedRunId) ?? null),
     [activities, selectedRunId]
   );
+
+  // Time in zone and pace:HR drift, which live in the 2.5 MB detail payload and
+  // are kept as a row per run so a whole list can show them. Read for the runs
+  // on screen; missing ones are computed in the background and appear as they
+  // land.
+  const summaries = useRunDetailSummaries({
+    api,
+    runs,
+    enabled: connected && selectedRunId === null
+  });
 
   const openRun = useCallback(
     (activity: TrainingHubActivity) => {
@@ -516,6 +527,7 @@ export function RunningView({
                 runs={runs}
                 zones={zones}
                 zoneModelLabel={zoneModel?.title}
+                summaries={summaries}
               />
               <RunSurfacePanel runs={runsInPeriod} />
             </div>
@@ -538,6 +550,7 @@ export function RunningView({
           <div className="running-list-panel">
             <RunList
               runs={runs}
+              summaries={summaries}
               sort={sort}
               onSortChange={setSort}
               onOpenRun={openRun}

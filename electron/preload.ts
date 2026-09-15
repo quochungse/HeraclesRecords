@@ -16,6 +16,8 @@ import type {
 } from "./backup/backupTypes";
 import type {
   ActivityBackupProgress,
+  ActivityDetailSummary,
+  ActivityDetailSummarySync,
   BinaryStatus,
   CachedCorosMapPackage,
   CoachAnalysisSessionAttention,
@@ -713,6 +715,19 @@ const api = {
       activityId,
       sportType,
       listActivity
+    ),
+  getActivityDetailSummaries: (
+    activityIds: string[]
+  ): Promise<ActivityDetailSummary[]> =>
+    ipcRenderer.invoke("trainingHub:getActivityDetailSummaries", activityIds),
+  syncActivityDetailSummaries: (
+    activityIds: string[],
+    limit?: number
+  ): Promise<ActivityDetailSummarySync> =>
+    ipcRenderer.invoke(
+      "trainingHub:syncActivityDetailSummaries",
+      activityIds,
+      limit
     ),
   exportTrainingHubActivityFile: (
     activityId: string,
