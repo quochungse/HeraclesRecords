@@ -1,3 +1,9 @@
+/**
+ * The camera maths behind focusing one muscle on the anatomical figure.
+ *
+ * Run: npm run test:strength-body-focus
+ * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

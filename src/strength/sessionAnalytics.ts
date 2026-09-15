@@ -98,6 +98,22 @@ const FULL_BODY_FAINT: SessionHeat = {
   max: FAINT_MAX
 };
 
+/**
+ * The same four counts off any analytics, whether that is one session or a
+ * whole window. Three callers were each re-adding the working total from the
+ * three fields, and a screen that disagrees with itself about how many sets it
+ * could place is worse than one that cannot place them.
+ */
+export function analyticsCoverage(analytics: StrengthAnalytics): SessionCoverage {
+  return {
+    attributed: analytics.attributedSets,
+    generic: analytics.genericSets,
+    unmapped: analytics.unmappedSets,
+    mobility: analytics.mobilitySets,
+    working: analytics.attributedSets + analytics.genericSets + analytics.unmappedSets
+  };
+}
+
 export function sessionAttribution(coverage: SessionCoverage): SessionAttribution {
   if (coverage.working <= 0) return "empty";
   if (coverage.attributed > 0) return "attributed";
@@ -200,13 +216,7 @@ export function buildStrengthSessionIndex(sessions: StrengthSession[]): Strength
   for (const session of sessions) {
     // The window length only feeds sessionsPerWeek, which means nothing for one session.
     const analytics = buildStrengthAnalytics([session], 1);
-    const coverage: SessionCoverage = {
-      attributed: analytics.attributedSets,
-      generic: analytics.genericSets,
-      unmapped: analytics.unmappedSets,
-      mobility: analytics.mobilitySets,
-      working: analytics.attributedSets + analytics.genericSets + analytics.unmappedSets
-    };
+    const coverage = analyticsCoverage(analytics);
     byId.set(session.activityId, {
       session,
       analytics,

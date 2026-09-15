@@ -11,7 +11,7 @@ import { resolveMuscleView } from "./bodyFocus";
 import { BodyMapV2, type BodyView } from "./BodyMapV2";
 import { MusclePanel } from "./MusclePanel";
 import { MUSCLE_BY_ID, type MuscleId } from "./muscles";
-import type { SessionHeat } from "./sessionAnalytics";
+import { analyticsCoverage, type SessionHeat } from "./sessionAnalytics";
 import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
 
@@ -110,10 +110,8 @@ export function StrengthHero({
     ? resolveHeat(metric)
     : { muscleById: analytics.muscleById, max: analytics.muscleMax[metric] };
   const hasSessions = analytics.summary.sessions > 0;
-  const genericSetCount = Math.round(analytics.genericSets);
-  const workingSetCount = Math.round(
-    analytics.attributedSets + analytics.genericSets + analytics.unmappedSets
-  );
+  const coverage = analyticsCoverage(analytics);
+  const genericSetCount = Math.round(coverage.generic);
 
   return (
     <div
@@ -196,7 +194,7 @@ export function StrengthHero({
       </section>
 
       <section className="panel strength-muscle-panel">
-        {hasSessions && workingSetCount > 0 && analytics.attributedSets <= 0 ? (
+        {hasSessions && coverage.working > 0 && coverage.attributed <= 0 ? (
           <div className="muscle-panel is-unattributed">
             <span className="muscle-panel-unattributed-icon" aria-hidden="true">
               <Info size={22} />

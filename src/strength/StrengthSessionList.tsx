@@ -3,14 +3,12 @@ import { Layers, Trophy } from "lucide-react";
 import type { StrengthSession } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type { StrengthSessionIndex } from "./sessionAnalytics";
-import { startOfWeekMs } from "./strengthAnalytics";
+import { previousWeekStartMs, startOfWeekMs } from "./strengthAnalytics";
 import { formatSpan, formatTotalWeight, sessionSourceLabel } from "./strengthFormat";
 import "./strengthSession.css";
 
 /** The list's first row: every session in the window at once, rather than one of them. */
 export const AGGREGATE_SELECTION = "aggregate";
-
-const MS_PER_DAY = 86_400_000;
 
 const PATTERNS = ["push", "pull", "legs", "core"] as const;
 
@@ -50,10 +48,7 @@ function weekHeading(weekStart: number | undefined, nowMs: number): string {
   }
   const thisWeek = startOfWeekMs(nowMs);
   if (weekStart === thisWeek) return "This week";
-  // Seven days back can cross a daylight-saving change; startOfWeekMs re-snaps it.
-  if (weekStart === startOfWeekMs(thisWeek - 7 * MS_PER_DAY + MS_PER_DAY / 2)) {
-    return "Last week";
-  }
+  if (weekStart === previousWeekStartMs(thisWeek)) return "Last week";
   const date = new Date(weekStart);
   const sameYear = date.getFullYear() === new Date(nowMs).getFullYear();
   return `Week of ${date.toLocaleDateString(undefined, {

@@ -16,7 +16,12 @@ const STATUS_WORD: Record<LandmarkStatus, string> = {
 /** Never narrower than a little past the landmark, so an all-light history still shows the band. */
 const MIN_SCALE_SETS = 25;
 
-function formatSets(value: number): string {
+/**
+ * Deliberately not `formatSets` from the analytics, which rounds anything from
+ * 10 up to a whole number: this panel's whole job is the distance to 10 and to
+ * 20, and "20 Over" reads as a contradiction where "20.4 Over" reads as a fact.
+ */
+function formatLandmarkSets(value: number): string {
   return value.toFixed(1).replace(/\.0$/, "");
 }
 
@@ -127,14 +132,14 @@ export function StrengthVolumeLandmarks({ analytics, windowDays }: StrengthVolum
                   >
                     {landmarks.weeks.map((week, weekIndex) => (
                       <span key={week.weekStart}>
-                        <strong>{formatSets(entry.weekly[weekIndex] ?? 0)}</strong>
+                        <strong>{formatLandmarkSets(entry.weekly[weekIndex] ?? 0)}</strong>
                         <em>{week.label}</em>
                       </span>
                     ))}
                   </span>
                 </span>
                 <span className="strength-volume-value">
-                  <strong>{formatSets(entry.average)}</strong>
+                  <strong>{formatLandmarkSets(entry.average)}</strong>
                   {STATUS_WORD[entry.status] ? <em>{STATUS_WORD[entry.status]}</em> : null}
                 </span>
               </li>
@@ -168,10 +173,10 @@ export function StrengthVolumeLandmarks({ analytics, windowDays }: StrengthVolum
                 <tr key={entry.muscle}>
                   <th scope="row">{MUSCLE_BY_ID[entry.muscle].label}</th>
                   {entry.weekly.map((sets, weekIndex) => (
-                    <td key={landmarks.weeks[weekIndex]!.weekStart}>{formatSets(sets)}</td>
+                    <td key={landmarks.weeks[weekIndex]!.weekStart}>{formatLandmarkSets(sets)}</td>
                   ))}
                   <td>
-                    {formatSets(entry.average)}
+                    {formatLandmarkSets(entry.average)}
                     {STATUS_WORD[entry.status] ? ` · ${STATUS_WORD[entry.status].toLowerCase()}` : ""}
                   </td>
                 </tr>

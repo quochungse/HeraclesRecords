@@ -3088,16 +3088,6 @@
 }
 
 @media (max-width: 700px) {
-  .strength-session-head {
-    align-items: flex-start;
-  }
-
-  .strength-session-meta {
-    align-items: flex-end;
-    flex-direction: column-reverse;
-    gap: 4px;
-  }
-
   .strength-hevy-dialog footer {
     align-items: stretch;
     flex-direction: column-reverse;

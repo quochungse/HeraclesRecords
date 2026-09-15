@@ -17,10 +17,10 @@ import { useChartColors } from "../training/useChartColors";
 import { useTheme } from "../theme/ThemeProvider";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { kilogramsToDisplayWeight } from "../units/units";
-import { startOfWeekMs, type WeekBucket } from "./strengthAnalytics";
+import { nextWeekStartMs, startOfWeekMs, type WeekBucket } from "./strengthAnalytics";
 import { formatTotalWeight } from "./strengthFormat";
 
-const MS_PER_WEEK = 604_800_000;
+const MS_PER_DAY = 86_400_000;
 
 /** Plot box of the weekly chart, in the same pixels the gradient is drawn in. */
 const CHART_HEIGHT = 268;
@@ -63,14 +63,18 @@ interface WeekPoint {
  * Zero-filled weeks across the whole window. The analytics only bucket weeks
  * that had a session, so a week off would otherwise close up and the chart
  * would read as an unbroken streak.
+ *
+ * Weeks are stepped with `nextWeekStartMs` rather than by adding a week's
+ * worth of milliseconds: past a daylight-saving change the flat step misses
+ * every bucket key from there on, and the rest of the chart draws as rest.
  */
 function buildWeekSeries(weeks: WeekBucket[], windowDays: number): WeekPoint[] {
   const byWeekStart = new Map(weeks.map((week) => [week.weekStart, week]));
   const currentWeek = startOfWeekMs(Date.now());
-  const firstWeek = startOfWeekMs(Date.now() - (windowDays - 1) * 86_400_000);
+  const firstWeek = startOfWeekMs(Date.now() - (windowDays - 1) * MS_PER_DAY);
   const points: WeekPoint[] = [];
 
-  for (let at = firstWeek; at <= currentWeek; at += MS_PER_WEEK) {
+  for (let at = firstWeek; at <= currentWeek; at = nextWeekStartMs(at)) {
     const bucket = byWeekStart.get(Math.floor(at / 1000));
     points.push({
       weekStart: Math.floor(at / 1000),

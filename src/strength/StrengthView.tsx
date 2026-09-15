@@ -1,24 +1,17 @@
+import { useCallback, useMemo, useState } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent
-} from "react";
-import {
-  ExternalLink,
   FlaskConical,
   Info,
   Link2,
   Loader2,
   LockKeyhole,
   RefreshCw,
-  Settings2,
-  X
+  Settings2
 } from "lucide-react";
 import type { TrainingHubStatus } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { StrengthHero } from "./StrengthHero";
+import { StrengthHevyDialog } from "./StrengthHevyDialog";
 import { ExerciseExplorer } from "./ExerciseExplorer";
 import { StrengthOverviewPanels } from "./StrengthOverviewPanels";
 import { AGGREGATE_SELECTION, StrengthSessionList } from "./StrengthSessionList";
@@ -29,25 +22,18 @@ import {
   StrengthSessionExercises,
   StrengthSessionHeader
 } from "./StrengthSessionDetail";
-import { sessionHeat } from "./sessionAnalytics";
+import { analyticsCoverage, buildStrengthSessionIndex, sessionHeat } from "./sessionAnalytics";
 import { StrengthVolumeLandmarks } from "./StrengthVolumeLandmarks";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
 import {
   cadencePhrase,
   durationParts,
   formatSpan,
-  formatSyncTime,
   liftWeightParts,
   totalWeightParts,
   type FigurePart
 } from "./strengthFormat";
-import {
-  WINDOW_OPTIONS,
-  activeStrengthWindow,
-  toErrorMessage,
-  useStrengthData
-} from "./useStrengthData";
-import { useStrengthSessionIndex } from "./useStrengthSessionIndex";
+import { WINDOW_OPTIONS, activeStrengthWindow, useStrengthData } from "./useStrengthData";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -106,72 +92,10 @@ export function StrengthView({
   } = useStrengthData({ api, corosConnected, showDevelopmentTools });
 
   const [hevyDialogOpen, setHevyDialogOpen] = useState(false);
-  const [hevyApiKey, setHevyApiKey] = useState("");
-  const [hevyBusy, setHevyBusy] = useState(false);
-  const [hevyDialogError, setHevyDialogError] = useState<string | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
   const [pickedSelection, setPickedSelection] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!hevyDialogOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !hevyBusy) setHevyDialogOpen(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [hevyBusy, hevyDialogOpen]);
-
-  const connectHevyAccount = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      setHevyBusy(true);
-      setHevyDialogError(null);
-      try {
-        await connectHevy(hevyApiKey);
-        setHevyApiKey("");
-      } catch (caught) {
-        setHevyDialogError(toErrorMessage(caught));
-      } finally {
-        setHevyBusy(false);
-      }
-    },
-    [connectHevy, hevyApiKey]
-  );
-
-  const changeWarmupSetting = useCallback(
-    async (includeWarmups: boolean) => {
-      setHevyBusy(true);
-      setHevyDialogError(null);
-      try {
-        await setHevyWarmups(includeWarmups);
-      } catch (caught) {
-        setHevyDialogError(toErrorMessage(caught));
-      } finally {
-        setHevyBusy(false);
-      }
-    },
-    [setHevyWarmups]
-  );
-
-  const disconnectHevyAccount = useCallback(async () => {
-    if (
-      !window.confirm(
-        "Disconnect Hevy and erase its cached workouts from this device?"
-      )
-    ) {
-      return;
-    }
-    setHevyBusy(true);
-    setHevyDialogError(null);
-    try {
-      await disconnectHevy();
-      if (!corosConnected) setHevyDialogOpen(false);
-    } catch (caught) {
-      setHevyDialogError(toErrorMessage(caught));
-    } finally {
-      setHevyBusy(false);
-    }
-  }, [corosConnected, disconnectHevy]);
+  const closeHevyDialog = useCallback(() => setHevyDialogOpen(false), []);
 
   const selectedExercise = selectedExerciseName
     ? analytics.exercises.find((exercise) => exercise.name === selectedExerciseName) ?? null
@@ -182,16 +106,16 @@ export function StrengthView({
   const activeWindow = activeStrengthWindow(days);
   const summary = analytics.summary;
   const hasSessions = summary.sessions > 0;
-  const attributedSetCount = Math.round(analytics.attributedSets);
-  const genericSetCount = Math.round(analytics.genericSets);
-  const workingSetCount = Math.round(
-    analytics.attributedSets + analytics.genericSets + analytics.unmappedSets
-  );
+  const coverage = analyticsCoverage(analytics);
+  const attributedSetCount = Math.round(coverage.attributed);
+  const genericSetCount = Math.round(coverage.generic);
+  const workingSetCount = Math.round(coverage.working);
   // A history of dips and pull-ups carries no load, so the page switches to
   // counting sets rather than showing a column of zeroes.
   const usesWeights = summary.volumeKg > 0;
 
-  const sessionIndex = useStrengthSessionIndex(sessions);
+  // Every session analysed once, rebuilt only when the history itself changes.
+  const sessionIndex = useMemo(() => buildStrengthSessionIndex(sessions), [sessions]);
   // "All sessions" is where the screen opens: the window as a whole, with the
   // sessions that make it up listed beside it.
   const selection =
@@ -258,135 +182,15 @@ export function StrengthView({
   ) : null;
 
   const hevyDialog = hevyDialogOpen ? (
-    <div
-      className="strength-hevy-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !hevyBusy) {
-          setHevyDialogOpen(false);
-        }
-      }}
-    >
-      <section
-        className="strength-hevy-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="strength-hevy-title"
-      >
-        <header>
-          <div>
-            <p className="eyebrow">Strength source</p>
-            <h2 id="strength-hevy-title">
-              {hevyConnected ? "Hevy connected" : "Connect Hevy"}
-            </h2>
-          </div>
-          <button
-            type="button"
-            className="strength-hevy-close"
-            aria-label="Close Hevy settings"
-            disabled={hevyBusy}
-            onClick={() => setHevyDialogOpen(false)}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        {hevyConnected ? (
-          <>
-            <div className="strength-hevy-account">
-              <span className="strength-hevy-mark" aria-hidden="true">H</span>
-              <div>
-                <strong>{hevyStatus?.displayName || "Hevy account"}</strong>
-                <span>{formatSyncTime(hevyStatus?.lastSyncedAt)}</span>
-              </div>
-              {hevyStatus?.profileUrl ? (
-                <a href={hevyStatus.profileUrl} target="_blank" rel="noreferrer">
-                  Profile <ExternalLink size={13} aria-hidden="true" />
-                </a>
-              ) : null}
-            </div>
-            <label className="strength-hevy-toggle">
-              <input
-                type="checkbox"
-                checked={Boolean(hevyStatus?.includeWarmups)}
-                disabled={hevyBusy}
-                onChange={(event) => void changeWarmupSetting(event.target.checked)}
-              />
-              <span>
-                <strong>Include warm-up sets</strong>
-                <small>Count warm-ups in sets, volume, and lift records.</small>
-              </span>
-            </label>
-            <p className="strength-hevy-privacy">
-              Heracles Records reads completed workouts only. It never writes to Hevy or
-              sends Hevy workouts to COROS.
-            </p>
-            <footer>
-              <button
-                type="button"
-                className="secondary-button danger"
-                disabled={hevyBusy}
-                onClick={() => void disconnectHevyAccount()}
-              >
-                Disconnect and erase cache
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={hevyBusy}
-                onClick={() => setHevyDialogOpen(false)}
-              >
-                Done
-              </button>
-            </footer>
-          </>
-        ) : (
-          <form onSubmit={connectHevyAccount}>
-            <p>
-              Hevy&apos;s developer API requires Hevy Pro. Create a key in your
-              Hevy web settings, then paste it below.
-            </p>
-            <a
-              className="strength-hevy-developer-link"
-              href="https://hevy.com/settings?developer"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open Hevy developer settings
-              <ExternalLink size={14} aria-hidden="true" />
-            </a>
-            <label className="field">
-              <span>Hevy API key</span>
-              <input
-                type="password"
-                value={hevyApiKey}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="Paste API key"
-                disabled={hevyBusy}
-                onChange={(event) => setHevyApiKey(event.target.value)}
-              />
-            </label>
-            <p className="strength-hevy-privacy">
-              The key is encrypted with your operating system&apos;s credential
-              storage and is never exposed to the page after connection.
-            </p>
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={hevyBusy || !hevyApiKey.trim()}
-            >
-              {hevyBusy ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <Link2 size={16} aria-hidden="true" />}
-              Connect Hevy
-            </button>
-          </form>
-        )}
-
-        {hevyDialogError ? (
-          <p className="strength-hevy-error" role="alert">{hevyDialogError}</p>
-        ) : null}
-      </section>
-    </div>
+    <StrengthHevyDialog
+      status={hevyStatus}
+      connected={hevyConnected}
+      corosConnected={corosConnected}
+      onConnect={connectHevy}
+      onSetWarmups={setHevyWarmups}
+      onDisconnect={disconnectHevy}
+      onClose={closeHevyDialog}
+    />
   ) : null;
 
   // The controls only appear once there is something to control: on the
@@ -462,10 +266,7 @@ export function StrengthView({
           <button
             type="button"
             className="strength-action"
-            onClick={() => {
-              setHevyDialogError(null);
-              setHevyDialogOpen(true);
-            }}
+            onClick={() => setHevyDialogOpen(true)}
           >
             {hevyConnected ? (
               <>

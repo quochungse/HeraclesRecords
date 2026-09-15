@@ -1,3 +1,9 @@
+/**
+ * One exercise's history: per-session records, rep-range bests and the plateau verdict.
+ *
+ * Run: npm run test:exercise-explorer
+ * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

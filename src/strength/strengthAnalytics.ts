@@ -187,6 +187,24 @@ export function startOfWeekMs(timestampMs: number): number {
   return date.getTime();
 }
 
+/**
+ * Monday of the week after the one starting at `weekStartMs`.
+ *
+ * Stepping a week by adding 7 × 86 400 000 ms is wrong either side of a
+ * daylight-saving change: the result lands an hour off local midnight and no
+ * longer equals the `startOfWeekMs` key every bucket is stored under, so the
+ * week reads as empty and every week after it stays shifted. Landing at noon
+ * and re-snapping keeps the key exact whichever way the clocks moved.
+ */
+export function nextWeekStartMs(weekStartMs: number): number {
+  return startOfWeekMs(weekStartMs + 7 * MS_PER_DAY + MS_PER_DAY / 2);
+}
+
+/** Monday of the week before the one starting at `weekStartMs`. */
+export function previousWeekStartMs(weekStartMs: number): number {
+  return startOfWeekMs(weekStartMs - 7 * MS_PER_DAY + MS_PER_DAY / 2);
+}
+
 function weekLabel(weekStartMs: number): string {
   return new Date(weekStartMs).toLocaleDateString(undefined, {
     month: "short",
@@ -538,20 +556,6 @@ export function daysSince(timestamp?: number): number | undefined {
   const then = new Date(timestamp * 1000);
   then.setHours(0, 0, 0, 0);
   return Math.max(0, Math.round((today.getTime() - then.getTime()) / MS_PER_DAY));
-}
-
-export function formatDaysSince(timestamp?: number): string {
-  const days = daysSince(timestamp);
-  if (days === undefined) {
-    return "Not trained";
-  }
-  if (days === 0) {
-    return "Today";
-  }
-  if (days === 1) {
-    return "Yesterday";
-  }
-  return `${days} days ago`;
 }
 
 export function formatVolumeKg(

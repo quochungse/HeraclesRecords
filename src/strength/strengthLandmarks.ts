@@ -1,5 +1,5 @@
 import { MUSCLES, type MuscleId } from "./muscles";
-import { startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
+import { nextWeekStartMs, startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
 
 /**
  * The weekly working-set range most hypertrophy guidance lands on for a
@@ -10,8 +10,6 @@ export const WEEKLY_SET_LANDMARK = { low: 10, high: 20 } as const;
 
 /** Weeks averaged: enough to smooth one heavy or missed week, short enough to be current. */
 export const LANDMARK_WEEKS = 4;
-
-const MS_PER_DAY = 86_400_000;
 
 export type LandmarkStatus = "below" | "within" | "above";
 
@@ -45,11 +43,6 @@ export function landmarkStatus(average: number): LandmarkStatus {
   if (average < WEEKLY_SET_LANDMARK.low) return "below";
   if (average > WEEKLY_SET_LANDMARK.high) return "above";
   return "within";
-}
-
-/** Monday of the week after the one starting at `weekStartMs`, re-snapped across a DST change. */
-function nextWeekStartMs(weekStartMs: number): number {
-  return startOfWeekMs(weekStartMs + 7 * MS_PER_DAY + MS_PER_DAY / 2);
 }
 
 /**

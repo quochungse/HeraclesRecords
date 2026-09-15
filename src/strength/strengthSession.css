@@ -564,12 +564,14 @@
 /* ---------- Weekly sets per muscle ---------- */
 
 /* One series, one colour: the page's ember, one step deeper on dark so the bar
-   sits inside the lightness band a chart mark should (validated, not picked). */
-.strength-view {
+   sits inside the lightness band a chart mark should (validated, not picked).
+   Declared on the card, not on .strength-view, so this sheet owns no token on
+   an element whose other tokens are set in strength.css. */
+.strength-volume-card {
   --sx-volume-bar: #dc7430;
 }
 
-:root[data-theme="paper"] .strength-view {
+:root[data-theme="paper"] .strength-volume-card {
   --sx-volume-bar: #cf6a2a;
 }
 

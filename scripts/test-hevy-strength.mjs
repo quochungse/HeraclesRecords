@@ -1,3 +1,9 @@
+/**
+ * Hevy workouts as strength sessions: set types, warm-up handling and the merge with COROS.
+ *
+ * Run: npm run test:hevy-strength
+ * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

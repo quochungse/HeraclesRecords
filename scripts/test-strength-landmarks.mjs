@@ -24,7 +24,11 @@ const load = async (...segments) => {
 };
 
 const { MUSCLES, resolveExerciseTargets } = await load("src", "strength", "muscles.ts");
-const { buildStrengthAnalytics } = await load("src", "strength", "strengthAnalytics.ts");
+const { buildStrengthAnalytics, nextWeekStartMs, previousWeekStartMs, startOfWeekMs } = await load(
+  "src",
+  "strength",
+  "strengthAnalytics.ts"
+);
 const { buildWeeklyVolumeLandmarks, landmarkStatus, landmarkWeeks, LANDMARK_WEEKS } = await load(
   "src",
   "strength",
@@ -153,5 +157,41 @@ assert.equal(landmarkStatus(20.1), "above");
 }
 
 assert.equal(buildWeeklyVolumeLandmarks(buildStrengthAnalytics([], 7), 7, WEDNESDAY), null);
+
+// ---- Stepping a week across a daylight-saving change ----
+
+// Every bucket in the app is keyed by startOfWeekMs, which is local midnight on
+// a Monday. Stepping by a flat 7 × 86 400 000 ms lands an hour off that key the
+// moment the clocks move, and each week after it stays shifted — the week reads
+// as a rest week and the weekly chart draws the rest of the window as empty.
+// Switched last, so nothing above is read on a different clock.
+process.env.TZ = "Europe/Berlin";
+
+{
+  const mondayNoon = (year, month, day) => new Date(year, month - 1, day, 12).getTime();
+  const isSnapped = (ms) => ms === startOfWeekMs(ms);
+
+  // Clocks go forward Sun 2026-03-29 and back Sun 2026-10-25 in this zone.
+  for (const [year, month, day] of [
+    [2026, 3, 23],
+    [2026, 10, 19]
+  ]) {
+    const from = startOfWeekMs(mondayNoon(year, month, day));
+    assert.equal(new Date(from).getDay(), 1, "fixture: the walk starts on a Monday");
+
+    let at = from;
+    for (let week = 0; week < 6; week += 1) {
+      const next = nextWeekStartMs(at);
+      assert.ok(isSnapped(next), `week ${week + 1} after ${new Date(from)} drifted off its key`);
+      assert.equal(new Date(next).getDay(), 1, "still a Monday");
+      assert.equal(previousWeekStartMs(next), at, "the step reverses exactly");
+      at = next;
+    }
+
+    // The flat step is what this replaced: it is off by an hour past the change.
+    const flat = from + 7 * 86_400_000 * 5;
+    assert.ok(!isSnapped(flat), "fixture: the flat step really does miss the key here");
+  }
+}
 
 console.log("strength landmarks OK");

@@ -1,9 +1,5 @@
 import type { StrengthSession, StrengthSet } from "../../electron/types";
-import { resolveExerciseName } from "../training/exerciseNames";
-import {
-  canonicalExerciseDisplayName,
-  estimateOneRepMax
-} from "./strengthAnalytics";
+import { estimateOneRepMax, exerciseDisplayName } from "./strengthAnalytics";
 
 const EPSILON = 0.01;
 
@@ -93,17 +89,6 @@ const REP_RANGES: RepRangeDefinition[] = [
   { id: "13-15", label: "High-rep", shortLabel: "13–15 reps", min: 13, max: 15 },
   { id: "16+", label: "Endurance", shortLabel: "16+ reps", min: 16 }
 ];
-
-/** Keep name matching identical to the Strength overview aggregation. */
-export function explorerExerciseName(
-  nameKey: string,
-  rawName: string | undefined
-): string {
-  const resolved = resolveExerciseName(nameKey, rawName);
-  return /^[TS]\d/.test(resolved)
-    ? "Unnamed exercise"
-    : canonicalExerciseDisplayName(resolved);
-}
 
 function repRangeFor(reps: number): RepRangeDefinition | undefined {
   return REP_RANGES.find(
@@ -223,7 +208,7 @@ export function buildExerciseExplorer(
     const entries = session.detail.exercises
       .filter(
         (exercise) =>
-          explorerExerciseName(exercise.nameKey, exercise.rawName) === exerciseName
+          exerciseDisplayName(exercise.nameKey, exercise.rawName) === exerciseName
       )
       .flatMap((exercise) => exercise.entries);
 
