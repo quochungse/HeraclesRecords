@@ -4,11 +4,9 @@
  *
  * Three decisions are pinned here because each fails quietly. A session COROS
  * logged only as Full Body must light the whole figure faintly rather than
- * leave it blank or paint it hot. The "compared with the window" scale must be
- * the busiest single session, not the window's summed muscleMax — against a
- * total, every muscle of every session sits in the bottom band. And a record
- * must not depend on muscle attribution, or a lift no rule recognises can never
- * be one.
+ * leave it blank or paint it hot. A session is read on its own scale, so one
+ * heavy session cannot repaint every other. And a record must not depend on
+ * muscle attribution, or a lift no rule recognises can never be one.
  *
  * Run: npm run test:strength-session-analytics
  * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
@@ -112,9 +110,9 @@ assert.equal(
   const credited = MUSCLES.reduce((n, m) => n + entry.analytics.muscleById[m.id].sets, 0);
   assert.ok(Math.abs(credited - 5) < 1e-9, "shares sum to 1, so no set is double-counted");
 
-  // Session scope: the busiest muscle of the session is always the hottest.
+  // The busiest muscle of the session is always the hottest.
   for (const metric of ["sets", "volume"]) {
-    const heat = sessionHeat(entry, index, metric, "session");
+    const heat = sessionHeat(entry, metric);
     assert.equal(heat.max, entry.analytics.muscleMax[metric]);
     assert.equal(Math.max(...Object.values(levels(heat, metric))), 5);
   }
@@ -134,15 +132,9 @@ assert.equal(
   assert.equal(entry.coverage.attributed, 0);
 
   for (const metric of METRICS) {
-    for (const scope of ["session", "window"]) {
-      const byMuscle = levels(sessionHeat(entry, index, metric, scope), metric);
-      for (const muscle of MUSCLES) {
-        assert.equal(
-          byMuscle[muscle.id],
-          1,
-          `Full Body draws ${muscle.id} at level 1 (${metric}, ${scope})`
-        );
-      }
+    const byMuscle = levels(sessionHeat(entry, metric), metric);
+    for (const muscle of MUSCLES) {
+      assert.equal(byMuscle[muscle.id], 1, `Full Body draws ${muscle.id} at level 1 (${metric})`);
     }
   }
   // The faint figure is for drawing only; what the panel reads stays true.
@@ -168,35 +160,30 @@ assert.equal(
 
   for (const id of ["unmapped", "warmup", "empty"]) {
     for (const metric of METRICS) {
-      const byMuscle = levels(sessionHeat(index.byId.get(id), index, metric, "session"), metric);
+      const byMuscle = levels(sessionHeat(index.byId.get(id), metric), metric);
       assert.ok(Object.values(byMuscle).every((level) => level === 0), `${id} draws nothing`);
     }
   }
 }
 
-// ---- 4. Window scope reads against the busiest single session, not the window total ----
+// ---- 4. A session is read on its own scale, whatever the rest of the history did ----
 
 {
   const light = session("light", now - 2 * DAY, [exercise("T1041", sets(3, 10, 40))]);
   const heavy = session("heavy", now - 9 * DAY, [exercise("T1041", sets(10, 10, 60))]);
-  const history = [light, heavy];
-  const index = buildStrengthSessionIndex(history);
-  const lightEntry = index.byId.get("light");
-  const heavyEntry = index.byId.get("heavy");
+  const alone = buildStrengthSessionIndex([light]);
+  const beside = buildStrengthSessionIndex([light, heavy]);
 
-  assert.equal(index.peakMax.sets, heavyEntry.analytics.muscleMax.sets);
-  assert.equal(index.peakMax.volume, heavyEntry.analytics.muscleMax.volume);
+  const onItsOwn = sessionHeat(alone.byId.get("light"), "sets");
+  const amongOthers = sessionHeat(beside.byId.get("light"), "sets");
+  assert.equal(onItsOwn.max, amongOthers.max, "a heavier session does not rescale a lighter one");
+  assert.deepEqual(levels(onItsOwn, "sets"), levels(amongOthers, "sets"));
+  assert.equal(levels(amongOthers, "sets").chest, 5);
+  assert.equal(levels(sessionHeat(beside.byId.get("heavy"), "sets"), "sets").chest, 5);
 
-  // The trap this scale exists to avoid: the window's own muscleMax is a sum.
-  const windowMax = buildStrengthAnalytics(history, 90).muscleMax;
-  assert.ok(windowMax.sets > index.peakMax.sets, "fixture: the window total exceeds any one session");
-
-  const sessionScope = sessionHeat(lightEntry, index, "sets", "session");
-  const windowScope = sessionHeat(lightEntry, index, "sets", "window");
-  assert.notEqual(sessionScope.max, windowScope.max);
-  assert.equal(levels(sessionScope, "sets").chest, 5, "on its own scale the light session's chest is hot");
-  assert.ok(levels(windowScope, "sets").chest < 5, "against the heavy session it is not");
-  assert.equal(levels(sessionHeat(heavyEntry, index, "sets", "window"), "sets").chest, 5);
+  // Both are read against their own busiest muscle, which is not the window's total.
+  const windowMax = buildStrengthAnalytics([light, heavy], 90).muscleMax;
+  assert.ok(windowMax.sets > amongOthers.max);
 }
 
 // ---- 5. Personal records ----

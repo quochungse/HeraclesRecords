@@ -12,14 +12,6 @@ import {
 } from "./strengthAnalytics";
 
 /**
- * What the body map's colours are measured against when it shows one session.
- * `session` answers "where did this session's work go": its busiest muscle is
- * always the hottest. `window` answers "how hard was it": each muscle is read
- * against the most any muscle took in a single session of the loaded window.
- */
-export type HeatScope = "session" | "window";
-
-/**
  * How much of a session the rules could place on specific muscles, which
  * decides what the figure can honestly show before any colour is picked:
  *
@@ -70,13 +62,6 @@ export interface SessionAnalytics {
 export interface StrengthSessionIndex {
   /** Every session in the history, keyed by activityId. */
   byId: Map<string, SessionAnalytics>;
-  /**
-   * The most any one muscle took in any one session, per metric — the scale
-   * `window` heat is read against. Deliberately not the window analytics'
-   * `muscleMax`: that sums every session, and against a total a single session
-   * lands in the bottom band on every muscle.
-   */
-  peakMax: Record<HeatMetric, number>;
 }
 
 /** What the body map draws for one session: per-muscle values and the scale they are read on. */
@@ -211,7 +196,6 @@ function buildPersonalRecords(
 export function buildStrengthSessionIndex(sessions: StrengthSession[]): StrengthSessionIndex {
   const records = buildPersonalRecords(sessions);
   const byId = new Map<string, SessionAnalytics>();
-  const peakMax: Record<HeatMetric, number> = { sets: 0, volume: 0, time: 0 };
 
   for (const session of sessions) {
     // The window length only feeds sessionsPerWeek, which means nothing for one session.
@@ -230,21 +214,16 @@ export function buildStrengthSessionIndex(sessions: StrengthSession[]): Strength
       coverage,
       records: records.get(session.activityId) ?? []
     });
-    for (const metric of Object.keys(peakMax) as HeatMetric[]) {
-      peakMax[metric] = Math.max(peakMax[metric], analytics.muscleMax[metric]);
-    }
   }
 
-  return { byId, peakMax };
+  return { byId };
 }
 
-/** The values and scale the body map should draw for one session. */
-export function sessionHeat(
-  entry: SessionAnalytics,
-  index: StrengthSessionIndex,
-  metric: HeatMetric,
-  scope: HeatScope
-): SessionHeat {
+/**
+ * The values and scale the body map should draw for one session: its own
+ * busiest muscle is the hottest.
+ */
+export function sessionHeat(entry: SessionAnalytics, metric: HeatMetric): SessionHeat {
   if (entry.attribution === "generic") {
     return FULL_BODY_FAINT;
   }
@@ -252,7 +231,7 @@ export function sessionHeat(
   // heatLevel draws as untouched whatever the scale.
   return {
     muscleById: entry.analytics.muscleById,
-    max: scope === "window" ? index.peakMax[metric] : entry.analytics.muscleMax[metric]
+    max: entry.analytics.muscleMax[metric]
   };
 }
 

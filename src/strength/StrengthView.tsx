@@ -47,11 +47,7 @@ import {
   toErrorMessage,
   useStrengthData
 } from "./useStrengthData";
-import {
-  STRENGTH_HEAT_SCOPE_PREFERENCE,
-  useStrengthSessionIndex
-} from "./useStrengthSessionIndex";
-import { useSelectionPreference } from "../preferences/selectionPreferences";
+import { useStrengthSessionIndex } from "./useStrengthSessionIndex";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -115,7 +111,6 @@ export function StrengthView({
   const [hevyDialogError, setHevyDialogError] = useState<string | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
   const [pickedSelection, setPickedSelection] = useState<string | null>(null);
-  const [heatScope, setHeatScope] = useSelectionPreference(STRENGTH_HEAT_SCOPE_PREFERENCE);
 
   useEffect(() => {
     if (!hevyDialogOpen) return;
@@ -197,22 +192,13 @@ export function StrengthView({
   const usesWeights = summary.volumeKg > 0;
 
   const sessionIndex = useStrengthSessionIndex(sessions);
-  const newestSession = useMemo(
-    () =>
-      sessions.reduce<(typeof sessions)[number] | undefined>(
-        (newest, session) =>
-          (session.startTime ?? 0) > (newest?.startTime ?? -1) ? session : newest,
-        undefined
-      ),
-    [sessions]
-  );
-  // A pick that the window or source has since dropped falls back to the newest
-  // session, without an effect racing the reload that dropped it.
+  // "All sessions" is where the screen opens: the window as a whole, with the
+  // sessions that make it up listed beside it.
   const selection =
-    pickedSelection === AGGREGATE_SELECTION ||
-    (pickedSelection !== null && sessionIndex.byId.has(pickedSelection))
+    pickedSelection !== null &&
+    (pickedSelection === AGGREGATE_SELECTION || sessionIndex.byId.has(pickedSelection))
       ? pickedSelection
-      : newestSession?.activityId ?? AGGREGATE_SELECTION;
+      : AGGREGATE_SELECTION;
   const selectedEntry =
     selection === AGGREGATE_SELECTION ? undefined : sessionIndex.byId.get(selection);
   const explorable = useMemo(
@@ -660,37 +646,7 @@ export function StrengthView({
                   showDevelopmentTools={showDevelopmentTools}
                   scope={selectedEntry ? "session" : "window"}
                   resolveHeat={
-                    selectedEntry
-                      ? (metric) => sessionHeat(selectedEntry, sessionIndex, metric, heatScope)
-                      : undefined
-                  }
-                  scaleControl={
-                    selectedEntry?.attribution === "attributed" ? (
-                      <div
-                        className="strength-segmented is-quiet"
-                        role="group"
-                        aria-label="Colour scale"
-                      >
-                        <button
-                          type="button"
-                          className={heatScope === "session" ? "is-active" : ""}
-                          aria-pressed={heatScope === "session"}
-                          title="The session's busiest muscle is the hottest"
-                          onClick={() => setHeatScope("session")}
-                        >
-                          This session
-                        </button>
-                        <button
-                          type="button"
-                          className={heatScope === "window" ? "is-active" : ""}
-                          aria-pressed={heatScope === "window"}
-                          title={`Against the hardest single session in ${activeWindow.phrase}`}
-                          onClick={() => setHeatScope("window")}
-                        >
-                          vs {activeWindow.label}
-                        </button>
-                      </div>
-                    ) : null
+                    selectedEntry ? (metric) => sessionHeat(selectedEntry, metric) : undefined
                   }
                 />
                 {selectedEntry ? <StrengthSessionCoverage entry={selectedEntry} /> : null}

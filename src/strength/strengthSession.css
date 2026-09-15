@@ -561,21 +561,6 @@
   }
 }
 
-/* The session's colour-scale switch, stacked on the legend it redefines. */
-.strength-body-scale {
-  position: absolute;
-  bottom: 58px;
-  left: 50%;
-  z-index: 3;
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-.strength-body-scale .strength-segmented {
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-
 /* ---------- Weekly sets per muscle ---------- */
 
 /* One series, one colour: the page's ember, one step deeper on dark so the bar

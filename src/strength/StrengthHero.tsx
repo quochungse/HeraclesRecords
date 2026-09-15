@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Info, RotateCw } from "lucide-react";
 import type { StrengthDataSource } from "../../electron/types";
 import {
@@ -46,11 +46,6 @@ interface StrengthHeroProps {
    * window, or a Full Body session drawn faintly. The panel shares the scale.
    */
   resolveHeat?: (metric: HeatMetric) => SessionHeat;
-  /**
-   * A control that changes what the colours are measured against. It sits on
-   * the legend it redefines, not in the view controls above the figure.
-   */
-  scaleControl?: ReactNode;
   /** Words the no-attribution note for one session rather than a stretch of time. */
   scope?: "window" | "session";
 }
@@ -66,7 +61,6 @@ export function StrengthHero({
   source,
   showDevelopmentTools = false,
   resolveHeat,
-  scaleControl,
   scope = "window"
 }: StrengthHeroProps) {
   const { unitSystem } = useUnitSystem();
@@ -189,8 +183,6 @@ export function StrengthHero({
           onViewChange={requestView}
           showLayerControls={showDevelopmentTools}
         />
-
-        {scaleControl ? <div className="strength-body-scale">{scaleControl}</div> : null}
 
         <div className="strength-legend" aria-hidden="true">
           <span>Light</span>
