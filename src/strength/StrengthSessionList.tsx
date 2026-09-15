@@ -169,7 +169,7 @@ export function StrengthSessionList({
                         <strong>{session.name?.trim() || "Strength session"}</strong>
                         {records > 0 ? (
                           <span
-                            className="strength-record-badge"
+                            className="strength-session-record-badge"
                             title={`${records} record${records === 1 ? "" : "s"} in this session`}
                           >
                             <Trophy size={10} aria-hidden="true" />

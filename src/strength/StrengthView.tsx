@@ -22,6 +22,7 @@ import { StrengthHero } from "./StrengthHero";
 import { ExerciseExplorer } from "./ExerciseExplorer";
 import { StrengthOverviewPanels } from "./StrengthOverviewPanels";
 import { AGGREGATE_SELECTION, StrengthSessionList } from "./StrengthSessionList";
+import { StrengthAggregateDetail, StrengthSessionDetail } from "./StrengthSessionDetail";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
 import {
   cadencePhrase,
@@ -199,6 +200,12 @@ export function StrengthView({
     (pickedSelection !== null && sessionIndex.byId.has(pickedSelection))
       ? pickedSelection
       : newestSession?.activityId ?? AGGREGATE_SELECTION;
+  const selectedEntry =
+    selection === AGGREGATE_SELECTION ? undefined : sessionIndex.byId.get(selection);
+  const explorable = useMemo(
+    () => new Set(analytics.exercises.map((exercise) => exercise.name)),
+    [analytics.exercises]
+  );
 
   const summaryItems: { key: string; label: string; parts: FigurePart[]; caption: string }[] = [
     {
@@ -607,6 +614,37 @@ export function StrengthView({
             ))}
           </section>
 
+          <div className="strength-split">
+            <aside className="panel strength-card strength-split-list">
+              <StrengthSessionList
+                sessions={sessions}
+                index={sessionIndex}
+                selected={selection}
+                onSelect={setPickedSelection}
+                windowLabel={activeWindow.label}
+                showSource={source === "combined"}
+              />
+            </aside>
+            <div className="strength-split-detail">
+              {selectedEntry ? (
+                <StrengthSessionDetail
+                  entry={selectedEntry}
+                  explorable={explorable}
+                  onOpenExercise={openExercise}
+                  showSource={source === "combined"}
+                />
+              ) : (
+                <StrengthAggregateDetail
+                  sessions={sessions}
+                  index={sessionIndex}
+                  windowLabel={activeWindow.label}
+                  windowPhrase={activeWindow.phrase}
+                  onSelectSession={setPickedSelection}
+                />
+              )}
+            </div>
+          </div>
+
           <StrengthWeeklyChart
             weeks={analytics.weeks}
             days={days}
@@ -617,24 +655,6 @@ export function StrengthView({
             analytics={analytics}
             onOpenExercise={openExercise}
           />
-
-          <section className="panel strength-card strength-sessions-card">
-            <div className="strength-card-head">
-              <div>
-                <h3>Sessions</h3>
-                <p>Every time you trained in {activeWindow.phrase}, newest first.</p>
-              </div>
-            </div>
-
-            <StrengthSessionList
-              sessions={sessions}
-              index={sessionIndex}
-              selected={selection}
-              onSelect={setPickedSelection}
-              windowLabel={activeWindow.label}
-              showSource={source === "combined"}
-            />
-          </section>
         </>
       )}
       {selectedExercise ? (

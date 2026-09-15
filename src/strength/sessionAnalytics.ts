@@ -1,4 +1,4 @@
-import type { StrengthSession } from "../../electron/types";
+import type { StrengthSession, StrengthSetType } from "../../electron/types";
 import type { MuscleId } from "./muscles";
 import {
   buildStrengthAnalytics,
@@ -254,4 +254,128 @@ export function sessionHeat(
     muscleById: entry.analytics.muscleById,
     max: scope === "window" ? index.peakMax[metric] : entry.analytics.muscleMax[metric]
   };
+}
+
+/** The figures a session's header shows. Optional ones are absent when the log does not record them. */
+export interface SessionStats {
+  durationSec: number;
+  /** Every set that is not a warm-up. */
+  workingSets: number;
+  warmupSets: number;
+  reps: number;
+  volumeKg: number;
+  /** Weight lifted per minute of the session; absent without load or duration. */
+  densityKgPerMin?: number;
+  /** Seconds of rest per second of work; absent when the log records no rest, as Hevy's never does. */
+  restPerWork?: number;
+  avgHr?: number;
+  maxHr?: number;
+  trainingLoad?: number;
+  calories?: number;
+}
+
+export function buildSessionStats(session: StrengthSession): SessionStats {
+  const summary = session.detail.summary;
+  let workingSets = 0;
+  let warmupSets = 0;
+  let reps = 0;
+  let volumeKg = 0;
+  let workSec = 0;
+  let restSec = 0;
+  for (const exercise of session.detail.exercises) {
+    for (const entry of exercise.entries) {
+      if (entry.type === "warmup") warmupSets += 1;
+      else workingSets += 1;
+      reps += entry.reps;
+      volumeKg += entry.reps * entry.weightKg;
+      workSec += entry.workSec;
+      restSec += entry.restSec;
+    }
+  }
+  const durationSec = summary.durationSec || session.duration || 0;
+  const optional = (value: number | undefined) =>
+    value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined;
+  return {
+    durationSec,
+    workingSets,
+    warmupSets,
+    reps,
+    volumeKg,
+    densityKgPerMin: volumeKg > 0 && durationSec > 0 ? volumeKg / (durationSec / 60) : undefined,
+    restPerWork: workSec > 0 && restSec > 0 ? restSec / workSec : undefined,
+    avgHr: optional(session.avgHr ?? summary.avgHr),
+    maxHr: optional(session.maxHr ?? summary.maxHr),
+    trainingLoad: optional(session.trainingLoad ?? summary.trainingLoad),
+    calories: optional(session.calories ?? summary.calories)
+  };
+}
+
+export interface ExerciseSetRow {
+  type: StrengthSetType;
+  reps: number;
+  weightKg: number;
+  /** 0 when the set is outside the range an estimate means anything in. */
+  e1rmKg: number;
+  workSec: number;
+  restSec: number;
+  rpe?: number;
+}
+
+export interface SessionExerciseRow {
+  /** Stable within a session even when a superset lists one exercise twice. */
+  key: string;
+  name: string;
+  sets: ExerciseSetRow[];
+  reps: number;
+  volumeKg: number;
+  /** The heaviest set, the one with more reps on a tie; absent for bodyweight work. */
+  topSet?: { weightKg: number; reps: number };
+  bestE1rmKg: number;
+  /** Records this row set. A superset's two rows never both claim one. */
+  records: SessionPersonalRecord[];
+}
+
+/** The exercise table, in the order the session logged it. */
+export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[] {
+  const rows: SessionExerciseRow[] = entry.session.detail.exercises.map((exercise, index) => {
+    const sets = exercise.entries.map((set) => ({
+      type: set.type ?? "normal",
+      reps: set.reps,
+      weightKg: set.weightKg,
+      e1rmKg: estimateOneRepMax(set.weightKg, set.reps),
+      workSec: set.workSec,
+      restSec: set.restSec,
+      ...(set.rpe !== undefined ? { rpe: set.rpe } : {})
+    }));
+    const top = sets.reduce<ExerciseSetRow | undefined>(
+      (best, set) =>
+        set.weightKg > 0 &&
+        (!best || set.weightKg > best.weightKg || (set.weightKg === best.weightKg && set.reps > best.reps))
+          ? set
+          : best,
+      undefined
+    );
+    return {
+      key: `${index}-${exercise.nameKey}`,
+      name: exerciseDisplayName(exercise.nameKey, exercise.rawName),
+      sets,
+      reps: sets.reduce((total, set) => total + set.reps, 0),
+      volumeKg: sets.reduce((total, set) => total + set.reps * set.weightKg, 0),
+      topSet: top ? { weightKg: top.weightKg, reps: top.reps } : undefined,
+      bestE1rmKg: Math.max(0, ...sets.map((set) => set.e1rmKg)),
+      records: []
+    };
+  });
+
+  for (const record of entry.records) {
+    const holder =
+      rows.find(
+        (row) =>
+          row.name === record.exercise &&
+          (record.kind === "weight" ? row.topSet?.weightKg ?? 0 : row.bestE1rmKg) >=
+            record.valueKg - RECORD_EPSILON_KG
+      ) ?? rows.find((row) => row.name === record.exercise);
+    holder?.records.push(record);
+  }
+  return rows;
 }

@@ -30,7 +30,7 @@ const { buildStrengthAnalytics, heatLevel, metricValue } = await load(
   "strength",
   "strengthAnalytics.ts"
 );
-const { buildStrengthSessionIndex, sessionHeat } = await load(
+const { buildExerciseRows, buildSessionStats, buildStrengthSessionIndex, sessionHeat } = await load(
   "src",
   "strength",
   "sessionAnalytics.ts"
@@ -259,6 +259,57 @@ assert.equal(
   assert.deepEqual(records("undated"), []);
   // ...and its 200 kg single does not become the best that later sessions must beat.
   assert.deepEqual(kinds("b3"), ["e1rm", "weight"]);
+}
+
+// ---- 6. Session stats: warm-ups are not working sets, missing data stays missing ----
+
+{
+  const hevy = session("hevy", now - DAY, [
+    exercise("T1041", [
+      { reps: 10, weightKg: 40, type: "warmup", workSec: 30, restSec: 0 },
+      { reps: 5, weightKg: 80, workSec: 30, restSec: 0 },
+      { reps: 5, weightKg: 80, workSec: 30, restSec: 0 }
+    ])
+  ]);
+  const stats = buildSessionStats(hevy);
+  assert.equal(stats.workingSets, 2);
+  assert.equal(stats.warmupSets, 1);
+  assert.equal(stats.volumeKg, 10 * 40 + 5 * 80 * 2);
+  assert.equal(stats.densityKgPerMin, stats.volumeKg / 60, "an hour-long session");
+  assert.equal(stats.restPerWork, undefined, "a log with no rest has no work:rest ratio, not 0");
+  assert.equal(stats.avgHr, undefined);
+
+  const coros = session("coros", now - DAY, [exercise("T1041", sets(2, 8, 0))]);
+  coros.avgHr = 118;
+  const corosStats = buildSessionStats(coros);
+  assert.equal(corosStats.restPerWork, 90 / 40, "fixture entries rest 90 s per 40 s of work");
+  assert.equal(corosStats.densityKgPerMin, undefined, "bodyweight work has no density");
+  assert.equal(corosStats.avgHr, 118);
+}
+
+// ---- 7. Exercise rows: top set, per-set e1RM, records on the row that set them ----
+
+{
+  const history = [
+    session("r0", now - 20 * DAY, [exercise("T1041", sets(3, 5, 80))]),
+    session("r1", now - 5 * DAY, [
+      // A superset lists bench twice; only the second block beat the old best.
+      exercise("T1041", [{ reps: 8, weightKg: 70 }, { reps: 6, weightKg: 75 }]),
+      exercise("T1061", sets(3, 5, 100)),
+      exercise("T1041", [{ reps: 3, weightKg: 85 }, { reps: 5, weightKg: 85 }, { reps: 20, weightKg: 40 }])
+    ])
+  ];
+  const index = buildStrengthSessionIndex(history);
+  const rows = buildExerciseRows(index.byId.get("r1"));
+
+  assert.deepEqual(rows.map((row) => row.name), ["Bench Press", "Squats", "Bench Press"]);
+  assert.equal(new Set(rows.map((row) => row.key)).size, 3, "row keys stay unique across a superset");
+  assert.deepEqual(rows[2].topSet, { weightKg: 85, reps: 5 }, "a weight tie goes to the set with more reps");
+  assert.equal(rows[2].sets[2].e1rmKg, 0, "20 reps is past where an e1RM means anything");
+  assert.equal(rows[2].bestE1rmKg, 85 * (1 + 5 / 30));
+  assert.equal(rows[0].records.length, 0, "the lighter superset block claims no record");
+  assert.deepEqual(rows[2].records.map((record) => record.kind).sort(), ["e1rm", "weight"]);
+  assert.equal(rows[1].records.length, 0, "Squats had no earlier session to beat");
 }
 
 console.log("strength session analytics OK");
