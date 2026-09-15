@@ -2248,6 +2248,45 @@ export function setTrainingActivityFeelType(
 }
 
 /**
+ * The cached feeling for each of these activities, as COROS has it.
+ *
+ * Three states, and the screen showing them has to keep them apart: a row not
+ * in the result has never been fetched, `0` means COROS was asked and the
+ * athlete never rated the session, and 1..5 is the rating itself. A caller that
+ * folds the first two together tells an athlete they have unrated sessions
+ * before the backfill has looked.
+ */
+export function readTrainingActivityFeelTypes(
+  activityIds: readonly string[]
+): Record<string, number> {
+  const feels: Record<string, number> = {};
+  if (activityIds.length === 0) {
+    return feels;
+  }
+
+  const db = requireDatabase();
+  // Chunked: SQLite caps a statement's variables, and this is called with the
+  // athlete's whole history.
+  const CHUNK = 500;
+  for (let index = 0; index < activityIds.length; index += CHUNK) {
+    const chunk = activityIds.slice(index, index + CHUNK);
+    const rows = db
+      .prepare(
+        `SELECT activity_id, feel_type
+         FROM training_activities
+         WHERE feel_type IS NOT NULL
+           AND activity_id IN (${chunk.map(() => "?").join(",")})`
+      )
+      .all(...chunk) as { activity_id: string; feel_type: number }[];
+    for (const row of rows) {
+      feels[row.activity_id] = row.feel_type;
+    }
+  }
+
+  return feels;
+}
+
+/**
  * Activities on/after `sinceEpochSeconds` whose feel_type has never been
  * fetched (NULL), NEWEST first — recent sessions are the most likely to be
  * rated, so they populate the heatmap soonest.

@@ -8,7 +8,11 @@
  * The set is chosen per sport rather than fixed, because a fixed set is what
  * put a column of "0 km" beside every strength session.
  */
-import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
+import type {
+  ActivityDetailSummary,
+  TrainingHubActivity,
+  UnitSystem
+} from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSpan,
@@ -31,14 +35,25 @@ function isPacedSport(sportType: number | undefined): boolean {
 }
 
 /**
- * At most four, in the order the sport is usually read.
+ * The most a row's line will carry.
  *
- * Four rather than everything available: the row is one line under a title,
- * and a fifth figure is the one that makes the line wrap on a narrow pane.
+ * Not everything available: the line sits under a title in a pane about 600px
+ * wide, and the sixth figure is the one that wraps it. A full run row —
+ * time, distance, pace, heart rate, drift — is exactly five.
+ */
+const MAX_FACTS = 5;
+
+/**
+ * At most {@link MAX_FACTS}, in the order the sport is usually read.
  */
 export function activityRowFacts(
   activity: TrainingHubActivity,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /**
+   * The stored detail summary, where one has been computed. It fills in behind
+   * the list rather than holding it back, so a row shows what it has.
+   */
+  summary?: ActivityDetailSummary
 ): ActivityFact[] {
   const { sportType, distance, duration, avgHr, trainingLoad, elevationGain } =
     activity;
@@ -86,10 +101,24 @@ export function activityRowFacts(
     });
   }
 
+  // Decoupling before climb and load: it says something about the session that
+  // none of the session's own figures do, and it is the reason the stored
+  // summaries exist at all.
+  if (facts.length < MAX_FACTS && summary?.decouplingPercent !== undefined) {
+    const drift = summary.decouplingPercent;
+    facts.push({
+      key: "drift",
+      value: `${drift > 0 ? "+" : ""}${drift.toFixed(1)}% drift`,
+      title:
+        "Aerobic decoupling — how far pace and heart rate moved apart after " +
+        "the first ten minutes. Under 5% is a session held together."
+    });
+  }
+
   // Climb earns its place only on a session that actually climbed: every flat
   // road run carries a few metres of GPS noise, and a "4 m" on every row is
   // four characters of nothing.
-  if (facts.length < 4 && elevationGain && elevationGain >= 50) {
+  if (facts.length < MAX_FACTS && elevationGain && elevationGain >= 50) {
     facts.push({
       key: "climb",
       value: formatElevationMeters(elevationGain, unitSystem),
@@ -97,7 +126,7 @@ export function activityRowFacts(
     });
   }
 
-  if (facts.length < 4 && trainingLoad && trainingLoad > 0) {
+  if (facts.length < MAX_FACTS && trainingLoad && trainingLoad > 0) {
     facts.push({
       key: "load",
       value: `${Math.round(trainingLoad)} TL`,
@@ -105,5 +134,5 @@ export function activityRowFacts(
     });
   }
 
-  return facts.slice(0, 4);
+  return facts.slice(0, MAX_FACTS);
 }

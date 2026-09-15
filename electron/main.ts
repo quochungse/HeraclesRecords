@@ -68,6 +68,7 @@ import {
   initializeDatabase,
   listDownloads,
   markDownloadTransferred,
+  readTrainingActivityFeelTypes,
   setSetting
 } from "./database";
 import {
@@ -2654,6 +2655,15 @@ function registerIpcHandlers(): void {
   // rather than one: a read that answers from SQLite in a millisecond, and a
   // sweep that goes to COROS and is meant to be called again until it reports
   // nothing left.
+  // The cached end-of-activity feeling per activity, straight out of SQLite.
+  // Only activities COROS has actually been asked about appear; see
+  // `readTrainingActivityFeelTypes` for why that matters.
+  ipcMain.handle(
+    "trainingHub:getActivityFeelTypes",
+    (_event, activityIds: string[]) =>
+      readTrainingActivityFeelTypes(activityIds)
+  );
+
   ipcMain.handle(
     "trainingHub:getActivityDetailSummaries",
     (_event, activityIds: string[]) => readActivityDetailSummaries(activityIds)

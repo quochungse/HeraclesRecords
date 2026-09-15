@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import type {
+  ActivityDetailSummary,
   TrainingHubActivity,
   TrainingHubActivityFileType,
   TrainingHubSportType
@@ -13,6 +14,7 @@ import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan } from "../formatters";
 import { sportColorCategory } from "../sportColors";
 import { resolveSportName } from "../sportTypes";
+import { FEEL_LABELS, type ActivityFeelMap } from "../useActivityFeelTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { ActivityExportMenu } from "./ActivityExportMenu";
 
@@ -23,6 +25,14 @@ interface ActivityJournalListProps {
   busy: string | null;
   /** Clock pinned by the caller, so headings cannot drift mid-render. */
   nowMs: number;
+  /** COROS's end-of-activity feeling, where this machine has read one. */
+  feel: ActivityFeelMap;
+  /**
+   * Stored detail summaries by activity id. They arrive after the list does
+   * and fill in as they are computed, so a row reads what it has rather than
+   * holding the list back.
+   */
+  summaries: ReadonlyMap<string, ActivityDetailSummary>;
   onLoadDetail: (activity: TrainingHubActivity) => void;
   onExportFile: (
     activity: TrainingHubActivity,
@@ -78,6 +88,8 @@ export function ActivityJournalList({
   selectedActivityId,
   busy,
   nowMs,
+  feel,
+  summaries,
   onLoadDetail,
   onExportFile
 }: ActivityJournalListProps) {
@@ -174,7 +186,12 @@ export function ActivityJournalList({
                 activity.name?.trim() || sportName || "Activity";
               const selected = selectedActivityId === activity.activityId;
               const loading = busy === `training-detail:${activity.activityId}`;
-              const facts = activityRowFacts(activity, unitSystem);
+              const facts = activityRowFacts(
+                activity,
+                unitSystem,
+                summaries.get(activity.activityId)
+              );
+              const rating = feel.rating.get(activity.activityId);
 
               return (
                 <li
@@ -201,6 +218,20 @@ export function ActivityJournalList({
                         >
                           {sportName}
                         </span>
+                        {/*
+                          * How the session felt, as the athlete rated it in the
+                          * COROS app. It is what every RPE figure in the app is
+                          * built from and no screen showed it.
+                          */}
+                        {rating !== undefined ? (
+                          <span
+                            className="activity-row-feel"
+                            data-feel={rating}
+                            title={`Felt ${FEEL_LABELS[rating]?.toLowerCase() ?? rating}`}
+                          >
+                            {rating}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="activity-row-facts">
                         {facts.map((fact) => (

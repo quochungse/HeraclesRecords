@@ -360,7 +360,7 @@ assert.deepEqual(
       trainingLoad: 210
     })
   ),
-  ["1h", "10.0 km", "6:00 /km", "148 bpm"],
+  ["1h", "10.0 km", "6:00 /km", "148 bpm", "210 TL"],
   "a run is read by pace"
 );
 
@@ -374,7 +374,7 @@ assert.deepEqual(
       trainingLoad: 150
     })
   ),
-  ["1h", "30.0 km", "30.0 km/h", "132 bpm"],
+  ["1h", "30.0 km", "30.0 km/h", "132 bpm", "150 TL"],
   "a ride is read by speed, not by pace"
 );
 
@@ -408,7 +408,7 @@ assert.deepEqual(
   "a real climb is"
 );
 
-assert.ok(
+assert.deepEqual(
   activityRowFacts(
     activity({
       sportType: 100,
@@ -419,8 +419,111 @@ assert.ok(
       trainingLoad: 210
     }),
     "metric"
-  ).length <= 4,
-  "four figures at most — a fifth is what makes the line wrap"
+  ).map((fact) => fact.key),
+  ["duration", "distance", "pace", "avgHr", "climb"],
+  "five figures at most — a sixth is what wraps the line, and load is the " +
+    "one dropped because COROS scores it on every row"
+);
+
+// ---------------------------------------------------------------------------
+// 10. The unrated filter keeps "not rated" apart from "not looked at yet"
+// ---------------------------------------------------------------------------
+
+const rateable = [
+  activity({ activityId: "rated", startTime: at(NOW - DAY) }),
+  activity({ activityId: "unrated", startTime: at(NOW - 2 * DAY) }),
+  activity({ activityId: "unchecked", startTime: at(NOW - 3 * DAY) })
+];
+const isRated = (row) =>
+  row.activityId === "rated"
+    ? true
+    : row.activityId === "unrated"
+      ? false
+      : undefined;
+
+assert.deepEqual(
+  filterActivities({
+    activities: rateable,
+    filters: { ...DEFAULT_ACTIVITY_FILTERS, unratedOnly: true },
+    nowMs: NOW,
+    isRated
+  }).map((row) => row.activityId),
+  ["unrated"],
+  "a session the backfill has not reached is unknown, not unrated"
+);
+
+assert.deepEqual(
+  filterActivities({
+    activities: rateable,
+    filters: DEFAULT_ACTIVITY_FILTERS,
+    nowMs: NOW,
+    isRated
+  }).map((row) => row.activityId),
+  ["rated", "unrated", "unchecked"],
+  "the filter off means every session"
+);
+
+// Without the ratings read, the filter matches nothing rather than everything:
+// a filter that silently turns into "show all" while its data loads is worse
+// than one that visibly waits.
+assert.equal(
+  filterActivities({
+    activities: rateable,
+    filters: { ...DEFAULT_ACTIVITY_FILTERS, unratedOnly: true },
+    nowMs: NOW
+  }).length,
+  0
+);
+
+// ---------------------------------------------------------------------------
+// 11. Drift comes off the stored summary, when there is one
+// ---------------------------------------------------------------------------
+
+const longRun = activity({
+  sportType: 100,
+  duration: 5400,
+  distance: 15_000,
+  trainingLoad: 300
+});
+
+assert.ok(
+  !factKeys(longRun).includes("drift"),
+  "no summary, no drift — the list is not held back for one"
+);
+
+assert.deepEqual(
+  activityRowFacts(longRun, "metric", {
+    activityId: "a1",
+    fingerprint: "f",
+    summaryVersion: 1,
+    decouplingPercent: 4.2,
+    computedAt: 0
+  }).map((fact) => fact.key),
+  ["duration", "distance", "pace", "drift", "load"],
+  "drift comes before climb and load"
+);
+
+// The row a real run produces: the four figures off the list payload plus the
+// one off the stored summary. This is what the cap is sized for.
+assert.deepEqual(
+  activityRowFacts(
+    activity({
+      sportType: 100,
+      duration: 5149,
+      distance: 12_200,
+      avgHr: 162,
+      trainingLoad: 280
+    }),
+    "metric",
+    {
+      activityId: "a1",
+      fingerprint: "f",
+      summaryVersion: 1,
+      decouplingPercent: 4.2,
+      computedAt: 0
+    }
+  ).map((fact) => fact.key),
+  ["duration", "distance", "pace", "avgHr", "drift"]
 );
 
 console.log("activity filter tests passed");

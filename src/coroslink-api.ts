@@ -516,6 +516,16 @@ export interface CorosLinkApi {
     activityId: string,
     sportType: number
   ) => Promise<Record<string, unknown>>;
+  /**
+   * The cached COROS end-of-activity feeling per activity, 1..5, or `0` where
+   * COROS was asked and the athlete never rated it. An activity absent from
+   * the result has never been fetched — which is not the same as unrated, and
+   * a caller that folds the two together reports gaps the backfill has simply
+   * not reached yet.
+   */
+  getActivityFeelTypes: (
+    activityIds: string[]
+  ) => Promise<Record<string, number>>;
   /** Stored summaries for these activities — only the ones still valid for the
    *  activity as COROS describes it now. Answers from SQLite; asks nothing. */
   getActivityDetailSummaries: (

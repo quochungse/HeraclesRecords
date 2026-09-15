@@ -32,7 +32,7 @@ import {
   surfacesPresent,
   type RunZoneScale
 } from "./runMetrics";
-import { useRunDetailSummaries } from "./useRunDetailSummaries";
+import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
 import { RunnerIcon } from "./runnerIcon";
 import {
   RUN_SURFACE_LABELS,
@@ -246,9 +246,9 @@ export function RunningView({
   // are kept as a row per run so a whole list can show them. Read for the runs
   // on screen; missing ones are computed in the background and appear as they
   // land.
-  const summaries = useRunDetailSummaries({
+  const summaries = useActivityDetailSummaries({
     api,
-    runs,
+    activities: runs,
     enabled: connected && selectedRunId === null
   });
 

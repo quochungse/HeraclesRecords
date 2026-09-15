@@ -1,4 +1,4 @@
-import { Search, X } from "lucide-react";
+import { Search, Smile, X } from "lucide-react";
 import {
   ACTIVITY_PERIOD_OPTIONS,
   type ActivityFilters
@@ -11,6 +11,8 @@ interface ActivitiesFilterBarProps {
   available: readonly SportColorCategory[];
   /** How many activities the current filters admit, for the live count. */
   matched: number;
+  /** Sessions COROS was asked about and holds no feeling for. */
+  unratedCount: number;
   onChange: (filters: ActivityFilters) => void;
 }
 
@@ -18,6 +20,7 @@ export function ActivitiesFilterBar({
   filters,
   available,
   matched,
+  unratedCount,
   onChange
 }: ActivitiesFilterBarProps) {
   function toggleSport(category: SportColorCategory) {
@@ -28,7 +31,9 @@ export function ActivitiesFilterBar({
   }
 
   const narrowed =
-    filters.sports.length > 0 || filters.query.trim().length > 0;
+    filters.sports.length > 0 ||
+    filters.query.trim().length > 0 ||
+    filters.unratedOnly;
 
   return (
     <div className="activities-filters">
@@ -75,6 +80,28 @@ export function ActivitiesFilterBar({
         </div>
       ) : null}
 
+      {/*
+        * Offered only when there is something to find. A filter that can only
+        * ever come back empty is a button that looks broken.
+        */}
+      {unratedCount > 0 || filters.unratedOnly ? (
+        <button
+          type="button"
+          aria-pressed={filters.unratedOnly}
+          className={`activities-sport-toggle activities-unrated${
+            filters.unratedOnly ? " is-active" : ""
+          }`}
+          title="Sessions COROS holds no end-of-activity feeling for. They count nothing towards session RPE load."
+          onClick={() =>
+            onChange({ ...filters, unratedOnly: !filters.unratedOnly })
+          }
+        >
+          <Smile size={13} aria-hidden="true" />
+          Unrated
+          <em>{unratedCount}</em>
+        </button>
+      ) : null}
+
       <div className="activities-search">
         <Search size={14} aria-hidden="true" />
         <input
@@ -110,7 +137,14 @@ export function ActivitiesFilterBar({
           </span>
           <button
             type="button"
-            onClick={() => onChange({ ...filters, sports: [], query: "" })}
+            onClick={() =>
+              onChange({
+                ...filters,
+                sports: [],
+                query: "",
+                unratedOnly: false
+              })
+            }
           >
             Clear filters
           </button>

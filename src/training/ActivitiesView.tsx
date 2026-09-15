@@ -13,6 +13,8 @@ import {
   summariseActivities
 } from "./activityFilters";
 import { resolveSportName } from "./sportTypes";
+import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
+import { feelCoverage, useActivityFeelTypes } from "./useActivityFeelTypes";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
 
@@ -49,7 +51,7 @@ export function ActivitiesView({
    * reaches for it.
    */
   const [limit, setLimit] = useState(PAGE_SIZE);
-  const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}`;
+  const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}|${filters.unratedOnly}`;
   const lastFilterKey = useRef(filterKey);
   if (lastFilterKey.current !== filterKey) {
     // Narrowing the list and keeping a limit from the wider one would leave the
@@ -70,18 +72,38 @@ export function ActivitiesView({
 
   const available = useMemo(() => sportsPresent(activities), [activities]);
 
+  /*
+   * Both read the whole history rather than the filtered list: each is keyed on
+   * the activity ids, and narrowing the set would re-read on every keystroke.
+   * Neither holds the screen back — the badges and the drift column fill in.
+   */
+  const feel = useActivityFeelTypes(api, activities);
+  const summaries = useActivityDetailSummaries({
+    api,
+    activities,
+    // Held back while a session the athlete just clicked is loading: computing
+    // a summary is a detail fetch of its own, and that payload wants the
+    // connection first.
+    enabled: detailRequest?.status !== "pending"
+  });
+
   const visible = useMemo(
     () =>
       filterActivities({
         activities,
         filters,
         nowMs,
-        sportName: (activity) => resolveSportName(activity, sportTypeMap)
+        sportName: (activity) => resolveSportName(activity, sportTypeMap),
+        isRated: (activity) => {
+          const state = feel.state(activity.activityId);
+          return state === "unchecked" ? undefined : state === "rated";
+        }
       }),
-    [activities, filters, nowMs, sportTypeMap]
+    [activities, feel, filters, nowMs, sportTypeMap]
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
+  const coverage = useMemo(() => feelCoverage(visible, feel), [visible, feel]);
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
@@ -123,6 +145,8 @@ export function ActivitiesView({
             selectedActivityId={selectedActivity?.activityId ?? null}
             busy={busy}
             nowMs={nowMs}
+            feel={feel}
+            summaries={summaries}
             onLoadDetail={onLoadDetail}
             onExportFile={onExportFile}
           />
@@ -204,12 +228,17 @@ export function ActivitiesView({
         </div>
       </header>
 
-      <ActivitiesSummary totals={totals} periodLabel={periodLabel} />
+      <ActivitiesSummary
+        totals={totals}
+        periodLabel={periodLabel}
+        feelCoverage={coverage}
+      />
 
       <ActivitiesFilterBar
         filters={filters}
         available={available}
         matched={visible.length}
+        unratedCount={coverage.checked - coverage.rated}
         onChange={setFilters}
       />
 

@@ -34,12 +34,21 @@ export interface ActivityFilters {
   /** Empty means every sport — not "no sports", which nothing would match. */
   sports: readonly SportColorCategory[];
   query: string;
+  /**
+   * Only sessions COROS was asked about and holds no feeling for.
+   *
+   * Deliberately not "everything without a rating": a session the RPE backfill
+   * has not reached yet is unknown, not unrated, and listing it sends the
+   * athlete to the COROS app to rate something that may already be rated.
+   */
+  unratedOnly: boolean;
 }
 
 export const DEFAULT_ACTIVITY_FILTERS: ActivityFilters = {
   periodDays: DEFAULT_ACTIVITY_PERIOD_DAYS,
   sports: [],
-  query: ""
+  query: "",
+  unratedOnly: false
 };
 
 /** Calendar weeks a period covers, this week included. */
@@ -86,6 +95,13 @@ export interface ActivityFilterInput {
   nowMs: number;
   /** Resolves a row's sport name, so the query can match it. */
   sportName?: (activity: TrainingHubActivity) => string | undefined;
+  /**
+   * Whether COROS holds a feeling for a row. Absent means the caller has not
+   * read them, and `unratedOnly` then matches nothing rather than everything —
+   * a filter that turns into "show all" while its data loads is worse than one
+   * that visibly waits.
+   */
+  isRated?: (activity: TrainingHubActivity) => boolean | undefined;
 }
 
 /**
@@ -99,7 +115,8 @@ export function filterActivities({
   activities,
   filters,
   nowMs,
-  sportName
+  sportName,
+  isRated
 }: ActivityFilterInput): TrainingHubActivity[] {
   const startMs = activityPeriodStartMs(filters.periodDays, nowMs);
   const sports = new Set(filters.sports);
@@ -117,6 +134,10 @@ export function filterActivities({
     }
 
     if (sports.size > 0 && !sports.has(sportColorCategory(activity.sportType))) {
+      return false;
+    }
+
+    if (filters.unratedOnly && isRated?.(activity) !== false) {
       return false;
     }
 

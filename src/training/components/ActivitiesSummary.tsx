@@ -1,4 +1,5 @@
 import type { ActivityTotals } from "../activityFilters";
+import type { FeelCoverage } from "../useActivityFeelTypes";
 import { SPORT_COLOR_LABELS } from "../sportColors";
 import {
   formatDistanceMeters,
@@ -11,6 +12,8 @@ interface ActivitiesSummaryProps {
   totals: ActivityTotals;
   /** What the period selector says, e.g. "3 months" — the caption's subject. */
   periodLabel: string;
+  /** How much of this stretch carries an end-of-activity feeling. */
+  feelCoverage: FeelCoverage;
 }
 
 interface SummaryTile {
@@ -42,7 +45,11 @@ function perWeekPhrase(total: number, weeks: number, noun: string): string {
  * lifting week and Strength cannot see a running one, so the question "what
  * have I actually been doing" has only ever been answerable here.
  */
-export function ActivitiesSummary({ totals, periodLabel }: ActivitiesSummaryProps) {
+export function ActivitiesSummary({
+  totals,
+  periodLabel,
+  feelCoverage: coverage
+}: ActivitiesSummaryProps) {
   const { unitSystem } = useUnitSystem();
   const mixTotal = totals.sports.reduce((sum, sport) => sum + sport.duration, 0);
 
@@ -128,6 +135,20 @@ export function ActivitiesSummary({ totals, periodLabel }: ActivitiesSummaryProp
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {/*
+       * Where the RPE figures elsewhere in the app are actually built from.
+       * `rpeLoad` turns a 1..5 feeling into a Foster session load and the
+       * heatmap draws it; a third of a block going unrated is a hole in that
+       * chart, and no screen said so. Only sessions COROS has been asked about
+       * are counted — the backfill's remainder is unknown, not unrated.
+       */}
+      {coverage.checked > 0 && coverage.rated < coverage.checked ? (
+        <p className="activities-coverage" role="note">
+          Rated {coverage.rated} of {coverage.checked} sessions. The rest carry
+          no RPE, so they count nothing towards session load.
+        </p>
       ) : null}
     </section>
   );
