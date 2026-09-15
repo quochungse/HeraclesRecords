@@ -98,9 +98,11 @@ export function parseIntervalsActivities(raw: any[]): IntervalsActivity[] {
       intervalsId: String(a.id),
       name: a.name ?? "Unnamed",
       startEpochMs: start ? Date.parse(start) : 0,
-      // COROS's activity list only exposes ELAPSED time (raw.totalTime), so we
-      // must prefer elapsed here too — comparing elapsed-vs-moving would flag
-      // activities with stops (e.g. cycling) as false "Missing" and cause
+      // Matched against COROS's ELAPSED time (`elapsedDuration`, raw.totalTime),
+      // so we must prefer elapsed here too. Elapsed is the one clock both sides
+      // measure alike: intervals.icu derives moving time from speed, COROS's
+      // activity time from the pause button. Comparing across the two would
+      // flag activities with stops (e.g. cycling) as false "Missing" and cause
       // duplicate imports.
       movingSec: Number(
         a.elapsed_time ?? a.elapsedTime ?? a.moving_time ?? a.movingTime ?? 0

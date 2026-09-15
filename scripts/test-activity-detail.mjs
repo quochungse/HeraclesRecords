@@ -796,8 +796,8 @@ const pausedRun = parseActivityDetail({
   ]
 });
 
-assert.equal(pausedRun.duration, 7102, "start to finish");
-assert.equal(pausedRun.activeDuration, 4190, "the running alone");
+assert.equal(pausedRun.duration, 4190, "duration is the running alone");
+assert.equal(pausedRun.elapsedDuration, 7102, "start to finish");
 assert.deepEqual(pausedRun.pauses, [
   { start: 1120, duration: 694 },
   { start: 2524, duration: 2218 }
@@ -805,7 +805,29 @@ assert.deepEqual(pausedRun.pauses, [
 assert.deepEqual(
   pausedRun.series.map((point) => point.elapsed),
   [0, 1120, 1813, 2524, 7102],
-  "the series stays on the wall clock — scaled against the duration it spans"
+  "the series stays on the wall clock — scaled against the elapsed time it spans"
+);
+
+// Only activity time sent: the one clock there is scales the series and
+// stands in for both. Elapsed is not invented from it.
+const workoutOnly = parseActivityDetail({
+  summary: { workoutTime: 30000 },
+  frequencyList: [{ distance: 0, timestamp: 0 }, { distance: 100000, timestamp: 30000 }]
+});
+assert.equal(workoutOnly.duration, 300);
+assert.equal("elapsedDuration" in workoutOnly, false);
+assert.deepEqual(workoutOnly.series.map((point) => point.elapsed), [0, 300]);
+
+// No activity time sent: fall back to start-to-finish rather than show nothing.
+assert.equal(parseActivityDetail({ summary: { totalTime: 30000 } }).duration, 300);
+
+// A lap's `time` is its activity time; a `totalTime` beside it would carry
+// the lap's pauses and must not win.
+assert.equal(
+  parseActivityDetail({
+    lapList: [{ type: 2, lapItemList: [{ distance: 100000, time: 30000, totalTime: 42000 }] }]
+  }).laps[0]?.duration,
+  300
 );
 
 // A run that never stopped carries neither a pause nor a second clock to show.
@@ -813,7 +835,8 @@ const unpaused = parseActivityDetail({
   summary: { totalTime: 514870, workoutTime: 514870, startTimestamp: 178920983092 },
   pauseList: []
 });
-assert.equal(unpaused.activeDuration, 5149);
+assert.equal(unpaused.duration, 5149);
+assert.equal(unpaused.elapsedDuration, 5149);
 assert.equal("pauses" in unpaused, false);
 
 // No start to measure from means nowhere to put a pause, not a guess at one.
@@ -836,19 +859,19 @@ const listed = mapTrainingHubActivity({
   workoutTime: 4190,
   distance: 10200.14
 });
-assert.equal(listed.duration, 7102);
-assert.equal(listed.activeDuration, 4190);
+assert.equal(listed.duration, 4190);
+assert.equal(listed.elapsedDuration, 7102);
 assert.equal(
-  mapTrainingHubActivity({ labelId: "x", totalTime: 60, workoutTime: 0 }).activeDuration,
-  undefined,
-  "zero is COROS's not-recorded"
+  mapTrainingHubActivity({ labelId: "x", totalTime: 60, workoutTime: 0 }).duration,
+  60,
+  "zero is COROS's not-recorded: the elapsed clock stands in"
 );
 
-// A detail that came back without activity time borrows the list's.
+// A detail that came back without the elapsed clock borrows the list's.
 assert.equal(
-  mergeActivityDetailWithList({ laps: [], hrZones: [], raw: {}, duration: 7102 }, listed)
-    .activeDuration,
-  4190
+  mergeActivityDetailWithList({ laps: [], hrZones: [], raw: {}, duration: 4190 }, listed)
+    .elapsedDuration,
+  7102
 );
 
 console.log("Activity detail parser tests passed.");

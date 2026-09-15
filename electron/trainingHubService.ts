@@ -4159,14 +4159,15 @@ export function mapTrainingHubActivity(
     sportName: raw.sportName ?? raw.sport_name,
     startTime: raw.startTime,
     endTime: raw.endTime,
-    duration: raw.totalTime,
     // Verified live: `totalTime` is `endTime - startTime` to the second, and
     // `workoutTime` is that less the pauses — 7 102 s against 4 190 s on a run
-    // with two of them. Both arrive in whole seconds on this endpoint.
-    activeDuration:
+    // with two of them. Both arrive in whole seconds on this endpoint; a zero
+    // `workoutTime` is COROS's not-recorded, not a zero-second activity.
+    duration:
       raw.workoutTime !== undefined && raw.workoutTime > 0
         ? raw.workoutTime
-        : undefined,
+        : raw.totalTime,
+    elapsedDuration: raw.totalTime,
     distance: raw.distance,
     avgHr: raw.avgHr,
     maxHr: raw.maxHr,
@@ -4222,8 +4223,8 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
   ]);
   const durationRaw = pickDailyMetricNumber(record, [
     "duration",
-    "totalTime",
     "workoutTime",
+    "totalTime",
     "sportTime",
     "time"
   ]);
@@ -5705,7 +5706,7 @@ function lapGroupSignature(items: Record<string, unknown>[]): string {
   return JSON.stringify(
     items.map((item) => [
       item.distance ?? item.totalDistance,
-      item.totalTime ?? item.duration
+      item.time ?? item.totalTime ?? item.duration
     ])
   );
 }
@@ -6901,9 +6902,9 @@ export function mergeActivityDetailWithList(
       ),
     startTime: detail.startTime ?? listActivity.startTime,
     duration: coalesceActivityMetric(detail.duration, listActivity.duration),
-    activeDuration: coalesceActivityMetric(
-      detail.activeDuration,
-      listActivity.activeDuration
+    elapsedDuration: coalesceActivityMetric(
+      detail.elapsedDuration,
+      listActivity.elapsedDuration
     ),
     distance: coalesceActivityMetric(detail.distance, listActivity.distance),
     avgHr: coalesceActivityMetric(detail.avgHr, listActivity.avgHr),
@@ -7252,11 +7253,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
   const laps = extractActivityLaps(raw);
   const track = parseActivityTrack(raw);
 
-  const durationRaw = pickActivityNumber(raw, summary, [
-    "totalTime",
-    "duration",
-    "workoutTime"
-  ]);
+  const elapsedRaw = pickActivityNumber(raw, summary, ["totalTime", "duration"]);
   const distanceRaw = pickActivityNumber(raw, summary, ["distance", "totalDistance"]);
   const elevationRaw = pickActivityNumber(raw, summary, [
     "ascent",
@@ -7270,10 +7267,10 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     "totalDescent",
     "elevLoss"
   ]);
-  const duration = normalizeCorosDetailDurationSeconds(durationRaw);
-  const activeDuration = normalizeCorosDetailDurationSeconds(
-    pickActivityNumber(raw, summary, ["workoutTime"])
-  );
+  const elapsedDuration = normalizeCorosDetailDurationSeconds(elapsedRaw);
+  const duration =
+    normalizeCorosDetailDurationSeconds(pickActivityNumber(raw, summary, ["workoutTime"])) ??
+    elapsedDuration;
   const pauses = parseActivityPauses(raw, summary);
 
   return {
@@ -7292,7 +7289,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
         toOptionalNumber(summary.startTimestamp)
     ),
     duration,
-    ...(activeDuration !== undefined ? { activeDuration } : {}),
+    ...(elapsedDuration !== undefined ? { elapsedDuration } : {}),
     ...(pauses.length > 0 ? { pauses } : {}),
     distance: normalizeActivityDistanceMeters(distanceRaw),
     avgHr:
@@ -7314,7 +7311,10 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,
-    series: parseActivitySeries(raw, duration),
+    // The samples run on the wall clock, so their unit is found against the
+    // span they cover — pauses included. Activity time would miss the 10%
+    // band on any run that stopped long enough to matter.
+    series: parseActivitySeries(raw, elapsedDuration ?? duration),
     strength: parseStrengthDetail(raw),
     raw
   };
@@ -7328,9 +7328,11 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
   const lap = raw as Record<string, unknown>;
   const distanceRaw =
     toOptionalNumber(lap.distance) ?? toOptionalNumber(lap.totalDistance);
+  // `time` first: it is the lap's activity time, pauses out, and the one field
+  // a real COROS lap carries (probed on cached payloads — no lap has `totalTime`).
   const durationRaw =
-    toOptionalNumber(lap.totalTime) ??
     toOptionalNumber(lap.time) ??
+    toOptionalNumber(lap.totalTime) ??
     toOptionalNumber(lap.duration);
 
   let duration = normalizeCorosDetailDurationSeconds(durationRaw);

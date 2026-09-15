@@ -486,7 +486,7 @@ async function main() {
     };
     const activities = RUNS.map((entry) =>
       entry.activityId === target.activityId
-        ? { ...entry, distance: 10_200, duration: 7102, activeDuration: 4190 }
+        ? { ...entry, distance: 10_200, duration: 4190, elapsedDuration: 7102 }
         : entry
     );
 
@@ -498,8 +498,8 @@ async function main() {
       detail: {
         activityId: target.activityId,
         distance: 10_200,
-        duration: 7102,
-        activeDuration: 4190,
+        duration: 4190,
+        elapsedDuration: 7102,
         pauses,
         avgHr: 150,
         laps,
@@ -561,8 +561,8 @@ async function main() {
       detail: {
         activityId: target.activityId,
         distance: 10_200,
-        duration: 7102,
-        activeDuration: 4190,
+        duration: 4190,
+        elapsedDuration: 7102,
         pauses: pauses.map((pause) => ({ ...pause })),
         avgHr: 150,
         laps: laps.map((lap) => ({ ...lap })),

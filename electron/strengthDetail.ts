@@ -100,7 +100,9 @@ function parseSummary(raw: Record<string, unknown>): StrengthSummary {
     raw.summary && typeof raw.summary === "object"
       ? (raw.summary as Record<string, unknown>)
       : raw;
-  const durationCs = num(s.totalTime) ?? num(s.workoutTime) ?? 0;
+  // Activity time, like every other duration in the app; `totalTime` keeps the
+  // pauses in. A zero `workoutTime` is COROS's not-recorded.
+  const durationCs = num(s.workoutTime) || num(s.totalTime) || 0;
   return {
     sets: num(s.sets) ?? 0,
     totalReps: num(s.totalReps) ?? 0,

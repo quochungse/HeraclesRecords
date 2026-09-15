@@ -1997,14 +1997,19 @@ export interface TrainingHubActivity {
   sportName?: string;
   startTime?: number;
   endTime?: number;
-  /** Seconds from start to finish, pauses included — COROS `totalTime`. */
-  duration?: number;
   /**
    * Seconds actually recorded, pauses taken out — COROS `workoutTime`, which the
-   * watch calls activity time. Equal to `duration` on a run that never stopped;
-   * 70 minutes against 118 on one that waited out two rain showers.
+   * watch calls activity time and every figure in the app means by "time".
+   * Falls back to `totalTime` only when COROS sent no activity time.
    */
-  activeDuration?: number;
+  duration?: number;
+  /**
+   * Seconds from start to finish, pauses included — COROS `totalTime`. Equal to
+   * `duration` on a run that never stopped; 118 minutes against 70 on one that
+   * waited out two rain showers. Only for what runs on the wall clock. Not
+   * stored in the local mirror, so a row read back from SQLite has none.
+   */
+  elapsedDuration?: number;
   distance?: number;
   avgHr?: number;
   maxHr?: number;
@@ -2429,10 +2434,10 @@ export interface TrainingHubActivityDetail {
   sportType?: number;
   sportName?: string;
   startTime?: number;
-  /** Seconds from start to finish, pauses included. */
+  /** Seconds recorded, pauses taken out. See `TrainingHubActivity.duration`. */
   duration?: number;
-  /** Seconds recorded, pauses taken out. See `TrainingHubActivity.activeDuration`. */
-  activeDuration?: number;
+  /** Seconds from start to finish, pauses included. See `TrainingHubActivity.elapsedDuration`. */
+  elapsedDuration?: number;
   /**
    * Pauses in the order they happened. Series `elapsed` runs on the wall clock
    * straight through them — the samples simply stop — so a reader that wants

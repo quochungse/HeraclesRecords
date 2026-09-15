@@ -65,7 +65,7 @@ interface RunDetailChartProps {
    * COROS's own activity time (`workoutTime`), stated for the whole run so the
    * unselected segment reads it directly rather than from the sample clock.
    */
-  activeDuration?: number;
+  activityTime?: number;
 }
 
 interface ChartRow extends TrainingHubActivitySeriesPoint {
@@ -153,7 +153,7 @@ export function RunDetailChart({
   hrZones,
   focusLapIndex,
   onFocusLapHandled,
-  activeDuration
+  activityTime
 }: RunDetailChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
@@ -268,8 +268,8 @@ export function RunDetailChart({
         ? last.distance - first.distance
         : undefined;
     const duration =
-      range === null && activeDuration !== undefined
-        ? activeDuration
+      range === null && activityTime !== undefined
+        ? activityTime
         : typeof first.elapsed === "number" && typeof last.elapsed === "number"
           ? last.elapsed - first.elapsed
           : undefined;
@@ -287,7 +287,7 @@ export function RunDetailChart({
       hr: mean("hr"),
       cadence: mean("cadence")
     };
-  }, [activeDuration, range, visible]);
+  }, [activityTime, range, visible]);
 
   if (rows.length < 2) {
     return (

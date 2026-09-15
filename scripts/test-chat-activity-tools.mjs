@@ -73,6 +73,25 @@ assert.match(formatted, /170/);
 const withSeries = formatActivityDetailForChat(detail, true);
 assert.match(withSeries, /Time series/);
 
+// Duration and pace are activity time; the elapsed clock gets a line only when
+// the pauses were real. The numbers are a real road run's: 10.2 km, 4 190 s
+// running, 7 102 s start to finish.
+const pausedFormatted = formatActivityDetailForChat(
+  parseActivityDetail({ summary: { sportType: 100, totalTime: 710202, workoutTime: 419028, distance: 1020014 } }),
+  false
+);
+assert.match(pausedFormatted, /Duration: 1:09:50/);
+assert.match(pausedFormatted, /Elapsed \(pauses included\): 1:58:22/);
+assert.match(pausedFormatted, /Avg pace: 6:51\/km/);
+assert.doesNotMatch(
+  formatActivityDetailForChat(
+    parseActivityDetail({ summary: { sportType: 100, totalTime: 514870, workoutTime: 514860, distance: 1221694 } }),
+    false
+  ),
+  /Elapsed/,
+  "a second of rounding is not a pause"
+);
+
 const imperialFormatted = formatActivityDetailForChat(detail, true, "imperial");
 assert.match(imperialFormatted, /62\.1 mi/);
 assert.match(imperialFormatted, /Avg pace: 9:39\/mi/);

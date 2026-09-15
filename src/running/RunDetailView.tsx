@@ -120,17 +120,9 @@ export function RunDetailView({
 
   const headline = useMemo<Stat[]>(() => {
     const distance = detail?.distance ?? activity.distance;
-    const total = detail?.duration ?? activity.duration;
-    const active = runSeconds({
-      activeDuration: detail?.activeDuration ?? activity.activeDuration,
-      duration: total
-    });
-    const pace = paceSecondsPerKm({
-      ...activity,
-      distance,
-      duration: total,
-      activeDuration: active
-    });
+    const active = runSeconds({ duration: detail?.duration ?? activity.duration });
+    const total = detail?.elapsedDuration ?? activity.elapsedDuration;
+    const pace = paceSecondsPerKm({ ...activity, distance, duration: active });
 
     const stats: Stat[] = [
       { label: "Distance", value: formatDistanceMeters(distance, unitSystem) },
@@ -356,7 +348,7 @@ export function RunDetailView({
           hrZones={detail?.hrZones ?? []}
           focusLapIndex={focusLapIndex}
           onFocusLapHandled={clearFocusLap}
-          activeDuration={detail?.activeDuration ?? activity.activeDuration}
+          activityTime={detail?.duration ?? activity.duration}
         />
       ) : null}
 

@@ -831,6 +831,13 @@ export function formatActivityDetailForChat(
       ? `Distance: ${formatDistanceValue(detail.distance, unitSystem, { swim })}`
       : undefined,
     detail.duration ? `Duration: ${formatDurationSeconds(detail.duration)}` : undefined,
+    // `Duration` is activity time; the elapsed clock is only worth a line when
+    // the pauses were real — COROS rounds the two apart on a run never stopped.
+    detail.duration &&
+    detail.elapsedDuration &&
+    detail.elapsedDuration - detail.duration >= 60
+      ? `Elapsed (pauses included): ${formatDurationSeconds(detail.elapsedDuration)}`
+      : undefined,
     performance,
     detail.adjustedPace
       ? `Adjusted pace (grade-adjusted): ${formatPaceSeconds(detail.adjustedPace, unitSystem)}`

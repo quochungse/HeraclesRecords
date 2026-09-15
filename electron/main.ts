@@ -2826,7 +2826,8 @@ function registerIpcHandlers(): void {
       }
       const coros = corosRaw.map((a) => ({
         startEpochMs: (a.startTime ?? 0) * 1000,
-        movingSec: a.duration ?? 0,
+        // Elapsed, to match what parseIntervalsActivities reads on the other side.
+        movingSec: a.elapsedDuration ?? a.duration ?? 0,
         distanceM: a.distance ?? 0
       }));
       const recentlyImported = getRecentlyImportedIds(RECENT_IMPORT_WINDOW_MS);

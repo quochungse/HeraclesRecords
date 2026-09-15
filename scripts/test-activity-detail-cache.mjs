@@ -63,7 +63,7 @@ const run = {
   startTime: 1789209830,
   endTime: 1789214979,
   duration: 5149,
-  activeDuration: 5149,
+  elapsedDuration: 5149,
   distance: 12216.94,
   avgHr: 162,
   maxHr: 178,

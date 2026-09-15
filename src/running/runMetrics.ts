@@ -40,15 +40,14 @@ function startedAtMs(activity: TrainingHubActivity): number | undefined {
 
 /**
  * How long a run took, in the sense every figure on this screen means: time
- * spent running. COROS's `duration` is start to finish with the pauses in it,
- * so a real 10.2 km run with two pauses totalling 48 minutes read 11:36 /km
- * against the 6:51 it was actually run at. Falls back to `duration` only where
- * COROS sent no activity time, which is the same number on a run never paused.
+ * spent running. `duration` is COROS's activity time, pauses out — never
+ * `elapsedDuration`, which put a real 10.2 km run with 48 minutes of pauses at
+ * 11:36 /km against the 6:51 it was actually run at.
  */
 export function runSeconds(
-  activity: Pick<TrainingHubActivity, "duration" | "activeDuration">
+  activity: Pick<TrainingHubActivity, "duration">
 ): number | undefined {
-  return positive(activity.activeDuration) ?? positive(activity.duration);
+  return positive(activity.duration);
 }
 
 /**

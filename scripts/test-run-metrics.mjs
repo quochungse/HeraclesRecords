@@ -127,15 +127,15 @@ assert.equal(elevationPerKm(run({ elevationGain: undefined })), undefined);
 
 
 // ---------------------------------------------------------------------------
-// Activity time. COROS's `duration` runs start to finish with the pauses in it;
-// every figure here is about time spent running. The numbers are a real road
-// run's: 10.2 km, 7 102 s start to finish, 4 190 s of it running.
+// Activity time. `duration` is COROS's activity time and `elapsedDuration` the
+// start-to-finish clock with the pauses in it; every figure here is about time
+// spent running. The numbers are a real road run's: 10.2 km, 7 102 s start to
+// finish, 4 190 s of it running.
 // ---------------------------------------------------------------------------
 
-const paused = run({ distance: 10_200, duration: 7102, activeDuration: 4190, avgHr: 150 });
-assert.equal(runSeconds(paused), 4190);
-assert.equal(runSeconds(run({ duration: 3000 })), 3000, "no activity time sent: the one clock there is");
-assert.equal(runSeconds(run({ duration: 3000, activeDuration: 0 })), 3000, "a zero is not a reading");
+const paused = run({ distance: 10_200, duration: 4190, elapsedDuration: 7102, avgHr: 150 });
+assert.equal(runSeconds(paused), 4190, "the elapsed clock is never read");
+assert.equal(runSeconds(run({ duration: 0 })), undefined, "a zero is not a reading");
 assert.ok(
   Math.abs(paceSecondsPerKm(paused) - 4190 / 10.2) < 1e-9,
   "6:51 /km, not the 11:36 the pauses would make it"
@@ -148,7 +148,7 @@ assert.equal(
 );
 assert.equal(
   buildRunEfficiencyWeeks(
-    [run({ startTime: secondsAgo(1), duration: 1800, activeDuration: 1100 })],
+    [run({ startTime: secondsAgo(1), duration: 1100, elapsedDuration: 1800 })],
     { weeks: 1, nowMs: NOW }
   )[0].count,
   0,
