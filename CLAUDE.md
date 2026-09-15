@@ -189,13 +189,21 @@ re-fetch every detail on every launch.
 globe, the coach's tools and the three backfills. A second call site would be both uncached
 and unvalidated, so `test:activity-detail-cache` asserts `/activity/detail/query` appears
 exactly once in the service. The backfills pass `persist: false` — they read one field out of
-2.5 MB, and opening a run is what earns it a file.
+2.5 MB, and opening a run is what earns it a file. The feel backfill also passes `fresh: true`:
+a feeling is set in the COROS app days later and moves no list figure, so a cached file would
+answer "unrated" forever. **The fingerprint is hashed from the stored mirror row**, falling
+back to the caller's list row only when the mirror has none — the summary check and the
+sweeps have no list row, and two sources let a stale renderer array write a file that the
+next sweep read as stale and deleted. A payload with none of `summary`/`lapList`/
+`frequencyList`/`graphList`/`zoneList` is neither cached nor summarised: COROS's `data: {}`
+parses as success and would otherwise be permanent.
 **Nothing about the file may enter the row.** `training_activity_summaries` is `derived`, and
 a column saying "cached, 131 KB" would reach another machine as a promise it cannot keep if
 it were ever reclassified — the trap `coach_analysis_local_triggers` exists to avoid. The
 directory is its own bookkeeping: size from `stat`, last use from `mtime` (touched on every
 hit, because relatime makes `atime` useless), and a 500 MB cap swept oldest-first with
-orphans — files whose run is in no list — taken first. A run deleted at COROS is therefore
+orphans — files whose run is in no list — taken first, once at start-up and after each write.
+Unreadable files are deleted on read and abandoned `.tmp` writes after an hour. A run deleted at COROS is therefore
 collected rather than detected: `1001 Service exceptions` is what COROS answers both for an
 activity that is gone and for one it could not serve this minute.
 The maths a summary is built from lives in `electron/activityMetrics.ts`, which the renderer

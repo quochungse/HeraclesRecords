@@ -51,12 +51,19 @@ const SWEEP_TARGET_RATIO = 0.9;
 /** COROS ids are digits, but nothing here may build a path out of a reply. */
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
+/** A write in progress. Carries the pid so two app instances writing the same
+ *  activity do not rename each other's half-finished file into place. */
+const TEMPORARY_SUFFIX = ".tmp";
+/** Old enough that no live write could still be holding it. */
+const TEMPORARY_MAX_AGE_MS = 60 * 60 * 1000;
+
 interface CacheEnvelope {
   v: number;
+  /** Not read back — the fingerprint already covers the id. Written so a file
+   *  opened by hand says which activity it belongs to. */
   activityId: string;
   fingerprint: string;
   fetchedAt: number;
-  lastUploadTime?: number;
   payload: Record<string, unknown>;
 }
 
@@ -197,15 +204,29 @@ export function readCachedActivityDetail(
       zlib.brotliDecompressSync(fs.readFileSync(file)).toString("utf8")
     );
     if (!parsed || typeof parsed !== "object") {
+      removeFile(file);
       return null;
     }
     envelope = parsed as CacheEnvelope;
-  } catch {
+  } catch (error) {
     // Missing is the common case and reads the same as unreadable: fetch it.
+    // Anything else — a truncated file, a half-written one from a process that
+    // died — is deleted rather than left. The caller that would overwrite it is
+    // the one path that persists; the three sweeps would each re-read and
+    // re-throw on it forever, and it would go on counting against the cap.
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      removeFile(file);
+    }
     return null;
   }
 
-  if (envelope.v !== ENVELOPE_VERSION || !envelope.payload) {
+  const payload = envelope.payload;
+  if (
+    envelope.v !== ENVELOPE_VERSION ||
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
     removeFile(file);
     return null;
   }
@@ -224,7 +245,7 @@ export function readCachedActivityDetail(
     // Not being able to touch it only costs it its place in the queue.
   }
 
-  return envelope.payload;
+  return payload;
 }
 
 /**
@@ -246,13 +267,10 @@ export function writeCachedActivityDetail(
     activityId,
     fingerprint,
     fetchedAt: Date.now(),
-    ...(typeof payload.lastUploadTime === "number"
-      ? { lastUploadTime: payload.lastUploadTime }
-      : {}),
     payload
   };
 
-  const temporary = `${file}.${process.pid}.tmp`;
+  const temporary = `${file}.${process.pid}${TEMPORARY_SUFFIX}`;
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const body = zlib.brotliCompressSync(
@@ -333,10 +351,26 @@ function listCacheFiles(): CacheFile[] {
       continue;
     }
     for (const entry of entries) {
+      const file = path.join(dir, entry);
+
+      // A half-written file left by a process that died mid-write. It is
+      // readable by nobody and counted by nothing, so without this it sits
+      // there for the life of the install — and a run of them could fill the
+      // directory without the cap ever noticing.
+      if (entry.endsWith(TEMPORARY_SUFFIX)) {
+        try {
+          if (Date.now() - fs.statSync(file).mtimeMs > TEMPORARY_MAX_AGE_MS) {
+            fs.rmSync(file, { force: true });
+          }
+        } catch {
+          // Gone already, or not ours to remove.
+        }
+        continue;
+      }
+
       if (!entry.endsWith(".json.br")) {
         continue;
       }
-      const file = path.join(dir, entry);
       try {
         const stats = fs.statSync(file);
         files.push({

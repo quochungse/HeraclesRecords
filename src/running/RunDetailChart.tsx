@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   Brush,
@@ -175,12 +175,18 @@ export function RunDetailChart({
   const [showAltitude, setShowAltitude] = useState(true);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
 
-  // A different run means different channels; re-open on this one's defaults
-  // rather than leaving chips selected that it has no readings for.
+  // A different set of channels means different chips; re-open on their
+  // defaults rather than leaving chips selected that have no readings. Keyed on
+  // which channels exist, not on the array: "Try again" re-fetches the same run
+  // and hands back a new detail object, and an identity key wiped the athlete's
+  // chip choice and brush on a run they never left.
+  const availableKey = available.map((channel) => channel.key).join(",");
+  const availableRef = useRef(available);
+  availableRef.current = available;
   useEffect(() => {
-    setSelected(defaultSelectedChannels(available));
+    setSelected(defaultSelectedChannels(availableRef.current));
     setRange(null);
-  }, [available]);
+  }, [availableKey]);
 
   useEffect(() => {
     if (!hasElapsed && hasDistance) {

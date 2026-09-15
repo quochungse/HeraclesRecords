@@ -2415,6 +2415,12 @@ export interface ActivityDetailSummarySync {
   computed: number;
   remaining: number;
   failed: number;
+  /**
+   * The summaries this pass wrote. Handed back so the caller can merge them
+   * rather than re-read the whole list after every few — which on a long
+   * history is the entire summary table crossing IPC once per pass.
+   */
+  summaries: ActivityDetailSummary[];
 }
 
 export interface TrainingHubActivityDetail {

@@ -27,7 +27,6 @@ interface ActivityRouteMapProps {
 
 interface RouteGeometry {
   latLngs: [number, number][];
-  bounds: { minLat: number; maxLat: number; minLon: number; maxLon: number };
 }
 
 const ROUTE_COLOR = "#74c08f";
@@ -133,17 +132,11 @@ function buildRouteGeometry(
     return null;
   }
 
-  const lats = routePoints.map((point) => point.lat!);
-  const lons = routePoints.map((point) => point.lon!);
-
+  // No bounds here: the map fits `L.latLngBounds(latLngs)`, and the
+  // `Math.min(...lats)` this used to carry was both unread and the one spread
+  // over a whole track in this file — past the argument limit on an ultra.
   return {
-    latLngs: routePoints.map((point) => [point.lat!, point.lon!]),
-    bounds: {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLon: Math.min(...lons),
-      maxLon: Math.max(...lons)
-    }
+    latLngs: routePoints.map((point) => [point.lat!, point.lon!])
   };
 }
 
@@ -367,7 +360,10 @@ function RouteMapCanvas({
     appliedBaseLayerRef.current = baseLayer;
   }, [baseLayer, theme]);
 
-  // Sync Waymarked Trails overlays with the selection.
+  // Sync Waymarked Trails overlays with the selection. The dependency list
+  // carries every one of the init effect's, because that effect's cleanup
+  // empties `overlayLayersRef`: a rebuild this one did not follow would leave
+  // the overlays gone with nothing to put them back.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) {
@@ -400,7 +396,7 @@ function RouteMapCanvas({
       layer.addTo(map);
       active.set(id, layer);
     }
-  }, [overlays, route, theme, scrollWheelZoom]);
+  }, [overlays, route, theme, scrollWheelZoom, interactive, visibleBand]);
 
   return (
     <div

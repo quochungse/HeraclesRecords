@@ -118,12 +118,14 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
   const ltsp = thresholdPace(snapshot);
   const lthr = thresholdHeartRate(snapshot);
 
-  // Under three of the four weeks, the chronic figure is averaging over history
-  // that does not exist, so the ratio reads high for a reason that is not
-  // training. Saying so beats showing an alarming number with no explanation.
+  // Under three of the four weeks of *any* running, the chronic figure is
+  // averaging over history that does not exist, so the ratio reads high for a
+  // reason that is not training. Saying so beats showing an alarming number
+  // with no explanation. A ratio implies a run, which implies an oldest run.
   const thinHistory =
     balance.ratio !== undefined &&
-    (balance.oldestRunDaysAgo === undefined || balance.oldestRunDaysAgo < 21);
+    balance.oldestRunDaysAgo !== undefined &&
+    balance.oldestRunDaysAgo < 21;
 
   return (
     <section className="run-hero">

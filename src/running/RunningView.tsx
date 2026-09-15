@@ -26,7 +26,7 @@ import { RunSurfacePanel } from "./RunSurfacePanel";
 import { RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
-import { summariseRuns, surfacesPresent } from "./runMetrics";
+import { runWindowStartMs, summariseRuns, surfacesPresent } from "./runMetrics";
 import { useRunDetailSummaries } from "./useRunDetailSummaries";
 import { RunnerIcon } from "./runnerIcon";
 import {
@@ -86,7 +86,6 @@ const SCROLL_KEYS = new Set([
   "End",
   " "
 ]);
-const MS_PER_DAY = 86_400_000;
 
 /**
  * Weeks the charts draw for a period.
@@ -103,6 +102,11 @@ function weeksForPeriod(days: number | null): number {
     : Math.max(1, Math.ceil(days / 7));
 }
 
+/**
+ * The runs a period covers, cut at the same Monday the charts start on — see
+ * `runWindowStartMs`. "4 weeks" is four calendar weeks, this one included, for
+ * the totals strip, the list and every chart alike.
+ */
 function withinPeriod(
   activities: readonly TrainingHubActivity[],
   days: number | null,
@@ -112,7 +116,7 @@ function withinPeriod(
     return [...activities];
   }
 
-  const cutoff = (nowMs - days * MS_PER_DAY) / 1000;
+  const cutoff = runWindowStartMs(weeksForPeriod(days), nowMs) / 1000;
   return activities.filter(
     (activity) => activity.startTime !== undefined && activity.startTime >= cutoff
   );
@@ -190,8 +194,8 @@ export function RunningView({
   // period, a "4 weeks" filter cut the oldest of those short and inflated the
   // week-on-baseline change.
   const runsAllTime = useMemo(
-    () => runsOnSurface(activities, surface),
-    [activities, surface]
+    () => (surface === null ? allRuns : runsOnSurface(allRuns, surface)),
+    [allRuns, surface]
   );
 
 

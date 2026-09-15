@@ -548,6 +548,43 @@ async function main() {
     assert.deepEqual(pressedAxis, ["Time"]);
     assert.equal(await harness("count", ".run-chip.is-active"), 2, "pace and heart rate open");
 
+    // "Try again" re-fetches the same run and hands back a new detail object
+    // with the same readings. That is not a different run, and the athlete's
+    // chip choice survives it — the reset used to key on the object.
+    await win.webContents.executeJavaScript(
+      `document.querySelectorAll(".run-chip.is-active")[1].click()`,
+      true
+    );
+    await settle();
+    assert.equal(await harness("count", ".run-chip.is-active"), 1, "one channel turned off");
+    await harness("setProps", {
+      detail: {
+        activityId: target.activityId,
+        distance: 10_200,
+        duration: 7102,
+        activeDuration: 4190,
+        pauses: pauses.map((pause) => ({ ...pause })),
+        avgHr: 150,
+        laps: laps.map((lap) => ({ ...lap })),
+        hrZones: [],
+        series: series.map((point) => ({ ...point })),
+        track,
+        raw: {}
+      }
+    });
+    await settle();
+    assert.equal(
+      await harness("count", ".run-chip.is-active"),
+      1,
+      "the same run's detail arriving again keeps the channels the athlete chose"
+    );
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".run-chip")].find((chip) => !chip.classList.contains("is-active")).click()`,
+      true
+    );
+    await settle();
+    assert.equal(await harness("count", ".run-chip.is-active"), 2);
+
     // No panel's content reaches past its own bottom edge — which is what a
     // squeezed grid row looks like, whatever squeezed it. Content inside
     // something that clips (Leaflet's panes are far larger than the map) is
@@ -702,7 +739,7 @@ async function main() {
       { activities: RUNS, activitiesStatus: "ready", snapshot: SNAPSHOT_WITH_ZONES },
       {
         getActivityDetailSummaries: summarised,
-        syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0 }
+        syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0, summaries: [] }
       }
     );
     await settle();
@@ -722,6 +759,46 @@ async function main() {
       RUNS.length - 2,
       "every run without a summary reads as a dash rather than a zero"
     );
+
+    // An eighth column, and the narrow width is where a table stops fitting.
+    // The earlier seven already pushed the page into a horizontal scrollbar
+    // once, and "—" in every drift cell is not the width that matters: a filled
+    // column is wider than an empty one.
+    await mountRunning(
+      {
+        activities: RUNS,
+        activitiesStatus: "ready",
+        snapshot: SNAPSHOT_WITH_ZONES,
+        height: 900,
+        width: 620
+      },
+      {
+        getActivityDetailSummaries: RUNS.map((activity, index) => ({
+          activityId: activity.activityId,
+          fingerprint: "fp",
+          summaryVersion: 1,
+          zoneSeconds: [0, 1800, 1500, 300, 0, 0],
+          decouplingPercent: index % 2 === 0 ? 12.75 : -8.5,
+          computedAt: Date.now()
+        })),
+        syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0, summaries: [] }
+      }
+    );
+    await settle();
+    assert.equal(
+      await harness("overflowX", ".running-view"),
+      0,
+      "a drift column with a value in every row still fits the narrow page"
+    );
+
+    await mountRunning(
+      { activities: RUNS, activitiesStatus: "ready", snapshot: SNAPSHOT_WITH_ZONES },
+      {
+        getActivityDetailSummaries: summarised,
+        syncActivityDetailSummaries: { computed: 0, remaining: 0, failed: 0, summaries: [] }
+      }
+    );
+    await settle();
 
     // The backfill is asked for, and for the runs on screen.
     const sweeps = await harness("calls", "syncActivityDetailSummaries");
@@ -746,6 +823,65 @@ async function main() {
       true
     );
     assert.equal(hard, true, "a run scored into zone 4 shows up as hard time");
+  }
+
+  // -------------------------------------------------------------------------
+  // Every block reads one window. The period filter cut at now − N days while
+  // the charts bucket by calendar week, so on any day but Monday the totals
+  // strip counted runs no bar held. And "a year ago" must not overlap the bars.
+  // -------------------------------------------------------------------------
+  {
+    const periodRuns = [
+      ...Array.from({ length: 40 }, (_, index) =>
+        run(index, { startTime: nowSeconds - index * DAY_SECONDS })
+      ),
+      // One run a year and a bit back, inside "3 months" seen a year earlier.
+      run(90, { startTime: nowSeconds - 400 * DAY_SECONDS }),
+      // And one over two years back, which any comparison window "All" might
+      // shift to would find — so hiding the aside is the rule, not the data.
+      run(91, { startTime: nowSeconds - 800 * DAY_SECONDS })
+    ];
+    const readTotals = () =>
+      win.webContents.executeJavaScript(
+        `(() => {
+          const strip = [...document.querySelectorAll(".running-totals .running-stat")]
+            .find((stat) => stat.querySelector("span").textContent === "Distance");
+          const heading = [...document.querySelectorAll(".run-block")]
+            .find((block) => block.textContent.includes("Weekly volume"));
+          return {
+            strip: parseFloat(strip.querySelector("strong").textContent),
+            chart: parseFloat(heading.querySelector("h3").textContent),
+            yearAgo: heading.textContent.includes("Same span a year ago")
+          };
+        })()`,
+        true
+      );
+    const pickPeriod = (label) =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".running-period .training-metric-option")].find((chip) => chip.textContent.trim() === ${JSON.stringify(label)}).click()`,
+        true
+      );
+
+    await mountRunning({ activities: periodRuns, activitiesStatus: "ready", width: 1000 });
+    await pickPeriod("4 weeks");
+    await settle();
+    const fourWeeks = await readTotals();
+    assert.ok(
+      Math.abs(fourWeeks.strip - fourWeeks.chart) < 1,
+      `the totals strip and the volume chart count the same runs (${fourWeeks.strip} vs ${fourWeeks.chart})`
+    );
+
+    await pickPeriod("3 months");
+    await settle();
+    assert.equal((await readTotals()).yearAgo, true, "a three-month window has a year-ago twin");
+
+    await pickPeriod("All");
+    await settle();
+    assert.equal(
+      (await readTotals()).yearAgo,
+      false,
+      "a two-year chart has no 'same span a year ago' that is not half itself"
+    );
   }
 
   const errors = await harness("consoleErrors");

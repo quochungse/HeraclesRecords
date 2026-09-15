@@ -32,6 +32,7 @@ import {
   deleteSettings,
   getActivityDetailSummaries,
   getSetting,
+  getStoredTrainingActivities,
   getStoredTrainingActivity,
   listStoredStrengthSessions,
   listStoredTrainingActivities,
@@ -1551,27 +1552,52 @@ export async function listTrainingHubActivities(
  * The activity as COROS last described it, hashed — or null when this machine
  * has no description to hash, which is the one case a detail cannot be cached.
  *
- * The caller's own list row is preferred over the stored mirror: they are
- * written from the same reply, and the caller's is the fresher of the two while
- * a list request is still landing.
+ * **The stored mirror decides, not the caller's list row.** Both are written
+ * from the same reply, but only one of them is available to every reader: the
+ * summary check and the three sweeps have no list row at all. When the two
+ * disagree — a renderer still holding the array from before a correction landed
+ * — hashing the caller's copy writes a file under a fingerprint nothing else
+ * computes, and the next sweep reads it, sees a mismatch and *deletes* the file
+ * it cannot refill. A stale row costs one refetch; two sources cost a fight.
  */
 function activityFingerprintFor(
   activityId: string,
   listActivity?: TrainingHubActivity
 ): string | null {
-  let source: TrainingHubActivity | undefined =
-    listActivity?.activityId === activityId ? listActivity : undefined;
-
-  if (!source) {
-    try {
-      source = getStoredTrainingActivity(activityId);
-    } catch {
-      // No database in this process; the cache simply does not apply.
-      return null;
-    }
+  let stored: TrainingHubActivity | undefined;
+  try {
+    stored = getStoredTrainingActivity(activityId);
+  } catch {
+    // No database in this process; the cache simply does not apply.
+    return null;
   }
 
+  const source =
+    stored ??
+    (listActivity?.activityId === activityId ? listActivity : undefined);
+
   return source ? activityDetailFingerprint(source) : null;
+}
+
+/**
+ * Whether a payload is worth keeping.
+ *
+ * COROS answers a request it cannot serve with an empty object often enough to
+ * matter, and `parseTrainingHubApiResponse` reads that as success — data did
+ * arrive. Cached, it is permanent: the file serves an empty detail until the
+ * activity is edited, and the summary computed from it carries the current
+ * fingerprint and version, so it reads as a run COROS genuinely scored nothing
+ * for and the sweep never looks at it again.
+ */
+function isUsableActivityDetail(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return false;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  return ["summary", "lapList", "frequencyList", "graphList", "zoneList"].some(
+    (key) => payload[key] !== undefined && payload[key] !== null
+  );
 }
 
 interface RawActivityDetailOptions {
@@ -1582,13 +1608,19 @@ interface RawActivityDetailOptions {
    * would otherwise fill the directory with details nobody asked to see.
    */
   persist?: boolean;
+  /**
+   * Skip the cached file and ask COROS. For a reader after something the
+   * fingerprint cannot see change: the end-of-activity feeling is set in the
+   * COROS app days later and moves no figure on the activity list, so a cached
+   * file would answer "still unrated" for as long as it lives.
+   */
+  fresh?: boolean;
 }
 
 interface RawActivityDetail {
   raw: Record<string, unknown>;
   /** null when the activity could not be fingerprinted — nothing was cached. */
   fingerprint: string | null;
-  fromCache: boolean;
 }
 
 /**
@@ -1607,10 +1639,10 @@ async function loadActivityDetailRaw(
 ): Promise<RawActivityDetail> {
   const fingerprint = activityFingerprintFor(activityId, options.listActivity);
 
-  if (fingerprint !== null) {
+  if (fingerprint !== null && options.fresh !== true) {
     const cached = readCachedActivityDetail(activityId, fingerprint);
     if (cached) {
-      return { raw: cached, fingerprint, fromCache: true };
+      return { raw: cached, fingerprint };
     }
   }
 
@@ -1627,11 +1659,15 @@ async function loadActivityDetailRaw(
     }
   );
 
-  if (fingerprint !== null && options.persist !== false) {
+  if (
+    fingerprint !== null &&
+    options.persist !== false &&
+    isUsableActivityDetail(raw)
+  ) {
     writeCachedActivityDetail(activityId, fingerprint, raw);
   }
 
-  return { raw, fingerprint, fromCache: false };
+  return { raw, fingerprint };
 }
 
 /**
@@ -1645,7 +1681,7 @@ function cacheActivityDetailSummary(
   detail: TrainingHubActivityDetail,
   raw: Record<string, unknown>
 ): ActivityDetailSummary | null {
-  if (fingerprint === null) {
+  if (fingerprint === null || !isUsableActivityDetail(raw)) {
     return null;
   }
 
@@ -1699,17 +1735,46 @@ export async function getTrainingHubActivityDetail(
       (point) => point.lat !== undefined && point.lon !== undefined
     ).length ?? 0;
 
-  if (gpsPointCount < 2) {
+  if (gpsPointCount < 2 && !knownTrackless(activityId, fingerprint)) {
     const gpxTrack = await fetchActivityTrackFromGpx(activityId, sportType);
     if (gpxTrack) {
       detail = {
         ...detail,
         track: mergeActivityTracks(detail.track, gpxTrack)
       };
+    } else {
+      rememberTrackless(activityId, fingerprint);
     }
   }
 
   return detail;
+}
+
+/**
+ * Activities whose GPX was asked for and came back with nothing.
+ *
+ * A payload with no GPS is normal — every strength session and treadmill run —
+ * and the fallback above is two requests: a signed URL, then the file. Once the
+ * payload itself is served from disk those two are the *only* network calls
+ * left on the path, so an indoor session reopened offline would sit through
+ * both timing out to end up exactly where it started.
+ *
+ * Keyed by fingerprint, so an upload COROS was still processing is asked again
+ * the moment its figures change — and held in memory only, because "COROS had
+ * no track for this a minute ago" is not worth a row.
+ */
+const tracklessActivities = new Set<string>();
+
+function tracklessKey(activityId: string, fingerprint: string | null): string {
+  return `${activityId}:${fingerprint ?? ""}`;
+}
+
+function knownTrackless(activityId: string, fingerprint: string | null): boolean {
+  return tracklessActivities.has(tracklessKey(activityId, fingerprint));
+}
+
+function rememberTrackless(activityId: string, fingerprint: string | null): void {
+  tracklessActivities.add(tracklessKey(activityId, fingerprint));
 }
 
 /**
@@ -1724,10 +1789,41 @@ export async function getTrainingHubActivityDetail(
 export function readActivityDetailSummaries(
   activityIds: readonly string[]
 ): ActivityDetailSummary[] {
+  const stored = storedActivityIndex(activityIds);
+  return validSummaries(activityIds, stored);
+}
+
+/**
+ * The stored rows for a list of ids, in one query rather than one each.
+ *
+ * The sweep below walks the same list on every pass, and a season of running is
+ * a few hundred activities: a prepared statement per row per pass adds up to
+ * tens of thousands of them for one backfill.
+ */
+function storedActivityIndex(
+  activityIds: readonly string[]
+): Map<string, TrainingHubActivity> {
+  return new Map(
+    getStoredTrainingActivities(activityIds).map((activity) => [
+      activity.activityId,
+      activity
+    ])
+  );
+}
+
+function validSummaries(
+  activityIds: readonly string[],
+  stored: ReadonlyMap<string, TrainingHubActivity>
+): ActivityDetailSummary[] {
+  const fingerprints = new Map<string, string>();
+  for (const [activityId, activity] of stored) {
+    fingerprints.set(activityId, activityDetailFingerprint(activity));
+  }
+
   return getActivityDetailSummaries(activityIds).filter(
     (summary) =>
       summary.summaryVersion === ACTIVITY_SUMMARY_VERSION &&
-      summary.fingerprint === activityFingerprintFor(summary.activityId)
+      summary.fingerprint === fingerprints.get(summary.activityId)
   );
 }
 
@@ -1754,11 +1850,18 @@ export async function syncActivityDetailSummaries(
   activityIds: readonly string[],
   limit = 6
 ): Promise<ActivityDetailSummarySync> {
+  const stored = storedActivityIndex(activityIds);
   const valid = new Set(
-    readActivityDetailSummaries(activityIds).map((summary) => summary.activityId)
+    validSummaries(activityIds, stored).map((summary) => summary.activityId)
   );
 
-  let computed = 0;
+  // Both brakes count **attempts**, not successes. Counting successes lets a
+  // pass that keeps failing quietly — a summary the database refuses to store,
+  // say — run the whole list at full speed: the limit is never reached, the
+  // pause between fetches never happens, and one call pulls a payload for every
+  // activity on screen.
+  let attempted = 0;
+  const written: ActivityDetailSummary[] = [];
   let failed = 0;
   let remaining = 0;
   let consecutiveFailures = 0;
@@ -1771,30 +1874,35 @@ export async function syncActivityDetailSummaries(
       remaining += 1;
       continue;
     }
-    if (computed >= limit || consecutiveFailures >= SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES) {
+    if (
+      attempted >= limit ||
+      consecutiveFailures >= SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES
+    ) {
       remaining += 1;
       continue;
     }
 
-    const stored = getStoredTrainingActivity(activityId);
-    if (!stored || stored.sportType === undefined) {
-      // Nothing to fingerprint against, so nothing that could be stored.
+    const activity = stored.get(activityId);
+    if (!activity) {
+      // Not in the local mirror, so there is nothing to fingerprint a payload
+      // against — and a summary that cannot be validated is not worth fetching.
       continue;
     }
 
     // Between fetches, never before the first: a screen waiting on its first
     // summary should not sit through a pause that exists to be polite to COROS
     // about the second.
-    if (computed > 0 || failed > 0) {
+    if (attempted > 0) {
       await delay(SUMMARY_BACKFILL_DELAY_MS);
     }
 
+    attempted += 1;
     summaryBackfillInFlight.add(activityId);
     try {
       const { raw, fingerprint } = await loadActivityDetailRaw(
         activityId,
-        stored.sportType,
-        { listActivity: stored, persist: false }
+        activity.sportType,
+        { listActivity: activity, persist: false }
       );
       const summary = cacheActivityDetailSummary(
         activityId,
@@ -1803,9 +1911,16 @@ export async function syncActivityDetailSummaries(
         raw
       );
       if (summary) {
-        computed += 1;
+        written.push(summary);
+        consecutiveFailures = 0;
+      } else {
+        // Fetched, and nothing came of it — an unusable payload, or a write the
+        // database refused. Either way this activity is not worth asking for
+        // again this session, and it counts against the brakes above.
+        summaryBackfillFailedIds.add(activityId);
+        failed += 1;
+        consecutiveFailures += 1;
       }
-      consecutiveFailures = 0;
     } catch {
       summaryBackfillFailedIds.add(activityId);
       failed += 1;
@@ -1815,7 +1930,7 @@ export async function syncActivityDetailSummaries(
     }
   }
 
-  return { computed, remaining, failed };
+  return { computed: written.length, remaining, failed, summaries: written };
 }
 
 export async function getTrainingHubActivityFileUrl(
@@ -2004,12 +2119,15 @@ export async function backfillFeelTypes(): Promise<void> {
       for (const { activityId, sportType } of pending) {
         attempted.add(activityId);
         try {
-          // Reads the cached file where one exists, and does not write one:
-          // this pass wants a single field out of a 2.5 MB payload, and a
-          // sweep through a year of activities would otherwise fill the
-          // directory with details nobody asked to see.
+          // Neither reads nor writes the cache. It writes nothing because this
+          // pass wants one field out of 2.5 MB; it reads nothing because that
+          // field is the one thing the fingerprint cannot see move. A feeling
+          // is set in the COROS app days after the run and changes no figure on
+          // the activity list, so a cached file would answer "still unrated"
+          // for as long as it lives and this sweep would never finish.
           const { raw } = await loadActivityDetailRaw(activityId, sportType, {
-            persist: false
+            persist: false,
+            fresh: true
           });
           cacheFeelTypeFromDetail(activityId, raw);
           consecutiveFailures = 0;

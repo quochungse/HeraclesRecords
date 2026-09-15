@@ -15,8 +15,7 @@
 //  3. **The cap.** A directory with no ceiling is a bug that takes a month to
 //     appear and arrives as a full disk.
 //
-// Under Electron because better-sqlite3 is built for its ABI, and with the
-// type-stripping resolver because the source guard reads `.ts` files.
+// Under Electron because better-sqlite3 is built for its ABI.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -28,7 +27,20 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-detail-cache-"));
+const tempDirs = [];
+const makeTemp = (prefix) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+};
+// On every exit, so a failing assertion does not leave the trees behind.
+process.on("exit", () => {
+  for (const dir of tempDirs) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const tempRoot = makeTemp("heracles-detail-cache-");
 
 const database = await import(distUrl("database.js"));
 const cache = await import(distUrl("activityDetailCache.js"));
@@ -296,12 +308,224 @@ assert.deepEqual(
 database.upsertActivityDetailSummary(summary);
 
 // ---------------------------------------------------------------------------
+// 3b. A cached open asks COROS for nothing
+//
+// The payload coming off disk is only half of it: an activity with no GPS in
+// its payload — every strength session and treadmill run — falls back to
+// fetching a GPX file, two requests that would then be the *only* network calls
+// left on the path. Reopened offline, the run would sit through both timing out
+// to arrive exactly where it started.
+// ---------------------------------------------------------------------------
+
+// A session with a token, pointed at a port nothing answers on, so any request
+// this path makes is both counted and harmless.
+database.setSetting("trainingHub.accessToken", "test-token");
+database.setSetting("trainingHub.regionId", "1");
+database.setSetting("trainingHub.baseUrl", "http://127.0.0.1:1");
+
+const indoor = {
+  ...run,
+  activityId: "run-indoor",
+  name: "Treadmill 8 km",
+  sportType: 101
+};
+database.upsertTrainingActivities([indoor]);
+cache.writeCachedActivityDetail(
+  indoor.activityId,
+  cache.activityDetailFingerprint(indoor),
+  { summary: { totalTime: 357000, distance: 800000 }, frequencyList: drifting }
+);
+
+let fetches = 0;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (...args) => {
+  fetches += 1;
+  throw new Error("offline");
+};
+
+const first = await service.getTrainingHubActivityDetail(
+  indoor.activityId,
+  indoor.sportType,
+  indoor
+);
+assert.ok(first.laps !== undefined, "the cached payload still parses");
+const afterFirst = fetches;
+assert.ok(
+  afterFirst > 0,
+  "the first open still asks whether COROS has a GPX track for it"
+);
+
+const second = await service.getTrainingHubActivityDetail(
+  indoor.activityId,
+  indoor.sportType,
+  indoor
+);
+assert.equal(second.laps !== undefined, true);
+assert.equal(
+  fetches,
+  afterFirst,
+  "reopening it asks COROS for nothing at all — payload cached, track known absent"
+);
+
+// --- The mirror decides the fingerprint, not the caller's copy -------------
+//
+// A renderer still holding the list from before a correction landed passes a
+// row that disagrees with the mirror. Hashing that copy wrote the file under a
+// fingerprint nothing else computes; the next sweep saw a mismatch and deleted
+// a file it could not refill. Here the stale copy must still find the file.
+const staleCopy = { ...indoor, name: "Treadmill 8 km (before the rename)" };
+const fetchesBefore = fetches;
+const fromStaleCopy = await service
+  .getTrainingHubActivityDetail(indoor.activityId, indoor.sportType, staleCopy)
+  .catch((error) =>
+    assert.fail(
+      `a stale list row missed the cache and went to the network: ${error.message}`
+    )
+  );
+assert.ok(fromStaleCopy.laps !== undefined);
+assert.equal(
+  fetches,
+  fetchesBefore,
+  "a caller holding an out-of-date list row is still served the cached file"
+);
+assert.ok(
+  cache.readCachedActivityDetail(
+    indoor.activityId,
+    cache.activityDetailFingerprint(indoor)
+  ),
+  "and the file is still there for everything that hashes the mirror"
+);
+
+// --- An answer with nothing in it is never kept ----------------------------
+//
+// COROS answers some requests it cannot serve with `data: {}`, which parses as
+// success. Cached, that is permanent: the file serves an empty detail until the
+// activity is edited, and a summary built from it carries the current
+// fingerprint, so it reads as a run nobody scored and is never looked at again.
+const hollow = { ...run, activityId: "run-hollow", name: "COROS had nothing" };
+database.upsertTrainingActivities([hollow]);
+globalThis.fetch = async () =>
+  new Response(JSON.stringify({ result: "0000", data: {} }), { status: 200 });
+
+await service.getTrainingHubActivityDetail(hollow.activityId, hollow.sportType, hollow);
+assert.equal(
+  cache.readCachedActivityDetail(
+    hollow.activityId,
+    cache.activityDetailFingerprint(hollow)
+  ),
+  null,
+  "an empty payload is not written to disk"
+);
+assert.deepEqual(
+  database.getActivityDetailSummaries([hollow.activityId]),
+  [],
+  "and no summary is built from it"
+);
+
+// --- The sweep's brakes count attempts -------------------------------------
+//
+// Counting successes let a pass that kept failing quietly run the whole list at
+// full speed: the limit never reached, the pause between fetches never taken.
+// Ten activities whose cached payloads are unusable, a limit of two.
+globalThis.fetch = async () => {
+  fetches += 1;
+  throw new Error("offline");
+};
+const unusable = Array.from({ length: 10 }, (_, index) => ({
+  ...run,
+  activityId: `run-unusable-${index}`,
+  name: `Unusable ${index}`
+}));
+database.upsertTrainingActivities(unusable);
+for (const activity of unusable) {
+  cache.writeCachedActivityDetail(
+    activity.activityId,
+    cache.activityDetailFingerprint(activity),
+    { nothing: "here" }
+  );
+}
+
+const sweepStarted = Date.now();
+const pass = await service.syncActivityDetailSummaries(
+  unusable.map((activity) => activity.activityId),
+  2
+);
+assert.equal(pass.computed, 0);
+assert.equal(pass.failed, 2, "two attempts, both failures — and no more than two");
+assert.equal(pass.remaining, 8, "the rest wait for the next pass");
+assert.deepEqual(pass.summaries, []);
+assert.ok(
+  Date.now() - sweepStarted >= 350,
+  "and the pause between the two attempts was still taken"
+);
+
+// A pass that does compute hands its summaries back, so the screen can merge
+// them instead of re-reading the whole list.
+const summable = { ...run, activityId: "run-summable", name: "Scored" };
+database.upsertTrainingActivities([summable]);
+cache.writeCachedActivityDetail(
+  summable.activityId,
+  cache.activityDetailFingerprint(summable),
+  detailPayload
+);
+const scoredPass = await service.syncActivityDetailSummaries([summable.activityId], 2);
+assert.equal(scoredPass.computed, 1);
+assert.deepEqual(
+  scoredPass.summaries.map((summary) => summary.activityId),
+  [summable.activityId]
+);
+
+globalThis.fetch = realFetch;
+database.deleteSettings(["trainingHub.accessToken", "trainingHub.baseUrl"]);
+
+// --- A file that cannot be read is removed, not left --------------------------
+//
+// Only the path that opens a run overwrites; the sweeps would re-read and
+// re-throw on a broken file forever while it went on counting against the cap.
+const brokenFingerprint = cache.activityDetailFingerprint(summable);
+const brokenFile = path.join(
+  tempRoot,
+  "activity-details",
+  ...fs.readdirSync(path.join(tempRoot, "activity-details")).filter((dir) =>
+    fs.existsSync(path.join(tempRoot, "activity-details", dir, `${summable.activityId}.json.br`))
+  ),
+  `${summable.activityId}.json.br`
+);
+const intact = fs.readFileSync(brokenFile);
+fs.writeFileSync(brokenFile, intact.subarray(0, Math.floor(intact.length / 2)));
+assert.equal(cache.readCachedActivityDetail(summable.activityId, brokenFingerprint), null);
+assert.ok(!fs.existsSync(brokenFile), "a truncated file is deleted on read");
+
+fs.writeFileSync(
+  brokenFile,
+  zlib.brotliCompressSync(
+    Buffer.from(JSON.stringify({ v: 99, fingerprint: brokenFingerprint, payload: {} }))
+  )
+);
+assert.equal(cache.readCachedActivityDetail(summable.activityId, brokenFingerprint), null);
+assert.ok(!fs.existsSync(brokenFile), "so is one written by an envelope version this build does not know");
+
+fs.writeFileSync(
+  brokenFile,
+  zlib.brotliCompressSync(
+    Buffer.from(JSON.stringify({ v: 1, fingerprint: brokenFingerprint, payload: "text" }))
+  )
+);
+assert.equal(
+  cache.readCachedActivityDetail(summable.activityId, brokenFingerprint),
+  null,
+  "a payload that is not an object is never handed back as one"
+);
+
+// ---------------------------------------------------------------------------
 // 4. The cap
 // ---------------------------------------------------------------------------
 
-const capRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-detail-cap-"));
+const capRoot = makeTemp("heracles-detail-cap-");
 database.setSetting("trainingHub.userId", "athlete-1");
-cache.initializeActivityDetailCache(capRoot, { maxBytes: 40_000 });
+// Written under a cap nothing reaches, then swept under one they all exceed —
+// so what is measured is the sweep, not whether a write happened to cross it.
+cache.initializeActivityDetailCache(capRoot, { maxBytes: 10_000_000 });
 
 // Incompressible bodies, so each file's size is predictable.
 const filler = (seed) => ({
@@ -325,23 +549,43 @@ for (let index = 0; index < 12; index += 1) {
   );
 }
 
+const capDir = path.join(
+  capRoot,
+  "activity-details",
+  ...fs.readdirSync(path.join(capRoot, "activity-details"))
+);
+// Last use one minute apart, oldest first, so the order is the files' own and
+// not whatever resolution the filesystem stamps writes at.
+kept.forEach((activity, index) => {
+  const at = new Date(Date.now() - (12 - index) * 60_000);
+  fs.utimesSync(path.join(capDir, `${activity.activityId}.json.br`), at, at);
+});
+
+const uncapped = cache.activityDetailCacheStats();
+assert.equal(uncapped.files, 12);
+const cap = Math.floor(uncapped.bytes / 2);
+cache.initializeActivityDetailCache(capRoot, { maxBytes: cap });
+const sweep = cache.sweepActivityDetailCache();
+
 const capped = cache.activityDetailCacheStats();
+assert.ok(sweep.removed >= 6, `half the directory over the cap, ${sweep.removed} removed`);
 assert.ok(
-  capped.bytes <= 40_000,
-  `the directory stays under its cap, holds ${capped.bytes} bytes`
+  capped.bytes <= cap * 0.9,
+  `a sweep goes under the cap with room to spare, holds ${capped.bytes} of ${cap}`
 );
-assert.ok(capped.files > 0, "and a sweep does not empty the whole directory");
-assert.ok(
-  cache.readCachedActivityDetail(
-    "run-11",
-    cache.activityDetailFingerprint(kept[11])
-  ),
-  "the most recently written detail survives the sweep"
-);
+assert.ok(capped.files > 0, "and does not empty the whole directory");
+for (const [index, activity] of kept.entries()) {
+  const present = fs.existsSync(path.join(capDir, `${activity.activityId}.json.br`));
+  if (index < sweep.removed) {
+    assert.equal(present, false, `${activity.activityId} was among the oldest and goes`);
+  } else {
+    assert.equal(present, true, `${activity.activityId} was used more recently and stays`);
+  }
+}
 
 // An orphan — a run deleted at COROS, or one belonging to an account that has
 // signed out — goes before anything still in the list, however recent it is.
-const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-detail-orphan-"));
+const orphanRoot = makeTemp("heracles-detail-orphan-");
 cache.initializeActivityDetailCache(orphanRoot, { maxBytes: 10_000_000 });
 
 const known = { ...run, activityId: "run-known", name: "Still in the list" };
@@ -384,6 +628,23 @@ assert.ok(
   "even though it is the older of the two — a run still in the list is kept"
 );
 
+// A write that died half way leaves a temp file behind. Nothing can read it and
+// nothing counts it, so it would otherwise sit in the directory for the life of
+// the install — and enough of them would fill a disk the cap thinks is empty.
+const staleTemp = path.join(accountDir, "run-dead.json.br.999.tmp");
+const liveTemp = path.join(accountDir, "run-writing.json.br.1000.tmp");
+fs.writeFileSync(staleTemp, "half a payload");
+fs.writeFileSync(liveTemp, "half a payload");
+const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+fs.utimesSync(staleTemp, twoHoursAgo, twoHoursAgo);
+cache.activityDetailCacheStats();
+assert.ok(!fs.existsSync(staleTemp), "an abandoned write is collected");
+assert.ok(
+  fs.existsSync(liveTemp),
+  "but one young enough to still be in progress is left alone"
+);
+fs.rmSync(liveTemp, { force: true });
+
 // ---------------------------------------------------------------------------
 // 5. One path to the payload
 // ---------------------------------------------------------------------------
@@ -410,6 +671,24 @@ assert.equal(
   3,
   "the three sweeps fetch without writing files; only opening a run earns one"
 );
+assert.equal(
+  serviceSource.split("fresh: true").length - 1,
+  1,
+  "exactly one reader skips the file — the feel backfill, whose field is the " +
+    "one thing a fingerprint cannot see change"
+);
+assert.match(
+  serviceSource,
+  /persist: false,\s*fresh: true\s*\}\);\s*cacheFeelTypeFromDetail/,
+  "and that reader is the feel backfill"
+);
+
+const mainSource = fs.readFileSync(path.join(repoRoot, "electron/main.ts"), "utf8");
+assert.match(
+  mainSource,
+  /initializeActivityDetailCache\(app\.getPath\(\"userData\"\)\);[\s\S]{0,400}sweepActivityDetailCache\(\)/,
+  "the cache is swept once at start-up — otherwise only a write reclaims anything"
+);
 
 const metricsSource = fs.readFileSync(
   path.join(repoRoot, "electron/activityMetrics.ts"),
@@ -429,8 +708,5 @@ assert.match(
   "the renderer re-exports the shared maths rather than keeping a second copy"
 );
 
-fs.rmSync(tempRoot, { recursive: true, force: true });
-fs.rmSync(capRoot, { recursive: true, force: true });
-fs.rmSync(orphanRoot, { recursive: true, force: true });
 
 console.log("activity detail cache: OK");

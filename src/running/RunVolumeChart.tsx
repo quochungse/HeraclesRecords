@@ -15,7 +15,7 @@ import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
-import { buildRunWeeks, type RunWeek } from "./runMetrics";
+import { buildRunWeeks, runWindowStartMs, type RunWeek } from "./runMetrics";
 import { RUN_SURFACE_LABELS, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
 
@@ -32,8 +32,11 @@ interface RunVolumeChartProps {
 
 /** Weeks the trailing average is taken over. */
 const MOVING_AVERAGE_WEEKS = 4;
-const MS_PER_DAY = 86_400_000;
-const DAYS_PER_YEAR = 365;
+/**
+ * How far back "a year ago" is, in whole weeks, so the comparison window starts
+ * on a Monday exactly as the chart's own window does.
+ */
+const WEEKS_PER_YEAR = 52;
 
 interface VolumeRow extends Record<string, number | string> {
   label: string;
@@ -41,14 +44,32 @@ interface VolumeRow extends Record<string, number | string> {
   longest: number;
 }
 
-function movingAverage(weeks: readonly RunWeek[], index: number): number {
-  const from = Math.max(0, index - MOVING_AVERAGE_WEEKS + 1);
-  const window = weeks.slice(from, index + 1);
+/**
+ * The trailing average ending at `index` of `buckets`, which must start
+ * `MOVING_AVERAGE_WEEKS - 1` weeks before the chart does. Taken over a window
+ * that reaches before the chart rather than one clipped to it: clipped, the
+ * first three points of every chart were one-, two- and three-week averages
+ * drawn under a legend calling all of them four-week.
+ */
+function movingAverage(buckets: readonly RunWeek[], index: number): number {
+  const window = buckets.slice(
+    Math.max(0, index - MOVING_AVERAGE_WEEKS + 1),
+    index + 1
+  );
   return window.reduce((sum, week) => sum + week.distance, 0) / window.length;
 }
 
+function shiftWeeks(timestampMs: number, weeks: number): number {
+  const date = new Date(timestampMs);
+  date.setDate(date.getDate() - weeks * 7);
+  return date.getTime();
+}
+
 /**
- * The same span of the calendar, a year back.
+ * The chart's own window, a year back — or nothing, when the window is longer
+ * than a year and "a year ago" would overlap the bars above it. Under "All" the
+ * chart spans two years, and half of the old figure was the same running the
+ * chart was drawing.
  *
  * Answered against the whole history rather than the filtered period, because
  * the period is what the athlete is looking at now and the comparison is
@@ -56,17 +77,23 @@ function movingAverage(weeks: readonly RunWeek[], index: number): number {
  */
 function distanceOneYearEarlier(
   runs: readonly TrainingHubActivity[],
-  spanDays: number,
+  weeks: number,
   nowMs: number
 ): number | undefined {
-  const end = nowMs - DAYS_PER_YEAR * MS_PER_DAY;
-  const start = end - spanDays * MS_PER_DAY;
+  // "1 year" is 53 calendar weeks; stepping back 53 keeps it clear of itself.
+  const back = Math.max(WEEKS_PER_YEAR, weeks);
+  if (back > WEEKS_PER_YEAR + 1) {
+    return undefined;
+  }
+
+  const start = shiftWeeks(runWindowStartMs(weeks, nowMs), back) / 1000;
+  const end = shiftWeeks(nowMs, back) / 1000;
   let total = 0;
   let seen = 0;
 
   for (const activity of runs) {
-    const at = (activity.startTime ?? 0) * 1000;
-    if (at >= start && at <= end) {
+    const at = activity.startTime;
+    if (at !== undefined && at >= start && at <= end) {
       total += activity.distance ?? 0;
       seen += 1;
     }
@@ -91,6 +118,17 @@ export function RunVolumeChart({
     [nowMs, runs, weeks]
   );
 
+  // The same surface over the whole history, reaching three weeks before the
+  // chart, so its first point is a four-week average like every other one.
+  const averageBuckets = useMemo(
+    () =>
+      buildRunWeeks(runsAllTime, {
+        weeks: weeks + MOVING_AVERAGE_WEEKS - 1,
+        nowMs
+      }),
+    [nowMs, runsAllTime, weeks]
+  );
+
   const rows = useMemo<VolumeRow[]>(
     () =>
       weekBuckets.map((week, index) => {
@@ -99,7 +137,7 @@ export function RunVolumeChart({
           total: metersToDisplayDistance(week.distance, unitSystem),
           longest: metersToDisplayDistance(week.longestRunMeters, unitSystem),
           average: metersToDisplayDistance(
-            movingAverage(weekBuckets, index),
+            movingAverage(averageBuckets, index + MOVING_AVERAGE_WEEKS - 1),
             unitSystem
           )
         };
@@ -111,7 +149,7 @@ export function RunVolumeChart({
         }
         return row;
       }),
-    [surfaces, unitSystem, weekBuckets]
+    [averageBuckets, surfaces, unitSystem, weekBuckets]
   );
 
   // What the bars add up to, not every run in the period: under "All" the
@@ -123,7 +161,7 @@ export function RunVolumeChart({
   );
 
   const lastYear = useMemo(
-    () => distanceOneYearEarlier(runsAllTime, weeks * 7, nowMs),
+    () => distanceOneYearEarlier(runsAllTime, weeks, nowMs),
     [nowMs, runsAllTime, weeks]
   );
 
@@ -168,8 +206,9 @@ export function RunVolumeChart({
               tickFormatter={(value: number) => value.toFixed(0)}
             />
 
-            {/* Stacked whatever the filter, so narrowing to one surface still
-                shows how that surface sat inside the week it belonged to. */}
+            {/* One segment per surface in the period. Under a surface filter
+                that is a single segment: the buckets hold only that surface's
+                runs, so the bar is its volume, not its share of the week. */}
             {surfaces.map((surface) => (
               <Bar
                 key={surface}

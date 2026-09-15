@@ -21,7 +21,7 @@ const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
 
 /** COROS's HR distribution has six buckets: below zone 1, then zones 1-5. */
-export const HR_BUCKET_COUNT = 6;
+const HR_BUCKET_COUNT = 6;
 
 /**
  * Bump when the figures below change shape or meaning. Every stored summary
@@ -97,11 +97,11 @@ export function paceHrDecoupling(
   // past what a spread can pass as arguments.
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
-  let stamped = 0;
+  const stamped: TrainingHubActivitySeriesPoint[] = [];
   for (const point of series) {
     const value = point.elapsed;
     if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      stamped += 1;
+      stamped.push(point);
       min = Math.min(min, value);
       max = Math.max(max, value);
     }
@@ -110,10 +110,14 @@ export function paceHrDecoupling(
   let first: readonly TrainingHubActivitySeriesPoint[];
   let second: readonly TrainingHubActivitySeriesPoint[];
 
-  if (stamped >= series.length / 2) {
+  if (stamped.length >= series.length / 2) {
+    // Only the stamped samples take part. Up to half the series may have no
+    // clock — the parser keeps a channel any sample carries, so a timestamp
+    // that drops out over the closing kilometres leaves holes — and reading
+    // those as elapsed 0 scored the end of the run into its first half.
     const midpoint = (min + max) / 2;
-    first = series.filter((point) => (point.elapsed ?? 0) <= midpoint);
-    second = series.filter((point) => (point.elapsed ?? 0) > midpoint);
+    first = stamped.filter((point) => (point.elapsed as number) <= midpoint);
+    second = stamped.filter((point) => (point.elapsed as number) > midpoint);
   } else {
     const cut = Math.floor(series.length / 2);
     first = series.slice(0, cut);
@@ -190,7 +194,7 @@ export function withPausesRemoved(
 export function hrZoneSeconds(
   detail: Pick<TrainingHubActivityDetail, "hrZones">
 ): number[] | undefined {
-  const buckets = detail.hrZones ?? [];
+  const buckets = detail.hrZones;
   if (buckets.length === 0) {
     return undefined;
   }
@@ -201,7 +205,6 @@ export function hrZoneSeconds(
     const index = bucket.index;
     const value = bucket.seconds;
     if (
-      typeof index !== "number" ||
       index < 0 ||
       index >= HR_BUCKET_COUNT ||
       typeof value !== "number" ||
@@ -222,10 +225,7 @@ export function hrZoneSeconds(
 export interface ActivityDetailSummaryInput {
   activityId: string;
   fingerprint: string;
-  detail: Pick<
-    TrainingHubActivityDetail,
-    "hrZones" | "series" | "pauses" | "activeDuration"
-  >;
+  detail: Pick<TrainingHubActivityDetail, "hrZones" | "series" | "pauses">;
   /** The payload as COROS sent it, for the fields the parser has no use for. */
   raw?: Record<string, unknown>;
   now?: number;

@@ -16,7 +16,6 @@ import {
 // Re-exported here so this module stays the one import the run screens reach
 // for, and so a call site never has to know which side computed the number.
 export {
-  activeElapsed,
   paceHrDecoupling,
   withPausesRemoved,
   type RunDecoupling
@@ -106,20 +105,6 @@ export function elevationPerKm(
   return activity.elevationGain / (distance / METERS_PER_KM);
 }
 
-/** Metres climbed per hour — the number trail running is actually paced by. */
-export function verticalSpeed(
-  activity: TrainingHubActivity
-): number | undefined {
-  const duration = runSeconds(activity);
-  if (duration === undefined || activity.elevationGain === undefined) {
-    return undefined;
-  }
-
-  // Zero climb is a reading, not a gap: a flat run really did climb nothing,
-  // and turning that into "no data" would hide every road run from the mix.
-  return activity.elevationGain / (duration / SECONDS_PER_HOUR);
-}
-
 /** Monday-start weeks, matching every other weekly figure in the app. */
 export function startOfRunWeekMs(timestampMs: number): number {
   const date = new Date(timestampMs);
@@ -128,6 +113,23 @@ export function startOfRunWeekMs(timestampMs: number): number {
   const offset = (date.getDay() + 6) % 7;
   date.setDate(date.getDate() - offset);
   return date.getTime();
+}
+
+/**
+ * Where a window of `weeks` calendar weeks begins, this week included.
+ *
+ * The one definition of "the last N weeks" on the Running screen. The charts
+ * bucket by calendar week, so a filter that cut at `now − N × 7 days` instead
+ * reached back past the oldest bucket on every day but Monday: the runs in
+ * between were counted by the totals strip and dropped by the chart eighteen
+ * pixels below it — 50 km against 30 km on a Tuesday, same four weeks.
+ */
+export function runWindowStartMs(weeks: number, nowMs: number): number {
+  // Stepped through the local calendar, like `buildRunWeeks`, so a DST change
+  // inside the window cannot land the start an hour off a Monday.
+  const cursor = new Date(startOfRunWeekMs(nowMs));
+  cursor.setDate(cursor.getDate() - Math.max(0, weeks - 1) * 7);
+  return cursor.getTime();
 }
 
 export interface RunTotals {
@@ -146,7 +148,7 @@ export interface RunWeek extends RunTotals {
   label: string;
   /** Metres of the week's single longest run. */
   longestRunMeters: number;
-  /** Metres per surface, so a filtered chart can still stack the whole week. */
+  /** Metres per surface in the week, for the volume chart's stacked bars. */
   distanceBySurface: Record<RunSurface, number>;
 }
 
@@ -264,9 +266,12 @@ export interface RunLoadBalance {
   /** acute ÷ chronic. Absent while there is nothing to divide by. */
   ratio?: number;
   /**
-   * How far back the oldest run inside the 28-day window is. Under ~21 days the
-   * chronic figure is averaging over history that does not exist, so the ratio
-   * reads high and the screen should say so rather than raise an alarm.
+   * How far back the athlete's oldest run is — across the whole list, not the
+   * window. Under ~21 days the chronic figure is averaging over history that
+   * does not exist, so the ratio reads high and the screen says so. Measured
+   * inside the window it said the same about a comeback: three weeks off leaves
+   * nothing in the window before this week, but those weeks are zeros that
+   * happened, and they are exactly why the ratio is high.
    */
   oldestRunDaysAgo?: number;
 }
@@ -293,6 +298,10 @@ export function runLoadBalance(
       continue;
     }
 
+    if (oldestAt === undefined || at < oldestAt) {
+      oldestAt = at;
+    }
+
     const daysAgo = (nowMs - at) / MS_PER_DAY;
     if (daysAgo > 28) {
       continue;
@@ -302,9 +311,6 @@ export function runLoadBalance(
     chronicTotal += load;
     if (daysAgo <= 7) {
       acute += load;
-    }
-    if (oldestAt === undefined || at < oldestAt) {
-      oldestAt = at;
     }
   }
 
@@ -371,25 +377,10 @@ export function runIntensity(
   return zone === 3 ? "moderate" : "hard";
 }
 
-/** Distance per surface across a whole list, for the surface mix panel. */
-export function distanceBySurface(
-  activities: readonly TrainingHubActivity[]
-): Record<RunSurface, number> {
-  const totals = emptySurfaceDistances();
-  for (const activity of activities) {
-    const surface = classifyRunSurface(activity.sportType);
-    if (surface !== null) {
-      totals[surface] += positive(activity.distance) ?? 0;
-    }
-  }
-  return totals;
-}
-
 /** The surfaces actually present in a list, in render order. */
 export function surfacesPresent(
   activities: readonly TrainingHubActivity[]
 ): RunSurface[] {
-  const totals = distanceBySurface(activities);
   const seen = new Set<RunSurface>();
   for (const activity of activities) {
     const surface = classifyRunSurface(activity.sportType);
@@ -397,9 +388,7 @@ export function surfacesPresent(
       seen.add(surface);
     }
   }
-  return RUN_SURFACES.filter(
-    (surface) => seen.has(surface) || totals[surface] > 0
-  );
+  return RUN_SURFACES.filter((surface) => seen.has(surface));
 }
 
 /**
@@ -411,6 +400,23 @@ export function surfacesPresent(
  * fitness that never happened.
  */
 const MIN_EFFICIENCY_DURATION_SECONDS = 1200;
+
+/**
+ * Whether a run belongs in an efficiency comparison: long enough for its
+ * average to mean something, and — given zones — easy. The one definition, so
+ * the trend line and the scatter beside it cannot draw different populations
+ * under the same header; the scatter used to plot every run, shakeouts and
+ * intervals included, beneath a caption saying they had been left out.
+ */
+export function countsForEfficiency(
+  activity: TrainingHubActivity,
+  zones: readonly TrainingHubThresholdZone[] = []
+): boolean {
+  if ((runSeconds(activity) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
+    return false;
+  }
+  return zones.length === 0 || runIntensity(activity.avgHr, zones) === "easy";
+}
 
 export interface RunEfficiencyWeek {
   weekStartMs: number;
@@ -450,13 +456,12 @@ export function buildRunEfficiencyWeeks(
     const surface = classifyRunSurface(activity.sportType);
     const at = startedAtMs(activity);
     const value = efficiencyIndex(activity);
-    if (surface === null || at === undefined || value === undefined) {
-      continue;
-    }
-    if ((runSeconds(activity) ?? 0) < MIN_EFFICIENCY_DURATION_SECONDS) {
-      continue;
-    }
-    if (zones.length > 0 && runIntensity(activity.avgHr, zones) !== "easy") {
+    if (
+      surface === null ||
+      at === undefined ||
+      value === undefined ||
+      !countsForEfficiency(activity, zones)
+    ) {
       continue;
     }
 
@@ -513,6 +518,11 @@ export interface RunIntensityMix {
   zoneTimed: number;
 }
 
+/** The share of a run its zone split must cover to be read instead of the
+ *  average. A dropout of a few minutes passes; a strap that barely worked does
+ *  not. */
+const MIN_ZONE_TIME_COVERAGE = 0.8;
+
 /**
  * Which band each of COROS's six HR buckets belongs to. Bucket 0 is the time
  * below zone 1, so it reads as easy alongside zones 1 and 2 — the same cut
@@ -563,8 +573,18 @@ export function runIntensityMix(
     const duration = runSeconds(activity) ?? 0;
     const zoneSeconds = summaries?.get(activity.activityId)?.zoneSeconds;
     const scored = zoneSeconds?.reduce((sum, value) => sum + value, 0) ?? 0;
+    // Only a split that covers most of the run is worth stretching over it. A
+    // strap that came back for the last five minutes of an easy hour scores
+    // those five minutes, and scaled onto the whole run they turned it into an
+    // hour of hard running — the same run read 100% easy or 100% hard depending
+    // only on whether the sweep had reached it yet. Below the floor the average
+    // is the better reading of what happened.
+    const covered =
+      zoneSeconds !== undefined &&
+      scored > 0 &&
+      (duration === 0 || scored >= duration * MIN_ZONE_TIME_COVERAGE);
 
-    if (zoneSeconds && scored > 0) {
+    if (zoneSeconds && covered) {
       const scale = duration > 0 ? duration / scored : 1;
       let leader: RunIntensity = "easy";
       let leaderSeconds = -1;

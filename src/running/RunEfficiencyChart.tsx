@@ -21,9 +21,30 @@ import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, secondsPerKmToDisplayPace } from "../units/units";
-import { buildRunEfficiencyWeeks, paceSecondsPerKm } from "./runMetrics";
+import {
+  buildRunEfficiencyWeeks,
+  countsForEfficiency,
+  paceSecondsPerKm
+} from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
+
+interface ScatterPoint {
+  /** Seconds per display unit — already converted, see `formatDisplayPace`. */
+  pace: number;
+  hr: number;
+  surface: RunSurface;
+  name: string;
+}
+
+const NO_ZONES: readonly TrainingHubThresholdZone[] = [];
+
+/** First and last weeks with a reading must be at least three weeks apart
+ *  before their difference is called a trend, so a four-week period still shows
+ *  one when both its ends were run. Twenty days rather than twenty-one: week
+ *  starts are local midnights, and across a clock change three weeks is an hour
+ *  short of 21 × 24 h. */
+const MIN_TREND_SPAN_MS = 20 * 86_400_000;
 
 interface RunEfficiencyChartProps {
   runs: readonly TrainingHubActivity[];
@@ -80,6 +101,9 @@ export function RunEfficiencyChart({
     return { rows: buildRunEfficiencyWeeks(runs, { weeks, nowMs }), easyOnly: false };
   }, [nowMs, runs, weeks, zones]);
 
+  // The zones the line was actually filtered by, for the scatter to match.
+  const appliedZones = easyOnly ? zones : NO_ZONES;
+
   const hasAny = rows.some((row) => row.count > 0);
 
   // Surfaces that actually carry a line. A surface with one lonely week makes a
@@ -108,37 +132,66 @@ export function RunEfficiencyChart({
     [drawn, rows]
   );
 
-  const scatter = useMemo(
-    () =>
-      runs.flatMap((activity) => {
-        const pace = paceSecondsPerKm(activity);
-        const surface = classifyRunSurface(activity.sportType);
-        if (pace === undefined || activity.avgHr === undefined || surface === null) {
-          return [];
-        }
-        return [
-          {
-            pace: secondsPerKmToDisplayPace(pace, unitSystem),
-            hr: activity.avgHr,
-            surface,
-            name: activity.name?.trim() || RUN_SURFACE_LABELS[surface]
-          }
-        ];
-      }),
-    [runs, unitSystem]
-  );
+  // Grouped by surface once, rather than filtered once per surface per render.
+  const scatterBySurface = useMemo(() => {
+    const grouped = new Map<RunSurface, ScatterPoint[]>();
+    for (const activity of runs) {
+      const pace = paceSecondsPerKm(activity);
+      const surface = classifyRunSurface(activity.sportType);
+      if (
+        pace === undefined ||
+        activity.avgHr === undefined ||
+        surface === null ||
+        !countsForEfficiency(activity, appliedZones)
+      ) {
+        continue;
+      }
+      const point: ScatterPoint = {
+        pace: secondsPerKmToDisplayPace(pace, unitSystem),
+        hr: activity.avgHr,
+        surface,
+        name: activity.name?.trim() || RUN_SURFACE_LABELS[surface]
+      };
+      const list = grouped.get(surface);
+      if (list) {
+        list.push(point);
+      } else {
+        grouped.set(surface, [point]);
+      }
+    }
+    return grouped;
+  }, [appliedZones, runs, unitSystem]);
 
+  const latest = useMemo(() => {
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      if (rows[index]!.overall !== undefined) {
+        return rows[index];
+      }
+    }
+    return undefined;
+  }, [rows]);
+
+  /**
+   * The change between the first and last weeks with a reading, when those are
+   * far enough apart to be a trend. Two adjacent weeks are not: efficiency moves
+   * a few percent week to week on unchanged fitness, and the old endpoint read
+   * printed that noise, in bold, as the change "across the period". It also
+   * names the week it measures from, because the first week with an easy run is
+   * rarely the first week of the period.
+   */
   const trend = useMemo(() => {
-    const values = rows
-      .filter((row) => row.overall !== undefined)
-      .map((row) => row.overall!);
-    if (values.length < 2) {
+    const first = rows.find((row) => row.overall !== undefined);
+    if (!first || !latest || first === latest) {
       return null;
     }
-    const first = values[0]!;
-    const last = values[values.length - 1]!;
-    return { first, last, deltaPct: ((last - first) / first) * 100 };
-  }, [rows]);
+    if (latest.weekStartMs - first.weekStartMs < MIN_TREND_SPAN_MS) {
+      return null;
+    }
+    return {
+      since: first.label,
+      deltaPct: ((latest.overall! - first.overall!) / first.overall!) * 100
+    };
+  }, [latest, rows]);
 
   return (
     <section className="panel run-block">
@@ -146,7 +199,7 @@ export function RunEfficiencyChart({
         <div>
           <p className="running-eyebrow">Aerobic efficiency</p>
           <h3>
-            {trend ? trend.last.toFixed(2) : "—"}
+            {latest?.overall !== undefined ? latest.overall.toFixed(2) : "—"}
             <span className="run-block-sub"> m per minute per beat</span>
           </h3>
         </div>
@@ -160,7 +213,7 @@ export function RunEfficiencyChart({
                 {trend.deltaPct >= 0 ? "+" : ""}
                 {trend.deltaPct.toFixed(1)}%
               </strong>{" "}
-              across the period
+              since {trend.since}
             </>
           ) : null}
         </p>
@@ -249,7 +302,7 @@ export function RunEfficiencyChart({
                 {surfaces.map((surface) => (
                   <Scatter
                     key={surface}
-                    data={scatter.filter((point) => point.surface === surface)}
+                    data={scatterBySurface.get(surface) ?? []}
                     fill={palette[surface]}
                     fillOpacity={0.55}
                     isAnimationActive={false}
@@ -283,9 +336,7 @@ function ScatterTooltip({
   if (!active || !payload?.length) {
     return null;
   }
-  const point = payload[0]?.payload as
-    | { pace: number; hr: number; surface: RunSurface; name: string }
-    | undefined;
+  const point = payload[0]?.payload as ScatterPoint | undefined;
   if (!point) {
     return null;
   }

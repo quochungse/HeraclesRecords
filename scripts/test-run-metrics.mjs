@@ -20,12 +20,11 @@ const {
 } = await import(moduleUrl("runSurface.ts"));
 
 const {
-  activeElapsed,
   buildRunEfficiencyWeeks,
   buildRunWeeks,
+  countsForEfficiency,
   runIntensityMix,
   runSurfaceBreakdown,
-  distanceBySurface,
   efficiencyIndex,
   elevationPerKm,
   heartRateZoneIndex,
@@ -34,11 +33,17 @@ const {
   runIntensity,
   runLoadBalance,
   runSeconds,
+  runWindowStartMs,
   startOfRunWeekMs,
   summariseRuns,
-  verticalSpeed,
+  surfacesPresent,
   withPausesRemoved
 } = await import(moduleUrl("runMetrics.ts"));
+
+// The pause maths lives with the main process, which shares it with this screen.
+const { activeElapsed } = await import(
+  `${pathToFileURL(path.join(repoRoot, "electron", "activityMetrics.ts")).href}${bust}`
+);
 
 // 14 Sep 2026 is a Monday; every fixture below is built in local time because
 // the week boundary is local too.
@@ -120,9 +125,6 @@ assert.equal(
 );
 assert.equal(elevationPerKm(run({ elevationGain: undefined })), undefined);
 
-assert.equal(verticalSpeed(run({ duration: 3600, elevationGain: 600 })), 600);
-assert.equal(verticalSpeed(run({ elevationGain: 0 })), 0);
-assert.equal(verticalSpeed(run({ elevationGain: undefined })), undefined);
 
 // ---------------------------------------------------------------------------
 // Activity time. COROS's `duration` runs start to finish with the pauses in it;
@@ -139,7 +141,6 @@ assert.ok(
   "6:51 /km, not the 11:36 the pauses would make it"
 );
 assert.ok(Math.abs(efficiencyIndex(paused) - 10_200 / (4190 / 60) / 150) < 1e-9);
-assert.equal(verticalSpeed(run({ duration: 7200, activeDuration: 3600, elevationGain: 600 })), 600);
 assert.equal(summariseRuns([paused, run({ duration: 1000 })]).duration, 5190);
 assert.equal(
   runIntensityMix([paused], [{ index: 0, hr: 140 }, { index: 1, hr: 155 }, { index: 2, hr: 170 }]).easy.duration,
@@ -268,7 +269,31 @@ const balance = runLoadBalance(loadFixtures, NOW);
 assert.equal(balance.acute, 180, "strength load stays out of the running ratio");
 assert.equal(balance.chronic, 60, "240 across 28 days is 60 a week");
 assert.equal(balance.ratio, 3);
-assert.ok(Math.abs(balance.oldestRunDaysAgo - 20) < 0.01);
+assert.ok(
+  Math.abs(balance.oldestRunDaysAgo - 40) < 0.01,
+  "history depth is the oldest run anywhere, not the oldest inside the window"
+);
+
+// A comeback is not a new account. Three weeks off, then three runs this week:
+// inside the 28-day window the oldest run is days old, but the history is
+// years deep, and the zeros before this week are why the ratio is high. The
+// hero's "short history" note used to explain the ramp away.
+const comeback = runLoadBalance(
+  [
+    run({ activityId: "c1", startTime: secondsAgo(2), trainingLoad: 90 }),
+    run({ activityId: "c2", startTime: secondsAgo(4), trainingLoad: 90 }),
+    run({ activityId: "c3", startTime: secondsAgo(6), trainingLoad: 90 }),
+    run({ activityId: "c-old", startTime: secondsAgo(900), trainingLoad: 90 })
+  ],
+  NOW
+);
+assert.equal(comeback.ratio, 4, "the ramp the ratio exists to flag");
+assert.ok(comeback.oldestRunDaysAgo > 21, "and not a thin history");
+const newcomer = runLoadBalance(
+  [run({ activityId: "n1", startTime: secondsAgo(6), trainingLoad: 90 })],
+  NOW
+);
+assert.ok(newcomer.oldestRunDaysAgo < 21, "an account a week old still is one");
 
 const emptyBalance = runLoadBalance([], NOW);
 assert.equal(emptyBalance.acute, 0);
@@ -355,6 +380,18 @@ const steady = Array.from({ length: 40 }, (_, index) => ({
 }));
 assert.ok(Math.abs(paceHrDecoupling(steady).percent) < 1e-9);
 
+// Samples with no clock sit out rather than land at elapsed 0. Up to half the
+// series may lack a timestamp, and scoring them into the first half moved the
+// drift figure by whatever those samples happened to hold.
+const withHoles = [
+  ...drifting,
+  ...Array.from({ length: 20 }, () => ({ hr: 190, pace: 420 }))
+];
+assert.ok(
+  Math.abs(paceHrDecoupling(withHoles).percent - decoupling.percent) < 1e-9,
+  "unstamped samples change nothing about a split taken on the clock"
+);
+
 assert.equal(paceHrDecoupling(undefined), undefined);
 assert.equal(paceHrDecoupling(drifting.slice(0, 10)), undefined, "too few samples");
 assert.equal(
@@ -371,10 +408,11 @@ const totals = summariseRuns(mixed);
 assert.equal(totals.count, 2, "hike and bike are not runs");
 assert.equal(totals.distance, 20_000);
 
-const bySurface = distanceBySurface(weekFixtures);
-assert.equal(bySurface.trail, 8_000);
-assert.equal(bySurface.road, 54_000);
-assert.equal(bySurface.treadmill, 0);
+assert.deepEqual(
+  surfacesPresent(weekFixtures),
+  ["road", "trail"],
+  "the surfaces a list holds, in render order, and none it does not"
+);
 
 // ---------------------------------------------------------------------------
 // Efficiency by week. Only steady running counts: a ten-minute shakeout spends
@@ -514,5 +552,78 @@ const treadmill = breakdown[2];
 assert.equal(treadmill.elevationPerKm, undefined);
 assert.equal(treadmill.verticalSpeed, undefined);
 assert.equal(treadmill.pace, 360);
+
+// ---------------------------------------------------------------------------
+// One definition of "the last N weeks". The charts bucket by calendar week, and
+// a filter that cut at now − N × 7 days reached past the oldest bucket on every
+// day but Monday: those runs were in the totals strip and in no bar.
+// ---------------------------------------------------------------------------
+
+const tuesday = new Date(2026, 8, 15, 12, 0, 0).getTime();
+assert.equal(
+  runWindowStartMs(4, tuesday),
+  new Date(2026, 7, 24).getTime(),
+  "four weeks seen from a Tuesday start on the Monday three weeks back"
+);
+assert.equal(runWindowStartMs(1, tuesday), new Date(2026, 8, 14).getTime(), "one week is this week");
+assert.equal(runWindowStartMs(1, NOW), new Date(2026, 8, 14).getTime(), "a Monday is its own week's start");
+
+const acrossTheWindow = [3, 10, 17, 22, 24, 27].map((daysAgo) =>
+  run({
+    activityId: `window-${daysAgo}`,
+    startTime: Math.floor((tuesday - daysAgo * MS_PER_DAY) / 1000)
+  })
+);
+const cutoffSeconds = runWindowStartMs(4, tuesday) / 1000;
+const admitted = acrossTheWindow.filter((activity) => activity.startTime >= cutoffSeconds);
+const drawn = buildRunWeeks(admitted, { weeks: 4, nowMs: tuesday });
+assert.equal(
+  drawn.reduce((sum, week) => sum + week.count, 0),
+  admitted.length,
+  "every run the period admits lands in one of its bars"
+);
+assert.ok(admitted.length < acrossTheWindow.length, "and the fixture really does straddle the edge");
+
+// ---------------------------------------------------------------------------
+// Time in zone only stands in for the average when it covers the run. A strap
+// that came back for the last five minutes of an easy hour scores those five
+// minutes; stretched over the hour they made it an hour of hard running.
+// ---------------------------------------------------------------------------
+
+const strapped = run({ activityId: "strap", duration: 3600, avgHr: 128 });
+const summaryOf = (activity, zoneSeconds) =>
+  new Map([
+    [
+      activity.activityId,
+      { activityId: activity.activityId, fingerprint: "fp", summaryVersion: 1, zoneSeconds, computedAt: 0 }
+    ]
+  ]);
+
+const dropout = runIntensityMix([strapped], zones, summaryOf(strapped, [0, 0, 0, 0, 0, 300]));
+assert.equal(dropout.zoneTimed, 0, "five scored minutes of an hour are not a split");
+assert.equal(dropout.easy.duration, 3600, "so the average places it, and 128 bpm is easy");
+
+const covered = runIntensityMix(
+  [strapped],
+  zones,
+  summaryOf(strapped, [0, 1800, 900, 300, 0, 0])
+);
+assert.equal(covered.zoneTimed, 1, "50 of 60 minutes scored: the split is the better reading");
+assert.ok(
+  Math.abs(covered.easy.duration - 3240) < 1e-6,
+  "2700 of 3000 scored seconds, scaled onto the 3600 run"
+);
+assert.ok(Math.abs(covered.moderate.duration - 360) < 1e-6);
+assert.equal(covered.hard.duration, 0);
+assert.equal(covered.easy.count, 1, "the session counts once, where it spent the most time");
+
+// ---------------------------------------------------------------------------
+// The efficiency line and its scatter draw one population.
+// ---------------------------------------------------------------------------
+
+assert.equal(countsForEfficiency(run({ duration: 600 })), false, "a shakeout is too short to mean anything");
+assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 })), true, "no zones: every long run");
+assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 }), zones), false, "zone 3 is not easy");
+assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), zones), true);
 
 console.log("run metrics: OK");

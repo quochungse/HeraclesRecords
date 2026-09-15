@@ -2355,6 +2355,40 @@ export function getStoredTrainingActivity(
   return row ? enrichActivitiesWithSportNames([toTrainingActivity(row)])[0] : undefined;
 }
 
+/**
+ * Many stored activities at once, for a caller holding a whole list of ids.
+ *
+ * `getStoredTrainingActivity` in a loop is a prepared statement per row, and
+ * the detail-summary sweep walks the same list on every pass — a few hundred
+ * runs then cost tens of thousands of statements over one sweep.
+ */
+export function getStoredTrainingActivities(
+  activityIds: readonly string[]
+): TrainingHubActivity[] {
+  if (activityIds.length === 0) {
+    return [];
+  }
+
+  const database = requireDatabase();
+  const rows: TrainingActivityRow[] = [];
+  for (let index = 0; index < activityIds.length; index += SUMMARY_QUERY_CHUNK) {
+    const chunk = activityIds.slice(index, index + SUMMARY_QUERY_CHUNK);
+    rows.push(
+      ...(database
+        .prepare(
+          `SELECT activity_id, name, sport_type, sport_name, start_time, end_time,
+                  duration, distance, avg_hr, max_hr, calories, training_load,
+                  elevation_gain
+           FROM training_activities
+           WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
+        )
+        .all(...chunk) as TrainingActivityRow[])
+    );
+  }
+
+  return enrichActivitiesWithSportNames(rows.map(toTrainingActivity));
+}
+
 /** Every activity id the local mirror holds. The detail cache uses it to tell
  *  a file worth keeping from one whose run is no longer anywhere. */
 export function listStoredTrainingActivityIds(): string[] {

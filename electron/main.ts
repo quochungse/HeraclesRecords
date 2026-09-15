@@ -54,7 +54,10 @@ import {
 } from "./backup/backupService";
 import type { RestoreMode } from "./backup/backupTypes";
 import { deviceId as syncDeviceId } from "./sync/deviceIdentity";
-import { initializeActivityDetailCache } from "./activityDetailCache";
+import {
+  initializeActivityDetailCache,
+  sweepActivityDetailCache
+} from "./activityDetailCache";
 import {
   clearDownloadTransferredByFileName,
   deleteDownload,
@@ -927,6 +930,11 @@ app.whenReady().then(() => {
   // Activity details are files beside the database, not rows in it: 2.5 MB
   // each, 98% sample series, and the rows sync.
   initializeActivityDetailCache(app.getPath("userData"));
+  // Once per launch, because nothing else reclaims anything: the cap is only
+  // checked when a detail is written, so an athlete who fills the directory and
+  // then stops opening runs — or signs out — keeps whatever is there for good.
+  // A scan of a few thousand files costs a millisecond or two.
+  sweepActivityDetailCache();
   hydratePlanDraftStoreFromDatabase();
   prunePlanDraftStore();
   pruneDeleteRequestStore();

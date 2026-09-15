@@ -17,11 +17,13 @@ import type { CorosLinkApi } from "../coroslink-api";
 const SUMMARY_CHUNK = 4;
 
 /**
- * A backstop for a history nobody has met yet. Summaries are permanent and they
- * sync, so the sweep is a one-off per account — but an athlete with thousands
- * of activities should not have their first afternoon on this screen spent
- * fetching all of them. Module-level, so it bounds the session and not the
- * mount: switching period filters must not buy another allowance.
+ * A backstop for a history nobody has met yet. Summaries are kept, so the sweep
+ * is a one-off per machine — not per account: the table is `derived` and does
+ * not sync, so a second computer, or this one after a restore, computes its own.
+ * Either way an athlete with thousands of activities should not have their
+ * first afternoon on this screen spent fetching all of them. Module-level, so
+ * it bounds the session and not the mount: switching period filters must not
+ * buy another allowance.
  */
 const SESSION_FETCH_CAP = 300;
 let fetchedThisSession = 0;
@@ -80,17 +82,26 @@ export function useRunDetailSummaries({
 
         while (!cancelled && fetchedThisSession < SESSION_FETCH_CAP) {
           const pass = await api.syncActivityDetailSummaries(ids, SUMMARY_CHUNK);
+          // Charged before anything else: the fetches happened whether or not
+          // this effect is still around to see them, and a period change tears
+          // it down mid-pass often enough that charging afterwards left the cap
+          // bounding nothing.
+          fetchedThisSession += pass.computed + pass.failed;
           if (cancelled) {
             return;
           }
-          fetchedThisSession += pass.computed;
 
-          if (pass.computed > 0) {
-            const next = await api.getActivityDetailSummaries(ids);
-            if (cancelled) {
-              return;
-            }
-            setSummaries(toMap(next));
+          const written = pass.summaries ?? [];
+          if (written.length > 0) {
+            // Merged, not re-read: a fresh read of every id after every few
+            // would send the whole summary table over IPC once per pass.
+            setSummaries((current) => {
+              const next = new Map(current);
+              for (const summary of written) {
+                next.set(summary.activityId, summary);
+              }
+              return next;
+            });
           }
 
           // Nothing left, or nothing moving — a pass that computes none is
