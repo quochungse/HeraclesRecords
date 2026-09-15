@@ -1,0 +1,311 @@
+/*
+ * The Activities screen.
+ *
+ * Renderer CSS has no scope, so everything here is prefixed `activities-` and
+ * was grepped across src/ before being named. The split panel itself still
+ * lives in styles.css, alongside the other `training-*` rules it shares.
+ */
+
+.activities-view {
+  /*
+   * Three surfaces, named once. On the dark theme they are derived from the
+   * ink; on paper a raised face is white and the hairline does the lifting, so
+   * they are respecified rather than flipped — the same shape the Strength
+   * screen settled on.
+   */
+  --ax-edge: color-mix(in srgb, var(--text-primary) 11%, transparent);
+  --ax-raised: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --ax-well: color-mix(in srgb, #000 22%, transparent);
+}
+
+:root[data-theme="paper"] .activities-view {
+  --ax-edge: rgba(38, 34, 28, 0.11);
+  --ax-raised: #ffffff;
+  --ax-well: rgba(38, 34, 28, 0.05);
+}
+
+.activities-view > .activities-head,
+.activities-view > .activities-summary,
+.activities-view > .activities-filters {
+  /* `.stack.stack-fill` hands `flex: 1` to the split panel below; without this
+   * these three would shrink to nothing before it gave up any height. */
+  flex: 0 0 auto;
+}
+
+.activities-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.activities-head h2 span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* --- Summary -------------------------------------------------------------- */
+
+.activities-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.activities-summary-tiles {
+  display: grid;
+  /* `auto` tracks grow to their widest caption and push the row out of the
+   * page; a minmax floor keeps every tile inside the pane. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.activities-summary-tile {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-raised);
+}
+
+.activities-summary-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activities-summary-value {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.activities-summary-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* --- Sport mix ------------------------------------------------------------ */
+
+.activities-mix {
+  display: grid;
+  gap: 8px;
+}
+
+.activities-mix-bar {
+  display: flex;
+  overflow: hidden;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activities-mix-bar i {
+  min-width: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activities-mix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activities-mix-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.activities-mix-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activities-mix-legend span {
+  color: var(--text-secondary);
+}
+
+.activities-mix-legend strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.activities-mix-legend em {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+/*
+ * One rule per category rather than an inline style, so the colours stay in
+ * CSS where the athlete's palette is applied. Scoped to this screen: renderer
+ * CSS has no scope, and a bare `[data-sport="run"]` would reach the sport
+ * chips on every other screen too.
+ */
+.activities-view [data-sport="strength"] {
+  --sport-mix-color: var(--sport-strength);
+}
+
+.activities-view [data-sport="trail"] {
+  --sport-mix-color: var(--sport-trail);
+}
+
+.activities-view [data-sport="run"] {
+  --sport-mix-color: var(--sport-run);
+}
+
+.activities-view [data-sport="bike"] {
+  --sport-mix-color: var(--sport-bike);
+}
+
+.activities-view [data-sport="other"] {
+  --sport-mix-color: var(--sport-other);
+}
+
+/* --- Filters -------------------------------------------------------------- */
+
+.activities-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.activities-period {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activities-period-option {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-period-option:hover:not(.is-active) {
+  color: var(--text-secondary);
+}
+
+.activities-period-option.is-active {
+  background: var(--ax-raised);
+  color: var(--text-primary);
+}
+
+.activities-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.activities-sport-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-sport-toggle i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activities-sport-toggle:hover:not(.is-active) {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--text-secondary) 40%, transparent);
+}
+
+.activities-sport-toggle.is-active {
+  border-color: color-mix(in srgb, var(--sport-mix-color) 45%, transparent);
+  background: color-mix(in srgb, var(--sport-mix-color) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.activities-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 200px;
+  max-width: 320px;
+  padding: 0 8px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+  color: var(--text-muted);
+}
+
+.activities-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.activities-search input:focus {
+  outline: none;
+}
+
+.activities-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.activities-search-clear {
+  width: 22px;
+  height: 22px;
+}
+
+.activities-filters-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.activities-filters-status button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-filters-status button:hover {
+  text-decoration: underline;
+}
