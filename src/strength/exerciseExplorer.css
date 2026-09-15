@@ -41,8 +41,7 @@
 }
 
 .strength-explore-all:focus-visible,
-.strength-lift-button:focus-visible,
-.strength-session-chip-button:focus-visible {
+.strength-lift-button:focus-visible {
   outline: 2px solid var(--sx-ember);
   outline-offset: 3px;
 }
@@ -101,28 +100,6 @@
 .strength-lift-button:hover .strength-lift-open-icon {
   color: var(--sx-ember);
   transform: translateX(2px);
-}
-
-.strength-session-chip-button {
-  max-width: 100%;
-  padding: 3px 10px;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: inherit;
-  font-size: 11.5px;
-  letter-spacing: -0.002em;
-  cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.strength-session-chip-button:hover {
-  background: color-mix(in srgb, var(--sx-ember) 14%, transparent);
-  color: var(--text-primary);
 }
 
 /* ---------- Shell ---------- */

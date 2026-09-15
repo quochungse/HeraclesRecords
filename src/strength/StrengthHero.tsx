@@ -11,6 +11,7 @@ import { resolveMuscleView } from "./bodyFocus";
 import { BodyMapV2, type BodyView } from "./BodyMapV2";
 import { MusclePanel } from "./MusclePanel";
 import { MUSCLE_BY_ID, type MuscleId } from "./muscles";
+import { analyticsCoverage, type SessionHeat } from "./sessionAnalytics";
 import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
 
@@ -33,11 +34,20 @@ const STRENGTH_METRIC_PREFERENCE = defineSelectionPreference<HeatMetric>({
 });
 
 interface StrengthHeroProps {
+  /** What the muscle panel reads, and by default what the figure draws. */
   analytics: StrengthAnalytics;
   /** COROS is the only source that reports time under load. */
   source: StrengthDataSource;
   /** Dev view unlocks the figure's layer controls. */
   showDevelopmentTools?: boolean;
+  /**
+   * What the figure draws and the scale it is read on, when that is not
+   * `analytics` against its own busiest muscle — one session read against the
+   * window, or a Full Body session drawn faintly. The panel shares the scale.
+   */
+  resolveHeat?: (metric: HeatMetric) => SessionHeat;
+  /** Words the no-attribution note for one session rather than a stretch of time. */
+  scope?: "window" | "session";
 }
 
 /**
@@ -49,7 +59,9 @@ interface StrengthHeroProps {
 export function StrengthHero({
   analytics,
   source,
-  showDevelopmentTools = false
+  showDevelopmentTools = false,
+  resolveHeat,
+  scope = "window"
 }: StrengthHeroProps) {
   const { unitSystem } = useUnitSystem();
   const [view, setView] = useSelectionPreference(STRENGTH_BODY_VIEW_PREFERENCE);
@@ -94,12 +106,12 @@ export function StrengthHero({
   );
 
   const highlightedMuscle = figureHover ?? listHover ?? selectedMuscle;
-  const heatMax = analytics.muscleMax[metric];
+  const heat = resolveHeat
+    ? resolveHeat(metric)
+    : { muscleById: analytics.muscleById, max: analytics.muscleMax[metric] };
   const hasSessions = analytics.summary.sessions > 0;
-  const genericSetCount = Math.round(analytics.genericSets);
-  const workingSetCount = Math.round(
-    analytics.attributedSets + analytics.genericSets + analytics.unmappedSets
-  );
+  const coverage = analyticsCoverage(analytics);
+  const genericSetCount = Math.round(coverage.generic);
 
   return (
     <div
@@ -160,8 +172,8 @@ export function StrengthHero({
           view={view}
           viewRequest={viewRequest}
           metric={metric}
-          muscleById={analytics.muscleById}
-          max={heatMax}
+          muscleById={heat.muscleById}
+          max={heat.max}
           selected={selectedMuscle}
           hovered={highlightedMuscle}
           onHover={setFigureHover}
@@ -182,7 +194,7 @@ export function StrengthHero({
       </section>
 
       <section className="panel strength-muscle-panel">
-        {hasSessions && workingSetCount > 0 && analytics.attributedSets <= 0 ? (
+        {hasSessions && coverage.working > 0 && coverage.attributed <= 0 ? (
           <div className="muscle-panel is-unattributed">
             <span className="muscle-panel-unattributed-icon" aria-hidden="true">
               <Info size={22} />
@@ -190,11 +202,17 @@ export function StrengthHero({
             <p className="eyebrow">Muscle attribution</p>
             <h3>No specific muscle data</h3>
             <p>
-              {genericSetCount > 0
-                ? `COROS recorded ${genericSetCount.toLocaleString()} working ${
-                    genericSetCount === 1 ? "set" : "sets"
-                  } only as Full Body. Session totals remain available, but the map stays neutral because no specific muscles were identified.`
-                : "None of the exercises in this window could be matched to specific muscles. Session totals remain available, but the map stays neutral."}
+              {scope === "session"
+                ? genericSetCount > 0
+                  ? `COROS recorded this session only as Full Body, across ${genericSetCount.toLocaleString()} working ${
+                      genericSetCount === 1 ? "set" : "sets"
+                    }, so the whole figure is drawn at the lightest level. No specific muscle was identified.`
+                  : "None of this session's exercises could be matched to specific muscles, so the map stays neutral."
+                : genericSetCount > 0
+                  ? `COROS recorded ${genericSetCount.toLocaleString()} working ${
+                      genericSetCount === 1 ? "set" : "sets"
+                    } only as Full Body. Session totals remain available, but the map stays neutral because no specific muscles were identified.`
+                  : "None of the exercises in this window could be matched to specific muscles. Session totals remain available, but the map stays neutral."}
             </p>
           </div>
         ) : (
@@ -202,7 +220,7 @@ export function StrengthHero({
             muscles={analytics.muscles}
             muscleById={analytics.muscleById}
             metric={metric}
-            max={heatMax}
+            max={heat.max}
             active={selectedMuscle}
             onSelect={selectMuscle}
             onHover={setListHover}

@@ -104,7 +104,7 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
       // The icon is ours rather than lucide's: lucide draws no running figure,
       // and Footprints — the nearest thing — already belongs to Gear.
       { id: "running", label: "Running", icon: RunnerIcon },
-      { id: "strength", label: "Strength", icon: Dumbbell, beta: true },
+      { id: "strength", label: "Strength", icon: Dumbbell },
     ],
   }),
   // Sleep sits beside Training rather than inside it: it is recovery, it is

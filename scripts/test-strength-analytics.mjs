@@ -1,3 +1,9 @@
+/**
+ * The Strength screen's aggregations: credited sets, weekly buckets and per-exercise history.
+ *
+ * Run: npm run test:strength-analytics
+ * (Electron, because this machine's Node has no Amaro for --experimental-strip-types.)
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

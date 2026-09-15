@@ -1,0 +1,816 @@
+/* ---------- Session list ---------- */
+
+.strength-session-nav {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.strength-session-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.strength-session-row:hover {
+  background: var(--sx-well);
+}
+
+.strength-session-row[aria-current="true"] {
+  border-color: var(--sx-edge);
+  background: var(--sx-raised);
+  box-shadow: var(--sx-lift);
+}
+
+.strength-session-row:focus-visible {
+  outline: 2px solid var(--sx-ember);
+  outline-offset: 1px;
+}
+
+.strength-session-row-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--sx-well);
+  color: var(--sx-ember);
+}
+
+.strength-session-row-date {
+  display: grid;
+  justify-items: center;
+  padding-top: 1px;
+  line-height: 1;
+}
+
+.strength-session-row-date em {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strength-session-row-date strong {
+  margin-top: 4px;
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.strength-session-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.strength-session-row-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.strength-session-row-title strong,
+.strength-session-row-main > strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strength-session-row.is-aggregate .strength-session-row-main {
+  align-self: center;
+}
+
+.strength-session-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-session-row-facts > span + span::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--text-muted);
+}
+
+.strength-session-row-source {
+  color: var(--text-muted);
+}
+
+/* The session's push / pull / legs / core split, as a hairline under its facts. */
+.strength-session-row-mix {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.strength-session-row-mix > i {
+  min-width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--pattern-color);
+  opacity: 0.85;
+}
+
+.strength-session-record-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--sx-record) 16%, transparent);
+  color: var(--sx-record);
+  font-size: 9.5px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+}
+
+.strength-session-week {
+  display: grid;
+  gap: 2px;
+}
+
+.strength-session-week ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Sticks to the top of whatever scrolls the list, so a long history never
+   loses track of which week it is showing. */
+.strength-session-week-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 2px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-base) 72%, transparent);
+  backdrop-filter: blur(12px);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---------- Split: session list | detail ---------- */
+
+.strength-split {
+  display: grid;
+  grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+/* The list keeps its place while a long session scrolls past beside it. */
+.strength-split-list {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 96px);
+  padding: 12px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The body map and its muscle panel sit side by side in a wide pane and stack
+   in a narrow one; that depends on the pane, not the window, so it is a
+   container query rather than the viewport breakpoint the Overview uses. */
+.strength-split-detail {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+@container (max-width: 700px) {
+  .strength-session-detail .strength-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1040px) {
+  .strength-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .strength-split-list {
+    position: static;
+    max-height: 360px;
+  }
+}
+
+/* ---------- Detail ---------- */
+
+/* Every grid in the pane takes minmax(0, 1fr), not the implicit auto column:
+   an auto track grows to the min-content of the stat captions and set tables
+   and pushes the cards past the edge of the pane. */
+.strength-session-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.strength-session-detail-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.strength-session-detail-head .eyebrow {
+  margin: 0;
+}
+
+.strength-session-detail-head h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.strength-session-detail-sub {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.strength-session-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 18px 22px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--sx-hairline);
+}
+
+.strength-session-stat {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.strength-session-stat span {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.strength-session-stat strong {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.strength-session-stat em {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Records ---------- */
+
+.strength-session-records {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strength-session-records li,
+.strength-session-records.is-list button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--sx-record) 22%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sx-record) 7%, transparent);
+  font-size: 13px;
+}
+
+.strength-session-records li > svg,
+.strength-session-records button > svg {
+  align-self: center;
+  color: var(--sx-record);
+}
+
+.strength-session-records.is-list {
+  margin: 0;
+}
+
+.strength-session-records.is-list li {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.strength-session-records.is-list button {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.strength-session-records.is-list button:hover {
+  border-color: color-mix(in srgb, var(--sx-record) 48%, transparent);
+}
+
+.strength-session-records.is-list button:focus-visible {
+  outline: 2px solid var(--sx-ember);
+  outline-offset: 1px;
+}
+
+.strength-session-record-figures {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  color: var(--text-secondary);
+}
+
+.strength-session-record-figures strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-session-record-figures em {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+.strength-session-record-date {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ---------- Exercises ---------- */
+
+.strength-session-exercise-card .strength-card-head {
+  margin-bottom: 14px;
+}
+
+.strength-session-exercise-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strength-session-exercise + .strength-session-exercise {
+  border-top: 1px solid var(--sx-hairline);
+}
+
+.strength-session-exercise-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strength-session-exercise-toggle {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.strength-session-exercise-toggle:hover {
+  background: var(--sx-well);
+}
+
+.strength-session-exercise-toggle:focus-visible,
+.strength-session-exercise-explore:focus-visible {
+  outline: 2px solid var(--sx-ember);
+  outline-offset: 1px;
+}
+
+.strength-session-exercise-chevron {
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+}
+
+.strength-session-exercise[data-open] .strength-session-exercise-chevron {
+  transform: rotate(90deg);
+}
+
+.strength-session-exercise-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.strength-session-exercise-name strong {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strength-session-exercise-facts,
+.strength-session-exercise-top {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.strength-session-exercise-top {
+  min-width: 92px;
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+}
+
+.strength-session-exercise-explore {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--sx-hairline);
+  border-radius: 9px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.strength-session-exercise-explore:hover {
+  border-color: color-mix(in srgb, var(--sx-ember) 45%, var(--sx-edge));
+  color: var(--sx-ember);
+}
+
+.strength-session-exercise-sets {
+  padding: 0 0 14px 34px;
+  overflow-x: auto;
+}
+
+/* The global table rule sets min-width: 720px; a set table has to fit the pane. */
+.strength-session-exercise-sets table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-session-exercise-sets th {
+  padding: 6px 10px;
+  border-bottom: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.strength-session-exercise-sets td {
+  padding: 7px 10px;
+  border-top: 1px solid var(--sx-hairline);
+  border-bottom: 0;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.strength-session-exercise-sets th:first-child,
+.strength-session-exercise-sets td:first-child {
+  width: 48px;
+  padding-left: 0;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.strength-session-exercise-sets tr[data-type="warmup"] td {
+  color: var(--text-muted);
+}
+
+.strength-session-set-tag {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--sx-well);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 700px) {
+  .strength-session-exercise-toggle {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+  }
+
+  .strength-session-exercise-facts {
+    display: none;
+  }
+}
+
+/* ---------- Weekly sets per muscle ---------- */
+
+/* One series, one colour: the page's ember, one step deeper on dark so the bar
+   sits inside the lightness band a chart mark should (validated, not picked).
+   Declared on the card, not on .strength-view, so this sheet owns no token on
+   an element whose other tokens are set in strength.css. */
+.strength-volume-card {
+  --sx-volume-bar: #dc7430;
+}
+
+:root[data-theme="paper"] .strength-volume-card {
+  --sx-volume-bar: #cf6a2a;
+}
+
+.strength-volume-summary {
+  display: flex;
+  flex-shrink: 0;
+  gap: 16px;
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.strength-volume-summary strong {
+  margin-right: 4px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.strength-volume-chart {
+  --volume-label: 108px;
+  --volume-value: 76px;
+}
+
+.strength-volume-scale,
+.strength-volume-row {
+  display: grid;
+  grid-template-columns: var(--volume-label) minmax(0, 1fr) var(--volume-value);
+  align-items: center;
+  gap: 14px;
+}
+
+.strength-volume-ticks {
+  position: relative;
+  height: 18px;
+}
+
+.strength-volume-ticks i {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-ticks i:first-child {
+  transform: none;
+}
+
+.strength-volume-ticks i:last-child {
+  transform: translateX(-100%);
+}
+
+.strength-volume-ticks i[data-landmark] {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.strength-volume-rows {
+  display: grid;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strength-volume-row {
+  position: relative;
+  padding: 3px 0;
+  border-radius: 8px;
+  outline: none;
+}
+
+.strength-volume-row[data-region-start] {
+  margin-top: 10px;
+}
+
+.strength-volume-row:hover,
+.strength-volume-row:focus-visible {
+  background: var(--sx-well);
+}
+
+.strength-volume-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--sx-ember);
+}
+
+.strength-volume-name {
+  overflow: hidden;
+  padding-left: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The row is the hit target; the track only needs to be tall enough to read. */
+.strength-volume-track {
+  position: relative;
+  height: 22px;
+}
+
+.strength-volume-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px solid var(--sx-edge);
+  border-left: 1px solid var(--sx-edge);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.strength-volume-bar {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: var(--sx-volume-bar);
+}
+
+.strength-volume-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-value strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.strength-volume-value em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.strength-volume-row[data-status="below"] .strength-volume-value strong {
+  color: var(--text-secondary);
+}
+
+/* Anchored at the bar's end, and held inside the track so it never runs off
+   the card on a long bar. */
+.strength-volume-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: min(var(--tip-at, 0%), calc(100% - 220px));
+  z-index: 4;
+  display: flex;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--sx-edge);
+  border-radius: 10px;
+  background: var(--sx-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+}
+
+.strength-volume-row:hover .strength-volume-tip,
+.strength-volume-row:focus-visible .strength-volume-tip {
+  opacity: 1;
+}
+
+/* One tooltip at a time: the row under the pointer wins over the focused one. */
+.strength-volume-rows:hover .strength-volume-row:focus-visible:not(:hover) .strength-volume-tip {
+  opacity: 0;
+}
+
+.strength-volume-tip span {
+  display: grid;
+  gap: 2px;
+}
+
+.strength-volume-tip strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-tip em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.strength-volume-note {
+  margin: 18px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.strength-volume-table {
+  margin-top: 12px;
+}
+
+.strength-volume-table summary {
+  width: fit-content;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.strength-volume-table-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+/* The global table rule sets min-width: 720px. */
+.strength-volume-table table {
+  min-width: 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-volume-table th,
+.strength-volume-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--sx-hairline);
+  text-align: right;
+}
+
+.strength-volume-table th:first-child {
+  text-align: left;
+}
+
+@media (max-width: 700px) {
+  .strength-volume-card .strength-card-head {
+    flex-direction: column;
+  }
+
+  .strength-volume-chart {
+    --volume-label: 84px;
+    --volume-value: 58px;
+  }
+}
