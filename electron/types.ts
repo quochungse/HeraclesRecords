@@ -2539,11 +2539,37 @@ export interface TrainingHubSleepHrvSummary {
   recentReadings: TrainingHubSleepHrvReading[];
 }
 
+/** One clock window COROS dated, as it writes them on their own line. */
+export interface TrainingHubSleepWindow {
+  start?: string;
+  end?: string;
+  startDay?: string;
+  endDay?: string;
+}
+
 export interface TrainingHubSleepRecord {
   happenDay: string;
-  kind?: "main" | "nap";
+  /**
+   * What the record holds for its day.
+   *
+   *   * `main` — an overnight sleep, with naps folded in beside it.
+   *   * `nap-only` — a day COROS reported naps for and no main sleep at all.
+   *     It is still one of the day's records: the athlete slept, and a screen
+   *     that drops it loses the day. Verified against the live feed, which
+   *     answers such a day with `Naps Total` and its `Nap Window` lines and
+   *     nothing else — no score, no stages, no main sleep window.
+   *   * `nap` — a single nap as a record of its own, which only the JSON
+   *     shapes produce. It is folded into its day and never listed as a day.
+   */
+  kind?: "main" | "nap" | "nap-only";
   completeness?: "complete" | "partial";
   partialReason?: string;
+  /**
+   * Minutes asleep in the **main sleep**, which is what the stage split and
+   * the efficiency are a share of. The day's whole sleep — naps included — is
+   * `totalSleepMinutes` in `electron/sleepMetrics.ts`; never add `napMinutes`
+   * onto this field, or every percentage hanging off it drifts.
+   */
   totalMinutes?: number;
   score?: number;
   deepMinutes?: number;
@@ -2556,9 +2582,17 @@ export interface TrainingHubSleepRecord {
   awakePercent?: number;
   awakeCountOverFiveMinutes?: number;
   windowMinutes?: number;
+  /** Every nap on the day, summed — COROS's own "Naps Total". */
   napMinutes?: number;
+  /**
+   * The clock of the **first** nap, kept because every stored night carries
+   * these two and the pair reads the same as it always did. A day can hold
+   * several naps, so `napWindows` is the one that answers "when".
+   */
   napStart?: string;
   napEnd?: string;
+  /** Each nap's own window, in the order COROS listed them. */
+  napWindows?: TrainingHubSleepWindow[];
   avgHr?: number;
   /** The night's heart-rate range, folded in from the daily health feed. */
   minHr?: number;

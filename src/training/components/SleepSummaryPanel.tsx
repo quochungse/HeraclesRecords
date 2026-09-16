@@ -15,6 +15,13 @@ import { pickLastNightSleep } from "../../sleep/sleepFreshness";
 import { MCP_SLEEP_NOTICE, mcpTextOr } from "../../mcp/mcpNotice";
 import { sleepScoreLabel, sleepScoreTone } from "../../sleep/sleepScore";
 import { drawableStages } from "../../sleep/sleepStages";
+import {
+  isNapOnlyRecord,
+  isSleepDayRecord,
+  totalSleepMinutes
+} from "../../../electron/sleepMetrics";
+import { formatNapValue, napHover } from "../../sleep/napSummary";
+import { SleepMetricValue } from "../../sleep/components/SleepMetricValue";
 import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../electron/types";
 
 interface SleepSummaryPanelProps {
@@ -23,14 +30,6 @@ interface SleepSummaryPanelProps {
   refreshing?: boolean;
   /** Opens the Sleep screen. Omitted, the panel stays a plain card. */
   onOpenDetails?: () => void;
-}
-
-function formatNapSummary(record: TrainingHubSleepRecord): string {
-  if (record.napMinutes === undefined) {
-    return "No data";
-  }
-
-  return formatSleepDurationMinutes(record.napMinutes);
 }
 
 function formatSleepWindow(
@@ -52,15 +51,17 @@ function formatSleepMetricDuration(minutes?: number): string {
 
 function SleepMetric({
   label,
-  value
+  value,
+  hover
 }: {
   label: string;
   value: string | number;
+  hover?: string;
 }) {
   return (
     <div className="sleep-metric">
       <dt>{label}</dt>
-      <dd title={String(value)}>{value}</dd>
+      <SleepMetricValue label={label} value={String(value)} hover={hover} />
     </div>
   );
 }
@@ -160,8 +161,9 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
 function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
   const parts = [formatSleepNightLabel(record)];
 
-  if (record.totalMinutes !== undefined && Number.isFinite(record.totalMinutes)) {
-    parts.push(formatSleepDurationMinutes(record.totalMinutes));
+  const total = totalSleepMinutes(record);
+  if (total !== undefined) {
+    parts.push(formatSleepDurationMinutes(total));
   }
 
   if (record.score !== undefined && Number.isFinite(record.score)) {
@@ -189,13 +191,16 @@ export function SleepSummaryPanel({
   // night", so nothing on screen claims to be this morning's.
   const previewNight = import.meta.env.DEV
     ? [...(sleep?.records ?? [])]
-        .filter((record) => record.kind !== "nap")
+        .filter(isSleepDayRecord)
         .sort((left, right) => right.happenDay.localeCompare(left.happenDay))[0]
     : undefined;
   const night = lastNight ?? previewNight;
   const staleNight = !night ? sleep?.latest : undefined;
   const tone = sleepScoreTone(night?.score);
-  const label = sleepScoreLabel(night?.score, "Waiting");
+  // A day the athlete only napped has no score and never will, so "Waiting"
+  // would have the card waiting on something COROS is not sending.
+  const napOnly = night !== undefined && isNapOnlyRecord(night);
+  const label = sleepScoreLabel(night?.score, napOnly ? "Naps only" : "Waiting");
   const isLoading = connecting || refreshing;
 
   return (
@@ -251,12 +256,21 @@ export function SleepSummaryPanel({
               <span>{label}</span>
             </div>
             <div className="sleep-panel-duration">
-              <span>Main sleep</span>
-              <strong>{formatSleepDurationMinutes(night.totalMinutes)}</strong>
+              {/* The whole day's sleep. The stage bar under it is the main
+                  sleep's split, which is why the naps get a row of their own. */}
+              <span>Total sleep</span>
+              <strong>{formatSleepDurationMinutes(totalSleepMinutes(night))}</strong>
             </div>
           </div>
 
-          <SleepStageBar record={night} />
+          {napOnly ? (
+            <p className="sleep-panel-empty-stages">
+              Naps only — COROS reports no score or stages for a day without a
+              main sleep.
+            </p>
+          ) : (
+            <SleepStageBar record={night} />
+          )}
 
           {night.completeness === "partial" ? (
             <p className="sleep-panel-partial">
@@ -276,7 +290,8 @@ export function SleepSummaryPanel({
             />
             <SleepMetric
               label="Naps"
-              value={formatNapSummary(night)}
+              value={formatNapValue(night)}
+              hover={napHover(night)}
             />
           </dl>
         </>

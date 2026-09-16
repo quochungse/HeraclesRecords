@@ -494,6 +494,49 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   (`ChatSettingsPanel`): they are feature-wide and the screen that used to host them is
   gone, so without a home a paused world would have no Resume button.
 
+- **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
+  nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
+  weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the
+  efficiency and the time in bed are all a share of it, so adding naps onto it drifts every
+  one of them. The day's whole sleep is `totalSleepMinutes` in `electron/sleepMetrics.ts`,
+  which the renderer imports directly (like `activityMetrics.ts`, and it must stay free of
+  `node:` imports for the same reason). Every list, trend, average and greeting reads that,
+  never `totalMinutes`.
+  **A day COROS reported naps for and no main sleep is a day.** Its prose block carries
+  `Naps Total` and a `Nap Window` line **per nap** and nothing else — no score, no `Main
+  Sleep`, no stages — so the parser's demand for one of those two lines dropped the whole
+  block and the day went missing from the screen, the trend and the coach's table with
+  nothing anywhere saying a day had gone. Four days were missing from this account's cache
+  when it was found. Such a day is `kind: "nap-only"`, is `complete` rather than `partial`
+  (COROS has said all it will), and is unsettled for one day past its own so a late watch
+  sync can still turn it into a night. `Naps Total: 0 min` with no main sleep is **not** a
+  record: nothing was slept.
+  `kind` therefore has three values, and the filter that means "a day" is
+  `isSleepDayRecord` (`kind !== "nap"`), not a bare comparison — a single `nap` is a
+  component folded into its day, never listed beside it. `selectWindow` does that folding
+  and is what keeps one date to one record: `sleep_nights` is keyed `<day>:<kind>`, so a day
+  first seen while only its naps had synced keeps that row for good once the main sleep
+  lands under another. `npm run test:sleep-metrics`, `test:sleep-data-parser` (verbatim live
+  payloads) and `test:sleep-history-cache` hold this down.
+  **Picking a night must cost neither a round trip nor a layout jump.**
+  `useSleepNightSeries` keeps every night it has been handed: a night that has
+  been slept never changes and the main process answers a settled one out of
+  SQLite in milliseconds, so the trip bought nothing and cost a frame of
+  "Loading the night…" — including on a click straight back onto the night that
+  was just on screen. And `SleepNightCurve` holds the height its box last
+  settled at while it waits, because the three states are three sizes and
+  passing through the short one between two charts dropped the detail pane 156px
+  and sprang it back, 7–12 ms at a time, on every selection. The held height
+  cannot be a constant: which size to hold depends on what was on screen, and a
+  fixed one invents the same bounce between two nights that both have no
+  samples. `npm run test:sleep-renderer` mounts the screen in a real window and
+  fails on either shortcut.
+  **COROS sends a window per nap but nothing at all about an individual
+  wake-up** (probed 2026-09-16: `querySleepData` has only `Awake Time` and
+  `Awake Count (>5 min)`, `querySleepHrv`'s `status` is 4 all night, and the
+  stress series' `score` is a stress band). The nap windows sum to the day's
+  reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its
+  hover note from them.
 - **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.

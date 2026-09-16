@@ -61,8 +61,10 @@ function SleepTrendLegend() {
 /**
  * The Sleep screen's length-and-score chart, on Overview. It reads the trend
  * points rather than the raw sleep summary because those are already one row
- * per night with naps and partial windows folded out — see
- * `mergeSleepIntoTrendPoints`. Bars are not wired to open a night here: this
+ * per day, with partial nights dropped and each day's naps summed into its
+ * total — see `mergeSleepIntoTrendPoints`. The record handed down therefore
+ * carries the whole day's sleep as `totalMinutes` and no naps of its own, so
+ * the chart adds nothing on top. Bars are not wired to open a night here: this
  * panel sits on a screen that has nowhere to open one.
  */
 export function SleepTrendPanel({

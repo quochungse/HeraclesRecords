@@ -28,6 +28,7 @@ import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
 import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { RunningView } from "../../src/running/RunningView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
+import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -242,6 +243,37 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           periodLabel={(options.periodLabel as string | undefined) ?? "3 months"}
         />
       </div>
+    );
+  },
+  /*
+   * The Sleep screen, in a column of a stated height.
+   *
+   * What is asserted on it is geometry and traffic: the curve's box must not
+   * shrink while a night's samples are on their way, and a night this screen
+   * has already been shown must not be asked for again. `sleep.css` arrives
+   * with the view itself; `styles.css` does not, and without it the boxes are
+   * unstyled and every height measured is a different page's.
+   */
+  SleepDetailsView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content"
+        style={{
+          height: `${(options.height as number | undefined) ?? 900}px`,
+          // The column's width, not the window's. The metric tiles are an
+          // `auto-fit` grid, so how many land in a row — and therefore which
+          // one is at an edge — is decided here.
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <SleepDetailsView
+          api={api}
+          connected={(options.connected as boolean | undefined) ?? true}
+          trendPoints={(options.trendPoints as never) ?? []}
+          onOpenOverview={spy("onOpenOverview")}
+        />
+      </main>
     );
   },
   ChatView: (options) => (
@@ -523,6 +555,17 @@ const harness = {
     return Boolean(element);
   },
 
+  /**
+   * The nth match, for a list whose rows differ only in the data on them. The
+   * text of a sleep night is a date, and asserting against a date computed twice
+   * proves less than picking the row by where it sits in the run.
+   */
+  clickNth(selector: string, nth: number): boolean {
+    const element = query(selector)[nth];
+    element?.click();
+    return Boolean(element);
+  },
+
   clickText(selector: string, text: string): boolean {
     const element = findByText(selector, text);
     element?.click();
@@ -560,6 +603,59 @@ const harness = {
           right: Math.round(box.right)
         }
       : null;
+  },
+
+  /**
+   * One metric tile, found by the label it sits under, with whatever its hover
+   * note holds. The tiles are a grid whose order follows the data, so naming
+   * one by its label is the only way to ask about it that survives a tile being
+   * added beside it.
+   */
+  metricTile(
+    label: string
+  ): { label: string; value: string; note: string | null } | null {
+    const tile = query(".sleep-metric, .sleep-detail-metric").find(
+      (element) =>
+        (element.querySelector("dt")?.textContent ?? "").trim().toLowerCase() ===
+        label.toLowerCase()
+    );
+    if (!tile) return null;
+    return {
+      label,
+      value: (tile.querySelector("dd")?.textContent ?? "").trim(),
+      note: tile.querySelector(".sleep-metric-note")?.textContent ?? null
+    };
+  },
+
+  /**
+   * Every hover note inside one row, measured against that row.
+   *
+   * A note is transparent until it is pointed at, and opacity is not what puts
+   * it off the panel — its box is laid out either way, which is what makes this
+   * answerable without hovering each one in turn.
+   */
+  noteBounds(rowSelector: string): Array<{
+    side: string | null;
+    left: number;
+    right: number;
+    rowLeft: number;
+    rowRight: number;
+  }> {
+    const row = query(rowSelector)[0];
+    if (!row) return [];
+    const bounds = row.getBoundingClientRect();
+    return [...row.querySelectorAll<HTMLElement>(".sleep-metric-note")].map(
+      (note) => {
+        const box = note.getBoundingClientRect();
+        return {
+          side: note.getAttribute("data-note-side"),
+          left: Math.round(box.left),
+          right: Math.round(box.right),
+          rowLeft: Math.round(bounds.left),
+          rowRight: Math.round(bounds.right)
+        };
+      }
+    );
   },
 
   /** How far an element's content runs past its own box, horizontally. */

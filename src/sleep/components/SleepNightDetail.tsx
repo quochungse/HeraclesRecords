@@ -14,6 +14,12 @@ import {
 import { SleepNightCurve } from "./SleepNightCurve";
 import { SleepStageDonut } from "./SleepStageDonut";
 import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
+import {
+  isNapOnlyRecord,
+  totalSleepMinutes
+} from "../../../electron/sleepMetrics";
+import { formatNapValue, napClocks, napHover } from "../napSummary";
+import { SleepMetricValue } from "./SleepMetricValue";
 import type {
   SleepNightSeries,
   TrainingHubSleepRecord
@@ -55,11 +61,19 @@ function formatSleepHeartRate(record: TrainingHubSleepRecord): string {
   return `${average}${range}`;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  hover
+}: {
+  label: string;
+  value: string;
+  hover?: string;
+}) {
   return (
     <div className="sleep-detail-metric">
       <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <SleepMetricValue label={label} value={value} hover={hover} />
     </div>
   );
 }
@@ -89,7 +103,12 @@ export function SleepNightDetail({
     );
   }
 
+  const napOnly = isNapOnlyRecord(record);
   const window = formatSleepClockRange(record.sleepStart, record.sleepEnd);
+  // A day with no main sleep has no window of its own, so the naps' own clocks
+  // stand where it would have been — the one line on the card with room for
+  // all of them.
+  const napWindowLine = napOnly ? napClocks(record).join(" · ") : "";
   // COROS dates both ends of the window, so a night that began the evening
   // before can say so instead of leaving "23:48 – 05:30" to be worked out.
   const startedYesterday =
@@ -105,7 +124,9 @@ export function SleepNightDetail({
       <header className="sleep-detail-header">
         <div>
           <p className="eyebrow">{formatHappenDayLabel(record.happenDay)}</p>
-          <h2>{formatSleepDurationMinutes(record.totalMinutes)}</h2>
+          {/* The whole day's sleep. The stage split below is the main sleep's,
+              which is why the naps are named rather than silently added. */}
+          <h2>{formatSleepDurationMinutes(totalSleepMinutes(record))}</h2>
           <p className="sleep-detail-window">
             {window ? (
               <>
@@ -118,6 +139,11 @@ export function SleepNightDetail({
                 {window}
                 <AlarmClock size={13} aria-hidden="true" />
               </>
+            ) : napOnly ? (
+              // Deliberately without the moon-and-alarm pair the window line
+              // wears: those read "went to bed" and "woke up", which is not
+              // what a nap is.
+              `Naps only — no main sleep${napWindowLine ? ` · ${napWindowLine}` : ""}`
             ) : (
               "Sleep window not reported"
             )}
@@ -135,23 +161,33 @@ export function SleepNightDetail({
         </p>
       ) : null}
 
-      <section className="sleep-detail-stages">
-        <SleepStageDonut record={record} />
-        <dl className="sleep-stage-table">
-          {stages.map((stage) => (
-            <div key={stage.key} className="sleep-stage-row">
-              <dt>
-                <span className={`sleep-stage-dot ${stage.className}`} aria-hidden="true" />
-                {stage.label}
-              </dt>
-              <dd>
-                <strong>{formatSleepDurationMinutes(stage.minutes)}</strong>
-                <span>({formatSleepPercent(stage.percent)})</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {napOnly ? (
+        <p className="sleep-detail-naps-only">
+          COROS sends no score and no stage breakdown for a day without a main
+          sleep — only how long the naps were and when.
+        </p>
+      ) : (
+        <section className="sleep-detail-stages">
+          <SleepStageDonut record={record} />
+          <dl className="sleep-stage-table">
+            {stages.map((stage) => (
+              <div key={stage.key} className="sleep-stage-row">
+                <dt>
+                  <span
+                    className={`sleep-stage-dot ${stage.className}`}
+                    aria-hidden="true"
+                  />
+                  {stage.label}
+                </dt>
+                <dd>
+                  <strong>{formatSleepDurationMinutes(stage.minutes)}</strong>
+                  <span>({formatSleepPercent(stage.percent)})</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
 
       {/*
         COROS's own card draws a hypnogram here. Its feed carries no stages, so
@@ -161,6 +197,10 @@ export function SleepNightDetail({
       <SleepNightCurve series={series} loading={seriesLoading} />
 
       <dl className="sleep-detail-metrics" aria-label="Night details">
+        <Metric
+          label="Main sleep"
+          value={formatSleepDurationMinutes(record.totalMinutes)}
+        />
         <Metric label="Time in bed" value={formatSleepDurationMinutes(inBed)} />
         <Metric
           label="Efficiency"
@@ -174,14 +214,7 @@ export function SleepNightDetail({
               : "No data"
           }
         />
-        <Metric
-          label="Naps"
-          value={
-            record.napMinutes !== undefined
-              ? formatSleepDurationMinutes(record.napMinutes)
-              : "No data"
-          }
-        />
+        <Metric label="Naps" value={formatNapValue(record)} hover={napHover(record)} />
         <Metric label="Sleep HR" value={formatSleepHeartRate(record)} />
       </dl>
     </div>

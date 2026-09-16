@@ -7,6 +7,11 @@ import {
 import { sleepScoreTone } from "../sleepScore";
 import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import { drawableStages } from "../sleepStages";
+import {
+  isNapOnlyRecord,
+  napMinutes,
+  totalSleepMinutes
+} from "../../../electron/sleepMetrics";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
 interface SleepNightListProps {
@@ -22,6 +27,10 @@ interface SleepNightListProps {
  * The nights on file, newest first. Each row carries the three things worth
  * scanning down a column for — when, how long, how well — plus the stage strip,
  * which is the only way to see at a glance that a long night was mostly light.
+ *
+ * "How long" is the whole day's sleep, naps included. The strip is the main
+ * sleep's stages, so a day with a nap on it shows a total the strip is shorter
+ * than — which is why the nap says how much of the total it is.
  */
 export function SleepNightList({
   records,
@@ -62,6 +71,7 @@ export function SleepNightList({
         const selected = record.happenDay === selectedDay;
         const stages = drawableStages(record);
         const total = stages.reduce((sum, stage) => sum + stage.weight, 0);
+        const naps = napMinutes(record) ?? 0;
 
         return (
           <li key={`${record.happenDay}:${record.kind ?? "main"}`}>
@@ -82,7 +92,14 @@ export function SleepNightList({
               </div>
 
               <div className="sleep-night-row-meta">
-                <span>{formatSleepDurationMinutes(record.totalMinutes)}</span>
+                <span>{formatSleepDurationMinutes(totalSleepMinutes(record))}</span>
+                {naps > 0 ? (
+                  <span className="sleep-night-row-nap">
+                    {isNapOnlyRecord(record)
+                      ? "naps only"
+                      : `incl. ${formatSleepDurationMinutes(naps)} nap`}
+                  </span>
+                ) : null}
                 {record.completeness === "partial" ? (
                   <span className="sleep-night-row-partial">
                     <AlertCircle size={12} aria-hidden="true" />

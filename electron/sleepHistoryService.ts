@@ -124,6 +124,14 @@ function isUnsettled(entry: CacheEntry, now: number): boolean {
     return true;
   }
 
+  // A day carrying only naps may be a day whose night the watch has not
+  // reported yet, so it gets last night's grace and one day beyond it — a late
+  // sync lands after the day has turned. Past that it is taken at its word: a
+  // day the athlete only napped, which never changes again.
+  if (entry.record.kind === "nap-only") {
+    return entry.record.happenDay >= dayKeyOffset(now, -1);
+  }
+
   return entry.record.happenDay >= dayKeyOffset(now, 0);
 }
 
@@ -217,24 +225,137 @@ function withHeartRate(
   });
 }
 
+function isMainEntry(record: TrainingHubSleepRecord): boolean {
+  return record.kind !== "nap" && record.kind !== "nap-only";
+}
+
 /**
- * The nights inside the window, newest first. Naps are dropped: the detail
- * screen lists nights, and a nap is already folded into its night's
- * `napMinutes` by `sleepDataService`.
+ * Everything the cache holds for one day, as the single record that day is.
+ *
+ * A day can be in the table more than once: `sleep_nights` is keyed
+ * `<day>:<kind>`, so a day first seen while only its naps had synced keeps its
+ * `nap-only` row for good once the main sleep lands under `main`. Folding here
+ * is what stops that reading as two nights under one date — and what lets a
+ * day whose whole sleep was naps be a day at all.
+ *
+ * The main sleep wins outright, naps included: COROS puts the day's
+ * `Naps Total` on the main block too, so its answer is the current one. Only a
+ * `kind: "nap"` row — a nap of the day, not a reading of the day — may fill in
+ * what it does not carry.
+ */
+function foldSleepDay(entries: CacheEntry[]): CacheEntry | undefined {
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const main = entries.find((entry) => isMainEntry(entry.record));
+  const napOnly = entries.find((entry) => entry.record.kind === "nap-only");
+  const napParts = entries.filter((entry) => entry.record.kind === "nap");
+  const fetchedAt = entries.reduce(
+    (newest, entry) => (entry.fetchedAt > newest ? entry.fetchedAt : newest),
+    0
+  );
+
+  // Naps carried as records of their own — the JSON shapes do this — summed
+  // into the day the same way COROS's own "Naps Total" line is.
+  const partMinutes = napParts.reduce(
+    (total, entry) =>
+      entry.record.totalMinutes !== undefined ? total + entry.record.totalMinutes : total,
+    0
+  );
+  const partWindows = napParts
+    .map((entry) => ({
+      start: entry.record.sleepStart,
+      end: entry.record.sleepEnd,
+      startDay: entry.record.sleepStartDay,
+      endDay: entry.record.sleepEndDay
+    }))
+    .filter((window) => window.start !== undefined || window.end !== undefined);
+
+  const base = main ?? napOnly;
+
+  if (!base) {
+    if (napParts.length === 0) {
+      return undefined;
+    }
+
+    return {
+      fetchedAt,
+      record: {
+        happenDay: napParts[0].record.happenDay,
+        kind: "nap-only",
+        completeness: "complete",
+        napMinutes: partMinutes > 0 ? partMinutes : undefined,
+        napStart: partWindows[0]?.start,
+        napEnd: partWindows[0]?.end,
+        napWindows: partWindows.length > 0 ? partWindows : undefined
+      }
+    };
+  }
+
+  const record = { ...base.record };
+
+  // Filled in as a whole — a day wearing one row's minutes and another's
+  // windows contradicts itself — and **never from the `nap-only` row**. That
+  // row is not a component of the day, it is what COROS said before the night
+  // synced, which is the very thing this fold exists to stop showing twice.
+  // Lending from it put its minutes on top of a main sleep whose own
+  // `napMinutes` was absent, so a 7h10 night first seen as 4h38 of "naps"
+  // totalled 11h48 on the list, the trend, the greeting and the coach's table.
+  if (record.napMinutes === undefined && partMinutes > 0) {
+    record.napMinutes = partMinutes;
+    record.napWindows = partWindows.length > 0 ? partWindows : undefined;
+    record.napStart = partWindows[0]?.start;
+    record.napEnd = partWindows[0]?.end;
+  }
+
+  return { fetchedAt, record };
+}
+
+/**
+ * One folded entry per day from `fromDay` on, in no particular order.
+ *
+ * Everything that reads the cache reads it through here, freshness included:
+ * the table is keyed `<day>:<kind>`, so a day can hold rows COROS has since
+ * superseded, and those rows are never written again — asking one of them
+ * whether it is stale answers "yes" forever. The fold takes the newest
+ * `fetchedAt` on the day, which is the only one that describes what we know.
+ */
+function foldedEntriesFrom(fromDay: string): CacheEntry[] {
+  const byDay = new Map<string, CacheEntry[]>();
+
+  for (const entry of cache.entries.values()) {
+    if (entry.record.happenDay < fromDay) {
+      continue;
+    }
+
+    const existing = byDay.get(entry.record.happenDay);
+    if (existing) {
+      existing.push(entry);
+    } else {
+      byDay.set(entry.record.happenDay, [entry]);
+    }
+  }
+
+  return [...byDay.values()]
+    .map(foldSleepDay)
+    .filter((entry): entry is CacheEntry => entry !== undefined);
+}
+
+/**
+ * The days inside the window, newest first — one record per day.
+ *
+ * A bare nap is never a day of its own here: it is folded into the day it
+ * belongs to. A day COROS reported nothing but naps for **is** one, because
+ * the athlete slept and dropping it loses the day from the list, the trend and
+ * every average taken over the window.
  */
 function selectWindow(days: number, now: number): {
   records: TrainingHubSleepRecord[];
   fetchedAt?: number;
 } {
   const fromDay = dayKeyOffset(now, -(Math.max(1, days) - 1));
-  const selected: CacheEntry[] = [];
-
-  for (const entry of cache.entries.values()) {
-    if (entry.record.kind === "nap" || entry.record.happenDay < fromDay) {
-      continue;
-    }
-    selected.push(entry);
-  }
+  const selected = foldedEntriesFrom(fromDay);
 
   selected.sort((left, right) =>
     right.record.happenDay.localeCompare(left.record.happenDay)
@@ -250,13 +371,25 @@ function selectWindow(days: number, now: number): {
   };
 }
 
+/** Everything the cache holds for one day, folded. */
+function cachedDay(happenDay: string): CacheEntry | undefined {
+  return foldSleepDay(
+    [...cache.entries.values()].filter(
+      (entry) => entry.record.happenDay === happenDay
+    )
+  );
+}
+
 /**
  * True when the cache cannot answer for the window on its own: last night is
  * missing, or something in there is stale enough to be worth another ask.
  */
 function needsNetwork(days: number, now: number): boolean {
   const today = dayKeyOffset(now, 0);
-  const lastNight = cache.entries.get(`${today}:main`);
+  // Any record for today, not only a main one: a day that has so far synced
+  // as naps alone is a day we have an answer for, and asking again on every
+  // call because the answer was not a night is what a TTL exists to stop.
+  const lastNight = cachedDay(today);
 
   if (!lastNight) {
     // A night COROS does not have yet is the ordinary state of a morning, and
@@ -271,10 +404,12 @@ function needsNetwork(days: number, now: number): boolean {
 
   const fromDay = dayKeyOffset(now, -(Math.max(1, days) - 1));
 
-  for (const entry of cache.entries.values()) {
-    if (entry.record.happenDay < fromDay) {
-      continue;
-    }
+  // Folded, not row by row. A `<day>:nap-only` row COROS has since answered as
+  // a main sleep is never written again, so its `fetched_at` stays where it
+  // was — and reading it on its own made every call after that "stale", which
+  // is one ~20-round-trip COROS fetch per Overview load for the rest of the
+  // day. The fold asks the day, whose newest row is the one that answered.
+  for (const entry of foldedEntriesFrom(fromDay)) {
     if (isStale(entry, now)) {
       return true;
     }
@@ -298,7 +433,7 @@ export function getCachedSleepNight(
   deps: SleepHistoryDeps = createDefaultSleepHistoryDeps()
 ): TrainingHubSleepRecord | undefined {
   hydrate(deps, dayKeyOffset(deps.now(), -HISTORY_RETENTION_DAYS));
-  return cache.entries.get(`${happenDay}:main`)?.record;
+  return cachedDay(happenDay)?.record;
 }
 
 export interface SleepHistoryRequest {

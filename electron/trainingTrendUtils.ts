@@ -1,3 +1,4 @@
+import { isSleepDayRecord, totalSleepMinutes } from "./sleepMetrics";
 import type {
   TrainingHubAnalytics,
   TrainingHubDailyMetric,
@@ -67,13 +68,16 @@ export function mergeSleepIntoTrendPoints(
     return trendPoints;
   }
 
+  // The whole day's sleep, naps included — a day of nothing but naps is a day
+  // the athlete slept, and the bar for it stood at nothing while `totalMinutes`
+  // was the only thing read.
   const sleepByDay = new Map(
     sleep.records
       .filter(
         (record) =>
-          record.kind !== "nap" &&
+          isSleepDayRecord(record) &&
           record.completeness !== "partial" &&
-          record.totalMinutes !== undefined
+          totalSleepMinutes(record) !== undefined
       )
       .map((record) => [record.happenDay, record])
   );
@@ -86,7 +90,7 @@ export function mergeSleepIntoTrendPoints(
 
     return {
       ...point,
-      sleepMinutes: record.totalMinutes,
+      sleepMinutes: totalSleepMinutes(record),
       sleepScore: record.score
     };
   });

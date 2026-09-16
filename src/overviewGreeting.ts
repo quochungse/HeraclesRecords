@@ -16,6 +16,7 @@ import {
   isUpcomingWorkoutToday
 } from "./training/formatters";
 import { pickLastNightSleep } from "./sleep/sleepFreshness";
+import { isNapOnlyRecord, totalSleepMinutes } from "../electron/sleepMetrics";
 import { resolveSportName } from "./training/sportTypes";
 import type { TrainingSummaryMetrics } from "./training/types";
 
@@ -148,7 +149,26 @@ function sleepLines(
   }
 
   const lines: OverviewGreetingLine[] = [];
-  const { score, totalMinutes } = record;
+  const { score } = record;
+  // The whole day's sleep, naps included — the line is about how rested the
+  // athlete is, and an afternoon spent asleep counts toward that.
+  const totalMinutes = totalSleepMinutes(record);
+
+  if (isNapOnlyRecord(record)) {
+    // Said as what it is. "Only 4h 38m of sleep last night" would be a claim
+    // about a night COROS has no record of at all.
+    return totalMinutes !== undefined && totalMinutes > 0
+      ? [
+          {
+            id: "sleep-naps-only",
+            priority: 86,
+            text: `No main sleep last night — ${formatSleepLength(
+              totalMinutes
+            )} of naps instead. Go gentle today.`
+          }
+        ]
+      : [];
+  }
 
   if (score !== undefined && Number.isFinite(score) && score < 60) {
     lines.push({

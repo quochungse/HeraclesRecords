@@ -705,4 +705,138 @@ assert.match(
 const blindArgs = buildSleepToolArgs({ name: "get_sleep_data", inputSchema: {} }, 7);
 assert.ok(blindArgs.length <= 3, `at most three blind attempts, got ${blindArgs.length}`);
 
+// --- A day the athlete only napped --------------------------------------
+//
+// Every fixture above carries a main sleep, which is why nothing caught this:
+// COROS answers a day with no overnight sleep with its naps and nothing else —
+// no score, no `Main Sleep` line, no stages. Demanding one of those two lines
+// dropped the block, and the day went missing from the screen, the trend and
+// the coach's table as if the athlete had not slept at all. The payload below
+// is verbatim from the live feed (2026-09-15, probed 2026-09-16).
+const napOnlyLive = [
+  "Sleep Data",
+  "========================",
+  "Note: each record below is dated by its wake-up day.",
+  "",
+  "2026-09-15",
+  "Naps Total: 4h 38min",
+  "Nap Window: 2026-09-15 00:19 - 2026-09-15 02:20",
+  "Nap Window: 2026-09-15 05:05 - 2026-09-15 07:42"
+].join("\n");
+const napOnlyRecords = parseSleepDataResponse(napOnlyLive);
+assert.equal(napOnlyRecords.length, 1, "the day is a record, not a dropped block");
+const napOnly = napOnlyRecords[0];
+assert.equal(napOnly.happenDay, "20260915");
+assert.equal(napOnly.kind, "nap-only");
+assert.equal(napOnly.napMinutes, 278, "4h 38min of naps, summed by COROS itself");
+assert.equal(napOnly.totalMinutes, undefined, "and no main sleep to claim");
+assert.equal(napOnly.score, undefined);
+// A day COROS has said everything it will ever say about. Left "partial", it
+// would be dropped from every average and trend that skips a syncing night.
+assert.equal(napOnly.completeness, "complete");
+
+// COROS writes one `Nap Window` line per nap. Matching once kept the first and
+// lost the rest, so a day of two naps read as a day of one.
+assert.deepEqual(napOnly.napWindows, [
+  { startDay: "20260915", start: "00:19", endDay: "20260915", end: "02:20" },
+  { startDay: "20260915", start: "05:05", endDay: "20260915", end: "07:42" }
+]);
+assert.equal(napOnly.napStart, "00:19", "the pair still reads as the first nap");
+assert.equal(napOnly.napEnd, "02:20");
+
+// A block whose windows COROS wrote but whose total line it did not — or wrote
+// in a spelling this parser does not know — still totals the day. The windows
+// carry the exact arithmetic, and without it the day parsed as a record that
+// counted nothing anywhere: "–" on the list, dropped from the trend, not
+// settled for the coach. One step further in than the disappearance the
+// nap-only case exists to fix.
+const napWindowsOnly = parseSleepDataResponse(
+  [
+    "Sleep Data",
+    "========================",
+    "",
+    "2026-09-15",
+    "Nap Window: 2026-09-15 00:19 - 2026-09-15 02:20",
+    "Nap Window: 2026-09-15 05:05 - 2026-09-15 07:42"
+  ].join("\n")
+);
+assert.equal(napWindowsOnly.length, 1);
+assert.equal(napWindowsOnly[0].kind, "nap-only");
+assert.equal(
+  napWindowsOnly[0].napMinutes,
+  278,
+  "121 + 157, which is what COROS's own total says for these two windows"
+);
+
+// A day with nothing on it at all is not a day of sleep. COROS says so with a
+// zero, and a zero must not become a record — it would list a night that was
+// never slept and a bar of nothing in the trend.
+assert.deepEqual(
+  parseSleepDataResponse(
+    ["Sleep Data", "========================", "", "2026-09-04", "Naps Total: 0 min"].join("\n")
+  ),
+  [],
+  "a day with no main sleep and no naps is no record"
+);
+
+// The same answer inside a range, beside the days that do have a night: the
+// splitter has to give the nap-only block its own section.
+const rangeWithNapDay = [
+  "Sleep Data",
+  "========================",
+  "Note: each record below is dated by its wake-up day.",
+  "",
+  "2026-09-14",
+  "Sleep Score: 41",
+  "Main Sleep: 5h 7min",
+  "Main Sleep Window: 2026-09-14 00:47 - 2026-09-14 06:20",
+  "Naps Total: 0 min",
+  "",
+  "2026-09-15",
+  "Naps Total: 4h 38min",
+  "Nap Window: 2026-09-15 00:19 - 2026-09-15 02:20",
+  "Nap Window: 2026-09-15 05:05 - 2026-09-15 07:42",
+  "",
+  "2026-09-16",
+  "Sleep Score: 48",
+  "Main Sleep: 6h 54min",
+  "Main Sleep Window: 2026-09-15 23:47 - 2026-09-16 07:50",
+  "Naps Total: 0 min"
+].join("\n");
+const rangeRecords = parseSleepDataResponse(rangeWithNapDay);
+assert.deepEqual(
+  rangeRecords.map((record) => `${record.happenDay}:${record.kind}`),
+  ["20260914:main", "20260915:nap-only", "20260916:main"]
+);
+// `latest` is read under headings that say night, so a nap-only day stands in
+// only when there is no main sleep at all to stand there instead.
+assert.equal(pickLatestSleepRecord(rangeRecords)?.happenDay, "20260916");
+assert.equal(
+  pickLatestSleepRecord(napOnlyRecords)?.happenDay,
+  "20260915",
+  "with nothing else on offer it is the day we have"
+);
+
+// A day's naps are summed, not picked. The JSON shapes carry a nap as a record
+// of its own, and taking the longest lost the rest of the day's sleep — which
+// only mattered once naps counted toward a total at all.
+const twoNapLatest = pickLatestSleepRecord([
+  {
+    happenDay: "20260812",
+    kind: "main",
+    score: 66,
+    totalMinutes: 400,
+    sleepStart: "23:30",
+    sleepEnd: "06:40"
+  },
+  { happenDay: "20260812", kind: "nap", totalMinutes: 40, sleepStart: "13:00", sleepEnd: "13:40" },
+  { happenDay: "20260812", kind: "nap", totalMinutes: 25, sleepStart: "17:05", sleepEnd: "17:30" }
+]);
+assert.equal(twoNapLatest?.totalMinutes, 400, "the main sleep is untouched");
+assert.equal(twoNapLatest?.napMinutes, 65, "and both naps are on the day");
+assert.deepEqual(
+  twoNapLatest?.napWindows?.map((window) => `${window.start}-${window.end}`),
+  ["13:00-13:40", "17:05-17:30"]
+);
+
 console.log("test-sleep-data-parser: ok");

@@ -1,3 +1,4 @@
+import { isSleepDayRecord } from "../../electron/sleepMetrics";
 import type {
   TrainingHubSleepRecord,
   TrainingHubSleepSummary
@@ -34,7 +35,12 @@ export interface LastNightSleepOptions {
 }
 
 /**
- * The main sleep that covers last night, or nothing. Naps are never it.
+ * Last night's sleep, or nothing.
+ *
+ * A single nap is never it — it is one piece of a day, folded into the day it
+ * belongs to. A day whose *whole* sleep was naps is it: COROS reported no main
+ * sleep for that day and never will, so waiting for one leaves the surface
+ * blank about a day the athlete did sleep on.
  *
  * `latest` is preferred when it qualifies — the main process already sorted the
  * newest day's records by completeness to build it — and `records` is only
@@ -50,7 +56,7 @@ export function pickLastNightSleep(
 
   const now = options.now ?? new Date();
   const qualifies = (record: TrainingHubSleepRecord): boolean =>
-    record.kind !== "nap" &&
+    isSleepDayRecord(record) &&
     (!options.excludePartial || record.completeness !== "partial") &&
     isLastNightHappenDay(record.happenDay, now);
 

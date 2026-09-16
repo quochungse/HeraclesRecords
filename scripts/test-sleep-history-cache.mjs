@@ -285,6 +285,322 @@ clearSleepHistoryCache();
     ["main"],
     "a nap is not a night in the list"
   );
+  assert.equal(
+    snapshot.records[0].napMinutes,
+    40,
+    "it is folded onto the day it belongs to instead"
+  );
+}
+
+// --- A day of nothing but naps is still a day -------------------------------
+//
+// COROS reports such a day with its naps and no main sleep at all. Dropping
+// every record that was not a main sleep dropped the day with it: it was
+// missing from the list, from the trend and from every average over the window,
+// with nothing anywhere saying a day had gone.
+
+clearSleepHistoryCache();
+{
+  const napOnly = {
+    happenDay: dayKey(-1),
+    kind: "nap-only",
+    completeness: "complete",
+    napMinutes: 278,
+    napWindows: [
+      { start: "00:19", end: "02:20" },
+      { start: "05:05", end: "07:42" }
+    ]
+  };
+  const { deps } = harness({ records: [night(0), napOnly, night(-2)] });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  assert.deepEqual(
+    snapshot.records.map((record) => record.happenDay),
+    [dayKey(0), dayKey(-1), dayKey(-2)],
+    "the nap-only day sits in the run of days, in its own place"
+  );
+  assert.equal(snapshot.records[1].napMinutes, 278);
+  assert.equal(snapshot.records[1].totalMinutes, undefined);
+}
+
+// --- One day is one record, however many rows the table holds for it --------
+//
+// `sleep_nights` is keyed `<day>:<kind>`, so a day first seen while only its
+// naps had synced keeps that row for good once the main sleep lands under
+// another. Two rows for one date would draw the day twice in the list and put
+// two bars under one label in the trend.
+
+clearSleepHistoryCache();
+{
+  const day = dayKey(-3);
+  const { deps } = harness({
+    rows: [
+      {
+        happen_day: day,
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: day,
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 95,
+          napWindows: [{ start: "13:00", end: "14:35" }]
+        }),
+        fetched_at: NOW - 60 * 60 * 1000
+      },
+      {
+        happen_day: day,
+        kind: "main",
+        payload: JSON.stringify(night(-3, { napMinutes: 95 })),
+        fetched_at: NOW - 30 * 60 * 1000
+      }
+    ],
+    records: [night(0)]
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  const forDay = snapshot.records.filter((record) => record.happenDay === day);
+  assert.equal(forDay.length, 1, "one record for the day, not one per row");
+  assert.equal(forDay[0].kind, "main", "the main sleep is the one that stands");
+  assert.equal(forDay[0].totalMinutes, 430);
+  assert.equal(forDay[0].napMinutes, 95, "and the day keeps its naps");
+}
+
+// A main sleep that says the day had no naps has answered. COROS puts the
+// day's `Naps Total` on the main block too, so a nap-only row left over from
+// before the night synced is the older answer — and picking up its clocks
+// while keeping the zero would have the day contradict itself.
+
+clearSleepHistoryCache();
+{
+  const day = dayKey(-4);
+  const { deps } = harness({
+    rows: [
+      {
+        happen_day: day,
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: day,
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 140,
+          napWindows: [{ start: "05:05", end: "07:25" }]
+        }),
+        fetched_at: NOW - 60 * 60 * 1000
+      },
+      {
+        happen_day: day,
+        kind: "main",
+        payload: JSON.stringify(night(-4, { napMinutes: 0 })),
+        fetched_at: NOW - 30 * 60 * 1000
+      }
+    ],
+    records: [night(0)]
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  const folded = snapshot.records.find((record) => record.happenDay === day);
+  assert.equal(folded.napMinutes, 0, "the main sleep's own answer stands");
+  assert.equal(folded.napWindows, undefined, "and no clocks arrive without it");
+}
+
+// --- A day whose night arrived late costs one fetch, not one per call -------
+//
+// `sleep_nights` is keyed `<day>:<kind>`, so the `nap-only` row a day was first
+// seen as is never written again once the main sleep lands under another key.
+// Asking that row whether it is stale answers yes forever — and every answer
+// spent a full COROS fetch, on every Overview load, for the rest of the day.
+
+clearSleepHistoryCache();
+{
+  const day = dayKey(-1);
+  const { state, deps } = harness({
+    rows: [
+      {
+        happen_day: day,
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: day,
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 278
+        }),
+        // Old enough that the nap-only grace would call it stale on its own.
+        fetched_at: NOW - 3 * UNSETTLED_NIGHT_TTL_MS
+      },
+      {
+        happen_day: day,
+        kind: "main",
+        payload: JSON.stringify(night(-1)),
+        fetched_at: NOW
+      },
+      {
+        happen_day: dayKey(0),
+        kind: "main",
+        payload: JSON.stringify(night(0)),
+        fetched_at: NOW
+      }
+    ],
+    records: [night(0)]
+  });
+
+  for (let call = 0; call < 4; call += 1) {
+    await getSleepHistory({ days: 30 }, deps);
+  }
+
+  assert.equal(
+    state.fetches,
+    0,
+    "freshness is asked of the day, whose newest row is the one that answered"
+  );
+}
+
+// --- The row a day was first seen as does not lend its naps to the night ----
+//
+// A `nap-only` row beside a `main` one is not a component of the day — it is
+// what COROS said before the night synced. Lending from it put those minutes
+// on top of the main sleep, and a 7h10 night that had first arrived as 4h38 of
+// naps totalled 11h48 on the list, the trend, the greeting and the coach's
+// table. A main block COROS writes no `Naps` line on is the shape that reaches
+// it, because then `napMinutes` is absent rather than zero.
+
+clearSleepHistoryCache();
+{
+  const day = dayKey(-1);
+  const { deps } = harness({
+    rows: [
+      {
+        happen_day: day,
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: day,
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 278,
+          napWindows: [{ start: "00:19", end: "02:20" }]
+        }),
+        fetched_at: NOW - 3 * 60 * 60 * 1000
+      },
+      {
+        happen_day: day,
+        kind: "main",
+        payload: JSON.stringify(night(-1, { napMinutes: undefined })),
+        fetched_at: NOW - 60 * 60 * 1000
+      }
+    ],
+    records: [night(0)]
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  const folded = snapshot.records.find((record) => record.happenDay === day);
+  assert.equal(folded.kind, "main");
+  assert.equal(folded.totalMinutes, 430);
+  assert.equal(folded.napMinutes, undefined, "the superseded row lends nothing");
+  assert.equal(folded.napWindows, undefined);
+}
+
+// A real nap component row still lends, which is the case the rule is for.
+
+clearSleepHistoryCache();
+{
+  const day = dayKey(-2);
+  const { deps } = harness({
+    rows: [
+      {
+        happen_day: day,
+        kind: "main",
+        payload: JSON.stringify(night(-2, { napMinutes: undefined })),
+        fetched_at: NOW
+      },
+      {
+        happen_day: day,
+        kind: "nap",
+        payload: JSON.stringify({
+          happenDay: day,
+          kind: "nap",
+          totalMinutes: 45,
+          sleepStart: "13:00",
+          sleepEnd: "13:45"
+        }),
+        fetched_at: NOW
+      }
+    ],
+    records: [night(0)]
+  });
+
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  const folded = snapshot.records.find((record) => record.happenDay === day);
+  assert.equal(folded.napMinutes, 45, "a nap of the day is part of the day");
+  assert.deepEqual(folded.napWindows, [
+    { start: "13:00", end: "13:45", startDay: undefined, endDay: undefined }
+  ]);
+}
+
+// --- A nap-only day is asked about again while a night could still land -----
+
+clearSleepHistoryCache();
+{
+  const { state, deps } = harness({
+    rows: [
+      {
+        happen_day: dayKey(-1),
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: dayKey(-1),
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 60
+        }),
+        fetched_at: NOW - 2 * UNSETTLED_NIGHT_TTL_MS
+      },
+      {
+        happen_day: dayKey(0),
+        kind: "main",
+        payload: JSON.stringify(night(0)),
+        fetched_at: NOW
+      }
+    ],
+    records: [night(0)]
+  });
+
+  await getSleepHistory({ days: 30 }, deps);
+  assert.equal(
+    state.fetches,
+    1,
+    "yesterday having only naps on it is worth one more ask"
+  );
+}
+
+clearSleepHistoryCache();
+{
+  const { state, deps } = harness({
+    rows: [
+      {
+        happen_day: dayKey(-9),
+        kind: "nap-only",
+        payload: JSON.stringify({
+          happenDay: dayKey(-9),
+          kind: "nap-only",
+          completeness: "complete",
+          napMinutes: 60
+        }),
+        fetched_at: NOW - 2 * UNSETTLED_NIGHT_TTL_MS
+      },
+      {
+        happen_day: dayKey(0),
+        kind: "main",
+        payload: JSON.stringify(night(0)),
+        fetched_at: NOW
+      }
+    ],
+    records: [night(0)]
+  });
+
+  await getSleepHistory({ days: 30 }, deps);
+  assert.equal(
+    state.fetches,
+    0,
+    "a nap-only day a week back is what it says it is, and costs nothing"
+  );
 }
 
 // --- The night's heart rate rides in from the daily-health feed -------------

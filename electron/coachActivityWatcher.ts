@@ -9,6 +9,7 @@ import {
 import type { CoachDailySampleRow, CoachUnseenActivityRow } from "./database";
 import { getCorosMcpStatus } from "./corosMcpService";
 import { getTrainingSleepData } from "./sleepDataService";
+import { isSleepDayRecord, totalSleepMinutes } from "./sleepMetrics";
 import { listTriggeredCoachAnalyses } from "./coachAnalysisStore";
 import {
   activityMatchesTrigger,
@@ -128,12 +129,12 @@ function createDefaultDeps(): CoachActivityWatcherDeps {
       if (getCorosMcpStatus().connected) {
         const sleep = await getTrainingSleepData(DAILY_SAMPLE_LOOKBACK_DAYS);
         for (const record of sleep.records) {
-          if (record.kind === "nap") continue;
-          if (
-            typeof record.totalMinutes === "number" &&
-            Number.isFinite(record.totalMinutes)
-          ) {
-            row(record.happenDay).sleep_minutes = record.totalMinutes;
+          if (!isSleepDayRecord(record)) continue;
+          // The day's whole sleep, naps included, so a day the athlete only
+          // napped is a sample rather than a hole.
+          const minutes = totalSleepMinutes(record);
+          if (minutes !== undefined) {
+            row(record.happenDay).sleep_minutes = minutes;
           }
         }
       }
