@@ -14,7 +14,7 @@ import type {
   TrainingHubSportType
 } from "../../../electron/types";
 import type { CorosLinkApi } from "../../coroslink-api";
-import type { TrainingHubDetailRequest } from "../types";
+import type { SportScreenRequest, TrainingHubDetailRequest } from "../types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -48,7 +48,7 @@ interface ActivityDetailPaneProps {
   api?: CorosLinkApi | null;
   onRetry: (activity: TrainingHubActivity) => void;
   /** Hands a run or a lifting session to the screen built for that sport. */
-  onOpenSportScreen?: (view: "running" | "strength") => void;
+  onOpenSportScreen?: (request: SportScreenRequest) => void;
 }
 
 interface Figure {
@@ -439,11 +439,17 @@ export function ActivityDetailPane({
         </div>
 
         <div className="activity-detail-pane-actions">
-          {sportScreen && onOpenSportScreen ? (
+          {sportScreen && onOpenSportScreen && activityId !== undefined ? (
             <button
               type="button"
               className="secondary-button"
-              onClick={() => onOpenSportScreen(sportScreen)}
+              onClick={() =>
+                onOpenSportScreen({
+                  view: sportScreen,
+                  activityId,
+                  startTime: detail.startTime ?? listActivity?.startTime
+                })
+              }
             >
               Open in {sportScreen === "running" ? "Running" : "Strength"}
               <ArrowUpRight size={14} aria-hidden="true" />

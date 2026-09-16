@@ -14371,6 +14371,14 @@ td span {
   flex: 1;
   min-height: 0;
   /*
+   * The list is a column of short rows — a date block, a name and a line of
+   * figures — and it stops getting better at about 440px, while the detail
+   * beside it carries a route, an eleven-channel chart and a lap table and
+   * never stops. So the left pane is clamped rather than given a share of the
+   * width: everything the window gains goes to the pane that can use it.
+   */
+  grid-template-columns: clamp(320px, 28%, 440px) minmax(0, 1fr);
+  /*
    * An explicit row track is what makes the panes' `height: 100%` resolve.
    * Left implicit, the row is auto-sized, so the percentage is circular, falls
    * back to content height, and both panes overflow the panel.

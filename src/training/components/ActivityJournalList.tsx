@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { Angry, Frown, Laugh, Meh, Smile } from "lucide-react";
 import type {
   ActivityDetailSummary,
   TrainingHubActivity,
@@ -38,6 +39,38 @@ interface ActivityJournalListProps {
     activity: TrainingHubActivity,
     fileType: TrainingHubActivityFileType
   ) => void;
+}
+
+/**
+ * COROS's five end-of-activity smileys, drawn as the faces they are.
+ *
+ * A bare "4" says nothing without the scale beside it, and the scale is not on
+ * the row. A face is read before it is decoded, and the colour carries the
+ * direction — cool to hot, the same way the heart-rate zones point.
+ */
+const FEEL_FACES: Record<number, typeof Smile> = {
+  1: Laugh,
+  2: Smile,
+  3: Meh,
+  4: Frown,
+  5: Angry
+};
+
+function FeelFace({ rating }: { rating: number }) {
+  const Face = FEEL_FACES[rating];
+  if (!Face) {
+    return null;
+  }
+
+  return (
+    <span
+      className="activity-row-feel"
+      data-feel={rating}
+      title={`Felt ${FEEL_LABELS[rating]?.toLowerCase() ?? rating}`}
+    >
+      <Face size={14} aria-hidden="true" />
+    </span>
+  );
 }
 
 /** "Wed" over "12" — the block that lets a week be read down its left edge. */
@@ -161,22 +194,6 @@ export function ActivityJournalList({
                 <span>{formatDurationSpan(group.duration)}</span>
               ) : null}
             </span>
-            {/*
-             * The week's own mix, on the same scale as the summary's. A week
-             * of five runs and a week of three runs and two lifts read as
-             * different shapes before either heading is read.
-             */}
-            {group.duration > 0 ? (
-              <span className="activity-journal-week-mix" aria-hidden="true">
-                {group.sports.map((sport) => (
-                  <i
-                    key={sport.category}
-                    data-sport={sport.category}
-                    style={{ flexGrow: sport.duration / group.duration }}
-                  />
-                ))}
-              </span>
-            ) : null}
           </h3>
 
           <ul>
@@ -191,7 +208,7 @@ export function ActivityJournalList({
                 unitSystem,
                 summaries.get(activity.activityId)
               );
-              const rating = feel.rating.get(activity.activityId);
+              const rating = feel.get(activity.activityId);
 
               return (
                 <li
@@ -224,13 +241,7 @@ export function ActivityJournalList({
                           * built from and no screen showed it.
                           */}
                         {rating !== undefined ? (
-                          <span
-                            className="activity-row-feel"
-                            data-feel={rating}
-                            title={`Felt ${FEEL_LABELS[rating]?.toLowerCase() ?? rating}`}
-                          >
-                            {rating}
-                          </span>
+                          <FeelFace rating={rating} />
                         ) : null}
                       </span>
                       <span className="activity-row-facts">

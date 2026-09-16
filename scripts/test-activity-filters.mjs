@@ -317,11 +317,6 @@ assert.deepEqual(
 );
 assert.equal(weeks[1].count, 2);
 assert.equal(weeks[1].duration, 7200);
-assert.deepEqual(
-  weeks[1].sports.map((sport) => sport.category).sort(),
-  ["run", "strength"],
-  "a week carries its own mix"
-);
 assert.equal(
   weeks[3].weekStartMs,
   undefined,
@@ -430,57 +425,7 @@ assert.deepEqual(
 );
 
 // ---------------------------------------------------------------------------
-// 10. The unrated filter keeps "not rated" apart from "not looked at yet"
-// ---------------------------------------------------------------------------
-
-const rateable = [
-  activity({ activityId: "rated", startTime: at(NOW - DAY) }),
-  activity({ activityId: "unrated", startTime: at(NOW - 2 * DAY) }),
-  activity({ activityId: "unchecked", startTime: at(NOW - 3 * DAY) })
-];
-const isRated = (row) =>
-  row.activityId === "rated"
-    ? true
-    : row.activityId === "unrated"
-      ? false
-      : undefined;
-
-assert.deepEqual(
-  filterActivities({
-    activities: rateable,
-    filters: { ...DEFAULT_ACTIVITY_FILTERS, unratedOnly: true },
-    nowMs: NOW,
-    isRated
-  }).map((row) => row.activityId),
-  ["unrated"],
-  "a session the backfill has not reached is unknown, not unrated"
-);
-
-assert.deepEqual(
-  filterActivities({
-    activities: rateable,
-    filters: DEFAULT_ACTIVITY_FILTERS,
-    nowMs: NOW,
-    isRated
-  }).map((row) => row.activityId),
-  ["rated", "unrated", "unchecked"],
-  "the filter off means every session"
-);
-
-// Without the ratings read, the filter matches nothing rather than everything:
-// a filter that silently turns into "show all" while its data loads is worse
-// than one that visibly waits.
-assert.equal(
-  filterActivities({
-    activities: rateable,
-    filters: { ...DEFAULT_ACTIVITY_FILTERS, unratedOnly: true },
-    nowMs: NOW
-  }).length,
-  0
-);
-
-// ---------------------------------------------------------------------------
-// 11. Drift comes off the stored summary, when there is one
+// 10. Drift comes off the stored summary, when there is one
 // ---------------------------------------------------------------------------
 
 const longRun = activity({
@@ -531,7 +476,7 @@ assert.deepEqual(
 );
 
 // ---------------------------------------------------------------------------
-// 12. A detail belongs to exactly one selection
+// 11. A detail belongs to exactly one selection
 // ---------------------------------------------------------------------------
 
 const selected = activity({ activityId: "b" });

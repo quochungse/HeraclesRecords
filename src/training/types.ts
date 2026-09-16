@@ -205,7 +205,26 @@ export type ActivitiesViewProps = Pick<
    * every sport lands in; the depth belongs on Running and Strength, and this
    * is the door between them.
    */
-  onOpenSportScreen?: (view: "running" | "strength") => void;
+  onOpenSportScreen?: (request: SportScreenRequest) => void;
 };
+
+/**
+ * One session, handed from Activities to the screen built for its sport.
+ *
+ * It carries the session rather than only the screen name because arriving on
+ * Running's list with nothing open is not what the button says it does: the
+ * athlete was already looking at that run. Running opens its full-page detail;
+ * Strength selects the session in its list.
+ */
+export interface SportScreenRequest {
+  view: "running" | "strength";
+  activityId: string;
+  /**
+   * Epoch seconds, as COROS sends it. Strength keeps a window of its own — 30
+   * days by default — so a session older than that would not be in the list it
+   * is asked to select from; this is what lets it widen first.
+   */
+  startTime?: number;
+}
 
 export type { TrainingHubDailyMetric };

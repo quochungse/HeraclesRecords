@@ -8,27 +8,18 @@ import type { CorosLinkApi } from "../coroslink-api";
  *
  * It is the input to every RPE figure in the app — `rpeLoad` turns a 1..5
  * feeling into a Foster CR10 session load, and the load heatmap draws it — and
- * until now no screen showed where it was missing. Twenty-nine of this
- * athlete's fifty-six sessions carry no rating, which is a silent hole in a
- * chart they read every week.
+ * until now no screen showed it at all.
  *
  * Nothing here fetches from COROS: the RPE backfill owns that, and this is a
- * SQLite read of what the backfill has already stored.
+ * SQLite read of what the backfill has already stored. A row the backfill has
+ * not reached is simply absent, which is why this is a map rather than a
+ * three-state answer: the screen draws a face where there is a rating and
+ * nothing where there is not, and "not looked at yet" and "looked at, unrated"
+ * are the same nothing to it.
  */
-export type ActivityFeelState = "rated" | "unrated" | "unchecked";
+export type ActivityFeelMap = ReadonlyMap<string, number>;
 
-export interface ActivityFeelMap {
-  /** 1..5 where COROS holds a rating; absent otherwise. */
-  rating: ReadonlyMap<string, number>;
-  /**
-   * Which of the three states an activity is in. `unchecked` is not `unrated`:
-   * the backfill may simply not have reached it, and reporting those as gaps
-   * tells the athlete to go and rate sessions that may already be rated.
-   */
-  state: (activityId: string) => ActivityFeelState;
-}
-
-const EMPTY: ReadonlyMap<string, number> = new Map();
+const EMPTY: ActivityFeelMap = new Map();
 
 /**
  * Pass the *whole* history rather than the filtered list: the read is keyed on
@@ -83,44 +74,8 @@ export function useActivityFeelTypes(
       }
     }
 
-    return {
-      rating: rating.size === 0 ? EMPTY : rating,
-      state: (activityId: string): ActivityFeelState => {
-        if (!(activityId in feels)) {
-          return "unchecked";
-        }
-        return rating.has(activityId) ? "rated" : "unrated";
-      }
-    };
+    return rating.size === 0 ? EMPTY : rating;
   }, [feels]);
-}
-
-export interface FeelCoverage {
-  rated: number;
-  /** Sessions COROS has actually been asked about. */
-  checked: number;
-  total: number;
-}
-
-/** How much of a stretch of training carries a rating. */
-export function feelCoverage(
-  activities: readonly TrainingHubActivity[],
-  feel: ActivityFeelMap
-): FeelCoverage {
-  let rated = 0;
-  let checked = 0;
-  for (const activity of activities) {
-    const state = feel.state(activity.activityId);
-    if (state === "unchecked") {
-      continue;
-    }
-    checked += 1;
-    if (state === "rated") {
-      rated += 1;
-    }
-  }
-
-  return { rated, checked, total: activities.length };
 }
 
 /** What COROS's five smileys mean. */

@@ -87,6 +87,7 @@ import {
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type {
+  SportScreenRequest,
   TrainingHubDetailRequest,
   TrainingHubLoadStatus,
   TrainingHubSnapshot,
@@ -477,6 +478,14 @@ export default function App() {
   const latestDetailRequestRef = useRef<string | null>(null);
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
+  /*
+   * A session Activities handed to Running or Strength, waiting for that screen
+   * to mount and take it. It is held here rather than passed as an argument
+   * because those screens are lazy: the view switches first and the component
+   * arrives a tick later, with nowhere for an argument to have waited.
+   */
+  const [sportScreenRequest, setSportScreenRequest] =
+    useState<SportScreenRequest | null>(null);
   const [trainingHubSleepData, setTrainingHubSleepData] =
     useState<TrainingHubSleepSummary | null>(null);
   const [trainingHubDailyHealthData, setTrainingHubDailyHealthData] =
@@ -2862,7 +2871,10 @@ export default function App() {
                   onExportFile={handleTrainingHubExport}
                   onConnect={() => setActiveView("overview")}
                   onRetry={() => void handleRunningActivitiesRetry()}
-                  onOpenSportScreen={(view) => setActiveView(view)}
+                  onOpenSportScreen={(request) => {
+                    setSportScreenRequest(request);
+                    setActiveView(request.view);
+                  }}
                 />
               </Suspense>
             ) : null}
@@ -2909,6 +2921,12 @@ export default function App() {
                   onRetryActivities={() => void handleRunningActivitiesRetry()}
                   onSelectActivity={handleTrainingHubActivityDetail}
                   onOpenOverview={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "running"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
                 />
               </Suspense>
             ) : null}
@@ -2921,6 +2939,12 @@ export default function App() {
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
                   onOpenTraining={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "strength"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
                 />
               </Suspense>
             ) : null}

@@ -360,19 +360,6 @@
   text-transform: none;
 }
 
-.activity-journal-week-mix {
-  display: flex;
-  overflow: hidden;
-  height: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--ax-well);
-}
-
-.activity-journal-week-mix i {
-  min-width: 2px;
-  background: var(--sport-mix-color, var(--sport-other));
-}
-
 .activity-journal-week ul {
   display: grid;
   gap: 4px;
@@ -868,24 +855,22 @@
 /* --- Feel (RPE) ----------------------------------------------------------- */
 
 /*
- * How the session felt, 1..5, as rated in the COROS app. Cool to hot, the same
- * direction as the heart-rate zones, so the two never disagree about which way
- * "harder" points.
+ * How the session felt, as rated in the COROS app: the smiley itself rather
+ * than the 1..5 behind it, which means nothing without a scale the row has no
+ * space for. Cool to hot, the same direction as the heart-rate zones, so the
+ * two never disagree about which way "harder" points.
  */
 .activity-row-feel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  border: 1px solid color-mix(in srgb, var(--feel-color) 45%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--feel-color) 18%, transparent);
-  color: color-mix(in srgb, var(--feel-color) 90%, var(--text-primary));
-  font-size: 9px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+  /*
+   * Pulled a little towards the page's own ink. The five hues are fixed so the
+   * scale reads the same in both themes, and the palest of them — the "very
+   * easy" blue — is washed out against paper on its own.
+   */
+  color: color-mix(in srgb, var(--feel-color) 86%, var(--text-primary));
 }
 
 .activities-view [data-feel="1"] { --feel-color: #7fb0d8; }
@@ -893,28 +878,6 @@
 .activities-view [data-feel="3"] { --feel-color: #d8b13a; }
 .activities-view [data-feel="4"] { --feel-color: #e08a3c; }
 .activities-view [data-feel="5"] { --feel-color: #dd5f4b; }
-
-.activities-unrated {
-  gap: 5px;
-}
-
-.activities-unrated em {
-  color: var(--text-muted);
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-}
-
-.activities-unrated.is-active {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--text-primary);
-}
-
-.activities-coverage {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 11px;
-}
 
 /* --- Narrow layout -------------------------------------------------------- */
 

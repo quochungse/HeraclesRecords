@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlaskConical,
   Info,
@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import type { TrainingHubStatus } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import type { SportScreenRequest } from "../training/types";
+import { epochMsFromCorosTime } from "../training/activityWindow";
 import { StrengthHero } from "./StrengthHero";
 import { StrengthHevyDialog } from "./StrengthHevyDialog";
 import { ExerciseExplorer } from "./ExerciseExplorer";
@@ -44,6 +46,13 @@ interface StrengthViewProps {
   onOpenTraining: () => void;
   /** Dev view unlocks the generated sample history. */
   showDevelopmentTools?: boolean;
+  /**
+   * A session Activities handed over, to be selected rather than merely
+   * listed. "Open in Strength" is pressed while looking at that session.
+   */
+  openRequest?: SportScreenRequest | null;
+  /** Taken, so the same session is not re-selected on the next render. */
+  onOpenRequestHandled?: () => void;
 }
 
 function Figure({ parts }: { parts: FigurePart[] }) {
@@ -63,7 +72,9 @@ export function StrengthView({
   api,
   status,
   onOpenTraining,
-  showDevelopmentTools = false
+  showDevelopmentTools = false,
+  openRequest = null,
+  onOpenRequestHandled
 }: StrengthViewProps) {
   const { unitSystem } = useUnitSystem();
   const corosConnected = Boolean(status?.authenticated);
@@ -94,6 +105,44 @@ export function StrengthView({
   const [hevyDialogOpen, setHevyDialogOpen] = useState(false);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
   const [pickedSelection, setPickedSelection] = useState<string | null>(null);
+
+  /*
+   * A session Activities handed over.
+   *
+   * The id is picked straight away and the request cleared, without waiting for
+   * the history to load: `selection` below already falls back to "All sessions"
+   * for an id the index does not hold, so the row selects itself the moment its
+   * session arrives. Holding the request instead would need a second piece of
+   * state saying whether the load had settled, and `loading` reads false in the
+   * gap before the first sync starts.
+   *
+   * The window is widened first where it has to be. Activities lists the whole
+   * history and this screen keeps a window of its own — 30 days, for some
+   * athletes — so a session from March would otherwise not be among the ones it
+   * is being asked to select from.
+   */
+  useEffect(() => {
+    if (!openRequest) {
+      return;
+    }
+
+    const startedAt = epochMsFromCorosTime(openRequest.startTime);
+    if (startedAt !== undefined) {
+      const ageDays = (Date.now() - startedAt) / 86_400_000;
+      if (ageDays > days) {
+        // The narrowest window that reaches back far enough. None does for a
+        // session over a year old, and the window is then left alone rather
+        // than widened to no purpose.
+        const wider = WINDOW_OPTIONS.find((option) => option.days >= ageDays);
+        if (wider) {
+          setDays(wider.days);
+        }
+      }
+    }
+
+    setPickedSelection(openRequest.activityId);
+    onOpenRequestHandled?.();
+  }, [days, onOpenRequestHandled, openRequest, setDays]);
 
   const closeHevyDialog = useCallback(() => setHevyDialogOpen(false), []);
 

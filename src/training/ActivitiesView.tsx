@@ -23,7 +23,7 @@ import {
 } from "./activityFilters";
 import { resolveSportName } from "./sportTypes";
 import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
-import { feelCoverage, useActivityFeelTypes } from "./useActivityFeelTypes";
+import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
 
@@ -80,7 +80,7 @@ export function ActivitiesView({
    * for.
    */
   const [detailOpen, setDetailOpen] = useState(false);
-  const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}|${filters.unratedOnly}`;
+  const filterKey = `${filters.periodDays}|${filters.sports.join(",")}|${filters.query}`;
   const lastFilterKey = useRef(filterKey);
   if (lastFilterKey.current !== filterKey) {
     // Narrowing the list and keeping a limit from the wider one would leave the
@@ -104,7 +104,7 @@ export function ActivitiesView({
   /*
    * Both read the whole history rather than the filtered list: each is keyed on
    * the activity ids, and narrowing the set would re-read on every keystroke.
-   * Neither holds the screen back — the badges and the drift column fill in.
+   * Neither holds the screen back — the faces and the drift figure fill in.
    */
   const feel = useActivityFeelTypes(api, activities);
   const summaries = useActivityDetailSummaries({
@@ -122,17 +122,12 @@ export function ActivitiesView({
         activities,
         filters,
         nowMs,
-        sportName: (activity) => resolveSportName(activity, sportTypeMap),
-        isRated: (activity) => {
-          const state = feel.state(activity.activityId);
-          return state === "unchecked" ? undefined : state === "rated";
-        }
+        sportName: (activity) => resolveSportName(activity, sportTypeMap)
       }),
-    [activities, feel, filters, nowMs, sportTypeMap]
+    [activities, filters, nowMs, sportTypeMap]
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
-  const coverage = useMemo(() => feelCoverage(visible, feel), [visible, feel]);
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
@@ -305,17 +300,12 @@ export function ActivitiesView({
         </div>
       </header>
 
-      <ActivitiesSummary
-        totals={totals}
-        periodLabel={periodLabel}
-        feelCoverage={coverage}
-      />
+      <ActivitiesSummary totals={totals} periodLabel={periodLabel} />
 
       <ActivitiesFilterBar
         filters={filters}
         available={available}
         matched={visible.length}
-        unratedCount={coverage.checked - coverage.rated}
         onChange={setFilters}
       />
 
