@@ -503,6 +503,7 @@ export function ActivityDetailPane({
               focusLapIndex={focusLapIndex}
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
+              embedded
             />
           ) : null}
 

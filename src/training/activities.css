@@ -770,7 +770,8 @@
 }
 
 .activity-zones h3,
-.activity-detail-block h3 {
+.activity-detail-block h3,
+.activity-chart-panel.is-embedded h3 {
   margin: 0;
   color: var(--text-secondary);
   font-size: 11px;

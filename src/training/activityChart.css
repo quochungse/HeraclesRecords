@@ -6,6 +6,13 @@
  * sport it is, but only the Running screen drew it. The two surfaces it needs
  * are declared here with defaults rather than inherited from `.running-view`,
  * so it looks the same wherever it is mounted.
+ *
+ * What it does not bring everywhere is the panel. On a page it is one; inside
+ * the Activities detail pane (`.is-embedded`) it is a block of a panel that is
+ * already there, because a `.panel` inside a `.panel` stacks two translucent
+ * whites and two backdrop blurs, and the plot read as if seen through fog. The
+ * grid layout is therefore declared here, not borrowed from `.run-detail-panel`,
+ * which the embedded chart does not carry.
  */
 .activity-chart-panel,
 .activity-chart-chip,
@@ -16,6 +23,8 @@
 
 
 .activity-chart-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 

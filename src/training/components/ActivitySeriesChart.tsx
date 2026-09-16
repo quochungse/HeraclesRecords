@@ -30,7 +30,6 @@ import {
   secondsPerKmToDisplayPace
 } from "../../units/units";
 import { formatDurationSeconds } from "../formatters";
-import { trainingChartTooltipStyle } from "../chartConfig";
 import { useChartColors } from "../useChartColors";
 import "../activityChart.css";
 import {
@@ -67,6 +66,13 @@ interface ActivitySeriesChartProps {
    * unselected segment reads it directly rather than from the sample clock.
    */
   activityTime?: number;
+  /**
+   * Mounted inside a surface that is already a panel — the Activities detail
+   * pane. The chart then draws as one block of that pane, not as a panel of its
+   * own: `.panel` is translucent white under a backdrop blur, and two of them
+   * stacked washed every line in the plot out to grey.
+   */
+  embedded?: boolean;
 }
 
 interface ChartRow extends TrainingHubActivitySeriesPoint {
@@ -122,6 +128,42 @@ function formatXTick(
   return metersToDisplayDistance(value, unitSystem).toFixed(1);
 }
 
+/** The tooltip's heading: the same position as a tick, with its unit. */
+function formatXLabel(
+  axis: ActivitySeriesAxis,
+  value: number,
+  unitSystem: UnitSystem
+): string {
+  if (axis === "elapsed") {
+    return formatDurationSeconds(value);
+  }
+  return `${metersToDisplayDistance(value, unitSystem).toFixed(2)} ${distanceUnit(unitSystem)}`;
+}
+
+/**
+ * Heart-rate zones as bands that meet.
+ *
+ * COROS states each zone's bounds in whole beats, so one zone ends a beat below
+ * where the next begins. Drawn as given, every boundary was a dark 1 bpm stripe
+ * across the plot; each band runs up to the next one's floor instead.
+ */
+function hrZoneBands(
+  zones: readonly TrainingHubActivityZoneBucket[]
+): { index: number; low: number; high: number }[] {
+  const bounded: { index: number; low: number; high: number }[] = [];
+  for (const zone of zones) {
+    if (zone.index > 0 && zone.low !== undefined && zone.high !== undefined) {
+      bounded.push({ index: zone.index, low: zone.low, high: zone.high });
+    }
+  }
+  bounded.sort((a, b) => a.low - b.low);
+
+  return bounded.map((zone, position) => {
+    const next = bounded[position + 1];
+    return next ? { ...zone, high: Math.max(zone.high, next.low) } : zone;
+  });
+}
+
 /**
  * Laps as positions on the current axis.
  *
@@ -154,7 +196,8 @@ export function ActivitySeriesChart({
   hrZones,
   focusLapIndex,
   onFocusLapHandled,
-  activityTime
+  activityTime,
+  embedded = false
 }: ActivitySeriesChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
@@ -203,6 +246,7 @@ export function ActivitySeriesChart({
   }, [axis, points]);
 
   const boundaries = useMemo(() => lapBoundaries(laps, axis), [axis, laps]);
+  const zoneBands = useMemo(() => hrZoneBands(hrZones), [hrZones]);
 
   // A lap picked in the table below: translate its span on the current axis
   // into the row indices the brush speaks in.
@@ -290,10 +334,19 @@ export function ActivitySeriesChart({
     };
   }, [activityTime, range, visible]);
 
+  const surfaceClass = embedded
+    ? "activity-chart-panel is-embedded"
+    : "panel run-detail-panel activity-chart-panel";
+  const heading = embedded ? (
+    <h3>Channels</h3>
+  ) : (
+    <p className="running-eyebrow">Channels</p>
+  );
+
   if (rows.length < 2) {
     return (
-      <section className="panel run-detail-panel">
-        <p className="running-eyebrow">Channels</p>
+      <section className={surfaceClass}>
+        {heading}
         <p className="activity-chart-empty">
           COROS returned no per-sample readings for this run, so there is nothing
           to plot. The summary above is everything it sent.
@@ -305,9 +358,9 @@ export function ActivitySeriesChart({
   const axisChannels = selected.map(activityChannel);
 
   return (
-    <section className="panel run-detail-panel activity-chart-panel">
+    <section className={surfaceClass}>
       <div className="activity-chart-head">
-        <p className="running-eyebrow">Channels</p>
+        {heading}
         <div
           className="training-metric-toggle activity-chart-axis"
           role="group"
@@ -430,23 +483,18 @@ export function ActivitySeriesChart({
             {/* This run's own heart-rate bands, so a glance says which zone the
                 line was sitting in without reading the axis. */}
             {selected.includes("hr")
-              ? hrZones
-                  .filter(
-                    (zone) =>
-                      zone.index > 0 && zone.low !== undefined && zone.high !== undefined
-                  )
-                  .map((zone) => (
-                    <ReferenceArea
-                      key={`zone-${zone.index}`}
-                      yAxisId="hr"
-                      y1={zone.low}
-                      y2={zone.high}
-                      fill={palette.hr.stroke}
-                      fillOpacity={0.03 + zone.index * 0.015}
-                      stroke="none"
-                      ifOverflow="hidden"
-                    />
-                  ))
+              ? zoneBands.map((zone) => (
+                  <ReferenceArea
+                    key={`zone-${zone.index}`}
+                    yAxisId="hr"
+                    y1={zone.low}
+                    y2={zone.high}
+                    fill={palette.hr.stroke}
+                    fillOpacity={0.03 + zone.index * 0.015}
+                    stroke="none"
+                    ifOverflow="hidden"
+                  />
+                ))
               : null}
 
             {axisChannels.length > 0 && boundaries.length <= 40
@@ -570,27 +618,54 @@ function RunChartTooltip({
     return null;
   }
 
-  const keys = payload
+  const readings = payload
     .map((entry) => entry.dataKey as ActivityChannelKey)
-    .filter((key) => key !== "altitude");
+    .filter((key) => key !== "altitude")
+    .flatMap((key) => {
+      const value = row[key];
+      return typeof value === "number" ? [{ key, value, color: palette[key].stroke }] : [];
+    });
+
+  // A gradient needs two stops, so a single channel fades in and out of its own
+  // colour instead of being handed a gradient the browser would drop.
+  const accent =
+    readings.length === 1
+      ? `transparent, ${readings[0]!.color}, transparent`
+      : readings.map((reading) => reading.color).join(", ");
 
   return (
-    <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
-      <span>{formatXTick(axis, Number(label), unitSystem)}</span>
-      {keys.map((key) => {
-        const value = row[key];
-        if (typeof value !== "number") {
-          return null;
-        }
-        return (
-          <strong key={key} style={{ color: palette[key].stroke }}>
-            {formatChannelValue(key, value, unitSystem)}
-          </strong>
-        );
-      })}
-      {showAltitude && typeof row.altitude === "number" ? (
-        <span>{formatChannelValue("altitude", row.altitude, unitSystem)}</span>
+    <div className="training-chart-tooltip">
+      {readings.length > 0 ? (
+        <span
+          className="training-chart-tooltip-accent"
+          style={{ background: `linear-gradient(90deg, ${accent})` }}
+        />
       ) : null}
+      <span className="training-chart-tooltip-label">
+        {formatXLabel(axis, Number(label), unitSystem)}
+      </span>
+      <ul className="training-chart-tooltip-rows">
+        {readings.map((reading) => (
+          <li key={reading.key} className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">
+              <i aria-hidden="true" style={{ background: reading.color }} />
+              {activityChannel(reading.key).label}
+            </span>
+            <strong>{formatChannelValue(reading.key, reading.value, unitSystem)}</strong>
+          </li>
+        ))}
+        {showAltitude && typeof row.altitude === "number" ? (
+          <li className="training-chart-tooltip-row">
+            {/* The backdrop's own stroke is a faint wash by design; a dot in
+                it would be invisible, so the key takes the muted ink. */}
+            <span className="training-chart-tooltip-key">
+              <i aria-hidden="true" style={{ background: "var(--text-muted)" }} />
+              {activityChannel("altitude").label}
+            </span>
+            <strong>{formatChannelValue("altitude", row.altitude, unitSystem)}</strong>
+          </li>
+        ) : null}
+      </ul>
     </div>
   );
 }
