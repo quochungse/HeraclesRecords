@@ -3,6 +3,12 @@ import { SLEEP_TARGET_MINUTES } from "./coachThresholdMetrics";
 import { isCorosMcpUsable } from "./corosMcpService";
 import { getCachedSleepNight, getSleepHistory } from "./sleepHistoryService";
 import { getSleepNightSeries } from "./sleepSeriesService";
+import {
+  isNapOnlyRecord,
+  isSleepDayRecord,
+  napMinutes,
+  totalSleepMinutes
+} from "./sleepMetrics";
 import type {
   CorosMcpTool,
   SleepHistorySnapshot,
@@ -47,7 +53,10 @@ export function getChatSleepTools(): CorosMcpTool[] {
       description:
         "Nightly sleep from COROS: duration, sleep score, deep/light/REM/awake " +
         "share, wake-ups, sleep window, overnight HR and naps, led by window " +
-        "averages and the net deficit against 8 h a night. Served from the app's " +
+        "averages and the net deficit against 8 h a night. Totals are the whole " +
+        "day's sleep, main sleep plus naps; the stage shares and the score " +
+        "describe the main sleep alone, and a day the athlete only napped has " +
+        "neither. Served from the app's " +
         "sleep cache, which keeps nights COROS drops after ~9 weeks. Nights are " +
         "dated by wake-up day, so today's date is last night. Windows over 14 " +
         "nights are rolled up by week with the last 7 nights listed. Pass night " +
@@ -190,9 +199,14 @@ function mean(values: (number | undefined)[]): number | undefined {
     : undefined;
 }
 
-/** A night whose numbers are final — what averages and the deficit are taken over. */
+/**
+ * A day whose numbers are final — what averages and the deficit are taken over.
+ *
+ * Measured on the whole day's sleep, so a day of nothing but naps counts as
+ * the sleep it was rather than as a night that never happened.
+ */
 function isSettled(record: TrainingHubSleepRecord): boolean {
-  return record.completeness !== "partial" && (record.totalMinutes ?? 0) > 0;
+  return record.completeness !== "partial" && (totalSleepMinutes(record) ?? 0) > 0;
 }
 
 interface Column {
@@ -202,10 +216,27 @@ interface Column {
 
 const NIGHT_COLUMNS: Column[] = [
   {
+    // The whole day's sleep. A column is dropped when no night fills it, so on
+    // the ordinary window — no naps anywhere — this stays the only duration
+    // column and the table reads exactly as it did.
     header: "Total",
+    value: (record) => {
+      const total = totalSleepMinutes(record);
+      if (total === undefined) {
+        return undefined;
+      }
+      return `${formatSleepMinutes(total)}${
+        record.completeness === "partial" ? " (partial)" : ""
+      }${isNapOnlyRecord(record) ? " (naps only)" : ""}`;
+    }
+  },
+  {
+    // Only where it says something Total does not: the stage shares and the
+    // score beside it are this figure's, not the total's.
+    header: "Main sleep",
     value: (record) =>
-      record.totalMinutes !== undefined
-        ? `${formatSleepMinutes(record.totalMinutes)}${record.completeness === "partial" ? " (partial)" : ""}`
+      (napMinutes(record) ?? 0) > 0 && record.totalMinutes !== undefined
+        ? formatSleepMinutes(record.totalMinutes)
         : undefined
   },
   { header: "Score", value: (record) => (record.score !== undefined ? String(Math.round(record.score)) : undefined) },
@@ -229,7 +260,16 @@ const NIGHT_COLUMNS: Column[] = [
   },
   {
     header: "Nap",
-    value: (record) => (record.napMinutes ? `${Math.round(record.napMinutes)} min` : undefined)
+    value: (record) => {
+      const naps = napMinutes(record) ?? 0;
+      if (naps <= 0) {
+        return undefined;
+      }
+      const count = record.napWindows?.length ?? 0;
+      // Same form as every other duration in the table: a nap can be four
+      // hours, and "278 min" reads as a number rather than as a length.
+      return `${formatSleepMinutes(naps)}${count > 1 ? ` ×${count}` : ""}`;
+    }
   }
 ];
 
@@ -256,7 +296,7 @@ function weekTable(nights: TrainingHubSleepRecord[]): string[] {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([start, week]) => {
       const settled = week.filter(isSettled);
-      const total = mean(settled.map((night) => night.totalMinutes));
+      const total = mean(settled.map((night) => totalSleepMinutes(night)));
       const score = mean(settled.map((night) => night.score));
       const deep = mean(settled.map((night) => share(night.deepPercent, night.deepMinutes, night.totalMinutes)));
       const rem = mean(settled.map((night) => share(night.remPercent, night.remMinutes, night.totalMinutes)));
@@ -290,7 +330,7 @@ export function formatSleepSummaryForChat(
   // rows under a "last 7 nights" heading the day some caller forgets to.
   const from = dayKeyDaysAgo(today, nights - 1);
   const records = snapshot.records
-    .filter((record) => record.kind !== "nap" && record.happenDay >= from)
+    .filter((record) => isSleepDayRecord(record) && record.happenDay >= from)
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay));
   const errorNote = snapshot.error
     ? `The latest COROS fetch failed (${snapshot.error}), so only cached nights are shown.`
@@ -312,7 +352,7 @@ export function formatSleepSummaryForChat(
   ];
 
   if (settled.length > 0) {
-    const total = mean(settled.map((night) => night.totalMinutes));
+    const total = mean(settled.map((night) => totalSleepMinutes(night)));
     const score = mean(settled.map((night) => night.score));
     const deep = mean(settled.map((night) => share(night.deepPercent, night.deepMinutes, night.totalMinutes)));
     const rem = mean(settled.map((night) => share(night.remPercent, night.remMinutes, night.totalMinutes)));
@@ -328,7 +368,7 @@ export function formatSleepSummaryForChat(
 
     // Nets out, as the sleep-debt trigger does: a long night pays back a short
     // one, and a night with no reading counts on neither side.
-    const slept = settled.reduce((sum, night) => sum + (night.totalMinutes ?? 0), 0);
+    const slept = settled.reduce((sum, night) => sum + (totalSleepMinutes(night) ?? 0), 0);
     const deficit = settled.length * SLEEP_TARGET_MINUTES - slept;
     lines.push(
       `- Net against 8 h a night over ${settled.length} settled night${settled.length === 1 ? "" : "s"}: ` +
@@ -375,10 +415,16 @@ export function formatSleepSummaryForChat(
 function nightHighlights(record: TrainingHubSleepRecord): string {
   const stageShares = stages(record);
   const wakeUps = record.awakeCountOverFiveMinutes;
+  const total = totalSleepMinutes(record);
+  const naps = napMinutes(record) ?? 0;
   return [
-    record.totalMinutes !== undefined
-      ? `${formatSleepMinutes(record.totalMinutes)}${
-          record.completeness === "partial" ? " (partial)" : ""
+    total !== undefined
+      ? `${formatSleepMinutes(total)}${
+          naps > 0 && record.totalMinutes !== undefined
+            ? ` total (${formatSleepMinutes(record.totalMinutes)} main sleep)`
+            : ""
+        }${record.completeness === "partial" ? " (partial)" : ""}${
+          isNapOnlyRecord(record) ? " of naps, no main sleep" : ""
         }`
       : undefined,
     record.score !== undefined ? `score ${Math.round(record.score)}` : undefined,
@@ -392,7 +438,9 @@ function nightHighlights(record: TrainingHubSleepRecord): string {
           record.minHr !== undefined ? ` (${Math.round(record.minHr)} min)` : ""
         }`
       : undefined,
-    record.napMinutes ? `nap ${Math.round(record.napMinutes)} min` : undefined
+    // Not on a nap-only day: the duration above is already those naps, and
+    // "4h38 of naps, no main sleep · nap 278 min" says it twice.
+    naps > 0 && !isNapOnlyRecord(record) ? `nap ${Math.round(naps)} min` : undefined
   ]
     .filter(Boolean)
     .join(" · ");

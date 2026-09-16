@@ -16,6 +16,7 @@ import {
 } from "../../training/formatters";
 import { useChartColors } from "../../training/useChartColors";
 import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
+import { isSleepDayRecord, totalSleepMinutes } from "../../../electron/sleepMetrics";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
 interface SleepTrendChartProps {
@@ -61,14 +62,15 @@ export function SleepTrendChart({
 }: SleepTrendChartProps) {
   const { colors } = useChartColors();
 
-  // Naps carry the happenDay of the night they belong to, so a feed that has
-  // not folded them in yet would draw two bars under one label. The Sleep
-  // screen hands over main sleeps only; Overview's source is looser.
+  // A single nap carries the happenDay of the day it belongs to, so a feed
+  // that has not folded it in yet would draw two bars under one label. A day
+  // of nothing *but* naps is a day of its own and keeps its bar — the whole
+  // point of the bar is how much was slept, and naps are sleep.
   const points: TrendPoint[] = records
-    .filter((record) => record.kind !== "nap")
+    .filter(isSleepDayRecord)
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay))
     .map((record) => {
-      const minutes = finite(record.totalMinutes);
+      const minutes = finite(totalSleepMinutes(record));
       return {
         happenDay: record.happenDay,
         label: formatHappenDayLabel(record.happenDay),

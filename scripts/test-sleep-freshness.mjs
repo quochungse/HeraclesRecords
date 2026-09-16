@@ -2,6 +2,11 @@
 // anything else, so a night COROS returned days ago must never appear under it.
 // These assertions fail against the pre-fix code, where the panel read
 // `sleep.latest` straight out of the summary.
+//
+// Run through Electron rather than plain `node`: the module graph is renderer
+// `.ts` with extensionless imports, and a distro Node built without Amaro
+// answers `--experimental-strip-types` with ERR_NO_TYPESCRIPT. Electron ships
+// one that has it, so the flag and the resolver hook ride along.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -131,16 +136,38 @@ assert.equal(
   "falls back to the qualifying record in the list"
 );
 
-// Naps are never last night's sleep.
-const napOnly = {
+// A single nap is never last night's sleep — it is one piece of a day, folded
+// into the day it belongs to.
+const singleNap = {
   mcpConnected: true,
   latest: undefined,
   records: [{ ...night(0), kind: "nap" }]
 };
 assert.equal(
-  pickLastNightSleep(napOnly, { now: NOW }),
+  pickLastNightSleep(singleNap, { now: NOW }),
   undefined,
   "a nap is not the night"
+);
+
+// A day whose *whole* sleep was naps is. COROS reported no main sleep for it
+// and never will, so holding out for one leaves the panel blank about a day the
+// athlete did sleep on.
+const napOnlyDay = {
+  mcpConnected: true,
+  latest: undefined,
+  records: [
+    {
+      happenDay: dayKey(0),
+      kind: "nap-only",
+      completeness: "complete",
+      napMinutes: 278
+    }
+  ]
+};
+assert.equal(
+  pickLastNightSleep(napOnlyDay, { now: NOW })?.napMinutes,
+  278,
+  "a day of nothing but naps is the day we have"
 );
 
 // The panel shows partial nights (it has copy for them); the greeting states

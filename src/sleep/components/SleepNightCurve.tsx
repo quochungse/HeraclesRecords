@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import {
   Area,
   CartesianGrid,
@@ -180,10 +181,38 @@ function merge(series: SleepNightSeries): CurveRow[] {
  */
 export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
   const { colors } = useChartColors();
+  const box = useRef<HTMLDivElement | null>(null);
+  // The height this box settled at last, so the wait for a night's samples
+  // holds the space rather than dropping it.
+  //
+  // The three states are three sizes — a chart is 210px of plot plus its
+  // heading, an answered "no samples" is a short dashed strip — and swapping
+  // through the short one on the way between two charts bounced the page under
+  // it by 156px. Holding the last settled height means a selection moves the
+  // layout once, when the new night turns out to be a different size, and never
+  // on the way there. It cannot be a constant: which size to hold depends on
+  // what was on screen, and a fixed one would invent the bounce in the other
+  // direction, between two nights that both have no samples.
+  const settledHeight = useRef<number | undefined>(undefined);
+
+  // Keyed to the two things that change the box's size. Left with no
+  // dependency list it forced a layout on every render of the detail pane,
+  // which is every hover and every selection, to re-read a number that had not
+  // moved.
+  useLayoutEffect(() => {
+    if (!loading && box.current) {
+      settledHeight.current = box.current.getBoundingClientRect().height;
+    }
+  }, [loading, series]);
 
   if (loading) {
     return (
-      <div className="sleep-curve is-empty">
+      <div
+        ref={box}
+        className="sleep-curve is-empty"
+        style={{ minHeight: settledHeight.current }}
+        aria-busy="true"
+      >
         <Loader2 className="spin" size={16} aria-hidden="true" />
         <p>Loading the night…</p>
       </div>
@@ -192,7 +221,7 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
 
   if (!series || (series.hrv.length === 0 && series.stress.length === 0)) {
     return (
-      <div className="sleep-curve is-empty">
+      <div ref={box} className="sleep-curve is-empty">
         <p>
           {/* This night's own error first, then the server, then the
               seven-day limit COROS keeps these under. */}
@@ -215,7 +244,7 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
   const assessment = series.assessment;
 
   return (
-    <div className="sleep-curve">
+    <div ref={box} className="sleep-curve">
       <div className="sleep-curve-head">
         <p className="sleep-curve-title">
           Across the night

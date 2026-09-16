@@ -245,6 +245,13 @@
   font-size: 12px;
 }
 
+/* The nap's share of a row's total, which the stage strip beside it excludes. */
+.sleep-night-row-nap {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .sleep-night-row-partial {
   display: inline-flex;
   align-items: center;
@@ -375,6 +382,17 @@
   border-radius: 9px;
   padding: 9px 11px;
   background: var(--warning-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Stands where the stage breakdown would be, for a day that has none. */
+.sleep-detail-naps-only {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-radius: 9px;
+  padding: 9px 11px;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
@@ -608,6 +626,9 @@
 }
 
 .sleep-detail-metric {
+  /* The containing block for `.sleep-metric-note` (src/styles.css), which has
+     to hang outside the value's own clipped box to be seen at all. */
+  position: relative;
   border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
   border-radius: 10px;
   padding: 9px 11px;

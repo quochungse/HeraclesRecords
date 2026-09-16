@@ -11844,10 +11844,69 @@ td span {
 }
 
 .sleep-metric {
+  position: relative;
   display: grid;
   align-content: start;
   gap: 4px;
   min-width: 0;
+}
+
+/*
+ * The detail a metric tile could not fit, shown while it is pointed at or
+ * focused. Used by both sleep screens, so it is defined here rather than beside
+ * either of them.
+ *
+ * `pre-line` is what makes it a list: the text arrives with real newlines in
+ * it, one nap to a line. It is absolutely positioned so the row it sits in does
+ * not grow when it appears, and its side is set by the component — a note
+ * centred on the last tile of a row hangs off the panel.
+ */
+.sleep-metric-note {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 9;
+  width: max-content;
+  max-width: min(320px, 70vw);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.16));
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: rgba(16, 18, 23, 0.97);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translateY(4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  white-space: pre-line;
+}
+
+.sleep-metric-note[data-note-side="start"] {
+  left: 0;
+}
+
+.sleep-metric-note[data-note-side="end"] {
+  right: 0;
+}
+
+.sleep-metric:hover > .sleep-metric-note,
+.sleep-metric:focus-within > .sleep-metric-note,
+.sleep-detail-metric:hover > .sleep-metric-note,
+.sleep-detail-metric:focus-within > .sleep-metric-note {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sleep-metric dd.has-note:focus-visible,
+.sleep-detail-metric dd.has-note:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .sleep-metric.is-window {
@@ -25120,6 +25179,15 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .sleep-stage-segment::before {
   border-color: rgba(38, 34, 28, 0.14);
   background: rgba(246, 243, 236, 0.97);
+}
+
+/* The metric tiles' hover note, on paper: it carries `--text-primary`, which is
+   dark ink here, so the dark card it sits on in the other theme would hide it
+   completely. */
+:root[data-theme="paper"] .sleep-metric-note {
+  border-color: rgba(38, 34, 28, 0.14);
+  background: rgba(252, 250, 245, 0.98);
+  box-shadow: 0 14px 34px rgba(60, 50, 35, 0.16);
 }
 
 /* VO2 widget — it sits on Personal now, beside the fitness scores, so it takes

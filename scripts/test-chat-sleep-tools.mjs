@@ -75,6 +75,11 @@ assert.match(
   /Night \| Total \| Score \| Deep\/Light\/REM\/Awake % \| Wake-ups >5 min \| Window \| HR avg \(min\)\n/
 );
 assert.doesNotMatch(week, /\| Nap/, "no night had a nap, so no column of dashes");
+assert.doesNotMatch(
+  week,
+  /\| Main sleep/,
+  "and no column repeating the total it would equal"
+);
 assert.match(week, /09-11 Fri \| 6h40 \(partial\) \| 80 \| 20\/55\/20\/5 \| 1 \| 23:10–06:30 \| 50 \(44\)/);
 assert.ok(week.indexOf("09-08 Tue") < week.indexOf("09-11 Fri"), "oldest night first");
 
@@ -230,5 +235,42 @@ assert.equal(parseSleepNights(undefined), 7);
 assert.equal(parseSleepNights("14"), 14);
 assert.equal(parseSleepNights(500), 90);
 assert.equal(parseSleepNights(0), 7);
+
+// --- Naps count toward the day's sleep -------------------------------------
+//
+// The coach reads these totals to say whether the athlete is rested and to net
+// out a sleep debt. Reading the main sleep alone put debt on a day that had an
+// afternoon of sleep in it, and lost a day of nothing but naps entirely.
+const withNaps = formatSleepSummaryForChat(
+  {
+    records: [
+      night(0, 400, { napMinutes: 60 }),
+      {
+        happenDay: key(1),
+        kind: "nap-only",
+        completeness: "complete",
+        napMinutes: 278
+      },
+      night(2, 480)
+    ],
+    mcpConnected: true,
+    source: "cache"
+  },
+  7,
+  today
+);
+
+// 460 + 278 + 480 = 1218 over three days, against 3 × 8 h = 1440.
+assert.match(withNaps, /- Average per settled night: 6h46/);
+assert.match(withNaps, /- Net against 8 h a night over 3 settled nights: 3h42 short/);
+// The naps are named rather than silently added: the stage shares and the score
+// on the same row describe the main sleep, not the total.
+assert.match(withNaps, /Night \| Total \| Main sleep \|/);
+assert.match(withNaps, /\| 7h40 \| 6h40 \|[^\n]*\| 1h00$/m);
+assert.match(
+  withNaps,
+  /4h38 \(naps only\)/,
+  "a day with no main sleep says so instead of reading as a short night"
+);
 
 console.log("test-chat-sleep-tools: ok");

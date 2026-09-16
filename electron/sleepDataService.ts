@@ -4,6 +4,10 @@ import {
   getCorosMcpTools,
   listCorosMcpTools
 } from "./corosMcpService";
+import {
+  sleepWindowDurationMinutes,
+  windowDurationMinutes
+} from "./sleepMetrics";
 import { recentTrainingHubDateList } from "./trainingTrendUtils";
 import type {
   CorosMcpTool,
@@ -79,59 +83,6 @@ function normalizeHappenDay(value: unknown): string | undefined {
   }
 
   return undefined;
-}
-
-function parseClockMinutes(value?: string): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const match = value.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) {
-    return undefined;
-  }
-
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function dayKeyToUtcMillis(happenDay?: string): number | undefined {
-  if (!happenDay || !/^\d{8}$/.test(happenDay)) {
-    return undefined;
-  }
-
-  return Date.UTC(
-    Number(happenDay.slice(0, 4)),
-    Number(happenDay.slice(4, 6)) - 1,
-    Number(happenDay.slice(6, 8))
-  );
-}
-
-function sleepWindowDurationMinutes(record: TrainingHubSleepRecord): number | undefined {
-  const startMinutes = parseClockMinutes(record.sleepStart);
-  const endMinutes = parseClockMinutes(record.sleepEnd);
-
-  if (startMinutes === undefined || endMinutes === undefined) {
-    return undefined;
-  }
-
-  // When COROS dated both ends, the length is arithmetic rather than inference.
-  const startDayMs = dayKeyToUtcMillis(record.sleepStartDay);
-  const endDayMs = dayKeyToUtcMillis(record.sleepEndDay);
-
-  if (startDayMs !== undefined && endDayMs !== undefined) {
-    const dayGapMinutes = Math.round((endDayMs - startDayMs) / 60_000);
-    const span = dayGapMinutes + endMinutes - startMinutes;
-    if (span >= 0) {
-      return span;
-    }
-  }
-
-  let adjustedEnd = endMinutes;
-  if (adjustedEnd <= startMinutes) {
-    adjustedEnd += 24 * 60;
-  }
-
-  return adjustedEnd - startMinutes;
 }
 
 function isPlausibleMainSleep(record: TrainingHubSleepRecord): boolean {
@@ -562,7 +513,12 @@ function normalizeSleepRecordFields(
 }
 
 function sleepRecordPartialReason(record: TrainingHubSleepRecord): string | undefined {
-  if (record.kind === "nap") {
+  // Neither a nap nor a day of nothing but naps is a main sleep still
+  // arriving: COROS has said all it is ever going to say about them. Reading
+  // them against the main-sleep checks marked every nap-only day "partial",
+  // which is the one flag that keeps a day out of the trend and the coach's
+  // averages.
+  if (record.kind === "nap" || record.kind === "nap-only") {
     return undefined;
   }
 
@@ -787,7 +743,6 @@ function parseSleepRecord(
 
   const window = readSleepWindow(record);
   const windowMinutes = sleepWindowDurationMinutes({
-    happenDay,
     sleepStart: defaults.sleepStart ?? window.sleepStart,
     sleepEnd: defaults.sleepEnd ?? window.sleepEnd,
     sleepStartDay: defaults.sleepStartDay ?? window.sleepStartDay,
@@ -1090,7 +1045,11 @@ function mergeSleepRecord(
           : incoming.totalMinutes ?? existing.totalMinutes,
       napMinutes: incoming.napMinutes ?? existing.napMinutes,
       napStart: incoming.napStart ?? existing.napStart,
-      napEnd: incoming.napEnd ?? existing.napEnd
+      napEnd: incoming.napEnd ?? existing.napEnd,
+      napWindows:
+        incoming.napWindows && incoming.napWindows.length > 0
+          ? incoming.napWindows
+          : existing.napWindows
     }
   );
 }
@@ -1111,7 +1070,7 @@ function sleepRecordCompleteness(record: TrainingHubSleepRecord): number {
 }
 
 function isOvernightMainSleep(record: TrainingHubSleepRecord): boolean {
-  if (record.kind === "nap") {
+  if (record.kind === "nap" || record.kind === "nap-only") {
     return false;
   }
 
@@ -1146,7 +1105,7 @@ function isOvernightMainSleep(record: TrainingHubSleepRecord): boolean {
 }
 
 function isCompleteMainSleep(record: TrainingHubSleepRecord): boolean {
-  if (record.kind === "nap") {
+  if (record.kind === "nap" || record.kind === "nap-only") {
     return false;
   }
 
@@ -1174,9 +1133,21 @@ function isCompleteMainSleep(record: TrainingHubSleepRecord): boolean {
 }
 
 function isSelectableMainSleep(record: TrainingHubSleepRecord): boolean {
-  return record.kind !== "nap" && isPlausibleMainSleep(record);
+  return isMainSleepRecord(record) && isPlausibleMainSleep(record);
 }
 
+/** A record that stands for a day's *main* sleep — not a nap, not a nap-only day. */
+function isMainSleepRecord(record: TrainingHubSleepRecord): boolean {
+  return record.kind !== "nap" && record.kind !== "nap-only";
+}
+
+/**
+ * The day's naps, folded onto its main sleep.
+ *
+ * Summed, not picked: `napMinutes` is COROS's own "Naps Total", so a day of
+ * two naps has to answer with both or the day's sleep is short by one of them.
+ * Taking the longest was right only while nothing counted naps toward a total.
+ */
 function attachNapToMain(
   main: TrainingHubSleepRecord,
   naps: TrainingHubSleepRecord[]
@@ -1186,15 +1157,32 @@ function attachNapToMain(
     return main;
   }
 
-  const bestNap = dayNaps.sort(
-    (left, right) => (right.totalMinutes ?? 0) - (left.totalMinutes ?? 0)
-  )[0];
+  const summed = dayNaps.reduce(
+    (total, nap) => (nap.totalMinutes !== undefined ? total + nap.totalMinutes : total),
+    0
+  );
+  const windows = dayNaps
+    .map((nap) => ({
+      start: nap.sleepStart,
+      end: nap.sleepEnd,
+      startDay: nap.sleepStartDay,
+      endDay: nap.sleepEndDay
+    }))
+    .filter((window) => window.start !== undefined || window.end !== undefined);
 
+  // The day's own answer wins every field it has, which is the rule
+  // `foldSleepDay` (`sleepHistoryService`) follows and the two must agree:
+  // COROS puts "Naps Total" on the main block as well, and it counts the naps
+  // the day had rather than the ones this response happened to carry as records
+  // of their own. Letting the records win shortened a day of two naps to the
+  // one that arrived — and swapped the windows to match, so the day's minutes
+  // and its clocks came from different answers.
   return {
     ...main,
-    napMinutes: bestNap.totalMinutes ?? main.napMinutes,
-    napStart: bestNap.sleepStart ?? main.napStart,
-    napEnd: bestNap.sleepEnd ?? main.napEnd
+    napMinutes: main.napMinutes ?? (summed > 0 ? summed : undefined),
+    napStart: main.napStart ?? windows[0]?.start,
+    napEnd: main.napEnd ?? windows[0]?.end,
+    napWindows: main.napWindows ?? (windows.length > 0 ? windows : undefined)
   };
 }
 
@@ -1205,10 +1193,19 @@ export function pickLatestSleepRecord(
     return undefined;
   }
 
-  const mains = records.filter((record) => record.kind !== "nap");
+  const mains = records.filter(isMainSleepRecord);
   const naps = records.filter((record) => record.kind === "nap");
+  const napOnlyDays = records.filter((record) => record.kind === "nap-only");
   const selectableMains = mains.filter(isSelectableMainSleep);
-  const candidates = selectableMains.length > 0 ? selectableMains : mains;
+  // A nap-only day is a day, but it is not a night, and `latest` is read under
+  // headings that say night. It stands in only when there is no main sleep at
+  // all to stand there instead.
+  const candidates =
+    selectableMains.length > 0
+      ? selectableMains
+      : mains.length > 0
+        ? mains
+        : napOnlyDays;
 
   const sortedMains = candidates.sort((left, right) => {
     const dayCompare = right.happenDay.localeCompare(left.happenDay);
@@ -1347,19 +1344,61 @@ function parseProseSleepSection(
   );
   const napLineMatch = section.match(/\bNaps?(?:\s+Total)?:\s*([^\n]+)/i);
   const napText = napLineMatch?.[1]?.trim();
-  // COROS puts the nap's clock on a line of its own — "Nap Window: 2026-08-12
+  // COROS puts each nap's clock on a line of its own — "Nap Window: 2026-08-12
   // 07:24 - 2026-08-12 08:00" — while "Naps Total" carries only a duration.
   // Reading the duration line for a window found none, so every nap arrived
   // without the hours it happened at.
-  const napWindowLineMatch = section.match(/\bNap\s+(?:window|period|range)\s*:\s*([^\n]+)/i);
+  //
+  // And it writes **one line per nap**: 2026-09-15 came back with two, summing
+  // to the 4h 38m on its "Naps Total" line. Matching once kept the first and
+  // dropped the rest, so a day of two naps read as a day of one.
+  const napWindows = [
+    ...section.matchAll(/\bNap\s+(?:window|period|range)\s*:\s*([^\n]+)/gi)
+  ]
+    .map((match) => parseSleepWindowRange(match[1]))
+    .filter((window) => window.start !== undefined || window.end !== undefined);
+
+  if (napWindows.length === 0) {
+    // The older shapes put the clock on the duration line itself.
+    const fromDurationLine = parseSleepWindowRange(napText);
+    if (fromDurationLine.start !== undefined || fromDurationLine.end !== undefined) {
+      napWindows.push(fromDurationLine);
+    }
+  }
+
   const napDurationMatch = napText?.match(
     /\b(?:none|no|zero)\b|(?:(?:\d+(?:\.\d+)?\s*h(?:ours?)?)(?:\s*\d+(?:\.\d+)?\s*m(?:in(?:utes?)?)?)?|\d+(?:\.\d+)?\s*m(?:in(?:utes?)?)?)/i
   );
-  const napWindow = parseSleepWindowRange(napWindowLineMatch?.[1] ?? napText);
-  const napStart = napWindow.start;
-  const napEnd = napWindow.end;
+  const napDurationText = napDurationMatch?.[0]?.trim();
+  const reportedNapMinutes = napDurationText
+    ? parseNapDurationText(napDurationText)
+    : undefined;
+  // COROS's own "Naps Total" first, and the windows when it did not write one.
+  // A block is accepted as a day on the strength of its windows alone, so a
+  // total that never parsed left a day of naps totalling nothing: "–" on the
+  // list, no bar in the trend, and dropped from every average — the same
+  // disappearance the nap-only case exists to fix, one step further in. The
+  // windows are the same arithmetic, which is why they sum to the reported
+  // total exactly where both are present.
+  const napTotalMinutes =
+    reportedNapMinutes ??
+    (napWindows.length > 0
+      ? napWindows.reduce(
+          (total, window) => total + (windowDurationMinutes(window) ?? 0),
+          0
+        ) || undefined
+      : undefined);
+  const napStart = napWindows[0]?.start;
+  const napEnd = napWindows[0]?.end;
 
-  if (!scoreMatch && !mainSleepMatch) {
+  // A day the athlete only napped on says so and stops there: "Naps Total: 4h
+  // 38min" and its windows, with no score, no main sleep and no stages —
+  // verified against the live feed. Demanding one of the two main-sleep lines
+  // dropped the whole block, so the day vanished from the screen, the trend
+  // and the coach's table as if nothing had been slept at all.
+  const napsOnly = (napTotalMinutes ?? 0) > 0 || napWindows.length > 0;
+
+  if (!scoreMatch && !mainSleepMatch && !napsOnly) {
     return undefined;
   }
 
@@ -1426,6 +1465,20 @@ function parseProseSleepSection(
     happenDay = fallbackHappenDay;
   }
 
+  if (!scoreMatch && !mainSleepMatch) {
+    return finalizeSleepRecord(
+      {},
+      {
+        happenDay,
+        kind: "nap-only",
+        napMinutes: napTotalMinutes,
+        napStart,
+        napEnd,
+        napWindows: napWindows.length > 0 ? napWindows : undefined
+      }
+    );
+  }
+
   const totalMinutes = mainSleepMatch
     ? parseDurationMinutes(mainSleepMatch[1].trim())
     : undefined;
@@ -1436,7 +1489,6 @@ function parseProseSleepSection(
   const sleepStart = window.start;
   const sleepEnd = window.end;
   const windowMinutes = sleepWindowDurationMinutes({
-    happenDay,
     sleepStart,
     sleepEnd,
     sleepStartDay: window.startDay,
@@ -1452,7 +1504,6 @@ function parseProseSleepSection(
       : awakeMinutes !== undefined && percentDenominator !== undefined
         ? Math.round((awakeMinutes / percentDenominator) * 1000) / 10
         : undefined;
-  const napDurationText = napDurationMatch?.[0]?.trim();
 
   return finalizeSleepRecord(
     {},
@@ -1484,9 +1535,12 @@ function parseProseSleepSection(
       sleepEnd,
       sleepStartDay: window.startDay,
       sleepEndDay: window.endDay,
-      napMinutes: napDurationText ? parseNapDurationText(napDurationText) : undefined,
+      napMinutes: napTotalMinutes,
       napStart,
-      napEnd
+      napEnd,
+      // Left off entirely on a day with no naps: an empty array is a field in
+      // every stored night for the sake of saying nothing.
+      napWindows: napWindows.length > 0 ? napWindows : undefined
     }
   );
 }
