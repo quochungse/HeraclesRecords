@@ -97,8 +97,7 @@
 /* --- Sport mix ------------------------------------------------------------ */
 
 .activities-mix {
-  display: grid;
-  gap: 8px;
+  position: relative;
 }
 
 .activities-mix-bar {
@@ -107,6 +106,12 @@
   height: 8px;
   border-radius: var(--radius-pill);
   background: var(--ax-well);
+  cursor: default;
+}
+
+.activities-mix-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .activities-mix-bar i {
@@ -114,13 +119,50 @@
   background: var(--sport-mix-color, var(--sport-other));
 }
 
+/*
+ * The percentages, on hover.
+ *
+ * Absolutely positioned rather than merely revealed: a legend taking its place
+ * in the flow would push the filters and the whole list down eight pixels the
+ * moment the pointer crossed the bar, which is a worse answer than showing it
+ * always. `pointer-events: none` keeps it from holding its own hover open once
+ * the pointer has left the bar and landed on the panel.
+ */
 .activities-mix-legend {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
   margin: 0;
-  padding: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  /*
+   * `--surface`, not `--ax-raised`: a raised face on this screen is a tint of
+   * the ink, which is transparent, and the filter row it lands on top of read
+   * straight through it. Popovers in this app are opaque — the same token the
+   * export dropdown uses, and it flips to white on paper on its own.
+   */
+  background: var(--surface);
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
   list-style: none;
+  transition: opacity 0.12s ease;
+}
+
+.activities-mix-bar:hover + .activities-mix-legend,
+.activities-mix-bar:focus-visible + .activities-mix-legend {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activities-mix-legend {
+    transition: none;
+  }
 }
 
 .activities-mix-legend li {

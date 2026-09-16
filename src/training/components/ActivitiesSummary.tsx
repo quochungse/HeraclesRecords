@@ -40,6 +40,16 @@ function perWeekPhrase(
   return `One every ${Math.round(7 / perWeek)} days`;
 }
 
+/** "Running 68%, 30 sessions" — one sport's share, spelled out. */
+function mixPhrase(
+  sport: ActivityTotals["sports"][number],
+  mixTotal: number
+): string {
+  const share = Math.round((sport.duration / mixTotal) * 100);
+  const sessions = `${sport.count} ${sport.count === 1 ? "session" : "sessions"}`;
+  return `${SPORT_COLOR_LABELS[sport.category]} ${share}%, ${sessions}`;
+}
+
 /**
  * What a filtered stretch of training adds up to, and how it is split between
  * sports.
@@ -47,6 +57,14 @@ function perWeekPhrase(
  * The mix bar is the one figure no other screen can draw: Running cannot see a
  * lifting week and Strength cannot see a running one, so the question "what
  * have I actually been doing" has only ever been answerable here.
+ *
+ * The bar answers the question on its own — a glance says "mostly running,
+ * a third lifting" — and the percentages under it were a second line of text
+ * above a list that is already the point of the screen. They are on hover now,
+ * as an overlay, so revealing them moves nothing. Nothing is lost to a reader
+ * who cannot hover: the bar carries the whole mix as its label, which is why
+ * the legend itself is hidden from the accessibility tree rather than being
+ * read out twice.
  */
 export function ActivitiesSummary({
   totals,
@@ -115,19 +133,35 @@ export function ActivitiesSummary({
 
       {mixTotal > 0 ? (
         <div className="activities-mix">
-          <div className="activities-mix-bar" aria-hidden="true">
+          {/*
+            * Focusable as well as hoverable, so the legend is reachable from
+            * the keyboard — and labelled in full, so it need not be reached at
+            * all to be read.
+            */}
+          <div
+            className="activities-mix-bar"
+            role="img"
+            tabIndex={0}
+            aria-label={`Sport mix: ${totals.sports
+              .map((sport) => mixPhrase(sport, mixTotal))
+              .join("; ")}`}
+          >
             {totals.sports.map((sport) => (
               <i
                 key={sport.category}
                 data-sport={sport.category}
                 style={{ flexGrow: sport.duration / mixTotal }}
+                // A band of its own, for the athlete who points at one rather
+                // than reading the list: the 1% slivers are a few pixels wide
+                // and this is the only way to ask them anything.
+                title={mixPhrase(sport, mixTotal)}
               />
             ))}
           </div>
-          <ul className="activities-mix-legend">
+          <ul className="activities-mix-legend" aria-hidden="true">
             {totals.sports.map((sport) => (
               <li key={sport.category}>
-                <i data-sport={sport.category} aria-hidden="true" />
+                <i data-sport={sport.category} />
                 <span>{SPORT_COLOR_LABELS[sport.category]}</span>
                 <strong>{Math.round((sport.duration / mixTotal) * 100)}%</strong>
                 <em>
