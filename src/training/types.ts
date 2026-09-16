@@ -174,9 +174,10 @@ export type TrainingOverviewProps = Omit<
   | "onRefresh"
 >;
 
-/** The Activities screen: the recent-activity list plus its detail pane. */
+/** The Activities screen: the activity list plus its detail pane. */
 export type ActivitiesViewProps = Pick<
   TrainingHubViewProps,
+  | "api"
   | "status"
   | "activities"
   | "sportTypes"
@@ -186,8 +187,44 @@ export type ActivitiesViewProps = Pick<
   | "onLoadDetail"
   | "onExportFile"
 > & {
+  /**
+   * Whether `activities` has arrived. `busy` cannot say: it is one string for
+   * the whole app, and an empty array is equally "still loading", "load
+   * failed" and "never trained" — the screen used to answer all three with
+   * "No Training Hub activities loaded."
+   */
+  activitiesStatus: TrainingHubLoadStatus;
+  /** Where the latest detail request stands, and which activity it was for. */
+  detailRequest: TrainingHubDetailRequest | null;
   /** Sends the disconnected state to Overview, where signing in lives. */
   onConnect: () => void;
+  /** Reloads the COROS data after the activity list failed to arrive. */
+  onRetry: () => void;
+  /**
+   * Hands a session to the screen built for its sport. Activities is the log
+   * every sport lands in; the depth belongs on Running and Strength, and this
+   * is the door between them.
+   */
+  onOpenSportScreen?: (request: SportScreenRequest) => void;
 };
+
+/**
+ * One session, handed from Activities to the screen built for its sport.
+ *
+ * It carries the session rather than only the screen name because arriving on
+ * Running's list with nothing open is not what the button says it does: the
+ * athlete was already looking at that run. Running opens its full-page detail;
+ * Strength selects the session in its list.
+ */
+export interface SportScreenRequest {
+  view: "running" | "strength";
+  activityId: string;
+  /**
+   * Epoch seconds, as COROS sends it. Strength keeps a window of its own — 30
+   * days by default — so a session older than that would not be in the list it
+   * is asked to select from; this is what lets it widen first.
+   */
+  startTime?: number;
+}
 
 export type { TrainingHubDailyMetric };

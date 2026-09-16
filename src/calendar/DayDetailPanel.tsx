@@ -168,10 +168,24 @@ export function DayDetailPanel({
               ) : (
                 <ActivityDetailPanel
                   embedded
+                  api={api}
                   detail={detail}
                   listActivity={selection.activity}
                   sportTypes={sportTypes}
-                  busy={loadingDetail ? "Loading activity…" : null}
+                  /*
+                   * This pane fetches its own detail, so it reports its own
+                   * state. The `busy` string it used to pass was free text and
+                   * never matched the `training-detail:<id>` key the panel
+                   * compares against, so the loader never appeared here.
+                   */
+                  detailRequest={
+                    loadingDetail
+                      ? {
+                          activityId: selection.activity.activityId,
+                          status: "pending"
+                        }
+                      : null
+                  }
                 />
               )}
             </div>

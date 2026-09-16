@@ -68,6 +68,7 @@ import {
   initializeDatabase,
   listDownloads,
   markDownloadTransferred,
+  readTrainingActivityFeelTypes,
   setSetting
 } from "./database";
 import {
@@ -114,6 +115,7 @@ import {
   getTrainingDashboard,
   fetchTrainingHubActivityFile,
   getTrainingHubActivityDetail,
+  getTrainingHubActivityDetailRaw,
   readActivityDetailSummaries,
   syncActivityDetailSummaries,
   getCorosProfileSnapshot,
@@ -2641,10 +2643,27 @@ function registerIpcHandlers(): void {
     ) => getTrainingHubActivityDetail(activityId, sportType, listActivity)
   );
 
+  // The unparsed payload, on its own channel: it is ~2.2 MB and only the
+  // development build's raw-JSON modal asks for it.
+  ipcMain.handle(
+    "trainingHub:getActivityDetailRaw",
+    (_event, activityId: string, sportType: number) =>
+      getTrainingHubActivityDetailRaw(activityId, sportType)
+  );
+
   // The list-level figures that only a detail payload knows. Two channels
   // rather than one: a read that answers from SQLite in a millisecond, and a
   // sweep that goes to COROS and is meant to be called again until it reports
   // nothing left.
+  // The cached end-of-activity feeling per activity, straight out of SQLite.
+  // Only activities COROS has actually been asked about appear; see
+  // `readTrainingActivityFeelTypes` for why that matters.
+  ipcMain.handle(
+    "trainingHub:getActivityFeelTypes",
+    (_event, activityIds: string[]) =>
+      readTrainingActivityFeelTypes(activityIds)
+  );
+
   ipcMain.handle(
     "trainingHub:getActivityDetailSummaries",
     (_event, activityIds: string[]) => readActivityDetailSummaries(activityIds)

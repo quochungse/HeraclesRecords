@@ -1,0 +1,979 @@
+/*
+ * The Activities screen.
+ *
+ * Renderer CSS has no scope, so everything here is prefixed `activities-` and
+ * was grepped across src/ before being named. The split panel itself still
+ * lives in styles.css, alongside the other `training-*` rules it shares.
+ */
+
+.activities-view {
+  /*
+   * Three surfaces, named once. On the dark theme they are derived from the
+   * ink; on paper a raised face is white and the hairline does the lifting, so
+   * they are respecified rather than flipped — the same shape the Strength
+   * screen settled on.
+   */
+  --ax-edge: color-mix(in srgb, var(--text-primary) 11%, transparent);
+  --ax-raised: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --ax-well: color-mix(in srgb, #000 22%, transparent);
+  --ax-heading: color-mix(in srgb, var(--bg-base) 82%, var(--text-primary));
+}
+
+:root[data-theme="paper"] .activities-view {
+  --ax-edge: rgba(38, 34, 28, 0.11);
+  --ax-raised: #ffffff;
+  --ax-well: rgba(38, 34, 28, 0.05);
+  --ax-heading: #f7f4ee;
+}
+
+.activities-view > .activities-head,
+.activities-view > .activities-summary,
+.activities-view > .activities-filters {
+  /* `.stack.stack-fill` hands `flex: 1` to the split panel below; without this
+   * these three would shrink to nothing before it gave up any height. */
+  flex: 0 0 auto;
+}
+
+.activities-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.activities-head h2 span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* --- Summary -------------------------------------------------------------- */
+
+.activities-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.activities-summary-tiles {
+  display: grid;
+  /* `auto` tracks grow to their widest caption and push the row out of the
+   * page; a minmax floor keeps every tile inside the pane. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.activities-summary-tile {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-raised);
+}
+
+.activities-summary-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activities-summary-value {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.activities-summary-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* --- Sport mix ------------------------------------------------------------ */
+
+.activities-mix {
+  /*
+   * A track taller than the bar, with the bar centred in it. The bar swells
+   * when it is being pointed at, and a track sized for the swollen state is
+   * what keeps that from moving the filters and the whole list below.
+   */
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 16px;
+}
+
+.activities-mix-bar {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+  cursor: default;
+  transition: height 0.14s ease;
+}
+
+.activities-mix-bar.is-probing,
+.activities-mix-bar:focus-visible {
+  height: 16px;
+}
+
+.activities-mix-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.activities-mix-bar i {
+  min-width: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+  transition:
+    opacity 0.14s ease,
+    filter 0.14s ease;
+}
+
+/*
+ * The band being pointed at is lifted by letting the others fall back rather
+ * than by brightening it: four saturated colours side by side have no room
+ * above them to stand out into, and dimming the neighbours reads as one block
+ * coming forward.
+ */
+.activities-mix-bar.is-probing i {
+  opacity: 0.3;
+}
+
+.activities-mix-bar.is-probing i.is-active {
+  opacity: 1;
+  filter: brightness(1.12);
+}
+
+/* The band's own figures, anchored under it. */
+.activities-mix-caret {
+  position: absolute;
+  top: calc(50% + 10px);
+  z-index: 21;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  border-top: 1px solid var(--ax-edge);
+  border-left: 1px solid var(--ax-edge);
+  border-top-left-radius: 2px;
+  background: var(--surface);
+}
+
+.activities-mix-tip {
+  position: absolute;
+  top: calc(50% + 13px);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  padding: 7px 11px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  /*
+   * `--surface`, not `--ax-raised`: a raised face on this screen is a tint of
+   * the ink, which is transparent, and the filter row it lands on top of read
+   * straight through it. Popovers in this app are opaque — the same token the
+   * export dropdown uses, and it flips to white on paper on its own.
+   */
+  background: var(--surface);
+  box-shadow: var(--shadow-elevated);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.activities-mix-tip-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.activities-mix-tip-name i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activities-mix-tip-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activities-mix-tip-figures strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activities-mix-bar,
+  .activities-mix-bar i {
+    transition: none;
+  }
+}
+
+/*
+ * One rule per category rather than an inline style, so the colours stay in
+ * CSS where the athlete's palette is applied. Scoped to this screen: renderer
+ * CSS has no scope, and a bare `[data-sport="run"]` would reach the sport
+ * chips on every other screen too.
+ */
+.activities-view [data-sport="strength"] {
+  --sport-mix-color: var(--sport-strength);
+}
+
+.activities-view [data-sport="trail"] {
+  --sport-mix-color: var(--sport-trail);
+}
+
+.activities-view [data-sport="run"] {
+  --sport-mix-color: var(--sport-run);
+}
+
+.activities-view [data-sport="bike"] {
+  --sport-mix-color: var(--sport-bike);
+}
+
+.activities-view [data-sport="other"] {
+  --sport-mix-color: var(--sport-other);
+}
+
+/* --- Filters -------------------------------------------------------------- */
+
+.activities-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.activities-period {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activities-period-option {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-period-option:hover:not(.is-active) {
+  color: var(--text-secondary);
+}
+
+.activities-period-option.is-active {
+  background: var(--ax-raised);
+  color: var(--text-primary);
+}
+
+.activities-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.activities-sport-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-sport-toggle i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--sport-mix-color, var(--sport-other));
+}
+
+.activities-sport-toggle:hover:not(.is-active) {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--text-secondary) 40%, transparent);
+}
+
+.activities-sport-toggle.is-active {
+  border-color: color-mix(in srgb, var(--sport-mix-color) 45%, transparent);
+  background: color-mix(in srgb, var(--sport-mix-color) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.activities-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 200px;
+  max-width: 320px;
+  padding: 0 8px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+  color: var(--text-muted);
+}
+
+.activities-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.activities-search input:focus {
+  outline: none;
+}
+
+.activities-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.activities-search-clear {
+  width: 22px;
+  height: 22px;
+}
+
+.activities-filters-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.activities-filters-status button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-filters-status button:hover {
+  text-decoration: underline;
+}
+
+/* --- The journal list ----------------------------------------------------- */
+
+.activity-journal {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* The rows have their own hairlines; a border here would double the first
+   * and last of them against the pane edge. */
+  padding-right: 4px;
+}
+
+.activity-journal-week {
+  margin-bottom: 10px;
+}
+
+.activity-journal-week-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 120px);
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 6px;
+  padding: 7px 4px 6px;
+  /*
+   * Opaque, because rows scroll under it — but mixed towards the panel rather
+   * than set to `--bg-base`, which is the page behind the glass and reads as a
+   * black band cut through the card.
+   */
+  background: var(--ax-heading);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-journal-week-facts {
+  display: inline-flex;
+  gap: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.activity-journal-week ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  position: relative;
+  border-radius: var(--radius-sm);
+}
+
+.activity-row-open {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  /* Room on the right for the actions, which sit outside this button. */
+  padding: 8px 46px 8px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.activity-row-open:hover {
+  background: var(--ax-raised);
+}
+
+.activity-row.is-selected .activity-row-open {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.activity-row.is-loading .activity-row-open {
+  opacity: 0.6;
+}
+
+.activity-row-date {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 2px 0;
+  border-radius: var(--radius-sm);
+  background: var(--ax-well);
+  line-height: 1.1;
+}
+
+.activity-row-date em {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-row-date strong {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row-date i {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.activity-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.activity-row-title strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-row-title .sport-chip {
+  flex: 0 0 auto;
+}
+
+.activity-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * A vertical rule between figures instead of a separator character, so a
+ * wrapped line does not start with a stray bullet.
+ */
+.activity-row-facts span + span {
+  padding-left: 10px;
+  border-left: 1px solid var(--ax-edge);
+}
+
+.activity-row-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 1;
+  transform: translateY(-50%);
+  /*
+   * Present for the keyboard and for screen readers, but out of the way of the
+   * eye until the row is wanted: a column of download icons used to be the
+   * loudest thing on the screen and the rarest action on it.
+   */
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.activity-row:hover .activity-row-actions,
+.activity-row:focus-within .activity-row-actions,
+.activity-row.is-selected .activity-row-actions {
+  opacity: 1;
+}
+
+.activity-journal-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 8px;
+  border-top: 1px solid var(--ax-edge);
+}
+
+.activity-journal-more p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* The pane is a flex column; the list takes the height and scrolls itself. */
+.activities-view .training-activities-list {
+  gap: 0;
+}
+
+/* --- Detail pane ---------------------------------------------------------- */
+
+.activity-detail-pane {
+  display: grid;
+  /*
+   * `minmax(0, 1fr)` rather than an implicit `auto` column: an auto track is
+   * floored at its content's minimum width, and the global
+   * `table { min-width: 720px }` in styles.css then pushes the whole pane wider
+   * than the split gives it. That is what put a horizontal scrollbar under the
+   * strength set table.
+   */
+  grid-template-columns: minmax(0, 1fr);
+  /*
+   * Rows sized to their content. In a grid with a fixed height an `auto` row
+   * gives way to its item's *minimum* size, and any item with `overflow` other
+   * than visible has a minimum of zero — so the figures grid below, which
+   * clips for its rounded corners, rendered as a two-pixel line between the
+   * headline and the zones. The same trap the Running view documents.
+   */
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  /* The pane is the one scroller. Nothing inside it scrolls on its own. */
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.activity-detail-pane.is-blank {
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.activity-detail-pane.is-blank p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.activity-detail-pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.activity-detail-pane-title {
+  min-width: 0;
+}
+
+.activity-detail-pane-title h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.activity-detail-pane-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.activity-detail-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.activity-detail-pane-actions .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+/* --- Figures -------------------------------------------------------------- */
+
+.activity-detail-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.activity-detail-headline > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-raised);
+}
+
+.activity-detail-headline span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-detail-headline strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * Everything the headline did not take, at half the weight.
+ *
+ * The rules between cells are drawn by the cells rather than by a 1px grid gap
+ * over a coloured container: the last row rarely fills, and a gap-drawn grid
+ * leaves that trailing space a different tone from the cells beside it.
+ */
+.activity-detail-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--ax-edge);
+  border-radius: var(--radius-md);
+  background: var(--ax-heading);
+}
+
+.activity-detail-figures > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 9px 12px;
+  box-shadow:
+    inset -1px 0 0 var(--ax-edge),
+    inset 0 -1px 0 var(--ax-edge);
+}
+
+.activity-detail-figures span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.activity-detail-figures strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Zones ---------------------------------------------------------------- */
+
+.activity-zones {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-zones h3,
+.activity-detail-block h3 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.activity-zones-bar {
+  display: flex;
+  overflow: hidden;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--ax-well);
+}
+
+.activity-zones-bar i {
+  min-width: 2px;
+  background: var(--zone-color);
+}
+
+/*
+ * One compact entry per zone. The band's name and its bpm bounds are on the
+ * entry's `title` rather than in the line: spelled out, four zones took three
+ * wrapped rows and read as a paragraph rather than a legend.
+ */
+.activity-zones-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-zones-legend li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activity-zones-legend i {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--zone-color);
+}
+
+.activity-zones-name {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.activity-zones-legend strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.activity-zones-share {
+  color: var(--text-muted);
+}
+
+/*
+ * Cool to hot across the six bands. Scoped like the sport colours above,
+ * because renderer CSS has no scope.
+ */
+.activities-view [data-zone="0"] { --zone-color: #6b7280; }
+.activities-view [data-zone="1"] { --zone-color: #7fb0d8; }
+.activities-view [data-zone="2"] { --zone-color: #3fb27f; }
+.activities-view [data-zone="3"] { --zone-color: #d8b13a; }
+.activities-view [data-zone="4"] { --zone-color: #e08a3c; }
+.activities-view [data-zone="5"] { --zone-color: #dd5f4b; }
+.activities-view [data-zone="6"] { --zone-color: #b4405c; }
+
+/* --- Blocks --------------------------------------------------------------- */
+
+.activity-detail-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.activity-detail-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/*
+ * `styles.css` floors every table at 720px. The strength set table comes from
+ * a shared component and inherits it, so the pane cancels it for anything
+ * inside — the split gives this pane less than 720px on any window under
+ * about 1 500, and the table pushed a horizontal scrollbar under the whole
+ * detail rather than wrapping.
+ */
+.activity-detail-pane table {
+  min-width: 0;
+}
+
+.activity-lap-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-lap-table th,
+.activity-lap-table td {
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--ax-edge);
+  text-align: left;
+}
+
+.activity-lap-table th {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-lap-table .is-numeric {
+  text-align: right;
+}
+
+.activity-lap-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.activity-lap-table tbody tr.is-pickable {
+  cursor: pointer;
+}
+
+.activity-lap-table tbody tr.is-pickable:hover td {
+  background: var(--ax-raised);
+}
+
+/*
+ * The route was a 400×190 postcard in a pane twice that wide, with a zoom
+ * control bigger than the streets. The pane is where a route is actually
+ * looked at, so it gets the room.
+ */
+.activity-detail-block .activity-route-map-canvas {
+  height: 300px;
+}
+
+.activity-detail-block .activity-elevation-chart-shell {
+  height: 180px;
+}
+
+/* --- Feel (RPE) ----------------------------------------------------------- */
+
+/*
+ * How the session felt, as rated in the COROS app: the smiley itself rather
+ * than the 1..5 behind it, which means nothing without a scale the row has no
+ * space for. Cool to hot, the same direction as the heart-rate zones, so the
+ * two never disagree about which way "harder" points.
+ */
+.activity-row-feel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  /*
+   * Pulled a little towards the page's own ink. The five hues are fixed so the
+   * scale reads the same in both themes, and the palest of them — the "very
+   * easy" blue — is washed out against paper on its own.
+   */
+  color: color-mix(in srgb, var(--feel-color) 86%, var(--text-primary));
+}
+
+.activities-view [data-feel="1"] { --feel-color: #7fb0d8; }
+.activities-view [data-feel="2"] { --feel-color: #3fb27f; }
+.activities-view [data-feel="3"] { --feel-color: #d8b13a; }
+.activities-view [data-feel="4"] { --feel-color: #e08a3c; }
+.activities-view [data-feel="5"] { --feel-color: #dd5f4b; }
+
+/* --- Narrow layout -------------------------------------------------------- */
+
+/*
+ * One pane at a time. The split panel keeps `flex: 1` either way, so whichever
+ * pane is rendered fills the screen and is the only thing that scrolls.
+ */
+.activities-view.is-narrow-detail > .activities-head {
+  padding-bottom: 2px;
+}
+
+.activities-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* The detail pane has no sibling to be divided from at this width. */
+.activities-view.is-narrow-detail .training-activities-detail {
+  border-left: 0;
+  padding-left: 0;
+}

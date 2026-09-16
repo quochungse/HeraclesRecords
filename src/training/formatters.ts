@@ -62,6 +62,30 @@ export function formatDurationSeconds(value?: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+/**
+ * A span of training time — "14h 20m", "48m" — rather than a stopwatch
+ * reading.
+ *
+ * `formatDurationSeconds` is right for one session, where the seconds matter
+ * and an hour is a long run. It is wrong for a total: "38:14:07" reads as a
+ * time of day before it reads as thirty-eight hours.
+ */
+export function formatDurationSpan(value?: number): string {
+  if (!Number.isFinite(value) || !value || value <= 0) {
+    return "0m";
+  }
+
+  const totalMinutes = Math.round(Math.max(0, value) / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
 export function formatDistanceMeters(
   value: number | undefined,
   unitSystem: UnitSystem,

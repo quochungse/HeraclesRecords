@@ -1751,6 +1751,24 @@ export async function getTrainingHubActivityDetail(
 }
 
 /**
+ * The unparsed COROS payload for one activity — the development build's "Show
+ * raw JSON" modal and nothing else.
+ *
+ * It is its own channel because it is ~2.2 MB: carried on
+ * `TrainingHubActivityDetail` it crossed the bridge every time a row was
+ * selected, for a modal almost nobody opens. This goes through
+ * `loadActivityDetailRaw` like every other detail read, so it answers from the
+ * cache file when one is valid and adds no COROS request of its own.
+ */
+export async function getTrainingHubActivityDetailRaw(
+  activityId: string,
+  sportType: number
+): Promise<Record<string, unknown>> {
+  const { raw } = await loadActivityDetailRaw(activityId, sportType, {});
+  return raw;
+}
+
+/**
  * Activities whose GPX was asked for and came back with nothing.
  *
  * A payload with no GPS is normal — every strength session and treadmill run —
@@ -7315,8 +7333,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     // span they cover — pauses included. Activity time would miss the 10%
     // band on any run that stopped long enough to matter.
     series: parseActivitySeries(raw, elapsedDuration ?? duration),
-    strength: parseStrengthDetail(raw),
-    raw
+    strength: parseStrengthDetail(raw)
   };
 }
 

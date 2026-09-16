@@ -5,6 +5,7 @@ import type {
   TrainingHubActivityDetail
 } from "../../electron/types";
 import type {
+  SportScreenRequest,
   TrainingHubDetailRequest,
   TrainingHubLoadStatus,
   TrainingHubSnapshot
@@ -32,7 +33,7 @@ import {
   surfacesPresent,
   type RunZoneScale
 } from "./runMetrics";
-import { useRunDetailSummaries } from "./useRunDetailSummaries";
+import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
 import { RunnerIcon } from "./runnerIcon";
 import {
   RUN_SURFACE_LABELS,
@@ -59,6 +60,14 @@ export interface RunningViewProps {
   /** Reloads the COROS data after the activity list failed to arrive. */
   onRetryActivities: () => void;
   onOpenOverview: () => void;
+  /**
+   * A run Activities handed over, to be opened rather than merely listed.
+   * "Open in Running" is pressed while looking at that run; arriving on the
+   * list with nothing open is not what the button says it does.
+   */
+  openRequest?: SportScreenRequest | null;
+  /** Taken, so the same run is not re-opened when the athlete closes it. */
+  onOpenRequestHandled?: () => void;
 }
 
 interface PeriodOption {
@@ -149,7 +158,9 @@ export function RunningView({
   busy,
   onSelectActivity,
   onRetryActivities,
-  onOpenOverview
+  onOpenOverview,
+  openRequest = null,
+  onOpenRequestHandled
 }: RunningViewProps) {
   const { unitSystem } = useUnitSystem();
   const [surface, setSurface] = useState<RunSurface | null>(null);
@@ -246,9 +257,9 @@ export function RunningView({
   // are kept as a row per run so a whole list can show them. Read for the runs
   // on screen; missing ones are computed in the background and appear as they
   // land.
-  const summaries = useRunDetailSummaries({
+  const summaries = useActivityDetailSummaries({
     api,
-    runs,
+    activities: runs,
     enabled: connected && selectedRunId === null
   });
 
@@ -262,6 +273,31 @@ export function RunningView({
   );
 
   const closeRun = useCallback(() => setSelectedRunId(null), []);
+
+  /*
+   * A run handed over from Activities.
+   *
+   * The id is taken straight rather than looked up first: this screen mounts
+   * with whatever `activities` the app already holds, and `selectedRun` reads
+   * the full history rather than the filtered list, so a run outside the
+   * current period opens just the same. The request is cleared as soon as it is
+   * taken — leaving it standing would re-open the run the moment the athlete
+   * closed it.
+   */
+  useEffect(() => {
+    if (!openRequest) {
+      return;
+    }
+
+    const activity = activities.find(
+      (row) => row.activityId === openRequest.activityId
+    );
+    setSelectedRunId(openRequest.activityId);
+    if (activity) {
+      onSelectActivity(activity);
+    }
+    onOpenRequestHandled?.();
+  }, [activities, onOpenRequestHandled, onSelectActivity, openRequest]);
 
   // Restoring the scroll is what makes a full-page detail feel like a drill-down
   // rather than a trip back to the top of the list.

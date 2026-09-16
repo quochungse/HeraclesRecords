@@ -87,6 +87,7 @@ import {
 } from "./training/chartConfig";
 import { recentTrainingHubDateList } from "./training/formatters";
 import type {
+  SportScreenRequest,
   TrainingHubDetailRequest,
   TrainingHubLoadStatus,
   TrainingHubSnapshot,
@@ -477,6 +478,14 @@ export default function App() {
   const latestDetailRequestRef = useRef<string | null>(null);
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
+  /*
+   * A session Activities handed to Running or Strength, waiting for that screen
+   * to mount and take it. It is held here rather than passed as an argument
+   * because those screens are lazy: the view switches first and the component
+   * arrives a tick later, with nowhere for an argument to have waited.
+   */
+  const [sportScreenRequest, setSportScreenRequest] =
+    useState<SportScreenRequest | null>(null);
   const [trainingHubSleepData, setTrainingHubSleepData] =
     useState<TrainingHubSleepSummary | null>(null);
   const [trainingHubDailyHealthData, setTrainingHubDailyHealthData] =
@@ -1133,8 +1142,16 @@ export default function App() {
     [api],
   );
 
+  /*
+   * Open the Activities screen on something rather than on an empty pane.
+   *
+   * Gated on that screen being the one in front: a detail is a ~2.2 MB payload
+   * to parse and this used to fire the moment the activity list landed, on
+   * every launch, whatever the athlete was actually looking at. Running and the
+   * globe each choose their own activity, so neither is waiting on this.
+   */
   useEffect(() => {
-    if (!api || trainingHubActivities.length === 0) {
+    if (!api || activeView !== "training" || trainingHubActivities.length === 0) {
       return;
     }
 
@@ -1151,6 +1168,7 @@ export default function App() {
     void handleTrainingHubActivityDetail(trainingHubActivities[0]);
   }, [
     api,
+    activeView,
     trainingHubActivities,
     selectedTrainingHubActivity?.activityId,
     handleTrainingHubActivityDetail,
@@ -2840,15 +2858,23 @@ export default function App() {
             {activeView === "training" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="activities" />}>
                 <LazyActivitiesView
+                  api={api}
                   status={trainingHubStatus}
                   activities={trainingHubActivities}
+                  activitiesStatus={trainingHubActivitiesStatus}
                   sportTypes={trainingHubSportTypes}
                   activityDetail={trainingHubActivityDetail}
                   selectedActivity={selectedTrainingHubActivity}
+                  detailRequest={trainingHubDetailRequest}
                   busy={busy}
                   onLoadDetail={handleTrainingHubActivityDetail}
                   onExportFile={handleTrainingHubExport}
                   onConnect={() => setActiveView("overview")}
+                  onRetry={() => void handleRunningActivitiesRetry()}
+                  onOpenSportScreen={(request) => {
+                    setSportScreenRequest(request);
+                    setActiveView(request.view);
+                  }}
                 />
               </Suspense>
             ) : null}
@@ -2895,6 +2921,12 @@ export default function App() {
                   onRetryActivities={() => void handleRunningActivitiesRetry()}
                   onSelectActivity={handleTrainingHubActivityDetail}
                   onOpenOverview={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "running"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
                 />
               </Suspense>
             ) : null}
@@ -2907,6 +2939,12 @@ export default function App() {
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
                   onOpenTraining={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "strength"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
                 />
               </Suspense>
             ) : null}

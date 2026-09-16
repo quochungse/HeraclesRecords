@@ -1,4 +1,4 @@
-import { useMemo, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { Layers, Trophy } from "lucide-react";
 import type { StrengthSession } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -91,6 +91,18 @@ export function StrengthSessionList({
     [groups]
   );
   const nowMs = Date.now();
+  const navRef = useRef<HTMLElement>(null);
+
+  // The selection can come from outside the list — Activities hands a session
+  // over — so the chosen row is scrolled to rather than left for the athlete to
+  // find somewhere down a window's worth of weeks.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector<HTMLButtonElement>(
+        `[data-selection="${CSS.escape(selected)}"]`
+      )
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
 
   const moveSelection = (event: KeyboardEvent<HTMLElement>) => {
     const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
@@ -105,7 +117,12 @@ export function StrengthSessionList({
   };
 
   return (
-    <nav className="strength-session-nav" aria-label="Strength sessions" onKeyDown={moveSelection}>
+    <nav
+      className="strength-session-nav"
+      aria-label="Strength sessions"
+      ref={navRef}
+      onKeyDown={moveSelection}
+    >
       <button
         type="button"
         className="strength-session-row is-aggregate"

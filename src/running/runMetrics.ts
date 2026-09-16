@@ -11,6 +11,7 @@ import {
   isRunSportType,
   type RunSurface
 } from "./runSurface";
+import { startOfWeekMs } from "../training/activityWindow";
 
 // The series maths is shared with the main process, which computes the same
 // figures once per run and stores them — see `electron/activityMetrics.ts`.
@@ -107,12 +108,7 @@ export function elevationPerKm(
 
 /** Monday-start weeks, matching every other weekly figure in the app. */
 export function startOfRunWeekMs(timestampMs: number): number {
-  const date = new Date(timestampMs);
-  date.setHours(0, 0, 0, 0);
-  // getDay() is 0 on Sunday; shift so weeks start on Monday.
-  const offset = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - offset);
-  return date.getTime();
+  return startOfWeekMs(timestampMs);
 }
 
 /**

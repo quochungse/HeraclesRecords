@@ -341,7 +341,7 @@ async function main() {
 
     // A detail for a different run is not this run's detail.
     await harness("setProps", {
-      detail: { activityId: RUNS[5].activityId, laps: [], hrZones: [], raw: {} }
+      detail: { activityId: RUNS[5].activityId, laps: [], hrZones: [] }
     });
     await settle();
     assert.equal(await hasText("detail did not load"), true);
@@ -352,8 +352,7 @@ async function main() {
         distance: target.distance,
         duration: target.duration,
         laps: [],
-        hrZones: [],
-        raw: {}
+        hrZones: []
       }
     });
     await settle();
@@ -411,8 +410,7 @@ async function main() {
           avgPower: 210
         },
         effect: { aerobic: 3.1, anaerobic: 0.4, vo2max: 50 },
-        weather: { temperatureC: 27, humidityPct: 80 },
-        raw: {}
+        weather: { temperatureC: 27, humidityPct: 80 }
       }
     });
     await win.webContents.executeJavaScript(
@@ -505,15 +503,14 @@ async function main() {
         laps,
         hrZones: [],
         series,
-        track,
-        raw: {}
+        track
       }
     });
     await win.webContents.executeJavaScript(
       `[...document.querySelectorAll(".running-list-panel tbody tr")].find((row) => row.textContent.includes(${JSON.stringify(target.name)})).click()`,
       true
     );
-    await waitFor(() => harness("exists", ".run-chart-segment"), "the chart renders");
+    await waitFor(() => harness("exists", ".activity-chart-segment"), "the chart renders");
     await waitFor(() => harness("exists", ".run-detail-cover .activity-route-map-canvas"), "the route cover renders");
     await settle();
 
@@ -526,7 +523,7 @@ async function main() {
     assert.equal(stats.Pace, "6:51 /km");
 
     const wholeRun = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".run-chart-segment span")].map((span) => span.textContent).find((text) => /^\\d+:\\d\\d(:\\d\\d)?$/.test(text))`,
+      `[...document.querySelectorAll(".activity-chart-segment span")].map((span) => span.textContent).find((text) => /^\\d+:\\d\\d(:\\d\\d)?$/.test(text))`,
       true
     );
     assert.ok(wholeRun, "the segment states a duration");
@@ -542,21 +539,21 @@ async function main() {
     );
 
     const pressedAxis = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".run-chart-axis .training-metric-option[aria-pressed=true]")].map((chip) => chip.textContent.trim())`,
+      `[...document.querySelectorAll(".activity-chart-axis .training-metric-option[aria-pressed=true]")].map((chip) => chip.textContent.trim())`,
       true
     );
     assert.deepEqual(pressedAxis, ["Time"]);
-    assert.equal(await harness("count", ".run-chip.is-active"), 2, "pace and heart rate open");
+    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 2, "pace and heart rate open");
 
     // "Try again" re-fetches the same run and hands back a new detail object
     // with the same readings. That is not a different run, and the athlete's
     // chip choice survives it — the reset used to key on the object.
     await win.webContents.executeJavaScript(
-      `document.querySelectorAll(".run-chip.is-active")[1].click()`,
+      `document.querySelectorAll(".activity-chart-chip.is-active")[1].click()`,
       true
     );
     await settle();
-    assert.equal(await harness("count", ".run-chip.is-active"), 1, "one channel turned off");
+    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 1, "one channel turned off");
     await harness("setProps", {
       detail: {
         activityId: target.activityId,
@@ -568,22 +565,21 @@ async function main() {
         laps: laps.map((lap) => ({ ...lap })),
         hrZones: [],
         series: series.map((point) => ({ ...point })),
-        track,
-        raw: {}
+        track
       }
     });
     await settle();
     assert.equal(
-      await harness("count", ".run-chip.is-active"),
+      await harness("count", ".activity-chart-chip.is-active"),
       1,
       "the same run's detail arriving again keeps the channels the athlete chose"
     );
     await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".run-chip")].find((chip) => !chip.classList.contains("is-active")).click()`,
+      `[...document.querySelectorAll(".activity-chart-chip")].find((chip) => !chip.classList.contains("is-active")).click()`,
       true
     );
     await settle();
-    assert.equal(await harness("count", ".run-chip.is-active"), 2);
+    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 2);
 
     // No panel's content reaches past its own bottom edge — which is what a
     // squeezed grid row looks like, whatever squeezed it. Content inside
@@ -708,9 +704,9 @@ async function main() {
 
     // Only the either/or switches took the heatmap's look; the channel chips
     // are a pick-any-two set and keep their own, coloured by channel.
-    assert.equal(await harness("count", ".run-chart-chips .training-metric-option"), 0);
+    assert.equal(await harness("count", ".activity-chart-chips .training-metric-option"), 0);
     const chipColours = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".run-chip.is-active")].map((chip) => chip.style.borderColor)`,
+      `[...document.querySelectorAll(".activity-chart-chip.is-active")].map((chip) => chip.style.borderColor)`,
       true
     );
     assert.equal(chipColours.length, 2);

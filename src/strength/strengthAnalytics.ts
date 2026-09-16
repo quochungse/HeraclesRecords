@@ -21,6 +21,7 @@ import {
   resolveProviderMuscleTargets,
   type MuscleId
 } from "./muscles";
+import { startOfWeekMs } from "../training/activityWindow";
 
 /** What the body map shades muscles by. */
 export type HeatMetric = "sets" | "volume" | "time";
@@ -178,14 +179,7 @@ export function estimateOneRepMax(weightKg: number, reps: number): number {
 }
 
 /** Monday 00:00 of the week `timestampMs` falls in, in milliseconds. */
-export function startOfWeekMs(timestampMs: number): number {
-  const date = new Date(timestampMs);
-  date.setHours(0, 0, 0, 0);
-  // getDay() is 0 on Sunday; shift so weeks start on Monday.
-  const offset = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - offset);
-  return date.getTime();
-}
+export { startOfWeekMs };
 
 /**
  * Monday of the week after the one starting at `weekStartMs`.

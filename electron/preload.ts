@@ -716,6 +716,19 @@ const api = {
       sportType,
       listActivity
     ),
+  getTrainingHubActivityDetailRaw: (
+    activityId: string,
+    sportType: number
+  ): Promise<Record<string, unknown>> =>
+    ipcRenderer.invoke(
+      "trainingHub:getActivityDetailRaw",
+      activityId,
+      sportType
+    ),
+  getActivityFeelTypes: (
+    activityIds: string[]
+  ): Promise<Record<string, number>> =>
+    ipcRenderer.invoke("trainingHub:getActivityFeelTypes", activityIds),
   getActivityDetailSummaries: (
     activityIds: string[]
   ): Promise<ActivityDetailSummary[]> =>

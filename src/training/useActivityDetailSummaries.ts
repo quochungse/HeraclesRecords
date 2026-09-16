@@ -3,11 +3,11 @@ import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/
 import type { CorosLinkApi } from "../coroslink-api";
 
 /**
- * The per-run figures that only an activity detail knows — time in each heart
- * rate zone, and how far pace and heart rate drifted apart.
+ * The per-activity figures that only a detail payload knows — time in each
+ * heart rate zone, and how far pace and heart rate drifted apart.
  *
- * A detail is 2.5 MB, so a list of thirty runs cannot simply ask for thirty of
- * them. Instead the main process keeps a ~130-byte summary per run, and this
+ * A detail is 2.2 MB, so a list of thirty sessions cannot simply ask for thirty
+ * of them. Instead the main process keeps a ~130-byte summary per activity, and this
  * reads whatever is already stored, then asks it to compute the rest a few at a
  * time, re-reading as they land so the column fills in while the athlete looks
  * at it. Nothing here waits: the screen is complete without any of it.
@@ -36,32 +36,32 @@ function toMap(
   return new Map(summaries.map((summary) => [summary.activityId, summary]));
 }
 
-export interface RunDetailSummariesInput {
+export interface ActivityDetailSummariesInput {
   api: CorosLinkApi | null;
-  runs: readonly TrainingHubActivity[];
-  /** False while a run is open: that page wants the connection for its own
-   *  payload, and nothing on screen is reading these. */
+  activities: readonly TrainingHubActivity[];
+  /** False while a session's own detail is loading: that payload wants the
+   *  connection, and nothing on screen is reading these meanwhile. */
   enabled: boolean;
 }
 
-export function useRunDetailSummaries({
+export function useActivityDetailSummaries({
   api,
-  runs,
+  activities,
   enabled
-}: RunDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
+}: ActivityDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
 
   // Keyed by the ids themselves rather than by the array: every activity list
-  // call pushes a new array holding the same runs, and an effect that restarted
+  // call pushes a new array holding the same activities, and an effect that restarted
   // on identity would re-sweep the list each time one arrived.
   const key = useMemo(
     () =>
-      runs
-        .map((run) => run.activityId)
+      activities
+        .map((activity) => activity.activityId)
         .filter((id): id is string => Boolean(id))
         .join(","),
-    [runs]
+    [activities]
   );
 
   useEffect(() => {
