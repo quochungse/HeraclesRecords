@@ -35,6 +35,15 @@ interface TableShape {
 export class SqliteSyncTarget implements SyncTarget {
   readonly #shapes = new Map<string, TableShape>();
   readonly #pendingLocalStorage: PendingLocalStorageOp[] = [];
+  readonly #incomplete = new Set<string>();
+
+  /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step, for the
+   *  same reason `drainLocalStorage` is. */
+  takeIncomplete(): readonly string[] {
+    const taken = [...this.#incomplete];
+    this.#incomplete.clear();
+    return taken;
+  }
 
   /**
    * Take the queue and empty it in one step.
@@ -101,7 +110,7 @@ export class SqliteSyncTarget implements SyncTarget {
 
   upsertRow(
     table: string,
-    _recordId: string,
+    recordId: string,
     row: Record<string, unknown>
   ): void {
     const shape = this.#shapeOf(table);
@@ -112,6 +121,12 @@ export class SqliteSyncTarget implements SyncTarget {
     const columns = Object.keys(row).filter((column) =>
       shape.columns.has(column)
     );
+    // …but say so. What lands is then less than the entry carried, and a caller
+    // that remembered this row as fully held would leave those columns empty
+    // for good once a later build learned about them.
+    if (columns.length !== Object.keys(row).length) {
+      this.#incomplete.add(`table:${table}:${recordId}`);
+    }
     if (columns.length === 0) {
       throw new Error(`No known columns in row for ${table}`);
     }

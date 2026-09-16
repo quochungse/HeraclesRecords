@@ -22,6 +22,10 @@
 
 import { formatHlc, HlcClock, parseHlc } from "./hlc";
 import {
+  shouldApply,
+  type RecordVersionStore
+} from "./recordVersions";
+import {
   appendBatch,
   compactOplog,
   entryIdentity,
@@ -138,6 +142,14 @@ export interface SyncLoopDeps {
   readonly setTimer: (fn: () => void, ms: number) => unknown;
   readonly clearTimer: (handle: unknown) => void;
   readonly conditions: () => { appActive: boolean; online: boolean };
+  /**
+   * What the local database already holds, per synced destination.
+   *
+   * Required rather than defaulted, and wired where a suite can see it: this is
+   * the only thing standing between a slow pull and the newer row underneath
+   * it, and a dep with a fallback is a dep nothing has to think about.
+   */
+  readonly recordVersions: RecordVersionStore;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: ApplyResult) => void;
   readonly onError?: (error: unknown) => void;
@@ -159,19 +171,18 @@ export class SyncLoop {
    *  reach the network must not lose the edit it was carrying. */
   #pending: OpEntry[] = [];
   /**
-   * What this device has already merged: entry identity -> the timestamp of the
-   * winner it was given.
+   * "Already merged", for the entries whose application this process must not
+   * promise on behalf of the next one.
    *
-   * The log has no cursor — `readAllEntries` returns all of it, every poll — so
-   * this is what stops the same rows being rewritten to SQLite every few
-   * seconds and `onApplied` firing forever with nothing new to report.
-   *
-   * In memory on purpose. A restart re-merges the log once, which is harmless:
-   * the local state it would overwrite came from that same log. Persisting a
-   * high-water mark instead would be wrong, because a device that was offline
-   * appends entries stamped *below* whatever the others have already seen.
+   * Two kinds land here, for the same reason at one remove. A `localStorage`
+   * entry queues work for the renderer rather than performing it, so a quit
+   * before it is delivered owes that work still. A row the target could take
+   * only part of — columns this build has no schema for — landed, but not as
+   * the entry describes it, and a later build has to be able to finish the job.
+   * Both are suppressed for this process, so neither churns `onApplied` every
+   * poll, and both come back on the next launch.
    */
-  readonly #merged = new Map<string, string>();
+  readonly #localStorageMerged = new Map<string, string>();
   #flushTimer: unknown = null;
   #pollTimer: unknown = null;
   #firstPendingAt: number | null = null;
@@ -264,6 +275,18 @@ export class SyncLoop {
    */
   enqueue(entries: readonly OpEntry[]): void {
     if (entries.length === 0) return;
+    // Stamped here, before anything is pushed or awaited, because this is the
+    // moment the local database moved and a pull already in flight cannot know
+    // it. The entry was built by reading the row that was just written, so its
+    // HLC is exactly what this machine now holds — and from here on any winner
+    // the log offers for that destination has to beat it.
+    //
+    // `enqueue` is the one door every local change comes through: the bridge's
+    // hooks on settings and row writes, and `fullState`'s republish, all end up
+    // here. A second door would be a second way to lose a write.
+    for (const entry of entries) {
+      this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+    }
     this.#pending.push(...entries);
     this.#firstPendingAt ??= this.#deps.now();
     this.#noteActivity();
@@ -344,9 +367,10 @@ export class SyncLoop {
     const provider = this.#deps.provider();
     const entries = await readAllEntries(provider);
 
+    // Only for the clock fold below. What may be *applied* is no longer a
+    // question about who wrote an entry — see the comment on `applyEntries`.
     const mine = this.#deps.deviceId();
-    const authoredHere = (entry: OpEntry) => entry.hlc.endsWith(`-${mine}`);
-    const foreign = entries.filter((entry) => !authoredHere(entry));
+    const foreign = entries.filter((entry) => !entry.hlc.endsWith(`-${mine}`));
 
     // Fold every remote timestamp into the clock before issuing another, so
     // anything this device does next sorts after what it has just seen.
@@ -361,38 +385,71 @@ export class SyncLoop {
       this.#noteActivity();
     }
 
-    // Resolved over the whole log, written back only where the winner came
-    // from somewhere else.
+    // Resolved over the whole log; written back only where the winner is
+    // causally later than what this machine already holds.
     //
-    // Both halves are load-bearing, and the asymmetry is the point. Own entries
-    // have to take part in last-writer-wins or a foreign entry this device has
-    // already superseded would win and undo the newer local write. But an own
-    // entry must never be *applied*: it was built by reading the local row at
-    // the moment of the write, so the database already holds that state or
-    // something newer, and writing it back can only ever rewind.
+    // That second half is the whole guard, and it has to be a comparison rather
+    // than a rule about authorship. `applyEntries` resolves entries against each
+    // other and never against the database, and `SqliteSyncTarget.upsertRow` is
+    // an unconditional `INSERT OR REPLACE` — so "this entry won the log" and
+    // "this entry is newer than the row it is about to replace" are different
+    // questions, and only the second one is safe to act on.
     //
-    // The engine has no way to notice that on its own. `applyEntries` compares
-    // entries against each other and never against what the database currently
-    // holds — SQLite stores no HLC per row — and `SqliteSyncTarget.upsertRow`
-    // is an unconditional `INSERT OR REPLACE`. The only thing that used to stop
-    // a stale own entry landing was `#merged`, which lives in memory and is
-    // therefore empty on the first pull after every launch.
+    // The log a pull acts on is the log as it was when `readAllEntries` began,
+    // and that read is a full fetch over the network. Anything written here in
+    // the meantime is invisible to it: a headless analysis run finished inside
+    // one, wrote its answer into a conversation and queued it, and the pull —
+    // whose newest copy of that row was one another machine had published two
+    // days earlier — wrote that over the answer. Measured, not hypothetical:
+    // the vault ended up holding the 96-entry transcript and this machine the
+    // 93-entry one, byte for byte the other device's copy, while the run log
+    // said the analysis had succeeded.
     //
-    // That is a data-loss bug, not a tidiness one, and it was measured: a pull
-    // is a full read of the log over the network and takes as long as the link
-    // does. A headless analysis run finished 18 seconds into one, wrote its
-    // answer into the conversation and moved its activity watermark; the pull
-    // then landed carrying the pre-run copy of both rows and put them back. The
-    // answer the athlete had just watched arrive was gone from the row, and the
-    // restored watermark made the next poll re-analyse the same activity — so
-    // reopening the app showed a *different* answer to the one that was lost.
+    // `recordVersions` is stamped by `enqueue` at the moment of that local
+    // write, so the stale winner is simply older and is skipped. It replaces
+    // two guards that each covered a corner of this:
+    //
+    //   * skipping anything this device authored, which did nothing about a
+    //     *foreign* entry older than the local row — and which made the loss
+    //     above permanent, since the winning entry afterwards was this device's
+    //     own and the good copy in the vault could never be applied back.
+    //   * an in-memory note of what this process had merged, empty after every
+    //     launch, so the whole log was re-merged on each first pull — which is
+    //     precisely when the race is live.
+    //
+    // `localStorage` is deliberately not stamped durably, and the asymmetry is
+    // the point. Applying one of those entries does not write anything: it
+    // queues an operation for the renderer, which performs it whenever a window
+    // is next ready. Nothing acknowledges that it did, so a durable stamp would
+    // record as held something that a quit in between simply loses. Held in
+    // memory instead, the queue is rebuilt on the next launch and the renderer
+    // writes the value again — idempotent, and the only direction in which the
+    // preference cannot be lost. Making it durable means persisting the pending
+    // operations and clearing them on an acknowledgement from the renderer,
+    // which is the honest fix and a larger one.
+    const versions = this.#deps.recordVersions;
+    const durable = (entry: OpEntry): boolean => entry.scope !== "localStorage";
     const result = applyEntries(this.#deps.target, entries, {
-      isApplied: (entry) =>
-        authoredHere(entry) ||
-        this.#merged.get(entryIdentity(entry)) === entry.hlc
+      isApplied: (entry) => {
+        const identity = entryIdentity(entry);
+        return durable(entry)
+          ? !shouldApply(versions, identity, entry.hlc)
+          : this.#localStorageMerged.get(identity) === entry.hlc;
+      }
     });
+    // Stamped from what actually landed. `merged` excludes an entry the target
+    // refused, which must stay unstamped so a later pull tries it again — and a
+    // row the target could only take part of is stamped in memory for the same
+    // reason at one remove: this build dropped columns it has no schema for, so
+    // the next one to learn about them has to be able to apply the entry again.
+    const incomplete = new Set(this.#deps.target.takeIncomplete?.() ?? []);
     for (const entry of result.merged) {
-      this.#merged.set(entryIdentity(entry), entry.hlc);
+      const identity = entryIdentity(entry);
+      if (durable(entry) && !incomplete.has(identity)) {
+        versions.set(identity, entry.hlc);
+      } else {
+        this.#localStorageMerged.set(identity, entry.hlc);
+      }
     }
 
     this.#deps.setSetting(

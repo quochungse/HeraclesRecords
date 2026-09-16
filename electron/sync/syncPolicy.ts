@@ -73,6 +73,13 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // "unchanged". There is no honest way to withhold half a row.
   coach_analysis_local_triggers: "device",
 
+  // Which write this machine's copy of each synced record came from, as an HLC.
+  // `device` for the same reason the sync clock and device id are: it describes
+  // this copy of the data, not the data. Carrying it would be actively wrong —
+  // the receiving machine would then believe it already holds writes it has
+  // never applied, and skip them for good. See `recordVersions.ts`.
+  sync_record_versions: "device",
+
   // Execution records of analysis runs. Not synced: a run belongs to whichever
   // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.

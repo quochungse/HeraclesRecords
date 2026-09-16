@@ -605,22 +605,43 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     calls it so the loop stops. **This is a guard between machines and files, not a data
     partition**: the tables have no owner column, so switching accounts on one machine leaves
     the previous account's records in place. Closing that means giving every row an owner.
-  - **A pull resolves over the whole log but never writes back an entry this device
-    itself wrote.** The merge compares entries against each other and never against the
-    database — SQLite keeps no HLC per row and `SqliteSyncTarget.upsertRow` is an
-    unconditional `INSERT OR REPLACE` — so the only thing standing between a stale entry and
-    a newer local row is `SyncLoop`'s `#merged` map, which lives in memory and is empty on
-    the first pull after every launch. An own entry is a *notification* about a write that
-    already happened, built by reading the row, so the database holds that state or something
-    newer and applying it can only rewind. Own entries still take part in
-    last-writer-wins — drop them from `resolve()` and a foreign entry this device already
-    superseded would win and undo the local write — so the skip belongs in `isApplied`, not
-    in what is handed to `applyEntries`. This cost an athlete a coach's answer: a pull is a
-    full read of the log over the network, a headless analysis run finished 18 seconds into
-    one and wrote both its answer and its activity watermark, and the pull landed carrying
-    the pre-run copy of both rows and put them back — so the next poll re-analysed the same
-    activity and the conversation came back holding a *different* answer to the one that was
-    lost. `npm run test:sync-twoway` fails in two places against the old shape.
+  - **An entry is applied only when it is newer than the row it would overwrite, and
+    `sync_record_versions` is how that question can be asked at all.** The merge compares
+    entries against each other and never against the database — `resolve()` picks a winner
+    per `entryIdentity` and `SqliteSyncTarget.upsertRow` is an unconditional `INSERT OR
+    REPLACE` — so "this entry won the log" and "this entry is newer than what is here" are
+    different questions and only the second is safe to act on. The log a pull acts on is the
+    log as it was when `readAllEntries` *began*, and that is a full fetch over the network,
+    so any local write made during it is invisible to that snapshot.
+    `SyncLoop.enqueue` therefore stamps `entryIdentity -> hlc` at the moment of the local
+    write and `pull` stamps what it merges, both through `recordVersions.ts`; a winner that
+    does not beat the stamp is skipped. Own entries still take part in last-writer-wins —
+    drop them from `resolve()` and a foreign entry this device already superseded would win —
+    so the guard belongs in `isApplied`, never in what is handed to `applyEntries`.
+    Two weaker guards stood here and **neither may come back**. Skipping anything
+    `authoredHere` did nothing about a *foreign* entry older than the local row, and it is
+    what made the loss permanent: once a row had been rewound the winning entry for it was
+    this device's own, so the skip fired forever and the good copy in the vault could never
+    return. An in-memory `#merged` map was empty after every launch, so the whole log was
+    re-merged on each first pull — exactly when the race is live.
+    This cost an athlete a coach's answer twice over, and the second time was measured on the
+    live vault: a headless run finished inside a pull, wrote 96 transcript entries and queued
+    them; the pull applied the 93-entry copy another machine had published two days earlier,
+    byte for byte; the queued entry went out moments later, so the vault held the answer and
+    this machine did not, while the run log said `success`. Because the stamp starts empty, a
+    machine upgrading into it re-merges the log once and **repairs** whatever the old guards
+    rewound. `npm run test:sync-twoway` drives the whole incident behind a gated provider and
+    fails against the old shape.
+  - **A change made before the vault opens is held, not dropped.** `prepareSync()` waits on
+    the COROS re-login at start-up — the vault's owner is the account, so it must — and until
+    it returns `syncBridge` has no sink. It used to discard what the hooks handed it: the
+    write reached SQLite and never reached the vault, with nothing recording that it had not,
+    and it left no `recordVersions` stamp either, so the first pull merged the vault's older
+    copy straight over it. The bridge now holds those changes, one per destination, and
+    replays them when `attachSyncSink` speaks — or drops them when what it says is that there
+    is no vault, which is what keeps the buffer to the boot window rather than the life of
+    the process. Policy is asked *before* a change is held, so a credential never sits in the
+    buffer at all. `npm run test:sync-bridge` covers all three.
   - **Quit waits for the queue, and only when there is one.** A change sits out
     `FLUSH_DEBOUNCE_MS` before it is even attempted, so a turn written and an app closed in
     the same breath never reached the vault — and by the rule above, the next launch then

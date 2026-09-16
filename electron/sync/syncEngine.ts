@@ -37,6 +37,17 @@ export interface SyncTarget {
   deleteSetting(key: string): void;
   setLocalStorage(key: string, value: string): void;
   deleteLocalStorage(key: string): void;
+  /**
+   * Identities this target could not take in full, taken and cleared.
+   *
+   * `SqliteSyncTarget.upsertRow` drops columns this build's schema does not
+   * have, which is what stops an older machine aborting the whole merge on a
+   * row a newer one extended. The row still lands, so the write is not a
+   * failure — but it is not the entry either, and a caller that records it as
+   * held would never apply the rest once the schema caught up. Optional: a
+   * target that takes everything it is given has nothing to report.
+   */
+  takeIncomplete?(): readonly string[];
 }
 
 export interface RejectedEntry {

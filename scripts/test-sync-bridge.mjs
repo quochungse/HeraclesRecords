@@ -206,6 +206,7 @@ assert.equal(isSyncAttached(), false);
   const { SyncLoop } = await load("sync/syncLoop.js");
   const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   const { LocalFolderProvider } = await load("sync/localFolderProvider.js");
+  const { createMemoryRecordVersions } = await load("sync/recordVersions.js");
 
   const root = tempDir("real-clock");
   let writes = 0;
@@ -224,7 +225,8 @@ assert.equal(isSyncAttached(), false);
     now: () => Date.now(),
     setTimer: () => 1,
     clearTimer: () => {},
-    conditions: () => ({ appActive: true, online: true })
+    conditions: () => ({ appActive: true, online: true }),
+    recordVersions: createMemoryRecordVersions()
   });
 
   captured = [];
@@ -289,6 +291,84 @@ assert.equal(isSyncAttached(), false);
   assert.ok(captured[1].payload.pinned_at, "and the pin is in the second");
 }
 
+// ---------------------------------------------------------------------------
+// The boot window. `prepareSync()` waits on the COROS re-login before it opens
+// the vault — the vault's owner is the account — so for the first seconds of a
+// launch these hooks have no sink. They used to drop what they were handed:
+// the write reached SQLite and never reached the vault, with nothing recording
+// that it had not. It also left no stamp in `recordVersions`, so the first pull
+// would merge the vault's older copy straight over it.
+//
+// Held until `prepareSync()` speaks, then replayed — or dropped, if what it
+// says is that there is no vault.
+// ---------------------------------------------------------------------------
+{
+  const { resetSyncSinkForTests, deferredChangeCount } = await load(
+    "sync/syncBridge.js"
+  );
+  const { HlcClock: Clock, formatHlc: fmt } = await load("sync/hlc.js");
+
+  const bootSession = chatStore.createChatSession("claude-code");
+
+  resetSyncSinkForTests();
+  database.setSetting("chat.provider", "claude-code");
+  database.setSetting("chat.provider", "anthropic");
+  chatStore.saveChatSession(bootSession.id, [
+    { kind: "message", role: "user", content: "written before the vault opened" }
+  ]);
+  assert.equal(
+    deferredChangeCount(),
+    2,
+    "a change made before the vault opened is held, once per destination"
+  );
+
+  // Refused by policy before it is held, not on the way out. A credential must
+  // not sit in a sync buffer even for the seconds this window lasts.
+  database.setSetting("trainingHub.password", "hunter2");
+  assert.equal(
+    deferredChangeCount(),
+    2,
+    "and a device-tier write is refused at the door, not queued and dropped later"
+  );
+
+  const clock = new Clock({ device: "aaaaaaaaaaaaaaaa" });
+  const replayed = [];
+  attachSyncSink({
+    enqueue: (entries) => replayed.push(...entries),
+    nextHlc: () => fmt(clock.tick())
+  });
+
+  assert.equal(deferredChangeCount(), 0, "attaching drains what was held");
+  assert.deepEqual(
+    replayed.map((entry) => entry.key),
+    ["chat.provider", "chat_sessions"],
+    "replayed in the order the writes happened, newest value per destination"
+  );
+  assert.equal(
+    replayed[0].payload.value,
+    "anthropic",
+    "and carrying the last value written, not the first"
+  );
+  assert.ok(
+    JSON.parse(replayed[1].payload.messages_json).length === 1,
+    "the row goes out with what the database holds"
+  );
+
+  // Told there is no vault, the same changes are dropped rather than held for
+  // the life of the process: nothing later turns them into something sendable.
+  resetSyncSinkForTests();
+  database.setSetting("chat.provider", "openrouter");
+  assert.equal(deferredChangeCount(), 1, "held while the answer is unknown");
+  attachSyncSink(null);
+  assert.equal(deferredChangeCount(), 0, "and dropped once the answer is no");
+  database.setSetting("chat.provider", "local");
+  assert.equal(
+    deferredChangeCount(),
+    0,
+    "with the answer known, a sinkless write queues nothing at all"
+  );
+}
+
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
@@ -297,5 +377,6 @@ console.log(
   "sync bridge OK — policy enforced at the hook, one entry per turn, " +
     "no-op saves queue nothing, inbound changes do not echo back, the real " +
     "clock does not recurse through the hook, and a rename or pin travels " +
-    "with every column"
+    "with every column, and a write made before the vault opened is held "
+    + "rather than dropped"
 );

@@ -454,6 +454,22 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       updated_at      TEXT NOT NULL
     );
 
+    -- What the local database currently holds, per synced destination, as the
+    -- HLC of the write that put it there. The one thing the merge could not
+    -- ask before: applyEntries compares entries against each other and never
+    -- against this database, so without a per-record timestamp a pull had no
+    -- way to notice that the row it was about to overwrite was newer than
+    -- anything the log it read contained. See sync/recordVersions.ts.
+    --
+    -- Never leaves the machine: it describes this copy of the data, not the
+    -- data, and it is 'device' in TABLE_POLICY. Written through
+    -- requireDatabase() rather than the hooked writers, so stamping a row
+    -- cannot itself queue a change.
+    CREATE TABLE IF NOT EXISTS sync_record_versions (
+      identity TEXT PRIMARY KEY,
+      hlc      TEXT NOT NULL
+    );
+
     -- Every activity trigger asks "what landed after this analysis's
     -- watermark", once per analysis, ordered by start_time.
     CREATE INDEX IF NOT EXISTS idx_training_activities_start_time

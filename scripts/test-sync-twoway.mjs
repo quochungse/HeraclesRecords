@@ -19,6 +19,9 @@ const load = (file) =>
 
 const { LocalFolderProvider } = await load("sync/localFolderProvider.js");
 const { ChangeBuilder } = await load("sync/syncEngine.js");
+const { createMemoryRecordVersions, createSqliteRecordVersions } = await load(
+  "sync/recordVersions.js"
+);
 const {
   SyncLoop,
   COMPACT_INTERVAL_MS,
@@ -59,8 +62,19 @@ function fakeTarget() {
   };
 }
 
-/** A device: its own clock, its own timers, its own view of the shared vault. */
-function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
+/**
+ * A device: its own clock, its own timers, its own view of the shared vault.
+ *
+ * `recordVersions` is passed in when a block means "the same machine, relaunched"
+ * — the real store is a table, so a restart keeps every stamp. Left out, the
+ * device starts with none, which is a fresh install or a machine upgrading into
+ * the store for the first time.
+ */
+function makeDevice(
+  root,
+  id,
+  { wallOffset = 0, online = true, recordVersions = createMemoryRecordVersions() } = {}
+) {
   const settings = new Map();
   const target = fakeTarget();
   const timers = new Map();
@@ -81,13 +95,15 @@ function makeDevice(root, id, { wallOffset = 0, online = true } = {}) {
       return handle;
     },
     clearTimer: (handle) => timers.delete(handle),
-    conditions: () => ({ appActive: state.appActive, online: state.online })
+    conditions: () => ({ appActive: state.appActive, online: state.online }),
+    recordVersions
   });
 
   return {
     id,
     loop,
     target,
+    recordVersions,
     settings,
     state,
     /** Advance this device's clock and fire whatever came due. */
@@ -393,6 +409,7 @@ function applyLocally(target, entry) {
     target: fakeTarget(),
     deviceId: () => "4444444444444444",
     deviceName: () => "slow",
+    recordVersions: createMemoryRecordVersions(),
     getSetting: () => undefined,
     setSetting: () => {},
     now: () => 1_700_000_000_000,
@@ -445,6 +462,7 @@ function applyLocally(target, entry) {
     target: fakeTarget(),
     deviceId: () => "dddddddddddddddd",
     deviceName: () => "d",
+    recordVersions: createMemoryRecordVersions(),
     getSetting: () => undefined,
     setSetting: () => {},
     now: () => 1_700_000_000_000,
@@ -785,7 +803,8 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     now: () => Date.now(),
     setTimer: () => 1,
     clearTimer: () => {},
-    conditions: () => ({ appActive: true, online: true })
+    conditions: () => ({ appActive: true, online: true }),
+    recordVersions: createMemoryRecordVersions()
   });
 
   const result = await sqliteLoop.pull();
@@ -849,15 +868,18 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   publisher.loop.enqueue(published.entries);
   await publisher.loop.flush();
 
-  // The same device, relaunched: a new loop, so nothing is remembered as
-  // merged. Its database has meanwhile moved on — the run landed while the
-  // pull was in flight — and the pull must leave that alone.
-  const relaunched = makeDevice(root, mine);
+  // The same device, relaunched: a new loop, and the stamps it kept. That is
+  // what a restart really looks like — `sync_record_versions` is a table — and
+  // it is the half the in-memory note of "already merged" could never do, so
+  // the whole log used to be re-merged on every first pull.
+  const relaunched = makeDevice(root, mine, {
+    recordVersions: publisher.recordVersions
+  });
   const first = await relaunched.loop.pull();
   assert.equal(
     first.applied,
     0,
-    "a device's own entries are never written back, not even on the first pull"
+    "what this device already holds is not written back, relaunch or not"
   );
   assert.equal(
     relaunched.target.rows.has("chat_sessions:s1"),
@@ -887,9 +909,9 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     "a foreign entry newer than this device's own still merges"
   );
 
-  // …and older loses, which is why the fix cannot be "only resolve foreign
-  // entries". Own entries have to take part in last-writer-wins or a foreign
-  // entry this device already superseded would win and undo the local write.
+  // …and older loses. Own entries still take part in last-writer-wins — drop
+  // them from `resolve()` and this stale one would win its key outright — they
+  // are simply never *applied* over something the machine already holds.
   const older = makeDevice(root, "eeeeeeeeeeeeeeee", { wallOffset: -3_600_000 });
   const olderBuilder = older.builder();
   olderBuilder.row("chat_sessions", "s1", {
@@ -903,57 +925,131 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   older.loop.enqueue(olderBuilder.entries);
   await older.loop.flush();
 
-  const afterStale = makeDevice(root, mine);
-  await afterStale.loop.pull();
+  await relaunched.loop.pull();
   assert.equal(
-    afterStale.target.rows.get("chat_sessions:s1")?.title,
+    relaunched.target.rows.get("chat_sessions:s1")?.title,
     "Renamed over there",
-    "an entry older than what the log already holds must not be applied"
+    "an entry older than what this device already holds must not be applied"
   );
 }
 
-// The same thing against the real database, which is where it cost data: the
-// row and the analysis row both moved on locally after this device published
-// them, and a pull must not put either back.
+// The incident, against the real database and in the shape it actually
+// happened: a pull whose read of the log began *before* a local write cannot
+// see that write, so its winner is an older copy — and applying that copy is
+// what cost an athlete a coach's answer. Measured on the real vault: 96 entries
+// in the log, 93 in SQLite, byte for byte the other machine's two-day-old row,
+// with the run recorded as a success.
 {
   const db = database.requireDatabase();
-  const root = tempDir("own-entries-sqlite");
+  const root = tempDir("stale-pull-sqlite");
   const mine = "ffffffffffffffff";
 
-  const publisher = makeDevice(root, mine);
-  const published = publisher.builder();
-  published.row("chat_sessions", "incident", {
-    id: "incident",
-    provider: "claude-code",
-    title: "FM Trainer",
-    messages_json: JSON.stringify([{ kind: "message", role: "user", content: "before the run" }]),
-    created_at: "2026-09-14T01:00:00Z",
-    updated_at: "2026-09-14T02:00:00Z"
-  });
-  publisher.loop.enqueue(published.entries);
-  await publisher.loop.flush();
-
-  // The run appended its answer here, after the entry above was published and
-  // while the pull below was already reading the log.
+  const beforeRun = JSON.stringify([
+    { kind: "message", role: "user", content: "before the run" }
+  ]);
   const afterRun = JSON.stringify([
     { kind: "message", role: "user", content: "before the run" },
     { kind: "message", role: "user", content: "A new activity synced." },
     { kind: "message", role: "assistant", content: "Heart rate ran high." }
   ]);
-  db.prepare(
-    `INSERT OR REPLACE INTO chat_sessions
-       (id, provider, title, messages_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    "incident",
-    "claude-code",
-    "FM Trainer",
+  const writeRow = (messagesJson, updatedAt) =>
+    db
+      .prepare(
+        `INSERT OR REPLACE INTO chat_sessions
+           (id, provider, title, messages_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        "incident",
+        "claude-code",
+        "FM Trainer",
+        messagesJson,
+        "2026-09-14T01:00:00Z",
+        updatedAt
+      );
+
+  // The only copy the vault holds, published by the other machine two days ago.
+  const remote = makeDevice(root, "dddddddddddddddd");
+  const remoteBuilder = remote.builder();
+  remoteBuilder.row("chat_sessions", "incident", {
+    id: "incident",
+    provider: "claude-code",
+    title: "FM Trainer",
+    messages_json: beforeRun,
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-14T04:04:40Z"
+  });
+  remote.loop.enqueue(remoteBuilder.entries);
+  await remote.loop.flush();
+  writeRow(beforeRun, "2026-09-14T04:04:40Z");
+
+  // A read of the whole log over a link that takes as long as it takes. The
+  // gate holds it open across the write below, which is the entire point: a
+  // pull acts on the log as it was when it started.
+  let openTheLink = () => {};
+  const held = new Promise((resolve) => {
+    openTheLink = resolve;
+  });
+  const inner = new LocalFolderProvider({ root });
+  const versions = createSqliteRecordVersions();
+  const loop = new SyncLoop({
+    provider: () => ({
+      name: "slow-link",
+      list: (prefix) => inner.list(prefix),
+      get: async (path) => {
+        await held;
+        return inner.get(path);
+      },
+      put: (path, body) => inner.put(path, body),
+      remove: (path) => inner.remove(path)
+    }),
+    target: new SqliteSyncTarget(),
+    deviceId: () => mine,
+    deviceName: () => "local",
+    getSetting: database.getSetting,
+    setSetting: database.setSetting,
+    now: () => Date.now(),
+    setTimer: () => 1,
+    clearTimer: () => {},
+    conditions: () => ({ appActive: true, online: true }),
+    recordVersions: versions
+  });
+
+  const pulling = loop.pull();
+
+  // The analysis run finishes inside that read. This is the write path the app
+  // takes: the row lands in SQLite and the bridge hands the loop the entry it
+  // built by reading that row back.
+  writeRow(afterRun, "2026-09-16T01:51:14Z");
+  const local = new ChangeBuilder({ nextHlc: loop.nextHlc });
+  local.row("chat_sessions", "incident", {
+    id: "incident",
+    provider: "claude-code",
+    title: "FM Trainer",
+    messages_json: afterRun,
+    created_at: "2026-09-14T01:00:00Z",
+    updated_at: "2026-09-16T01:51:14Z"
+  });
+  loop.enqueue(local.entries);
+
+  openTheLink();
+  await pulling;
+
+  assert.equal(
+    db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get("incident")
+      .messages_json,
     afterRun,
-    "2026-09-14T01:00:00Z",
-    "2026-09-14T02:03:15Z"
+    "a pull must not apply an entry older than the row it would overwrite"
   );
 
-  const relaunched = new SyncLoop({
+  // The other half, and the reason the old guard could not simply be widened:
+  // once a row has been rewound, the good copy is in the vault under *this*
+  // device's own timestamp. A rule that skipped own entries could never put it
+  // back, so the loss was permanent. An empty watermark — a fresh install, or a
+  // machine upgrading into this file — reads as "unknown" and merges it.
+  await loop.flush();
+  writeRow(beforeRun, "2026-09-14T04:04:40Z");
+  const repaired = new SyncLoop({
     provider: () => new LocalFolderProvider({ root }),
     target: new SqliteSyncTarget(),
     deviceId: () => mine,
@@ -963,15 +1059,23 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     now: () => Date.now(),
     setTimer: () => 1,
     clearTimer: () => {},
-    conditions: () => ({ appActive: true, online: true })
+    conditions: () => ({ appActive: true, online: true }),
+    recordVersions: createMemoryRecordVersions()
   });
-  await relaunched.pull();
+  await repaired.pull();
 
   assert.equal(
     db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get("incident")
       .messages_json,
     afterRun,
-    "the run's answer survives a pull carrying this device's own older copy"
+    "a rewound row is repaired from the vault's newer copy, own entry or not"
+  );
+
+  // And the stamp is durable, so the next launch does not re-merge the log —
+  // which is what made the race live on every first pull.
+  assert.ok(
+    createSqliteRecordVersions().get("table:chat_sessions:incident"),
+    "the merge records what the row now holds, across processes"
   );
 }
 
@@ -982,7 +1086,8 @@ await Promise.all(
 console.log(
   "sync two-way OK — debounce batches bursts, offline queue survives, " +
     "devices converge across clock skew, presence expires, SQLite pull lands, " +
-    "a device never writes its own entries back over newer local rows, " +
+    "a stale pull never overwrites a newer local row and a rewound one is " +
+    "repaired from the vault, " +
     "quit flushes what is queued and skips the wait when nothing is, " +
     "compaction is interval-gated and one device at a time"
 );
