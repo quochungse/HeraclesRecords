@@ -37,6 +37,8 @@ import type {
   WorkoutDeletePreview
 } from "./types";
 import { migrateActivityHrTrendPreview } from "./chatActivityTools";
+import { deviceId } from "./sync/deviceIdentity";
+import { contentKey, transcriptEntryId } from "./sync/rowMergers";
 
 export interface ChatSessionRow {
   id: string;
@@ -859,10 +861,34 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
   };
 }
 
+/**
+ * Copy an entry's merge metadata onto the value `parseEntry` rebuilt.
+ *
+ * One place rather than nine. Every kind is reconstructed field by field, which
+ * is what makes an unlisted field vanish in silence — the trap this file is
+ * already known for — and `mid` vanishing would be worse than a missing field:
+ * the entry would look new to the next merge and be unioned in beside itself.
+ */
+function withMergeMeta(
+  entry: PersistedChatEntry,
+  source: Record<string, unknown>
+): PersistedChatEntry {
+  const mid = typeof source.mid === "string" && source.mid ? source.mid : undefined;
+  const mrev =
+    typeof source.mrev === "string" && source.mrev ? source.mrev : undefined;
+  if (!mid && !mrev) return entry;
+  return { ...entry, ...(mid ? { mid } : {}), ...(mrev ? { mrev } : {}) };
+}
+
 function parseEntry(value: unknown): PersistedChatEntry | null {
   if (!isRecord(value)) {
     return null;
   }
+  const parsed = parseEntryShape(value);
+  return parsed ? withMergeMeta(parsed, value) : null;
+}
+
+function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | null {
 
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
@@ -968,7 +994,14 @@ export function restoreChatPlanDraftSources(
     const recoveredByKey = new Map(
       recovered.entries.map((draftEntry) => [draftEntry.key, draftEntry])
     );
+    // `...entry` first, so the entry keeps its merge identity. Rebuilding the
+    // object without it would hand the runner's `readBack()` a draft with no
+    // `mid`, and the next save would have to recover one from the card's id —
+    // bumping `mrev` every time a conversation holding a draft is saved, which
+    // would win last-writer-wins against edits made on another machine that
+    // this one never saw.
     return {
+      ...entry,
       kind: "planDraft",
       draft: {
         ...entry.draft,
@@ -1123,7 +1156,7 @@ export function createChatSession(
  * safe direction for the accident this guards against.
  */
 function foreignTail(
-  storedJson: string,
+  stored: PersistedChatEntry[],
   knownEntryCount: number | undefined,
   incoming: PersistedChatEntry[]
 ): PersistedChatEntry[] {
@@ -1139,7 +1172,6 @@ function foreignTail(
   // accident fails harmlessly.
   const claimed = Math.max(0, Math.floor(knownEntryCount));
   const known = Math.min(claimed, incoming.length);
-  const stored = parseChatTranscriptJson(storedJson);
   if (stored.length <= known) {
     return [];
   }
@@ -1168,14 +1200,20 @@ function foreignTail(
   // rejects never reaches the row, so leaving it in would put a hole in the
   // caller's array that no stored entry can match — and the overlap would read
   // as none.
+  // Content, with `mid` and `mrev` taken off. A stored entry carries them and
+  // the caller's copy of that same entry does not — the renderer rebuilds
+  // entries field by field on the way out — so comparing the raw JSON would
+  // find no overlap at all and append the tail the caller is already sending.
   const canonical = (entry: PersistedChatEntry | null): string =>
-    JSON.stringify(entry);
+    entry === null ? "null" : contentKey(entry);
   const accepted = incoming.map((entry) => parseEntry(entry));
   const start = accepted.slice(0, known).filter((entry) => entry !== null).length;
   const incomingText = accepted
     .filter((entry): entry is PersistedChatEntry => entry !== null)
     .map(canonical);
-  const tailText = tail.map((entry) => canonical(parseEntry(entry)));
+  // `tail` comes from `parseChatTranscriptJson`, so it is already what the
+  // store accepts; only `incoming` still needs putting through the parser.
+  const tailText = tail.map((entry) => canonical(entry));
   let held = 0;
   for (
     let offset = start;
@@ -1201,6 +1239,172 @@ function foreignTail(
  * passes a database is a test, and moving the seam would put an `undefined`
  * placeholder in a dozen of them to spare one production call site.
  */
+/**
+ * A timestamp for `mid` and `mrev`: monotonic, unique to this machine, and
+ * lexicographically ordered.
+ *
+ * Same construction as an HLC, and for the first of the same two reasons — a
+ * clock that steps backwards must not hand out an identifier that sorts before
+ * one already in use. It is deliberately *not* the sync clock: transcripts are
+ * written whether or not sync is configured, and an id minted only when it
+ * happens to be on would leave exactly the entries that need identifying
+ * without one.
+ */
+let stampMillis = 0;
+let stampCounter = 0;
+let stampDevice: string | null = null;
+
+function mergeStampDevice(): string {
+  if (stampDevice) return stampDevice;
+  try {
+    stampDevice = deviceId();
+  } catch {
+    // No database behind this call — a suite with an injected one. A random id
+    // is still unique, which is all this needs.
+    stampDevice = crypto.randomBytes(8).toString("hex");
+  }
+  return stampDevice;
+}
+
+function nextMergeStamp(): string {
+  const millis = Math.max(Date.now(), stampMillis);
+  stampCounter = millis === stampMillis ? stampCounter + 1 : 0;
+  stampMillis = millis;
+  // The leading `1-` sorts every minted id after every backfilled one, which
+  // are `0-<index>`. A conversation that predates this therefore keeps its
+  // order and everything new lands after it. See `transcriptEntryId`.
+  return (
+    `1-${millis.toString(16).padStart(12, "0")}` +
+    `-${stampCounter.toString(16).padStart(4, "0")}-${mergeStampDevice()}`
+  );
+}
+
+/**
+ * What an entry *is*, for the entries that can say.
+ *
+ * Every card kind carries an id of its own already, and that is what makes
+ * "this is the entry that changed" answerable without guessing. A coach prompt
+ * being answered is the edit-in-place that actually happens, and it keeps its
+ * `promptId` through it.
+ *
+ * Messages return nothing, deliberately. They carry no id, and a message is
+ * written once — the question at send time, the answer when the turn ends — so
+ * there is nothing to recognise and nothing that needs recognising. Guessing
+ * from position was the alternative and it is worse than useless: a save whose
+ * array is shorter than the row would read an unrelated entry at the same index
+ * as an edit of it, quietly take over its identity, and the other machine's copy
+ * would then lose last-writer-wins against a turn that was never the same turn.
+ */
+function logicalKey(entry: PersistedChatEntry): string | undefined {
+  switch (entry.kind) {
+    case "coachPrompt":
+      return `coachPrompt:${entry.prompt.promptId}`;
+    case "planDraft":
+      return `planDraft:${entry.draft.draftId}`;
+    case "workoutDelete":
+      return `workoutDelete:${entry.preview.requestId}`;
+    case "activityVisual":
+    case "activityHrTrend":
+    case "fitnessTrend":
+    case "hrZoneSummary":
+      return `${entry.kind}:${entry.preview.previewId}`;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Give every entry a stable identity, so a merge can union two transcripts
+ * instead of choosing between them. See `sync/rowMergers.ts`.
+ *
+ * The renderer strips both fields — it rebuilds entries field by field on the
+ * way through `toPersistedEntries` — so almost every save arrives with them
+ * missing and they have to be recovered rather than trusted. Two rules do it,
+ * in this order, because each covers what the other cannot:
+ *
+ *   * **by content**, which survives the entries moving. A merge can land a
+ *     foreign entry anywhere in the list, so position is not dependable;
+ *   * **by the card's own id**, for an entry whose content was edited in place
+ *     and so matches nothing — an answered coach prompt. The identity is kept
+ *     and `mrev` bumped, which is what makes the edit outrank the copy the
+ *     other machine still holds.
+ *
+ * Anything left is genuinely new and is minted. Note that an unchanged save
+ * therefore produces byte-identical JSON, which is what keeps `saveChatSession`
+ * from touching the row every time a conversation is opened.
+ */
+function stampEntries(
+  incoming: PersistedChatEntry[],
+  stored: PersistedChatEntry[]
+): PersistedChatEntry[] {
+  const storedById = new Map<string, PersistedChatEntry>();
+  const byContent = new Map<string, number[]>();
+  const byLogical = new Map<string, number[]>();
+  const push = (map: Map<string, number[]>, key: string, index: number): void => {
+    const held = map.get(key);
+    if (held) held.push(index);
+    else map.set(key, [index]);
+  };
+  stored.forEach((entry, index) => {
+    if (entry.mid) storedById.set(entry.mid, entry);
+    push(byContent, contentKey(entry), index);
+    const logical = logicalKey(entry);
+    if (logical) push(byLogical, logical, index);
+  });
+
+  const claimed = new Set<number>();
+  const take = (map: Map<string, number[]>, key: string | undefined) => {
+    if (!key) return undefined;
+    const queue = map.get(key);
+    while (queue && queue.length > 0) {
+      const index = queue.shift() as number;
+      if (!claimed.has(index)) return index;
+    }
+    return undefined;
+  };
+
+  // Content first for every entry, before any identity is claimed: an entry
+  // that merely moved must not have its identity taken by one that was edited.
+  const byContentMatch = incoming.map((entry) =>
+    entry.mid ? undefined : take(byContent, contentKey(entry))
+  );
+  byContentMatch.forEach((index) => {
+    if (index !== undefined) claimed.add(index);
+  });
+
+  return incoming.map((entry, index) => {
+    if (entry.mid) {
+      const previous = storedById.get(entry.mid);
+      const changed = previous ? contentKey(previous) !== contentKey(entry) : false;
+      return changed ? { ...entry, mrev: nextMergeStamp() } : entry;
+    }
+
+    const exact = byContentMatch[index];
+    if (exact !== undefined) {
+      const previous = stored[exact];
+      return {
+        ...entry,
+        mid: transcriptEntryId(previous, exact),
+        ...(previous.mrev ? { mrev: previous.mrev } : {})
+      };
+    }
+
+    const edited = take(byLogical, logicalKey(entry));
+    if (edited !== undefined) {
+      claimed.add(edited);
+      const previous = stored[edited];
+      return {
+        ...entry,
+        mid: transcriptEntryId(previous, edited),
+        mrev: nextMergeStamp()
+      };
+    }
+
+    const stamp = nextMergeStamp();
+    return { ...entry, mid: stamp, mrev: stamp };
+  });
+}
+
 export function saveChatSession(
   id: string,
   entries: PersistedChatEntry[],
@@ -1212,10 +1416,18 @@ export function saveChatSession(
     return null;
   }
 
-  const normalizedEntries = normalizeEntries([
-    ...entries,
-    ...foreignTail(row.messages_json, options.knownEntryCount, entries)
-  ]);
+  // Parsed once and handed to both. Each entry is rebuilt field by field on the
+  // way through `parseEntry`, and a transcript carrying chart cards runs to
+  // hundreds of kilobytes — measured at 480 kB on a real conversation — so the
+  // second parse was pure waste on the hot path of every finished turn.
+  const stored = parseChatTranscriptJson(row.messages_json);
+  const normalizedEntries = stampEntries(
+    normalizeEntries([
+      ...entries,
+      ...foreignTail(stored, options.knownEntryCount, entries)
+    ]),
+    stored
+  );
   const title =
     row.title === DEFAULT_SESSION_TITLE
       ? deriveSessionTitleFromEntries(normalizedEntries)

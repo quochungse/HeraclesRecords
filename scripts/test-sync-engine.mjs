@@ -318,16 +318,31 @@ const entry = (hlc, overrides = {}) => ({
     snapshot.upTo
   );
 
-  // Batches already covered by the snapshot are not replayed on top of it.
+  // A batch the snapshot already folded in is not parsed into the result twice…
   await appendBatch(storage, "aaaa", history);
   await appendBatch(storage, "aaaa", [
     entry(hlcOf(9), { recordId: "s3", payload: { id: "s3", title: "later" } })
   ]);
   const entries = await readAllEntries(storage);
   assert.deepEqual(
-    entries.map((item) => item.recordId).sort(),
+    entries.map((item) => item.hlc).sort(),
+    [hlcOf(1), hlcOf(2), hlcOf(3), hlcOf(9)],
+    "every entry in the vault is read exactly once"
+  );
+  // …but an entry compaction *superseded* is read again rather than hidden, and
+  // that is deliberate. Skipping by timestamp is a claim that nothing below the
+  // line can still arrive, which nothing enforces — see the late-arrival case
+  // at the end of this file. It costs a duplicate that last-writer-wins folds
+  // away, which is the cheap half of the trade.
+  assert.deepEqual(
+    [...resolve(entries).values()].map((item) => item.recordId).sort(),
     ["s1", "s2", "s3"],
-    "a joining device sees the snapshot plus only what came after it"
+    "and the state a joining device resolves to is the snapshot's"
+  );
+  assert.equal(
+    resolve(entries).get("table:chat_sessions:s1").payload.title,
+    "v2",
+    "the superseded copy read back does not win"
   );
 
   assert.equal(compactEntries([]), null, "nothing to compact is not an error");
@@ -1356,6 +1371,301 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   assert.deepEqual(log.snapshotPaths, []);
 }
 
+// A batch that arrives after a compaction, stamped before it, is still read.
+//
+// This is not a corner: a device holding a queued change goes offline, another
+// compacts, and the first comes back and flushes. The upload succeeds and the
+// file is in the vault — and `readLog` used to skip everything at or below the
+// snapshot's `upTo`, so nobody ever read it again. `COMPACT_HORIZON_MS` was the
+// guard and it only covers clock skew; an hour offline is not skew.
+{
+  const root = tempDir("compact-late-arrival");
+  const storage = new LocalFolderProvider({ root });
+  const HOUR = 60 * 60 * 1000;
+  const NOW = 1_800_000_000_000;
+  const at = (millis, device = "aaaa") => formatHlc({ millis, counter: 0, device });
+
+  // Device B is busy. Device A is offline, holding one change stamped 3h ago.
+  const held = entry(at(NOW - 3 * HOUR, "aaaa"), {
+    scope: "setting",
+    key: "chat.model",
+    recordId: undefined,
+    payload: { value: "written before the compaction" }
+  });
+  for (let index = 0; index < 60; index += 1) {
+    await appendBatch(storage, "bbbb", [
+      entry(at(NOW - 2 * HOUR + index, "bbbb"), {
+        recordId: `k${index}`,
+        payload: { id: `k${index}` }
+      })
+    ]);
+  }
+  const compacted = await compactOplog(storage, { now: () => NOW });
+  assert.ok(compacted.snapshotPath, "the log was compacted");
+  assert.equal(compacted.batchesDeleted, 60, "and its batches pruned");
+
+  // A comes back and flushes what it was holding.
+  await appendBatch(storage, "aaaa", [held]);
+
+  const all = await readAllEntries(storage);
+  const late = all.find((candidate) => candidate.key === "chat.model");
+  assert.ok(
+    late,
+    "a batch stamped below the snapshot's upTo must still be read, not silently shadowed"
+  );
+  assert.equal(late.payload.value, "written before the compaction");
+
+  // …and the snapshot's own entries are not doubled up by the batches that
+  // straddle it, which is what the skip was really for.
+  const seen = new Set();
+  for (const candidate of all) {
+    assert.ok(!seen.has(candidate.hlc), `entry ${candidate.hlc} read twice`);
+    seen.add(candidate.hlc);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// A transcript is unioned, not chosen between.
+//
+// Last-writer-wins is right for a record that describes one thing and wrong for
+// one that accumulates. Two machines adding to the same conversation used to
+// resolve to whichever wrote last, and the other's turn was gone with no error
+// anywhere — the ordinary case, since an analysis runs headless on whichever
+// machine holds the lease while the athlete may be at the other.
+//
+// The three properties below are what make it safe to run this merge on both
+// machines, in either order, as many times as a poll happens to fire.
+// ---------------------------------------------------------------------------
+{
+  const { mergeTranscripts } = await load("sync/rowMergers.js");
+  const { rowMergerFor } = await load("sync/rowMergers.js");
+  const say = (mid, content, mrev = mid) => ({
+    kind: "message",
+    role: "assistant",
+    content,
+    mid,
+    mrev
+  });
+
+  const shared = say("1-a", "shared history");
+  const desktop = [shared, say("1-c", "DESKTOP: coach answer")];
+  const laptop = [shared, say("1-b", "LAPTOP: my question")];
+
+  assert.deepEqual(
+    mergeTranscripts(desktop, laptop).map((entry) => entry.content),
+    ["shared history", "LAPTOP: my question", "DESKTOP: coach answer"],
+    "both machines' turns survive, ordered by when they were written"
+  );
+  assert.deepEqual(
+    mergeTranscripts(laptop, desktop),
+    mergeTranscripts(desktop, laptop),
+    "and the result does not depend on which side merged first"
+  );
+  const once = mergeTranscripts(desktop, laptop);
+  assert.deepEqual(
+    mergeTranscripts(once, laptop),
+    once,
+    "merging again changes nothing, so a poll that repeats costs nothing"
+  );
+  assert.deepEqual(mergeTranscripts(once, once), once, "and neither does itself");
+
+  // An entry both sides hold is still last-writer-wins — per entry, by `mrev`,
+  // which is what an edit in place moves. A card answered on one machine must
+  // outrank the unanswered copy on the other without taking the turns beside it
+  // with it.
+  const unanswered = say("1-b", "question: easy or hard?", "1-b");
+  const answeredLater = say("1-b", "question: easy or hard? [Easy]", "1-z");
+  assert.deepEqual(
+    mergeTranscripts([shared, unanswered], [shared, answeredLater]).map(
+      (entry) => entry.content
+    ),
+    ["shared history", "question: easy or hard? [Easy]"],
+    "the newer revision of an entry wins"
+  );
+  assert.deepEqual(
+    mergeTranscripts([shared, answeredLater], [shared, unanswered]).map(
+      (entry) => entry.content
+    ),
+    ["shared history", "question: easy or hard? [Easy]"],
+    "whichever side it arrives from"
+  );
+
+  // Two copies that diverged before identities existed answer to the same
+  // backfilled id with no revision on either. Nothing says which is right, so
+  // the tie is broken by content — the one thing both machines compute the same
+  // way. Breaking it by argument order instead is a livelock: each takes the
+  // other's copy, republishes it, and they swap for as long as both poll.
+  const clash = (content) => ({ kind: "message", role: "user", content });
+  assert.deepEqual(
+    mergeTranscripts([clash("this machine")], [clash("that machine")]).map(
+      (entry) => entry.content
+    ),
+    ["this machine", "that machine"],
+    "two turns appended at the same position on the old build are both kept"
+  );
+  assert.deepEqual(
+    mergeTranscripts([clash("this machine")], [clash("that machine")]),
+    mergeTranscripts([clash("that machine")], [clash("this machine")]),
+    "and the result is the same whichever side merges"
+  );
+
+  // A build that predates identities rebuilds entries field by field, so it
+  // drops `mid` and `mrev` and then publishes the conversation with every
+  // identity stripped. Those have to be recovered by content, or the union
+  // reads them as entries it has never met and the transcript doubles — worse
+  // than the loss it replaced. Symmetric, because the stripped copy can be
+  // either side: an upgraded machine that has not yet saved a conversation
+  // holds one too.
+  const identified = [say("1-a", "shared history"), say("1-b", "coach answer")];
+  const stripped = identified.map(({ mid, mrev, ...rest }) => rest);
+  assert.deepEqual(
+    mergeTranscripts(identified, stripped).map((entry) => entry.content),
+    ["shared history", "coach answer"],
+    "an old build republishing a stripped copy does not double the transcript"
+  );
+  assert.deepEqual(
+    mergeTranscripts(stripped, identified).map((entry) => entry.content),
+    ["shared history", "coach answer"],
+    "whichever side the stripped copy is on"
+  );
+  // A turn the old build appended has no identity anywhere and cannot be lent
+  // one, so it falls back to position-and-content — which sorts before every
+  // minted id and therefore lands at the top rather than the end. That is the
+  // trade `identify` documents: an id that depends on what else the array held
+  // reads better and gives the same turn two identities across two log entries,
+  // and a machine folding both adds it twice. Kept in the wrong place beats
+  // kept twice, and it lasts only until every machine is upgraded.
+  assert.deepEqual(
+    mergeTranscripts(identified, [
+      ...stripped,
+      { kind: "message", role: "assistant", content: "and a turn from over there" }
+    ])
+      .map((entry) => entry.content)
+      .sort(),
+    ["and a turn from over there", "coach answer", "shared history"],
+    "a turn the old build appended is kept, whatever order it lands in"
+  );
+
+  // An id worked out during a merge is written down. Recomputing it next time
+  // gives the same answer only while whatever it was anchored to is still
+  // there, so a turn an old build appended would otherwise be minted a fresh
+  // identity on the next save and jump to the end of the conversation.
+  const unioned = mergeTranscripts(identified, [
+    ...stripped,
+    { kind: "message", role: "assistant", content: "appended over there" }
+  ]);
+  assert.ok(
+    unioned.every((entry) => entry.mid),
+    "every entry comes back carrying the identity it was merged under"
+  );
+  assert.deepEqual(
+    mergeTranscripts(unioned, unioned).map((entry) => entry.content),
+    unioned.map((entry) => entry.content),
+    "so the order is stable when it is merged again"
+  );
+  // …and the identity does not depend on what else the array held. The union
+  // above and the entry it was built from both sit in the log; a machine
+  // folding the two must not see the same turn twice.
+  assert.deepEqual(
+    mergeTranscripts(unioned, [
+      ...stripped,
+      { kind: "message", role: "assistant", content: "appended over there" }
+    ]).map((entry) => entry.content),
+    unioned.map((entry) => entry.content),
+    "and folding the union against its own source adds nothing"
+  );
+
+  // Entries written before identities existed are matched by position, which is
+  // the only thing two copies of the same history agree on.
+  const old = [
+    { kind: "message", role: "user", content: "written long ago" },
+    { kind: "message", role: "assistant", content: "answered long ago" }
+  ];
+  assert.deepEqual(
+    mergeTranscripts(old, old).map((entry) => entry.content),
+    old.map((entry) => entry.content),
+    "an unidentified transcript merged with itself does not double"
+  );
+  assert.deepEqual(
+    mergeTranscripts(old, [...old, say("1-d", "and this came later")]).map(
+      (entry) => entry.content
+    ),
+    ["written long ago", "answered long ago", "and this came later"],
+    "and a new turn lands after it"
+  );
+
+  // Last-writer-wins keeps one entry per record, and for a record that
+  // accumulates that is the wrong question: the loser is exactly where the
+  // other machine's half lives. Both the merge and compaction have to fold.
+  const conv = (msgs, title, hlcAt, device) => ({
+    hlc: formatHlc({ millis: hlcAt, counter: 0, device }),
+    op: "set",
+    scope: "table",
+    key: "chat_sessions",
+    recordId: "conv",
+    payload: {
+      id: "conv",
+      provider: "claude-code",
+      title,
+      messages_json: JSON.stringify(msgs),
+      created_at: "2026-09-01",
+      updated_at: "2026-09-16"
+    }
+  });
+  const fromA = conv([shared, say("1-b", "A: my turn")], "FM", 1000, "aaaa");
+  const fromB = conv([shared, say("1-c", "B: my turn")], "Renamed on B", 2000, "bbbb");
+
+  const folded = compactEntries([fromA, fromB], { now: () => 3000 });
+  assert.equal(folded.entries.length, 1, "compaction still keeps one entry per record");
+  assert.deepEqual(
+    JSON.parse(folded.entries[0].payload.messages_json).map((entry) => entry.content),
+    ["shared history", "A: my turn", "B: my turn"],
+    "but it folds the two appends rather than dropping the loser's"
+  );
+  assert.equal(
+    folded.entries[0].payload.title,
+    "Renamed on B",
+    "and every other column is still last-writer-wins"
+  );
+  assert.deepEqual(
+    compactEntries([fromB, fromA], { now: () => 3000 }).entries[0].payload,
+    folded.entries[0].payload,
+    "whichever order they are read in"
+  );
+
+  // A payload this machine cannot read must not replace a transcript it can.
+  // `upsertRow` names the columns it writes, so leaving the column out of the
+  // row means *unchanged* — everything else the entry carries still applies.
+  const merger = rowMergerFor("chat_sessions");
+  const old_ = old;
+  const readable = { id: "s1", title: "Renamed", messages_json: JSON.stringify(old) };
+  const garbled = { id: "s1", title: "Renamed over there", messages_json: "{not json" };
+  const guarded = merger(readable, garbled, { winner: true });
+  assert.equal(
+    "messages_json" in guarded.row,
+    false,
+    "an unreadable transcript is left out of the row rather than written over a readable one"
+  );
+  assert.equal(guarded.row.title, "Renamed over there", "the rest of the entry still lands");
+  // …and an entry that lost last-writer-wins carries only what this table
+  // merges, so an older append cannot undo a rename made on the winning machine.
+  const loser = merger(
+    { id: "s1", title: "Mine", messages_json: JSON.stringify(old_) },
+    { id: "s1", title: "Theirs", messages_json: JSON.stringify([...old_, say("1-z", "later")]) },
+    { winner: false }
+  );
+  assert.deepEqual(
+    Object.keys(loser.row).sort(),
+    ["id", "messages_json"],
+    "a losing entry writes its key and its merged column, nothing else"
+  );
+  assert.equal(
+    merger(undefined, readable, { winner: true }).row,
+    readable,
+    "and a row this machine has never seen is taken whole"
+  );
+}
+
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
@@ -1366,5 +1676,6 @@ console.log(
     "timestamp costs one entry, a refused entry costs one entry, nothing is " +
     "applied twice, SQLite round trip, compaction snapshots and user backups " +
     "cannot shadow each other, compaction prunes what it covers and nothing " +
-    "it does not"
+    "it does not, a batch arriving after a compaction is still read, and " +
+    "two machines appending to one conversation both keep their turn"
 );

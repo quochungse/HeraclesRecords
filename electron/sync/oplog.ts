@@ -34,6 +34,7 @@
 // comes back sorted.
 
 import { compareHlcStrings, isValidHlc } from "./hlc";
+import { rowMergerFor } from "./rowMergers";
 import {
   normalizeStoragePath,
   type StorageProvider
@@ -210,8 +211,27 @@ export async function readLog(
   );
 
   const entries: OpEntry[] = snapshot ? [...snapshot.entries] : [];
-  const covered = snapshot?.upTo;
   const batches: ReadBatch[] = [];
+
+  // Exactly what the snapshot holds, by identity *and* timestamp, so a batch
+  // straddling the horizon is not parsed into the result twice.
+  //
+  // This used to skip everything at or below `upTo`, which is a different and
+  // much stronger claim: that nothing below that line can still arrive. Nothing
+  // enforces it. A device holding a queued change goes offline, another device
+  // compacts, and the first one comes back and appends a batch stamped before
+  // the snapshot — the upload succeeds, `flush` reports it pushed, the file is
+  // in the vault, and no reader ever looks at it again. Measured: one setting
+  // written three hours before a compaction, gone from `readAllEntries` while
+  // sitting on disk. `COMPACT_HORIZON_MS` was the guard, and it only ever
+  // covered clock skew; being offline for an hour is not skew.
+  //
+  // Duplicates cost nothing to admit: `resolve` is last-writer-wins over
+  // whatever it is given, so an entry the snapshot already folded in resolves
+  // to the same winner. Being invisible costs the write.
+  const alreadyFolded = new Set(
+    (snapshot?.entries ?? []).map((entry) => `${entry.hlc}`)
+  );
 
   for (const batch of listed.sort((a, b) => a.path.localeCompare(b.path))) {
     const stored = await storage.get(batch.path);
@@ -221,8 +241,7 @@ export async function readLog(
       if (maxHlc === null || compareHlcStrings(entry.hlc, maxHlc) > 0) {
         maxHlc = entry.hlc;
       }
-      // Skip what the snapshot already accounts for.
-      if (covered && compareHlcStrings(entry.hlc, covered) <= 0) continue;
+      if (alreadyFolded.has(entry.hlc)) continue;
       entries.push(entry);
     }
     if (maxHlc !== null) batches.push({ path: batch.path, maxHlc });
@@ -326,9 +345,35 @@ export function compactEntries(
   for (const entry of entries) {
     const identity = entryIdentity(entry);
     const current = winners.get(identity);
-    if (!current || compareHlcStrings(entry.hlc, current.hlc) > 0) {
+    if (!current) {
       winners.set(identity, entry);
+      continue;
     }
+    const newer = compareHlcStrings(entry.hlc, current.hlc) > 0 ? entry : current;
+    const older = newer === entry ? current : entry;
+
+    // A record that accumulates is folded, not chosen between. Compaction is
+    // the one place the vault forgets things on purpose, and last-writer-wins
+    // here would forget a turn: two machines appending to one conversation
+    // publish two entries, and the loser is exactly where the other athlete's
+    // half lives. Dropping it means no machine that has not already pulled can
+    // ever see it again.
+    //
+    // The fold is the same union the merge does, so the surviving entry is
+    // what every reader would have computed anyway — and it is one entry, so
+    // this costs nothing the old shape was buying.
+    const merger =
+      newer.op === "set" && older.op === "set" && newer.scope === "table"
+        ? rowMergerFor(newer.key)
+        : undefined;
+    if (merger) {
+      const folded = merger(older.payload ?? {}, newer.payload ?? {}, {
+        winner: true
+      });
+      winners.set(identity, { ...newer, payload: folded.row });
+      continue;
+    }
+    winners.set(identity, newer);
   }
 
   const survivors: OpEntry[] = [];

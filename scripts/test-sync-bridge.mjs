@@ -207,6 +207,7 @@ assert.equal(isSyncAttached(), false);
   const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   const { LocalFolderProvider } = await load("sync/localFolderProvider.js");
   const { createMemoryRecordVersions } = await load("sync/recordVersions.js");
+  const { createMemoryOutbox } = await load("sync/outbox.js");
 
   const root = tempDir("real-clock");
   let writes = 0;
@@ -226,7 +227,8 @@ assert.equal(isSyncAttached(), false);
     setTimer: () => 1,
     clearTimer: () => {},
     conditions: () => ({ appActive: true, online: true }),
-    recordVersions: createMemoryRecordVersions()
+    recordVersions: createMemoryRecordVersions(),
+    outbox: createMemoryOutbox()
   });
 
   captured = [];

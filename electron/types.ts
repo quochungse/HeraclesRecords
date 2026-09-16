@@ -4626,8 +4626,28 @@ export interface WorkoutDeletePreview {
   summary: string;
 }
 
+/**
+ * What lets a transcript be merged entry by entry instead of row by row.
+ *
+ * Both are written by `chatHistoryStore` on save and are never set by the
+ * renderer, which round-trips entries through `toPersistedEntries` and would
+ * drop them. They are optional because every entry written before they existed
+ * has neither; see `transcriptEntryId` for how those are identified.
+ */
+export interface ChatEntryMergeMeta {
+  /**
+   * Stable identity, minted once and never reassigned. Sorts in creation order
+   * across machines, so it doubles as the transcript's ordering key.
+   */
+  mid?: string;
+  /** Bumped when this entry's content changes, so an edit made on one machine
+   *  outranks the copy the other still holds. */
+  mrev?: string;
+}
+
 /** Persisted coach timeline entry (messages plus inline action cards). */
-export type PersistedChatEntry =
+export type PersistedChatEntry = ChatEntryMergeMeta &
+  (
   | PersistedChatMessageEntry
   | PersistedChatAnalysisSilentEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
@@ -4636,7 +4656,8 @@ export type PersistedChatEntry =
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }
-  | { kind: "hrZoneSummary"; preview: HrZonePreview };
+  | { kind: "hrZoneSummary"; preview: HrZonePreview }
+  );
 
 export interface IntervalsStatus {
   connected: boolean;
