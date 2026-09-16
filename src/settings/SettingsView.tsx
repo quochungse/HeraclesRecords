@@ -4,7 +4,6 @@ import {
   BrainCircuit,
   Bug,
   Check,
-  ChevronDown,
   ChevronRight,
   Code2,
   Dumbbell,
@@ -17,10 +16,10 @@ import {
   Loader2,
   Moon,
   Mountain,
+  Palette,
   RefreshCw,
   Ruler,
   Server,
-  Sparkles,
   Sun,
   Watch,
   type LucideIcon,
@@ -52,7 +51,7 @@ import {
   ACCENT_PALETTES,
   ACCENT_PALETTE_DETAILS
 } from "../theme/accentPalette";
-import { CorosConnectionCard } from "../training/components/CorosConnectionCard";
+import { CorosConnectionRow } from "../training/components/CorosConnectionRow";
 import {
   DEFAULT_SPORT_COLORS,
   SPORT_COLOR_CATEGORIES,
@@ -111,33 +110,52 @@ const PLATFORM_LABELS: Record<string, string> = {
   linux: "Linux",
 };
 
-const SPORT_COLOR_DETAILS: Record<
-  SportColorCategory,
-  { description: string; icon: LucideIcon }
-> = {
-  strength: {
-    description: "Weight training, strength sessions, gym workouts",
-    icon: Dumbbell,
-  },
-  trail: {
-    description: "Trail running, hiking, off-road activities",
-    icon: Mountain,
-  },
-  run: {
-    // The Running screen's own figure, so the colour an athlete picks here is
-    // shown against the mark they will see it on.
-    icon: RunnerIcon,
-    description: "Outdoor runs, track runs, intervals",
-  },
-  bike: {
-    description: "Road cycling, indoor cycling, e-bike",
-    icon: Bike,
-  },
-  other: {
-    description: "Yoga, pilates, mobility, mixed and other activities",
-    icon: Ellipsis,
-  },
+/** The mark each sport wears elsewhere in the app, so the colour is picked
+    against the figure it will be seen on. The sentence of examples that used to
+    sit beside each one is gone with the rows it needed: the label already names
+    the sport. */
+const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
+  strength: Dumbbell,
+  trail: Mountain,
+  run: RunnerIcon,
+  bike: Bike,
+  other: Ellipsis,
 };
+
+/**
+ * A row in the Connections list that opens something: an icon, what it is, what
+ * state it is in, and a chevron. Three copies of this markup sat inline, which
+ * is how two of them ended up a size apart from the third.
+ */
+function SettingsNavRow({
+  icon: Icon,
+  title,
+  detail,
+  onClick
+}: {
+  icon: LucideIcon;
+  title: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="settings-nav-row" type="button" onClick={onClick}>
+      <span className="settings-nav-row-icon" aria-hidden="true">
+        <Icon size={20} strokeWidth={1.9} />
+      </span>
+      <span className="settings-nav-row-copy">
+        <strong>{title}</strong>
+        <span>{detail}</span>
+      </span>
+      <ChevronRight
+        className="settings-row-chevron"
+        size={20}
+        strokeWidth={2}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
 
 function platformLabel(info: AppInfo): string {
   const name = PLATFORM_LABELS[info.platform] ?? info.platform;
@@ -171,6 +189,19 @@ interface SettingsViewProps {
       only asks for it. */
   onTrainingSignIn: () => void;
 }
+
+const UNIT_SYSTEMS = [
+  {
+    value: "metric" as const,
+    label: "Metric",
+    detail: "Kilometres, metres, min/km, kilograms"
+  },
+  {
+    value: "imperial" as const,
+    label: "Imperial",
+    detail: "Miles, feet, min/mi, pounds, yards"
+  }
+];
 
 const THEME_MODES = [
   { id: "dark" as const, label: "Dark", icon: Moon },
@@ -506,155 +537,125 @@ export function SettingsView({
       </div>
 
       <div className="panel settings-connections-panel">
-        <div className="settings-connections-heading">
-          <span className="settings-connections-icon" aria-hidden="true">
-            <Link2 size={22} strokeWidth={1.9} />
+        <div className="settings-section-head">
+          <span className="settings-section-icon" aria-hidden="true">
+            <Link2 size={18} strokeWidth={1.9} />
           </span>
           <div>
-            <p className="eyebrow">Integrations</p>
             <h2>Connections</h2>
-            <p>
-              Accounts and services Heracles Records talks to on your behalf.
-            </p>
+            <p>Accounts and services Heracles Records talks to on your behalf.</p>
           </div>
         </div>
 
         <div className="settings-connections-list">
           {trainingStatus?.authenticated ? (
-            <CorosConnectionCard
-              embedded
+            <CorosConnectionRow
               status={trainingStatus}
               busy={trainingBusy}
               onRefresh={onTrainingRefresh}
               onLogout={onTrainingLogout}
             />
           ) : (
-            <button
-              className="settings-nav-row"
-              type="button"
+            <SettingsNavRow
+              icon={Watch}
+              title="COROS account"
+              detail={
+                trainingStatus?.rememberCredentials && trainingStatus?.email
+                  ? `Not connected. Sign in as ${trainingStatus.email} to sync activities and workouts.`
+                  : "Not connected. Sign in to sync activities and workouts."
+              }
               onClick={onTrainingSignIn}
-            >
-              <span className="settings-nav-row-icon" aria-hidden="true">
-                <Watch size={22} strokeWidth={1.9} />
-              </span>
-              <span className="settings-nav-row-copy">
-                <strong>COROS account</strong>
-                <span>
-                  {trainingStatus?.rememberCredentials && trainingStatus?.email
-                    ? `Not connected. Sign in as ${trainingStatus.email} to sync activities and workouts.`
-                    : "Not connected. Sign in to sync activities and workouts."}
-                </span>
-              </span>
-              <ChevronRight
-                className="settings-storage-link-chevron"
-                size={20}
-                strokeWidth={2}
-                aria-hidden="true"
-              />
-            </button>
+            />
           )}
 
-          <button
-            className="settings-nav-row"
-            type="button"
+          <SettingsNavRow
+            icon={Server}
+            title="MCP Servers"
+            detail={mcpSummaryLine(mcpSummary)}
             onClick={() => setMcpModalOpen(true)}
-          >
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <Server size={22} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>MCP Servers</strong>
-              <span>{mcpSummaryLine(mcpSummary)}</span>
-            </span>
-            <ChevronRight
-              className="settings-storage-link-chevron"
-              size={20}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-          </button>
+          />
 
-          <button
-            className="settings-nav-row"
-            type="button"
+          <SettingsNavRow
+            icon={BrainCircuit}
+            title="Coach Models"
+            detail={coachModelsSummaryLine(coachModels)}
             onClick={() => setCoachModelsOpen(true)}
-          >
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <BrainCircuit size={22} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>Coach Models</strong>
-              <span>{coachModelsSummaryLine(coachModels)}</span>
-            </span>
-            <ChevronRight
-              className="settings-storage-link-chevron"
-              size={20}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-          </button>
+          />
         </div>
       </div>
 
       <SyncPanel api={api} />
-      <BackupPanel api={api} />
 
-      <div className="panel settings-units-panel">
-        <div className="settings-units-heading">
-          <span className="settings-units-icon" aria-hidden="true">
-            <Ruler size={22} strokeWidth={1.9} />
+      {/* Measurements is a two-way switch, so it is a row, not a card. It had a
+          44px icon, an eyebrow, a 26px heading, two lines of explanation and a
+          pair of 72px radio cards listing the units each system uses — a page
+          of chrome around one binary choice most people make once and never
+          revisit. The unit lists are what the switch names anyway, so they
+          moved to the option's `title`. */}
+      <div className="panel settings-compact-panel">
+        <div className="settings-compact-head">
+          <span className="settings-compact-icon" aria-hidden="true">
+            <Ruler size={18} strokeWidth={1.9} />
           </span>
-          <div>
-            <p className="eyebrow">Measurements</p>
-            <h2>Units</h2>
-            <p>
-              Choose how distance, pace, elevation, swimming, and strength
-              values appear throughout Heracles Records.
-            </p>
+          <div className="settings-compact-copy">
+            <strong>Units</strong>
+            <span>
+              How distance, pace, elevation, swimming and strength values appear
+              throughout Heracles Records.
+            </span>
           </div>
-        </div>
-        <div className="settings-unit-options" role="radiogroup" aria-label="Unit system">
-          {([
-            {
-              value: "metric" as const,
-              label: "Metric",
-              detail: "Kilometres, metres, min/km, kilograms"
-            },
-            {
-              value: "imperial" as const,
-              label: "Imperial",
-              detail: "Miles, feet, min/mi, pounds, yards"
-            }
-          ]).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={unitSystem === option.value}
-              className={unitSystem === option.value ? "is-active" : ""}
-              onClick={() => setUnitSystem(option.value)}
-            >
-              <span className="settings-unit-radio" aria-hidden="true" />
-              <span>
-                <strong>{option.label}</strong>
-                <small>{option.detail}</small>
-              </span>
-            </button>
-          ))}
+          <div
+            className="settings-segment"
+            role="radiogroup"
+            aria-label="Unit system"
+          >
+            {UNIT_SYSTEMS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={unitSystem === option.value}
+                title={option.detail}
+                className={`settings-segment-option${
+                  unitSystem === option.value ? " is-active" : ""
+                }`}
+                onClick={() => setUnitSystem(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="panel settings-sport-panel">
-        <div className="section-heading settings-sport-heading">
-          <div>
-            <p className="eyebrow">Appearance</p>
-            <h2>Themes</h2>
+      <div className="panel settings-appearance-panel">
+        {/* Both axes of the theme on one line: the mode switch, the five
+            palettes as swatches, and the selected palette named beside them.
+            The palettes were five 220px cards carrying a sentence apiece —
+            "Cool and low-glare for long sessions" — which is read once and
+            never again, and which cost the section four hundred pixels for a
+            choice made by looking at the colour. The sentence is not lost: the
+            active one is shown under the row, and each swatch carries its own
+            as a title. */}
+        <div className="settings-appearance-head">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden="true">
+              <Palette size={18} strokeWidth={1.9} />
+            </span>
+            <div>
+              <h2>Appearance</h2>
+              <p>Colour mode, accent palette and the colours sports wear.</p>
+            </div>
           </div>
-          <div className="settings-theme-mode" role="group" aria-label="Color mode">
+          <div
+            className="settings-segment"
+            role="group"
+            aria-label="Color mode"
+          >
             {THEME_MODES.map((mode) => (
               <button
                 key={mode.id}
-                className={`settings-theme-mode-option${theme === mode.id ? " is-active" : ""}`}
+                className={`settings-segment-option${theme === mode.id ? " is-active" : ""}`}
                 type="button"
                 aria-pressed={theme === mode.id}
                 onClick={(event) => {
@@ -671,90 +672,90 @@ export function SettingsView({
             ))}
           </div>
         </div>
-        <p className="settings-sport-hint">
-          The palette recolours buttons, links, charts and highlights. Light and
-          dark are independent of it — every palette ships both.
-        </p>
-        <ul className="settings-theme-list">
-          {ACCENT_PALETTES.map((palette) => {
-            const detail = ACCENT_PALETTE_DETAILS[palette];
-            const active = accent === palette;
-            const swatchStyle = {
-              "--swatch-from": detail.swatch[0],
-              "--swatch-to": detail.swatch[1]
-            } as CSSProperties;
 
-            return (
-              <li key={palette}>
-                <button
-                  className={`settings-theme-option${active ? " is-active" : ""}`}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setAccent(palette, {
-                      x: rect.left + rect.width / 2,
-                      y: rect.top + rect.height / 2
-                    });
-                  }}
-                >
-                  <span
-                    className="settings-theme-swatch"
-                    style={swatchStyle}
-                    aria-hidden="true"
-                  />
-                  <span className="settings-theme-copy">
-                    <strong>{detail.label}</strong>
-                    <span>{detail.description}</span>
-                  </span>
-                  {active ? (
-                    <Check size={17} strokeWidth={2.4} aria-hidden="true" />
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="settings-palette-row">
+          <ul className="settings-palette-swatches">
+            {ACCENT_PALETTES.map((palette) => {
+              const detail = ACCENT_PALETTE_DETAILS[palette];
+              const active = accent === palette;
+              const swatchStyle = {
+                "--swatch-from": detail.swatch[0],
+                "--swatch-to": detail.swatch[1]
+              } as CSSProperties;
 
-        <div className="section-heading settings-sport-heading settings-sport-subheading">
-          <div>
-            <h2>Activity colors</h2>
+              return (
+                <li key={palette}>
+                  <button
+                    className={`settings-palette-option${active ? " is-active" : ""}`}
+                    type="button"
+                    aria-pressed={active}
+                    title={`${detail.label} — ${detail.description}`}
+                    aria-label={detail.label}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setAccent(palette, {
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2
+                      });
+                    }}
+                  >
+                    <span
+                      className="settings-theme-swatch"
+                      style={swatchStyle}
+                      aria-hidden="true"
+                    />
+                    {active ? (
+                      <Check size={15} strokeWidth={3} aria-hidden="true" />
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {/* The one sentence still worth showing, and it belongs to whichever
+              swatch is selected — so the row stays readable without five
+              copies of it. */}
+          <p className="settings-palette-caption">
+            <strong>{ACCENT_PALETTE_DETAILS[accent].label}</strong>
+            <span>{ACCENT_PALETTE_DETAILS[accent].description}</span>
+          </p>
+        </div>
+
+        {/* A secondary control, and sized like one. Five full rows with an
+            icon tile, a sentence of description and a 164px picker apiece ran
+            to roughly four hundred pixels for a preference most people set
+            once; the chips carry the same two facts — which sport, which
+            colour — in a fifth of the height. The per-sport descriptions went
+            with them: the label already names the sport, and the sentence
+            under it only listed examples of the thing it had just named. */}
+        <div className="settings-sport-subheading">
+          <div className="settings-sport-subheading-copy">
+            <strong>Activity colors</strong>
+            <span>
+              Used by the training load heatmap and the calendar. A day with one
+              sport is solid; several sports split into a wheel.
+            </span>
           </div>
           <button
-            className="secondary-button"
+            className="settings-sport-reset"
             type="button"
             onClick={resetSportColors}
           >
-            <RefreshCw size={15} aria-hidden="true" />
-            Reset to defaults
+            <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
+            Reset
           </button>
         </div>
-        <p className="settings-sport-hint">
-          Color activities by sport across the training load heatmap and
-          calendar. A day with one sport uses a solid color; days with several
-          sports are split into a color wheel.
-        </p>
-        <ul className="settings-sport-list">
+        <ul className="settings-sport-chips">
           {SPORT_COLOR_CATEGORIES.map((cat) => {
-            const { description, icon: SportIcon } = SPORT_COLOR_DETAILS[cat];
             const colorStyle = {
               "--sport-color": sportColors[cat],
             } as CSSProperties;
 
+            const SportIcon = SPORT_COLOR_ICONS[cat];
+
             return (
-              <li
-                className="settings-sport-row"
-                key={cat}
-                style={colorStyle}
-              >
-                <span className="settings-sport-icon" aria-hidden="true">
-                  <SportIcon size={21} strokeWidth={2.1} />
-                </span>
-                <span className="settings-sport-copy">
-                  <strong>{SPORT_COLOR_LABELS[cat]}</strong>
-                  <span>{description}</span>
-                </span>
-                <label className="settings-sport-picker">
+              <li key={cat} style={colorStyle}>
+                <label className="settings-sport-chip">
                   <input
                     type="color"
                     className="settings-sport-input"
@@ -764,46 +765,47 @@ export function SettingsView({
                     }
                     aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
                   />
-                  <span className="settings-sport-swatch" aria-hidden="true" />
+                  <span className="settings-sport-swatch" aria-hidden="true">
+                    <SportIcon size={14} strokeWidth={2.2} />
+                  </span>
+                  <span className="settings-sport-chip-label">
+                    {SPORT_COLOR_LABELS[cat]}
+                  </span>
                   <span className="settings-sport-hex">
                     {sportColors[cat].toUpperCase()}
                   </span>
-                  <ChevronDown size={18} strokeWidth={2} aria-hidden="true" />
                 </label>
               </li>
             );
           })}
         </ul>
-        <div className="settings-sport-tip">
-          <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
-          <p>
-            <strong>Tip:</strong> These colors are used in your training load
-            heatmap and calendar.
-          </p>
-        </div>
       </div>
 
-      <div className="panel settings-storage-panel">
-        <p className="eyebrow">Storage</p>
+      <BackupPanel api={api} />
+
+      {/* The same compact row, with the whole head as the control: this panel
+          is one link to a subpage, so an eyebrow above a 46px row spent a card
+          saying what a row already said. */}
+      <div className="panel settings-compact-panel">
         <button
-          className="settings-storage-link"
+          className="settings-compact-head is-link"
           type="button"
           onClick={() => setSettingsPage("storage")}
         >
-          <span className="settings-storage-link-icon" aria-hidden="true">
-            <HardDrive size={22} strokeWidth={1.9} />
+          <span className="settings-compact-icon" aria-hidden="true">
+            <HardDrive size={18} strokeWidth={1.9} />
           </span>
-          <span className="settings-storage-link-copy">
-            <strong>On this computer</strong>
+          <span className="settings-compact-copy">
+            <strong>Storage on this computer</strong>
             <span>
               {appInfo
-                ? `${appInfo.storageLocations.length} storage locations`
-                : "Downloads, projects, caches, and app data"}
+                ? `Downloads, projects, caches and app data — ${appInfo.storageLocations.length} locations.`
+                : "Downloads, projects, caches and app data."}
             </span>
           </span>
           <ChevronRight
-            className="settings-storage-link-chevron"
-            size={20}
+            className="settings-row-chevron"
+            size={18}
             strokeWidth={2}
             aria-hidden="true"
           />

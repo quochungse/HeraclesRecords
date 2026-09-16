@@ -109,7 +109,7 @@ export function ChatSettingsPanel({
           <span>{coachModelsSummary ?? "Checking connections…"}</span>
         </span>
         <ChevronRight
-          className="settings-storage-link-chevron"
+          className="settings-row-chevron"
           size={20}
           strokeWidth={2}
           aria-hidden="true"

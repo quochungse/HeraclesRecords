@@ -21,6 +21,23 @@ interface SyncPanelProps {
   api: CorosLinkApi;
 }
 
+/**
+ * The last answer this window got, kept outside the component.
+ *
+ * Settings is unmounted every time the athlete leaves it, so the panel used to
+ * come back with `status === null` and render a "Loading sync status…" line in
+ * place of the whole card — the rows below it jumped, the card resized, and the
+ * same numbers reappeared a round trip later. The status is the same on remount
+ * as it was on unmount in every case that matters, so it is painted straight
+ * away and the refresh that follows only corrects it. A stale destination shown
+ * for one round trip is a far smaller lie than a card that empties itself.
+ *
+ * Module scope, not a ref: a ref dies with the component, which is exactly the
+ * moment being covered here.
+ */
+let cachedStatus: SyncStatus | null = null;
+let cachedAccount: GoogleAccountInfo | null = null;
+
 const BACKENDS: ReadonlyArray<{
   readonly value: SyncBackend;
   readonly label: string;
@@ -29,6 +46,13 @@ const BACKENDS: ReadonlyArray<{
   { value: "local", label: "Local", Icon: HardDrive },
   { value: "google", label: "Google Drive", Icon: Cloud }
 ];
+
+/** How long a read may be out before the corner chip says so. */
+const REFRESH_NOTICE_DELAY_MS = 400;
+
+const SYNC_DESCRIPTION =
+  "Keeps your conversations, plans and preferences the same on every computer " +
+  "signed in to the same COROS account. Sign-ins never leave this machine.";
 
 /**
  * Where this machine's data meets the other one's.
@@ -39,8 +63,13 @@ const BACKENDS: ReadonlyArray<{
  * this vault. It no longer is.
  */
 export function SyncPanel({ api }: SyncPanelProps) {
-  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [status, setStatus] = useState<SyncStatus | null>(() => cachedStatus);
   const [busy, setBusy] = useState<string | null>(null);
+  // True only once a read has been out long enough to be worth mentioning. A
+  // local status answers in a few milliseconds, and while a seed is publishing
+  // this panel re-reads every three seconds — flagged immediately, the corner
+  // chip would blink on every one of those and say nothing.
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   // Set the instant the switch is clicked and cleared when the refresh that
@@ -50,29 +79,49 @@ export function SyncPanel({ api }: SyncPanelProps) {
   // Fetched on its own schedule, never inside `refresh`. It is one Drive round
   // trip and the panel does not need it to render, so making the rows wait for
   // it would trade a working panel for a decorated one.
-  const [account, setAccount] = useState<GoogleAccountInfo | null>(null);
+  const [account, setAccount] = useState<GoogleAccountInfo | null>(
+    () => cachedAccount
+  );
 
   // A refresh that resolves after the component is gone, or after a newer one
   // already landed, must not write its stale answer into state. Switching
   // backends fires exactly that race.
   const liveRef = useRef(true);
   const refreshSeq = useRef(0);
+  const refreshTimer = useRef<number | null>(null);
   useEffect(() => {
     liveRef.current = true;
     return () => {
       liveRef.current = false;
+      if (refreshTimer.current !== null) {
+        window.clearTimeout(refreshTimer.current);
+      }
     };
   }, []);
 
   const refresh = useCallback(async () => {
     const seq = ++refreshSeq.current;
+    if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => {
+      if (liveRef.current && seq === refreshSeq.current) setRefreshing(true);
+    }, REFRESH_NOTICE_DELAY_MS);
     try {
       const next = await api.getSyncStatus();
+      // Written outside the liveness guard on purpose: a reply that lands after
+      // the panel is gone is still the freshest answer, and the next mount is
+      // the one that wants it.
+      cachedStatus = next;
       if (!liveRef.current || seq !== refreshSeq.current) return;
       setStatus(next);
     } catch (cause) {
       if (!liveRef.current || seq !== refreshSeq.current) return;
       setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (seq === refreshSeq.current && refreshTimer.current !== null) {
+        window.clearTimeout(refreshTimer.current);
+        refreshTimer.current = null;
+      }
+      if (liveRef.current && seq === refreshSeq.current) setRefreshing(false);
     }
   }, [api]);
 
@@ -97,7 +146,14 @@ export function SyncPanel({ api }: SyncPanelProps) {
   }, [api, refresh]);
 
   useEffect(() => {
+    // Read before preparing, but only when there is nothing on screen yet.
+    // `prepareSyncVault` probes the destination, which is the slow half, and
+    // nothing it can answer changes what the status already says — so on a cold
+    // mount the early read is what fills the panel, and on a warm one the cache
+    // has already filled it and the read would just be a second round trip.
+    const cold = cachedStatus === null;
     void (async () => {
+      if (cold) await refresh();
       // The main process does this at launch too. This covers a destination
       // chosen after that, and costs one probe of the destination otherwise.
       try {
@@ -132,6 +188,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
   const googleConnected = status?.googleConnected ?? false;
   useEffect(() => {
     if (!googleConnected) {
+      cachedAccount = null;
       setAccount(null);
       return;
     }
@@ -139,11 +196,13 @@ export function SyncPanel({ api }: SyncPanelProps) {
     void api
       .googleDriveAccount()
       .then((info) => {
+        cachedAccount = info;
         if (current) setAccount(info);
       })
       .catch(() => {
-        // Decoration. The row says "Connected" without it.
-        if (current) setAccount(null);
+        // Decoration. The row says "Connected" without it, and a cached address
+        // from a moment ago beats blanking the line.
+        if (current) setAccount(cachedAccount);
       });
     return () => {
       current = false;
@@ -201,12 +260,39 @@ export function SyncPanel({ api }: SyncPanelProps) {
       );
     });
 
+  // The same head either way, so the placeholder and the panel cannot drift
+  // apart — and so the card keeps its shape while the first read is out.
+  const head = (
+    <div className="settings-section-head">
+      <span className="settings-section-icon" aria-hidden="true">
+        <RefreshCw size={18} strokeWidth={1.9} />
+      </span>
+      <div>
+        <h2>Sync</h2>
+        <p>{SYNC_DESCRIPTION}</p>
+      </div>
+      {/* The corner tell. A refresh that has something to correct leaves what
+          is on screen exactly where it is and says so here instead — the panel
+          emptying itself is what used to make this card jump on every visit to
+          Settings. */}
+      {refreshing ? (
+        <span className="sync-heading-refreshing" title="Checking sync status…">
+          <Loader2 size={14} strokeWidth={2} className="spin" />
+          Checking…
+        </span>
+      ) : null}
+    </div>
+  );
+
   if (!status) {
-    // `error` is rendered here too: when getSyncStatus fails there is no status
-    // to build the panel from, and returning only a spinner would leave the
-    // panel saying "loading" forever with the reason invisible.
+    // Only reachable on the very first read of a launch — after that the cached
+    // status carries the panel through every remount. `error` is rendered here
+    // too: when getSyncStatus fails there is no status to build the panel from,
+    // and returning only a spinner would leave the panel saying "loading"
+    // forever with the reason invisible.
     return (
       <div className="panel settings-connections-panel settings-sync-panel">
+        {head}
         <p className="sync-panel-loading">
           {error ?? (
             <>
@@ -266,35 +352,28 @@ export function SyncPanel({ api }: SyncPanelProps) {
         : "No Google account connected yet."
       : (status.folder ?? "No folder chosen yet.");
 
-  // What kind of place this backend is, which stays true throughout a switch —
-  // `backend` is already the side being moved to.
-  const destinationHint =
-    backend === "google"
+  // What kind of place this backend is — and only while the question is still
+  // open. Once a destination is set, the row's second line is the destination
+  // itself, which is the answer; a paragraph explaining what kind of place it
+  // is sat above that answer for the life of the install, saying the same thing
+  // every time. Mid-switch it stays, because nothing is settled yet.
+  const destinationSettled =
+    !switching &&
+    (backend === "google" ? status.googleConnected : Boolean(status.folder));
+  const destinationHint = destinationSettled
+    ? null
+    : backend === "google"
       ? status.googleConnected || switching
         ? "Your Google Drive, in a folder this app creates and can only see its own files in."
         : "Connecting opens your browser to Google — consent happens there, never inside the app."
-      : "A folder on this computer. A folder kept in sync by Dropbox or Drive Desktop can work, but two machines may then run the same scheduled analysis — connect Google Drive directly to avoid that.";
+      : "A folder on this computer. One kept in sync by Dropbox or Drive Desktop works too, though two machines may then run the same scheduled analysis — connecting Google Drive directly avoids that.";
 
   return (
     <div
       className="panel settings-connections-panel settings-sync-panel"
       aria-busy={busy !== null}
     >
-      <div className="settings-connections-heading">
-        <span className="settings-connections-icon" aria-hidden="true">
-          <RefreshCw size={22} strokeWidth={1.9} />
-        </span>
-        <div>
-          <p className="eyebrow">Two machines, one account</p>
-          <h2>Sync</h2>
-          <p>
-            Keeps your conversations, plans and preferences the same on every
-            computer you sign in to with the same COROS account, through a
-            folder you control or your own Google Drive. Sign-ins stay on each
-            machine and never travel.
-          </p>
-        </div>
-      </div>
+      {head}
 
       <div className="settings-connections-list">
         {/* One row answers one question. The switch picks the kind of place,
@@ -307,16 +386,16 @@ export function SyncPanel({ api }: SyncPanelProps) {
         >
           <span className="settings-nav-row-icon" aria-hidden="true">
             {switching ? (
-              <Loader2 size={22} strokeWidth={1.9} className="spin" />
+              <Loader2 size={20} strokeWidth={1.9} className="spin" />
             ) : backend === "google" ? (
-              <Cloud size={22} strokeWidth={1.9} />
+              <Cloud size={20} strokeWidth={1.9} />
             ) : (
-              <HardDrive size={22} strokeWidth={1.9} />
+              <HardDrive size={20} strokeWidth={1.9} />
             )}
           </span>
           <span className="settings-nav-row-copy">
             <strong>Where this machine syncs</strong>
-            <span>{destinationHint}</span>
+            {destinationHint ? <span>{destinationHint}</span> : null}
           </span>
           <span
             className="sync-backend-switch"
@@ -408,14 +487,13 @@ export function SyncPanel({ api }: SyncPanelProps) {
         {status.state === "signed-out" ? (
           <div className="settings-nav-row is-static sync-row-alert">
             <span className="settings-nav-row-icon" aria-hidden="true">
-              <UserRound size={22} strokeWidth={1.9} />
+              <UserRound size={20} strokeWidth={1.9} />
             </span>
             <span className="settings-nav-row-copy">
               <strong>Sign in to COROS to sync</strong>
               <span>
-                Your data belongs to your COROS account, and syncing needs to
-                know whose records it is merging. Sign in under Connections,
-                then come back — sync starts on its own.
+                Syncing needs to know whose records it is merging. Sign in under
+                Connections — sync starts on its own.
               </span>
             </span>
           </div>
@@ -424,7 +502,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
         {status.state === "wrong-owner" ? (
           <div className="settings-nav-row is-static sync-row-alert sync-row-stacked">
             <span className="settings-nav-row-icon" aria-hidden="true">
-              <UserRound size={22} strokeWidth={1.9} />
+              <UserRound size={20} strokeWidth={1.9} />
             </span>
             <span className="settings-nav-row-copy">
               <strong>This vault holds another account's data</strong>
@@ -459,7 +537,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
         {status.state === "unreachable" && !switching ? (
           <div className="settings-nav-row is-static sync-row-alert">
             <span className="settings-nav-row-icon" aria-hidden="true">
-              <AlertTriangle size={22} strokeWidth={1.9} />
+              <AlertTriangle size={20} strokeWidth={1.9} />
             </span>
             <span className="settings-nav-row-copy">
               <strong>That destination did not answer</strong>
@@ -496,9 +574,9 @@ export function SyncPanel({ api }: SyncPanelProps) {
           >
             <span className="settings-nav-row-icon" aria-hidden="true">
               {seed.state === "failed" ? (
-                <AlertTriangle size={22} strokeWidth={1.9} />
+                <AlertTriangle size={20} strokeWidth={1.9} />
               ) : (
-                <Loader2 size={22} strokeWidth={1.9} className="spin" />
+                <Loader2 size={20} strokeWidth={1.9} className="spin" />
               )}
             </span>
             <span className="settings-nav-row-copy">
@@ -520,9 +598,9 @@ export function SyncPanel({ api }: SyncPanelProps) {
           <div className="settings-nav-row is-static">
             <span className="settings-nav-row-icon" aria-hidden="true">
               {busy === "syncnow" ? (
-                <Loader2 size={22} strokeWidth={1.9} className="spin" />
+                <Loader2 size={20} strokeWidth={1.9} className="spin" />
               ) : (
-                <CloudUpload size={22} strokeWidth={1.9} />
+                <CloudUpload size={20} strokeWidth={1.9} />
               )}
             </span>
             <span className="settings-nav-row-copy">

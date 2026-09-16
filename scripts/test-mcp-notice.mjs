@@ -51,10 +51,15 @@ assert.ok(
   `no sidebar item is called "${view}" — MCP_CONNECT_LOCATION is stale`
 );
 
+// Both shapes count. A heading spells its label as element text; a row built
+// from `SettingsNavRow` passes it as a prop, and the three rows in Connections
+// were collapsed onto that component precisely so they could not drift apart.
+// What this asserts is that Settings still names the place the copy sends
+// people to — not which of the two ways it happens to say it today.
 const settings = read("src/settings/SettingsView.tsx");
 for (const row of rows) {
   assert.ok(
-    settings.includes(`>${row}<`),
+    settings.includes(`>${row}<`) || settings.includes(`"${row}"`),
     `SettingsView renders no "${row}" — MCP_CONNECT_LOCATION is stale`
   );
 }

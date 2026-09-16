@@ -134,101 +134,69 @@ export function BackupPanel({ api }: BackupPanelProps) {
   const working = busy !== null;
 
   return (
-    <div
-      className="panel settings-connections-panel settings-backup-panel"
-      aria-busy={working}
-    >
-      <div className="settings-connections-heading">
-        <span className="settings-connections-icon" aria-hidden="true">
-          <Archive size={22} strokeWidth={1.9} />
+    <div className="panel settings-compact-panel settings-backup-panel" aria-busy={working}>
+      {/* A secondary setting, laid out as one: title, one line of what it does,
+          and the two actions beside it. The three stacked paragraphs and the
+          pair of full-height rows this replaced said the same thing at four
+          times the height, on a card most people open twice a year.
+          Two of the caveats are kept because nothing else says them — the file
+          is scrambled rather than encrypted, and it belongs to one COROS
+          account — and the rest is left to the restore dialog, which is where
+          the choice that needs them is actually made. */}
+      <div className="settings-compact-head">
+        <span className="settings-compact-icon" aria-hidden="true">
+          <Archive size={18} strokeWidth={1.9} />
         </span>
-        <div>
-          <p className="eyebrow">A file you keep</p>
-          <h2>Backup &amp; Restore</h2>
-          <p>
-            Save everything you have written — conversations, plans, routes,
-            preferences — to a single file you choose the home of, and read it
-            back whenever you need it. A backup belongs to the COROS account
-            that made it and will not restore into another one. Sign-ins are
-            never in it, so restoring never costs you an account.
-          </p>
+        <div className="settings-compact-copy">
+          <strong>Backup &amp; Restore</strong>
+          <span>
+            Everything you have written, in one file you keep — scrambled, not
+            encrypted. Sign-ins are never in it, and it only restores into the
+            COROS account that made it.
+          </span>
         </div>
-      </div>
-
-      <div className="settings-connections-list">
-        <div className="settings-nav-row is-static">
-          <span className="settings-nav-row-icon" aria-hidden="true">
-            {busy === "export" ? (
-              <Loader2 size={22} strokeWidth={1.9} className="spin" />
-            ) : (
-              <Download size={22} strokeWidth={1.9} />
-            )}
-          </span>
-          <span className="settings-nav-row-copy">
-            <strong>Save a backup</strong>
-            <span>
-              Writes one file. Its contents are scrambled, so a preview, a
-              search index or a glance at the folder shows nothing — but the key
-              ships inside the app, so this is not encryption: anyone with
-              Heracles Records can open it. Keep it where you would keep a
-              diary.
-            </span>
-          </span>
+        <div className="settings-compact-actions">
           <button
             type="button"
-            className="primary-button"
+            className="secondary-button"
             onClick={exportBackup}
             disabled={working}
           >
             {busy === "export" ? (
-              <Loader2 size={15} strokeWidth={2} className="spin" />
-            ) : null}
+              <Loader2 size={14} strokeWidth={2} className="spin" />
+            ) : (
+              <Download size={14} strokeWidth={2} />
+            )}
             Save backup…
           </button>
-        </div>
-
-        <div className="settings-nav-row is-static">
-          <span className="settings-nav-row-icon" aria-hidden="true">
-            {busy === "choose" || busy === "restore" ? (
-              <Loader2 size={22} strokeWidth={1.9} className="spin" />
-            ) : (
-              <Upload size={22} strokeWidth={1.9} />
-            )}
-          </span>
-          <span className="settings-nav-row-copy">
-            <strong>Restore from a backup</strong>
-            <span>
-              Pick a file you saved earlier — including one from an older
-              version. If this computer already has data, you will be asked
-              whether to override it or merge.
-            </span>
-          </span>
           <button
             type="button"
             className="secondary-button"
             onClick={chooseBackup}
             disabled={working}
           >
-            {busy === "choose" ? (
-              <Loader2 size={15} strokeWidth={2} className="spin" />
-            ) : null}
-            Choose file…
+            {busy === "choose" || busy === "restore" ? (
+              <Loader2 size={14} strokeWidth={2} className="spin" />
+            ) : (
+              <Upload size={14} strokeWidth={2} />
+            )}
+            Restore…
           </button>
         </div>
-
-        {error ? (
-          <p className="sync-panel-note is-error">
-            <AlertTriangle size={14} strokeWidth={2} />
-            {error}
-          </p>
-        ) : null}
-        {message && !error ? (
-          <p className="sync-panel-note">
-            <Check size={14} strokeWidth={2} />
-            {message}
-          </p>
-        ) : null}
       </div>
+
+      {error ? (
+        <p className="sync-panel-note is-error">
+          <AlertTriangle size={14} strokeWidth={2} />
+          {error}
+        </p>
+      ) : null}
+      {message && !error ? (
+        <p className="sync-panel-note">
+          <Check size={14} strokeWidth={2} />
+          {message}
+        </p>
+      ) : null}
 
       <BackupRestoreModal
         candidate={candidate}
