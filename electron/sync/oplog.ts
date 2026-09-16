@@ -34,6 +34,7 @@
 // comes back sorted.
 
 import { compareHlcStrings, isValidHlc } from "./hlc";
+import { rowMergerFor } from "./rowMergers";
 import {
   normalizeStoragePath,
   type StorageProvider
@@ -344,9 +345,35 @@ export function compactEntries(
   for (const entry of entries) {
     const identity = entryIdentity(entry);
     const current = winners.get(identity);
-    if (!current || compareHlcStrings(entry.hlc, current.hlc) > 0) {
+    if (!current) {
       winners.set(identity, entry);
+      continue;
     }
+    const newer = compareHlcStrings(entry.hlc, current.hlc) > 0 ? entry : current;
+    const older = newer === entry ? current : entry;
+
+    // A record that accumulates is folded, not chosen between. Compaction is
+    // the one place the vault forgets things on purpose, and last-writer-wins
+    // here would forget a turn: two machines appending to one conversation
+    // publish two entries, and the loser is exactly where the other athlete's
+    // half lives. Dropping it means no machine that has not already pulled can
+    // ever see it again.
+    //
+    // The fold is the same union the merge does, so the surviving entry is
+    // what every reader would have computed anyway — and it is one entry, so
+    // this costs nothing the old shape was buying.
+    const merger =
+      newer.op === "set" && older.op === "set" && newer.scope === "table"
+        ? rowMergerFor(newer.key)
+        : undefined;
+    if (merger) {
+      const folded = merger(older.payload ?? {}, newer.payload ?? {}, {
+        winner: true
+      });
+      winners.set(identity, { ...newer, payload: folded.row });
+      continue;
+    }
+    winners.set(identity, newer);
   }
 
   const survivors: OpEntry[] = [];

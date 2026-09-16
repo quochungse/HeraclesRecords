@@ -51,7 +51,26 @@ export interface RowMerge {
   readonly republish: boolean;
 }
 
-export type RowMerger = (local: SyncRow | undefined, incoming: SyncRow) => RowMerge;
+export interface RowMergeContext {
+  /**
+   * Whether this entry won last-writer-wins for its record.
+   *
+   * A merged table folds *every* entry, not only the winner — that is the whole
+   * point, and it is what stops one machine's turn being dropped because
+   * another's was a second later. But only the columns this table merges may
+   * come from a loser: a title renamed on the winning machine must not be
+   * undone by an older entry that happened to be folded after it. A loser
+   * therefore returns its primary key and its merged columns and nothing else,
+   * which `upsertRow` writes without touching the rest.
+   */
+  readonly winner: boolean;
+}
+
+export type RowMerger = (
+  local: SyncRow | undefined,
+  incoming: SyncRow,
+  context: RowMergeContext
+) => RowMerge;
 
 /**
  * Identity of a transcript entry, for the union.
@@ -88,12 +107,15 @@ export function transcriptEntryId(
  * and a duplicate is the better half of that trade.
  */
 function legacyEntryId(entry: PersistedChatEntry, index: number): string {
-  const digest = crypto
+  return `0-${String(index).padStart(6, "0")}-${contentDigest(entry)}`;
+}
+
+function contentDigest(entry: PersistedChatEntry): string {
+  return crypto
     .createHash("sha1")
     .update(contentKey(entry))
     .digest("hex")
     .slice(0, 8);
-  return `0-${String(index).padStart(6, "0")}-${digest}`;
 }
 
 function revisionOf(entry: PersistedChatEntry): string {
@@ -185,33 +207,29 @@ function identify(
   const queues = new Map<string, string[]>();
   for (const [key, ids] of lendable) queues.set(key, [...ids]);
 
-  const ids: string[] = [];
-  let anchor: string | null = null;
-  let nudge = 0;
-  entries.forEach((entry, index) => {
-    if (entry.mid) {
-      ids.push(entry.mid);
-      anchor = entry.mid;
-      nudge = 0;
-      return;
-    }
+  return entries.map((entry, index) => {
+    if (entry.mid) return entry.mid;
     const borrowed = queues.get(contentKey(entry))?.shift();
-    if (borrowed) {
-      ids.push(borrowed);
-      anchor = borrowed;
-      nudge = 0;
-      return;
-    }
-    if (anchor) {
-      ids.push(`${anchor}~${String(nudge).padStart(4, "0")}`);
-      nudge += 1;
-      return;
-    }
-    // Nothing identified before it either: a transcript written entirely
-    // before any of this. See `legacyEntryId`.
-    ids.push(legacyEntryId(entry, index));
+    if (borrowed) return borrowed;
+    // Whatever is left is an entry no machine has ever identified — an old
+    // build appending a turn. Its id is a function of the entry and where it
+    // sits and *nothing else*, which is the property that matters more than any
+    // other here.
+    //
+    // An earlier version anchored it to the entry before it, to keep it where
+    // it was written. That reads better and is wrong: the id then depends on
+    // what the rest of the array happened to hold, so the same turn was
+    // identified one way in the entry that first carried it and another way in
+    // the union republished afterwards — both of which sit in the log — and a
+    // machine folding both added the turn twice. Measured.
+    //
+    // The cost is ordering, not data: a `0-` id sorts before every minted `1-`
+    // one, so a turn appended on an old build to a conversation the new build
+    // had already identified lands at the top of it rather than the end. That
+    // lasts until every machine is upgraded, and it is the better half of the
+    // trade against a transcript that doubles.
+    return legacyEntryId(entry, index);
   });
-  return ids;
 }
 
 function parseTranscript(value: unknown): PersistedChatEntry[] | null {
@@ -299,7 +317,13 @@ export function mergeTranscripts(
  * The transcript column is merged; every other column is last-writer-wins, and
  * the caller has already decided that this entry is the winner.
  */
-const mergeChatSession: RowMerger = (local, incoming) => {
+const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
+  // What a loser is allowed to carry: the key that names the row, and the one
+  // column this table merges.
+  const onlyMerged = (messagesJson: unknown): SyncRow => ({
+    id: incoming.id,
+    messages_json: messagesJson
+  });
   const localEntries = parseTranscript(local?.messages_json);
   const incomingEntries = parseTranscript(incoming.messages_json);
 
@@ -307,28 +331,40 @@ const mergeChatSession: RowMerger = (local, incoming) => {
     // Nothing readable arrived. When this machine holds a transcript it can
     // read, the column is left out of the row entirely rather than overwritten:
     // `upsertRow` names the columns it writes, so leaving one out means
-    // *unchanged*. Everything else the entry carries still applies.
+    // *unchanged*. Everything else the entry carries still applies — unless it
+    // lost, in which case there is nothing left for it to say.
     if (localEntries) {
       const { messages_json: _unreadable, ...rest } = incoming;
-      return { row: rest, republish: false };
+      return { row: winner ? rest : { id: incoming.id }, republish: false };
     }
     return { row: incoming, republish: false };
   }
   // A row this machine has never seen. There is no second half to union, and
   // taking the entry whole is what every other table does.
   if (!localEntries) {
-    return { row: incoming, republish: false };
+    return {
+      row: winner ? incoming : onlyMerged(incoming.messages_json),
+      republish: false
+    };
   }
 
   const merged = mergeTranscripts(localEntries, incomingEntries);
   const mergedJson = JSON.stringify(merged);
   if (mergedJson === incoming.messages_json) {
     // The incoming row already holds everything this machine does.
-    return { row: incoming, republish: false };
+    return {
+      row: winner ? incoming : onlyMerged(incoming.messages_json),
+      republish: false
+    };
   }
   return {
-    row: { ...incoming, messages_json: mergedJson },
-    republish: true
+    row: winner
+      ? { ...incoming, messages_json: mergedJson }
+      : onlyMerged(mergedJson),
+    // Only what the vault does not hold. A loser's merge always differs from
+    // the entry it came from — the winner's half is in it — so saying
+    // "republish" on that alone would put a batch in the air on every pull.
+    republish: mergedJson !== JSON.stringify(localEntries)
   };
 };
 
@@ -338,4 +374,16 @@ const MERGERS: Readonly<Record<string, RowMerger>> = {
 
 export function rowMergerFor(table: string): RowMerger | undefined {
   return MERGERS[table];
+}
+
+/**
+ * Whether this table's rows accumulate.
+ *
+ * Asked by the merge itself, which folds every entry for such a record instead
+ * of only the one that won last-writer-wins. Two machines appending to one
+ * conversation publish two entries, and LWW keeps one: the other's turn then
+ * reaches no third machine at all, and compaction drops the entry carrying it.
+ */
+export function isMergedTable(table: string): boolean {
+  return table in MERGERS;
 }

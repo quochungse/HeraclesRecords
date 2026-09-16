@@ -19,6 +19,7 @@
 
 import { compareHlcStrings } from "./hlc";
 import { entryIdentity, type OpEntry } from "./oplog";
+import { isMergedTable } from "./rowMergers";
 import {
   isDeviceEncrypted,
   policyForLocalStorage,
@@ -31,7 +32,12 @@ import {
 /** Where merged state lands. Implemented over SQLite in the main process, and
  *  over plain maps in the suites. */
 export interface SyncTarget {
-  upsertRow(table: string, recordId: string, row: Record<string, unknown>): void;
+  upsertRow(
+    table: string,
+    recordId: string,
+    row: Record<string, unknown>,
+    context?: { readonly winner: boolean }
+  ): void;
   deleteRow(table: string, recordId: string): void;
   setSetting(key: string, value: string): void;
   deleteSetting(key: string): void;
@@ -129,6 +135,23 @@ export interface ApplyOptions {
    * older entry win once its successor had been seen.
    */
   readonly isApplied?: (entry: OpEntry) => boolean;
+  /**
+   * Whether this entry's columns may overwrite what the target holds.
+   *
+   * Winning last-writer-wins is necessary and, for a merged record, not
+   * sufficient: an entry can win the log and still be older than the row here,
+   * which is the case `recordVersions` exists for. Such an entry still has its
+   * merged columns folded — a turn is a turn whenever it was written — but its
+   * *other* columns are stale and must not land, or an append that arrived late
+   * would undo a rename made since.
+   *
+   * Defaults to "the winner is authoritative", which is what a target with no
+   * view of its own rows can say.
+   */
+  readonly isAuthoritative?: (
+    entry: OpEntry,
+    wonLastWriterWins: boolean
+  ) => boolean;
 }
 
 export interface ApplyResult {
@@ -254,9 +277,23 @@ export function applyEntries(
 
   // Apply in causal order so a target that logs or triggers on writes sees a
   // plausible history rather than an arbitrary one.
-  const ordered = [...winners.values()].sort((a, b) =>
-    compareHlcStrings(a.hlc, b.hlc)
-  );
+  //
+  // **A record that accumulates keeps every entry, not only the winner.** Last-
+  // writer-wins asks which single entry describes the record now, which is the
+  // wrong question for a coach transcript: two machines appending to one
+  // conversation publish two entries, and keeping one means the other's turn
+  // reaches no third machine at all — measured, and then compaction drops the
+  // entry that carried it, so it is gone from the vault for good. The union in
+  // `rowMergers` is commutative and idempotent, so folding all of them in HLC
+  // order is both safe and the whole point. Only the winner's *other* columns
+  // are authoritative; see `RowMergeContext`.
+  const ordered = admissible
+    .filter((entry) =>
+      entry.scope === "table" && isMergedTable(entry.key)
+        ? true
+        : winners.get(entryIdentity(entry)) === entry
+    )
+    .sort((a, b) => compareHlcStrings(a.hlc, b.hlc));
 
   const merged: OpEntry[] = [];
 
@@ -287,7 +324,13 @@ export function applyEntries(
             target.upsertRow(
               entry.key,
               entry.recordId as string,
-              entry.payload ?? {}
+              entry.payload ?? {},
+              {
+                winner: (options.isAuthoritative ?? ((_entry, won) => won))(
+                  entry,
+                  winners.get(entryIdentity(entry)) === entry
+                )
+              }
             );
             break;
           case "setting":

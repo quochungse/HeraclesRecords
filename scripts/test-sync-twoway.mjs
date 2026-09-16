@@ -23,6 +23,7 @@ const { createMemoryRecordVersions, createSqliteRecordVersions } = await load(
   "sync/recordVersions.js"
 );
 const { createMemoryOutbox } = await load("sync/outbox.js");
+const { rowMergerFor } = await load("sync/rowMergers.js");
 const {
   SyncLoop,
   COMPACT_INTERVAL_MS,
@@ -54,7 +55,16 @@ function fakeTarget() {
     rows,
     settings,
     storage,
-    upsertRow: (table, id, row) => rows.set(`${table}:${id}`, row),
+    // Merges the way the real target does, through the same `rowMergers`
+    // registry. A map-backed fake that skipped it would let an older append
+    // undo a rename, and would union no transcript — so the rules this whole
+    // file is about would go unexercised everywhere `fakeTarget` is used.
+    upsertRow: (table, id, row, context = { winner: true }) => {
+      const key = `${table}:${id}`;
+      const merger = rowMergerFor(table);
+      const next = merger ? merger(rows.get(key), row, context).row : row;
+      rows.set(key, context.winner ? next : { ...(rows.get(key) ?? {}), ...next });
+    },
     deleteRow: (table, id) => rows.delete(`${table}:${id}`),
     setSetting: (key, value) => settings.set(key, value),
     deleteSetting: (key) => settings.delete(key),
@@ -1264,6 +1274,132 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   );
 }
 
+// Three machines. Two of them append to one conversation while the third is
+// away; the third comes back and pulls both entries at once.
+//
+// This is where last-writer-wins and a merged record part company. `resolve`
+// keeps one entry per record, and for a transcript the loser is exactly where
+// the other athlete's half lives — so the third machine used to receive only
+// the later turn, and compaction then dropped the entry carrying the earlier
+// one. Neither device that had it was at fault and nothing reported anything.
+{
+  const chatStore = await load("chatHistoryStore.js");
+  const db = database.requireDatabase();
+  const root = tempDir("three-machines");
+
+  const session = chatStore.createChatSession("claude-code");
+  chatStore.saveChatSession(session.id, [
+    { kind: "message", role: "user", content: "shared history" }
+  ]);
+  const shared = chatStore.getChatSession(session.id);
+  // Each machine appends through the store, the way the app does, so the turn
+  // is given an identity before it is ever published. Building the payload by
+  // hand would publish an unidentified turn and test a shape the app never
+  // writes.
+  const publish = async (device, turn, title, wallOffset) => {
+    db.prepare(
+      "UPDATE chat_sessions SET messages_json = ?, title = ? WHERE id = ?"
+    ).run(JSON.stringify(shared), title, session.id);
+    chatStore.saveChatSession(session.id, [...shared, turn]);
+    const machine = makeDevice(root, device, { wallOffset });
+    const builder = machine.builder();
+    builder.row(
+      "chat_sessions",
+      session.id,
+      db.prepare("SELECT * FROM chat_sessions WHERE id = ?").get(session.id)
+    );
+    machine.loop.enqueue(builder.entries);
+    await machine.loop.flush();
+  };
+
+  await publish(
+    "aaaaaaaaaaaaaaab",
+    { kind: "message", role: "user", content: "A: my turn" },
+    "FM Trainer",
+    0
+  );
+  await publish(
+    "bbbbbbbbbbbbbbbc",
+    { kind: "message", role: "assistant", content: "B: my turn" },
+    "Renamed on B",
+    60_000
+  );
+
+  // The third machine holds only the shared history and pulls both at once.
+  db.prepare("UPDATE chat_sessions SET messages_json = ? WHERE id = ?").run(
+    JSON.stringify(shared),
+    session.id
+  );
+  const third = new SyncLoop({
+    provider: () => new LocalFolderProvider({ root }),
+    target: new SqliteSyncTarget(),
+    deviceId: () => "cccccccccccccccd",
+    deviceName: () => "third",
+    getSetting: database.getSetting,
+    setSetting: database.setSetting,
+    now: () => Date.now(),
+    setTimer: () => 1,
+    clearTimer: () => {},
+    conditions: () => ({ appActive: true, online: true }),
+    recordVersions: createMemoryRecordVersions(),
+    outbox: createMemoryOutbox()
+  });
+  await third.pull();
+
+  assert.deepEqual(
+    chatStore.getChatSession(session.id).map((entry) => entry.content),
+    ["shared history", "A: my turn", "B: my turn"],
+    "a machine pulling both entries at once keeps both turns"
+  );
+  assert.equal(
+    db.prepare("SELECT title FROM chat_sessions WHERE id = ?").get(session.id).title,
+    "Renamed on B",
+    "and every other column is still last-writer-wins, so the loser cannot undo a rename"
+  );
+
+  // A fourth machine, whose turn was written on a plane and reaches the vault
+  // stamped *below* what the others have already merged. One high-water mark
+  // per record reads that as "not newer" and drops it on every machine for
+  // good, so the mark is per device for a record that accumulates.
+  // Every "machine" in this file shares one database, so publishing from
+  // another one writes over what the third machine holds. Put it back before
+  // the pull: the point is that the older entry has to reach a machine that has
+  // *already* merged past its timestamp.
+  const union = db
+    .prepare("SELECT messages_json, title FROM chat_sessions WHERE id = ?")
+    .get(session.id);
+  await publish(
+    "ddddddddddddddde",
+    { kind: "message", role: "user", content: "D: written offline" },
+    "FM Trainer",
+    -3_600_000
+  );
+  db.prepare("UPDATE chat_sessions SET messages_json = ?, title = ? WHERE id = ?").run(
+    union.messages_json,
+    union.title,
+    session.id
+  );
+  await third.pull();
+
+  const afterOffline = chatStore
+    .getChatSession(session.id)
+    .map((entry) => entry.content);
+  assert.equal(
+    afterOffline.length,
+    4,
+    "an entry older than the record's newest still has its turn folded in"
+  );
+  assert.ok(
+    afterOffline.includes("D: written offline"),
+    "including the one written while that machine was offline"
+  );
+  assert.equal(
+    db.prepare("SELECT title FROM chat_sessions WHERE id = ?").get(session.id).title,
+    "Renamed on B",
+    "and being older is still enough to keep its columns out"
+  );
+}
+
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
@@ -1276,5 +1412,7 @@ console.log(
     "quit flushes what is queued and skips the wait when nothing is, " +
     "a queued change survives the process that made it, " +
     "two machines appending to one conversation both keep their turn, " +
+    "a third pulling both at once keeps both, an entry stamped below the " +
+    "record newest is still folded, " +
     "compaction is interval-gated and one device at a time"
 );

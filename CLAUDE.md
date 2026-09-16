@@ -675,7 +675,39 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     recomputing it later gives the same answer only while whatever it was anchored to is
     still there. And a `messages_json` this build cannot parse is **left out of the row**
     rather than written over one it can — which is only safe because `upsertRow` names
-    its columns, so an omitted one means *unchanged*.
+    its columns, so an omitted one means *unchanged*. **A fallback id depends on the entry and its
+    position and nothing else.** It carries a content digest, because two machines that each
+    appended an unidentified turn would otherwise claim one slot with a turn dropped to
+    settle it — and it must *not* depend on what the rest of the array held. An earlier
+    version anchored such a turn just after the entry before it, which reads better and gave
+    the same turn one identity in the entry that first carried it and another in the union
+    republished afterwards; both sit in the log, and a machine folding the two added the turn
+    twice. The cost is ordering — a `0-` id sorts before every minted `1-` one, so a turn
+    appended on an old build lands at the top of the conversation rather than the end, until
+    every machine is upgraded.
+    **`applyEntries` folds every entry for such a record, not only the winner**, and that is
+    the half that makes the rest worth anything. `resolve` asks which single entry describes
+    the record now, which for a transcript picks one machine's turn and discards the other's:
+    a third machine pulling both at once received only the later one, and compaction then
+    dropped the entry that carried the earlier. So `compactEntries` folds them too — the
+    surviving entry is the union every reader would have computed, and it is still one entry.
+    Only the **winner's other columns** are authoritative (`RowMergeContext.winner`): a loser
+    writes its primary key and the merged column and nothing else, or an older append would
+    undo a rename made on the winning machine.
+    That partial write is why `upsertRow` has two paths. An upsert cannot express it —
+    `INSERT … ON CONFLICT DO UPDATE` builds the candidate row first, so a `NOT NULL` column
+    the payload omits fails the statement before the conflict clause is reached, and
+    `chat_sessions` has four. A payload short of the full column set goes out as an `UPDATE`,
+    falling through to the insert only when the row is not there yet.
+  - **`sync_record_versions` keys a merged record per device, and every other record by
+    the record.** A high-water mark per record answers "is there anything here I do not
+    have" only when a newer entry *replaces* an older one. For a record that accumulates it
+    is the wrong question and it silently drops turns: a turn written on a plane at 10:00
+    reaches the vault after another machine's 11:00 entry has been merged, and 10:00 is not
+    newer than 11:00, so every machine skips it for good. Measured. `versionKey` splits the
+    mark by device for those records — and *only* the fold, because the record's own mark is
+    still stamped and still decides `isAuthoritative`, so an entry older than the row cannot
+    put its title back even while its turn is folded in.
   - **`upsertRow` names its columns; it is not `INSERT OR REPLACE`.** The two differ only
     when a payload is short of a column, and there `REPLACE` rewrites the row so the
     missing column comes back as its default — which is to say NULL, meaning *deleted*

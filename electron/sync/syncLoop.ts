@@ -25,6 +25,7 @@ import {
   shouldApply,
   type RecordVersionStore
 } from "./recordVersions";
+import { isMergedTable } from "./rowMergers";
 import type { OutboxStore } from "./outbox";
 import {
   appendBatch,
@@ -175,6 +176,25 @@ export interface PullResult extends ApplyResult {
   readonly entriesSeen: number;
 }
 
+/**
+ * The mark that says whether an entry still has something to give.
+ *
+ * For most tables that is the record: a newer entry replaces an older one, so
+ * one high-water mark per record answers it.
+ *
+ * A record that **accumulates** needs one mark per *device*. Its entries are
+ * folded rather than chosen between, so an entry being older than the record's
+ * newest says nothing about whether this machine has its contents — and a
+ * single mark drops it. Measured: a turn written offline at 10:00 reaches the
+ * vault after another machine's 11:00 entry has already been merged, and every
+ * machine skipped it for good because 10:00 is not newer than 11:00.
+ */
+function versionKey(entry: OpEntry): string {
+  const identity = entryIdentity(entry);
+  if (entry.scope !== "table" || !isMergedTable(entry.key)) return identity;
+  return `${identity}@${parseHlc(entry.hlc).device}`;
+}
+
 export class SyncLoop {
   readonly #deps: SyncLoopDeps;
   readonly #clock: HlcClock;
@@ -305,7 +325,10 @@ export class SyncLoop {
     // hooks on settings and row writes, and `fullState`'s republish, all end up
     // here. A second door would be a second way to lose a write.
     for (const entry of entries) {
+      // Both marks: this machine's row holds the state, and this machine's own
+      // entry for it has nothing left to fold.
       this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+      this.#deps.recordVersions.set(versionKey(entry), entry.hlc);
     }
     // Durable before it is queued, so the queue is a cache of the table rather
     // than the other way round. Everything between here and a confirmed upload
@@ -503,21 +526,30 @@ export class SyncLoop {
 
       const merged = applyEntries(target, entries, {
         isApplied: (entry) => {
-          const identity = entryIdentity(entry);
+          const key = versionKey(entry);
           return durable(entry)
-            ? !shouldApply(versions, identity, entry.hlc)
-            : this.#localStorageMerged.get(identity) === entry.hlc;
-        }
+            ? !shouldApply(versions, key, entry.hlc)
+            : this.#localStorageMerged.get(key) === entry.hlc;
+        },
+        // Winning the log is not enough to overwrite a row's other columns. An
+        // entry can win and still be older than what is here — a turn written
+        // on a plane reaches the vault after one written since — and its
+        // transcript half is still wanted while its title is not.
+        isAuthoritative: (entry, won) =>
+          won && shouldApply(versions, entryIdentity(entry), entry.hlc)
       });
 
       const incomplete = new Set(target.takeIncomplete?.() ?? []);
       for (const entry of merged.merged) {
-        const identity = entryIdentity(entry);
-        if (durable(entry) && !incomplete.has(identity)) {
-          versions.set(identity, entry.hlc);
-        } else {
-          this.#localStorageMerged.set(identity, entry.hlc);
+        const key = versionKey(entry);
+        if (!durable(entry) || incomplete.has(entryIdentity(entry))) {
+          this.#localStorageMerged.set(key, entry.hlc);
+          continue;
         }
+        versions.set(key, entry.hlc);
+        // The record's own mark moves too, so the column guard above keeps
+        // working for a merged table — `versionKey` only splits the *fold*.
+        versions.set(entryIdentity(entry), entry.hlc);
       }
       return merged;
     };

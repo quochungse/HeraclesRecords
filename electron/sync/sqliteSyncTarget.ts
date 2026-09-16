@@ -146,7 +146,8 @@ export class SqliteSyncTarget implements SyncTarget {
   upsertRow(
     table: string,
     recordId: string,
-    row: Record<string, unknown>
+    row: Record<string, unknown>,
+    context: { readonly winner: boolean } = { winner: true }
   ): void {
     const shape = this.#shapeOf(table);
 
@@ -157,7 +158,7 @@ export class SqliteSyncTarget implements SyncTarget {
     const merger = rowMergerFor(table);
     let republish = false;
     if (merger) {
-      const merged = merger(this.#readRow(table, shape, recordId), row);
+      const merged = merger(this.#readRow(table, shape, recordId), row, context);
       row = merged.row;
       republish = merged.republish;
     }
@@ -186,15 +187,44 @@ export class SqliteSyncTarget implements SyncTarget {
       }
     }
 
-    // An upsert that names its columns, not `INSERT OR REPLACE`. The two differ
-    // only when the payload is short of a column — and there `REPLACE` writes
-    // the row afresh, so the missing column comes back as its default, which is
-    // to say NULL. That is the trap the whole schema has been shaped around: a
-    // column an older or newer build did not send arrived as *deleted* rather
-    // than *unchanged*. Naming the columns leaves everything else alone.
+    // Write what the payload names and leave every other column alone. That is
+    // the trap the whole schema has been shaped around: with `INSERT OR REPLACE`
+    // the row is written afresh, so a column an older or newer build did not
+    // send comes back as its default — which is to say NULL, meaning *deleted*
+    // rather than *unchanged*.
+    //
+    // **A partial payload has to go out as an `UPDATE`.** An upsert cannot do
+    // it: `INSERT … ON CONFLICT DO UPDATE` builds the candidate row first, so a
+    // `NOT NULL` column the payload omits fails the statement before the
+    // conflict clause is ever reached — `chat_sessions` has four of them.
+    // Measured, and it is why this is two paths rather than one clever one.
+    const updatable = columns.filter(
+      (column) => !shape.primaryKey.includes(column)
+    );
+    const keyMatch = shape.primaryKey.map((column) => `${column} = ?`).join(" AND ");
+    const value = (column: string) => toSqlValue(row[column]);
+
+    if (columns.length !== shape.columns.size && updatable.length > 0) {
+      const changed = requireDatabase()
+        .prepare(
+          `UPDATE ${table} SET ${updatable.map((c) => `${c} = ?`).join(", ")} ` +
+            `WHERE ${keyMatch}`
+        )
+        .run([
+          ...updatable.map(value),
+          ...shape.primaryKey.map(value)
+        ]).changes;
+      // A row that is not here yet cannot be updated into existence, so the
+      // insert below still runs — and fails loudly if the payload cannot make a
+      // complete row, which is the honest answer rather than a half-written one.
+      if (changed > 0) {
+        this.#noteRepublish(table, shape, recordId, republish);
+        return;
+      }
+    }
+
     const placeholders = columns.map(() => "?").join(", ");
-    const assignments = columns
-      .filter((column) => !shape.primaryKey.includes(column))
+    const assignments = updatable
       .map((column) => `${column} = excluded.${column}`)
       .join(", ");
     const conflict = assignments
@@ -205,17 +235,28 @@ export class SqliteSyncTarget implements SyncTarget {
         `INSERT INTO ${table} (${columns.join(", ")}) ` +
           `VALUES (${placeholders}) ${conflict}`
       )
-      .run(columns.map((column) => toSqlValue(row[column])));
+      .run(columns.map(value));
 
-    // Read back, not reused. What goes out has to be what this database now
-    // holds — the merged row was built from the arriving payload, which a
-    // machine on an older schema may have sent short of a column, and the
-    // upsert above deliberately left that column alone. Publishing the payload
-    // would announce a row nobody has.
-    if (republish) {
-      const written = this.#readRow(table, shape, recordId);
-      if (written) this.#republish.push({ table, recordId, row: written });
-    }
+    this.#noteRepublish(table, shape, recordId, republish);
+  }
+
+  /**
+   * Queue the row for publishing, read back rather than reused.
+   *
+   * What goes out has to be what this database now holds. The merged row was
+   * built from the arriving payload — which a machine on an older schema may
+   * have sent short of a column, and which a losing entry carries only the
+   * merged columns of — so publishing it would announce a row nobody has.
+   */
+  #noteRepublish(
+    table: string,
+    shape: TableShape,
+    recordId: string,
+    republish: boolean
+  ): void {
+    if (!republish) return;
+    const written = this.#readRow(table, shape, recordId);
+    if (written) this.#republish.push({ table, recordId, row: written });
   }
 
   deleteRow(table: string, recordId: string): void {
