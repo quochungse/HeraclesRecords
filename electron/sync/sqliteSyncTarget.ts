@@ -14,6 +14,8 @@
 import { requireDatabase } from "../database";
 import { policyForTable, RECORD_ID_SEPARATOR } from "./syncPolicy";
 import { toSqlValue } from "./syncableStore";
+import { rowMergerFor } from "./rowMergers";
+import type { RepublishRow } from "./syncEngine";
 import type { SyncTarget } from "./syncEngine";
 
 /** A localStorage write the renderer still has to perform. */
@@ -36,6 +38,22 @@ export class SqliteSyncTarget implements SyncTarget {
   readonly #shapes = new Map<string, TableShape>();
   readonly #pendingLocalStorage: PendingLocalStorageOp[] = [];
   readonly #incomplete = new Set<string>();
+  readonly #republish: RepublishRow[] = [];
+
+  /**
+   * Rows whose merge produced something the vault does not hold, taken and
+   * cleared. See `SyncTarget.takeRepublish`.
+   */
+  takeRepublish(): readonly RepublishRow[] {
+    return this.#republish.splice(0, this.#republish.length);
+  }
+
+  /** See `SyncTarget.transaction`. `better-sqlite3` rolls back if `work`
+   *  throws, which is why `applyEntries` keeps catching per entry: one entry
+   *  this schema cannot hold must not undo the merge around it. */
+  transaction<T>(work: () => T): T {
+    return requireDatabase().transaction(work)();
+  }
 
   /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step, for the
    *  same reason `drainLocalStorage` is. */
@@ -108,12 +126,42 @@ export class SqliteSyncTarget implements SyncTarget {
     return shape;
   }
 
+  /** The row as this database currently holds it, for a merger to union with. */
+  #readRow(
+    table: string,
+    shape: TableShape,
+    recordId: string
+  ): Record<string, unknown> | undefined {
+    const parts = recordId.split(RECORD_ID_SEPARATOR);
+    if (parts.length !== shape.primaryKey.length) return undefined;
+    const where = shape.primaryKey
+      .map((column) => `${column} = ?`)
+      .join(" AND ");
+    return requireDatabase()
+      .prepare(`SELECT * FROM ${table} WHERE ${where}`)
+      .get(parts) as Record<string, unknown> | undefined;
+  }
+
   upsertRow(
     table: string,
     recordId: string,
     row: Record<string, unknown>
   ): void {
     const shape = this.#shapeOf(table);
+
+    // A record that accumulates is unioned with what is already here rather
+    // than replacing it — the coach transcript is the only one, and two
+    // machines adding to the same conversation used to resolve to whichever
+    // wrote last. See `rowMergers.ts`.
+    const merger = rowMergerFor(table);
+    if (merger) {
+      const current = this.#readRow(table, shape, recordId);
+      const merged = merger(current, row);
+      row = merged.row;
+      if (merged.republish) {
+        this.#republish.push({ table, recordId, row: merged.row });
+      }
+    }
 
     // Drop columns this build does not have. An older machine writing a row
     // that a newer schema has since extended, or a newer one writing a column
@@ -136,11 +184,24 @@ export class SqliteSyncTarget implements SyncTarget {
       }
     }
 
+    // An upsert that names its columns, not `INSERT OR REPLACE`. The two differ
+    // only when the payload is short of a column — and there `REPLACE` writes
+    // the row afresh, so the missing column comes back as its default, which is
+    // to say NULL. That is the trap the whole schema has been shaped around: a
+    // column an older or newer build did not send arrived as *deleted* rather
+    // than *unchanged*. Naming the columns leaves everything else alone.
     const placeholders = columns.map(() => "?").join(", ");
+    const assignments = columns
+      .filter((column) => !shape.primaryKey.includes(column))
+      .map((column) => `${column} = excluded.${column}`)
+      .join(", ");
+    const conflict = assignments
+      ? `ON CONFLICT(${shape.primaryKey.join(", ")}) DO UPDATE SET ${assignments}`
+      : `ON CONFLICT(${shape.primaryKey.join(", ")}) DO NOTHING`;
     requireDatabase()
       .prepare(
-        `INSERT OR REPLACE INTO ${table} (${columns.join(", ")}) ` +
-          `VALUES (${placeholders})`
+        `INSERT INTO ${table} (${columns.join(", ")}) ` +
+          `VALUES (${placeholders}) ${conflict}`
       )
       .run(columns.map((column) => toSqlValue(row[column])));
   }

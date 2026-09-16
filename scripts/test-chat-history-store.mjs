@@ -11,7 +11,7 @@ const {
   createChatSession,
   deleteChatSession,
   deriveSessionTitleFromEntries,
-  getChatSession,
+  getChatSession: readChatSession,
   listChatSessions,
   migrateLegacyTranscriptRow,
   parseChatTranscriptJson,
@@ -20,6 +20,23 @@ const {
   setChatSessionPinned,
   setChatSessionTitle
 } = await import(`${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`);
+
+/**
+ * Every entry now carries `mid` and `mrev` so a transcript can be merged entry
+ * by entry rather than row by row — see `sync/rowMergers.ts`. They are minted
+ * from a clock, so they cannot be written into an expected value; the
+ * assertions below are about content, and the bookkeeping has its own block at
+ * the end of this file.
+ */
+const stripMergeMeta = (value) => {
+  if (Array.isArray(value)) return value.map(stripMergeMeta);
+  if (value && typeof value === "object") {
+    const { mid: _mid, mrev: _mrev, ...rest } = value;
+    return rest;
+  }
+  return value;
+};
+const getChatSession = (...args) => stripMergeMeta(readChatSession(...args));
 
 function createMemoryDatabase() {
   /** @type {Map<string, { id: string, provider: string, title: string, messages_json: string, created_at: string, updated_at: string, pinned_at: string | null }>} */
@@ -638,7 +655,9 @@ assert.deepEqual(
   "the trace comes back whole"
 );
 assert.deepEqual(
-  parseChatTranscriptJson(db.getSession(traced.id).messages_json)[1],
+  stripMergeMeta(
+    parseChatTranscriptJson(db.getSession(traced.id).messages_json)[1]
+  ),
   { kind: "automationSilent", automation: marker, at: lookedAt },
   "and it survives the JSON the row actually stores"
 );
@@ -1063,6 +1082,118 @@ assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
     parseChatTranscriptJson(JSON.stringify([oneOffWorkoutEntry]))[0].draft
       .removedAt,
     undefined
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Merge identity. Every entry gets a `mid` it keeps for life and a `mrev` that
+// moves when its content does, which is what lets two machines union a
+// conversation instead of one of them winning it outright. Recovered on every
+// save rather than trusted, because the renderer rebuilds entries field by
+// field on the way here and drops both.
+// ---------------------------------------------------------------------------
+{
+  const db = createMemoryDatabase();
+  const session = createChatSession("claude-code", db);
+  const prompt = {
+    promptId: "p1",
+    question: "How hard on Thursday?",
+    choices: [
+      { id: "c1", label: "Easy", response: "Easy" },
+      { id: "c2", label: "Hard", response: "Hard" }
+    ],
+    allowCustom: false
+  };
+
+  saveChatSession(
+    session.id,
+    [
+      { kind: "message", role: "user", content: "Plan my week" },
+      { kind: "coachPrompt", prompt }
+    ],
+    db
+  );
+  const first = readChatSession(session.id, db);
+  assert.ok(first[0].mid && first[1].mid, "every entry is given an identity");
+  assert.notEqual(first[0].mid, first[1].mid, "and they are distinct");
+  assert.ok(first[0].mid < first[1].mid, "ids sort in the order entries were made");
+
+  // Opening a conversation replays it through this path. The identities have to
+  // come back the same or the row would be rewritten — and, worse, the other
+  // machine would see the same turns arrive under new ids and union them in
+  // beside themselves.
+  const replayed = JSON.parse(JSON.stringify(stripMergeMeta(first)));
+  saveChatSession(session.id, replayed, db, { knownEntryCount: replayed.length });
+  assert.deepEqual(
+    readChatSession(session.id, db).map((entry) => entry.mid),
+    first.map((entry) => entry.mid),
+    "a save that changed nothing recovers every identity by content"
+  );
+  assert.equal(
+    db.getSession(session.id).updatedAt ?? db.getSession(session.id).updated_at,
+    db.getSession(session.id).updated_at,
+    "and the row is not touched"
+  );
+
+  // Answering the card edits it in place. Content no longer matches, so the
+  // identity is recovered from the card's own id and the revision moves — which
+  // is what makes this edit outrank the unanswered copy the other machine holds.
+  const answered = stripMergeMeta(first).map((entry) =>
+    entry.kind === "coachPrompt"
+      ? { ...entry, prompt: { ...entry.prompt, answer: "Easy", selectedChoiceId: "c1" } }
+      : entry
+  );
+  saveChatSession(session.id, answered, db, { knownEntryCount: answered.length });
+  const edited = readChatSession(session.id, db);
+  assert.equal(edited[1].mid, first[1].mid, "an edited card keeps its identity");
+  assert.ok(edited[1].mrev > first[1].mrev, "and its revision moves forward");
+  assert.equal(edited[0].mrev, first[0].mrev, "the entry beside it is untouched");
+
+  // A turn arriving from somewhere this window cannot see keeps its own
+  // identity rather than being renumbered on the way past.
+  const appended = [
+    ...stripMergeMeta(edited),
+    { kind: "message", role: "assistant", content: "Easy it is." }
+  ];
+  saveChatSession(session.id, appended, db, { knownEntryCount: appended.length });
+  const grown = readChatSession(session.id, db);
+  assert.equal(grown.length, 3);
+  assert.deepEqual(
+    grown.slice(0, 2).map((entry) => entry.mid),
+    edited.slice(0, 2).map((entry) => entry.mid),
+    "existing entries keep their identities when one is appended"
+  );
+  assert.ok(grown[2].mid > grown[1].mid, "and the new one sorts after them");
+
+  // A transcript written before any of this exists gets identities that both
+  // machines derive the same way — by position, which is the only thing two
+  // copies of the same history agree on.
+  const legacy = createChatSession("claude-code", db);
+  db.updateSession(
+    legacy.id,
+    "Old",
+    JSON.stringify([
+      { kind: "message", role: "user", content: "written long ago" },
+      { kind: "message", role: "assistant", content: "answered long ago" }
+    ]),
+    "2026-09-01T00:00:00.000Z"
+  );
+  const carried = readChatSession(legacy.id, db);
+  assert.deepEqual(
+    carried.map((entry) => entry.mid),
+    [undefined, undefined],
+    "reading does not mint anything"
+  );
+  saveChatSession(legacy.id, stripMergeMeta(carried), db, { knownEntryCount: 2 });
+  const backfilled = readChatSession(legacy.id, db);
+  assert.deepEqual(
+    backfilled.map((entry) => entry.mid),
+    ["0-000000", "0-000001"],
+    "a backfilled id is the entry's position, so two machines agree on it"
+  );
+  assert.ok(
+    backfilled[1].mid < first[0].mid,
+    "and every backfilled id sorts before every minted one"
   );
 }
 

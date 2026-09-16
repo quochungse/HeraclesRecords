@@ -632,6 +632,45 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     machine upgrading into it re-merges the log once and **repairs** whatever the old guards
     rewound. `npm run test:sync-twoway` drives the whole incident behind a gated provider and
     fails against the old shape.
+  - **A record that accumulates is unioned, not replaced.** Last-writer-wins is right
+    for a row that describes one thing and wrong for one that grows, and the coach
+    transcript is the only one of those: `chat_sessions.messages_json` is an append-only
+    list carried as a single opaque column, so two machines adding to the same
+    conversation resolved to whichever wrote last and the other's turn was gone — no
+    error, nothing in a log. That is the ordinary case rather than a corner, because an
+    analysis runs headless on whichever machine holds the lease while the athlete may be
+    at the other. `rowMergers.ts` holds the one merger; `SqliteSyncTarget.upsertRow`
+    consults it. Every entry carries a `mid` minted once and a `mrev` bumped when its
+    content changes (`chatHistoryStore.stampEntries`), and the merge is union by `mid`,
+    last-writer-wins *per entry* by `mrev`, ordered by `mid` — all three commutative and
+    idempotent, which is what makes it safe on both machines in either order. **A merge
+    that produced something neither side had must be republished** (`takeRepublish`), or
+    the vault's newest entry for that row is the incoming one, which does not hold this
+    machine's half, and compaction folds the entry that did away. It terminates: the
+    other machine unions that against a copy it already equals and publishes nothing.
+    Identities are recovered on every save, never trusted — the renderer rebuilds entries
+    field by field and drops both fields — **by content first, then by the card's own
+    id**, never by position: a save whose array is shorter than the row would read an
+    unrelated entry at the same index as an edit of it and take over its identity.
+    `foreignTail` compares content with both fields stripped for the same reason.
+    `test:sync-engine` asserts the three properties directly, `test:chat-history-store`
+    the identity rules, `test:sync-twoway` the whole round.
+  - **`upsertRow` names its columns; it is not `INSERT OR REPLACE`.** The two differ only
+    when a payload is short of a column, and there `REPLACE` rewrites the row so the
+    missing column comes back as its default — which is to say NULL, meaning *deleted*
+    rather than *unchanged*. That is the trap `coach_analysis_local_triggers` exists to
+    avoid, and naming the columns removes it at the source. A row this build could take
+    only part of is reported through `takeIncomplete` and **not** stamped durably, so a
+    later build that learns the columns can apply the entry again.
+  - **A merge is one transaction.** `applyEntries` and the `recordVersions` stamps commit
+    together, so a crash partway cannot leave a state no device was ever in — an analysis
+    row arriving ahead of the conversation it names — nor stamps claiming rows that never
+    landed. The per-entry `try` inside `applyEntries` still stands: a failed statement
+    does not abort a SQLite transaction, so one unusable entry costs one entry.
+  - **`pull` and `flush` are serialised against each other**, not only inside `tick`.
+    "Sync now" calls both directly. `flushBeforeQuit` deliberately goes *past* that
+    turnstile: quit is bounded by a timeout and its one job is to get the queue out, not
+    to wait on a pull nobody needs finished.
   - **A change made before the vault opens is held, not dropped.** `prepareSync()` waits on
     the COROS re-login at start-up — the vault's owner is the account, so it must — and until
     it returns `syncBridge` has no sink. It used to discard what the hooks handed it: the
@@ -642,6 +681,27 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     is no vault, which is what keeps the buffer to the boot window rather than the life of
     the process. Policy is asked *before* a change is held, so a credential never sits in the
     buffer at all. `npm run test:sync-bridge` covers all three.
+  - **A compaction snapshot summarises the log; it does not shadow it.** `readLog` skips
+    only entries the snapshot holds *by timestamp identity*, never everything at or below
+    its `upTo` — that is a claim that nothing below the line can still arrive, and nothing
+    enforces it. A device holding a queued change goes offline, another compacts, the
+    first comes back and appends a batch stamped before the snapshot: the upload succeeds,
+    `flush` reports it pushed, the file is in the vault, and no reader ever looks at it
+    again. Measured. `COMPACT_HORIZON_MS` was the guard and it only ever covered clock
+    skew; an hour offline is not skew. Duplicates cost nothing — `resolve` is
+    last-writer-wins over whatever it is given — and being invisible costs the write.
+    `npm run test:sync-engine` fails against the old shape.
+  - **The outbound queue is a table, not an array.** `sync_outbox` (`device` tier) takes
+    an entry the moment it is queued and releases it only when the upload returns. What
+    was lost before was never the write — that is in SQLite before an entry is built — but
+    the vault's only notice of it, and nothing could discover the gap: `seedVaultIfNeeded`
+    runs once per vault id and nothing else ever compares this machine against the log. So
+    the two diverged in silence and the other machine settled it the wrong way, its entry
+    built from the stale copy and carrying a newer HLC. `before-quit` narrowed that window
+    and could not close it — `flushBeforeQuit` makes one attempt and returns instantly
+    when offline, which is exactly when the queue is full. `start()` adopts whatever the
+    last launch left. The queue keeps one entry per destination: an older entry for the
+    same record is already dead to every reader.
   - **Quit waits for the queue, and only when there is one.** A change sits out
     `FLUSH_DEBOUNCE_MS` before it is even attempted, so a turn written and an app closed in
     the same breath never reached the vault — and by the rule above, the next launch then

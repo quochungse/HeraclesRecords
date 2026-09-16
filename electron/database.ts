@@ -470,6 +470,20 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       hlc      TEXT NOT NULL
     );
 
+    -- Changes made here that the vault has not confirmed. The queue used to be
+    -- an array in the sync loop, so a change written and the app closed in the
+    -- same breath never reached the other machine — and nothing ever noticed,
+    -- because nothing compares this database against the log. See
+    -- sync/outbox.ts. 'device' in TABLE_POLICY, and written through
+    -- requireDatabase() so queueing a change cannot queue another.
+    CREATE TABLE IF NOT EXISTS sync_outbox (
+      hlc        TEXT PRIMARY KEY,
+      identity   TEXT NOT NULL,
+      entry_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_outbox_identity
+      ON sync_outbox (identity);
+
     -- Every activity trigger asks "what landed after this analysis's
     -- watermark", once per analysis, ordered by start_time.
     CREATE INDEX IF NOT EXISTS idx_training_activities_start_time

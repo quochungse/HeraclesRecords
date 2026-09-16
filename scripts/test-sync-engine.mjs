@@ -318,16 +318,31 @@ const entry = (hlc, overrides = {}) => ({
     snapshot.upTo
   );
 
-  // Batches already covered by the snapshot are not replayed on top of it.
+  // A batch the snapshot already folded in is not parsed into the result twice…
   await appendBatch(storage, "aaaa", history);
   await appendBatch(storage, "aaaa", [
     entry(hlcOf(9), { recordId: "s3", payload: { id: "s3", title: "later" } })
   ]);
   const entries = await readAllEntries(storage);
   assert.deepEqual(
-    entries.map((item) => item.recordId).sort(),
+    entries.map((item) => item.hlc).sort(),
+    [hlcOf(1), hlcOf(2), hlcOf(3), hlcOf(9)],
+    "every entry in the vault is read exactly once"
+  );
+  // …but an entry compaction *superseded* is read again rather than hidden, and
+  // that is deliberate. Skipping by timestamp is a claim that nothing below the
+  // line can still arrive, which nothing enforces — see the late-arrival case
+  // at the end of this file. It costs a duplicate that last-writer-wins folds
+  // away, which is the cheap half of the trade.
+  assert.deepEqual(
+    [...resolve(entries).values()].map((item) => item.recordId).sort(),
     ["s1", "s2", "s3"],
-    "a joining device sees the snapshot plus only what came after it"
+    "and the state a joining device resolves to is the snapshot's"
+  );
+  assert.equal(
+    resolve(entries).get("table:chat_sessions:s1").payload.title,
+    "v2",
+    "the superseded copy read back does not win"
   );
 
   assert.equal(compactEntries([]), null, "nothing to compact is not an error");
@@ -1356,6 +1371,156 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   assert.deepEqual(log.snapshotPaths, []);
 }
 
+// A batch that arrives after a compaction, stamped before it, is still read.
+//
+// This is not a corner: a device holding a queued change goes offline, another
+// compacts, and the first comes back and flushes. The upload succeeds and the
+// file is in the vault — and `readLog` used to skip everything at or below the
+// snapshot's `upTo`, so nobody ever read it again. `COMPACT_HORIZON_MS` was the
+// guard and it only covers clock skew; an hour offline is not skew.
+{
+  const root = tempDir("compact-late-arrival");
+  const storage = new LocalFolderProvider({ root });
+  const HOUR = 60 * 60 * 1000;
+  const NOW = 1_800_000_000_000;
+  const at = (millis, device = "aaaa") => formatHlc({ millis, counter: 0, device });
+
+  // Device B is busy. Device A is offline, holding one change stamped 3h ago.
+  const held = entry(at(NOW - 3 * HOUR, "aaaa"), {
+    scope: "setting",
+    key: "chat.model",
+    recordId: undefined,
+    payload: { value: "written before the compaction" }
+  });
+  for (let index = 0; index < 60; index += 1) {
+    await appendBatch(storage, "bbbb", [
+      entry(at(NOW - 2 * HOUR + index, "bbbb"), {
+        recordId: `k${index}`,
+        payload: { id: `k${index}` }
+      })
+    ]);
+  }
+  const compacted = await compactOplog(storage, { now: () => NOW });
+  assert.ok(compacted.snapshotPath, "the log was compacted");
+  assert.equal(compacted.batchesDeleted, 60, "and its batches pruned");
+
+  // A comes back and flushes what it was holding.
+  await appendBatch(storage, "aaaa", [held]);
+
+  const all = await readAllEntries(storage);
+  const late = all.find((candidate) => candidate.key === "chat.model");
+  assert.ok(
+    late,
+    "a batch stamped below the snapshot's upTo must still be read, not silently shadowed"
+  );
+  assert.equal(late.payload.value, "written before the compaction");
+
+  // …and the snapshot's own entries are not doubled up by the batches that
+  // straddle it, which is what the skip was really for.
+  const seen = new Set();
+  for (const candidate of all) {
+    assert.ok(!seen.has(candidate.hlc), `entry ${candidate.hlc} read twice`);
+    seen.add(candidate.hlc);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// A transcript is unioned, not chosen between.
+//
+// Last-writer-wins is right for a record that describes one thing and wrong for
+// one that accumulates. Two machines adding to the same conversation used to
+// resolve to whichever wrote last, and the other's turn was gone with no error
+// anywhere — the ordinary case, since an analysis runs headless on whichever
+// machine holds the lease while the athlete may be at the other.
+//
+// The three properties below are what make it safe to run this merge on both
+// machines, in either order, as many times as a poll happens to fire.
+// ---------------------------------------------------------------------------
+{
+  const { mergeTranscripts } = await load("sync/rowMergers.js");
+  const say = (mid, content, mrev = mid) => ({
+    kind: "message",
+    role: "assistant",
+    content,
+    mid,
+    mrev
+  });
+
+  const shared = say("1-a", "shared history");
+  const desktop = [shared, say("1-c", "DESKTOP: coach answer")];
+  const laptop = [shared, say("1-b", "LAPTOP: my question")];
+
+  assert.deepEqual(
+    mergeTranscripts(desktop, laptop).map((entry) => entry.content),
+    ["shared history", "LAPTOP: my question", "DESKTOP: coach answer"],
+    "both machines' turns survive, ordered by when they were written"
+  );
+  assert.deepEqual(
+    mergeTranscripts(laptop, desktop),
+    mergeTranscripts(desktop, laptop),
+    "and the result does not depend on which side merged first"
+  );
+  const once = mergeTranscripts(desktop, laptop);
+  assert.deepEqual(
+    mergeTranscripts(once, laptop),
+    once,
+    "merging again changes nothing, so a poll that repeats costs nothing"
+  );
+  assert.deepEqual(mergeTranscripts(once, once), once, "and neither does itself");
+
+  // An entry both sides hold is still last-writer-wins — per entry, by `mrev`,
+  // which is what an edit in place moves. A card answered on one machine must
+  // outrank the unanswered copy on the other without taking the turns beside it
+  // with it.
+  const unanswered = say("1-b", "question: easy or hard?", "1-b");
+  const answeredLater = say("1-b", "question: easy or hard? [Easy]", "1-z");
+  assert.deepEqual(
+    mergeTranscripts([shared, unanswered], [shared, answeredLater]).map(
+      (entry) => entry.content
+    ),
+    ["shared history", "question: easy or hard? [Easy]"],
+    "the newer revision of an entry wins"
+  );
+  assert.deepEqual(
+    mergeTranscripts([shared, answeredLater], [shared, unanswered]).map(
+      (entry) => entry.content
+    ),
+    ["shared history", "question: easy or hard? [Easy]"],
+    "whichever side it arrives from"
+  );
+
+  // Two copies that diverged before identities existed answer to the same
+  // backfilled id with no revision on either. Nothing says which is right, so
+  // the tie is broken by content — the one thing both machines compute the same
+  // way. Breaking it by argument order instead is a livelock: each takes the
+  // other's copy, republishes it, and they swap for as long as both poll.
+  const clash = (content) => ({ kind: "message", role: "user", content });
+  assert.deepEqual(
+    mergeTranscripts([clash("this machine")], [clash("that machine")]),
+    mergeTranscripts([clash("that machine")], [clash("this machine")]),
+    "a tie resolves the same way whichever side merges"
+  );
+
+  // Entries written before identities existed are matched by position, which is
+  // the only thing two copies of the same history agree on.
+  const old = [
+    { kind: "message", role: "user", content: "written long ago" },
+    { kind: "message", role: "assistant", content: "answered long ago" }
+  ];
+  assert.deepEqual(
+    mergeTranscripts(old, old).map((entry) => entry.content),
+    old.map((entry) => entry.content),
+    "an unidentified transcript merged with itself does not double"
+  );
+  assert.deepEqual(
+    mergeTranscripts(old, [...old, say("1-d", "and this came later")]).map(
+      (entry) => entry.content
+    ),
+    ["written long ago", "answered long ago", "and this came later"],
+    "and a new turn lands after it"
+  );
+}
+
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
@@ -1366,5 +1531,6 @@ console.log(
     "timestamp costs one entry, a refused entry costs one entry, nothing is " +
     "applied twice, SQLite round trip, compaction snapshots and user backups " +
     "cannot shadow each other, compaction prunes what it covers and nothing " +
-    "it does not"
+    "it does not, a batch arriving after a compaction is still read, and " +
+    "two machines appending to one conversation both keep their turn"
 );

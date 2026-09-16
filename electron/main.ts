@@ -25,6 +25,7 @@ import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
 import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
+import { createSqliteOutbox } from "./sync/outbox";
 import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
@@ -1366,6 +1367,7 @@ function startSyncLoop(): SyncLoop | null {
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
     recordVersions: createSqliteRecordVersions(),
+    outbox: createSqliteOutbox(),
     conditions: () => ({
       // A hidden window means nobody is looking, so there is nothing to poll
       // for; `resume()` picks it up again when the window comes back.

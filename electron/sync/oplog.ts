@@ -210,8 +210,27 @@ export async function readLog(
   );
 
   const entries: OpEntry[] = snapshot ? [...snapshot.entries] : [];
-  const covered = snapshot?.upTo;
   const batches: ReadBatch[] = [];
+
+  // Exactly what the snapshot holds, by identity *and* timestamp, so a batch
+  // straddling the horizon is not parsed into the result twice.
+  //
+  // This used to skip everything at or below `upTo`, which is a different and
+  // much stronger claim: that nothing below that line can still arrive. Nothing
+  // enforces it. A device holding a queued change goes offline, another device
+  // compacts, and the first one comes back and appends a batch stamped before
+  // the snapshot — the upload succeeds, `flush` reports it pushed, the file is
+  // in the vault, and no reader ever looks at it again. Measured: one setting
+  // written three hours before a compaction, gone from `readAllEntries` while
+  // sitting on disk. `COMPACT_HORIZON_MS` was the guard, and it only ever
+  // covered clock skew; being offline for an hour is not skew.
+  //
+  // Duplicates cost nothing to admit: `resolve` is last-writer-wins over
+  // whatever it is given, so an entry the snapshot already folded in resolves
+  // to the same winner. Being invisible costs the write.
+  const alreadyFolded = new Set(
+    (snapshot?.entries ?? []).map((entry) => `${entry.hlc}`)
+  );
 
   for (const batch of listed.sort((a, b) => a.path.localeCompare(b.path))) {
     const stored = await storage.get(batch.path);
@@ -221,8 +240,7 @@ export async function readLog(
       if (maxHlc === null || compareHlcStrings(entry.hlc, maxHlc) > 0) {
         maxHlc = entry.hlc;
       }
-      // Skip what the snapshot already accounts for.
-      if (covered && compareHlcStrings(entry.hlc, covered) <= 0) continue;
+      if (alreadyFolded.has(entry.hlc)) continue;
       entries.push(entry);
     }
     if (maxHlc !== null) batches.push({ path: batch.path, maxHlc });

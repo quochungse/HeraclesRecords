@@ -25,6 +25,7 @@ import {
   shouldApply,
   type RecordVersionStore
 } from "./recordVersions";
+import type { OutboxStore } from "./outbox";
 import {
   appendBatch,
   compactOplog,
@@ -34,7 +35,9 @@ import {
   type OpEntry
 } from "./oplog";
 import { Lease } from "./lease";
-import { applyEntries, type ApplyResult, type SyncTarget } from "./syncEngine";
+import { applyEntries, type ApplyResult, type SyncTarget,
+  ChangeBuilder
+} from "./syncEngine";
 import type { StorageProvider } from "./storageProvider";
 
 export const SYNC_LOOP_SETTINGS = {
@@ -150,6 +153,14 @@ export interface SyncLoopDeps {
    * it, and a dep with a fallback is a dep nothing has to think about.
    */
   readonly recordVersions: RecordVersionStore;
+  /**
+   * Where queued changes live until the vault confirms them.
+   *
+   * Required for the same reason as `recordVersions`: a fallback would be an
+   * in-memory queue again, and the whole point is that the queue outlives the
+   * process that made it.
+   */
+  readonly outbox: OutboxStore;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: ApplyResult) => void;
   readonly onError?: (error: unknown) => void;
@@ -189,6 +200,9 @@ export class SyncLoop {
   #lastActivityAt: number | null = null;
   #running = false;
   #inFlight: Promise<unknown> | null = null;
+  /** Held by whichever of `pull` / `flush` / `tick` is running. See
+   *  `#exclusive`. */
+  #turnstile: Promise<unknown> | null = null;
   /** Work started by a timer, so callers (and the suite) can wait for it
    *  instead of guessing how many ticks a filesystem write takes. */
   #background = new Set<Promise<unknown>>();
@@ -254,7 +268,13 @@ export class SyncLoop {
     // batch while the older one was still unaccounted for.
     await this.#uploading?.catch(() => undefined);
     if (this.#pending.length === 0) return;
-    await this.flush().catch(() => undefined);
+    // Past the turnstile on purpose. Quit is bounded by a timeout and its one
+    // job is to get the queue out; queueing behind a pull that may be halfway
+    // through downloading the log would spend that budget on work nobody needs
+    // finished. A flush racing a pull is what the loop did before the turnstile
+    // existed, and it is safe: appending a batch is this device's own directory
+    // and no reader is mid-write.
+    await this.#flush().catch(() => undefined);
   }
 
   nextHlc = (): string => {
@@ -287,6 +307,10 @@ export class SyncLoop {
     for (const entry of entries) {
       this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
     }
+    // Durable before it is queued, so the queue is a cache of the table rather
+    // than the other way round. Everything between here and a confirmed upload
+    // is recoverable by the next launch.
+    this.#deps.outbox.add(entries);
     this.#pending.push(...entries);
     this.#firstPendingAt ??= this.#deps.now();
     this.#noteActivity();
@@ -317,6 +341,10 @@ export class SyncLoop {
 
   /** Push whatever is queued. Safe to call directly for a manual "Sync now". */
   async flush(): Promise<FlushResult> {
+    return this.#exclusive(() => this.#flush());
+  }
+
+  async #flush(): Promise<FlushResult> {
     if (this.#pending.length === 0) return { pushed: 0, path: null };
     if (!this.#deps.conditions().online) {
       // Offline: keep the queue and try again on the next flush. Nothing is
@@ -348,6 +376,11 @@ export class SyncLoop {
         this.#deps.deviceId(),
         batch
       );
+      // Only once the write returned. This is the one moment the vault is known
+      // to hold them, and until it comes the next launch has to be able to send
+      // them again — a duplicate entry costs nothing, a missing one costs the
+      // change.
+      this.#deps.outbox.remove(batch);
       return { pushed: batch.length, path: written?.path ?? null };
     } catch (error) {
       // Put the work back. A queue that drops entries on a transient failure
@@ -362,8 +395,20 @@ export class SyncLoop {
 
   // --- Inbound ---------------------------------------------------------------
 
-  /** Read everything other devices have written and merge it in. */
+  /**
+   * Read everything other devices have written and merge it in.
+   *
+   * Serialised against the rest of the loop rather than only inside `tick`.
+   * `tick` has always held `#inFlight` so a slow pull cannot have a second one
+   * applying underneath it, but `pull` and `flush` are also public — "Sync now"
+   * calls both directly — so the guard belonged on the methods, not on the one
+   * caller that remembered it.
+   */
   async pull(): Promise<PullResult> {
+    return this.#exclusive(() => this.#pull());
+  }
+
+  async #pull(): Promise<PullResult> {
     const provider = this.#deps.provider();
     const entries = await readAllEntries(provider);
 
@@ -429,27 +474,63 @@ export class SyncLoop {
     // which is the honest fix and a larger one.
     const versions = this.#deps.recordVersions;
     const durable = (entry: OpEntry): boolean => entry.scope !== "localStorage";
-    const result = applyEntries(this.#deps.target, entries, {
-      isApplied: (entry) => {
+    const merge = (): ApplyResult =>
+      applyEntries(this.#deps.target, entries, {
+        isApplied: (entry) => {
+          const identity = entryIdentity(entry);
+          return durable(entry)
+            ? !shouldApply(versions, identity, entry.hlc)
+            : this.#localStorageMerged.get(identity) === entry.hlc;
+        }
+      });
+    // One transaction for the rows *and* the stamps that say this machine holds
+    // them. A merge used to be a few hundred separate writes with nothing
+    // spanning them, so a crash partway left a state no device had ever been
+    // in — an analysis row arriving without the conversation it names, for
+    // instance. Committing the stamps alongside also keeps the two from
+    // disagreeing: stamps without rows would skip entries that never landed.
+    //
+    // The per-entry `try` inside `applyEntries` still stands. A statement that
+    // fails does not abort a SQLite transaction, so one unusable entry costs
+    // one entry here exactly as it did before.
+    const runMerge = (): ApplyResult => {
+      // Drained before, not only after. Both are filled inside the transaction,
+      // so a merge that threw would leave them holding rows that were rolled
+      // back — and the republish below would then publish content this database
+      // does not have.
+      this.#deps.target.takeIncomplete?.();
+      this.#deps.target.takeRepublish?.();
+      const merged = merge();
+      const incomplete = new Set(this.#deps.target.takeIncomplete?.() ?? []);
+      for (const entry of merged.merged) {
         const identity = entryIdentity(entry);
-        return durable(entry)
-          ? !shouldApply(versions, identity, entry.hlc)
-          : this.#localStorageMerged.get(identity) === entry.hlc;
+        if (durable(entry) && !incomplete.has(identity)) {
+          versions.set(identity, entry.hlc);
+        } else {
+          this.#localStorageMerged.set(identity, entry.hlc);
+        }
       }
-    });
-    // Stamped from what actually landed. `merged` excludes an entry the target
-    // refused, which must stay unstamped so a later pull tries it again — and a
-    // row the target could only take part of is stamped in memory for the same
-    // reason at one remove: this build dropped columns it has no schema for, so
-    // the next one to learn about them has to be able to apply the entry again.
-    const incomplete = new Set(this.#deps.target.takeIncomplete?.() ?? []);
-    for (const entry of result.merged) {
-      const identity = entryIdentity(entry);
-      if (durable(entry) && !incomplete.has(identity)) {
-        versions.set(identity, entry.hlc);
-      } else {
-        this.#localStorageMerged.set(identity, entry.hlc);
+      return merged;
+    };
+    const result = this.#deps.target.transaction
+      ? this.#deps.target.transaction(runMerge)
+      : runMerge();
+
+    // A union neither side had has to go back out, or the vault's newest entry
+    // for that row stays the incoming one — which does not hold this machine's
+    // half, and compaction eventually folds away the entry that did. Outside
+    // the transaction because `enqueue` opens its own, and after it because
+    // there is nothing to publish until the merge has committed.
+    //
+    // It terminates: the other machine merges this union against a copy it
+    // already equals, produces nothing new, and publishes nothing.
+    const republish = this.#deps.target.takeRepublish?.() ?? [];
+    if (republish.length > 0) {
+      const builder = new ChangeBuilder({ nextHlc: this.nextHlc });
+      for (const row of republish) {
+        builder.row(row.table, row.recordId, row.row);
       }
+      this.enqueue(builder.entries);
     }
 
     this.#deps.setSetting(
@@ -554,7 +635,32 @@ export class SyncLoop {
   start(): void {
     if (this.#running) return;
     this.#running = true;
+    this.#adoptOutbox();
     this.#scheduleNextPoll();
+  }
+
+  /**
+   * Take over whatever the last launch could not send.
+   *
+   * Deliberately in `start` and not the constructor: a loop is built before the
+   * vault is known to be usable, and re-queueing is only meaningful once
+   * something is going to try sending it. Entries already in `#pending` are
+   * kept — `attachSyncSink` replays the boot window's writes before `start`
+   * runs, and those are in the table too, so the queue is rebuilt from the
+   * table and the in-memory copies are dropped rather than doubled.
+   */
+  #adoptOutbox(): void {
+    try {
+      const held = this.#deps.outbox.load();
+      if (held.length === 0) return;
+      this.#pending = held;
+      this.#firstPendingAt ??= this.#deps.now();
+      this.#scheduleFlush();
+    } catch (error) {
+      // A queue that cannot be read must not stop the loop: everything else
+      // still works, and the next write re-queues normally.
+      this.#deps.onError?.(error);
+    }
   }
 
   stop(): void {
@@ -563,6 +669,27 @@ export class SyncLoop {
     if (this.#flushTimer !== null) this.#deps.clearTimer(this.#flushTimer);
     this.#pollTimer = null;
     this.#flushTimer = null;
+  }
+
+  /**
+   * One round at a time, whoever asks.
+   *
+   * A queue rather than a "skip if busy": a caller that asked for a flush is
+   * owed one, and `tick`'s old `if (#inFlight) await it; return;` answered a
+   * "Sync now" with somebody else's half-finished round. Waiting is what the
+   * caller meant.
+   */
+  async #exclusive<T>(work: () => Promise<T>): Promise<T> {
+    while (this.#turnstile) {
+      await this.#turnstile.catch(() => undefined);
+    }
+    const running = work();
+    this.#turnstile = running;
+    try {
+      return await running;
+    } finally {
+      if (this.#turnstile === running) this.#turnstile = null;
+    }
   }
 
   #track(work: Promise<unknown>): void {
@@ -614,11 +741,11 @@ export class SyncLoop {
       await this.#inFlight;
       return;
     }
-    this.#inFlight = (async () => {
+    this.#inFlight = this.#exclusive(async () => {
       try {
-        await this.flush();
+        await this.#flush();
         if (this.#deps.conditions().online) {
-          await this.pull();
+          await this.#pull();
           // After the pull, so anything pruned is already merged here.
           await this.compactIfDue();
         }
@@ -628,7 +755,7 @@ export class SyncLoop {
         this.#inFlight = null;
         this.#scheduleNextPoll();
       }
-    })();
+    });
     await this.#inFlight;
   }
 

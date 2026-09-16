@@ -80,6 +80,11 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // never applied, and skip them for good. See `recordVersions.ts`.
   sync_record_versions: "device",
 
+  // This machine's unconfirmed outbound queue. `device` for the same reason:
+  // it describes what this copy still owes the vault. Carrying it would have
+  // another machine re-publishing entries it never made.
+  sync_outbox: "device",
+
   // Execution records of analysis runs. Not synced: a run belongs to whichever
   // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.

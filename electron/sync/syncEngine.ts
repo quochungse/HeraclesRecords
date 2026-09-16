@@ -48,6 +48,34 @@ export interface SyncTarget {
    * target that takes everything it is given has nothing to report.
    */
   takeIncomplete?(): readonly string[];
+  /**
+   * Run a merge as one unit, if this target can.
+   *
+   * A pull writes hundreds of rows, and without this they were hundreds of
+   * unrelated writes: a crash partway through left the database in a state no
+   * device had ever been in, with an analysis row arriving ahead of the
+   * conversation it names. Optional, because a map-backed target has nothing to
+   * commit.
+   */
+  transaction?<T>(work: () => T): T;
+  /**
+   * Rows this target merged into something neither side had, taken and cleared.
+   *
+   * Only a merging table produces these (see `rowMergers.ts`). The union has to
+   * be published or the vault's newest entry for that row stays the incoming
+   * one, which does not hold this machine's half — and compaction eventually
+   * folds the entry that did away. Publishing terminates: the other machine
+   * merges the union with a copy it already equals and reports nothing.
+   */
+  takeRepublish?(): readonly RepublishRow[];
+}
+
+/** A merged row on its way back out. Carries the row itself so the caller does
+ *  not have to read it back and risk publishing something newer by accident. */
+export interface RepublishRow {
+  readonly table: string;
+  readonly recordId: string;
+  readonly row: Record<string, unknown>;
 }
 
 export interface RejectedEntry {
