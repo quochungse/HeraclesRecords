@@ -1496,9 +1496,44 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   // other's copy, republishes it, and they swap for as long as both poll.
   const clash = (content) => ({ kind: "message", role: "user", content });
   assert.deepEqual(
+    mergeTranscripts([clash("this machine")], [clash("that machine")]).map(
+      (entry) => entry.content
+    ),
+    ["this machine", "that machine"],
+    "two turns appended at the same position on the old build are both kept"
+  );
+  assert.deepEqual(
     mergeTranscripts([clash("this machine")], [clash("that machine")]),
     mergeTranscripts([clash("that machine")], [clash("this machine")]),
-    "a tie resolves the same way whichever side merges"
+    "and the result is the same whichever side merges"
+  );
+
+  // A build that predates identities rebuilds entries field by field, so it
+  // drops `mid` and `mrev` and then publishes the conversation with every
+  // identity stripped. Those have to be recovered by content, or the union
+  // reads them as entries it has never met and the transcript doubles — worse
+  // than the loss it replaced. Symmetric, because the stripped copy can be
+  // either side: an upgraded machine that has not yet saved a conversation
+  // holds one too.
+  const identified = [say("1-a", "shared history"), say("1-b", "coach answer")];
+  const stripped = identified.map(({ mid, mrev, ...rest }) => rest);
+  assert.deepEqual(
+    mergeTranscripts(identified, stripped).map((entry) => entry.content),
+    ["shared history", "coach answer"],
+    "an old build republishing a stripped copy does not double the transcript"
+  );
+  assert.deepEqual(
+    mergeTranscripts(stripped, identified).map((entry) => entry.content),
+    ["shared history", "coach answer"],
+    "whichever side the stripped copy is on"
+  );
+  assert.deepEqual(
+    mergeTranscripts(identified, [
+      ...stripped,
+      { kind: "message", role: "assistant", content: "and a turn from over there" }
+    ]).map((entry) => entry.content),
+    ["shared history", "coach answer", "and a turn from over there"],
+    "and a turn the old build appended lands where it was written"
   );
 
   // Entries written before identities existed are matched by position, which is

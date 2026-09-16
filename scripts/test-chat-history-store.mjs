@@ -1186,10 +1186,19 @@ assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
   );
   saveChatSession(legacy.id, stripMergeMeta(carried), db, { knownEntryCount: 2 });
   const backfilled = readChatSession(legacy.id, db);
-  assert.deepEqual(
-    backfilled.map((entry) => entry.mid),
-    ["0-000000", "0-000001"],
-    "a backfilled id is the entry's position, so two machines agree on it"
+  assert.ok(
+    backfilled.every((entry, index) =>
+      new RegExp(`^0-${String(index).padStart(6, "0")}-[0-9a-f]{8}$`).test(entry.mid)
+    ),
+    "a backfilled id is position and content, so two machines derive the same one"
+  );
+  // Content, not only position: two machines that each appended a turn while
+  // both were on the old build would otherwise claim the same slot and one
+  // athlete's turn would be dropped resolving it.
+  assert.notEqual(
+    backfilled[0].mid.slice(9),
+    backfilled[1].mid.slice(9),
+    "and two different entries never share one"
   );
   assert.ok(
     backfilled[1].mid < first[0].mid,

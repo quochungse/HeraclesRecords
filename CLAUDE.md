@@ -655,6 +655,23 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     `foreignTail` compares content with both fields stripped for the same reason.
     `test:sync-engine` asserts the three properties directly, `test:chat-history-store`
     the identity rules, `test:sync-twoway` the whole round.
+    **An entry that arrives without an identity has one lent to it, by content, from
+    either side.** A build older than this rebuilds entries field by field, so it drops
+    both fields, and then saves and publishes the conversation with every identity
+    stripped — which the union would read as entries it has never met and add beside the
+    ones they already are. The transcript doubles, which is worse than the loss it
+    replaced. `lendableIds` is built from both sides together for the same reason it
+    cannot be one-sided: an upgraded machine that has not yet saved a conversation holds
+    an unidentified copy too. What is left over — an old build appending a turn — is
+    anchored just after the entry it followed (`<id>~0000`, and `~` sorts above every hex
+    digit), so it lands where it was written rather than at the top. A transcript with
+    nothing identified anywhere falls back to `0-<index>-<content hash>`: **position and
+    content, and both halves are load-bearing.** Position lines the shared history up;
+    content stops two machines that each appended a turn on the old build from claiming
+    `0-000042` and one athlete's turn being dropped to resolve it. Ties on equal `mrev`
+    break by content, never by which side was passed second — that reads as a reasonable
+    default and is a livelock, each machine taking the other's copy and republishing it
+    forever.
   - **`upsertRow` names its columns; it is not `INSERT OR REPLACE`.** The two differ only
     when a payload is short of a column, and there `REPLACE` rewrites the row so the
     missing column comes back as its default — which is to say NULL, meaning *deleted*
