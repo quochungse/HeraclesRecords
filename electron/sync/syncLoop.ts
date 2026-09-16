@@ -310,7 +310,15 @@ export class SyncLoop {
     // Durable before it is queued, so the queue is a cache of the table rather
     // than the other way round. Everything between here and a confirmed upload
     // is recoverable by the next launch.
-    this.#deps.outbox.add(entries);
+    try {
+      this.#deps.outbox.add(entries);
+    } catch (error) {
+      // A queue that cannot be made durable is still a queue. Letting this
+      // escape would take the change with it — the bridge catches and logs, and
+      // the entry would exist nowhere — which is a worse failure than the one
+      // the table was added to fix.
+      this.#deps.onError?.(error);
+    }
     this.#pending.push(...entries);
     this.#firstPendingAt ??= this.#deps.now();
     this.#noteActivity();
@@ -474,15 +482,7 @@ export class SyncLoop {
     // which is the honest fix and a larger one.
     const versions = this.#deps.recordVersions;
     const durable = (entry: OpEntry): boolean => entry.scope !== "localStorage";
-    const merge = (): ApplyResult =>
-      applyEntries(this.#deps.target, entries, {
-        isApplied: (entry) => {
-          const identity = entryIdentity(entry);
-          return durable(entry)
-            ? !shouldApply(versions, identity, entry.hlc)
-            : this.#localStorageMerged.get(identity) === entry.hlc;
-        }
-      });
+    const target = this.#deps.target;
     // One transaction for the rows *and* the stamps that say this machine holds
     // them. A merge used to be a few hundred separate writes with nothing
     // spanning them, so a crash partway left a state no device had ever been
@@ -498,10 +498,19 @@ export class SyncLoop {
       // so a merge that threw would leave them holding rows that were rolled
       // back — and the republish below would then publish content this database
       // does not have.
-      this.#deps.target.takeIncomplete?.();
-      this.#deps.target.takeRepublish?.();
-      const merged = merge();
-      const incomplete = new Set(this.#deps.target.takeIncomplete?.() ?? []);
+      target.takeIncomplete?.();
+      target.takeRepublish?.();
+
+      const merged = applyEntries(target, entries, {
+        isApplied: (entry) => {
+          const identity = entryIdentity(entry);
+          return durable(entry)
+            ? !shouldApply(versions, identity, entry.hlc)
+            : this.#localStorageMerged.get(identity) === entry.hlc;
+        }
+      });
+
+      const incomplete = new Set(target.takeIncomplete?.() ?? []);
       for (const entry of merged.merged) {
         const identity = entryIdentity(entry);
         if (durable(entry) && !incomplete.has(identity)) {
@@ -512,9 +521,7 @@ export class SyncLoop {
       }
       return merged;
     };
-    const result = this.#deps.target.transaction
-      ? this.#deps.target.transaction(runMerge)
-      : runMerge();
+    const result = target.transaction ? target.transaction(runMerge) : runMerge();
 
     // A union neither side had has to go back out, or the vault's newest entry
     // for that row stays the incoming one — which does not hold this machine's
@@ -524,7 +531,7 @@ export class SyncLoop {
     //
     // It terminates: the other machine merges this union against a copy it
     // already equals, produces nothing new, and publishes nothing.
-    const republish = this.#deps.target.takeRepublish?.() ?? [];
+    const republish = target.takeRepublish?.() ?? [];
     if (republish.length > 0) {
       const builder = new ChangeBuilder({ nextHlc: this.nextHlc });
       for (const row of republish) {
@@ -645,15 +652,21 @@ export class SyncLoop {
    * Deliberately in `start` and not the constructor: a loop is built before the
    * vault is known to be usable, and re-queueing is only meaningful once
    * something is going to try sending it. Entries already in `#pending` are
-   * kept — `attachSyncSink` replays the boot window's writes before `start`
-   * runs, and those are in the table too, so the queue is rebuilt from the
-   * table and the in-memory copies are dropped rather than doubled.
+   * kept and not doubled — `attachSyncSink` replays the boot window's writes
+   * before `start` runs, and those are in the table too.
    */
   #adoptOutbox(): void {
     try {
-      const held = this.#deps.outbox.load();
+      const known = new Set(this.#pending.map((entry) => entry.hlc));
+      const held = this.#deps.outbox
+        .load()
+        .filter((entry) => !known.has(entry.hlc));
       if (held.length === 0) return;
-      this.#pending = held;
+      // Added to the queue, never substituted for it. `enqueue` treats a table
+      // it cannot write to as a warning rather than a failure — the change is
+      // still queued in memory — so replacing the queue with the table would
+      // throw away exactly the entries that write failed for.
+      this.#pending = [...this.#pending, ...held];
       this.#firstPendingAt ??= this.#deps.now();
       this.#scheduleFlush();
     } catch (error) {

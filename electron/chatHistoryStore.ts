@@ -38,7 +38,7 @@ import type {
 } from "./types";
 import { migrateActivityHrTrendPreview } from "./chatActivityTools";
 import { deviceId } from "./sync/deviceIdentity";
-import { transcriptEntryId } from "./sync/rowMergers";
+import { contentKey, transcriptEntryId } from "./sync/rowMergers";
 
 export interface ChatSessionRow {
   id: string;
@@ -1156,7 +1156,7 @@ export function createChatSession(
  * safe direction for the accident this guards against.
  */
 function foreignTail(
-  storedJson: string,
+  stored: PersistedChatEntry[],
   knownEntryCount: number | undefined,
   incoming: PersistedChatEntry[]
 ): PersistedChatEntry[] {
@@ -1172,7 +1172,6 @@ function foreignTail(
   // accident fails harmlessly.
   const claimed = Math.max(0, Math.floor(knownEntryCount));
   const known = Math.min(claimed, incoming.length);
-  const stored = parseChatTranscriptJson(storedJson);
   if (stored.length <= known) {
     return [];
   }
@@ -1212,7 +1211,9 @@ function foreignTail(
   const incomingText = accepted
     .filter((entry): entry is PersistedChatEntry => entry !== null)
     .map(canonical);
-  const tailText = tail.map((entry) => canonical(parseEntry(entry)));
+  // `tail` comes from `parseChatTranscriptJson`, so it is already what the
+  // store accepts; only `incoming` still needs putting through the parser.
+  const tailText = tail.map((entry) => canonical(entry));
   let held = 0;
   for (
     let offset = start;
@@ -1276,15 +1277,6 @@ function nextMergeStamp(): string {
     `1-${millis.toString(16).padStart(12, "0")}` +
     `-${stampCounter.toString(16).padStart(4, "0")}-${mergeStampDevice()}`
   );
-}
-
-/** An entry's content, with the merge bookkeeping taken back off. */
-function contentKey(entry: PersistedChatEntry): string {
-  const { mid: _mid, mrev: _mrev, ...rest } = entry as PersistedChatEntry & {
-    mid?: string;
-    mrev?: string;
-  };
-  return JSON.stringify(rest);
 }
 
 /**
@@ -1392,7 +1384,7 @@ function stampEntries(
       const previous = stored[exact];
       return {
         ...entry,
-        mid: previous.mid ?? transcriptEntryId(previous, exact),
+        mid: transcriptEntryId(previous, exact),
         ...(previous.mrev ? { mrev: previous.mrev } : {})
       };
     }
@@ -1403,7 +1395,7 @@ function stampEntries(
       const previous = stored[edited];
       return {
         ...entry,
-        mid: previous.mid ?? transcriptEntryId(previous, edited),
+        mid: transcriptEntryId(previous, edited),
         mrev: nextMergeStamp()
       };
     }
@@ -1424,12 +1416,17 @@ export function saveChatSession(
     return null;
   }
 
+  // Parsed once and handed to both. Each entry is rebuilt field by field on the
+  // way through `parseEntry`, and a transcript carrying chart cards runs to
+  // hundreds of kilobytes — measured at 480 kB on a real conversation — so the
+  // second parse was pure waste on the hot path of every finished turn.
+  const stored = parseChatTranscriptJson(row.messages_json);
   const normalizedEntries = stampEntries(
     normalizeEntries([
       ...entries,
-      ...foreignTail(row.messages_json, options.knownEntryCount, entries)
+      ...foreignTail(stored, options.knownEntryCount, entries)
     ]),
-    parseChatTranscriptJson(row.messages_json)
+    stored
   );
   const title =
     row.title === DEFAULT_SESSION_TITLE

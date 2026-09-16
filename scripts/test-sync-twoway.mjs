@@ -963,6 +963,15 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     { kind: "message", role: "user", content: "A new activity synced." },
     { kind: "message", role: "assistant", content: "Heart rate ran high." }
   ]);
+  // Content, not the raw column: a merge annotates entries with the identity it
+  // worked out for them, so the bytes move even when nothing anyone wrote did.
+  const contentsOf = (id) =>
+    JSON.parse(
+      db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get(id)
+        .messages_json
+    ).map((entry) => entry.content);
+  const expected = (json) => JSON.parse(json).map((entry) => entry.content);
+
   const writeRow = (messagesJson, updatedAt) =>
     db
       .prepare(
@@ -1047,10 +1056,9 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   openTheLink();
   await pulling;
 
-  assert.equal(
-    db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get("incident")
-      .messages_json,
-    afterRun,
+  assert.deepEqual(
+    contentsOf("incident"),
+    expected(afterRun),
     "a pull must not apply an entry older than the row it would overwrite"
   );
 
@@ -1077,10 +1085,9 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   });
   await repaired.pull();
 
-  assert.equal(
-    db.prepare("SELECT messages_json FROM chat_sessions WHERE id = ?").get("incident")
-      .messages_json,
-    afterRun,
+  assert.deepEqual(
+    contentsOf("incident"),
+    expected(afterRun),
     "a rewound row is repaired from the vault's newer copy, own entry or not"
   );
 

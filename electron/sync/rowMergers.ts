@@ -101,13 +101,31 @@ function revisionOf(entry: PersistedChatEntry): string {
   return typeof rev === "string" ? rev : "";
 }
 
-/** An entry's content, with the merge bookkeeping taken back off. */
-function contentKey(entry: PersistedChatEntry): string {
+/**
+ * An entry's content, with the merge bookkeeping taken back off.
+ *
+ * Exported because `chatHistoryStore` has to ask exactly the same question —
+ * `foreignTail` decides what the caller is already sending, `stampEntries`
+ * decides which stored entry an unidentified one *is*, and this decides what
+ * two machines are holding the same copy of. Two definitions of "the same
+ * entry" that drifted apart would put those three quietly out of step.
+ *
+ * Memoised per object. A transcript entry can be a chart card carrying a full
+ * sample series — measured at 32 kB on a real conversation — and the callers
+ * above each ask more than once per merge.
+ */
+const contentKeys = new WeakMap<object, string>();
+
+export function contentKey(entry: PersistedChatEntry): string {
+  const cached = contentKeys.get(entry as object);
+  if (cached !== undefined) return cached;
   const { mid: _mid, mrev: _mrev, ...rest } = entry as PersistedChatEntry & {
     mid?: string;
     mrev?: string;
   };
-  return JSON.stringify(rest);
+  const key = JSON.stringify(rest);
+  contentKeys.set(entry as object, key);
+  return key;
 }
 
 /**
@@ -159,6 +177,11 @@ function identify(
   entries: PersistedChatEntry[],
   lendable: Map<string, string[]>
 ): string[] {
+  if (entries.every((entry) => entry.mid)) {
+    return entries.map((entry) => entry.mid as string);
+  }
+  // A queue per side, not per merge: both sides borrow from the same pool, and
+  // the side that already has an identity does not consume one.
   const queues = new Map<string, string[]>();
   for (const [key, ids] of lendable) queues.set(key, [...ids]);
 
@@ -207,11 +230,22 @@ function parseTranscript(value: unknown): PersistedChatEntry[] | null {
  * Exported for the suite, which is where the convergence properties are
  * asserted directly rather than through a whole sync round.
  */
+const NOTHING_TO_LEND: Map<string, string[]> = new Map();
+
 export function mergeTranscripts(
   local: PersistedChatEntry[],
   incoming: PersistedChatEntry[]
 ): PersistedChatEntry[] {
-  const lendable = lendableIds(local, incoming);
+  // Lending only matters when something arrived unidentified, which stops being
+  // true once every machine has saved each conversation once. Building the map
+  // means taking the content key of every entry on both sides, and those carry
+  // chart payloads tens of kilobytes each — the steady state should not pay for
+  // the mixed-version case.
+  const unidentified =
+    local.some((entry) => !entry.mid) || incoming.some((entry) => !entry.mid);
+  const lendable = unidentified
+    ? lendableIds(local, incoming)
+    : NOTHING_TO_LEND;
   const byId = new Map<string, { id: string; entry: PersistedChatEntry }>();
   const take = (entries: PersistedChatEntry[]): void => {
     const ids = identify(entries, lendable);
@@ -250,7 +284,15 @@ export function mergeTranscripts(
 
   return [...byId.values()]
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((held) => held.entry);
+    // The id an entry was identified *by* becomes the id it carries. Working it
+    // out again on the next merge would give the same answer only while the
+    // entry it was anchored to is still there — and a turn an old build
+    // appended, anchored at `<id>~0000`, would otherwise be minted a fresh
+    // identity by the next save and jump to the end of the conversation.
+    //
+    // After the sort, so the tie-break above still compares the entries as they
+    // arrived rather than as this is about to rewrite them.
+    .map(({ id, entry }) => (entry.mid ? entry : { ...entry, mid: id }));
 }
 
 /**
@@ -260,10 +302,21 @@ export function mergeTranscripts(
 const mergeChatSession: RowMerger = (local, incoming) => {
   const localEntries = parseTranscript(local?.messages_json);
   const incomingEntries = parseTranscript(incoming.messages_json);
-  // Nothing to union: a row this machine has never seen, or a column one side
-  // could not parse. Taking the incoming row whole is what the merge did before
-  // this file existed, and it is the right answer when there is no second half.
-  if (!localEntries || !incomingEntries) {
+
+  if (!incomingEntries) {
+    // Nothing readable arrived. When this machine holds a transcript it can
+    // read, the column is left out of the row entirely rather than overwritten:
+    // `upsertRow` names the columns it writes, so leaving one out means
+    // *unchanged*. Everything else the entry carries still applies.
+    if (localEntries) {
+      const { messages_json: _unreadable, ...rest } = incoming;
+      return { row: rest, republish: false };
+    }
+    return { row: incoming, republish: false };
+  }
+  // A row this machine has never seen. There is no second half to union, and
+  // taking the entry whole is what every other table does.
+  if (!localEntries) {
     return { row: incoming, republish: false };
   }
 

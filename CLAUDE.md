@@ -671,7 +671,11 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
     `0-000042` and one athlete's turn being dropped to resolve it. Ties on equal `mrev`
     break by content, never by which side was passed second — that reads as a reasonable
     default and is a livelock, each machine taking the other's copy and republishing it
-    forever.
+    forever. **An id worked out during a merge is written onto the entry**, because
+    recomputing it later gives the same answer only while whatever it was anchored to is
+    still there. And a `messages_json` this build cannot parse is **left out of the row**
+    rather than written over one it can — which is only safe because `upsertRow` names
+    its columns, so an omitted one means *unchanged*.
   - **`upsertRow` names its columns; it is not `INSERT OR REPLACE`.** The two differ only
     when a payload is short of a column, and there `REPLACE` rewrites the row so the
     missing column comes back as its default — which is to say NULL, meaning *deleted*

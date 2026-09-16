@@ -1438,6 +1438,7 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
 // ---------------------------------------------------------------------------
 {
   const { mergeTranscripts } = await load("sync/rowMergers.js");
+  const { rowMergerFor } = await load("sync/rowMergers.js");
   const say = (mid, content, mrev = mid) => ({
     kind: "message",
     role: "assistant",
@@ -1536,6 +1537,24 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
     "and a turn the old build appended lands where it was written"
   );
 
+  // An id worked out during a merge is written down. Recomputing it next time
+  // gives the same answer only while whatever it was anchored to is still
+  // there, so a turn an old build appended would otherwise be minted a fresh
+  // identity on the next save and jump to the end of the conversation.
+  const anchored = mergeTranscripts(identified, [
+    ...stripped,
+    { kind: "message", role: "assistant", content: "appended over there" }
+  ]);
+  assert.ok(
+    anchored.every((entry) => entry.mid),
+    "every entry comes back carrying the identity it was merged under"
+  );
+  assert.deepEqual(
+    mergeTranscripts(anchored, anchored).map((entry) => entry.content),
+    anchored.map((entry) => entry.content),
+    "so the order is stable when it is merged again"
+  );
+
   // Entries written before identities existed are matched by position, which is
   // the only thing two copies of the same history agree on.
   const old = [
@@ -1553,6 +1572,25 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
     ),
     ["written long ago", "answered long ago", "and this came later"],
     "and a new turn lands after it"
+  );
+
+  // A payload this machine cannot read must not replace a transcript it can.
+  // `upsertRow` names the columns it writes, so leaving the column out of the
+  // row means *unchanged* — everything else the entry carries still applies.
+  const merger = rowMergerFor("chat_sessions");
+  const readable = { id: "s1", title: "Renamed", messages_json: JSON.stringify(old) };
+  const garbled = { id: "s1", title: "Renamed over there", messages_json: "{not json" };
+  const guarded = merger(readable, garbled);
+  assert.equal(
+    "messages_json" in guarded.row,
+    false,
+    "an unreadable transcript is left out of the row rather than written over a readable one"
+  );
+  assert.equal(guarded.row.title, "Renamed over there", "the rest of the entry still lands");
+  assert.equal(
+    merger(undefined, readable).row,
+    readable,
+    "and a row this machine has never seen is taken whole"
   );
 }
 

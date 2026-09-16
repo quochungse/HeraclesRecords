@@ -14,6 +14,7 @@
 import { requireDatabase } from "../database";
 import { policyForTable, RECORD_ID_SEPARATOR } from "./syncPolicy";
 import { toSqlValue } from "./syncableStore";
+import { entryIdentity } from "./oplog";
 import { rowMergerFor } from "./rowMergers";
 import type { RepublishRow } from "./syncEngine";
 import type { SyncTarget } from "./syncEngine";
@@ -154,13 +155,11 @@ export class SqliteSyncTarget implements SyncTarget {
     // machines adding to the same conversation used to resolve to whichever
     // wrote last. See `rowMergers.ts`.
     const merger = rowMergerFor(table);
+    let republish = false;
     if (merger) {
-      const current = this.#readRow(table, shape, recordId);
-      const merged = merger(current, row);
+      const merged = merger(this.#readRow(table, shape, recordId), row);
       row = merged.row;
-      if (merged.republish) {
-        this.#republish.push({ table, recordId, row: merged.row });
-      }
+      republish = merged.republish;
     }
 
     // Drop columns this build does not have. An older machine writing a row
@@ -173,7 +172,10 @@ export class SqliteSyncTarget implements SyncTarget {
     // that remembered this row as fully held would leave those columns empty
     // for good once a later build learned about them.
     if (columns.length !== Object.keys(row).length) {
-      this.#incomplete.add(`table:${table}:${recordId}`);
+      // Through `entryIdentity`, not a template of the same shape: the caller
+      // looks these up by the identity it computed from the entry, and two
+      // spellings of one format drift apart in silence.
+      this.#incomplete.add(entryIdentity({ scope: "table", key: table, recordId }));
     }
     if (columns.length === 0) {
       throw new Error(`No known columns in row for ${table}`);
@@ -204,6 +206,16 @@ export class SqliteSyncTarget implements SyncTarget {
           `VALUES (${placeholders}) ${conflict}`
       )
       .run(columns.map((column) => toSqlValue(row[column])));
+
+    // Read back, not reused. What goes out has to be what this database now
+    // holds — the merged row was built from the arriving payload, which a
+    // machine on an older schema may have sent short of a column, and the
+    // upsert above deliberately left that column alone. Publishing the payload
+    // would announce a row nobody has.
+    if (republish) {
+      const written = this.#readRow(table, shape, recordId);
+      if (written) this.#republish.push({ table, recordId, row: written });
+    }
   }
 
   deleteRow(table: string, recordId: string): void {
