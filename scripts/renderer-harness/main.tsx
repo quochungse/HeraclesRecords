@@ -27,6 +27,7 @@ import { ConversationAnalyses } from "../../src/chat/analyses/ConversationAnalys
 import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
 import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { RunningView } from "../../src/running/RunningView";
+import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -171,6 +172,25 @@ function loadAppStyles() {
   });
 }
 
+/**
+ * The same, plus the Activities stylesheet.
+ *
+ * `activities.css` is imported by `ActivitiesView`, not by the pieces it is
+ * built from, so a mount of one of those pieces on its own gets none of its
+ * styling — and a layout assertion would then be measuring unstyled boxes and
+ * passing. Kept apart from `loadAppStyles` so the suites that predate it go on
+ * standing on exactly the ground they were written against.
+ */
+function loadActivitiesStyles() {
+  if (appStylesReady) return;
+  void Promise.all([
+    import("../../src/styles.css"),
+    import("../../src/training/activities.css")
+  ]).then(() => {
+    appStylesReady = true;
+  });
+}
+
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
   // Inside the same column the app gives it — `.content.content-fill` clips, so
   // the page has to scroll itself — at a fixed height, because every layout
@@ -202,6 +222,26 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           onOpenOverview={spy("onOpenOverview")}
         />
       </main>
+    );
+  },
+  /*
+   * The summary strip on its own, inside the class that scopes its tokens.
+   * Everything asserted about it is geometry — a tooltip that must not leave
+   * the bar, a bar that must not move what is under it — so it is mounted at a
+   * stated width rather than the window's.
+   */
+  ActivitiesSummary: (options) => {
+    loadActivitiesStyles();
+    return (
+      <div
+        className="activities-view"
+        style={{ width: `${(options.width as number | undefined) ?? 1200}px` }}
+      >
+        <ActivitiesSummary
+          totals={options.totals as never}
+          periodLabel={(options.periodLabel as string | undefined) ?? "3 months"}
+        />
+      </div>
     );
   },
   ChatView: (options) => (
@@ -389,6 +429,9 @@ const harness = {
   text: (selector: string): string | null =>
     query(selector)[0]?.textContent?.trim() ?? null,
 
+  attr: (selector: string, name: string, nth = 0): string | null =>
+    query(selector)[nth]?.getAttribute(name) ?? null,
+
   /** Types into a controlled input or textarea the way React's onChange expects. */
   setValue(selector: string, value: string): boolean {
     const element = query(selector)[0] as HTMLInputElement | undefined;
@@ -409,6 +452,57 @@ const harness = {
     setter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     return true;
+  },
+
+  focus(selector: string): boolean {
+    const element = query(selector)[0] as HTMLElement | undefined;
+    if (!element) return false;
+    element.focus();
+    // `focusin`, the mirror of `blur` below. A hidden window's document is not
+    // the focused one, and Chromium holds the focus *events* back until it is —
+    // so `.focus()` moves `activeElement` and React hears nothing.
+    element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    return document.activeElement === element;
+  },
+
+  /**
+   * Points at an element the way React hears it.
+   *
+   * `onMouseEnter` is not a DOM event: React synthesises it from the delegated
+   * `mouseover`/`mouseout` pair, so a dispatched `mouseenter` is swallowed and
+   * the handler never runs. `relatedTarget` is what says where the pointer came
+   * from, and React reads it to decide which enters and leaves to fire.
+   */
+  hover(selector: string, nth = 0): boolean {
+    const element = query(selector)[nth];
+    if (!element) return false;
+    element.dispatchEvent(
+      new MouseEvent("mouseover", { bubbles: true, relatedTarget: document.body })
+    );
+    return true;
+  },
+
+  /** Takes the pointer off, to `document.body`, which is outside everything. */
+  unhover(selector: string, nth = 0): boolean {
+    const element = query(selector)[nth];
+    if (!element) return false;
+    element.dispatchEvent(
+      new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body })
+    );
+    return true;
+  },
+
+  keyDown(selector: string, key: string): boolean {
+    const element = query(selector)[0];
+    if (!element) return false;
+    element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    return true;
+  },
+
+  /** One computed style value, for assertions about what a state class did. */
+  style(selector: string, property: string, nth = 0): string | null {
+    const element = query(selector)[nth];
+    return element ? window.getComputedStyle(element).getPropertyValue(property) : null;
   },
 
   blur(selector: string): boolean {
@@ -452,10 +546,19 @@ const harness = {
   scrollTop: (selector: string): number | null => query(selector)[0]?.scrollTop ?? null,
 
   /** A box, rounded, for assertions about how big something ended up. */
-  rect(selector: string): { width: number; height: number; top: number } | null {
-    const box = query(selector)[0]?.getBoundingClientRect();
+  rect(
+    selector: string,
+    nth = 0
+  ): { width: number; height: number; top: number; left: number; right: number } | null {
+    const box = query(selector)[nth]?.getBoundingClientRect();
     return box
-      ? { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top) }
+      ? {
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          top: Math.round(box.top),
+          left: Math.round(box.left),
+          right: Math.round(box.right)
+        }
       : null;
   },
 
@@ -463,6 +566,26 @@ const harness = {
   overflowX(selector: string): number | null {
     const element = query(selector)[0];
     return element ? element.scrollWidth - element.clientWidth : null;
+  },
+
+  /**
+   * Takes the clock out of every transition and animation on the page.
+   *
+   * A hidden window lays out but does not paint, and a transition is driven by
+   * frames — so a transitioned property read after a state change is whatever
+   * the last frame left behind, which in this window arrives when it arrives. A
+   * test about *what a state looks like* has no business waiting on that; one
+   * about the animation itself could not run here at all.
+   */
+  freezeAnimations(): boolean {
+    if (document.getElementById("harness-freeze")) return true;
+    const style = document.createElement("style");
+    style.id = "harness-freeze";
+    style.textContent =
+      "*, *::before, *::after { transition-duration: 0s !important; " +
+      "animation-duration: 0s !important; animation-delay: 0s !important; }";
+    document.head.append(style);
+    return true;
   },
 
   /** Proves the driver is talking to the dev build, so React's warnings exist. */

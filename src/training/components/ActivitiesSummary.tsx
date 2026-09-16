@@ -1,5 +1,6 @@
+import { useMemo, useState, type KeyboardEvent } from "react";
 import type { ActivityTotals } from "../activityFilters";
-import { SPORT_COLOR_LABELS } from "../sportColors";
+import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
 import {
   formatDistanceMeters,
   formatDurationSpan,
@@ -40,14 +41,24 @@ function perWeekPhrase(
   return `One every ${Math.round(7 / perWeek)} days`;
 }
 
-/** "Running 68%, 30 sessions" — one sport's share, spelled out. */
-function mixPhrase(
-  sport: ActivityTotals["sports"][number],
-  mixTotal: number
-): string {
-  const share = Math.round((sport.duration / mixTotal) * 100);
-  const sessions = `${sport.count} ${sport.count === 1 ? "session" : "sessions"}`;
-  return `${SPORT_COLOR_LABELS[sport.category]} ${share}%, ${sessions}`;
+/** One sport's slice of the mix bar, and where along the bar it sits. */
+interface MixBand {
+  category: SportColorCategory;
+  label: string;
+  /** 0..1 — what the flex item grows by. */
+  share: number;
+  percent: number;
+  count: number;
+  /** Seconds. */
+  duration: number;
+  /** Middle of the band along the bar, 0..1: where its tooltip points. */
+  centre: number;
+}
+
+/** "Running 68%, 30 sessions" — one band, spelled out for the bar's label. */
+function bandPhrase(band: MixBand): string {
+  const sessions = `${band.count} ${band.count === 1 ? "session" : "sessions"}`;
+  return `${band.label} ${band.percent}%, ${sessions}`;
 }
 
 /**
@@ -60,11 +71,15 @@ function mixPhrase(
  *
  * The bar answers the question on its own — a glance says "mostly running,
  * a third lifting" — and the percentages under it were a second line of text
- * above a list that is already the point of the screen. They are on hover now,
- * as an overlay, so revealing them moves nothing. Nothing is lost to a reader
- * who cannot hover: the bar carries the whole mix as its label, which is why
- * the legend itself is hidden from the accessibility tree rather than being
- * read out twice.
+ * above a list that is already the point of the screen. One band at a time
+ * answers on hover instead: the band lifts out of the bar, its neighbours fall
+ * back, and the figures appear under it. A list of all four said less per word
+ * and cost a permanent line.
+ *
+ * Nothing is lost to a reader who cannot hover. The bar carries the whole mix
+ * as its own label — which is why the bands are hidden from the accessibility
+ * tree rather than read out twice — and the left and right arrows step through
+ * them from one tab stop, so the tooltip is reachable without a pointer.
  */
 export function ActivitiesSummary({
   totals,
@@ -72,6 +87,53 @@ export function ActivitiesSummary({
 }: ActivitiesSummaryProps) {
   const { unitSystem } = useUnitSystem();
   const mixTotal = totals.sports.reduce((sum, sport) => sum + sport.duration, 0);
+
+  const bands = useMemo<MixBand[]>(() => {
+    if (mixTotal <= 0) {
+      return [];
+    }
+
+    let start = 0;
+    return totals.sports.map((sport) => {
+      const share = sport.duration / mixTotal;
+      const centre = start + share / 2;
+      start += share;
+      return {
+        category: sport.category,
+        label: SPORT_COLOR_LABELS[sport.category],
+        share,
+        percent: Math.round(share * 100),
+        count: sport.count,
+        duration: sport.duration,
+        centre
+      };
+    });
+  }, [mixTotal, totals.sports]);
+
+  /*
+   * Held as an index rather than a category so the arrow keys have something
+   * to step, and read back through `bands` so a filter change that drops the
+   * sport being pointed at closes the tooltip instead of leaving it stranded.
+   */
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const active = activeIndex === null ? null : (bands[activeIndex] ?? null);
+
+  function stepBand(event: KeyboardEvent<HTMLDivElement>) {
+    const delta =
+      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (delta === 0 || bands.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    setActiveIndex((current) =>
+      current === null
+        ? delta > 0
+          ? 0
+          : bands.length - 1
+        : Math.min(bands.length - 1, Math.max(0, current + delta))
+    );
+  }
 
   const tiles: SummaryTile[] = [
     {
@@ -131,45 +193,77 @@ export function ActivitiesSummary({
         ))}
       </div>
 
-      {mixTotal > 0 ? (
+      {bands.length > 0 ? (
         <div className="activities-mix">
           {/*
-            * Focusable as well as hoverable, so the legend is reachable from
-            * the keyboard — and labelled in full, so it need not be reached at
-            * all to be read.
+            * Focusable as well as hoverable, and labelled in full, so the mix
+            * can be read without reaching a single band.
             */}
           <div
-            className="activities-mix-bar"
+            className={`activities-mix-bar${active ? " is-probing" : ""}`}
             role="img"
             tabIndex={0}
-            aria-label={`Sport mix: ${totals.sports
-              .map((sport) => mixPhrase(sport, mixTotal))
-              .join("; ")}`}
+            aria-label={`Sport mix: ${bands.map(bandPhrase).join("; ")}`}
+            onMouseLeave={() => setActiveIndex(null)}
+            onFocus={() => setActiveIndex((current) => current ?? 0)}
+            onBlur={() => setActiveIndex(null)}
+            onKeyDown={stepBand}
           >
-            {totals.sports.map((sport) => (
+            {bands.map((band, index) => (
               <i
-                key={sport.category}
-                data-sport={sport.category}
-                style={{ flexGrow: sport.duration / mixTotal }}
-                // A band of its own, for the athlete who points at one rather
-                // than reading the list: the 1% slivers are a few pixels wide
-                // and this is the only way to ask them anything.
-                title={mixPhrase(sport, mixTotal)}
+                key={band.category}
+                data-sport={band.category}
+                className={index === activeIndex ? "is-active" : undefined}
+                style={{ flexGrow: band.share }}
+                onMouseEnter={() => setActiveIndex(index)}
               />
             ))}
           </div>
-          <ul className="activities-mix-legend" aria-hidden="true">
-            {totals.sports.map((sport) => (
-              <li key={sport.category}>
-                <i data-sport={sport.category} />
-                <span>{SPORT_COLOR_LABELS[sport.category]}</span>
-                <strong>{Math.round((sport.duration / mixTotal) * 100)}%</strong>
-                <em>
-                  {sport.count} {sport.count === 1 ? "session" : "sessions"}
-                </em>
-              </li>
-            ))}
-          </ul>
+
+          {/*
+            * The tooltip anchors its near edge to the band's centre and grows
+            * towards the middle of the bar, so it cannot run off either end —
+            * no measuring, and exact for the 1% sliver at the far right as
+            * much as for the 68% block. The caret is what pins it to the band.
+            */}
+          {active ? (
+            <>
+              <span
+                className="activities-mix-caret"
+                style={{ left: `${active.centre * 100}%` }}
+                aria-hidden="true"
+              />
+              <div
+                className="activities-mix-tip"
+                role="status"
+                style={
+                  /*
+                   * Backed off by the caret's own inset so the arrow lands
+                   * inside the panel rather than half off its corner, and
+                   * floored at the bar's end so backing off cannot push it
+                   * past the edge it was being kept inside.
+                   */
+                  active.centre <= 0.5
+                    ? { left: `max(0px, calc(${active.centre * 100}% - 14px))` }
+                    : {
+                        right: `max(0px, calc(${(1 - active.centre) * 100}% - 14px))`
+                      }
+                }
+              >
+                <p className="activities-mix-tip-name">
+                  <i data-sport={active.category} aria-hidden="true" />
+                  {active.label}
+                </p>
+                <p className="activities-mix-tip-figures">
+                  <strong>{active.percent}%</strong>
+                  <span>
+                    {active.count} {active.count === 1 ? "session" : "sessions"}
+                  </span>
+                  <span>{formatDurationSpan(active.duration)}</span>
+                </p>
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
     </section>

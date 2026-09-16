@@ -296,12 +296,21 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   reach — Running covers sport codes 100–103 and Strength 400/402, so a ride, a hike, a swim
   or a Hybrid Fitness session has no other home — and the only one that can compare sports
   against each other, which is what the summary's mix bar is for. Depth per sport belongs on
-  Running and Strength; this screen links out to them rather than growing its own.
+  Running and Strength; **a link out carries the session, not just the screen** — Activities
+  hands a `SportScreenRequest` to `App.tsx`, which holds it until the lazy screen mounts and
+  takes it (Running opens its full-page detail; Strength selects the row, widening its own
+  window first if the session predates it).
   The arithmetic is out of the view on purpose, because it is the only part a test can reach:
   `activityFilters.ts` (periods cut at a Monday, sport categories, search, week grouping,
   totals), `activityFacts.ts` (which figures a row shows, per sport) and `activityDetail.ts`
   (whether a loaded detail belongs to the current selection). `npm run test:activity-filters`
   covers all three.
+  What is left is geometry, and `npm run test:activities-renderer` mounts the summary strip in
+  a real window for it: the mix bar's tooltip must name one sport, must not move what is under
+  it, and must stay inside the bar at both ends — the 1% sliver at the far right is the case
+  that put it off the screen. Note that `activities.css` is imported by `ActivitiesView`, not
+  by the pieces it is built from, so a harness mount of one of those has to pull it in or it
+  measures unstyled boxes and passes.
   `ActivitySeriesChart` + `activityChannels.ts` + `useActivityDetailSummaries.ts` are shared
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than

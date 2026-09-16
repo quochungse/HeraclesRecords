@@ -97,16 +97,31 @@
 /* --- Sport mix ------------------------------------------------------------ */
 
 .activities-mix {
+  /*
+   * A track taller than the bar, with the bar centred in it. The bar swells
+   * when it is being pointed at, and a track sized for the swollen state is
+   * what keeps that from moving the filters and the whole list below.
+   */
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 16px;
 }
 
 .activities-mix-bar {
   display: flex;
   overflow: hidden;
-  height: 8px;
+  width: 100%;
+  height: 10px;
   border-radius: var(--radius-pill);
   background: var(--ax-well);
   cursor: default;
+  transition: height 0.14s ease;
+}
+
+.activities-mix-bar.is-probing,
+.activities-mix-bar:focus-visible {
+  height: 16px;
 }
 
 .activities-mix-bar:focus-visible {
@@ -117,27 +132,47 @@
 .activities-mix-bar i {
   min-width: 2px;
   background: var(--sport-mix-color, var(--sport-other));
+  transition:
+    opacity 0.14s ease,
+    filter 0.14s ease;
 }
 
 /*
- * The percentages, on hover.
- *
- * Absolutely positioned rather than merely revealed: a legend taking its place
- * in the flow would push the filters and the whole list down eight pixels the
- * moment the pointer crossed the bar, which is a worse answer than showing it
- * always. `pointer-events: none` keeps it from holding its own hover open once
- * the pointer has left the bar and landed on the panel.
+ * The band being pointed at is lifted by letting the others fall back rather
+ * than by brightening it: four saturated colours side by side have no room
+ * above them to stand out into, and dimming the neighbours reads as one block
+ * coming forward.
  */
-.activities-mix-legend {
+.activities-mix-bar.is-probing i {
+  opacity: 0.3;
+}
+
+.activities-mix-bar.is-probing i.is-active {
+  opacity: 1;
+  filter: brightness(1.12);
+}
+
+/* The band's own figures, anchored under it. */
+.activities-mix-caret {
   position: absolute;
-  top: calc(100% + 7px);
-  left: 0;
+  top: calc(50% + 10px);
+  z-index: 21;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  border-top: 1px solid var(--ax-edge);
+  border-left: 1px solid var(--ax-edge);
+  border-top-left-radius: 2px;
+  background: var(--surface);
+}
+
+.activities-mix-tip {
+  position: absolute;
+  top: calc(50% + 13px);
   z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 0;
-  padding: 8px 12px;
+  display: grid;
+  gap: 2px;
+  padding: 7px 11px;
   border: 1px solid var(--ax-edge);
   border-radius: var(--radius-md);
   /*
@@ -148,49 +183,48 @@
    */
   background: var(--surface);
   box-shadow: var(--shadow-elevated);
-  opacity: 0;
   pointer-events: none;
-  list-style: none;
-  transition: opacity 0.12s ease;
+  white-space: nowrap;
 }
 
-.activities-mix-bar:hover + .activities-mix-legend,
-.activities-mix-bar:focus-visible + .activities-mix-legend {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .activities-mix-legend {
-    transition: none;
-  }
-}
-
-.activities-mix-legend li {
+.activities-mix-tip-name {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: 0;
+  color: var(--text-primary);
   font-size: 11px;
+  font-weight: 650;
 }
 
-.activities-mix-legend i {
+.activities-mix-tip-name i {
   width: 8px;
   height: 8px;
   border-radius: 2px;
   background: var(--sport-mix-color, var(--sport-other));
 }
 
-.activities-mix-legend span {
-  color: var(--text-secondary);
-}
-
-.activities-mix-legend strong {
-  color: var(--text-primary);
+.activities-mix-tip-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
-.activities-mix-legend em {
-  color: var(--text-muted);
-  font-style: normal;
+.activities-mix-tip-figures strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activities-mix-bar,
+  .activities-mix-bar i {
+    transition: none;
+  }
 }
 
 /*
