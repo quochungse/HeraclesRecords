@@ -881,6 +881,25 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
 
+**`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
+a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
+of the page under it: the shell, the sidebar and every panel read as one flat sheet, and the
+sidebar's own gradient ended *in the page colour*, so the rail was not there at all. So the
+page is grey and every surface white, and `--glass-bg` — a white *lift* in dark — is a grey
+wash here, because it is spent on controls and rows that sit on cards which are already
+white. A surface that must be white asks for `--glass-bg-elevated`; `.panel` inside a
+`.panel` deliberately recesses instead, restated at the generic rule's own specificity to
+outrank it. **And `--bg-base` carries no accent hue**: the cream one left Sky and Indigo
+sitting on a yellow page, while the window chrome is painted from
+`THEME_WINDOW_BACKGROUND`, a flat string written on a theme change but *not* on an accent
+change — so an accent-derived base would drift out of step with the frame around it. The
+accent reaches the page through `--bg-ambient-*` and the sidebar's top gradient, which read
+`var(--accent)` at use time. Paper accents are measured against `--bg-base` for WCAG AA and
+mirrored in `src/theme/accentPalette.ts` for the globe and the charts, which cannot read a
+custom property — change both. Every paper rule is scoped `:root[data-theme="paper"]`, which
+is what keeps dark out of reach of a light-theme edit; nothing in the file relies on a bare
+selector meaning "light".
+
 ## Releases
 
 `npm run release:prepare -- v0.1.31` syncs the version into `package.json` and the lockfile,

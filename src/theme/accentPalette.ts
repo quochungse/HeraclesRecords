@@ -41,35 +41,35 @@ export const ACCENT_PALETTE_DETAILS: Record<AccentPalette, AccentPaletteDetail> 
       description: "Default. Taken from the app icon.",
       swatch: ["#e7b04c", "#c78f38"],
       dark: { accent: "#e7b04c", strong: "#f3bf5c" },
-      paper: { accent: "#9a6414", strong: "#7a4f0f" }
+      paper: { accent: "#915e13", strong: "#734a0e" }
     },
     teal: {
       label: "Original Teal",
       description: "The palette the app shipped with.",
       swatch: ["#2fbe91", "#1fb6a6"],
       dark: { accent: "#2fbe91", strong: "#4fd6a6" },
-      paper: { accent: "#12946e", strong: "#0f7f5f" }
+      paper: { accent: "#0f7859", strong: "#0c674d" }
     },
     indigo: {
       label: "Indigo",
       description: "Cool and low-glare for long sessions.",
       swatch: ["#818cf8", "#6470e2"],
       dark: { accent: "#818cf8", strong: "#96a0fa" },
-      paper: { accent: "#5763d3", strong: "#49539f" }
+      paper: { accent: "#535ec8", strong: "#3d46a6" }
     },
     rose: {
       label: "Rose",
       description: "Warm contrast against the dark shell.",
       swatch: ["#fb7185", "#e2596f"],
       dark: { accent: "#fb7185", strong: "#fc8b9b" },
-      paper: { accent: "#c63a4e", strong: "#a02f40" }
+      paper: { accent: "#be384b", strong: "#9c2537" }
     },
     sky: {
       label: "Sky",
       description: "Bright blue, highest legibility on paper.",
       swatch: ["#38bdf8", "#22a3e0"],
       dark: { accent: "#38bdf8", strong: "#5ecbfa" },
-      paper: { accent: "#0076aa", strong: "#005c82" }
+      paper: { accent: "#0070a2", strong: "#00587f" }
     }
   };
 

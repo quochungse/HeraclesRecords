@@ -99,80 +99,117 @@
 }
 
 /*
- * Paper light theme — a subtle warm "paper" palette. Redefines the core tokens
- * so everything that reads var(--…) reskins automatically. Hardcoded hex/rgba
- * values that bypass these tokens are handled in the paper-override section at
- * the end of this file.
+ * Paper light theme — a neutral cool-grey canvas carrying white surfaces.
+ * Redefines the core tokens so everything that reads var(--…) reskins
+ * automatically. Hardcoded hex/rgba values that bypass these tokens are
+ * handled in the paper-override section at the end of this file.
+ *
+ * Two rules hold the palette up, and both are answers to the warm "paper"
+ * cream this replaced:
+ *
+ * **The canvas is not white and the surfaces are.** A card has to separate by
+ * its own fill. Cream at #f6f3ec under a 72%-white glass put the two within
+ * three levels of each other, so the shell, the sidebar and every panel read
+ * as one flat sheet with hairlines drawn on it — the sidebar in particular
+ * ended its own gradient *in the page colour*, so the rail simply was not
+ * there. Here the page is grey, every surface is white, and the border is a
+ * seam rather than the only thing saying a card exists.
+ *
+ * **The canvas carries no accent hue.** The old base was warm, so choosing
+ * Sky or Indigo left the whole app sitting on a yellow page that argued with
+ * its own palette. The accent arrives through the ambient washes and the
+ * sidebar's top gradient instead, each of which reads var(--accent) at use
+ * time and therefore follows whichever palette is set. Keep --bg-base itself
+ * free of it: THEME_WINDOW_BACKGROUND in src/theme/theme.ts is a flat string
+ * the window chrome is painted with, and it is written on a theme change but
+ * not on an accent change, so an accent-derived base would drift out of step
+ * with the frame around it.
  */
 :root[data-theme="paper"] {
   color-scheme: light;
 
-  --bg-base: #f6f3ec; /* warm paper */
-  --bg-ambient-tertiary: rgba(216, 155, 34, 0.05);
-  --bg-ambient-white: rgba(255, 255, 255, 0.5); /* light wash, not dark */
+  --bg-base: #e9ecf2; /* cool paper */
+  --bg-ambient-tertiary: color-mix(in srgb, var(--accent) 8%, transparent);
+  --bg-ambient-white: rgba(255, 255, 255, 0.55);
 
-  /* Glass surfaces become near-white cards on paper */
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-bg-hover: rgba(255, 255, 255, 0.85);
+  /* rgb(19, 26, 40) is this theme's ink, and every alpha below is mixed from
+     it — borders, wells, shadows, scrims — including the ~190 longhand uses
+     in the paper-override section at the end of the file. Written out rather
+     than held in a custom property because most of those are inside
+     multi-stop shadows and gradients that read better spelled in full; if you
+     add one, take the same triplet so nothing drifts back to warm. */
+
+  /* --glass-bg is a *lift* over the page in the dark theme, and it is spent
+     almost entirely on controls and rows — buttons, inputs, chips, settings
+     rows, segment tracks — which here sit on cards that are already white.
+     Lifting them further leaves nothing to see, so on this theme it is a
+     grey wash instead, picked to read in both directions at once: ten levels
+     above the canvas for the few that sit straight on the page, twelve below
+     white for the many that do not. A surface that must be white asks for
+     --glass-bg-elevated, which is what `.panel` and the popovers already do. */
+  --glass-bg: #f2f4f9;
+  --glass-bg-hover: #e4e9f1;
   --glass-bg-elevated: #ffffff;
-  --glass-border: rgba(38, 34, 28, 0.1);
+  --glass-border: rgba(19, 26, 40, 0.14);
   --glass-blur: 24px;
   --glass-blur-shell: 40px;
-  --glass-shadow: 0 14px 34px rgba(60, 50, 35, 0.12);
-  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --shadow-soft: 0 4px 14px rgba(60, 50, 35, 0.1), 0 1px 2px rgba(60, 50, 35, 0.06);
-  --shadow-card: 0 1px 2px rgba(60, 50, 35, 0.04), 0 14px 34px rgba(60, 50, 35, 0.09);
-  --shadow-elevated: 0 22px 50px rgba(60, 50, 35, 0.16);
-  --shadow-inset: inset 0 1px 0 rgba(38, 34, 28, 0.06);
+  --glass-shadow: 0 12px 30px rgba(19, 26, 40, 0.1), 0 2px 6px rgba(19, 26, 40, 0.06);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-soft: 0 6px 18px rgba(19, 26, 40, 0.09), 0 1px 2px rgba(19, 26, 40, 0.07);
+  --shadow-card: 0 1px 2px rgba(19, 26, 40, 0.06), 0 12px 30px rgba(19, 26, 40, 0.09);
+  --shadow-elevated: 0 24px 54px rgba(19, 26, 40, 0.18);
+  --shadow-inset: inset 0 1px 0 rgba(19, 26, 40, 0.05);
 
-  --text-primary: #2b2a28; /* soft ink */
-  --text-secondary: #57544e;
-  --text-muted: #8a857c;
+  --text-primary: #151a26; /* cool ink */
+  --text-secondary: #4a5265;
+  --text-muted: #61687a;
 
   --surface: #ffffff;
 
-  --accent-gold: #b9791a;
+  --accent-gold: #905e0e;
 
-  --success-bg: rgba(47, 190, 145, 0.16);
-  --success-border: rgba(18, 148, 110, 0.3);
-  --success-text: #147a52;
-  --success-dot: #16a34a;
+  --success-bg: rgba(16, 122, 82, 0.13);
+  --success-border: rgba(16, 122, 82, 0.32);
+  --success-text: #0f6f4b;
+  --success-dot: #12915f;
 
-  --warning-bg: rgba(216, 155, 34, 0.16);
-  --warning-border: rgba(216, 155, 34, 0.35);
-  --warning-text: #9a6b12;
+  --warning-bg: rgba(180, 122, 18, 0.15);
+  --warning-border: rgba(180, 122, 18, 0.36);
+  --warning-text: #8a5d09;
 
-  --error-bg: rgba(194, 65, 12, 0.12);
-  --error-border: rgba(192, 57, 43, 0.3);
-  --error-text: #c0392b;
-  --error-dot: #dc2626;
+  --error-bg: rgba(185, 40, 30, 0.11);
+  --error-border: rgba(185, 40, 30, 0.3);
+  --error-text: #b3261e;
+  --error-dot: #d92d20;
 
-  --sidebar-glass-border: rgba(38, 34, 28, 0.08);
-  --sidebar-glass-highlight: rgba(255, 255, 255, 0.42);
+  --sidebar-glass-border: rgba(19, 26, 40, 0.13);
+  --sidebar-glass-highlight: rgba(255, 255, 255, 0.9);
   --sidebar-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.52),
-    0 18px 44px rgba(60, 50, 35, 0.08),
-    0 6px 16px rgba(60, 50, 35, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 18px 44px rgba(19, 26, 40, 0.1),
+    0 4px 12px rgba(19, 26, 40, 0.06);
+  /* White against the grey page. Dark separates the rail by making it lighter
+     than the canvas; this is the same move in the other direction, and it is
+     the one thing the cream theme got backwards. */
   --sidebar-glass-bg:
     linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.3) 0%,
-      rgba(255, 255, 255, 0.1) 32%,
-      transparent 58%
+      170deg,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 3%, transparent) 28%,
+      transparent 54%
     ),
-    linear-gradient(225deg, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 48%),
-    #f6f3ec;
+    #ffffff;
   --sidebar-overlay-bg: var(--sidebar-glass-bg);
   --sidebar-overlay-shadow: var(--sidebar-glass-shadow);
   --sidebar-indicator-bg: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-    color-mix(in srgb, var(--accent-2) 9%, transparent) 100%
+    color-mix(in srgb, var(--accent) 20%, transparent) 0%,
+    color-mix(in srgb, var(--accent-2) 12%, transparent) 100%
   );
-  --sidebar-indicator-border: color-mix(in srgb, var(--accent) 22%, transparent);
+  --sidebar-indicator-border: color-mix(in srgb, var(--accent) 36%, transparent);
   --sidebar-indicator-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 6px 16px color-mix(in srgb, var(--accent) 10%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px color-mix(in srgb, var(--accent) 16%, transparent);
 
   color: var(--text-primary);
   background: var(--bg-base);
@@ -182,7 +219,13 @@
    Switchable from Settings -> Appearance -> Themes. Gold is the default and
    carries no data-accent attribute, so it also covers a cleared setting.
    Every value below was checked to clear WCAG AA (4.5:1) against its own
-   theme background before being committed. */
+   theme background before being committed — measured against --bg-base, which
+   is the worst case, since most accent text sits on a card that is lighter
+   still. The paper set was re-measured when the canvas moved off cream: a
+   grey page is darker than the cream was, so each of those five came down
+   with it, and Paper Teal was under 4.5 even before that. The canvas-facing
+   halves of these are mirrored in src/theme/accentPalette.ts for the globe
+   and the charts, which cannot read a custom property — change both. */
 
 :root, :root[data-accent="gold"] {
   --accent: #e7b04c;
@@ -290,108 +333,108 @@
 }
 
 :root[data-theme="paper"], :root[data-theme="paper"][data-accent="gold"] {
-  --accent: #9a6414;
-  --accent-strong: #7a4f0f;
-  --accent-2: #8a5a12;
-  --accent-hover: #6b450d;
-  --accent-muted: #b9791a;
-  --accent-glow: rgba(154, 100, 20, .22);
-  --accent-soft: rgba(154, 100, 20, .12);
-  --accent-gradient: linear-gradient(135deg, #b9791a 0%, #8a5a12 100%);
-  --bg-ambient-primary: rgba(154, 100, 20, 0.06);
-  --bg-ambient-secondary: rgba(138, 90, 18, 0.05);
-  --palette-accent: #9a6414;
-  --palette-accent-strong: #7a4f0f;
-  --palette-accent-2: #8a5a12;
-  --palette-accent-hover: #6b450d;
-  --palette-accent-muted: #b9791a;
-  --palette-accent-glow: rgba(154, 100, 20, .22);
-  --palette-accent-soft: rgba(154, 100, 20, .12);
-  --palette-accent-gradient: linear-gradient(135deg, #b9791a 0%, #8a5a12 100%);
+  --accent: #915e13;
+  --accent-strong: #734a0e;
+  --accent-2: #825511;
+  --accent-hover: #65410c;
+  --accent-muted: #ae7218;
+  --accent-glow: rgba(145, 94, 19, .22);
+  --accent-soft: rgba(145, 94, 19, .12);
+  --accent-gradient: linear-gradient(135deg, #ae7218 0%, #825511 100%);
+  --bg-ambient-primary: rgba(145, 94, 19, 0.06);
+  --bg-ambient-secondary: rgba(130, 85, 17, 0.05);
+  --palette-accent: #915e13;
+  --palette-accent-strong: #734a0e;
+  --palette-accent-2: #825511;
+  --palette-accent-hover: #65410c;
+  --palette-accent-muted: #ae7218;
+  --palette-accent-glow: rgba(145, 94, 19, .22);
+  --palette-accent-soft: rgba(145, 94, 19, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #ae7218 0%, #825511 100%);
 }
 
 :root[data-theme="paper"][data-accent="teal"] {
-  --accent: #12946e;
-  --accent-strong: #0f7f5f;
-  --accent-2: #128a7f;
-  --accent-hover: #0c6f52;
-  --accent-muted: #12946e;
-  --accent-glow: rgba(18, 148, 110, .22);
-  --accent-soft: rgba(18, 148, 110, .12);
-  --accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
-  --bg-ambient-primary: rgba(18, 148, 110, 0.06);
-  --bg-ambient-secondary: rgba(18, 138, 127, 0.05);
-  --palette-accent: #12946e;
-  --palette-accent-strong: #0f7f5f;
-  --palette-accent-2: #128a7f;
-  --palette-accent-hover: #0c6f52;
-  --palette-accent-muted: #12946e;
-  --palette-accent-glow: rgba(18, 148, 110, .22);
-  --palette-accent-soft: rgba(18, 148, 110, .12);
-  --palette-accent-gradient: linear-gradient(135deg, #17a67d 0%, #128a7f 100%);
+  --accent: #0f7859;
+  --accent-strong: #0c674d;
+  --accent-2: #0f7067;
+  --accent-hover: #0a5a42;
+  --accent-muted: #0f7859;
+  --accent-glow: rgba(15, 120, 89, .22);
+  --accent-soft: rgba(15, 120, 89, .12);
+  --accent-gradient: linear-gradient(135deg, #138665 0%, #0f7067 100%);
+  --bg-ambient-primary: rgba(15, 120, 89, 0.06);
+  --bg-ambient-secondary: rgba(15, 112, 103, 0.05);
+  --palette-accent: #0f7859;
+  --palette-accent-strong: #0c674d;
+  --palette-accent-2: #0f7067;
+  --palette-accent-hover: #0a5a42;
+  --palette-accent-muted: #0f7859;
+  --palette-accent-glow: rgba(15, 120, 89, .22);
+  --palette-accent-soft: rgba(15, 120, 89, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #138665 0%, #0f7067 100%);
 }
 
 :root[data-theme="paper"][data-accent="indigo"] {
-  --accent: #5763d3;
-  --accent-strong: #404aaf;
-  --accent-2: #4c57c1;
-  --accent-hover: #333d9b;
-  --accent-muted: #6d7aec;
-  --accent-glow: rgba(87, 99, 211, .22);
-  --accent-soft: rgba(87, 99, 211, .12);
-  --accent-gradient: linear-gradient(135deg, #6d7aec 0%, #4c57c1 100%);
-  --bg-ambient-primary: rgba(87, 99, 211, 0.06);
-  --bg-ambient-secondary: rgba(76, 87, 193, 0.05);
-  --palette-accent: #5763d3;
-  --palette-accent-strong: #404aaf;
-  --palette-accent-2: #4c57c1;
-  --palette-accent-hover: #333d9b;
-  --palette-accent-muted: #6d7aec;
-  --palette-accent-glow: rgba(87, 99, 211, .22);
-  --palette-accent-soft: rgba(87, 99, 211, .12);
-  --palette-accent-gradient: linear-gradient(135deg, #6d7aec 0%, #4c57c1 100%);
+  --accent: #535ec8;
+  --accent-strong: #3d46a6;
+  --accent-2: #4853b7;
+  --accent-hover: #303a93;
+  --accent-muted: #6874e0;
+  --accent-glow: rgba(83, 94, 200, .22);
+  --accent-soft: rgba(83, 94, 200, .12);
+  --accent-gradient: linear-gradient(135deg, #6874e0 0%, #4853b7 100%);
+  --bg-ambient-primary: rgba(83, 94, 200, 0.06);
+  --bg-ambient-secondary: rgba(72, 83, 183, 0.05);
+  --palette-accent: #535ec8;
+  --palette-accent-strong: #3d46a6;
+  --palette-accent-2: #4853b7;
+  --palette-accent-hover: #303a93;
+  --palette-accent-muted: #6874e0;
+  --palette-accent-glow: rgba(83, 94, 200, .22);
+  --palette-accent-soft: rgba(83, 94, 200, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #6874e0 0%, #4853b7 100%);
 }
 
 :root[data-theme="paper"][data-accent="rose"] {
-  --accent: #c63a4e;
-  --accent-strong: #a22739;
-  --accent-2: #b43144;
-  --accent-hover: #8e1e2e;
-  --accent-muted: #e04d62;
-  --accent-glow: rgba(198, 58, 78, .22);
-  --accent-soft: rgba(198, 58, 78, .12);
-  --accent-gradient: linear-gradient(135deg, #e04d62 0%, #b43144 100%);
-  --bg-ambient-primary: rgba(198, 58, 78, 0.06);
-  --bg-ambient-secondary: rgba(180, 49, 68, 0.05);
-  --palette-accent: #c63a4e;
-  --palette-accent-strong: #a22739;
-  --palette-accent-2: #b43144;
-  --palette-accent-hover: #8e1e2e;
-  --palette-accent-muted: #e04d62;
-  --palette-accent-glow: rgba(198, 58, 78, .22);
-  --palette-accent-soft: rgba(198, 58, 78, .12);
-  --palette-accent-gradient: linear-gradient(135deg, #e04d62 0%, #b43144 100%);
+  --accent: #be384b;
+  --accent-strong: #9c2537;
+  --accent-2: #ad2f41;
+  --accent-hover: #881d2c;
+  --accent-muted: #d74a5e;
+  --accent-glow: rgba(190, 56, 75, .22);
+  --accent-soft: rgba(190, 56, 75, .12);
+  --accent-gradient: linear-gradient(135deg, #d74a5e 0%, #ad2f41 100%);
+  --bg-ambient-primary: rgba(190, 56, 75, 0.06);
+  --bg-ambient-secondary: rgba(173, 47, 65, 0.05);
+  --palette-accent: #be384b;
+  --palette-accent-strong: #9c2537;
+  --palette-accent-2: #ad2f41;
+  --palette-accent-hover: #881d2c;
+  --palette-accent-muted: #d74a5e;
+  --palette-accent-glow: rgba(190, 56, 75, .22);
+  --palette-accent-soft: rgba(190, 56, 75, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #d74a5e 0%, #ad2f41 100%);
 }
 
 :root[data-theme="paper"][data-accent="sky"] {
-  --accent: #0076aa;
-  --accent-strong: #005d86;
-  --accent-2: #006a98;
-  --accent-hover: #004f72;
-  --accent-muted: #0a8bc3;
-  --accent-glow: rgba(0, 118, 170, .22);
-  --accent-soft: rgba(0, 118, 170, .12);
-  --accent-gradient: linear-gradient(135deg, #0a8bc3 0%, #006a98 100%);
-  --bg-ambient-primary: rgba(0, 118, 170, 0.06);
-  --bg-ambient-secondary: rgba(0, 106, 152, 0.05);
-  --palette-accent: #0076aa;
-  --palette-accent-strong: #005d86;
-  --palette-accent-2: #006a98;
-  --palette-accent-hover: #004f72;
-  --palette-accent-muted: #0a8bc3;
-  --palette-accent-glow: rgba(0, 118, 170, .22);
-  --palette-accent-soft: rgba(0, 118, 170, .12);
-  --palette-accent-gradient: linear-gradient(135deg, #0a8bc3 0%, #006a98 100%);
+  --accent: #0070a2;
+  --accent-strong: #00587f;
+  --accent-2: #006590;
+  --accent-hover: #004b6c;
+  --accent-muted: #0a84b9;
+  --accent-glow: rgba(0, 112, 162, .22);
+  --accent-soft: rgba(0, 112, 162, .12);
+  --accent-gradient: linear-gradient(135deg, #0a84b9 0%, #006590 100%);
+  --bg-ambient-primary: rgba(0, 112, 162, 0.06);
+  --bg-ambient-secondary: rgba(0, 101, 144, 0.05);
+  --palette-accent: #0070a2;
+  --palette-accent-strong: #00587f;
+  --palette-accent-2: #006590;
+  --palette-accent-hover: #004b6c;
+  --palette-accent-muted: #0a84b9;
+  --palette-accent-glow: rgba(0, 112, 162, .22);
+  --palette-accent-soft: rgba(0, 112, 162, .12);
+  --palette-accent-gradient: linear-gradient(135deg, #0a84b9 0%, #006590 100%);
 }
 
 * {
@@ -24406,37 +24449,66 @@ tr.data-intervals-row-missing {
  * become light. Grouped by feature. Tune values against the running app.
  * ========================================================================== */
 
+/* --- Controls and nested surfaces ------------------------------------------
+ * Two things the token swap alone cannot reach.
+ *
+ * The shared controls lift on hover with `0 10px 24px rgba(0, 0, 0, 0.2)`,
+ * written for a page that is nearly black. On a white card that is a bruise
+ * under the button, so the same lift is restated in the theme's own ink.
+ *
+ * And a `.panel` inside a `.panel` is the app's standard nesting — the
+ * recovery ring and the weekly chart inside Training Intelligence, the rows
+ * inside a Settings card. The generic paper `.panel` rule below paints every
+ * one of them white, which flattens the hierarchy to a single sheet; on this
+ * theme a nested surface recesses instead. It has to be restated at the
+ * `.panel` rule's own specificity to outrank it, which is why the selector
+ * names `.panel` twice rather than reading as the obvious descendant.
+ */
+:root[data-theme="paper"] :is(
+    .secondary-button,
+    .icon-button,
+    .app-select-trigger
+  ):hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(19, 26, 40, 0.14);
+}
+
+/* An input has to out-read the controls beside it while it is being typed in,
+   and on this theme that means going white rather than lighting up. */
+:root[data-theme="paper"] :is(.input-shell:focus-within, .field input:focus, .field textarea:focus) {
+  background: #ffffff;
+}
+
 /* --- Shell / header ------------------------------------------------------- */
 :root[data-theme="paper"] .primary-tabs {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
   border-color: var(--glass-border);
 }
 
 :root[data-theme="paper"] .primary-tabs-indicator {
-  border-color: rgba(38, 34, 28, 0.12);
-  background: rgba(38, 34, 28, 0.08);
+  border-color: rgba(19, 26, 40, 0.15);
+  background: rgba(19, 26, 40, 0.1);
   box-shadow: var(--shadow-inset);
 }
 
 :root[data-theme="paper"] .app-version-chip,
 :root[data-theme="paper"] .update-chip {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .update-settings-trigger {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .update-settings-trigger:hover,
 :root[data-theme="paper"] .update-settings-trigger[aria-expanded="true"] {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .resources-popover,
 :root[data-theme="paper"] .startup-view-popover,
 :root[data-theme="paper"] .update-settings-popover {
   background: var(--glass-bg-elevated);
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   box-shadow: var(--shadow-elevated);
 }
 
@@ -24444,7 +24516,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .resources-link:focus-visible,
 :root[data-theme="paper"] .startup-view-option:hover,
 :root[data-theme="paper"] .startup-view-option:focus-visible {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .startup-view-option.is-active {
@@ -24453,7 +24525,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .primary-tab:hover:not(.active) {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .primary-tab.active {
@@ -24477,8 +24549,8 @@ tr.data-intervals-row-missing {
   --accent-strong: #3d3a36;
   --accent-2: #8a837a;
   --accent-hover: #5c5752;
-  --accent-glow: rgba(38, 34, 28, 0.12);
-  --accent-soft: rgba(38, 34, 28, 0.07);
+  --accent-glow: rgba(19, 26, 40, 0.15);
+  --accent-soft: rgba(19, 26, 40, 0.09);
   --accent-gradient: linear-gradient(135deg, #8a837a 0%, #5c5752 100%);
   --chat-signal: var(--palette-accent);
   --chat-signal-strong: var(--palette-accent-strong);
@@ -24488,10 +24560,10 @@ tr.data-intervals-row-missing {
   background:
     radial-gradient(
       1100px 520px at 50% -8%,
-      rgba(38, 34, 28, 0.03),
+      rgba(19, 26, 40, 0.04),
       transparent 62%
     ),
-    linear-gradient(180deg, rgba(38, 34, 28, 0.015), transparent 30%);
+    linear-gradient(180deg, rgba(19, 26, 40, 0.02), transparent 30%);
 }
 
 :root[data-theme="paper"] .dev-toolbar {
@@ -24503,36 +24575,40 @@ tr.data-intervals-row-missing {
   backdrop-filter: none;
 }
 
+/* Both of these paint white onto white on this theme. The rail's edge is the
+   border and the shadow now, so they are switched off rather than left to
+   render as nothing. */
 :root[data-theme="paper"] .app-sidebar::before {
-  opacity: 0.42;
+  opacity: 0;
 }
 
 :root[data-theme="paper"] .app-sidebar::after {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .app-sidebar-overlay {
-  background: rgba(43, 42, 40, 0.18);
+  background: rgba(17, 22, 34, 0.32);
   -webkit-backdrop-filter: blur(10px) saturate(115%);
   backdrop-filter: blur(10px) saturate(115%);
 }
 
 :root[data-theme="paper"] .app-sidebar-brand {
-  border-bottom-color: rgba(38, 34, 28, 0.07);
+  border-bottom-color: rgba(19, 26, 40, 0.09);
 }
 
 :root[data-theme="paper"] .app-sidebar-brand .brand-mark {
   box-shadow:
-    0 0 0 1px rgba(38, 34, 28, 0.06),
+    0 0 0 1px rgba(19, 26, 40, 0.07),
     0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* The rail is white now, so a white hover has nothing to say. Hover, and the
+   collapse control's resting state, are ink washes here — the light-theme
+   direction is down into the surface, not up off it. */
 :root[data-theme="paper"] .app-sidebar-nav-item:hover {
-  background: rgba(255, 255, 255, 0.52);
-  border-color: rgba(38, 34, 28, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 6px 16px rgba(60, 50, 35, 0.07);
+  background: var(--glass-bg);
+  border-color: rgba(19, 26, 40, 0.1);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .app-sidebar-nav-item.active .app-sidebar-nav-icon {
@@ -24547,27 +24623,25 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .app-sidebar-footer {
-  border-top-color: rgba(38, 34, 28, 0.07);
+  border-top-color: rgba(19, 26, 40, 0.09);
 }
 
 :root[data-theme="paper"] .app-sidebar-toggle {
-  background: rgba(255, 255, 255, 0.22);
+  background: transparent;
 }
 
 :root[data-theme="paper"] .app-sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.58);
-  border-color: rgba(38, 34, 28, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 6px 16px rgba(60, 50, 35, 0.07);
+  background: var(--glass-bg);
+  border-color: rgba(19, 26, 40, 0.1);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-settings-backdrop {
-  background: rgba(38, 34, 28, 0.35);
+  background: rgba(19, 26, 40, 0.35);
 }
 
 :root[data-theme="paper"] .chat-sidebar-overlay {
-  background: rgba(43, 42, 40, 0.18);
+  background: rgba(17, 22, 34, 0.32);
   -webkit-backdrop-filter: blur(10px) saturate(115%);
   backdrop-filter: blur(10px) saturate(115%);
 }
@@ -24586,11 +24660,11 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-sidebar::before {
-  opacity: 0.42;
+  opacity: 0;
 }
 
 :root[data-theme="paper"] .chat-sidebar::after {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-sidebar.is-overlay {
@@ -24599,20 +24673,20 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-history-toolbar {
-  background: rgba(255, 255, 255, 0.62);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  backdrop-filter: blur(20px) saturate(120%);
-  border-bottom-color: rgba(38, 34, 28, 0.07);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom-color: rgba(19, 26, 40, 0.09);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-history-search {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass-bg);
   border-color: var(--glass-border);
 }
 
 :root[data-theme="paper"] .chat-history-search:focus-within {
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   box-shadow:
     var(--glass-inset),
@@ -24620,11 +24694,9 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-session-row:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.52);
-  border-color: rgba(38, 34, 28, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 6px 16px rgba(60, 50, 35, 0.07);
+  background: var(--glass-bg);
+  border-color: rgba(19, 26, 40, 0.1);
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-session-row.is-active {
@@ -24637,22 +24709,22 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .chat-settings-modal {
   background: var(--glass-bg-elevated);
-  border-color: rgba(38, 34, 28, 0.12);
-  box-shadow: 0 24px 60px rgba(60, 50, 35, 0.16);
+  border-color: rgba(19, 26, 40, 0.15);
+  box-shadow: 0 24px 60px rgba(19, 26, 40, 0.21);
 }
 
 :root[data-theme="paper"] .chat-settings-section {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
   border-color: var(--glass-border);
 }
 
 :root[data-theme="paper"] .chat-composer-inner {
-  box-shadow: 0 8px 28px rgba(60, 50, 35, 0.12), var(--glass-inset);
+  box-shadow: 0 8px 28px rgba(19, 26, 40, 0.16), var(--glass-inset);
 }
 
 :root[data-theme="paper"] .chat-composer-inner:focus-within {
   box-shadow: 0 0 0 3px var(--accent-soft),
-    0 10px 32px rgba(60, 50, 35, 0.14);
+    0 10px 32px rgba(19, 26, 40, 0.18);
 }
 
 :root[data-theme="paper"] .chat-select--gpt,
@@ -24723,7 +24795,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .chat-model-select .app-select-trigger {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 5px 14px rgba(60, 50, 35, 0.08);
+    0 5px 14px rgba(19, 26, 40, 0.1);
 }
 
 :root[data-theme="paper"]
@@ -24735,7 +24807,7 @@ tr.data-intervals-row-missing {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 0 0 3px var(--accent-soft),
-    0 10px 24px rgba(60, 50, 35, 0.12);
+    0 10px 24px rgba(19, 26, 40, 0.16);
 }
 
 :root[data-theme="paper"] .chat-select-menu {
@@ -24748,9 +24820,9 @@ tr.data-intervals-row-missing {
     rgba(255, 255, 255, 0.97);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    inset 0 0 0 1px rgba(38, 34, 28, 0.025),
-    0 22px 50px rgba(60, 50, 35, 0.16),
-    0 5px 16px rgba(60, 50, 35, 0.08);
+    inset 0 0 0 1px rgba(19, 26, 40, 0.03),
+    0 22px 50px rgba(19, 26, 40, 0.21),
+    0 5px 16px rgba(19, 26, 40, 0.1);
 }
 
 /* --- Route Studio panels + Leaflet controls ------------------------------- */
@@ -24773,7 +24845,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .route-drawer {
   background: rgba(255, 255, 255, 0.9);
   border-color: var(--glass-border);
-  box-shadow: 0 18px 50px rgba(60, 50, 35, 0.16);
+  box-shadow: 0 18px 50px rgba(19, 26, 40, 0.21);
 }
 
 /* Subtle white-alpha panel controls that vanish on white → dark-alpha */
@@ -24789,12 +24861,12 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .route-distance-presets button,
 :root[data-theme="paper"] .route-cta-hint,
 :root[data-theme="paper"] .route-sketch-text {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
   border-color: var(--glass-border);
 }
 
 :root[data-theme="paper"] .sync-backend-switch {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
   border-color: var(--glass-border);
 }
 
@@ -24805,7 +24877,7 @@ tr.data-intervals-row-missing {
 /* --- Activity route map (per-activity replay) ----------------------------- */
 :root[data-theme="paper"] .activity-route-map-canvas {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution,
@@ -24825,16 +24897,16 @@ tr.data-intervals-row-missing {
 
 /* --- Media tab -------------------------------------------------------------- */
 :root[data-theme="paper"] .media-tabs-shell {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
   border-color: var(--glass-border);
 }
 
 :root[data-theme="paper"] .media-tab:hover:not(.active) {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .media-tab.active {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-inset);
 }
@@ -24861,13 +24933,13 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .library-panel-header em {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .library-search-field,
 :root[data-theme="paper"] .library-filter-group {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .library-search-field:focus-within {
@@ -24876,11 +24948,11 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .library-search-clear:hover {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .library-filter-option.active {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-inset);
 }
@@ -24900,23 +24972,23 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .watch-storage-track,
 :root[data-theme="paper"] .library-transfer-progress-track {
-  background: rgba(38, 34, 28, 0.1);
+  background: rgba(19, 26, 40, 0.12);
 }
 
 :root[data-theme="paper"] .track-avatar.track-avatar--library {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 2px 6px rgba(38, 34, 28, 0.18);
+    0 2px 6px rgba(19, 26, 40, 0.23);
 }
 
 :root[data-theme="paper"] .library-panel {
-  --library-row-bg: rgba(38, 34, 28, 0.06);
-  --library-row-bg-hover: rgba(38, 34, 28, 0.09);
-  --library-row-border: rgba(38, 34, 28, 0.08);
+  --library-row-bg: rgba(19, 26, 40, 0.07);
+  --library-row-bg-hover: rgba(19, 26, 40, 0.11);
+  --library-row-border: rgba(19, 26, 40, 0.1);
 }
 
 :root[data-theme="paper"] .library-track-stack {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .library-track-row {
@@ -24925,7 +24997,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .library-track-row:hover:not(.is-selected) {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   background: var(--library-row-bg-hover);
 }
 
@@ -24936,7 +25008,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .library-connector-pill {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .library-connector-pill--ready {
@@ -24956,7 +25028,7 @@ tr.data-intervals-row-missing {
     180deg,
     transparent,
     var(--accent-soft),
-    rgba(38, 34, 28, 0.1),
+    rgba(19, 26, 40, 0.12),
     var(--bg-ambient-secondary),
     transparent
   );
@@ -24979,33 +25051,33 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .watch-line {
-  stroke: rgba(38, 34, 28, 0.35);
+  stroke: rgba(19, 26, 40, 0.35);
 }
 
 :root[data-theme="paper"] .watch-line--faint {
-  stroke: rgba(38, 34, 28, 0.16);
+  stroke: rgba(19, 26, 40, 0.2);
 }
 
 :root[data-theme="paper"] .watch-ring {
-  stroke: rgba(38, 34, 28, 0.22);
+  stroke: rgba(19, 26, 40, 0.22);
 }
 
 :root[data-theme="paper"] .watch-dot--muted {
-  fill: rgba(38, 34, 28, 0.28);
+  fill: rgba(19, 26, 40, 0.28);
 }
 
 :root[data-theme="paper"] .output-panel pre {
-  background: rgba(38, 34, 28, 0.04);
-  scrollbar-color: rgba(38, 34, 28, 0.15) transparent;
+  background: rgba(19, 26, 40, 0.05);
+  scrollbar-color: rgba(19, 26, 40, 0.19) transparent;
 }
 
 :root[data-theme="paper"] .output-panel pre::-webkit-scrollbar-thumb {
-  background: rgba(38, 34, 28, 0.15);
+  background: rgba(19, 26, 40, 0.19);
 }
 
 /* --- Media streaming (Spotify / YT Music / Apple Music) --------------------- */
 :root[data-theme="paper"] .playlist-list {
-  scrollbar-color: rgba(38, 34, 28, 0.15) transparent;
+  scrollbar-color: rgba(19, 26, 40, 0.19) transparent;
 }
 
 :root[data-theme="paper"] .playlist-button.active {
@@ -25013,17 +25085,17 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .youtube-music-steps li {
-  background: rgba(38, 34, 28, 0.03);
+  background: rgba(19, 26, 40, 0.04);
 }
 
 :root[data-theme="paper"] .youtube-music-steps li:hover {
-  border-color: rgba(38, 34, 28, 0.12);
-  background: rgba(38, 34, 28, 0.05);
+  border-color: rgba(19, 26, 40, 0.15);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .youtube-music-steps code {
-  border-color: rgba(38, 34, 28, 0.1);
-  background: rgba(38, 34, 28, 0.06);
+  border-color: rgba(19, 26, 40, 0.12);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .spotify-connect-note {
@@ -25031,15 +25103,15 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .service-open-link {
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .spotify-playlist-header,
 :root[data-theme="paper"] .youtube-music-playlist-header,
 :root[data-theme="paper"] .apple-music-playlist-header {
-  border-color: rgba(38, 34, 28, 0.1);
+  border-color: rgba(19, 26, 40, 0.12);
   background:
-    linear-gradient(135deg, rgba(38, 34, 28, 0.04), rgba(255, 255, 255, 0.6)),
+    linear-gradient(135deg, rgba(19, 26, 40, 0.05), rgba(255, 255, 255, 0.6)),
     var(--glass-bg-elevated);
   box-shadow: var(--shadow-soft);
 }
@@ -25048,8 +25120,8 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .youtube-music-playlist-header::after,
 :root[data-theme="paper"] .apple-music-playlist-header::after {
   background:
-    linear-gradient(90deg, rgba(246, 243, 236, 0.15), rgba(246, 243, 236, 0.72)),
-    linear-gradient(180deg, transparent, rgba(246, 243, 236, 0.55));
+    linear-gradient(90deg, rgba(248, 250, 252, 0.15), rgba(248, 250, 252, 0.72)),
+    linear-gradient(180deg, transparent, rgba(248, 250, 252, 0.55));
 }
 
 :root[data-theme="paper"] .spotify-playlist-meta > span,
@@ -25067,29 +25139,29 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .spotify-playlist-thumb,
 :root[data-theme="paper"] .youtube-music-playlist-thumb,
 :root[data-theme="paper"] .apple-music-playlist-thumb {
-  border-color: rgba(38, 34, 28, 0.1);
+  border-color: rgba(19, 26, 40, 0.12);
   box-shadow: var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .spotify-playlist-art,
 :root[data-theme="paper"] .youtube-music-playlist-art,
 :root[data-theme="paper"] .apple-music-playlist-art {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   box-shadow: var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .spotify-art-fallback,
 :root[data-theme="paper"] .youtube-music-art-fallback {
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(38, 34, 28, 0.04)),
-    rgba(38, 34, 28, 0.03);
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(19, 26, 40, 0.05)),
+    rgba(19, 26, 40, 0.04);
   color: var(--accent);
 }
 
 :root[data-theme="paper"] .apple-music-art-fallback {
   background:
-    linear-gradient(135deg, rgba(250, 87, 122, 0.16), rgba(38, 34, 28, 0.04)),
-    rgba(38, 34, 28, 0.03);
+    linear-gradient(135deg, rgba(250, 87, 122, 0.16), rgba(19, 26, 40, 0.05)),
+    rgba(19, 26, 40, 0.04);
   color: #c44a6a;
 }
 
@@ -25097,25 +25169,25 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .youtube-music-detail-panel .table-shell,
 :root[data-theme="paper"] .apple-music-detail-panel .table-shell {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.025);
+  background: rgba(19, 26, 40, 0.03);
 }
 
 /* --- YouTube Browser overlays ----------------------------------------------- */
 :root[data-theme="paper"] .browser-loading {
-  background: rgba(246, 243, 236, 0.72);
+  background: rgba(248, 250, 252, 0.72);
 }
 
 :root[data-theme="paper"] .browser-load-error {
-  background: rgba(246, 243, 236, 0.92);
+  background: rgba(248, 250, 252, 0.92);
   color: var(--text-primary);
 }
 
 :root[data-theme="paper"] .youtube-jobs-list {
-  scrollbar-color: rgba(38, 34, 28, 0.15) transparent;
+  scrollbar-color: rgba(19, 26, 40, 0.19) transparent;
 }
 
 :root[data-theme="paper"] .youtube-jobs-list::-webkit-scrollbar-thumb {
-  background: rgba(38, 34, 28, 0.15);
+  background: rgba(19, 26, 40, 0.19);
 }
 
 /* --- Cards / panels -------------------------------------------------------
@@ -25126,8 +25198,17 @@ tr.data-intervals-row-missing {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.4)),
     var(--glass-bg-elevated);
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   box-shadow: var(--shadow-card);
+}
+
+/* A panel inside a panel is a nested surface, not a second card floating on
+   the first. It recesses, and it drops the outer card's shadow — stacking two
+   of those reads as a card that has come loose. */
+:root[data-theme="paper"] :is(.panel, .training-intelligence) .panel:not(.is-disconnected) {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-inset);
 }
 
 /* Training Intelligence + heatmap wrappers set their own near-transparent
@@ -25135,7 +25216,7 @@ tr.data-intervals-row-missing {
  * white cards so the whole section reads as one surface. */
 :root[data-theme="paper"] .training-intelligence {
   background: var(--glass-bg-elevated);
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   box-shadow: var(--shadow-card);
 }
 
@@ -25144,8 +25225,8 @@ tr.data-intervals-row-missing {
  * tint + faint border so they read as nested panels. */
 :root[data-theme="paper"] .training-intelligence .training-ring-panel,
 :root[data-theme="paper"] .training-intelligence .training-fitness-panel {
-  background: rgba(38, 34, 28, 0.025);
-  border-color: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.03);
+  border-color: rgba(19, 26, 40, 0.1);
   box-shadow: var(--shadow-inset);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -25153,41 +25234,41 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .sleep-stage-bar,
 :root[data-theme="paper"] .sleep-stage-bar::before {
-  background: rgba(38, 34, 28, 0.08);
-  box-shadow: inset 0 1px 0 rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.1);
+  box-shadow: inset 0 1px 0 rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .sleep-stage-segment.is-awake {
-  --sleep-stage-color: rgba(85, 80, 72, 0.46);
+  --sleep-stage-color: rgba(96, 104, 120, 0.46);
 }
 
 :root[data-theme="paper"] .sleep-stage-legend-dot.is-awake {
-  background: rgba(85, 80, 72, 0.52);
+  background: rgba(96, 104, 120, 0.52);
 }
 
 :root[data-theme="paper"] .sleep-stage-segment::after {
-  border-color: rgba(38, 34, 28, 0.14);
+  border-color: rgba(19, 26, 40, 0.17);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 243, 236, 0.97)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.97)),
     rgba(255, 255, 255, 0.92);
   box-shadow:
-    0 14px 34px rgba(60, 50, 35, 0.16),
+    0 14px 34px rgba(19, 26, 40, 0.21),
     0 0 18px color-mix(in srgb, var(--sleep-stage-color) 24%, transparent);
   color: var(--text-primary);
 }
 
 :root[data-theme="paper"] .sleep-stage-segment::before {
-  border-color: rgba(38, 34, 28, 0.14);
-  background: rgba(246, 243, 236, 0.97);
+  border-color: rgba(19, 26, 40, 0.17);
+  background: rgba(248, 250, 252, 0.97);
 }
 
 /* The metric tiles' hover note, on paper: it carries `--text-primary`, which is
    dark ink here, so the dark card it sits on in the other theme would hide it
    completely. */
 :root[data-theme="paper"] .sleep-metric-note {
-  border-color: rgba(38, 34, 28, 0.14);
-  background: rgba(252, 250, 245, 0.98);
-  box-shadow: 0 14px 34px rgba(60, 50, 35, 0.16);
+  border-color: rgba(19, 26, 40, 0.17);
+  background: rgba(250, 251, 253, 0.98);
+  box-shadow: 0 14px 34px rgba(19, 26, 40, 0.21);
 }
 
 /* VO2 widget — it sits on Personal now, beside the fitness scores, so it takes
@@ -25195,7 +25276,7 @@ tr.data-intervals-row-missing {
  * wore inside Training Intelligence. The arrive animation keyframes a heavy
  * outer shadow that wins over static rules, which is what is-ready is for. */
 :root[data-theme="paper"] .profile-fitness-grid > .vo2-widget-panel {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   box-shadow: var(--shadow-card);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -25218,11 +25299,11 @@ tr.data-intervals-row-missing {
  * either vanish or look muddy on paper — swap to a warm-ink track, softened
  * lifts, and a light pin ring that reads against the card. */
 :root[data-theme="paper"] .vo2-gauge-track {
-  stroke: rgba(38, 34, 28, 0.1);
+  stroke: rgba(19, 26, 40, 0.12);
 }
 
 :root[data-theme="paper"] .vo2-gauge-needle {
-  filter: drop-shadow(0 1px 2px rgba(60, 50, 35, 0.18));
+  filter: drop-shadow(0 1px 2px rgba(19, 26, 40, 0.23));
 }
 
 :root[data-theme="paper"] .vo2-gauge-pin {
@@ -25274,13 +25355,13 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .vo2-plateau:hover::before,
 :root[data-theme="paper"] .vo2-plateau:focus-visible::before {
   box-shadow:
-    0 3px 10px rgba(38, 34, 28, 0.18),
+    0 3px 10px rgba(19, 26, 40, 0.23),
     0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
 }
 
 :root[data-theme="paper"] .vo2-plateau-tip {
   border-color: var(--glass-border);
-  background: rgba(252, 250, 246, 0.98);
+  background: rgba(250, 251, 253, 0.98);
 }
 
 :root[data-theme="paper"] .training-stat-card.is-widget:hover {
@@ -25289,10 +25370,10 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-stat-card,
 :root[data-theme="paper"] .training-stat-card:hover {
-  border-color: rgba(38, 34, 28, 0.1);
+  border-color: rgba(19, 26, 40, 0.12);
   background:
-    linear-gradient(145deg, rgba(38, 34, 28, 0.04), rgba(38, 34, 28, 0.015)),
-    rgba(38, 34, 28, 0.025);
+    linear-gradient(145deg, rgba(19, 26, 40, 0.05), rgba(19, 26, 40, 0.02)),
+    rgba(19, 26, 40, 0.03);
 }
 
 :root[data-theme="paper"] .training-stat-card:hover {
@@ -25300,7 +25381,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-stat-card.is-widget .training-stat-card__detail {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 /* --- Training Hub: tables --------------------------------------------------
@@ -25313,20 +25394,20 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .table-shell {
-  scrollbar-color: rgba(38, 34, 28, 0.22) transparent;
+  scrollbar-color: rgba(19, 26, 40, 0.22) transparent;
 }
 
 :root[data-theme="paper"] .table-shell::-webkit-scrollbar-thumb {
-  background: rgba(38, 34, 28, 0.22);
+  background: rgba(19, 26, 40, 0.22);
 }
 
 :root[data-theme="paper"] .table-shell thead th {
-  background: rgba(255, 255, 255, 0.94);
+  background: #eef1f6;
   color: var(--text-muted);
 }
 
 :root[data-theme="paper"] tbody tr:hover {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 
@@ -25340,7 +25421,7 @@ tr.data-intervals-row-missing {
 
 /* --- Recovery ring -------------------------------------------------------- */
 :root[data-theme="paper"] .storage-ring-track {
-  stroke: rgba(38, 34, 28, 0.08);
+  stroke: rgba(19, 26, 40, 0.1);
   stroke-width: 10;
 }
 
@@ -25373,12 +25454,12 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-ring-panel.tone-neutral {
-  --ring-color: #a8a29e;
+  --ring-color: #97a0b0;
   --ring-glow: rgba(168, 162, 158, 0.2);
 }
 
 :root[data-theme="paper"] .training-recovery-ring .storage-ring-track {
-  stroke: color-mix(in srgb, var(--ring-color) 18%, rgba(38, 34, 28, 0.05));
+  stroke: color-mix(in srgb, var(--ring-color) 18%, rgba(19, 26, 40, 0.06));
 }
 
 /* --- Training Hub: export dropdown ----------------------------------------- */
@@ -25390,13 +25471,13 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-export-option:hover,
 :root[data-theme="paper"] .training-export-option:focus-visible {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 /* --- Training Hub: graph menus (fitness metrics + zone select) ------------- */
 :root[data-theme="paper"] .metric-select-trigger,
 :root[data-theme="paper"] .training-zone-select-trigger {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
   border-color: var(--glass-border);
 }
 
@@ -25404,8 +25485,8 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .metric-select-trigger[aria-expanded="true"],
 :root[data-theme="paper"] .training-zone-select-trigger:hover,
 :root[data-theme="paper"] .training-zone-select-trigger[aria-expanded="true"] {
-  background: rgba(38, 34, 28, 0.09);
-  border-color: rgba(38, 34, 28, 0.2);
+  background: rgba(19, 26, 40, 0.11);
+  border-color: rgba(19, 26, 40, 0.25);
 }
 
 :root[data-theme="paper"] .training-zone-select-icon {
@@ -25424,11 +25505,11 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-zone-select-option.is-active,
 :root[data-theme="paper"] .training-zone-select-option:hover,
 :root[data-theme="paper"] .training-zone-select-option:focus-visible {
-  background: rgba(38, 34, 28, 0.07);
+  background: rgba(19, 26, 40, 0.09);
 }
 
 :root[data-theme="paper"] .metric-select-check {
-  border-color: rgba(38, 34, 28, 0.28);
+  border-color: rgba(19, 26, 40, 0.28);
 }
 
 :root[data-theme="paper"] .training-zone-select-option.is-selected {
@@ -25452,7 +25533,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-heatmap-cell[data-level="0"],
 :root[data-theme="paper"] .training-heatmap-legend-cell[data-level="0"] {
-  background: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.1);
 }
 
 /* Warm grey rather than the near-black #26221c: on cream, 85% of the ink is
@@ -25468,7 +25549,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):hover,
 :root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):focus-visible {
   box-shadow:
-    0 0 0 2px rgba(38, 34, 28, 0.18),
+    0 0 0 2px rgba(19, 26, 40, 0.23),
     0 6px 18px color-mix(in srgb, var(--accent-muted) 30%, transparent);
 }
 
@@ -25479,7 +25560,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-heatmap-summary > span:not([aria-hidden="true"]) {
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
   border-color: var(--glass-border);
 }
 
@@ -25506,8 +25587,8 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-empty-state,
 :root[data-theme="paper"] .training-chart-empty {
-  border-color: rgba(38, 34, 28, 0.14);
-  background: rgba(38, 34, 28, 0.025);
+  border-color: rgba(19, 26, 40, 0.17);
+  background: rgba(19, 26, 40, 0.03);
 }
 
 :root[data-theme="paper"] .training-chart-legend-dot.is-accent {
@@ -25530,7 +25611,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-chart-tooltip {
   border-color: var(--glass-border);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(250, 247, 240, 0.97));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(250, 251, 253, 0.97));
   box-shadow:
     var(--shadow-soft),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -25542,17 +25623,17 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-zone-info {
-  background: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.1);
   color: var(--text-secondary);
 }
 
 :root[data-theme="paper"] .training-zone-metric-pill {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .training-zone-track {
-  background: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.1);
 }
 
 /* --- Training Hub: fitness scores ------------------------------------------ */
@@ -25561,8 +25642,8 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .score-bar-track {
-  border-color: rgba(38, 34, 28, 0.08);
-  background: rgba(38, 34, 28, 0.07);
+  border-color: rgba(19, 26, 40, 0.1);
+  background: rgba(19, 26, 40, 0.09);
 }
 
 /* --- Training Hub: upcoming workouts --------------------------------------- */
@@ -25579,42 +25660,42 @@ tr.data-intervals-row-missing {
   border-color: var(--glass-border);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4)),
-    rgba(38, 34, 28, 0.025);
+    rgba(19, 26, 40, 0.03);
   box-shadow: var(--shadow-card);
 }
 
 :root[data-theme="paper"] .data-intervals-connect-card,
 :root[data-theme="paper"] .data-intervals-connected {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .data-intervals-range {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .data-intervals-range button:hover:not(:disabled):not(.active) {
-  background: rgba(38, 34, 28, 0.07);
+  background: rgba(19, 26, 40, 0.09);
 }
 
 :root[data-theme="paper"] .data-intervals-table {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.03);
+  background: rgba(19, 26, 40, 0.04);
 }
 
 :root[data-theme="paper"] .training-backup-card {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.04);
+  background: rgba(19, 26, 40, 0.05);
 }
 
 :root[data-theme="paper"] .training-backup-format-option {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.03);
+  background: rgba(19, 26, 40, 0.04);
 }
 
 :root[data-theme="paper"] .training-backup-format-option:hover:not(:disabled) {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
 }
 
 :root[data-theme="paper"] .training-backup-format-option.active {
@@ -25628,11 +25709,11 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-backup-result {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.03);
+  background: rgba(19, 26, 40, 0.04);
 }
 
 :root[data-theme="paper"] .training-backup-progress-track {
-  background: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.1);
 }
 
 :root[data-theme="paper"] .training-upcoming-today {
@@ -25645,17 +25726,17 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-upcoming-today-empty {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.025);
+  background: rgba(19, 26, 40, 0.03);
   box-shadow: var(--shadow-inset);
 }
 
 :root[data-theme="paper"] .training-upcoming-today-empty .training-upcoming-today-icon {
-  background: rgba(38, 34, 28, 0.08);
+  background: rgba(19, 26, 40, 0.1);
 }
 
 :root[data-theme="paper"] .training-upcoming-today-empty .training-upcoming-today-pill {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .training-upcoming-today-pill {
@@ -25667,11 +25748,11 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .training-upcoming-today-tag,
 :root[data-theme="paper"] .training-upcoming-tag {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .training-upcoming-rail::before {
-  background: rgba(38, 34, 28, 0.12);
+  background: rgba(19, 26, 40, 0.15);
 }
 
 :root[data-theme="paper"] .training-upcoming-dot {
@@ -25685,11 +25766,11 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-records-tab {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .training-records-tab:hover {
-  border-color: rgba(38, 34, 28, 0.16);
+  border-color: rgba(19, 26, 40, 0.2);
 }
 
 :root[data-theme="paper"] .training-records-tab.active {
@@ -25702,7 +25783,7 @@ tr.data-intervals-row-missing {
   border-color: rgba(185, 121, 26, 0.22);
   background:
     radial-gradient(90% 120% at 50% 118%, rgba(185, 121, 26, 0.14), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(246, 243, 236, 0.8));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(248, 250, 252, 0.8));
 }
 
 :root[data-theme="paper"] .training-records-banner::before {
@@ -25717,17 +25798,17 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-record-card {
-  border-color: rgba(38, 34, 28, 0.1);
+  border-color: rgba(19, 26, 40, 0.12);
   background:
     radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 8%, transparent), transparent 62%),
-    rgba(38, 34, 28, 0.025);
+    rgba(19, 26, 40, 0.03);
   box-shadow: var(--shadow-inset);
 }
 
 /* --- Training Hub: activity detail ----------------------------------------- */
 :root[data-theme="paper"] .activity-detail-stat {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.05);
+  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .activity-detail-sport {
@@ -25737,19 +25818,19 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .activity-detail-visual-panel {
   border-color: var(--glass-border);
   background:
-    linear-gradient(145deg, rgba(38, 34, 28, 0.04), rgba(38, 34, 28, 0.015)),
-    rgba(38, 34, 28, 0.025);
+    linear-gradient(145deg, rgba(19, 26, 40, 0.05), rgba(19, 26, 40, 0.02)),
+    rgba(19, 26, 40, 0.03);
   box-shadow: var(--shadow-inset);
 }
 
 /* --- Training Hub: sign-in hero -------------------------------------------- */
 :root[data-theme="paper"] .training-command-center.is-disconnected {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   background:
     linear-gradient(
       90deg,
-      rgba(246, 243, 236, 0.92),
-      rgba(246, 243, 236, 0.55) 48%,
+      rgba(248, 250, 252, 0.92),
+      rgba(248, 250, 252, 0.55) 48%,
       rgba(255, 255, 255, 0.78)
     ),
     var(--training-signin-bg),
@@ -25760,7 +25841,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-command-copy {
-  background: linear-gradient(90deg, rgba(246, 243, 236, 0.35), transparent 72%);
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.35), transparent 72%);
 }
 
 :root[data-theme="paper"] .training-command-copy h2 {
@@ -25789,16 +25870,16 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .training-signin-feature-icon {
-  border-color: rgba(38, 34, 28, 0.1);
+  border-color: rgba(19, 26, 40, 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4)),
-    rgba(38, 34, 28, 0.025);
+    rgba(19, 26, 40, 0.03);
   color: var(--accent);
   box-shadow: var(--shadow-inset), var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .training-login-panel {
-  border-color: rgba(38, 34, 28, 0.12);
+  border-color: rgba(19, 26, 40, 0.15);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-elevated);
 }
@@ -25830,7 +25911,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-login-input {
   border-color: var(--glass-border);
-  background: rgba(38, 34, 28, 0.03);
+  background: rgba(19, 26, 40, 0.04);
 }
 
 :root[data-theme="paper"] .training-login-input:focus-within {
@@ -25855,7 +25936,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .training-login-visibility:hover:not(:disabled),
 :root[data-theme="paper"] .training-login-visibility:focus-visible {
-  background: rgba(38, 34, 28, 0.06);
+  background: rgba(19, 26, 40, 0.07);
   color: var(--text-primary);
 }
 
@@ -30208,7 +30289,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-active,
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:focus-visible,
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-selected {
-  background: rgba(38, 34, 28, 0.065);
+  background: rgba(19, 26, 40, 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

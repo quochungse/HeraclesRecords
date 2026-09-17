@@ -141,12 +141,12 @@
 :root[data-theme="paper"] :is(.training-library-view, .training-library-gate) {
   color-scheme: light;
 
-  --tl-ground: #efebe1;
-  --tl-panel-bg: #fdfcf8;
+  --tl-ground: #e6eaf1;
+  --tl-panel-bg: #fbfcfe;
   --tl-card: #ffffff;
-  --tl-reader-bg: #f4f1e9;
-  --tl-tile: #f5f2ea;
-  --tl-tile-hover: #fbf9f4;
+  --tl-reader-bg: #eff2f7;
+  --tl-tile: #f1f4f9;
+  --tl-tile-hover: #f8fafc;
 
   /*
    * Controls take an ink wash rather than the app's white glass: the library's
@@ -154,15 +154,15 @@
    * states with nothing to say.
    */
   --surface: #ffffff;
-  --glass-bg: rgba(38, 34, 28, 0.045);
-  --glass-bg-hover: rgba(38, 34, 28, 0.08);
-  --glass-bg-elevated: rgba(38, 34, 28, 0.1);
-  --glass-border: rgba(38, 34, 28, 0.14);
+  --glass-bg: rgba(19, 26, 40, 0.06);
+  --glass-bg-hover: rgba(19, 26, 40, 0.1);
+  --glass-bg-elevated: rgba(19, 26, 40, 0.12);
+  --glass-border: rgba(19, 26, 40, 0.17);
   --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 
-  --text-primary: #26251f;
-  --text-secondary: #55524a;
-  --text-muted: #857f74;
+  --text-primary: #151a26;
+  --text-secondary: #4a5265;
+  --text-muted: #6c7488;
 
   /*
    * The sheen survives only where paper is not already white — the reader
@@ -173,19 +173,19 @@
   --tl-sheen-lit: rgba(255, 255, 255, 0.85);
   --tl-sheen-fade: rgba(255, 255, 255, 0);
   --tl-edge-light: rgba(255, 255, 255, 0.8);
-  --tl-well: rgba(38, 34, 28, 0.055);
+  --tl-well: rgba(19, 26, 40, 0.07);
   --tl-shimmer: rgba(255, 255, 255, 0.9);
-  --tl-scrim: rgba(38, 34, 28, 0.34);
+  --tl-scrim: rgba(19, 26, 40, 0.34);
 
-  --tl-shadow-card: 0 1px 2px rgba(60, 50, 35, 0.07), 0 10px 26px rgba(60, 50, 35, 0.09);
-  --tl-shadow-card-hover: 0 2px 4px rgba(60, 50, 35, 0.09), 0 18px 38px rgba(60, 50, 35, 0.14);
-  --tl-shadow-card-held: 0 1px 2px rgba(60, 50, 35, 0.07), 0 12px 28px rgba(60, 50, 35, 0.11);
+  --tl-shadow-card: 0 1px 2px rgba(19, 26, 40, 0.09), 0 10px 26px rgba(19, 26, 40, 0.12);
+  --tl-shadow-card-hover: 0 2px 4px rgba(19, 26, 40, 0.12), 0 18px 38px rgba(19, 26, 40, 0.18);
+  --tl-shadow-card-held: 0 1px 2px rgba(19, 26, 40, 0.09), 0 12px 28px rgba(19, 26, 40, 0.14);
   /* Sunk, so the plate's shadow falls inward — until hover lifts it clear. */
-  --tl-shadow-plate: inset 0 1px 3px rgba(60, 50, 35, 0.07);
-  --tl-shadow-plate-hover: 0 2px 5px rgba(60, 50, 35, 0.08), 0 14px 30px rgba(60, 50, 35, 0.11);
-  --tl-shadow-plate-held: 0 2px 6px rgba(60, 50, 35, 0.1);
-  --tl-shadow-week: 0 1px 2px rgba(60, 50, 35, 0.05), 0 8px 22px rgba(60, 50, 35, 0.07);
-  --tl-shadow-lift: 0 4px 14px rgba(60, 50, 35, 0.1);
+  --tl-shadow-plate: inset 0 1px 3px rgba(19, 26, 40, 0.09);
+  --tl-shadow-plate-hover: 0 2px 5px rgba(19, 26, 40, 0.1), 0 14px 30px rgba(19, 26, 40, 0.14);
+  --tl-shadow-plate-held: 0 2px 6px rgba(19, 26, 40, 0.13);
+  --tl-shadow-week: 0 1px 2px rgba(19, 26, 40, 0.07), 0 8px 22px rgba(19, 26, 40, 0.09);
+  --tl-shadow-lift: 0 4px 14px rgba(19, 26, 40, 0.13);
 
   --tl-source-coach: #7c3aed;
   --tl-source-template: #a16207;
