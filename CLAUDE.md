@@ -881,6 +881,30 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
 
+**The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
+Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
+`em` steps for text that must follow its parent, four tracking steps
+(`-0.02em` / `0` / `0.06em` / `0.1em`) and six radius tokens — every literal in those four
+properties must come from that set. It is enforced because it cannot be maintained by
+intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
+a shade light beside a heading, and the file had grown to **20 weights, 18 sizes (thirteen
+of them between 9px and 15px, half-pixels included), 45 spellings of letter-spacing down to
+`-0.004em`, and ~150 hand-written radii** alongside the five tokens. The test's header
+lists the exceptions and why each one is real. Adding a value means editing that file,
+which is the point.
+
+**Colour is data; chrome is the neutral surface plus one accent.** Hue belongs to sport,
+sleep stage, heart-rate zone, load band, the strength heatmap, a provider's own brand — and
+to `--success-*` / `--warning-*` / `--error-*`, which are the only way a semantic colour
+gets to follow the theme. It does not belong to chrome: the four weekly tiles under the
+recovery ring carried one Tailwind pastel each (peach for load, sky for steps, pink for
+distance, lavender for duration) plus a dead set for recovery states nothing rendered, and
+none of it said anything — they are four totals of one kind for one week. Those
+`--stat-*` properties and the `tone` prop on `TrainingSummaryTiles` are gone rather than
+neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#86efac` for
+"update ready" is the same mistake in miniature: it means success, so it reads
+`var(--success-text)` and follows the theme.
+
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
 of the page under it: the shell, the sidebar and every panel read as one flat sheet, and the

@@ -17,9 +17,9 @@
 
 .gear-header h1 {
   margin: 3px 0 5px;
-  font-size: clamp(30px, 4vw, 48px);
+  font-size: clamp(28px, 4vw, 36px);
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .gear-header p:last-child {
@@ -47,7 +47,7 @@
   color: var(--gear-accent);
   padding: 7px 11px;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .gear-message {
@@ -132,7 +132,7 @@
   width: 58px;
   height: 58px;
   margin-bottom: 26px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--gear-accent);
   color: #102307;
   box-shadow: 0 16px 44px color-mix(in srgb, var(--gear-accent) 20%, transparent);
@@ -141,15 +141,15 @@
 .gear-auth-copy h2 {
   max-width: 650px;
   margin: 7px 0 14px;
-  font-size: clamp(30px, 4vw, 54px);
+  font-size: clamp(28px, 4vw, 36px);
   line-height: 1.02;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .gear-auth-copy > p:last-of-type {
   max-width: 580px;
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
@@ -165,7 +165,7 @@
   align-items: center;
   gap: 9px;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .gear-auth-points svg {
@@ -294,7 +294,7 @@
   place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--gear-accent) 14%, transparent);
   color: var(--gear-accent);
 }
@@ -302,15 +302,15 @@
 .gear-card-top > div > span {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.07em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .gear-card h3 {
   overflow: hidden;
   margin: 2px 0 0;
-  font-size: 17px;
+  font-size: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -327,8 +327,8 @@
 }
 
 .gear-distance-summary strong {
-  font-size: 27px;
-  letter-spacing: -0.035em;
+  font-size: 28px;
+  letter-spacing: -0.02em;
 }
 
 .gear-distance-summary span,
@@ -444,7 +444,7 @@
   color: var(--text-muted);
   padding: 6px 9px;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .gear-sport-chip input:checked + span {

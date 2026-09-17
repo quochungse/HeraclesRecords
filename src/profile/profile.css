@@ -23,9 +23,9 @@
 
 .profile-header h2 {
   margin: 3px 0 5px;
-  font-size: clamp(28px, 3.6vw, 42px);
+  font-size: clamp(28px, 3.6vw, 36px);
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
 }
 
 .profile-header p:last-child {
@@ -42,8 +42,8 @@
 
 .profile-cached-at {
   color: var(--text-muted);
-  font-size: 12.5px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -193,7 +193,7 @@
   margin: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .profile-list dd small {
@@ -203,7 +203,7 @@
 
 .profile-account-id {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .profile-mono {
@@ -217,7 +217,7 @@
   gap: 6px;
   margin: 0;
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -314,7 +314,7 @@
   padding: 0 0 1px;
   color: inherit;
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -336,7 +336,7 @@
   background: var(--glass-bg);
   padding: 6px 13px;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -396,7 +396,7 @@
   height: 34px;
   border-top: 1px solid var(--glass-border);
   padding: 0;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 @media (max-width: 720px) {

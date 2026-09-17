@@ -67,23 +67,23 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: clamp(28px, 3.2vw, 38px);
+  font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
   line-height: 1.02;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .running-page-header > p:last-child {
   margin: 7px 0 0;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .running-eyebrow {
   margin: 0;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -136,14 +136,14 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .running-stat > strong {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -227,7 +227,7 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -246,7 +246,7 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -313,16 +313,16 @@
 
 .run-list-when > div > span {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .run-surface-chip {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-primary);
 }
@@ -360,7 +360,7 @@
 .running-empty h3 {
   margin: 0 0 4px;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .running-empty p {
@@ -386,10 +386,10 @@
   margin: 2px 0 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: clamp(24px, 2.8vw, 32px);
+  font-size: clamp(22px, 2.8vw, 36px);
   font-weight: 700;
   line-height: 1.05;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
 }
 
 .run-detail-back {
@@ -737,17 +737,17 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .run-hero-value {
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.05;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -780,10 +780,10 @@
   border-radius: var(--radius-pill);
   background: var(--warning-bg);
   color: var(--warning-text);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   cursor: help;
 }
 
@@ -833,7 +833,7 @@
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .run-block-sub {
@@ -847,7 +847,7 @@
 .run-block-aside {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .run-block-aside .tone-up {
@@ -873,13 +873,13 @@
 .run-block-note {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .run-block-note {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .run-legend {
@@ -887,7 +887,7 @@
   flex-wrap: wrap;
   gap: 6px 16px;
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .run-legend span {
@@ -899,7 +899,7 @@
 .run-legend i {
   width: 10px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .running-columns {
@@ -935,7 +935,7 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -950,7 +950,7 @@
   align-items: center;
   justify-content: center;
   min-width: 4px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   /* A fixed dark ink, not --bg-base. The fills below are the same on both
      themes, so the label has to be too: --bg-base is near-white on paper, which
      put "Easy 72%" at about 2:1 on the green — the block's primary reading. */
@@ -979,7 +979,7 @@
   flex-wrap: wrap;
   gap: 4px 14px;
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .run-intensity-legend span {
@@ -991,7 +991,7 @@
 .run-intensity-legend i {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 /* -------------------------------------------------------------- surface -- */
@@ -1003,12 +1003,12 @@
 }
 
 .run-surface-bar > div {
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   min-width: 6px;
 }
 
 .run-surface-table {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .run-surface-table tbody tr {
@@ -1023,14 +1023,14 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   margin-right: 8px;
 }
 
 .run-legend i.is-bar {
   width: 9px;
   height: 9px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 /* A dashed rule matching the mark it stands for. Masked rather than bordered,
@@ -1071,7 +1071,7 @@
    `body.is-backgrounded` already pauses it with every other animation. */
 .run-skeleton {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--text-primary) 5%, transparent),
@@ -1121,7 +1121,7 @@
 .run-skeleton-plot {
   width: 100%;
   height: 200px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .run-skeleton-plot-tall {

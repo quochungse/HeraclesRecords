@@ -12,9 +12,6 @@ interface TrainingSummaryTilesProps {
   className?: string;
 }
 
-/** Which tone class a tile wears; the palettes live in `styles.css`. */
-type TrainingSummaryMetric = "load" | "steps" | "distance" | "duration";
-
 const ICON_SIZE = 13;
 
 interface StatCardProps {
@@ -22,12 +19,19 @@ interface StatCardProps {
   label: string;
   value: string;
   detail: string;
-  tone: TrainingSummaryMetric;
 }
 
-function StatCard({ icon, label, value, detail, tone }: StatCardProps) {
+/**
+ * All four tiles wear the same treatment, and there is no per-metric tone to
+ * pass. They used to carry one Tailwind pastel each — peach, sky, pink,
+ * lavender — which read as four kinds of thing when they are four totals of
+ * one kind, for one week. Hue in this app belongs to data that has a hue:
+ * sport, sleep stage, heart-rate zone, load band. See the note above
+ * `.training-stat-card` in styles.css.
+ */
+function StatCard({ icon, label, value, detail }: StatCardProps) {
   return (
-    <section className={`training-stat-card is-widget tone-${tone}`}>
+    <section className="training-stat-card is-widget">
       <div className="training-stat-card__icon" aria-hidden="true">
         {icon}
       </div>
@@ -79,7 +83,6 @@ export function TrainingSummaryTiles({
         label="Load"
         value={formatWholeNumber(totals.trainingLoad)}
         detail="this week"
-        tone="load"
       />
 
       <StatCard
@@ -87,7 +90,6 @@ export function TrainingSummaryTiles({
         label="Steps"
         value={formatWholeNumber(totals.steps)}
         detail={stepsNeedMcp ? MCP_DAILY_HEALTH_TILE_DETAIL : "this week"}
-        tone="steps"
       />
 
       <StatCard
@@ -99,7 +101,6 @@ export function TrainingSummaryTiles({
             : "–"
         }
         detail={`${unit} this week`}
-        tone="distance"
       />
 
       <StatCard
@@ -111,7 +112,6 @@ export function TrainingSummaryTiles({
             : "–"
         }
         detail="this week"
-        tone="duration"
       />
     </div>
   );

@@ -93,7 +93,7 @@
   padding: clamp(18px, 1.6vw, 26px);
   overflow: hidden;
   border: 1px solid var(--map-border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(
       ellipse 52% 38% at 100% 0%,
@@ -132,9 +132,9 @@
   gap: 9px;
   margin: 0 0 8px;
   color: var(--map-accent);
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.17em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -143,7 +143,7 @@
   flex: 0 0 auto;
   width: 16px;
   height: 2.5px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--map-accent-gradient);
 }
 
@@ -151,16 +151,16 @@
   margin: 0;
   color: var(--map-text-primary);
   font-family: var(--font-display);
-  font-size: clamp(30px, 2.3vw, 38px);
+  font-size: clamp(28px, 2.3vw, 36px);
   font-weight: 700;
   line-height: 1.02;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .training-map-header > p:last-child {
   margin: 7px 0 0;
   color: var(--map-text-secondary);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -183,16 +183,16 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: clamp(28px, 3.2vw, 38px);
+  font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
   line-height: 1.02;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .training-map-page-header > p:last-child {
   margin: 7px 0 0;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -206,7 +206,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   border: 1px solid var(--map-border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--map-secondary-surface);
   box-shadow:
     inset 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);
@@ -221,13 +221,13 @@
   min-width: 0;
   min-height: 36px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--map-text-secondary);
   padding: 0 7px;
   font-size: 12px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -282,7 +282,7 @@
   gap: 9px;
   min-height: 40px;
   border: 1px solid var(--map-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--map-card-surface);
   padding: 4px 10px 4px 12px;
   transition:
@@ -297,9 +297,9 @@
 
 .training-map-date-range label > span {
   color: var(--map-text-muted);
-  font-size: 9.5px;
-  font-weight: 750;
-  letter-spacing: 0.07em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -309,7 +309,7 @@
   border: 0;
   background: transparent;
   color: var(--map-text-primary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   outline: none;
 }
@@ -317,7 +317,7 @@
 .training-map-stats {
   overflow: hidden;
   border: 1px solid var(--map-border);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       180deg,
@@ -368,9 +368,9 @@
 }
 
 .training-map-primary-stat dt span {
-  font-size: 9.5px;
-  font-weight: 750;
-  letter-spacing: 0.09em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -379,7 +379,7 @@
   height: 16px;
   box-sizing: content-box;
   padding: 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--map-accent-muted);
   color: var(--map-accent);
 }
@@ -397,10 +397,10 @@
 .training-map-primary-stat dd strong {
   color: var(--map-text-primary);
   font-family: var(--font-display);
-  font-size: clamp(26px, 2vw, 34px);
+  font-size: clamp(28px, 2vw, 36px);
   font-weight: 700;
   line-height: 0.95;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .training-map-primary-stat dd span {
@@ -435,7 +435,7 @@
   height: 14px;
   box-sizing: content-box;
   padding: 4px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--map-text-primary) 5%, transparent);
   color: var(--map-text-secondary);
 }
@@ -449,7 +449,7 @@
 .training-map-secondary-stats dt {
   overflow: hidden;
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -467,12 +467,12 @@
 
 .training-map-secondary-stats dd strong {
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .training-map-secondary-stats dd small {
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -481,7 +481,7 @@
   min-height: 214px;
   overflow: hidden;
   border: 1px solid var(--map-border);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       180deg,
@@ -513,7 +513,7 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--map-accent-muted);
   color: var(--map-accent);
 }
@@ -524,10 +524,10 @@
   margin: 0;
   color: var(--map-text-primary);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .training-map-location-header p {
@@ -540,13 +540,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--map-accent-muted);
   color: var(--map-accent);
   padding: 5px 10px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -573,9 +573,9 @@
 
 .training-map-location-metrics dt {
   color: var(--map-text-muted);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.07em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -593,7 +593,7 @@
 
 .training-map-location-metrics dd small {
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -611,16 +611,16 @@
 
 .training-map-location-trend > div:first-child span {
   color: var(--map-text-muted);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.07em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .training-map-location-trend > div:first-child strong {
   color: var(--map-text-primary);
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -635,7 +635,7 @@
   align-self: center;
   margin: 0;
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
@@ -646,13 +646,13 @@
   gap: 7px;
   min-height: 38px;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--map-accent-gradient);
   color: var(--map-on-accent);
   padding: 0 14px;
   font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   box-shadow:
@@ -739,7 +739,7 @@
   max-width: 46ch;
   margin: 0;
   color: var(--map-text-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -763,9 +763,9 @@
 
 .training-map-overview-values dt {
   color: var(--map-text-muted);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.09em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -774,7 +774,7 @@
   margin: 0;
   color: var(--map-text-primary);
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
   text-overflow: ellipsis;
@@ -796,7 +796,7 @@
   height: 20px;
   box-sizing: content-box;
   padding: 10px;
-  border-radius: 13px;
+  border-radius: var(--radius-md);
   background: var(--map-accent-muted);
 }
 
@@ -818,7 +818,7 @@
 .training-map-location-loading span {
   display: block;
   height: 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--map-text-primary) 7%, transparent);
   animation: training-map-skeleton 1.4s ease-in-out infinite;
 }
@@ -842,7 +842,7 @@
   overflow: hidden;
   isolation: isolate;
   border: 1px solid var(--map-border);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(ellipse 62% 58% at 50% 42%, var(--map-globe-radial) 0%, transparent 72%),
     radial-gradient(ellipse 78% 78% at 50% 52%, var(--map-globe-rim-light) 0%, transparent 76%),
@@ -950,15 +950,15 @@
   transform: translateX(-50%);
   overflow: hidden;
   border: 1px solid var(--map-globe-label-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--map-globe-label-bg);
   box-shadow: 0 7px 20px rgba(0, 0, 0, 0.2);
   color: var(--map-globe-label-text);
   padding: 0 10px;
   font-family: var(--font-display);
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -975,13 +975,13 @@
   );
   color: color-mix(in srgb, var(--map-globe-label-text) 86%, transparent);
   padding: 0 8px;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
 }
 
 .training-map-globe-stage .activity-globe-street-map {
   inset: 0;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
 }
 
 .training-map-globe-helper,
@@ -1000,16 +1000,16 @@
   gap: 8px;
   min-height: 32px;
   border: 1px solid var(--map-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 64%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
   box-shadow: 0 8px 22px var(--map-globe-control-shadow);
   color: var(--map-text-secondary);
   padding: 0 13px;
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
   pointer-events: none;
 }
 
@@ -1027,7 +1027,7 @@
   gap: 7px;
   min-height: 32px;
   border: 1px solid var(--map-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 72%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
@@ -1036,9 +1036,9 @@
     0 8px 22px var(--map-globe-control-shadow);
   color: var(--map-text-secondary);
   padding: 0 13px;
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
   cursor: pointer;
   transition:
     color 180ms var(--map-ease),
@@ -1071,9 +1071,9 @@
   align-items: center;
   gap: 6px;
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
 }
 
 .training-map-globe-meta svg {
@@ -1087,9 +1087,9 @@
   align-items: center;
   gap: 7px;
   color: var(--map-text-muted);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   pointer-events: none;
 }
 
@@ -1156,7 +1156,7 @@
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .training-map-recent-controls {
@@ -1170,7 +1170,7 @@
   width: 30px;
   height: 30px;
   border: 1px solid var(--map-border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--map-card-surface);
   color: var(--map-text-secondary);
   cursor: pointer;
@@ -1206,7 +1206,7 @@
   min-width: 0;
   min-height: 76px;
   border: 1px solid var(--map-border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--map-card-surface);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);
   color: var(--map-text-primary);
@@ -1243,7 +1243,7 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--map-accent-muted);
   color: var(--map-accent);
   transition:
@@ -1269,9 +1269,9 @@
 .training-map-recent-value > strong {
   overflow: hidden;
   color: var(--map-text-primary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1283,8 +1283,8 @@
 .training-map-recent-value strong small {
   overflow: hidden;
   color: var(--map-text-muted);
-  font-size: 9px;
-  font-weight: 550;
+  font-size: 10px;
+  font-weight: 500;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1411,12 +1411,12 @@
   }
 
   .training-map-header > p:last-child {
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   .training-map-periods button {
     min-height: 33px;
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .training-map-primary-stats {
@@ -1485,7 +1485,7 @@
 @container (max-width: 640px) {
   .training-map {
     padding: 14px;
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
   }
 
   .training-map-information {
@@ -1493,7 +1493,7 @@
   }
 
   .training-map-header h2 {
-    font-size: 27px;
+    font-size: 28px;
   }
 
   .training-map-periods {
