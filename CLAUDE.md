@@ -906,6 +906,17 @@ transition it names is gone. Check a rewritten shorthand in a renderer, not by e
 time, so neither the build nor a render says anything. (`\bease\b` also matches inside
 `var(--map-ease)`; the keyword pattern is `(?<![-\w])ease\b(?!-)`.)
 
+**Elevation is one device per level, held by `npm run test:elevation`.** A card floats on an
+outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
+(an inset is a highlight, `--focus-ring` marks focus, and a border spelled
+`var(--surface-line, …)` is the card recipe), and every `box-shadow` spends
+`--shadow-soft|card|elevated|inset` or `--focus-ring`. Neither holds across the app yet, so
+`scripts/elevation-allowlist.json` lists what broke them when the test was written, keyed
+`file|selector` with a count — and it only shrinks: a converted rule whose entry stays listed
+fails the test too. Take the entry out in the same change. Tokens are judged by what they
+resolve to across every definition, which is how it noticed `--wf-shadow-soft` is defined
+nowhere. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+
 **Colour is data; chrome is the neutral surface plus one accent.** Hue belongs to sport,
 sleep stage, heart-rate zone, load band, the strength heatmap, a provider's own brand — and
 to `--success-*` / `--warning-*` / `--error-*`, which are the only way a semantic colour

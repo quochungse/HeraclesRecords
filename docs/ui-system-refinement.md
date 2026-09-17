@@ -501,6 +501,15 @@ over `src/**/*.css`:
    `.panel`'s `var(--glass-shadow), var(--glass-inset)` is an outer shadow with
    a top highlight, which is L1.
 
+*As built* (`scripts/test-elevation.mjs`, allowlist in
+`scripts/elevation-allowlist.json`): under the Q1 reading rule 1 starts at
+**109** rules, not 185 — the other 76 pair a border with an inset highlight, or
+name a token that resolves to nothing (`--wf-shadow-soft` is used twice in
+`watchfaces.css` and defined nowhere, so that `box-shadow` computes to `none`).
+Rule 2 starts at **378** declarations: 154 elevation, 73 inset, 60 ring, 33
+glow, and 58 that spend a token outside the set — mostly `--glass-shadow` and
+`--glass-inset`, which is what `.panel` itself spends. Rule 3 was not built.
+
 **The allowlists are keyed by file and selector, and a stale entry fails the
 test.** A selector alone is ambiguous — the same one recurs inside a media
 query and under a theme scope. And an allowlist that merely tolerates its
