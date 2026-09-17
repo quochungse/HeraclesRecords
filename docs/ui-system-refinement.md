@@ -673,6 +673,64 @@ change on the screens you touched unless you intended it to.
   screen; and the Personal screen's VO2max card, which shares the matte rule
   and keeps its 20px through its own rule until that screen is taken.
 
+### 4.7 The rest of the app (phase 7)
+
+*As built, 7a and 7b* (2026-09-17 — **awaiting review**). Two batches, because
+the first changes how a box is drawn and the second changes what paper looks
+like everywhere at once.
+
+**7a — the radius ladder.** Every card that sits on the page came to
+`--radius-md` and every box inside one to `--radius-sm`, on the ten screens the
+ladder had not reached (Running, Strength, Calendar, Coach, Training Library,
+Personal, Coros Overview, Media, Maps, Data). Controls kept their own shapes.
+Strength's seven cards are one line, `--sx-radius`. Running's totals and hero
+cards stopped being wells and became L1 cards: the screen gained the paper
+surface tokens its siblings already had — a raised face is white there — and
+the tiles spend `--shadow-card` with a `--surface-line` border. The selected
+Strength session row dropped its lift, because an L2 row carries no shadow.
+
+**7b — one edge device, everywhere.** `--surface-line: transparent` moved to
+paper's `:root`, so the `:is()` list of converted screens is gone; the paper
+`.panel` rule reads the token **without a fallback**, which is what puts it
+over the cards that give themselves a border colour of their own (the chart
+panels, the sleep summary, Upcoming Workouts). Deleting that line instead was
+tried first and put the border back on six cards — the probe caught it.
+Then every remaining rule that drew a visible border *and* an outer shadow was
+taken by hand, in four groups:
+
+- **Overlays** (43: menus, popovers, modals, dialogs, tooltips, toasts, the
+  route drawer, the globe's floating panels) spell their border
+  `var(--surface-line, …)`: on paper an overlay floats on its shadow alone,
+  in dark it keeps the lit edge that is the only one that reads there.
+- **Cards** (39) the same way, the app rail among them.
+- **Artwork and marks** (15: album art, playlist thumbs, the podcast cover, the
+  VO2max icon, a legend swatch, the calendar's row thumbnail) keep their
+  hairline and lose the drop shadow. A picture is not a card: it sits in the
+  card that already carries the elevation.
+- **Illustrations** (6) are `exempt` in the allowlist, with the reason written
+  out: a watch face preview's 9px bezel and its strap ring, the recovery ring's
+  halo, the Gear screen's sign-in light. An exempt entry is counted nowhere and
+  must still apply — one matching no violating rule fails the test, so a
+  converted rule cannot leave a claim behind. The three checks (an invented
+  key, an empty reason, an exemption withdrawn) were each injected and each
+  failed as it should.
+
+The sidebar's active mark and the Coach's active conversation row share
+`--sidebar-indicator-shadow`; it lost its outer glow and keeps its top
+highlight, which is the L2 reading of a selected row.
+
+**Rule 1 is now held across the app: 0 rules draw a visible border and an outer
+shadow**, from 185 measured in §4.1 and 109 when the test was written. Rule 2
+still allows 348 shadows outside the token set (elevation 137, inset 74, ring
+53, glow 30, token-outside-set 54); that is what is left of phase 7.
+
+Measured before and after in the same sitting, 1600 and 1180, all fourteen
+screens (the eight the probe lists by default plus Training Library, Personal,
+Coros Overview, Media, Maps and Data under their own label): no clip or spill
+anywhere, no container count changed, and in paper every card on every screen
+reads `bg + shadow`. Dark changed in one place, the active conversation row's
+glow, and that was the intention.
+
 **Risk, and it is real.** Removing the border from L1 in paper is the first
 change on this branch that alters `paper`'s appearance in a way a person will
 notice immediately, and §4.4 also touches dark. Neither is a bug, but neither
@@ -920,7 +978,7 @@ after each, `test:elevation` joining it from phase 3.
 | 4 | ~~One focus ring~~ — done 2026-09-17, as an outline (§3) | 3 | S | — | no |
 | 5 | ~~Elevation ladder on **Sleep**~~ — done and approved 2026-09-17 (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
 | 6 | Ladder on Overview, Settings, then Activities — built 2026-09-17, **awaiting review** (§4.6) | 4.6 | M | 5 approved | yes |
-| 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) | 4 | L | 6 | yes, per file |
+| 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) — **7a and 7b built 2026-09-17** (§4.7); rule 2 is what is left | 4 | L | 6 | yes, per file |
 | 8 | Composition | 5 | L | **decide first** | yes |
 
 The focus ring moved behind the elevation test: §3 composes its ring with

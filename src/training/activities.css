@@ -180,7 +180,7 @@
   display: grid;
   gap: 2px;
   padding: 7px 11px;
-  border: 1px solid var(--ax-edge);
+  border: 1px solid var(--surface-line, var(--ax-edge));
   border-radius: var(--radius-md);
   /*
    * `--surface`, not `--ax-raised`: a raised face on this screen is a tint of

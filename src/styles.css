@@ -99,9 +99,7 @@
     color-mix(in srgb, var(--accent-2) 14%, transparent) 100%
   );
   --sidebar-indicator-border: color-mix(in srgb, var(--accent-strong) 28%, transparent);
-  --sidebar-indicator-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 8px 22px color-mix(in srgb, var(--accent) 14%, transparent);
+  --sidebar-indicator-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
   --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
 
@@ -193,6 +191,12 @@
   --glass-bg-hover: #e4e9f1;
   --glass-bg-elevated: #ffffff;
   --glass-border: rgba(19, 26, 40, 0.14);
+  /* The elevation ladder's L1 edge on this theme is the card's shadow and
+     nothing else, so a surface that floats reads its border colour through
+     this token and gets nothing (docs/ui-system-refinement.md §4.4). Dark
+     defines it nowhere, so there the fallback — a lit hairline — applies.
+     A hairline that divides rather than encloses does not read it. */
+  --surface-line: transparent;
   --glass-blur: 24px;
   --glass-blur-shell: 40px;
   --glass-shadow: 0 12px 30px rgba(19, 26, 40, 0.1), 0 2px 6px rgba(19, 26, 40, 0.06);
@@ -249,9 +253,7 @@
     color-mix(in srgb, var(--accent-2) 12%, transparent) 100%
   );
   --sidebar-indicator-border: color-mix(in srgb, var(--accent) 36%, transparent);
-  --sidebar-indicator-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 6px 16px color-mix(in srgb, var(--accent) 16%, transparent);
+  --sidebar-indicator-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
   color: var(--text-primary);
   background: var(--bg-base);
@@ -686,7 +688,7 @@ input::placeholder {
   min-height: 0;
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--sidebar-glass-border);
+  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
   border-radius: 0 var(--sidebar-radius) 0 0;
   background: var(--sidebar-glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
@@ -806,7 +808,7 @@ input::placeholder {
   border: 1px solid var(--sidebar-indicator-border);
   border-radius: calc(var(--radius-lg) - 2px);
   background: var(--sidebar-indicator-bg);
-  box-shadow: var(--sidebar-indicator-shadow);
+  box-shadow: none;
   pointer-events: none;
   will-change: transform, height;
   transition:
@@ -1402,7 +1404,7 @@ input::placeholder {
   gap: 12px;
   width: 260px;
   padding: 14px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
   box-shadow: var(--glass-shadow);
@@ -1505,7 +1507,7 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--glass-border));
+  border: 1px solid var(--surface-line, color-mix(in srgb, var(--accent) 24%, var(--glass-border)));
   border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 12% 0%, var(--accent-soft), transparent 34%),
@@ -1534,7 +1536,7 @@ input::placeholder {
   border-radius: var(--radius-md);
   background: var(--accent-gradient);
   color: #ffffff;
-  box-shadow: 0 12px 28px var(--accent-glow);
+  box-shadow: none;
 }
 
 .update-prompt-eyebrow {
@@ -1708,7 +1710,7 @@ input::placeholder {
   gap: 14px;
   width: 240px;
   padding: 14px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
   box-shadow: var(--glass-shadow);
@@ -1806,7 +1808,7 @@ input::placeholder {
   gap: 10px;
   width: 238px;
   padding: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
   box-shadow: var(--glass-shadow);
@@ -3482,7 +3484,7 @@ input::placeholder {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
@@ -3761,7 +3763,7 @@ input::placeholder {
   gap: 8px;
   max-width: calc(100% - 40px);
   transform: translateX(-50%);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-pill);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05)),
@@ -4475,7 +4477,7 @@ tbody tr.is-selected:hover {
   gap: 10px;
   overflow: hidden;
   pointer-events: auto;
-  border: 1px solid var(--success-border);
+  border: 1px solid var(--surface-line, var(--success-border));
   border-radius: var(--radius-md);
   background: var(--glass-bg-elevated);
   -webkit-backdrop-filter: blur(16px);
@@ -5609,7 +5611,7 @@ td span {
   gap: 0;
   overflow: hidden;
   overscroll-behavior: contain;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-base) 92%, #000);
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.42);
@@ -5693,7 +5695,7 @@ td span {
   left: 10px;
   display: grid;
   gap: 3px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-soft);
@@ -7066,7 +7068,7 @@ td span {
   margin: 0;
   padding: 6px;
   overflow-y: auto;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
   background: var(--surface);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
@@ -7464,7 +7466,7 @@ td span {
   gap: 14px;
   width: min(420px, 96vw);
   padding: 20px 22px 22px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface, #11201a);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
@@ -7652,8 +7654,7 @@ td span {
     rgba(255, 255, 255, 0.035);
   color: var(--accent);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 12px 24px rgba(0, 0, 0, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .training-signin-feature strong {
@@ -7751,7 +7752,7 @@ td span {
   width: min(calc(100% - clamp(36px, 5vw, 72px)), 614px);
   min-height: 0;
   margin: clamp(26px, 3.2vw, 42px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-md);
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.1), transparent 30%),
@@ -8846,7 +8847,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-sm);
   object-fit: cover;
-  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .apple-music-playlist-copy {
@@ -8902,7 +8903,7 @@ td span {
   align-items: flex-end;
   flex-wrap: wrap;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md);
   background:
     linear-gradient(135deg, rgba(250, 87, 122, 0.14), rgba(255, 255, 255, 0.04)),
@@ -8949,7 +8950,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   object-fit: cover;
-  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.34);
+  box-shadow: none;
 }
 
 .apple-music-playlist-meta {
@@ -9302,7 +9303,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   object-fit: cover;
-  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.34);
+  box-shadow: none;
 }
 
 .apple-podcast-show-meta {
@@ -9982,7 +9983,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-sm);
   object-fit: cover;
-  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .spotify-playlist-copy {
@@ -10033,7 +10034,7 @@ td span {
   align-items: flex-end;
   flex-wrap: wrap;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md);
   background:
     linear-gradient(135deg, rgba(30, 215, 96, 0.16), rgba(255, 255, 255, 0.04)),
@@ -10080,7 +10081,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   object-fit: cover;
-  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.34);
+  box-shadow: none;
 }
 
 .spotify-playlist-art svg {
@@ -10358,7 +10359,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-sm);
   object-fit: cover;
-  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .youtube-music-playlist-copy {
@@ -10409,7 +10410,7 @@ td span {
   align-items: flex-end;
   flex-wrap: wrap;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md);
   background:
     linear-gradient(135deg, rgba(255, 45, 45, 0.18), rgba(255, 255, 255, 0.04)),
@@ -10456,7 +10457,7 @@ td span {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   object-fit: cover;
-  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.34);
+  box-shadow: none;
 }
 
 .youtube-music-playlist-art svg {
@@ -11062,7 +11063,7 @@ td span {
   border: 1px solid color-mix(in srgb, var(--vo2-tone) 28%, transparent);
   border-radius: 50%;
   background: color-mix(in srgb, var(--vo2-tone) 14%, transparent);
-  box-shadow: 0 0 28px color-mix(in srgb, var(--vo2-tone) 26%, transparent);
+  box-shadow: none;
   color: var(--vo2-tone);
 }
 
@@ -11381,7 +11382,7 @@ td span {
   width: max-content;
   max-width: 260px;
   padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-sm);
   background: rgba(18, 18, 20, 0.96);
   box-shadow: var(--shadow-soft);
@@ -11663,7 +11664,7 @@ td span {
   width: max-content;
   min-width: max-content;
   max-width: none;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.16));
   border-radius: var(--radius-sm);
   background:
     linear-gradient(180deg, rgba(25, 28, 34, 0.96), rgba(12, 14, 18, 0.94)),
@@ -11887,7 +11888,7 @@ td span {
   z-index: 9;
   width: max-content;
   max-width: min(320px, 70vw);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.16));
+  border: 1px solid var(--surface-line, var(--glass-border, rgba(255, 255, 255, 0.16)));
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   background: rgba(16, 18, 23, 0.97);
@@ -12330,7 +12331,7 @@ td span {
   gap: 2px;
   min-width: 230px;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-md);
   background: rgba(20, 24, 28, 0.68);
   -webkit-backdrop-filter: blur(22px) saturate(1.3);
@@ -12410,7 +12411,7 @@ td span {
   display: grid;
   min-width: 148px;
   gap: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-sm);
   background: rgba(18, 18, 20, 0.96);
   box-shadow: var(--shadow-soft);
@@ -13456,7 +13457,7 @@ td span {
   min-width: 152px;
   padding: 12px 12px 11px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(28, 33, 31, 0.92), rgba(13, 16, 15, 0.94));
@@ -13549,7 +13550,7 @@ td span {
       var(--swatch-color),
       color-mix(in srgb, var(--swatch-color) 62%, transparent)
     );
-  box-shadow: 0 0 6px color-mix(in srgb, var(--swatch-color) 30%, transparent);
+  box-shadow: none;
 }
 
 .training-chart-empty {
@@ -13826,7 +13827,7 @@ td span {
   left: 0;
   width: 100%;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.18));
   border-radius: var(--radius-sm);
   background:
     linear-gradient(180deg, rgba(31, 35, 38, 0.82), rgba(13, 15, 16, 0.78)),
@@ -14127,7 +14128,7 @@ td span {
 .training-zone-tooltip {
   display: grid;
   gap: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-sm);
   background: rgba(18, 18, 20, 0.96);
   color: var(--text-primary);
@@ -15869,7 +15870,7 @@ tr.data-intervals-row-missing {
   flex-direction: column;
   min-width: 232px;
   padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-md);
   background: var(--surface, #16181c);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
@@ -16156,7 +16157,7 @@ tr.data-intervals-row-missing {
   height: 94vh;
   overflow: hidden;
   padding: 0;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--bg-base);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
@@ -16344,7 +16345,7 @@ tr.data-intervals-row-missing {
   height: 88vh;
   overflow: hidden;
   padding: 0;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--bg-base);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
@@ -18007,7 +18008,7 @@ tr.data-intervals-row-missing {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--sidebar-glass-border);
+  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
   border-left: 0;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
@@ -18079,7 +18080,7 @@ tr.data-intervals-row-missing {
   margin: var(--sidebar-float-gap) var(--sidebar-float-gap)
     var(--sidebar-float-gap) 0;
   overflow: hidden;
-  border: 1px solid var(--sidebar-glass-border);
+  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
   border-radius: var(--sidebar-radius);
   background: var(--sidebar-glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
@@ -18459,7 +18460,7 @@ tr.data-intervals-row-missing {
   max-height: min(92vh, 900px);
   overflow: hidden;
   padding: 0;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
@@ -18806,7 +18807,7 @@ tr.data-intervals-row-missing {
   width: 280px;
   min-width: 280px;
   overflow: hidden;
-  border: 1px solid var(--sidebar-glass-border);
+  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
   border-radius: var(--sidebar-radius);
   background: var(--sidebar-glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
@@ -19343,7 +19344,7 @@ tr.data-intervals-row-missing {
   /* Same layer as the other body-portaled menus (.app-select-menu.is-portaled). */
   z-index: 420;
   gap: 2px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-elevated);
@@ -20424,7 +20425,7 @@ tr.data-intervals-row-missing {
   );
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   padding: 11px 16px;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), var(--glass-inset);
@@ -21350,7 +21351,7 @@ tr.data-intervals-row-missing {
   background: var(--glass-bg-elevated);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
   backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   padding: 7px 7px 7px 18px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), var(--glass-inset);
@@ -21709,7 +21710,7 @@ tr.data-intervals-row-missing {
 .chat-coach-prompt {
   display: grid;
   gap: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--glass-border));
+  border: 1px solid var(--surface-line, color-mix(in srgb, var(--accent) 52%, var(--glass-border)));
   border-radius: var(--radius-md);
   background: linear-gradient(
     145deg,
@@ -23282,7 +23283,7 @@ tr.data-intervals-row-missing {
   max-height: 360px;
   overflow-y: auto;
   padding: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--glass-bg-elevated);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
@@ -23396,7 +23397,7 @@ tr.data-intervals-row-missing {
   background: rgba(12, 16, 21, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.09));
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
 }
 
@@ -23736,7 +23737,7 @@ tr.data-intervals-row-missing {
   list-style: none;
   border-radius: var(--radius-md);
   background: rgba(8, 16, 13, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.1));
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
   max-height: 220px;
   overflow-y: auto;
@@ -25235,21 +25236,15 @@ tr.data-intervals-row-missing {
  * Panels use a 72%-white glass fill plus a white-on-white sheen that reads as
  * near-invisible over the cream page. Make them opaque white cards with a
  * crisper border + warm lift so they separate from the background. */
-/* The elevation ladder's L1 edge on paper is the card's shadow and nothing else
- * (docs/ui-system-refinement.md §4.4). A screen joins this list when the
- * ladder reaches it; once every screen has, the declaration moves to this
- * theme's :root and the fallback colours that read it go. Settings' subpages
- * are not in it yet: their rows are still drawn at the card's radius. */
-:root[data-theme="paper"] :is(.sleep-details-view, .training-dashboard, .settings-view:not(.settings-subpage)) {
-  --surface-line: transparent;
-}
-
 :root[data-theme="paper"] .panel:not(.is-disconnected):not(.strength-body-panel) {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.4)),
     var(--glass-bg-elevated);
-  /* This rule outranks `.panel`, so the token has to be read here too. */
-  border-color: var(--surface-line, rgba(19, 26, 40, 0.15));
+  /* Read straight, without a fallback, and here rather than only on `.panel`:
+     a card that gives itself a border colour of its own — the chart panels,
+     the sleep summary, Upcoming Workouts — outranks the base rule, and on this
+     theme a card's edge is its shadow whatever it asked for. */
+  border-color: var(--surface-line);
   box-shadow: var(--shadow-card);
 }
 
@@ -28547,8 +28542,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass-bg-hover) 74%, var(--bg-base));
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent),
-    0 6px 16px color-mix(in srgb, var(--accent) 14%, transparent);
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .calendar-builder-row-thumbnail img {
@@ -30027,7 +30021,7 @@ tr.data-intervals-row-missing {
   gap: 2px;
   padding: 6px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.15));
   border-radius: var(--radius-sm);
   background:
     linear-gradient(180deg, rgba(29, 32, 37, 0.98), rgba(15, 17, 21, 0.98));
@@ -30869,7 +30863,7 @@ tr.data-intervals-row-missing {
   height: min(860px, calc(100dvh - 36px));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   background: var(--bg-base);
   box-shadow: 0 26px 90px rgba(0, 0, 0, 0.52);
@@ -31552,7 +31546,7 @@ tr.data-intervals-row-missing {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid color-mix(in srgb, #f28b8b 42%, var(--glass-border));
+  border: 1px solid var(--surface-line, color-mix(in srgb, #f28b8b 42%, var(--glass-border)));
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-base) 95%, #f28b8b 5%);
   box-shadow: var(--shadow-card);
@@ -34135,7 +34129,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--glass-bg-elevated);
   backdrop-filter: blur(var(--glass-blur));
@@ -34581,7 +34575,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   width: min(520px, 96vw);
   max-height: min(92vh, 720px);
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);

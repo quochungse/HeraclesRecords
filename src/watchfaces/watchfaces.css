@@ -340,7 +340,7 @@
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-auth, .watchfaces-login-panel) {
   width: min(680px, 100%);
   margin: clamp(18px, 5vh, 56px) auto;
-  border: 1px solid var(--wf-border);
+  border: 1px solid var(--surface-line, var(--wf-border));
   border-radius: var(--wf-pane-radius);
   background: var(--wf-surface);
   box-shadow: var(--wf-shadow);
@@ -1116,7 +1116,7 @@
   align-self: center;
   width: min(calc(100% - clamp(32px, 4vw, 56px)), 520px);
   margin: clamp(22px, 3.4vw, 42px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
   border-radius: var(--wf-dashboard-radius);
   background: rgba(14, 20, 24, 0.46);
   box-shadow:
@@ -1846,7 +1846,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: var(--wf-surface-raised);
   box-shadow: var(--wf-shadow);
@@ -1901,7 +1901,7 @@
   width: min(560px, 100%);
   max-height: min(760px, calc(100dvh - 36px));
   overflow: auto;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-pane-radius);
   background: var(--wf-surface-raised);
   box-shadow: var(--wf-shadow);
@@ -2009,7 +2009,7 @@
   background: #05090b;
   /* Was `…, var(--wf-shadow-soft)`: a token defined nowhere, which made the
      whole declaration invalid and dropped this hairline with it. */
-  box-shadow: 0 0 0 1px var(--wf-border-strong);
+  box-shadow: none;
 }
 
 .watchface-shell .wf-export-phone-preview img,
@@ -2641,7 +2641,7 @@
   right: 0;
   width: 190px;
   gap: 2px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: var(--wf-surface-raised);
   box-shadow: var(--wf-shadow);
@@ -3151,7 +3151,7 @@
   z-index: 120;
   width: 230px;
   gap: 3px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: var(--wf-surface-raised);
   box-shadow: var(--wf-shadow);
@@ -3203,7 +3203,7 @@
   right: 0;
   width: min(310px, calc(100vw - 36px));
   gap: 9px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: var(--wf-surface-raised);
   box-shadow: var(--wf-shadow);
@@ -3598,7 +3598,7 @@
   align-items: center;
   gap: 2px;
   min-height: 34px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: color-mix(in srgb, var(--wf-surface-raised) 96%, transparent);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
@@ -7095,7 +7095,7 @@ body.wf-value-scrubbing * {
   right: 0;
   width: min(344px, calc(100vw - 44px));
   gap: 0;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-pane-radius);
   background: color-mix(in srgb, var(--bg-base) 94%, var(--glass-bg-elevated));
   box-shadow:
@@ -7413,7 +7413,7 @@ body.wf-value-scrubbing * {
   position: relative;
   min-height: 214px;
   overflow: visible;
-  border: 1px solid var(--wf-dashboard-border);
+  border: 1px solid var(--surface-line, var(--wf-dashboard-border));
   border-radius: var(--wf-dashboard-radius);
   background: var(--wf-dashboard-card);
   box-shadow: 0 14px 34px color-mix(in srgb, var(--bg-base) 42%, transparent);
@@ -7574,8 +7574,7 @@ body.wf-value-scrubbing * {
     var(--bg-base)
   );
   box-shadow:
-    0 12px 30px color-mix(in srgb, var(--bg-base) 64%, transparent),
-    0 0 0 5px color-mix(in srgb, var(--text-primary) 7%, transparent);
+    none;
   place-items: center;
 }
 
@@ -7692,7 +7691,7 @@ body.wf-value-scrubbing * {
   right: 0;
   width: 146px;
   gap: 3px;
-  border: 1px solid var(--wf-border-strong);
+  border: 1px solid var(--surface-line, var(--wf-border-strong));
   border-radius: var(--wf-control-radius);
   background: var(--wf-dashboard-card);
   box-shadow: var(--shadow-elevated);
@@ -8458,7 +8457,7 @@ body.wf-value-scrubbing * {
   left: 50%;
   max-width: min(620px, calc(100vw - 32px));
   transform: translateX(-50%);
-  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--wf-border));
+  border: 1px solid var(--surface-line, color-mix(in srgb, var(--accent) 42%, var(--wf-border)));
   border-radius: var(--radius-md);
   background: var(--wf-surface);
   box-shadow: 0 16px 45px rgba(0, 0, 0, 0.28);
@@ -8490,7 +8489,7 @@ body.wf-value-scrubbing * {
   grid-template-columns: minmax(340px, 0.92fr) minmax(430px, 1.08fr);
   align-items: center;
   gap: clamp(28px, 5vw, 78px);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--wf-dashboard-border));
+  border: 1px solid var(--surface-line, color-mix(in srgb, var(--accent) 28%, var(--wf-dashboard-border)));
   border-radius: var(--wf-dashboard-radius);
   background:
     radial-gradient(circle at 92% 18%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 34%),

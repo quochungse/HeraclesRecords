@@ -92,7 +92,7 @@
   margin-inline: auto;
   padding: clamp(18px, 1.6vw, 26px);
   overflow: hidden;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background:
     radial-gradient(
@@ -317,7 +317,7 @@
 
 .training-map-stats {
   overflow: hidden;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background:
     linear-gradient(
@@ -481,7 +481,7 @@
   flex: 1;
   min-height: 214px;
   overflow: hidden;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background:
     linear-gradient(
@@ -950,7 +950,7 @@
   max-width: 176px;
   transform: translateX(-50%);
   overflow: hidden;
-  border: 1px solid var(--map-globe-label-border);
+  border: 1px solid var(--surface-line, var(--map-globe-label-border));
   border-radius: var(--radius-sm);
   background: var(--map-globe-label-bg);
   box-shadow: 0 7px 20px rgba(0, 0, 0, 0.2);
@@ -1000,7 +1000,7 @@
   align-items: center;
   gap: 8px;
   min-height: 32px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 64%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
@@ -1027,7 +1027,7 @@
   align-items: center;
   gap: 7px;
   min-height: 32px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 72%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
@@ -1206,7 +1206,7 @@
   gap: 9px;
   min-width: 0;
   min-height: 76px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background: var(--map-card-surface);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);

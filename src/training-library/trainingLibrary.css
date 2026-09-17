@@ -422,7 +422,7 @@
 .tl-notice {
   margin-bottom: 18px;
   padding: 11px 14px;
-  border: 1px solid var(--warning-border);
+  border: 1px solid var(--surface-line, var(--warning-border));
   border-radius: var(--radius-md);
   color: var(--warning-text);
   background:
@@ -1253,7 +1253,7 @@
   flex-direction: column;
   /* --tl-rule, not --glass-border: a tile needs a defined edge, and the glass
      border is a 0.1-alpha dark that disappears on a white paper tile. */
-  border: 1px solid var(--tl-rule);
+  border: 1px solid var(--surface-line, var(--tl-rule));
   border-radius: var(--radius-md);
   background:
     linear-gradient(158deg, var(--tl-sheen), var(--tl-sheen-fade) 46%),
@@ -3246,7 +3246,7 @@
   width: 34px;
   height: 34px;
   padding: 18px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: 50%;
   color: var(--accent-strong);
   background:
@@ -3352,7 +3352,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
@@ -3416,7 +3416,7 @@
 .tl-dialog {
   width: min(460px, 100%);
   padding: 22px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
@@ -3500,7 +3500,7 @@
 .plan-compare {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
@@ -4032,7 +4032,7 @@
 }
 
 .plan-week {
-  border: 1px solid var(--tl-rule);
+  border: 1px solid var(--surface-line, var(--tl-rule));
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, var(--tl-sheen), transparent 30%),
@@ -4845,7 +4845,7 @@
   max-height: calc(100dvh - 40px);
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
@@ -5502,7 +5502,7 @@
 }
 
 .plan-entry-card .plan-entry-actions button:hover { color: var(--text-primary); background: var(--glass-bg-hover); }
-.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 36%, transparent); border-radius: var(--radius-sm); color: var(--danger, #e5484d); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
+.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid var(--surface-line, color-mix(in srgb, var(--danger, #e5484d) 36%, transparent)); border-radius: var(--radius-sm); color: var(--danger, #e5484d); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
 .plan-editor-workout-error button { display: inline-flex; margin-left: auto; border: 0; color: inherit; background: none; cursor: pointer; }
 
 @media (max-width: 840px) {

@@ -34,6 +34,14 @@
  * — elevation, glow, ring, inset, or a token outside the set — and the group
  * is recomputed here, so a label cannot drift from the shadow it describes.
  *
+ * **An `exempt` entry is a decision, not a to-do.** A few rules break rule 1
+ * and are right to: a watch face's bezel is a 9px border around a preview and
+ * the ring beside it is the strap's edge, not a card's; the recovery ring's
+ * halo is the datum. Those sit in `exempt` with the reason written out, are
+ * counted nowhere, and still have to *apply* — an exempt entry matching no
+ * violating rule fails, so a deleted or converted rule takes its reason with
+ * it rather than leaving a claim nobody can check.
+ *
  * `node scripts/test-elevation.mjs --dump` prints the violations as allowlist
  * JSON and asserts nothing. It exists to seed the list, not to refresh it: an
  * entry leaves the list by being deleted by hand.
@@ -164,6 +172,11 @@ const spendsTokens = (value) =>
 
 // ------------------------------------------------------------------ measure
 
+const allowed = JSON.parse(readFileSync(ALLOWLIST_PATH, "utf8"));
+const exempt = allowed.exempt ?? {};
+/** Which exempt entries were actually met, so a stale reason cannot sit in the file. */
+const exemptSeen = new Set();
+
 const found = { borderAndShadow: {}, shadowOutsideTokens: {} };
 /** Where each counted violation is, per rule — a rule can break both. */
 const sites = new Map();
@@ -180,11 +193,14 @@ for (const { file, code } of files) {
     const site = `${relative(ROOT, file)}:${rule.line}`;
     const shadows = declarations(rule.body, "box-shadow");
     const borders = declarations(rule.body, "border");
+    const isExempt = key in exempt;
     if (borders.some(drawsVisibleBorder) && shadows.some((v) => castsOuterShadow(v))) {
-      bump("border+shadow", found.borderAndShadow, key, site);
+      if (isExempt) exemptSeen.add(key);
+      else bump("border+shadow", found.borderAndShadow, key, site);
     }
     for (const value of shadows) {
       if (spendsTokens(value)) continue;
+      if (isExempt) { exemptSeen.add(key); continue; }
       const kind = shadowKind(value);
       found.shadowOutsideTokens[kind] ??= {};
       bump(`shadow:${kind}`, found.shadowOutsideTokens[kind], key, site);
@@ -202,8 +218,12 @@ if (process.argv.includes("--dump")) {
 
 // ---------------------------------------------------------------- compare
 
-const allowed = JSON.parse(readFileSync(ALLOWLIST_PATH, "utf8"));
 const problems = [];
+
+for (const [key, reason] of Object.entries(exempt)) {
+  if (!reason || typeof reason !== "string") problems.push(`exempt   ${key.replace("|", "  ")}  needs a reason, not ${JSON.stringify(reason)}`);
+  else if (!exemptSeen.has(key)) problems.push(`exempt   ${key.replace("|", "  ")}  breaks neither rule any more — take the entry out`);
+}
 
 function ratchet(label, actual, listed) {
   for (const [key, count] of Object.entries(actual)) {
@@ -234,7 +254,7 @@ assert.deepEqual(
 const total = (entries) => Object.values(entries).reduce((sum, n) => sum + n, 0);
 const kinds = Object.entries(found.shadowOutsideTokens);
 console.log(
-  `elevation OK — ${files.length} stylesheets; still allowlisted: ` +
+  `elevation OK — ${files.length} stylesheets; ${Object.keys(exempt).length} exempt by decision; still allowlisted: ` +
     `${total(found.borderAndShadow)} rules with a border and an outer shadow, ` +
     `${kinds.reduce((sum, [, entries]) => sum + total(entries), 0)} shadows outside the tokens ` +
     `(${kinds.map(([kind, entries]) => `${kind} ${total(entries)}`).join(", ")})`,
