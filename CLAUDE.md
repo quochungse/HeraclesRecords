@@ -887,13 +887,24 @@ Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) p
 (`-0.02em` / `0` / `0.06em` / `0.1em`), five unitless leading steps (`1` for figures and
 chips, `1.2` display, `1.3` headings and dense rows, `1.45` body, `1.6` long prose) and six
 radius tokens — every literal in those five properties must come from that set. A box that
-has to match a neighbour's height says so with a height, not with a leading inflated to fit. It is enforced because it cannot be maintained by
-intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
+has to match a neighbour's height says so with a height, not with a leading inflated to fit.
+It is enforced because it cannot be maintained by intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
 a shade light beside a heading, and the file had grown to **20 weights, 18 sizes (thirteen
 of them between 9px and 15px, half-pixels included), 45 spellings of letter-spacing down to
 `-0.004em`, and ~150 hand-written radii** alongside the five tokens. The test's header
 lists the exceptions and why each one is real. Adding a value means editing that file,
 which is the point.
+
+**Motion is part of that vocabulary, and the same test holds it.** A `transition` spends
+`var(--ease)` — one decelerating curve; bare `ease` was 92% of every curve and is the browser
+default nobody chose — and a `--dur-fast` (a state: colour, opacity, border, shadow) /
+`--dur-base` (something that moves or resizes) / `--dur-slow` (a drawer that travels) token.
+A length that is designed rather than reactive — a fill growing to its value, a staged
+reveal, a spring — stays literal only as an entry in `DESIGNED_LENGTHS`, which fails once the
+transition it names is gone. Check a rewritten shorthand in a renderer, not by eye: a
+`transition` holding `var()` always parses, and an invalid one is dropped at computed-value
+time, so neither the build nor a render says anything. (`\bease\b` also matches inside
+`var(--map-ease)`; the keyword pattern is `(?<![-\w])ease\b(?!-)`.)
 
 **Colour is data; chrome is the neutral surface plus one accent.** Hue belongs to sport,
 sleep stage, heart-rate zone, load band, the strength heatmap, a provider's own brand — and

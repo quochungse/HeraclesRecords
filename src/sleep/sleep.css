@@ -184,8 +184,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background 140ms ease,
-    border-color 140ms ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .sleep-night-row:hover {

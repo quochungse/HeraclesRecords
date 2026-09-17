@@ -232,12 +232,12 @@
   /* The fold (pointer leaving): one quick, uniform close. The bloom's
      springier transition replaces this while the group is open. */
   transition:
-    margin-left 0.2s cubic-bezier(0.6, 0.04, 0.3, 1),
-    max-width 0.2s cubic-bezier(0.6, 0.04, 0.3, 1),
-    padding-inline 0.2s cubic-bezier(0.6, 0.04, 0.3, 1),
-    background 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease;
+    margin-left var(--dur-base) cubic-bezier(0.6, 0.04, 0.3, 1),
+    max-width var(--dur-base) cubic-bezier(0.6, 0.04, 0.3, 1),
+    padding-inline var(--dur-base) cubic-bezier(0.6, 0.04, 0.3, 1),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .strength-segment button:hover:not(.is-active):not(:disabled) {
@@ -293,8 +293,8 @@
 .strength-segment-label {
   display: inline-block;
   transition:
-    opacity 0.1s ease,
-    transform 0.1s ease;
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 
 .strength-segment button:not(.is-active) {
@@ -311,13 +311,14 @@
 .strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active) {
   max-width: 110px;
   padding-inline: 14px;
+  /* The length belongs to the spring curve: a designed length, not a reaction time. */
   transition:
     margin-left 0.36s cubic-bezier(0.32, 1.28, 0.46, 1),
     max-width 0.36s cubic-bezier(0.32, 1.28, 0.46, 1),
     padding-inline 0.36s cubic-bezier(0.32, 1.28, 0.46, 1),
-    background 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .strength-segment:is(:hover, :has(:focus-visible)) button + button {
@@ -344,8 +345,8 @@
   opacity: 1;
   transform: translateX(0);
   transition:
-    opacity 0.18s ease 90ms,
-    transform 0.3s cubic-bezier(0.22, 0.9, 0.3, 1) 90ms;
+    opacity var(--dur-base) var(--ease) 90ms,
+    transform var(--dur-slow) cubic-bezier(0.22, 0.9, 0.3, 1) 90ms;
 }
 
 .strength-segment:is(:hover, :has(:focus-visible)) button:nth-child(2) .strength-segment-label {
@@ -404,9 +405,9 @@
   letter-spacing: 0;
   white-space: nowrap;
   transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .strength-action:hover:not(:disabled) {
@@ -448,8 +449,8 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .strength-segmented button:hover:not(.is-active) {
@@ -536,8 +537,8 @@
   font-size: 13px;
   font-weight: 700;
   transition:
-    background 0.16s ease,
-    border-color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .strength-sample-button:hover {
@@ -639,10 +640,11 @@
   border-radius: var(--radius-pill);
   background: var(--glass-bg);
   color: var(--text-secondary);
+  /* The length belongs to the spring curve: a designed length, not a reaction time. */
   transition:
     transform 0.35s cubic-bezier(0.32, 0.8, 0.36, 1),
-    color 0.16s ease,
-    background 0.16s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .strength-flip:hover {
@@ -676,9 +678,9 @@
   backdrop-filter: blur(14px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   transition:
-    color 0.16s ease,
-    background 0.16s ease,
-    border-color 0.16s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .anatomy-layer-trigger:hover,
@@ -743,8 +745,8 @@
   background: transparent;
   color: var(--text-muted);
   transition:
-    color 0.14s ease,
-    background 0.14s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .anatomy-layer-reset:hover,
@@ -830,6 +832,7 @@
   );
   opacity: 0;
   pointer-events: none;
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
   transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -862,7 +865,7 @@
   opacity: 0;
   pointer-events: none;
   will-change: transform;
-  transition: opacity 0.18s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .anatomy-muscle-callout[data-side="left"] {
@@ -906,7 +909,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 10px 28px color-mix(in srgb, var(--panel-floor) 75%, transparent);
-  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--dur-slow) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .anatomy-muscle-callout[data-side="left"] strong {
@@ -1250,8 +1253,8 @@
   background: transparent;
   text-align: left;
   transition:
-    background 0.16s ease,
-    transform 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .muscle-ranking-row[data-level="1"],
@@ -1317,9 +1320,10 @@
   border-radius: inherit;
   background: var(--sport-strength);
   transform-origin: left center;
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition:
     transform 0.5s cubic-bezier(0.32, 0.8, 0.36, 1),
-    background 0.4s ease;
+    background 0.4s var(--ease);
 }
 
 /* The same restrained heat ramp appears on the figure and in the ranking.
@@ -1446,14 +1450,14 @@
   font-weight: 600;
   letter-spacing: 0;
   transition:
-    background 0.16s ease,
-    color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .muscle-panel-back svg {
-  transition: transform 0.18s cubic-bezier(0.32, 0.8, 0.36, 1);
+  transition: transform var(--dur-base) cubic-bezier(0.32, 0.8, 0.36, 1);
 }
 
 .muscle-panel-back:hover {
@@ -1636,6 +1640,7 @@
     var(--tone)
   );
   transform-origin: left center;
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition: transform 0.5s cubic-bezier(0.32, 0.8, 0.36, 1);
 }
 
@@ -1799,7 +1804,7 @@
   align-content: start;
   padding: 11px 13px 12px;
   background: var(--muscle-cell);
-  transition: background 0.18s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .muscle-readout-cell:hover {
@@ -1991,9 +1996,10 @@
   );
   opacity: calc(0.4 + var(--v, 1) * 0.6);
   transform-origin: bottom;
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition:
     height 0.45s cubic-bezier(0.32, 0.8, 0.36, 1),
-    opacity 0.18s ease;
+    opacity var(--dur-base) var(--ease);
 }
 
 /* The week still in progress gets its full extent outlined, so a Monday
@@ -2055,8 +2061,8 @@
   transform: translate(-50%, -3px);
   pointer-events: none;
   transition:
-    opacity 0.14s ease,
-    transform 0.14s ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .muscle-trend-readout em {
@@ -2669,7 +2675,7 @@
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: stroke 150ms ease;
+  transition: stroke var(--dur-fast) var(--ease);
 }
 
 .strength-spark circle {
@@ -2798,6 +2804,7 @@
   min-width: 4px;
   border-radius: var(--radius-pill);
   background: var(--pattern-color);
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition: flex-grow 0.5s cubic-bezier(0.32, 0.8, 0.36, 1);
 }
 

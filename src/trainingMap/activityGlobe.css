@@ -231,10 +231,10 @@
   white-space: nowrap;
   cursor: pointer;
   transition:
-    color 200ms var(--map-ease),
-    background 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease),
-    transform 120ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-periods button:hover {
@@ -272,7 +272,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  animation: training-map-content-in 200ms ease both;
+  animation: training-map-content-in 200ms var(--ease) both;
 }
 
 .training-map-date-range label {
@@ -286,8 +286,8 @@
   background: var(--map-card-surface);
   padding: 4px 10px 4px 12px;
   transition:
-    border-color 180ms var(--map-ease),
-    box-shadow 180ms var(--map-ease);
+    border-color var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-date-range label:focus-within {
@@ -659,13 +659,13 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 4px 14px color-mix(in srgb, var(--map-accent) 26%, transparent);
   transition:
-    filter 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    filter var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-view-action svg {
-  transition: transform 180ms var(--map-ease);
+  transition: transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-view-action:hover {
@@ -869,7 +869,7 @@
     radial-gradient(circle at 92% 58%, var(--map-globe-star-dim) 0 0.65px, transparent 1.15px);
   opacity: 0.82;
   pointer-events: none;
-  transition: opacity 220ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-panel.is-street-mode::before {
@@ -888,7 +888,7 @@
   inset: 0;
   min-height: 0;
   opacity: 1;
-  transition: opacity 240ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-stage .activity-globe-webgl > div {
@@ -921,7 +921,7 @@
   height: 1px;
   opacity: 1;
   pointer-events: none;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-label-anchor::after {
@@ -1041,10 +1041,10 @@
   letter-spacing: 0;
   cursor: pointer;
   transition:
-    color 180ms var(--map-ease),
-    background 180ms var(--map-ease),
-    border-color 180ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-reset:hover:not(:disabled) {
@@ -1175,10 +1175,10 @@
   color: var(--map-text-secondary);
   cursor: pointer;
   transition:
-    color 180ms var(--map-ease),
-    border-color 180ms var(--map-ease),
-    background 180ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-recent-controls button:hover:not(:disabled) {
@@ -1216,11 +1216,11 @@
   animation: training-map-content-in 300ms var(--map-ease) both;
   animation-delay: var(--recent-delay, 0ms);
   transition:
-    color 200ms var(--map-ease),
-    border-color 200ms var(--map-ease),
-    background 200ms var(--map-ease),
-    transform 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-recent-list > button:hover {
@@ -1247,9 +1247,9 @@
   background: var(--map-accent-muted);
   color: var(--map-accent);
   transition:
-    background 200ms var(--map-ease),
-    color 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease);
+    background var(--dur-fast) var(--map-ease),
+    color var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-recent-list > button.is-selected .training-map-recent-pin {
@@ -1299,8 +1299,8 @@
 .training-map-recent-chevron {
   color: var(--map-text-muted);
   transition:
-    color 180ms var(--map-ease),
-    transform 180ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-recent-list > button:hover .training-map-recent-chevron {

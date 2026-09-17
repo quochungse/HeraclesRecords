@@ -512,9 +512,9 @@
   color: var(--text-primary);
   padding: 12px;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    transform 140ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-project-card, .watchface-project-card):hover {
@@ -623,8 +623,8 @@
   border-radius: var(--wf-control-radius);
   background: var(--wf-surface-raised);
   transition:
-    border-color 140ms ease,
-    transform 140ms ease;
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-template-card, .watchfaces-theme-card):hover {
@@ -2750,7 +2750,7 @@
 }
 
 .watchface-shell .wf-export-button > svg:last-child {
-  transition: transform 160ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchface-shell .wf-export-button[aria-expanded="true"] > svg:last-child {
@@ -2849,7 +2849,7 @@
 }
 
 .watchface-shell .wf-layer-section-toggle > svg {
-  transition: transform 140ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchface-shell .wf-layer-section-toggle > svg.is-collapsed {
@@ -3781,7 +3781,7 @@
 .watchface-shell .wf-property-section-chevron {
   flex: 0 0 auto;
   color: var(--text-tertiary);
-  transition: transform 120ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchface-shell .wf-property-section.is-open .wf-property-section-chevron {
@@ -4313,7 +4313,7 @@
     var(--wf-canvas);
   color: var(--text-secondary);
   place-items: center;
-  transition: opacity 160ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .watchface-shell .wf-config-asset-preview.is-disabled {
@@ -5838,7 +5838,7 @@ body.wf-value-scrubbing * {
     bottom: 0;
     width: min(340px, calc(100% - 56px));
     box-shadow: var(--wf-shadow);
-    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform var(--dur-base) cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-layers-pane, .watchface-editor-layers) {
@@ -6849,7 +6849,7 @@ body.wf-value-scrubbing * {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 160ms ease;
+  transition: width var(--dur-base) var(--ease);
 }
 
 /* Watch Faces project dashboard */
@@ -6978,11 +6978,11 @@ body.wf-value-scrubbing * {
     .watchfaces-battery-toggle
   ) {
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease,
-    transform 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .watchface-device-menu,
@@ -7047,7 +7047,7 @@ body.wf-value-scrubbing * {
 
 .watchface-device-trigger > svg:last-child {
   margin-left: 2px;
-  transition: transform 160ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchface-device-trigger[aria-expanded="true"] > svg:last-child {
@@ -7328,7 +7328,7 @@ body.wf-value-scrubbing * {
   font-weight: 600;
   color: var(--text-secondary);
   background: transparent;
-  transition: color 0.16s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .watchface-shell--hub .watchface-dashboard-tabs > button:hover,
@@ -7383,7 +7383,7 @@ body.wf-value-scrubbing * {
   font-weight: 700;
   line-height: 1;
   place-items: center;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .watchface-shell--hub .watchface-dashboard-tabs > button.is-active > .watchface-tab-count {
@@ -7572,7 +7572,7 @@ body.wf-value-scrubbing * {
   border-radius: inherit;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .watchface-project-preview.is-ready :is(canvas, img) {
@@ -7886,9 +7886,9 @@ body.wf-value-scrubbing * {
   background: var(--wf-dashboard-card);
   box-shadow: none;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -7993,7 +7993,7 @@ body.wf-value-scrubbing * {
 }
 
 .watchfaces-battery-toggle svg {
-  transition: transform 160ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchfaces-battery-toggle svg.is-open {
@@ -8389,7 +8389,7 @@ body.wf-value-scrubbing * {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 160ms ease;
+  transition: width var(--dur-base) var(--ease);
 }
 
 .watchface-community-detail {
@@ -8632,7 +8632,7 @@ body.wf-value-scrubbing * {
     0 18px 35px rgba(0, 0, 0, 0.32),
     0 0 0 5px color-mix(in srgb, var(--text-primary) 7%, transparent);
   object-fit: contain;
-  transition: transform 180ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchface-create-preview-stack img:first-child {
@@ -9129,7 +9129,7 @@ body.wf-value-scrubbing * {
   align-items: center;
   gap: 1px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .watchface-shell :is(.wf-layer-item, .wf-editor-group-tree):hover

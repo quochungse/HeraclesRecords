@@ -61,6 +61,18 @@
   --radius-xl: 28px;
   --radius-pill: 999px;
 
+  /* Motion. One curve, and it decelerates: the browser's `ease` accelerates
+     into its destination, which is what read as soft and slightly late. A
+     transition is a reaction time and spends a duration token — fast for a
+     state (colour, opacity, border, shadow), base for something that moves or
+     resizes, slow for a drawer that travels a distance. A length that belongs
+     to a designed movement (a fill growing to its value, a staged reveal, a
+     spring) stays literal and is listed in test:design-vocabulary. */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 140ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+
   --sidebar-float-gap: 14px;
   --sidebar-radius: var(--radius-xl);
   --sidebar-glass-border: rgba(255, 255, 255, 0.14);
@@ -631,7 +643,7 @@ input::placeholder {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.22s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .app-sidebar-overlay.is-visible {
@@ -773,9 +785,9 @@ input::placeholder {
   pointer-events: none;
   will-change: transform, height;
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
+    transform var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    height var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--dur-base) var(--ease);
 }
 
 .app-sidebar-nav-item {
@@ -797,11 +809,11 @@ input::placeholder {
   font-weight: 500;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .app-sidebar-nav-item:hover {
@@ -845,7 +857,7 @@ input::placeholder {
   margin-left: auto;
   opacity: 0.65;
   transform: rotate(-90deg);
-  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .app-sidebar-nav-chevron.is-open {
@@ -945,7 +957,7 @@ input::placeholder {
   justify-content: center;
   width: 24px;
   color: inherit;
-  transition: color 0.2s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .app-sidebar-nav-activity {
@@ -1001,10 +1013,10 @@ input::placeholder {
   font-weight: 500;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .app-sidebar-toggle:hover {
@@ -1091,10 +1103,10 @@ input::placeholder {
   pointer-events: none;
   will-change: transform, width, height;
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
+    transform var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    width var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    height var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--dur-base) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1118,8 +1130,8 @@ input::placeholder {
   font-size: 14px;
   font-weight: 500;
   transition:
-    color 0.18s ease,
-    background 0.15s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .primary-tab:hover:not(.active) {
@@ -1270,9 +1282,9 @@ input::placeholder {
 .app-version-chip.button {
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .app-version-chip.button:hover:not(:disabled) {
@@ -1291,8 +1303,8 @@ input::placeholder {
   color: var(--success-text);
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .update-chip.ready:hover {
@@ -1333,9 +1345,9 @@ input::placeholder {
   color: var(--text-secondary);
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .update-settings-trigger--labeled {
@@ -1400,8 +1412,8 @@ input::placeholder {
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .update-settings-action:hover:not(:disabled) {
@@ -1699,8 +1711,8 @@ input::placeholder {
   text-decoration: none;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .resources-link:hover,
@@ -1722,7 +1734,7 @@ input::placeholder {
   flex-shrink: 0;
   opacity: 0;
   color: var(--text-secondary);
-  transition: opacity 0.15s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .resources-link:hover .resources-link-external,
@@ -1793,9 +1805,9 @@ input::placeholder {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .startup-view-option:hover,
@@ -1922,9 +1934,9 @@ input::placeholder {
   padding: 0 12px;
   text-align: left;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .nav button:hover {
@@ -2090,11 +2102,11 @@ input::placeholder {
   backdrop-filter: blur(var(--glass-blur));
   color: var(--text-primary);
   transition:
-    border-color 0.15s ease,
-    color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .icon-button:hover:not(:disabled) {
@@ -2172,10 +2184,10 @@ input::placeholder {
   color: var(--text-secondary);
   padding: 0 14px;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .media-tab:hover {
@@ -2238,7 +2250,7 @@ input::placeholder {
 }
 
 .dashboard-block {
-  animation: dashboard-enter 0.55s ease both;
+  animation: dashboard-enter 0.55s var(--ease) both;
 }
 
 .dashboard-block:nth-child(1) {
@@ -2500,7 +2512,7 @@ input::placeholder {
   gap: 6px;
   min-width: 0;
   padding: 4px 0 2px;
-  animation: activity-globe-hero-in 420ms ease both;
+  animation: activity-globe-hero-in 420ms var(--ease) both;
 }
 
 @keyframes activity-globe-hero-in {
@@ -2734,7 +2746,7 @@ input::placeholder {
   cursor: grab;
   touch-action: none;
   user-select: none;
-  transition: opacity 320ms ease, filter 320ms ease;
+  transition: opacity var(--dur-slow) var(--ease), filter var(--dur-slow) var(--ease);
 }
 
 .activity-globe-canvas.is-street-hidden {
@@ -2750,7 +2762,7 @@ input::placeholder {
   overflow: hidden;
   border-radius: calc(var(--radius-xl) - 4px);
   opacity: 0;
-  animation: activity-globe-street-in 360ms ease forwards;
+  animation: activity-globe-street-in 360ms var(--ease) forwards;
 }
 
 .activity-globe-street-map .leaflet-container {
@@ -2830,9 +2842,9 @@ input::placeholder {
   backdrop-filter: blur(8px);
   cursor: pointer;
   transition:
-    color 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .activity-globe-reset:hover {
@@ -2941,9 +2953,9 @@ input::placeholder {
   font-weight: 600;
   white-space: nowrap;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .activity-globe-action:hover {
@@ -3002,9 +3014,9 @@ input::placeholder {
 .dashboard-status.is-clickable {
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .dashboard-status.is-clickable:hover {
@@ -3068,9 +3080,9 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
   transition:
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .watch-status-icon.connected {
@@ -3142,8 +3154,8 @@ input::placeholder {
   cursor: pointer;
   opacity: 0.75;
   transition:
-    background 0.15s ease,
-    opacity 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 
 .connection-pill-action:hover:not(:disabled),
@@ -3186,6 +3198,7 @@ input::placeholder {
   stroke: var(--accent);
   stroke-width: 8;
   stroke-linecap: round;
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -3238,9 +3251,9 @@ input::placeholder {
   padding: 20px 22px;
   text-align: left;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .metric-tile-button {
@@ -3271,9 +3284,9 @@ input::placeholder {
   color: var(--accent-strong);
   margin-bottom: 4px;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .metric-tile-button:hover .metric-tile-icon {
@@ -3312,7 +3325,7 @@ input::placeholder {
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.03);
   padding: 12px 14px;
-  transition: background 0.15s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .track-avatar {
@@ -3361,9 +3374,9 @@ input::placeholder {
   box-shadow: var(--glass-shadow), var(--glass-inset);
   padding: 20px;
   transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .panel-flex {
@@ -3551,7 +3564,7 @@ input::placeholder {
   border-radius: var(--radius-pill);
   background: var(--accent-gradient);
   box-shadow: 0 0 10px var(--accent-glow);
-  transition: width 0.15s ease-out;
+  transition: width var(--dur-base) ease-out;
 }
 
 .library-panel-tools {
@@ -3598,8 +3611,8 @@ input::placeholder {
   color: var(--text-secondary);
   padding: 0 10px;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .library-search-field:focus-within {
@@ -3826,8 +3839,8 @@ input::placeholder {
   cursor: pointer;
   padding: 8px 10px;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .library-track-row:hover:not(.is-selected) {
@@ -3985,9 +3998,9 @@ input::placeholder {
   text-align: center;
   white-space: nowrap;
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .library-connector-pill--ready {
@@ -4079,7 +4092,8 @@ input::placeholder {
   border-radius: inherit;
   background: var(--accent-gradient);
   box-shadow: 0 0 10px var(--accent-glow);
-  transition: width 0.4s ease;
+  /* A fill growing to its value: a designed length, not a reaction time. */
+  transition: width 0.4s var(--ease);
 }
 
 .library-empty-state {
@@ -4246,8 +4260,8 @@ input::placeholder {
   backdrop-filter: blur(var(--glass-blur));
   padding: 0 12px;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .input-shell:focus-within {
@@ -4289,9 +4303,9 @@ input::placeholder {
   font-weight: 700;
   box-shadow: 0 4px 16px var(--accent-glow);
   transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .primary-button:hover:not(:disabled) {
@@ -4463,8 +4477,8 @@ tbody tr.is-selected:hover {
   color: var(--text-muted);
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .toast-close:hover {
@@ -4568,8 +4582,8 @@ td {
 
 tbody tr {
   transition:
-    background 0.12s ease,
-    box-shadow 0.12s ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 tbody tr:hover {
@@ -4722,11 +4736,11 @@ td span {
   padding: 0 14px;
   font-weight: 700;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .secondary-button:hover:not(:disabled) {
@@ -5105,7 +5119,7 @@ td span {
 .watchfaces-battery-day summary svg {
   margin-left: auto;
   color: var(--text-muted);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .watchfaces-battery-day[open] summary svg {
@@ -5402,7 +5416,7 @@ td span {
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.09);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
 .wf-selectable-component input[role="switch"]::after {
@@ -5414,7 +5428,7 @@ td span {
   height: 11px;
   border-radius: 50%;
   background: var(--text-secondary);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform var(--dur-base) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .wf-selectable-component input[role="switch"]:checked {
@@ -6006,10 +6020,10 @@ td span {
   color: var(--text-secondary);
   overflow: hidden;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .watchface-metric-card:hover {
@@ -6919,9 +6933,9 @@ td span {
   font-weight: 600;
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .app-select-trigger:hover,
@@ -6977,7 +6991,7 @@ td span {
 .app-select-icon {
   flex: 0 0 auto;
   color: var(--text-secondary);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .app-select-icon.is-open {
@@ -7772,9 +7786,9 @@ td span {
   background: rgba(255, 255, 255, 0.028);
   padding: 0 13px 0 17px;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    background 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .training-login-input:focus-within {
@@ -7812,8 +7826,8 @@ td span {
   color: rgba(245, 245, 247, 0.62);
   padding: 0;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .training-login-visibility:hover:not(:disabled),
@@ -7917,10 +7931,10 @@ td span {
   font-weight: 700;
   text-decoration: none;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .training-login-browser-link:hover,
@@ -7984,7 +7998,7 @@ td span {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .training-login-text-button:hover:not(:disabled),
@@ -8419,9 +8433,9 @@ td span {
   padding: 11px 12px 11px 14px;
   text-align: left;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .playlist-button::before {
@@ -8436,8 +8450,8 @@ td span {
   background: var(--accent);
   opacity: 0;
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .playlist-button:hover:not(:disabled) {
@@ -8608,8 +8622,8 @@ td span {
     rgba(255, 255, 255, 0.015)
   );
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .youtube-music-steps li:hover {
@@ -8902,9 +8916,9 @@ td span {
   font-size: 13px;
   font-weight: 600;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .service-open-link:hover {
@@ -9444,7 +9458,7 @@ td span {
   content: "";
   opacity: 0;
   transform: scaleY(0.4);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity var(--dur-base) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .apple-podcast-result:hover:not(:disabled) {
@@ -10565,9 +10579,9 @@ td span {
   padding: 12px 14px;
   animation: training-card-enter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .training-stat-card:nth-child(2) {
@@ -10908,7 +10922,8 @@ td span {
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.75s ease 0.22s;
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
+  transition: opacity 0.75s var(--ease) 0.22s;
 }
 
 .vo2-widget-panel::after {
@@ -10919,7 +10934,8 @@ td span {
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.75s ease 0.22s;
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
+  transition: opacity 0.75s var(--ease) 0.22s;
 }
 
 .vo2-widget-panel.is-ready::before {
@@ -11004,8 +11020,9 @@ td span {
   filter: blur(18px);
   opacity: 0;
   transform: translateY(10px) scale(0.88);
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
   transition:
-    opacity 0.8s ease 0.22s,
+    opacity 0.8s var(--ease) 0.22s,
     transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.22s;
 }
 
@@ -11062,10 +11079,11 @@ td span {
   opacity: 0;
   transform: scale(0.28);
   transform-origin: 120px 118px;
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
   transition:
-    opacity 0.36s ease 0.22s,
+    opacity 0.36s var(--ease) 0.22s,
     transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.22s,
-    stroke 0.2s ease;
+    stroke var(--dur-fast) var(--ease);
 }
 
 .vo2-widget-panel.is-ready .vo2-gauge-needle {
@@ -11245,9 +11263,9 @@ td span {
     transparent
   );
   transition:
-    transform 0.16s cubic-bezier(0.34, 1.4, 0.64, 1),
-    background-color 0.16s ease,
-    box-shadow 0.16s ease;
+    transform var(--dur-base) cubic-bezier(0.34, 1.4, 0.64, 1),
+    background-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .vo2-plateau.is-current::before {
@@ -11305,8 +11323,8 @@ td span {
   opacity: 0;
   transform: translate(-50%, 4px);
   transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 /*
@@ -11427,8 +11445,8 @@ td span {
 .sleep-panel.is-openable {
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    transform 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .sleep-panel.is-openable:hover {
@@ -11447,8 +11465,8 @@ td span {
   color: var(--text-secondary);
   cursor: pointer;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .sleep-panel.is-openable:hover .sleep-panel-open,
@@ -11551,10 +11569,10 @@ td span {
   outline: none;
   transform-origin: center;
   transition:
-    border-radius 160ms ease,
-    box-shadow 160ms ease,
-    filter 160ms ease,
-    transform 160ms ease;
+    border-radius var(--dur-base) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .sleep-stage-segment::after {
@@ -11586,8 +11604,8 @@ td span {
   text-align: center;
   transform: translate(-50%, 4px) scale(0.98, 0.58);
   transition:
-    opacity 140ms ease,
-    transform 140ms ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
   white-space: nowrap;
 }
 
@@ -11606,8 +11624,8 @@ td span {
   pointer-events: none;
   transform: translate(-50%, 4px) rotate(45deg);
   transition:
-    opacity 140ms ease,
-    transform 140ms ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .sleep-stage-segment:first-child {
@@ -11797,8 +11815,8 @@ td span {
   text-align: left;
   transform: translateY(4px);
   transition:
-    opacity 140ms ease,
-    transform 140ms ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
   white-space: pre-line;
 }
 
@@ -12045,10 +12063,11 @@ td span {
     color-mix(in srgb, var(--text-muted) 58%, transparent) 0%,
     color-mix(in srgb, var(--text-muted) 34%, transparent) 100%
   );
+  /* A fill growing to its value: a designed length, not a reaction time. */
   transition:
     height 0.85s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.25s ease,
-    background 0.35s ease;
+    box-shadow var(--dur-base) var(--ease),
+    background 0.35s var(--ease);
 }
 
 /* A day that has activities draws one block per activity, coloured by its sport
@@ -12192,8 +12211,8 @@ td span {
   font-weight: 600;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .metric-select-trigger:hover,
@@ -12208,7 +12227,7 @@ td span {
 
 .metric-select-icon {
   color: var(--text-secondary);
-  transition: transform 0.18s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .metric-select-icon.is-open {
@@ -12248,7 +12267,7 @@ td span {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .metric-select-option:hover {
@@ -12314,8 +12333,8 @@ td span {
   pointer-events: none;
   transform: translate(-50%, -4px);
   transition:
-    opacity 0.14s ease,
-    transform 0.14s ease;
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .training-fitness-day:first-child .training-fitness-tooltip {
@@ -12415,7 +12434,7 @@ td span {
   padding: 5px 12px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .training-metric-option:hover {
@@ -12534,9 +12553,9 @@ td span {
   filter: brightness(var(--heatmap-brightness, 1));
   z-index: 0;
   transition:
-    scale 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.22s ease,
-    filter 0.2s ease;
+    scale var(--dur-base) cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
 }
 
 .training-heatmap-cell:not(.is-empty)::before {
@@ -12549,7 +12568,7 @@ td span {
     0 0 18px 4px color-mix(in srgb, var(--cell-color) 20%, transparent);
   opacity: var(--heatmap-glow-opacity, 0);
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur-fast) var(--ease);
   z-index: -1;
 }
 
@@ -12646,8 +12665,8 @@ td span {
   pointer-events: none;
   opacity: 0;
   transition:
-    opacity 0.2s ease,
-    transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.34, 1.4, 0.64, 1);
   z-index: 5;
 }
 
@@ -12950,7 +12969,7 @@ td span {
   width: clamp(14px, 1.4vw, 18px);
   height: clamp(14px, 1.4vw, 18px);
   border-radius: clamp(3px, 0.4vw, 5px);
-  transition: transform 0.2s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .training-heatmap-legend-cell[data-level="0"] {
@@ -13099,8 +13118,9 @@ td span {
   opacity: 0;
   pointer-events: none;
   transform: scale(0.94);
+  /* Part of a staged reveal on load: a designed length, not a reaction time. */
   transition:
-    opacity 0.8s ease 0.22s,
+    opacity 0.8s var(--ease) 0.22s,
     transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.22s;
 }
 
@@ -13237,7 +13257,7 @@ td span {
 }
 
 .training-chart-shell .recharts-wrapper {
-  animation: training-chart-rise 0.7s ease both;
+  animation: training-chart-rise 0.7s var(--ease) both;
   background: transparent !important;
 }
 
@@ -13653,9 +13673,9 @@ td span {
   font-size: 13px;
   font-weight: 600;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .training-zone-select-trigger:hover,
@@ -13692,7 +13712,7 @@ td span {
 .training-zone-select-icon {
   flex: 0 0 auto;
   color: rgba(245, 245, 247, 0.8);
-  transition: transform 160ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .training-zone-select-trigger[aria-expanded="true"] .training-zone-select-icon {
@@ -13735,8 +13755,8 @@ td span {
   font-weight: 600;
   outline: none;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .training-zone-select-option.is-active,
@@ -13799,7 +13819,7 @@ td span {
 }
 
 .training-zone-donut .recharts-wrapper {
-  animation: training-chart-rise 0.7s ease both;
+  animation: training-chart-rise 0.7s var(--ease) both;
 }
 
 .training-zone-donut-icon {
@@ -13941,7 +13961,7 @@ td span {
   grid-template-columns: subgrid;
   align-items: center;
   min-width: 0;
-  animation: training-row-enter 0.55s ease both;
+  animation: training-row-enter 0.55s var(--ease) both;
 }
 
 .training-zone-percent,
@@ -13988,7 +14008,7 @@ td span {
   min-width: 0;
   border-radius: inherit;
   transform-origin: left center;
-  animation: training-fill 0.85s ease both;
+  animation: training-fill 0.85s var(--ease) both;
 }
 
 .training-zone-detail {
@@ -14116,7 +14136,7 @@ td span {
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
   transform-origin: left center;
-  animation: training-fill 0.85s ease both;
+  animation: training-fill 0.85s var(--ease) both;
 }
 
 .training-threshold-grid {
@@ -14333,10 +14353,10 @@ td span {
   padding: 10px 12px;
   text-align: left;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .training-backup-format-option strong {
@@ -14463,7 +14483,7 @@ td span {
   width: var(--backup-progress, 0%);
   border-radius: inherit;
   background: var(--accent-gradient);
-  transition: width 0.25s ease;
+  transition: width var(--dur-base) var(--ease);
 }
 
 .training-backup-progress-track.is-indeterminate span {
@@ -14742,8 +14762,8 @@ td span {
   font-weight: 700;
   white-space: nowrap;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .data-intervals-range button:hover:not(:disabled):not(.active) {
@@ -15057,7 +15077,7 @@ tr.data-intervals-row-missing {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .training-upcoming-today-button:hover,
@@ -15155,7 +15175,7 @@ tr.data-intervals-row-missing {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .training-upcoming-row:hover,
@@ -15298,9 +15318,9 @@ tr.data-intervals-row-missing {
   font-weight: 600;
   padding: 6px 12px;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .training-records-tab:hover {
@@ -15736,7 +15756,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-md);
   background: var(--surface, #16181c);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-  animation: training-row-enter 0.16s ease both;
+  animation: training-row-enter 0.16s var(--ease) both;
   text-align: left;
 }
 
@@ -15760,7 +15780,7 @@ tr.data-intervals-row-missing {
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .training-export-option:hover,
@@ -16082,8 +16102,8 @@ tr.data-intervals-row-missing {
   margin-bottom: 4px;
   border-radius: var(--radius-sm);
   transition:
-    opacity 0.25s ease,
-    visibility 0.25s ease;
+    opacity var(--dur-base) var(--ease),
+    visibility var(--dur-base) var(--ease);
 }
 
 .activity-route-modal-map:not(.is-credit-open) .leaflet-control-attribution {
@@ -16347,8 +16367,8 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   padding: 0 12px;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .browser-search-field:focus-within {
@@ -16491,8 +16511,8 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
   transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .browser-download-overlay:hover:not(:disabled) {
@@ -16647,7 +16667,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
   padding: 10px 12px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .youtube-job-item.downloading {
@@ -16730,7 +16750,7 @@ tr.data-intervals-row-missing {
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  transition: width 0.2s ease;
+  transition: width var(--dur-base) var(--ease);
 }
 
 .youtube-job-error {
@@ -17784,7 +17804,7 @@ tr.data-intervals-row-missing {
 
 .chat-login-panel .primary-button {
   margin-top: 6px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: transform var(--dur-base) var(--ease), box-shadow var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .chat-login-panel .primary-button:hover:not(:disabled) {
@@ -17875,9 +17895,9 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   box-shadow: var(--glass-inset), 0 8px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  animation: chat-sidebar-expand-enter 0.2s ease both;
-  transition: color 0.15s ease, border-color 0.15s ease,
-    background 0.15s ease;
+  animation: chat-sidebar-expand-enter 0.2s var(--ease) both;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .chat-sidebar-expand-button:hover {
@@ -17902,8 +17922,8 @@ tr.data-intervals-row-missing {
   overflow: hidden;
   padding: var(--sidebar-float-gap) 0;
   box-sizing: content-box;
-  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    padding-left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    padding-left var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-sidebar-shell.is-open {
@@ -18030,8 +18050,8 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
-  transition: color 0.16s ease, border-color 0.16s ease,
-    background 0.16s ease, transform 0.16s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-list-item:hover {
@@ -18118,7 +18138,7 @@ tr.data-intervals-row-missing {
 
 .chat-plan-list-item > svg {
   color: var(--text-muted);
-  transition: color 0.16s ease, transform 0.16s ease;
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-list-item:hover > svg {
@@ -18151,8 +18171,8 @@ tr.data-intervals-row-missing {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease,
-    background 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .chat-plan-panel-chat-link:hover {
@@ -18287,7 +18307,7 @@ tr.data-intervals-row-missing {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.22s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .chat-sidebar-overlay.is-visible {
@@ -18419,7 +18439,7 @@ tr.data-intervals-row-missing {
   background: var(--surface-raised);
   color: inherit;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .backup-restore-option:hover:not(:disabled) {
@@ -18633,9 +18653,9 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .chat-settings-button:hover {
@@ -18724,9 +18744,9 @@ tr.data-intervals-row-missing {
   box-shadow: var(--sidebar-overlay-shadow);
   transform: translateX(calc(-100% - var(--sidebar-float-gap)));
   transition:
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.28s ease,
-    opacity 0.22s ease;
+    transform var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow var(--dur-slow) var(--ease),
+    opacity var(--dur-base) var(--ease);
 }
 
 .chat-sidebar.is-overlay:not(.is-open) {
@@ -18759,9 +18779,9 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .chat-sidebar-tabs button:hover {
@@ -18880,8 +18900,8 @@ tr.data-intervals-row-missing {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease,
-    background 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .chat-history-collapse-button:hover {
@@ -18901,10 +18921,10 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   box-shadow: none;
   transition:
-    color 0.22s ease,
-    border-color 0.22s ease,
-    background 0.22s ease,
-    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-new-chat-sidebar:hover:not(:disabled) {
@@ -18936,9 +18956,9 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
   box-shadow: var(--glass-inset);
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .chat-history-search:focus-within {
@@ -19023,11 +19043,11 @@ tr.data-intervals-row-missing {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-session-row:hover:not(:disabled) {
@@ -19165,11 +19185,11 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
   opacity: 0;
   transition:
-    opacity 0.18s ease,
-    color 0.18s ease,
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 /*
@@ -19440,7 +19460,7 @@ tr.data-intervals-row-missing {
   line-height: 1.3;
   text-align: center;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .chat-auth-scope-switch button.is-active {
@@ -19603,9 +19623,9 @@ tr.data-intervals-row-missing {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .chat-creations-pill:hover {
@@ -19676,7 +19696,7 @@ tr.data-intervals-row-missing {
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
-  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .chat-signout:hover {
@@ -19696,8 +19716,8 @@ tr.data-intervals-row-missing {
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
-  transition: color 0.18s ease, border-color 0.18s ease,
-    background 0.18s ease, transform 0.18s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .chat-new-chat:hover:not(:disabled) {
@@ -20223,7 +20243,7 @@ tr.data-intervals-row-missing {
   outline-offset: 8px;
   background: color-mix(in srgb, var(--chat-signal-soft) 45%, transparent);
   box-shadow: 0 0 24px color-mix(in srgb, var(--chat-signal-glow) 42%, transparent);
-  animation: chat-jump-highlight 1.8s ease both;
+  animation: chat-jump-highlight 1.8s var(--ease) both;
 }
 
 @keyframes chat-jump-highlight {
@@ -20391,8 +20411,8 @@ tr.data-intervals-row-missing {
   font-weight: 600;
   color: var(--text-muted);
   user-select: none;
-  transition: color 0.18s ease, border-color 0.18s ease,
-    background 0.18s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .chat-thinking summary:hover,
@@ -20409,7 +20429,7 @@ tr.data-intervals-row-missing {
   font-size: 14px;
   line-height: 1;
   transform: rotate(0deg);
-  transition: transform 0.18s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .chat-thinking[open] summary::before {
@@ -20640,8 +20660,8 @@ tr.data-intervals-row-missing {
   padding: 9px 16px;
   font-size: 13px;
   cursor: pointer;
-  transition: color 0.18s ease, border-color 0.18s ease,
-    background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease), box-shadow var(--dur-fast) var(--ease);
   animation: chat-empty-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -20800,11 +20820,11 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 700;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease,
-    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-provider-select .app-select-trigger:hover,
@@ -20938,10 +20958,10 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font-weight: 600;
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease,
-    transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-select-menu .app-select-option:hover,
@@ -21197,8 +21217,8 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-lg);
   padding: 7px 7px 7px 18px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), var(--glass-inset);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
-    transform 0.2s ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .chat-composer-inner:focus-within {
@@ -21233,12 +21253,12 @@ tr.data-intervals-row-missing {
   cursor: pointer;
   flex-shrink: 0;
   box-shadow: 0 4px 14px var(--accent-glow);
-  transition: background 0.18s ease, opacity 0.18s ease,
-    transform 0.18s ease, box-shadow 0.18s ease;
+  transition: background var(--dur-fast) var(--ease), opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .chat-send svg {
-  transition: transform 0.18s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .chat-send:hover:not(:disabled) {
@@ -21359,7 +21379,7 @@ tr.data-intervals-row-missing {
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-color: var(--chat-signal-border);
-  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), text-decoration-color var(--dur-fast) var(--ease);
 }
 
 .chat-markdown a:hover {
@@ -21615,8 +21635,8 @@ tr.data-intervals-row-missing {
   padding: 10px 12px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, background 0.18s ease,
-    transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .chat-coach-prompt-choice > span {
@@ -21857,8 +21877,8 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
   color: var(--text-secondary);
-  transition: border-color 0.15s ease, background 0.15s ease,
-    color 0.15s ease, transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-week-stepper button:hover:not(:disabled) {
@@ -21907,8 +21927,8 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   text-align: left;
   scroll-snap-align: start;
-  transition: border-color 0.15s ease, background 0.15s ease,
-    color 0.15s ease, transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-week-tabs button:hover:not(.is-active) {
@@ -22000,7 +22020,7 @@ tr.data-intervals-row-missing {
 
 .chat-plan-issues summary > svg {
   color: var(--text-muted);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-issues[open] summary > svg {
@@ -22408,8 +22428,8 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease,
-    transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .chat-plan-destination-option:hover:not(.is-disabled) {
@@ -22582,7 +22602,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .chat-plan-review:hover:not(:disabled) {
@@ -22608,7 +22628,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .chat-plan-upload:hover:not(:disabled) {
@@ -23128,7 +23148,7 @@ tr.data-intervals-row-missing {
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
   backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
   box-shadow: var(--glass-shadow), var(--glass-inset);
-  animation: chat-empty-enter 0.22s ease both;
+  animation: chat-empty-enter 0.22s var(--ease) both;
 }
 
 .chat-mcp-panel-head {
@@ -23264,7 +23284,7 @@ tr.data-intervals-row-missing {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .route-mode-tabs button:hover {
   color: var(--text-primary);
@@ -23395,7 +23415,7 @@ tr.data-intervals-row-missing {
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-sport-picker button svg {
   flex: none;
@@ -23438,7 +23458,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-mode-switch button.is-active,
 .route-toggle button.is-active {
@@ -23462,7 +23482,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 .route-chip-group button:hover,
 .route-distance-presets button:hover {
@@ -23694,7 +23714,7 @@ tr.data-intervals-row-missing {
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-template-preview {
   width: 26px;
@@ -23778,7 +23798,7 @@ tr.data-intervals-row-missing {
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   text-align: left;
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-overlay-item:hover {
   border-color: var(--accent-soft);
@@ -23842,7 +23862,7 @@ tr.data-intervals-row-missing {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-studio .button.primary {
   flex: 1;
@@ -24194,7 +24214,7 @@ tr.data-intervals-row-missing {
   flex-direction: column;
   gap: 14px;
   transform: translateX(105%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--dur-slow) cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
 }
@@ -24242,7 +24262,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.03);
-  transition: all 0.16s ease;
+  transition: all var(--dur-base) var(--ease);
 }
 .route-drawer-list li.is-active {
   border-color: var(--accent);
@@ -25908,8 +25928,8 @@ tr.data-intervals-row-missing {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .settings-segment-option:hover {
@@ -25963,8 +25983,8 @@ tr.data-intervals-row-missing {
   background: transparent;
   cursor: pointer;
   transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .settings-palette-option:hover {
@@ -26117,7 +26137,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
 .calendar-nav-button:hover:not(:disabled) {
@@ -26304,7 +26324,7 @@ tr.data-intervals-row-missing {
   min-height: 132px;
   padding: 8px;
   border-right: 1px solid var(--glass-border);
-  transition: background 0.15s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .calendar-day-week {
@@ -26358,7 +26378,7 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
+  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .calendar-day:hover .calendar-day-add {
@@ -26396,7 +26416,7 @@ tr.data-intervals-row-missing {
   text-align: left;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
 }
 
 .calendar-chip:hover:not(:disabled) {
@@ -26463,7 +26483,7 @@ tr.data-intervals-row-missing {
   opacity: 0.55;
   pointer-events: none;
   transform: translateY(-50%);
-  transition: color 0.15s ease, opacity 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 
 .calendar-chip-planned[draggable="true"]:hover .calendar-chip-drag-handle {
@@ -26598,7 +26618,7 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
 .calendar-weekstats-coach:hover {
@@ -26621,7 +26641,7 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .calendar-view .ghost-button:hover:not(:disabled),
@@ -26936,7 +26956,7 @@ tr.data-intervals-row-missing {
   flex-basis: 0;
   min-width: 4px;
   border-radius: var(--radius-xs);
-  transition: filter 0.15s ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .sched-bar-segment:hover {
@@ -27397,17 +27417,17 @@ tr.data-intervals-row-missing {
   text-align: center;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .calendar-builder-sport-chip svg {
   flex: 0 0 auto;
   color: var(--text-muted);
-  transition: color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-sport-chip span {
@@ -27507,7 +27527,7 @@ tr.data-intervals-row-missing {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .calendar-modal-tab:hover:not(.is-active) {
@@ -27668,7 +27688,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .calendar-quick-input:focus-within {
@@ -27727,7 +27747,7 @@ tr.data-intervals-row-missing {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .calendar-quick-presets button:hover,
@@ -27762,7 +27782,7 @@ tr.data-intervals-row-missing {
   background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .calendar-quick-save:hover,
@@ -27878,7 +27898,7 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
-  transition: color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .calendar-activity-search-toggle:hover:not(:disabled),
@@ -28007,10 +28027,10 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .calendar-sport-card svg {
@@ -28203,7 +28223,7 @@ tr.data-intervals-row-missing {
   border-left: 3px solid color-mix(in srgb, var(--step-color) 55%, var(--glass-border));
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-row[data-builder-kind="warmup"] { --step-color: #f0a72e; }
@@ -28277,7 +28297,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: grab;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-drag-handle:hover {
@@ -28305,7 +28325,7 @@ tr.data-intervals-row-missing {
   padding: 0;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-order-buttons button:hover:not(:disabled),
@@ -28448,7 +28468,7 @@ tr.data-intervals-row-missing {
 .calendar-builder-row-toggle > svg {
   flex: 0 0 auto;
   color: var(--text-muted);
-  transition: transform 0.15s ease, color 0.15s ease;
+  transition: transform var(--dur-base) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-row-toggle:hover > svg,
@@ -28872,7 +28892,7 @@ tr.data-intervals-row-missing {
   margin-left: auto;
   flex: 0 0 auto;
   color: var(--text-muted);
-  transition: transform 0.15s ease, color 0.15s ease;
+  transition: transform var(--dur-base) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-repeat-child-toggle > svg.is-open {
@@ -29093,7 +29113,7 @@ tr.data-intervals-row-missing {
   border: 1px dashed color-mix(in srgb, var(--glass-border) 95%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass-bg) 45%, transparent);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-add-bar:hover {
@@ -29136,10 +29156,10 @@ tr.data-intervals-row-missing {
   font-weight: 600;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .calendar-builder-add-chip[data-kind="warmup"] { --chip: #f0a72e; }
@@ -29149,7 +29169,7 @@ tr.data-intervals-row-missing {
 
 .calendar-builder-add-chip svg {
   color: var(--text-muted);
-  transition: color 0.15s ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-add-chip:hover {
@@ -29490,7 +29510,7 @@ tr.data-intervals-row-missing {
     background: color-mix(in srgb, var(--glass-bg) 68%, transparent);
     color: var(--text-muted);
     cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
   }
 
   .calendar-builder-save-card:hover,
@@ -29551,7 +29571,7 @@ tr.data-intervals-row-missing {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-pill);
     background: var(--glass-bg-hover);
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
   }
 
   .calendar-builder-save-switch > span {
@@ -29559,7 +29579,7 @@ tr.data-intervals-row-missing {
     height: 12px;
     border-radius: 50%;
     background: var(--text-muted);
-    transition: transform 0.15s ease, background 0.15s ease;
+    transition: transform var(--dur-base) var(--ease), background var(--dur-fast) var(--ease);
   }
 
   .calendar-builder-save-card.is-checked .calendar-builder-save-switch {
@@ -29616,7 +29636,7 @@ tr.data-intervals-row-missing {
       linear-gradient(180deg, color-mix(in srgb, var(--glass-bg-hover) 52%, transparent), transparent),
       color-mix(in srgb, var(--glass-bg) 74%, transparent);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
-    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
   }
 
   .calendar-builder-row:hover,
@@ -29749,7 +29769,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
   color: var(--text-muted);
-  transition: border-color 150ms ease, background 150ms ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .exercise-combobox-input:hover {
@@ -29815,7 +29835,7 @@ tr.data-intervals-row-missing {
 }
 
 .exercise-combobox-input > button svg {
-  transition: transform 150ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .exercise-combobox-input > button svg.is-open {
@@ -29951,7 +29971,7 @@ tr.data-intervals-row-missing {
   opacity: 0;
   background: transparent;
   object-fit: contain;
-  transition: opacity 0.18s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .exercise-preview-stage video.is-ready {
@@ -30029,7 +30049,7 @@ tr.data-intervals-row-missing {
   background: var(--glass-bg);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .exercise-preview-angles > button:hover,
@@ -30248,7 +30268,7 @@ tr.data-intervals-row-missing {
   justify-content: center;
   gap: 3px;
   padding: 10px 15px 12px;
-  transition: background 0.15s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .set-line-cell:focus-within {
@@ -30430,7 +30450,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .calendar-builder-row .rest-picker > button:hover {
@@ -30543,7 +30563,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
   padding: 4px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .workout-library-row:hover,
@@ -30821,7 +30841,7 @@ tr.data-intervals-row-missing {
 .workout-drop-zone {
   height: 10px;
   border-radius: var(--radius-pill);
-  transition: background 0.12s ease, height 0.12s ease;
+  transition: background var(--dur-fast) var(--ease), height var(--dur-base) var(--ease);
 }
 
 .workout-drop-zone:has(+ [draggable="true"]:active),
@@ -31127,7 +31147,7 @@ tr.data-intervals-row-missing {
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .workout-step-card .rest-picker > button:hover:not(:disabled) {
@@ -31708,9 +31728,9 @@ tr.data-intervals-row-missing {
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .settings-sport-reset:hover {
@@ -31740,8 +31760,8 @@ tr.data-intervals-row-missing {
   background: color-mix(in srgb, var(--sport-color) 7%, var(--glass-bg));
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    border-color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .settings-sport-chip:hover {
@@ -31907,8 +31927,8 @@ tr.data-intervals-row-missing {
   font-weight: 600;
   text-decoration: none;
   transition:
-    border-color 0.18s ease,
-    color 0.18s ease;
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .settings-about-link:hover {
@@ -31986,9 +32006,9 @@ button.settings-about-link {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .settings-nav-row:hover:not(:disabled):not(.is-static) {
@@ -32101,9 +32121,9 @@ button.settings-about-link {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .settings-row-button:hover:not(:disabled) {
@@ -32381,8 +32401,8 @@ button.settings-about-link {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .sync-backend-switch button:hover:not(:disabled):not(.is-active) {
@@ -32487,9 +32507,9 @@ button.settings-about-link {
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .settings-subpage-back:hover {
@@ -33017,9 +33037,9 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   background: color-mix(in srgb, var(--glass-bg) 74%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .mcp-server-row:hover {
@@ -33159,10 +33179,10 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   font-weight: 600;
   cursor: pointer;
   transition:
-    color 0.16s ease,
-    border-color 0.16s ease,
-    background 0.16s ease,
-    transform 0.16s ease;
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .mcp-server-action:hover:not(:disabled),
@@ -33234,8 +33254,8 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
   color: var(--text-muted);
   transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .mcp-server-bearer:focus-within {
@@ -33328,10 +33348,10 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .mcp-servers-preset-grid button:hover:not(:disabled) {
@@ -33402,9 +33422,9 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--text-primary);
   font-size: 12px;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .mcp-server-field input::placeholder {
@@ -33436,9 +33456,9 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    transform 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .mcp-servers-add-submit:hover:not(:disabled) {
@@ -33644,8 +33664,8 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   font-size: 13px;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .coach-analysis-tab[data-active="true"] {
@@ -33780,8 +33800,8 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .coach-analysis-run-open:hover {
@@ -33875,9 +33895,9 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .chat-coaches-pill:hover {
@@ -34130,8 +34150,8 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
 .coach-analysis-starter:hover {
@@ -34447,7 +34467,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
 .mcp-session-button:hover:not(:disabled) {

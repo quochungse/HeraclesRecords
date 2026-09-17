@@ -31,7 +31,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .strength-explore-all:hover {
@@ -68,7 +68,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .strength-lift-list li:first-child .strength-lift-button {
@@ -94,7 +94,7 @@
 
 .strength-lift-open-icon {
   color: var(--text-muted);
-  transition: color 150ms ease, transform 150ms ease;
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .strength-lift-button:hover .strength-lift-open-icon {
@@ -114,7 +114,7 @@
   background: rgba(0, 0, 0, 0.58);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  animation: exercise-explorer-fade 180ms ease both;
+  animation: exercise-explorer-fade 180ms var(--ease) both;
 }
 
 :root[data-theme="paper"] .exercise-explorer-backdrop {
@@ -263,7 +263,7 @@
   background: var(--xx-well);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .exercise-explorer-close:hover {
@@ -706,7 +706,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .exercise-history-trigger:hover {
@@ -720,7 +720,7 @@
 
 .exercise-history-trigger > svg {
   color: var(--text-muted);
-  transition: transform 180ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .exercise-history-trigger[aria-expanded="true"] > svg {

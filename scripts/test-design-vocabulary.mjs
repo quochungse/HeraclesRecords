@@ -32,6 +32,18 @@
  *   - `clamp()` for letter-spacing in a container query: the watchface editor
  *     tracks a label against its own container width, which no fixed em can do.
  *
+ * Motion is held the same way, because it drifted the same way: 26 duration
+ * steps, and 92% of every curve was the browser's `ease`, which nobody chose —
+ * it is what you get for not choosing. So a `transition` spends `var(--ease)`
+ * (or names another curve on purpose) and a `--dur-*` token; an `animation`
+ * never spells bare `ease`. Exceptions, both narrow:
+ *   - a duration of 10ms or less marked `!important` — a reduced-motion
+ *     override switching transitions off, not a reaction time;
+ *   - `DESIGNED_LENGTHS` below: a fill growing to its value, a staged reveal,
+ *     a spring whose length belongs to its curve. Each entry names its rule and
+ *     property, and an entry that no longer matches fails, so the list cannot
+ *     outlive the transitions it excuses.
+ *
  * Run: npm run test:design-vocabulary
  */
 import assert from "node:assert/strict";
@@ -87,6 +99,39 @@ const RADIUS_TOKENS = new Set([
   "--wf-control-radius",
   "--wf-dashboard-radius",
 ]);
+
+const DURATION_TOKENS = new Set(["--dur-fast", "--dur-base", "--dur-slow"]);
+/**
+ * Transitions whose length is designed rather than reactive — file, the rule's
+ * selector, and the property. Each rule carries a comment saying which kind.
+ */
+const DESIGNED_LENGTHS = [
+  // Springs: the curve overshoots, and its length is part of that shape.
+  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "margin-left"],
+  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "max-width"],
+  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "padding-inline"],
+  ["src/strength/strength.css", ".strength-flip", "transform"],
+  // Fills growing to their value.
+  ["src/strength/strength.css", ".muscle-ranking-fill", "transform"],
+  ["src/strength/strength.css", ".muscle-ranking-fill", "background"],
+  ["src/strength/strength.css", ".muscle-recovery-fill", "transform"],
+  ["src/strength/strength.css", ".muscle-trend-bar-fill", "height"],
+  ["src/strength/strength.css", ".strength-mix-bar > span", "flex-grow"],
+  ["src/styles.css", ".storage-ring-progress", "stroke-dashoffset"],
+  ["src/styles.css", ".watch-storage-bar", "width"],
+  ["src/styles.css", ".training-fitness-bar", "height"],
+  ["src/styles.css", ".training-fitness-bar", "background"],
+  // Staged reveals on load, most of them behind a 220ms delay.
+  ["src/strength/strength.css", ".anatomy-body-map::after", "opacity"],
+  ["src/styles.css", ".vo2-widget-panel::before", "opacity"],
+  ["src/styles.css", ".vo2-widget-panel::after", "opacity"],
+  ["src/styles.css", ".vo2-gauge::before", "opacity"],
+  ["src/styles.css", ".vo2-gauge::before", "transform"],
+  ["src/styles.css", ".vo2-gauge-needle", "opacity"],
+  ["src/styles.css", ".vo2-gauge-needle", "transform"],
+  ["src/styles.css", ".training-recovery-ring::before", "opacity"],
+  ["src/styles.css", ".training-recovery-ring::before", "transform"],
+];
 
 function cssFiles(dir) {
   const out = [];
@@ -205,6 +250,82 @@ for (const file of cssFiles(SRC)) {
   });
 }
 
+/** Splits on `sep` at paren depth 0 — `var(--x, cubic-bezier(…))` nests two deep. */
+function splitTop(value, sep) {
+  const out = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && (sep === "," ? ch === "," : /\s/.test(ch))) {
+      out.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(value.slice(start));
+  return out.map((part) => part.trim()).filter(Boolean);
+}
+
+const BARE_EASE = /(?<![-\w])ease\b(?!-)/;
+const TIME = /^(\d*\.?\d+)(ms|s)$/;
+const CURVE = /^(var\(--[\w-]*ease[\w-]*|cubic-bezier\(|steps\(|linear|ease-in|ease-out|ease-in-out|step-start|step-end)/;
+const designedUnused = new Set(DESIGNED_LENGTHS.map((entry) => entry.join("|")));
+
+// A transition list runs over several lines, so motion is read per declaration
+// rather than per line. Comments are blanked first, keeping every offset, so a
+// comment quoting `ease` is prose and a reported line number is still right.
+for (const file of cssFiles(SRC)) {
+  const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+  const where = relative(ROOT, file);
+  for (const m of code.matchAll(/(?<![-\w])(transition|transition-duration|transition-timing-function|animation|animation-timing-function):\s*([^;}]+)/g)) {
+    const line = code.slice(0, m.index).split("\n").length;
+    const [prop, raw] = [m[1], m[2]];
+    const important = raw.includes("!important");
+    const value = raw.replace(/!important/g, "").trim();
+    if (BARE_EASE.test(value)) {
+      fail(file, line, prop, value.replace(/\s+/g, " "), "spend var(--ease): bare `ease` is the browser default, not a choice");
+      continue;
+    }
+    if (prop.startsWith("animation") || prop === "transition-timing-function") continue;
+
+    const open = code.lastIndexOf("{", m.index);
+    const before = Math.max(code.lastIndexOf("}", open - 1), code.lastIndexOf("{", open - 1), code.lastIndexOf(";", open - 1));
+    const selector = code.slice(before + 1, open).trim().replace(/\s+/g, " ");
+
+    for (const item of splitTop(value, ",")) {
+      if (item === "none") continue;
+      const tokens = splitTop(item, " ");
+      const property = prop === "transition-duration" ? null : tokens[0];
+      const duration = prop === "transition-duration" ? tokens[0] : tokens.find((t) => TIME.test(t) || t.startsWith("var(--dur-"));
+      const shown = item.replace(/\s+/g, " ");
+      if (prop === "transition" && !tokens.some((t) => CURVE.test(t))) {
+        fail(file, line, prop, shown, "name the curve — an item without one is `ease` by omission");
+      }
+      if (!duration) continue;
+      const token = duration.match(/^var\((--[\w-]+)\)$/)?.[1];
+      if (token) {
+        if (!DURATION_TOKENS.has(token)) fail(file, line, prop, shown, `${token} is not a duration token`);
+        continue;
+      }
+      const time = duration.match(TIME);
+      const msValue = time ? Number(time[1]) * (time[2] === "ms" ? 1 : 1000) : NaN;
+      if (important && msValue <= 10) continue;
+      const key = [where, selector, property].join("|");
+      if (property && designedUnused.has(key)) {
+        designedUnused.delete(key);
+        continue;
+      }
+      fail(file, line, prop, shown,
+        `spend ${[...DURATION_TOKENS].join(" / ")} — fast for a state, base for movement, slow for a drawer; a designed length goes in DESIGNED_LENGTHS`);
+    }
+  }
+}
+for (const key of designedUnused) {
+  violations.push(`DESIGNED_LENGTHS  ${key.replaceAll("|", "  ")}   — no such literal transition any more; remove the entry`);
+}
+
 assert.deepEqual(
   violations,
   [],
@@ -216,5 +337,6 @@ console.log(
   `design vocabulary OK — ${files} stylesheets, ` +
     `${WEIGHTS.size} weights, ${SIZES_PX.size} sizes (+${RELATIVE.size} relative), ${TRACKING.size} tracking steps, ` +
     `${LEADING.size} leading steps, ` +
+    `${DURATION_TOKENS.size} duration tokens (+${DESIGNED_LENGTHS.length} designed lengths), ` +
     `${RADIUS_TOKENS.size} radius tokens and no literal outside them`
 );

@@ -238,9 +238,9 @@
     0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.14);
   transition:
-    transform 170ms var(--tl-ease-out),
-    box-shadow 170ms var(--tl-ease-out),
-    filter 170ms ease;
+    transform var(--dur-base) var(--tl-ease-out),
+    box-shadow var(--dur-fast) var(--tl-ease-out),
+    filter var(--dur-fast) var(--ease);
 }
 
 .training-library-view .primary-button:hover:not(:disabled) {
@@ -262,11 +262,11 @@
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    transform 170ms var(--tl-ease-out),
-    box-shadow 170ms var(--tl-ease-out);
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out),
+    box-shadow var(--dur-fast) var(--tl-ease-out);
 }
 
 .training-library-view .ghost-button:hover:not(:disabled) {
@@ -299,7 +299,7 @@
   color: var(--text-muted);
   background: none;
   cursor: pointer;
-  transition: color 150ms ease, background 150ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .training-library-view .icon-button:hover:not(:disabled) {
@@ -494,16 +494,16 @@
   white-space: nowrap;
   cursor: pointer;
   transition:
-    color 180ms ease,
-    background 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .tl-sections button svg {
   width: 15px;
   height: 15px;
-  transition: color 180ms ease, transform 220ms var(--tl-ease-out);
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-sections button:hover:not(:disabled) {
@@ -534,7 +534,7 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   text-align: center;
-  transition: color 180ms ease, background 180ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-sections button[aria-current="page"] {
@@ -665,10 +665,10 @@
   color: var(--text-muted);
   background: var(--glass-bg);
   transition:
-    border-color 170ms ease,
-    box-shadow 170ms ease,
-    color 170ms ease,
-    flex-basis 240ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    flex-basis var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-search input {
@@ -715,11 +715,11 @@
   font-size: 12px;
   cursor: pointer;
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 170ms var(--tl-ease-out);
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-chips button:hover {
@@ -866,7 +866,7 @@
 
 .tl-index-head .tl-sortable {
   cursor: pointer;
-  transition: color 140ms ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .tl-index-head .tl-sortable:hover {
@@ -884,7 +884,7 @@
 .tl-row {
   align-items: center;
   border-bottom: 1px solid var(--tl-rule-soft);
-  transition: background 170ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-row:last-child {
@@ -1134,10 +1134,10 @@
   background: none;
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-mark:hover {
@@ -1173,7 +1173,7 @@
   justify-content: flex-end;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-row:hover .tl-row-actions,
@@ -1200,7 +1200,7 @@
   color: var(--text-muted);
   background: none;
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-row-actions button:hover {
@@ -1260,9 +1260,9 @@
   box-shadow: var(--tl-shadow-card);
   overflow: hidden;
   transition:
-    border-color 190ms ease,
-    box-shadow 220ms var(--tl-ease-out),
-    transform 220ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--tl-ease-out),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 /* A wash of accent light that rises from the top edge when the tile is touched. */
@@ -1275,7 +1275,7 @@
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: opacity 240ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover {
@@ -1429,7 +1429,7 @@
   display: flex;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover .tl-card-actions,
@@ -1449,7 +1449,7 @@
   color: var(--text-muted);
   background: color-mix(in srgb, var(--tl-card, var(--surface)) 88%, transparent);
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-card-actions button:hover {
@@ -1578,8 +1578,8 @@
   pointer-events: none;
   mask-image: radial-gradient(circle at 78% 78%, #000, transparent 72%);
   transition:
-    opacity 260ms var(--tl-ease-out),
-    transform 320ms var(--tl-ease-out);
+    opacity var(--dur-base) var(--tl-ease-out),
+    transform var(--dur-slow) var(--tl-ease-out);
 }
 
 .tl-card:hover .tl-wk-glyph,
@@ -1697,7 +1697,7 @@
   flex-basis: 0;
   border-radius: var(--radius-xs);
   background: var(--tl-sport-accent, var(--accent));
-  transition: filter 150ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 /* A long interval set has more steps than a tile has pixels for pills, so the
@@ -1780,7 +1780,7 @@
   background: color-mix(in srgb, var(--tl-sport-accent, var(--accent)) 78%, transparent);
   transform-origin: left;
   animation: tl-wk-fill 560ms var(--tl-ease-out) backwards;
-  transition: filter 200ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover .tl-wk-track i {
@@ -1855,9 +1855,9 @@
   background: none;
   cursor: pointer;
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .tl-layout-switch button:hover {
@@ -1901,7 +1901,7 @@
     linear-gradient(180deg, color-mix(in srgb, var(--accent-strong) 82%, transparent), color-mix(in srgb, var(--accent) 46%, transparent));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transform-origin: bottom;
-  transition: filter 180ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-ridge-bar.is-empty {
@@ -2033,7 +2033,7 @@
   height: var(--tl-bar-height);
   border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) var(--radius-xs);
   transform-origin: bottom;
-  transition: filter 180ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-bullet b {
@@ -2211,10 +2211,10 @@
   background: none;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    background 170ms ease,
-    border-color 170ms ease,
-    transform 170ms var(--tl-ease-out);
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-reader-favorite:hover {
@@ -2347,7 +2347,7 @@
   flex-basis: 0;
   border-radius: var(--radius-xs);
   background: var(--tl-sport-accent, var(--accent));
-  transition: filter 160ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 /* A long interval set closes the pills up rather than overflowing the panel. */
@@ -2501,7 +2501,7 @@
   padding: 10px 20px 10px 54px;
   border-bottom: 1px solid var(--tl-rule-soft);
   counter-increment: tl-step;
-  transition: background 160ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-steps li:first-child {
@@ -2754,7 +2754,7 @@
   color: var(--text-primary);
   background: var(--glass-bg);
   font-size: 13px;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .tl-reader-schedule input:focus-visible {
@@ -3014,7 +3014,7 @@
 .tl-tally div {
   padding: 14px 20px;
   background: var(--tl-panel-bg);
-  transition: background 180ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-tally div:hover {
@@ -3325,9 +3325,9 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    transform 180ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)),
-    box-shadow 180ms ease,
-    filter 180ms ease;
+    transform var(--dur-base) var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)),
+    box-shadow var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
 }
 
 .training-library-gate .primary-button:hover {
@@ -3391,7 +3391,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(8px);
   place-items: center;
-  animation: tl-fade-in 200ms ease both;
+  animation: tl-fade-in 200ms var(--ease) both;
 }
 
 @keyframes tl-fade-in {
@@ -3532,7 +3532,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(10px);
   content: "";
-  animation: tl-fade-in 240ms ease both;
+  animation: tl-fade-in 240ms var(--ease) both;
 }
 
 .plan-editor-header,
@@ -3562,7 +3562,7 @@
   font-weight: 600;
   letter-spacing: -0.02em;
   outline: 0;
-  transition: border-color 160ms ease;
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .plan-editor-name:hover {
@@ -3790,9 +3790,9 @@
   color: var(--text-muted);
   background: var(--glass-bg);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .plan-editor-sidebar .plan-editor-library-search input {
@@ -3869,9 +3869,9 @@
   text-align: left;
   cursor: pointer;
   transition:
-    color 150ms ease,
-    background 150ms ease,
-    transform 120ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .plan-editor-library-list button:hover {
@@ -3901,10 +3901,10 @@
   color: var(--text-muted);
   opacity: 0.72;
   transition:
-    color 150ms ease,
-    background 150ms ease,
-    border-color 150ms ease,
-    opacity 150ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 
 .plan-editor-library-list button:hover > .plan-editor-library-add {
@@ -3984,9 +3984,9 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 40%, transparent);
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .plan-holding-area.is-drop-target {
@@ -4050,7 +4050,7 @@
   display: flex;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .plan-week:hover > header > div:last-child,
@@ -4074,8 +4074,8 @@
   padding: 9px;
   border-right: 1px solid var(--tl-rule-soft);
   transition:
-    background 160ms ease,
-    box-shadow 160ms ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 /* A dragged card lights the day it is over — the clearest answer to "where
@@ -4123,7 +4123,7 @@
   background: none;
   opacity: 0;
   cursor: pointer;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .plan-day:hover .plan-day-heading button,
@@ -4161,9 +4161,9 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 16%, transparent);
   cursor: grab;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .plan-entry-card:hover {
@@ -4236,10 +4236,10 @@
   font-size: 13px;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    border-color 170ms ease,
-    background 170ms ease,
-    box-shadow 170ms ease;
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .plan-add-week:hover {
@@ -4349,11 +4349,11 @@
   background: none;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    border-color 170ms ease,
-    background 170ms ease,
-    box-shadow 170ms ease,
-    transform 170ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1));
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1));
 }
 
 .plan-compare-picker button:hover:not(:disabled) {
@@ -4818,7 +4818,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(10px);
   place-items: center;
-  animation: tl-fade-in 180ms ease both;
+  animation: tl-fade-in 180ms var(--ease) both;
 }
 
 .plan-generator,
@@ -4972,7 +4972,7 @@
   background: var(--glass-bg);
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease, transform 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .plan-generator-sports button svg { flex: none; opacity: 0.72; }
@@ -5095,7 +5095,7 @@
   background: transparent;
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-examples button:hover:not(:disabled) {
@@ -5123,7 +5123,7 @@
   background: var(--glass-bg);
   cursor: pointer;
   text-align: left;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-segmented button strong { color: inherit; font-size: 11px; font-weight: 600; }
@@ -5163,7 +5163,7 @@
   background: transparent;
   cursor: pointer;
   place-items: center;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-stepper button:first-child { border-right: 1px solid var(--tl-rule-soft); }

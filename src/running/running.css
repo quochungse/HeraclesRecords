@@ -264,7 +264,7 @@
 .run-list tbody tr {
   border-bottom: 1px solid var(--run-hairline);
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .run-list tbody tr:last-child {
@@ -406,8 +406,8 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .run-detail-back:hover {
@@ -598,8 +598,8 @@
   background: color-mix(in srgb, var(--bg-base) 70%, transparent);
   color: var(--text-muted);
   transition:
-    opacity 0.25s ease,
-    visibility 0.25s ease;
+    opacity var(--dur-base) var(--ease),
+    visibility var(--dur-base) var(--ease);
 }
 
 .run-detail-cover:not(.is-credit-open) .leaflet-control-attribution.leaflet-control {
