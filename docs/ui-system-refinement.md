@@ -1,13 +1,17 @@
 # UI System refinement — round 3
 
-Status: **specification, not built**. Written 2026-09-17, on branch
-`redesign_ui_language`, which starts level with `main`. Revised the same day
-after a review, which found two instructions that would have broken the app if
-followed to the letter (§2's replace pattern, §3's token scope), four places
-where the spec contradicted itself, and a verification step that named a probe
-nobody had written. Those are corrected in place below; the four questions the
-corrections could not settle alone are in §9, where the decisions taken on them
-are recorded.
+Status: **built**. Phases 0–8 were carried out on 2026-09-17 on branch
+`ui_system_refinement`, which started level with `main`; each phase is one
+commit, and each section carries an *As built* note saying what was actually
+done, where it departed from the plan and why. Read those alongside the prose
+around them — the prose is the brief as written, the notes are the record.
+
+Written the same day as a specification and revised once after a review, which
+found two instructions that would have broken the app if followed to the letter
+(§2's replace pattern, §3's token scope), four places where the spec
+contradicted itself, and a verification step that named a probe nobody had
+written. Those are corrected in place below; the four questions the corrections
+could not settle alone are in §9, with the decisions taken on them.
 
 This is a self-contained brief. It assumes no memory of the conversation it came
 out of. Every number in it was measured on the tree at the time of writing and
@@ -1065,8 +1069,9 @@ the charts, which cannot read a custom property — change both together.
 
 ## 8. Order of work
 
-One commit per phase, on `redesign_ui_language`. The suite in §7 runs before and
-after each, `test:elevation` joining it from phase 3.
+One commit per phase, on `ui_system_refinement`. The suite in §7 ran before and
+after each, `test:elevation` joining it from phase 3. All eight are built; 7c
+and 8 are the ones still waiting to be looked at.
 
 | # | Item | § | Effort | Blocked on | Needs an aesthetic call |
 |---|---|---|---|---|---|
@@ -1076,9 +1081,9 @@ after each, `test:elevation` joining it from phase 3.
 | 3 | ~~`test:elevation` (static, keyed allowlists)~~ — done 2026-09-17 | 4.5 | S | — | no |
 | 4 | ~~One focus ring~~ — done 2026-09-17, as an outline (§3) | 3 | S | — | no |
 | 5 | ~~Elevation ladder on **Sleep**~~ — done and approved 2026-09-17 (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
-| 6 | Ladder on Overview, Settings, then Activities — built 2026-09-17, **awaiting review** (§4.6) | 4.6 | M | 5 approved | yes |
-| 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) — **7a and 7b built 2026-09-17** (§4.7); rule 2 is what is left | 4 | L | 6 | yes, per file |
-| 8 | Composition — measure, one serif level, eyebrows, figures: built 2026-09-17, **awaiting review** (§5) | 5 | L | **decided 2026-09-17** | yes |
+| 6 | ~~Ladder on Overview, Settings, then Activities~~ — done and approved 2026-09-17 (§4.6) | 4.6 | M | 5 approved | yes |
+| 7 | ~~Ladder on the rest, then rule 2's shadows~~ — done 2026-09-17 in three batches (§4.7): 7a the radius, 7b the edge device, 7c the shadows. Both rules of the ladder hold app-wide | 4 | L | 6 | yes, per file |
+| 8 | Composition — the measure, one serif level, eyebrows and the figures: built 2026-09-17, **awaiting review** (§5). The page grid and density are not done | 5 | L | **decided 2026-09-17** | yes |
 
 The focus ring moved behind the elevation test: §3 composes its ring with
 elevation shadows, and the draft both told you to do §4 first and listed it

@@ -73,6 +73,7 @@ Those URLs and these patterns must change together.
 npm install
 npm run rebuild          # electron-builder install-app-deps — rebuilds better-sqlite3 against Electron's ABI. Required after install.
 npm run binaries:prepare # downloads pinned yt-dlp + copies ffmpeg-static into bin/<platform>-<arch>/
+npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs binaries:prepare and build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm start                # build, then run the packaged-style app
@@ -899,8 +900,8 @@ which is the point.
 Inter and Space Grotesk from `fonts.googleapis.com`, so a fresh install with no network drew
 the interface in a system fallback. The three families now ship as variable `.woff2` files in
 `src/assets/fonts` (latin, latin-ext and **vietnamese** — an athlete's activity names and the
-coach's answers are written in it), declared in `src/fonts.css`; `scripts/fetch-fonts.mjs`
-re-fetches them, and `test:design-vocabulary` skips `@font-face`, where `font-weight: 300 700`
+coach's answers are written in it), declared in `src/fonts.css`; `npm run fonts:fetch`
+(`scripts/fetch-fonts.mjs`) re-fetches them, and `test:design-vocabulary` skips `@font-face`, where `font-weight: 300 700`
 is a file's range rather than a choice off the scale. `--font-title` (Source Serif 4) is spent
 on a screen's own title and nothing else, at weight 600 and leading 1.3 — a serif's descender
 does not fit inside `line-height: 1`. Figures spend one treatment (the display face, weight
