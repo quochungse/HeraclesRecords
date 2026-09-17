@@ -582,6 +582,44 @@ in the list on the day it was taken — so check it against the baseline, not
 against this document. Look at the screenshots in both themes; dark must not
 change on the screens you touched unless you intended it to.
 
+*As built* (phase 5, 2026-09-17 — **awaiting review**):
+
+- **The token is inert until a scope sets it.** `.panel` reads
+  `border: 1px solid var(--surface-line, var(--glass-border))`, and the paper
+  override that outranks it reads `border-color: var(--surface-line, rgba(19,
+  26, 40, 0.15))` rather than losing its colour. Only
+  `:root[data-theme="paper"] .sleep-details-view` sets `--surface-line:
+  transparent` (in `sleep.css`), so no other screen changes: over `compare`'s
+  treatments and chains, Sleep differs and the other seven screens are
+  identical, in both themes, at 1600 and 1180. Spreading the ladder is moving
+  that declaration to paper's `:root` and deleting the fallback colour.
+- **L1**, paper: `bg + border + shadow + r12` became `bg + shadow + r12` on both
+  Sleep panels, and the HRV panel became `bg + shadow + r20`. Dark L1 is
+  unchanged.
+- **L2**: `.sleep-detail-metric` spends `--glass-bg`, `--glass-border` and
+  `--radius-sm`. **This changes dark too**, on purpose: the wash goes from 3%
+  ink to `rgba(255,255,255,0.06)` and the hairline from 9% ink to 0.12 white.
+  `.sleep-curve.is-empty` (the no-samples placeholder) moved to `--radius-sm`.
+- **The nights**: no surface at rest; a hairline on `li + li` (8% ink, the
+  column divider's colour), which carries no padding and so is no container;
+  `--glass-bg` under the pointer; selection keeps its sleep-hue tint at 8px.
+  The hairlines either side of a drawn row step aside (`:has()`), so none cuts
+  across a rounded corner.
+- **Depth 3: 29 → 1, not 0.** The one left is the selected row. The list
+  column's divider is a `border-right` on a padded box, so the probe counts
+  the column as a layer and any surface inside it lands at depth 3. This
+  section prescribes a surface for the selection *and* no container at depth
+  3; with the divider where it is, both cannot hold. The selection was kept.
+  Moving the divider to a pseudo-element would satisfy the count and change
+  nothing anyone sees, which is the wrong reason to do it.
+- `test:elevation`: `.panel` left rule 1's list (109 → 108). `sleep.css` had
+  no entries to begin with. The Tab walk over Sleep in both themes finds a ring
+  on 13 of 14 stops; the refresh button draws the browser's own outline, as it
+  did before.
+- **Left for phase 6**, being shared with Overview: `.sleep-metric-note` (the
+  tile's hover note, an overlay still on literals) and `.training-chart-panel`'s
+  20px radius, which makes the HRV panel the one card on the screen not at 12px.
+
 **Risk, and it is real.** Removing the border from L1 in paper is the first
 change on this branch that alters `paper`'s appearance in a way a person will
 notice immediately, and §4.4 also touches dark. Neither is a bug, but neither
@@ -817,7 +855,7 @@ after each, `test:elevation` joining it from phase 3.
 | 2 | ~~Motion: one curve, three durations~~ — done 2026-09-17 | 2 | S | — | no |
 | 3 | ~~`test:elevation` (static, keyed allowlists)~~ — done 2026-09-17 | 4.5 | S | — | no |
 | 4 | ~~One focus ring~~ — done 2026-09-17, as an outline (§3) | 3 | S | — | no |
-| 5 | Elevation ladder on **Sleep** | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
+| 5 | Elevation ladder on **Sleep** — built 2026-09-17, **awaiting review** (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
 | 6 | Ladder on Overview, Settings, then Activities | 4.6 | M | 5 approved | yes |
 | 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) | 4 | L | 6 | yes, per file |
 | 8 | Composition | 5 | L | **decide first** | yes |

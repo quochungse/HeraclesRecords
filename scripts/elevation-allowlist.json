@@ -38,7 +38,6 @@
     "src/styles.css|.mcp-session-modal": 1,
     "src/styles.css|.metric-select-menu": 1,
     "src/styles.css|.metric-tile": 1,
-    "src/styles.css|.panel": 1,
     "src/styles.css|.resources-popover": 1,
     "src/styles.css|.route-panel, .route-mode-tabs, .route-saved-toggle, .route-statsbar, .route-map-controls button, .route-map-legend, .route-basemap-menu, .route-basemap-toggle, .route-drawer": 1,
     "src/styles.css|.route-search-results": 1,

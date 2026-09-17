@@ -15,6 +15,17 @@
      off at whatever height the window happened to leave. */
 }
 
+/*
+ * The elevation ladder, tried here first (docs/ui-system-refinement.md §4.6).
+ * A panel is L1: in paper it floats on its shadow with no border, and what sits
+ * inside it is L2 — a wash in a hairline at the smaller radius — or no box
+ * at all. Scoped to this screen until it has been looked at; spreading it is
+ * moving this declaration to paper's :root.
+ */
+:root[data-theme="paper"] .sleep-details-view {
+  --surface-line: transparent;
+}
+
 .sleep-details-panel {
   /* Tall enough that one short night does not collapse the pane into a strip.
      No max, and no hidden overflow: the pane grows and the page scrolls. */
@@ -139,7 +150,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 0 4px 0 0;
   overflow-y: auto;
@@ -171,15 +182,32 @@
   font-size: 13px;
 }
 
+/*
+ * A night is a row, not a box. Each one used to be a surface of its own, which
+ * made a month of nights a third layer inside the panel's list; now a hairline
+ * divides them and a surface is drawn only under the pointer and for the night
+ * on screen. The hairline sits on the item, and steps aside for a drawn row so
+ * it does not cut across its corners.
+ */
+.sleep-night-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.sleep-night-list > li:has(> .sleep-night-row:is(:hover, .is-selected)),
+.sleep-night-list > li:has(> .sleep-night-row:is(:hover, .is-selected)) + li {
+  border-top-color: transparent;
+}
+
 .sleep-night-row {
   display: flex;
   flex-direction: column;
   gap: 7px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: 10px 11px;
-  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -189,7 +217,7 @@
 }
 
 .sleep-night-row:hover {
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  background: var(--glass-bg);
 }
 
 /* Inside: the night list scrolls, and clips a ring drawn outside its rows. */
@@ -552,7 +580,7 @@
   gap: 8px;
   min-height: 120px;
   border: 1px dashed color-mix(in srgb, var(--text-primary) 14%, transparent);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: 14px;
   color: var(--text-muted);
   font-size: 12px;
@@ -630,10 +658,11 @@
   /* The containing block for `.sleep-metric-note` (src/styles.css), which has
      to hang outside the value's own clipped box to be seen at all. */
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
-  border-radius: var(--radius-md);
+  /* L2: a wash in a hairline, no shadow, the inner radius. */
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
   padding: 9px 11px;
-  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  background: var(--glass-bg);
 }
 
 .sleep-detail-metric dt {

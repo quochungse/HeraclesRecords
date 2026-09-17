@@ -3405,7 +3405,11 @@ input::placeholder {
 
 .panel {
   position: relative;
-  border: 1px solid var(--glass-border);
+  /* The L1 edge: a lit border in dark, the shadow alone wherever paper sets
+     --surface-line to transparent (docs/ui-system-refinement.md §4.4). The
+     fallback resolves here, where it is used, so a feature that redefines
+     --glass-border for its subtree still gets its own. */
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
@@ -25249,7 +25253,10 @@ tr.data-intervals-row-missing {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.4)),
     var(--glass-bg-elevated);
-  border-color: rgba(19, 26, 40, 0.15);
+  /* This rule outranks `.panel`, so the token has to be read here too. Only
+     Sleep sets it so far (src/sleep/sleep.css); once the ladder has spread,
+     --surface-line moves to this theme's :root and this line goes. */
+  border-color: var(--surface-line, rgba(19, 26, 40, 0.15));
   box-shadow: var(--shadow-card);
 }
 
