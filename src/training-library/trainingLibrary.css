@@ -332,7 +332,7 @@
   font-size: 36px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
   /* The signature gradient: ink settling into the accent, left to right. */
   background: linear-gradient(
     100deg,
@@ -949,7 +949,7 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.25;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1026,7 +1026,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  line-height: 1.5;
+  line-height: 1.45;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1350,7 +1350,7 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.28;
+  line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -1359,7 +1359,7 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1552,7 +1552,7 @@
 
 .tl-catalog .tl-card-name {
   font-size: 18px;
-  line-height: 1.24;
+  line-height: 1.2;
 }
 
 /* Centred on the sport badge opposite it, not on the tile corner. */
@@ -1604,7 +1604,7 @@
   color: var(--text-secondary);
   font-size: 10px;
   font-style: normal;
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: nowrap;
 }
 
@@ -1806,7 +1806,7 @@
   border-top: 1px solid var(--tl-rule-soft);
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .tl-wk-foot > span {
@@ -2134,7 +2134,7 @@
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.16;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
@@ -2156,7 +2156,7 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2297,7 +2297,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2623,7 +2623,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .tl-reader-references svg {
@@ -2726,7 +2726,7 @@
 .tl-reader-schedule-heading strong {
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .tl-reader-schedule-heading small {
@@ -3805,7 +3805,7 @@
   color: var(--text-primary);
   background: transparent;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   outline: 0;
 }
 
@@ -4203,7 +4203,7 @@
   overflow: hidden;
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4883,7 +4883,7 @@
   margin: 7px 0 0;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .plan-generator-body {
@@ -5265,7 +5265,7 @@
 .plan-generator-provider.is-blocked { color: var(--warning-text); }
 .plan-generator-provider span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .plan-generator-provider strong { color: var(--text-primary); font-size: 12px; }
-.plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
+.plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.45; }
 .plan-generator-status > .ghost-button { width: 100%; margin-top: 9px; }
 
 .plan-generator-progress,
@@ -5351,7 +5351,7 @@
 .plan-generator-privacy strong { font-size: 12px; }
 .plan-generator-progress p,
 .plan-generator-failure p,
-.plan-generator-privacy p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.plan-generator-privacy p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .plan-generator-progress .ghost-button { margin-top: 12px; }
 .plan-generator-failure > svg { color: var(--warning-text); }
 .plan-generator-failure > div { display: flex; flex-direction: column; gap: 7px; margin-top: 11px; }
@@ -5401,7 +5401,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .plan-calendar-loading {

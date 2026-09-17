@@ -884,8 +884,10 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 **The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
 Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
 `em` steps for text that must follow its parent, four tracking steps
-(`-0.02em` / `0` / `0.06em` / `0.1em`) and six radius tokens — every literal in those four
-properties must come from that set. It is enforced because it cannot be maintained by
+(`-0.02em` / `0` / `0.06em` / `0.1em`), five unitless leading steps (`1` for figures and
+chips, `1.2` display, `1.3` headings and dense rows, `1.45` body, `1.6` long prose) and six
+radius tokens — every literal in those five properties must come from that set. A box that
+has to match a neighbour's height says so with a height, not with a leading inflated to fit. It is enforced because it cannot be maintained by
 intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
 a shade light beside a heading, and the file had grown to **20 weights, 18 sizes (thirteen
 of them between 9px and 15px, half-pixels included), 45 spellings of letter-spacing down to

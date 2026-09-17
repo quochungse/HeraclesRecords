@@ -39,7 +39,7 @@
   margin: 2px 0 0;
   font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1;
   letter-spacing: -0.02em;
   background: linear-gradient(
     100deg,
@@ -384,7 +384,7 @@
   background: var(--warning-bg);
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* Stands where the stage breakdown would be, for a day that has none. */
@@ -395,7 +395,7 @@
   padding: 9px 11px;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .sleep-detail-stages {

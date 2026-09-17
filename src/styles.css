@@ -99,7 +99,7 @@
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-synthesis: none;
-  line-height: 1.5;
+  line-height: 1.45;
   text-rendering: optimizeLegibility;
 }
 
@@ -1445,7 +1445,7 @@ input::placeholder {
   display: block;
   margin-top: 2px;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--text-secondary);
 }
 
@@ -1514,7 +1514,7 @@ input::placeholder {
   color: var(--text-primary);
   font-family: var(--font-display);
   font-size: clamp(22px, 3vw, 28px);
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .update-prompt-header div > p:last-child {
@@ -1558,7 +1558,7 @@ input::placeholder {
   color: var(--text-primary);
   font-family: var(--font-display);
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .update-prompt-changelog p,
@@ -2223,7 +2223,7 @@ input::placeholder {
   font-size: clamp(36px, 3vw, 36px);
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 1;
   text-wrap: balance;
 }
 
@@ -2234,7 +2234,7 @@ input::placeholder {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .dashboard-block {
@@ -2385,7 +2385,7 @@ input::placeholder {
   color: #fff;
   font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
-  line-height: 0.98;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -2477,7 +2477,7 @@ input::placeholder {
   font-size: clamp(22px, 2.1vw, 36px);
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.08;
+  line-height: 1;
 }
 
 .activity-globe-period {
@@ -2682,7 +2682,7 @@ input::placeholder {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.55;
+  line-height: 1.6;
   max-width: 34ch;
 }
 
@@ -3285,7 +3285,7 @@ input::placeholder {
   font-size: 36px;
   font-weight: 400;
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 1;
 }
 
 .metric-tile span {
@@ -3886,7 +3886,7 @@ input::placeholder {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .library-track-meta small {
@@ -4446,7 +4446,7 @@ tbody tr.is-selected:hover {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
@@ -4596,7 +4596,7 @@ td span {
 
 td strong {
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 td strong + span {
@@ -4752,7 +4752,7 @@ td span {
 .watchfaces-hero h1 {
   margin: 0;
   font-size: clamp(28px, 4vw, 36px);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .watchfaces-hero p:not(.eyebrow) {
@@ -5436,7 +5436,7 @@ td span {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 /* Searchable local-font browser used by both watchface design surfaces. */
@@ -5533,7 +5533,7 @@ td span {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .watchface-font-picker-panel {
@@ -5580,7 +5580,7 @@ td span {
 .watchface-font-picker-panel-header strong {
   color: var(--text-primary);
   font-size: 13px;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .watchface-font-picker-panel-header span {
@@ -5686,7 +5686,7 @@ td span {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .watchface-font-picker-status {
@@ -5720,7 +5720,7 @@ td span {
   margin: 0;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .watchface-raster-font-panel .watchface-raster-font-warning {
@@ -5990,7 +5990,7 @@ td span {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .watchface-metric-grid {
@@ -6754,7 +6754,7 @@ td span {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .map-install-progress .map-install-error {
@@ -6964,7 +6964,7 @@ td span {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .app-select-leading-icon {
@@ -7116,7 +7116,7 @@ td span {
 .map-region-cell strong {
   display: block;
   font-size: 18px;
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: 600;
 }
 
@@ -7296,7 +7296,7 @@ td span {
   padding-left: 20px;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .ors-key-guide-actions {
@@ -7421,7 +7421,7 @@ td span {
   align-self: stretch;
   color: var(--text-secondary, var(--text-primary));
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .route-share-steps strong {
@@ -7520,7 +7520,7 @@ td span {
   font-size: clamp(36px, 4.6vw, 36px);
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 0.98;
+  line-height: 1;
   text-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
 }
 
@@ -7549,7 +7549,7 @@ td span {
   margin: 0;
   color: rgba(245, 245, 247, 0.78);
   font-size: 18px;
-  line-height: 1.42;
+  line-height: 1.45;
 }
 
 .training-signin-feature-list {
@@ -7586,7 +7586,7 @@ td span {
   color: #ffffff;
   font-size: 14px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .training-signin-feature p {
@@ -7594,7 +7594,7 @@ td span {
   margin: 5px 0 0;
   color: rgba(245, 245, 247, 0.62);
   font-size: 13px;
-  line-height: 1.42;
+  line-height: 1.45;
 }
 
 .training-command-panel,
@@ -7703,7 +7703,7 @@ td span {
   color: #ffffff;
   font-size: 28px;
   font-weight: 700;
-  line-height: 1.12;
+  line-height: 1.2;
   text-overflow: clip;
   white-space: normal;
 }
@@ -7740,7 +7740,7 @@ td span {
 .training-login-reconnect-text small {
   color: rgba(245, 245, 247, 0.66);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .training-login-reconnect .primary-button {
@@ -7939,7 +7939,7 @@ td span {
   margin: 6px 0 0;
   color: rgba(245, 245, 247, 0.58);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   text-align: center;
 }
 
@@ -8186,13 +8186,13 @@ td span {
 .spotify-connect-step-copy strong {
   color: var(--text-primary);
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .spotify-connect-step-copy span {
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .spotify-dashboard-link {
@@ -8203,7 +8203,7 @@ td span {
   color: #1ed760;
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -8263,7 +8263,7 @@ td span {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .spotify-connect-actions {
@@ -8287,14 +8287,14 @@ td span {
   min-width: 180px;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .spotify-connect-note {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .stack.stack-fill > .music-connect-panel {
@@ -8347,14 +8347,14 @@ td span {
 .spotify-account-copy h2 {
   margin: 0;
   font-size: 18px;
-  line-height: 1.25;
+  line-height: 1.3;
   letter-spacing: 0;
 }
 
 .spotify-account-copy span {
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .spotify-account-card > .secondary-button {
@@ -8591,7 +8591,7 @@ td span {
   gap: 10px;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .youtube-music-steps li {
@@ -8871,7 +8871,7 @@ td span {
   margin: 0;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
@@ -8883,7 +8883,7 @@ td span {
 .apple-music-playlist-meta p {
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   margin: 4px 0 0;
 }
 
@@ -9223,7 +9223,7 @@ td span {
 .apple-podcast-show-meta h3 {
   margin: 0;
   font-size: clamp(28px, 4vw, 36px);
-  line-height: 1.02;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
@@ -9237,7 +9237,7 @@ td span {
   overflow: hidden;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   margin: 4px 0 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -9512,7 +9512,7 @@ td span {
 .apple-podcast-browser-empty span {
   max-width: 24ch;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .apple-podcast-search-note {
@@ -9642,7 +9642,7 @@ td span {
   max-width: 38ch;
   margin: 0;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .apple-podcast-detail-skeleton {
@@ -10007,7 +10007,7 @@ td span {
   margin: 0;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
@@ -10019,7 +10019,7 @@ td span {
 .spotify-playlist-meta p {
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   margin: 4px 0 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -10088,7 +10088,7 @@ td span {
   max-width: 320px;
   color: var(--error-text);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-align: left;
 }
 
@@ -10383,7 +10383,7 @@ td span {
   margin: 0;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
@@ -10395,7 +10395,7 @@ td span {
 .youtube-music-playlist-meta p {
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   margin: 4px 0 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -10853,7 +10853,7 @@ td span {
   padding: 3px 8px;
   font-size: 10px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -11100,7 +11100,7 @@ td span {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 0.95;
+  line-height: 1;
 }
 
 .vo2-gauge-value.has-value strong {
@@ -11421,7 +11421,7 @@ td span {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .sleep-panel.is-openable {
@@ -11746,7 +11746,7 @@ td span {
   background: color-mix(in srgb, var(--sleep-tone) 12%, rgba(255, 255, 255, 0.04));
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .sleep-panel-metrics {
@@ -11835,7 +11835,7 @@ td span {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  line-height: 1.15;
+  line-height: 1.2;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -11850,7 +11850,7 @@ td span {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -12286,7 +12286,7 @@ td span {
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.2;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -12666,7 +12666,7 @@ td span {
 .training-heatmap-tooltip span {
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   white-space: nowrap;
 }
 
@@ -12847,7 +12847,7 @@ td span {
   color: var(--text-primary);
   font-size: clamp(10px, 0.8vw, 12px);
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
   /* break-word, not anywhere: a word only splits when it cannot fit a line on
      its own, so "Shoulders, Arms" still breaks at the space. */
   overflow-wrap: break-word;
@@ -13142,7 +13142,7 @@ td span {
   max-width: 30ch;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
   text-align: center;
   text-wrap: balance;
 }
@@ -13466,7 +13466,7 @@ td span {
   max-width: 32ch;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .training-empty-chart,
@@ -13849,7 +13849,7 @@ td span {
   color: var(--text-primary);
   font-size: clamp(18px, 1.4vw, 22px);
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .training-zone-panel-heart .training-zone-hero-percent {
@@ -13881,7 +13881,7 @@ td span {
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 /* The head and every row are subgrids of this one track list, so the column
@@ -13947,7 +13947,7 @@ td span {
 .training-zone-percent,
 .training-zone-name,
 .training-zone-detail {
-  line-height: 1.1;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
@@ -14287,7 +14287,7 @@ td span {
   margin: 8px 0 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   max-width: 640px;
 }
 
@@ -14349,7 +14349,7 @@ td span {
 .training-backup-format-option span {
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .training-backup-format-option:hover:not(:disabled) {
@@ -14475,7 +14475,7 @@ td span {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -14583,7 +14583,7 @@ td span {
   margin: 10px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .data-view-header-icon {
@@ -15109,7 +15109,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .training-upcoming-today-meta {
@@ -15480,7 +15480,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   font-size: clamp(22px, 3vw, 36px);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.2;
   background: linear-gradient(180deg, #ffe6ac, #e9b64a 55%, #c9902f);
   -webkit-background-clip: text;
   background-clip: text;
@@ -15626,7 +15626,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   font-size: clamp(22px, 2.2vw, 28px);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1;
 }
 
 .training-record-card-unit {
@@ -15790,7 +15790,7 @@ tr.data-intervals-row-missing {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  line-height: 1.1;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -16736,14 +16736,14 @@ tr.data-intervals-row-missing {
 .youtube-job-error {
   color: var(--error-text);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .youtube-job-meta {
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -16751,20 +16751,20 @@ tr.data-intervals-row-missing {
 .youtube-job-activity {
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .youtube-job-stall {
   color: var(--text-muted);
   font-size: 11px;
   font-style: italic;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .youtube-job-warning {
   color: var(--warning-text, #c9a227);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .icon-button.compact {
@@ -17799,7 +17799,7 @@ tr.data-intervals-row-missing {
 .chat-login-note {
   font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .chat-header {
@@ -18083,7 +18083,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -18364,7 +18364,7 @@ tr.data-intervals-row-missing {
   max-width: 62ch;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 /* Actions for a dialog that asks something, rather than one that just shows a
@@ -18458,7 +18458,7 @@ tr.data-intervals-row-missing {
 
 .backup-restore-option-copy > span {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 
@@ -18973,7 +18973,7 @@ tr.data-intervals-row-missing {
   margin: 18px 10px 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .chat-session-group + .chat-session-group {
@@ -19115,7 +19115,7 @@ tr.data-intervals-row-missing {
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -19540,7 +19540,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .chat-settings-account {
@@ -19599,7 +19599,7 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font: inherit;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -19771,7 +19771,7 @@ tr.data-intervals-row-missing {
   padding: 8px 10px;
   font: inherit;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
   resize: vertical;
   outline: none;
 }
@@ -19910,7 +19910,7 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
   padding: 8px 10px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .chat-context-section {
@@ -19971,7 +19971,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   font: inherit;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .chat-context-messages {
@@ -20267,7 +20267,7 @@ tr.data-intervals-row-missing {
   max-width: calc(100% - 46px);
   color: var(--text-primary);
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .chat-row-assistant .chat-bubble {
@@ -21214,7 +21214,7 @@ tr.data-intervals-row-missing {
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  line-height: 1.5;
+  line-height: 1.45;
   padding: 9px 0;
   max-height: 200px;
   outline: none;
@@ -21288,7 +21288,7 @@ tr.data-intervals-row-missing {
 .chat-markdown {
   white-space: normal;
   font-size: 14px;
-  line-height: 1.72;
+  line-height: 1.6;
 }
 
 .chat-markdown > :first-child {
@@ -22090,7 +22090,7 @@ tr.data-intervals-row-missing {
 .chat-plan-entry-day {
   font-size: 14px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.2;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -22470,7 +22470,7 @@ tr.data-intervals-row-missing {
 .chat-plan-destination-copy small {
   color: var(--text-muted);
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .chat-plan-destination-check {
@@ -22514,7 +22514,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   padding: 9px 12px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--chat-signal-strong);
   background: var(--chat-signal-soft);
   border: 1px solid var(--chat-signal-border);
@@ -22909,7 +22909,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   font-size: 18px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .chat-zone-hero-percent {
@@ -22934,7 +22934,7 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .chat-zone-table {
@@ -23177,7 +23177,7 @@ tr.data-intervals-row-missing {
 .chat-mcp-panel li span {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* ============================================================
@@ -23405,7 +23405,7 @@ tr.data-intervals-row-missing {
   font-size: 10px;
   font-weight: 600;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 .route-sport-picker button:hover {
   border-color: var(--accent-soft);
@@ -23711,7 +23711,7 @@ tr.data-intervals-row-missing {
   font-style: normal;
   font-size: 10px;
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 .route-template-grid button:hover {
   border-color: var(--accent-soft);
@@ -23740,7 +23740,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 .route-sketch-actions {
   grid-template-columns: repeat(2, 1fr);
@@ -23756,7 +23756,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   font-size: 12px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.45;
 }
 .route-explore-lead svg {
   flex: none;
@@ -23823,7 +23823,7 @@ tr.data-intervals-row-missing {
 .route-explore-note {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* Panel action buttons */
@@ -23920,7 +23920,7 @@ tr.data-intervals-row-missing {
 .route-advanced-body small {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 .route-advanced-key {
   padding: 9px 10px;
@@ -26852,7 +26852,7 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .sched-stat-label svg {
@@ -27330,7 +27330,7 @@ tr.data-intervals-row-missing {
   margin: 3px 0 0;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .calendar-builder-canvas-header {
@@ -27629,7 +27629,7 @@ tr.data-intervals-row-missing {
   margin: 5px 0 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .calendar-quick-fields {
@@ -27744,7 +27744,7 @@ tr.data-intervals-row-missing {
 .calendar-field-help {
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .calendar-field-help.is-error {
@@ -28430,7 +28430,7 @@ tr.data-intervals-row-missing {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
-  line-height: 1.25;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
@@ -28438,7 +28438,7 @@ tr.data-intervals-row-missing {
   color: color-mix(in srgb, var(--text-primary) 82%, transparent);
   font-size: 11px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .calendar-builder-row:not(.is-collapsed) .calendar-builder-row-summary {
@@ -28544,7 +28544,7 @@ tr.data-intervals-row-missing {
 .calendar-builder-derived .workout-control-hint {
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .calendar-builder-exercise-workspace > span:first-child {
@@ -28626,7 +28626,7 @@ tr.data-intervals-row-missing {
   padding: 7px 10px;
   color: var(--error-text);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .calendar-builder-error svg {
@@ -28681,7 +28681,7 @@ tr.data-intervals-row-missing {
 .calendar-builder-repeat-copy small {
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .calendar-builder-repeat-count {
@@ -30299,7 +30299,7 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
   appearance: textfield;
 }
 
@@ -30374,10 +30374,15 @@ tr.data-intervals-row-missing {
   font-size: 13px;
 }
 
+/* Stands where an input would be, so it takes that input's height and centres
+   in it — which a 2.1 leading used to do by inflating the line box. */
 .set-line-open {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 2.1;
+  line-height: 1.45;
 }
 
 .set-line-weight {
@@ -31060,7 +31065,7 @@ tr.data-intervals-row-missing {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
   appearance: textfield;
 }
 
@@ -31203,7 +31208,7 @@ tr.data-intervals-row-missing {
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .workout-field-error { padding: 0 13px 10px; }
@@ -31631,7 +31636,7 @@ tr.data-intervals-row-missing {
   margin: 4px 0 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .settings-section-icon {
@@ -32511,7 +32516,7 @@ button.settings-about-link {
   margin: 7px 0 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .settings-storage-list {
@@ -32956,7 +32961,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 .mcp-servers-subheading span {
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .mcp-servers-error {
@@ -33103,7 +33108,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -33124,7 +33129,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   gap: 6px;
   color: var(--error-text);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .mcp-server-row-error svg {
@@ -33360,7 +33365,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -33866,7 +33871,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--text-secondary);
   font: inherit;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -34064,7 +34069,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -34150,7 +34155,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 .coach-analysis-starter-copy {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .coach-analysis-starter-trigger {
@@ -34387,7 +34392,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 .mcp-session-modal-body p {
   margin: 0;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 

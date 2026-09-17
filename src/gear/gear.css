@@ -142,7 +142,7 @@
   max-width: 650px;
   margin: 7px 0 14px;
   font-size: clamp(28px, 4vw, 36px);
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -150,7 +150,7 @@
   max-width: 580px;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.6;
 }
 
 .gear-auth-points {
@@ -237,7 +237,7 @@
 
 .gear-checkbox small {
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .gear-dashboard {

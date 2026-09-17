@@ -10,8 +10,11 @@
  * out of: 20 weights, 18 font sizes (thirteen of them between 9px and 15px,
  * half-pixels included), 45 spellings of letter-spacing down to -0.004em, and
  * ~150 hand-written radii between 1px and 22px alongside the five tokens.
+ * Leading was left open by that first pass, and leading is half of a type
+ * scale: 27 values across 365 declarations, with 1.35, 1.4 and 1.45 all in
+ * common use where nobody had chosen between them.
  *
- * So: every literal in these four properties must come from the scale below.
+ * So: every literal in these five properties must come from the scale below.
  * The point is not the specific numbers — it is that adding a number is a
  * deliberate act that edits this file, rather than a decision taken alone at
  * the bottom of a 34k-line stylesheet.
@@ -56,6 +59,19 @@ const RELATIVE = new Set(["1.3em", "1.15em", "1em", "0.9em", "0.6em"]);
 /** Not a size: `font-size: 0` is how a narrow layout drops a button's label. */
 const NO_TEXT = "0";
 const TRACKING = new Set(["0", "-0.02em", "0.06em", "0.1em"]);
+/**
+ * Leading. Four steps and `1`, which is not leading but the absence of it: a
+ * figure, a badge or an icon chip whose box is its own height.
+ *   1.2  display type, 22px and up
+ *   1.3  headings and dense UI rows
+ *   1.45 body, the default
+ *   1.6  long prose only — the coach's Markdown, settings explainers
+ * Unitless only. A px leading does not scale with the text it spaces, and
+ * `normal` is whatever the font's metrics say, which differs per platform.
+ * A box that has to match a neighbour's height says so with a height, not
+ * with a leading inflated to fit it.
+ */
+const LEADING = new Set(["1", "1.2", "1.3", "1.45", "1.6"]);
 /** Radius is spent through tokens only, so the scale lives in styles.css. */
 const RADIUS_TOKENS = new Set([
   "--radius-xs",
@@ -153,6 +169,14 @@ for (const file of cssFiles(SRC)) {
       }
     }
 
+    for (const v of declarations(text, "line-height")) {
+      if (isPassthrough(v)) continue;
+      if (!LEADING.has(v)) {
+        fail(file, line, "line-height", v,
+          `use ${[...LEADING].join(" | ")} — 1 for figures and chips, 1.2 display, 1.3 headings and dense rows, 1.45 body, 1.6 long prose`);
+      }
+    }
+
     for (const v of declarations(text, "border-radius")) {
       if (v === "inherit" || v.includes("%") || v.startsWith("clamp(")) continue;
       // Every custom property named must be a radius token, and once the
@@ -191,5 +215,6 @@ const files = cssFiles(SRC).length;
 console.log(
   `design vocabulary OK — ${files} stylesheets, ` +
     `${WEIGHTS.size} weights, ${SIZES_PX.size} sizes (+${RELATIVE.size} relative), ${TRACKING.size} tracking steps, ` +
+    `${LEADING.size} leading steps, ` +
     `${RADIUS_TOKENS.size} radius tokens and no literal outside them`
 );

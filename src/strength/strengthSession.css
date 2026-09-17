@@ -259,7 +259,7 @@
   margin: 4px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .strength-session-stats {
@@ -767,7 +767,7 @@
   margin: 18px 0 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .strength-volume-table {

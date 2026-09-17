@@ -85,7 +85,7 @@
   font-size: 22px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .activities-summary-caption {
@@ -488,7 +488,7 @@
   padding: 2px 0;
   border-radius: var(--radius-sm);
   background: var(--ax-well);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .activity-row-date em {
