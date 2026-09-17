@@ -113,14 +113,6 @@
   --tl-shimmer: rgba(255, 255, 255, 0.09);
   --tl-scrim: rgba(22, 23, 27, 0.76);
 
-  --tl-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16), 0 10px 26px rgba(0, 0, 0, 0.14);
-  --tl-shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.18), 0 18px 38px rgba(0, 0, 0, 0.2);
-  --tl-shadow-card-held: 0 1px 2px rgba(0, 0, 0, 0.16), 0 12px 28px rgba(0, 0, 0, 0.15);
-  --tl-shadow-plate: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --tl-shadow-plate-hover: 0 2px 5px rgba(0, 0, 0, 0.34), 0 14px 30px rgba(0, 0, 0, 0.28);
-  --tl-shadow-plate-held: 0 2px 5px rgba(0, 0, 0, 0.32);
-  --tl-shadow-week: 0 1px 2px rgba(0, 0, 0, 0.14), 0 8px 22px rgba(0, 0, 0, 0.12);
-  --tl-shadow-lift: 0 4px 14px rgba(0, 0, 0, 0.14);
 
   /* Provenance: where a plan came from, never what it contains. */
   --tl-source-coach: #c084fc;
@@ -177,15 +169,7 @@
   --tl-shimmer: rgba(255, 255, 255, 0.9);
   --tl-scrim: rgba(19, 26, 40, 0.34);
 
-  --tl-shadow-card: 0 1px 2px rgba(19, 26, 40, 0.09), 0 10px 26px rgba(19, 26, 40, 0.12);
-  --tl-shadow-card-hover: 0 2px 4px rgba(19, 26, 40, 0.12), 0 18px 38px rgba(19, 26, 40, 0.18);
-  --tl-shadow-card-held: 0 1px 2px rgba(19, 26, 40, 0.09), 0 12px 28px rgba(19, 26, 40, 0.14);
   /* Sunk, so the plate's shadow falls inward — until hover lifts it clear. */
-  --tl-shadow-plate: inset 0 1px 3px rgba(19, 26, 40, 0.09);
-  --tl-shadow-plate-hover: 0 2px 5px rgba(19, 26, 40, 0.1), 0 14px 30px rgba(19, 26, 40, 0.14);
-  --tl-shadow-plate-held: 0 2px 6px rgba(19, 26, 40, 0.13);
-  --tl-shadow-week: 0 1px 2px rgba(19, 26, 40, 0.07), 0 8px 22px rgba(19, 26, 40, 0.09);
-  --tl-shadow-lift: 0 4px 14px rgba(19, 26, 40, 0.13);
 
   --tl-source-coach: #7c3aed;
   --tl-source-template: #a16207;
@@ -273,7 +257,7 @@
   border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   color: var(--text-primary);
   background: var(--glass-bg-hover);
-  box-shadow: var(--tl-shadow-lift);
+  box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
 
@@ -1258,7 +1242,9 @@
   background:
     linear-gradient(158deg, var(--tl-sheen), var(--tl-sheen-fade) 46%),
     var(--tl-card, var(--glass-bg));
-  box-shadow: var(--tl-shadow-card);
+  /* A tile inside the panel, so no shadow: its states are drawn in colour
+     below (docs/ui-system-refinement.md §4.3). */
+  box-shadow: none;
   overflow: hidden;
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -1282,7 +1268,6 @@
 .tl-card:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-hover),
     0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
     0 10px 30px color-mix(in srgb, var(--accent) 10%, transparent);
   transform: translateY(-3px);
@@ -1296,7 +1281,6 @@
 .tl-card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 62%, transparent);
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
     0 8px 26px color-mix(in srgb, var(--accent) 16%, transparent);
 }
@@ -1304,7 +1288,6 @@
 .tl-card.is-active {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
@@ -1506,8 +1489,7 @@
   border-color: var(--tl-rule-soft);
   background: var(--tl-tile);
   box-shadow:
-    inset 0 1px 0 var(--tl-well),
-    var(--tl-shadow-plate);
+    inset 0 1px 0 var(--tl-well);
 }
 
 /* ::before is the accent wash, ::after the sport stripe. Neither survives. */
@@ -1522,8 +1504,7 @@
   border-color: color-mix(in srgb, var(--text-muted) 48%, transparent);
   background: var(--tl-tile-hover);
   box-shadow:
-    inset 0 1px 0 var(--tl-well),
-    var(--tl-shadow-plate-hover);
+    inset 0 1px 0 var(--tl-well);
   transform: translateY(-2px);
 }
 
@@ -1534,8 +1515,7 @@
   background: var(--tl-tile-hover);
   box-shadow:
     inset 0 1px 0 var(--tl-well),
-    0 0 0 1px color-mix(in srgb, var(--text-primary) 14%, transparent),
-    var(--tl-shadow-plate-held);
+    0 0 0 1px color-mix(in srgb, var(--text-primary) 14%, transparent);
 }
 
 .tl-catalog .tl-card.is-selected,
@@ -1543,8 +1523,7 @@
   border-color: color-mix(in srgb, var(--text-primary) 58%, transparent);
   box-shadow:
     inset 0 1px 0 var(--tl-well),
-    0 0 0 1px color-mix(in srgb, var(--text-primary) 24%, transparent),
-    var(--tl-shadow-plate-held);
+    0 0 0 1px color-mix(in srgb, var(--text-primary) 24%, transparent);
 }
 
 .tl-catalog .tl-card-open {
@@ -1969,7 +1948,6 @@
 .tl-card[data-accent]:hover {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 42%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-hover),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 14%, transparent),
     0 10px 30px color-mix(in srgb, var(--tl-sport-accent) 12%, transparent);
 }
@@ -1977,7 +1955,6 @@
 .tl-card[data-accent].is-selected {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 62%, transparent);
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 30%, transparent),
     0 8px 26px color-mix(in srgb, var(--tl-sport-accent) 16%, transparent);
 }
@@ -1985,7 +1962,6 @@
 .tl-card[data-accent].is-active {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 58%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 22%, transparent);
 }
 
@@ -2667,8 +2643,7 @@
     linear-gradient(145deg, var(--tl-sheen-lit), var(--tl-sheen-fade) 54%),
     color-mix(in srgb, var(--tl-reader-bg, var(--surface)) 86%, transparent);
   box-shadow:
-    inset 0 1px 0 var(--tl-edge-light),
-    0 -18px 42px color-mix(in srgb, var(--tl-reader-bg, var(--surface)) 72%, transparent);
+    inset 0 1px 0 var(--tl-edge-light), var(--shadow-card);
   backdrop-filter: blur(24px) saturate(145%);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
@@ -3484,14 +3459,12 @@
   color: #fff;
   background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 6px 18px rgba(239, 68, 68, 0.32);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--shadow-soft);
 }
 
 .tl-dialog .primary-button.danger:hover:not(:disabled) {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 10px 26px rgba(239, 68, 68, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.26), var(--shadow-card);
 }
 
 /* ----------------------------------------------- Plan editor and comparison */
@@ -4037,7 +4010,6 @@
   background:
     linear-gradient(180deg, var(--tl-sheen), transparent 30%),
     color-mix(in srgb, var(--surface) 30%, transparent);
-  box-shadow: var(--tl-shadow-week);
   overflow: hidden;
 }
 

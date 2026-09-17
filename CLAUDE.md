@@ -909,12 +909,17 @@ time, so neither the build nor a render says anything. (`\bease\b` also matches 
 **Elevation is one device per level, held by `npm run test:elevation`.** A card floats on an
 outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
 (an inset is a highlight, and a border spelled `var(--surface-line, …)` is the card recipe),
-and every `box-shadow` spends `--shadow-soft|card|elevated|inset`. Neither holds across the app yet, so
-`scripts/elevation-allowlist.json` lists what broke them when the test was written, keyed
-`file|selector` with a count — and it only shrinks: a converted rule whose entry stays listed
-fails the test too. Take the entry out in the same change. Tokens are judged by what they
-resolve to across every definition, which is how it found a `--wf-shadow-soft` defined nowhere
-— an invalid token silently voids the whole `box-shadow`, hairline and all. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+and every layer that **lifts** spends `--shadow-soft|card|elevated|inset`. Both rules hold
+across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty but for six
+`exempt` decisions and a new violation fails outright. A `box-shadow` draws four other things
+and those are not elevation: a hairline (an inset with no blur — a highlight, a gridline, a
+marker bar), a ring (`0 0 0 Npx`, up to 8px), a glow (no offset), a tint (a lift painted in a
+named signal colour — accent, sport, sleep stage, tone) and the 1–2px edge under a control.
+`layerKind` in the test draws that line; the sizes are written up in §4.5 of the doc. Tokens
+are judged by what they resolve to across every definition, which is how it found a
+`--wf-shadow-soft` defined nowhere — an invalid token silently voids the whole `box-shadow`,
+hairline and all — and it is why a feature token that lifts (`--wf-shadow`, `--map-card-shadow`)
+spends one of the four rather than restating a shadow. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
 Paper defines `--surface-line: transparent` on its `:root`, so a card that spells its border
 `var(--surface-line, …)` floats on its shadow there and keeps a lit hairline in dark; the
 paper `.panel` rule reads the token **without a fallback**, which is what puts it over the

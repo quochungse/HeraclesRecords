@@ -16,9 +16,16 @@
  *      A border spelled `var(--surface-line, …)` is the L1 recipe (transparent
  *      in paper, the glass border in dark) and is not a violation; nor is a
  *      transparent one, which only reserves the space.
- *   2. Every `box-shadow` spends a token: `--shadow-soft`, `--shadow-card`,
- *      `--shadow-elevated` or `--shadow-inset`, alone or as a comma list — or
- *      is `none`. (The focus ring is an outline, so it never meets either rule.)
+ *   2. Every layer that **lifts** spends a token: `--shadow-soft`,
+ *      `--shadow-card`, `--shadow-elevated` or `--shadow-inset`. A `box-shadow`
+ *      draws four other things — a 1px inset highlight or gridline, a ring
+ *      (`0 0 0 Npx`), a glow (no offset, and on this app a datum's colour), and
+ *      the crisp 1–2px edge under a control — and those are not elevation, so
+ *      they are judged by the rules that own them (the hairline, colour-is-data)
+ *      rather than by this token set. `layerKind` below draws the line, and the
+ *      sizes there are the decision: they were taken on 2026-09-17 when the
+ *      survey found 157 of the 348 remaining shadows were not elevation at all.
+ *      (The focus ring is an outline, so it never meets either rule.)
  *
  * A token is judged by what it resolves to, across every definition it has
  * (dark, paper, a feature scope): `var(--glass-shadow)` is an outer shadow even
@@ -148,27 +155,65 @@ function drawsVisibleBorder(value) {
   return !/var\(--surface-line\b/.test(value);
 }
 
-/** What a shadow outside the token set is, so the list reads as a to-do rather than a heap. */
-function shadowKind(value) {
-  const layers = splitTop(value, ",");
-  const literal = layers.filter((l) => !l.startsWith("var("));
-  if (!literal.length) return "token-outside-set";
-  const kinds = literal.map((layer) => {
-    if (/\binset\b/.test(layer)) return "inset";
-    const [x = 0, y = 0, blur = 0, spread = 0] = lengths(layer);
-    if (x === 0 && y === 0 && blur === 0 && spread !== 0) return "ring";
-    if (x === 0 && y === 0) return "glow";
-    return "elevation";
-  });
-  return ["elevation", "glow", "ring"].find((kind) => kinds.includes(kind)) ?? "inset";
+/**
+ * What one layer is *for*. Only `elevation` and `inner` lift a box off what is
+ * under it, and only those have to spend a token; the rest are other devices
+ * drawn with the same property, and the sizes below are what separates them:
+ *
+ *   hairline  an inset drawn as a line rather than a shadow: no blur at all (a
+ *             top highlight, a gridline between cells, a 3px marker bar down
+ *             one side), or a single blurred pixel at the edge
+ *   ring      no offset and no blur: an edge drawn as a shadow, up to 8px
+ *   glow      no offset, some blur: colour spreading from the box, which on
+ *             this app means a datum (a sport, a tone, the accent)
+ *   lift      an offset under 3px with a blur under 5px: the crisp edge under a
+ *             control, below the smallest step the ladder has
+ *   tint      an outer layer painted in a named signal colour — the accent, a
+ *             sport, a sleep stage, a tone, a success or an error. Elevation is
+ *             spelled in ink; a shadow carrying one of those is that colour
+ *             bleeding out of the box, so the colour rules own it, not this
+ *             token set. A neutral shadow behind a name (`--panel-floor`,
+ *             `--bg-base`) is still elevation
+ *   elevation anything further: the device a card floats on
+ *   inner     an inset deeper than a hairline: elevation, inverted
+ */
+const TINTED = /var\(--[\w-]*(accent|glow|tone|sport|stage|signal|success|warning|error|zone)[\w-]*\)/;
+
+function layerKind(layer) {
+  const inset = /\binset\b/.test(layer);
+  if (!inset && TINTED.test(layer)) return "tint";
+  const [x = 0, y = 0, blur = 0, spread = 0] = lengths(layer);
+  if (inset) return blur === 0 || (Math.abs(x) <= 1 && Math.abs(y) <= 1 && blur <= 2 && Math.abs(spread) <= 1) ? "hairline" : "inner";
+  if (x === 0 && y === 0 && blur === 0) return Math.abs(spread) <= 8 ? "ring" : "elevation";
+  if (x === 0 && y === 0) return "glow";
+  if (Math.abs(x) < 3 && Math.abs(y) < 3 && blur < 5 && Math.abs(spread) <= 1) return "lift";
+  return "elevation";
 }
 
-const spendsTokens = (value) =>
-  value === "none" ||
-  splitTop(value, ",").every((layer) => {
-    const name = layer.match(/^var\((--[\w-]+)\)$/)?.[1];
-    return name !== undefined && SHADOW_TOKENS.has(name);
-  });
+const SPENDS_NOTHING = new Set(["hairline", "ring", "glow", "lift", "tint"]);
+
+/** A layer that lifts, resolved through every definition a token has. */
+function liftsWithoutToken(layer, seen = new Set()) {
+  const token = layer.match(/^var\((--[\w-]+)\s*(?:,\s*(.+))?\)$/);
+  if (token) {
+    const [, name, fallback] = token;
+    if (SHADOW_TOKENS.has(name)) return false;
+    if (seen.has(name)) return false;
+    const values = definitions.get(name) ?? (fallback ? [fallback] : []);
+    return values.some((v) => splitTop(v, ",").some((inner) => liftsWithoutToken(inner, new Set([...seen, name]))));
+  }
+  if (isTransparent(layer)) return false;
+  return !SPENDS_NOTHING.has(layerKind(layer));
+}
+
+/** What is left of a violation, so the list reads as a to-do rather than a heap. */
+function shadowKind(value) {
+  const layers = splitTop(value, ",").filter((l) => liftsWithoutToken(l));
+  if (!layers.length) return "token-outside-set";
+  return layers.some((l) => !l.startsWith("var(") && layerKind(l) === "inner") ? "inset" : "elevation";
+}
+
+const spendsTokens = (value) => value === "none" || !splitTop(value, ",").some((layer) => liftsWithoutToken(layer));
 
 // ------------------------------------------------------------------ measure
 

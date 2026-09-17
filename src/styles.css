@@ -80,8 +80,7 @@
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-    0 22px 54px rgba(0, 0, 0, 0.34),
-    0 8px 20px rgba(0, 0, 0, 0.2);
+    var(--shadow-elevated);
   --sidebar-glass-bg:
     linear-gradient(
       165deg,
@@ -232,8 +231,7 @@
   --sidebar-glass-highlight: rgba(255, 255, 255, 0.9);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 18px 44px rgba(19, 26, 40, 0.1),
-    0 4px 12px rgba(19, 26, 40, 0.06);
+    var(--shadow-elevated);
   /* White against the grey page. Dark separates the rail by making it lighter
      than the canvas; this is the same move in the other direction, and it is
      the one thing the cream theme got backwards. */
@@ -848,8 +846,7 @@ input::placeholder {
   border-color: var(--glass-border);
   color: var(--text-primary);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 6px 16px rgba(0, 0, 0, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
   transform: translateX(2px);
 }
 
@@ -1051,8 +1048,7 @@ input::placeholder {
   border-color: var(--glass-border);
   color: var(--text-primary);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 6px 16px rgba(0, 0, 0, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
 }
 
 .app-sidebar-toggle-label {
@@ -1407,7 +1403,7 @@ input::placeholder {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-card);
 }
 
 .update-settings-heading {
@@ -1513,8 +1509,7 @@ input::placeholder {
     radial-gradient(circle at 12% 0%, var(--accent-soft), transparent 34%),
     color-mix(in srgb, var(--bg-base) 94%, var(--glass-bg-elevated));
   box-shadow:
-    0 34px 90px rgba(0, 0, 0, 0.58),
-    var(--glass-inset);
+    var(--shadow-elevated), var(--glass-inset);
 }
 
 .update-prompt-header {
@@ -1713,7 +1708,7 @@ input::placeholder {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-card);
 }
 
 .resources-group {
@@ -1811,7 +1806,7 @@ input::placeholder {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: rgba(18, 18, 20, 0.98);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-card);
 }
 
 .startup-view-options {
@@ -2150,7 +2145,7 @@ input::placeholder {
   border-color: var(--accent);
   background: var(--glass-bg-hover);
   color: var(--accent);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
 
@@ -3290,7 +3285,7 @@ input::placeholder {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-shadow), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
   padding: 20px 22px;
   text-align: left;
   transition:
@@ -3418,7 +3413,7 @@ input::placeholder {
     var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-shadow), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
   padding: 20px;
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -3458,7 +3453,7 @@ input::placeholder {
     radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-primary), transparent 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
     #14171c;
-  box-shadow: var(--glass-shadow), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
   animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -3492,7 +3487,7 @@ input::placeholder {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   padding: 20px;
-  box-shadow: var(--glass-shadow), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
 }
 
 /* Watch rows drop the redundant per-row status badge. */
@@ -3771,8 +3766,7 @@ input::placeholder {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.42),
-    var(--glass-inset);
+    var(--shadow-elevated), var(--glass-inset);
   padding: 7px 8px 7px 14px;
   animation: library-fab-enter 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   white-space: nowrap;
@@ -3915,8 +3909,7 @@ input::placeholder {
     color-mix(in srgb, var(--track-color, var(--accent)) 70%, #000000 30%)
   );
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 4px 10px rgba(0, 0, 0, 0.22);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16), var(--shadow-soft);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.32);
 }
 
@@ -4794,7 +4787,7 @@ td span {
   border-color: var(--accent);
   background: var(--glass-bg-hover);
   color: var(--accent);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
 
@@ -5614,7 +5607,7 @@ td span {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-base) 92%, #000);
-  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.42);
+  box-shadow: var(--shadow-card);
 }
 
 .watchface-font-picker-panel-header {
@@ -7071,7 +7064,7 @@ td span {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
   background: var(--surface);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 /* Form dropdowns inside scrollable dialogs escape their clipping containers. */
@@ -7469,7 +7462,7 @@ td span {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface, #11201a);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 .route-share-header {
@@ -7557,8 +7550,7 @@ td span {
   background-position: center;
   background-size: cover;
   box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    var(--shadow-elevated), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 0;
 }
 
@@ -7759,8 +7751,7 @@ td span {
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.028)),
     rgba(19, 24, 26, 0.86);
   box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    var(--shadow-elevated), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   padding: clamp(38px, 5vw, 58px) clamp(34px, 5vw, 72px);
 }
 
@@ -7857,8 +7848,7 @@ td span {
   border-color: color-mix(in srgb, var(--accent) 68%, transparent);
   background: rgba(255, 255, 255, 0.046);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent),
-    0 12px 24px rgba(0, 0, 0, 0.14);
+    0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent), var(--shadow-soft);
 }
 
 .training-login-input svg {
@@ -8909,7 +8899,7 @@ td span {
     linear-gradient(135deg, rgba(250, 87, 122, 0.14), rgba(255, 255, 255, 0.04)),
     rgba(255, 255, 255, 0.035);
   padding: 18px 20px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-card);
 }
 
 .apple-music-playlist-header::after {
@@ -9158,7 +9148,7 @@ td span {
 .apple-podcast-search-button {
   flex-shrink: 0;
   background: linear-gradient(135deg, #8550e6, #bd5ac9);
-  box-shadow: 0 4px 16px rgba(145, 82, 255, 0.28);
+  box-shadow: var(--shadow-soft);
 }
 
 .apple-podcast-search-note {
@@ -9481,7 +9471,7 @@ td span {
 
 .apple-podcast-search-button:hover:not(:disabled) {
   background: #9b68e6;
-  box-shadow: 0 8px 20px rgba(135, 89, 213, 0.2);
+  box-shadow: var(--shadow-soft);
 }
 
 .apple-podcast-result-nav {
@@ -10040,7 +10030,7 @@ td span {
     linear-gradient(135deg, rgba(30, 215, 96, 0.16), rgba(255, 255, 255, 0.04)),
     rgba(255, 255, 255, 0.035);
   padding: 18px 20px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-card);
 }
 
 .spotify-playlist-header::after {
@@ -10416,7 +10406,7 @@ td span {
     linear-gradient(135deg, rgba(255, 45, 45, 0.18), rgba(255, 255, 255, 0.04)),
     rgba(255, 255, 255, 0.035);
   padding: 18px 20px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-card);
 }
 
 .youtube-music-playlist-header::after {
@@ -10967,9 +10957,7 @@ td span {
     linear-gradient(180deg, color-mix(in srgb, var(--vo2-tone) 5%, transparent), transparent 44%),
     rgba(255, 255, 255, 0.026);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 42px rgba(0, 0, 0, 0.2),
-    0 0 24px color-mix(in srgb, var(--vo2-tone) 10%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-card), 0 0 24px color-mix(in srgb, var(--vo2-tone) 10%, transparent);
   min-width: 0;
   min-height: clamp(282px, 31vh, 392px);
   padding: clamp(16px, 1.55vw, 21px);
@@ -11364,8 +11352,7 @@ td span {
   transform: scaleY(1.7);
   background: var(--vo2-tone);
   box-shadow:
-    0 3px 10px rgba(0, 0, 0, 0.45),
-    0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
+    var(--shadow-soft), 0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
 }
 
 /*
@@ -11670,8 +11657,7 @@ td span {
     linear-gradient(180deg, rgba(25, 28, 34, 0.96), rgba(12, 14, 18, 0.94)),
     rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.36),
-    0 0 18px color-mix(in srgb, var(--sleep-stage-color) 28%, transparent);
+    var(--shadow-card), 0 0 18px color-mix(in srgb, var(--sleep-stage-color) 28%, transparent);
   color: var(--text-primary);
   font-size: 11px;
   font-stretch: normal;
@@ -11724,9 +11710,7 @@ td span {
   z-index: 4;
   border-radius: var(--radius-pill);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--sleep-stage-color) 82%, white 18%),
-    0 0 16px color-mix(in srgb, var(--sleep-stage-color) 58%, transparent),
-    0 8px 18px rgba(0, 0, 0, 0.32);
+    0 0 0 1px color-mix(in srgb, var(--sleep-stage-color) 82%, white 18%), 0 0 16px color-mix(in srgb, var(--sleep-stage-color) 58%, transparent), var(--shadow-soft);
   filter: saturate(1.18) brightness(1.12);
   transform: translateY(-3px) scaleY(1.72);
 }
@@ -11892,7 +11876,7 @@ td span {
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   background: rgba(16, 18, 23, 0.97);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+  box-shadow: var(--shadow-card);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
@@ -12337,8 +12321,7 @@ td span {
   -webkit-backdrop-filter: blur(22px) saturate(1.3);
   backdrop-filter: blur(22px) saturate(1.3);
   box-shadow:
-    0 24px 50px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    var(--shadow-elevated), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .metric-select-option {
@@ -13462,9 +13445,7 @@ td span {
   background:
     linear-gradient(180deg, rgba(28, 33, 31, 0.92), rgba(13, 16, 15, 0.94));
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    var(--shadow-card), var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   backdrop-filter: blur(16px) saturate(1.3);
   animation: training-tooltip-pop 0.18s ease-out;
@@ -13799,7 +13780,7 @@ td span {
 
 .training-zone-select-trigger:focus-visible {
   border-color: rgba(79, 195, 243, 0.52);
-  box-shadow: var(--glass-inset), 0 16px 38px rgba(0, 0, 0, 0.34);
+  box-shadow: var(--glass-inset), var(--shadow-card);
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
@@ -13835,8 +13816,7 @@ td span {
   -webkit-backdrop-filter: blur(24px) saturate(155%);
   backdrop-filter: blur(24px) saturate(155%);
   box-shadow:
-    var(--glass-inset),
-    0 22px 48px rgba(0, 0, 0, 0.42);
+    var(--glass-inset), var(--shadow-elevated);
   padding: 6px;
 }
 
@@ -15873,7 +15853,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-md);
   background: var(--surface, #16181c);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-card);
   animation: training-row-enter 0.16s var(--ease) both;
   text-align: left;
 }
@@ -16160,7 +16140,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--bg-base);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 .activity-route-modal-header {
@@ -16348,7 +16328,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--bg-base);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 .training-raw-modal-header {
@@ -16632,7 +16612,7 @@ tr.data-intervals-row-missing {
   color: #ffffff;
   padding: 0 14px;
   font-weight: 700;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-card);
   transition:
     background var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
@@ -18015,7 +17995,7 @@ tr.data-intervals-row-missing {
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   backdrop-filter: blur(16px) saturate(140%);
   color: var(--text-secondary);
-  box-shadow: var(--glass-inset), 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--glass-inset), var(--shadow-soft);
   cursor: pointer;
   animation: chat-sidebar-expand-enter 0.2s var(--ease) both;
   transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
@@ -18463,7 +18443,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 .chat-settings-modal-header,
@@ -19178,8 +19158,7 @@ tr.data-intervals-row-missing {
   border-color: var(--glass-border);
   color: var(--text-primary);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 6px 16px rgba(0, 0, 0, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
   transform: translateX(2px);
 }
 
@@ -20428,7 +20407,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   padding: 11px 16px;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), var(--glass-inset);
+  box-shadow: var(--shadow-soft), var(--glass-inset);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -20938,8 +20917,7 @@ tr.data-intervals-row-missing {
     var(--text-secondary)
   );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 6px 16px rgba(2, 10, 8, 0.16);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
   font-size: 12px;
   font-weight: 700;
   transition:
@@ -20977,13 +20955,7 @@ tr.data-intervals-row-missing {
     var(--glass-bg-hover);
   color: var(--text-primary);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 0 3px color-mix(
-      in srgb,
-      var(--chat-select-tone-shadow) 66%,
-      transparent
-    ),
-    0 10px 24px rgba(2, 10, 8, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 3px color-mix( in srgb, var(--chat-select-tone-shadow) 66%, transparent ), var(--shadow-soft);
   transform: none;
 }
 
@@ -21037,10 +21009,7 @@ tr.data-intervals-row-missing {
     ),
     color-mix(in srgb, var(--surface) 94%, #151b1a 6%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
-    0 22px 54px rgba(2, 8, 7, 0.52),
-    0 6px 18px rgba(2, 8, 7, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.02), var(--shadow-elevated), var(--shadow-soft);
   -webkit-backdrop-filter: blur(22px) saturate(1.35);
   backdrop-filter: blur(22px) saturate(1.35);
   font-size: 13px;
@@ -21354,15 +21323,14 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   padding: 7px 7px 7px 18px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
     transform var(--dur-base) var(--ease);
 }
 
 .chat-composer-inner:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft),
-    0 10px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card);
 }
 
 .chat-input {
@@ -21420,11 +21388,11 @@ tr.data-intervals-row-missing {
 
 .chat-stop {
   background: var(--error-text);
-  box-shadow: 0 4px 14px rgba(248, 113, 113, 0.35);
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-stop:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(248, 113, 113, 0.45);
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-stop:hover:not(:disabled) svg {
@@ -23288,7 +23256,7 @@ tr.data-intervals-row-missing {
   background: var(--glass-bg-elevated);
   -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
   backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
-  box-shadow: var(--glass-shadow), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
   animation: chat-empty-enter 0.22s var(--ease) both;
 }
 
@@ -23398,7 +23366,7 @@ tr.data-intervals-row-missing {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.09));
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-elevated);
 }
 
 /* Mode switcher — top center */
@@ -23738,7 +23706,7 @@ tr.data-intervals-row-missing {
   border-radius: var(--radius-md);
   background: rgba(8, 16, 13, 0.98);
   border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.1));
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-card);
   max-height: 220px;
   overflow-y: auto;
 }
@@ -24506,7 +24474,7 @@ tr.data-intervals-row-missing {
     .icon-button,
     .app-select-trigger
   ):hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(19, 26, 40, 0.14);
+  box-shadow: var(--shadow-soft);
 }
 
 /* An input has to out-read the controls beside it while it is being typed in,
@@ -24752,7 +24720,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .chat-settings-modal {
   background: var(--glass-bg-elevated);
   border-color: rgba(19, 26, 40, 0.15);
-  box-shadow: 0 24px 60px rgba(19, 26, 40, 0.21);
+  box-shadow: var(--shadow-elevated);
 }
 
 :root[data-theme="paper"] .chat-settings-section {
@@ -24761,12 +24729,11 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .chat-composer-inner {
-  box-shadow: 0 8px 28px rgba(19, 26, 40, 0.16), var(--glass-inset);
+  box-shadow: var(--shadow-card), var(--glass-inset);
 }
 
 :root[data-theme="paper"] .chat-composer-inner:focus-within {
-  box-shadow: 0 0 0 3px var(--accent-soft),
-    0 10px 32px rgba(19, 26, 40, 0.18);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card);
 }
 
 :root[data-theme="paper"] .chat-select--gpt,
@@ -24836,8 +24803,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .chat-provider-select .app-select-trigger,
 :root[data-theme="paper"] .chat-model-select .app-select-trigger {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 5px 14px rgba(19, 26, 40, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.82), var(--shadow-soft);
 }
 
 :root[data-theme="paper"]
@@ -24847,9 +24813,7 @@ tr.data-intervals-row-missing {
   .chat-model-select
   .app-select-trigger[aria-expanded="true"] {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0 0 3px var(--accent-soft),
-    0 10px 24px rgba(19, 26, 40, 0.16);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 3px var(--accent-soft), var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .chat-select-menu {
@@ -24861,10 +24825,7 @@ tr.data-intervals-row-missing {
     ),
     rgba(255, 255, 255, 0.97);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    inset 0 0 0 1px rgba(19, 26, 40, 0.03),
-    0 22px 50px rgba(19, 26, 40, 0.21),
-    0 5px 16px rgba(19, 26, 40, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.92), inset 0 0 0 1px rgba(19, 26, 40, 0.03), var(--shadow-elevated), var(--shadow-soft);
 }
 
 /* --- Route Studio panels + Leaflet controls ------------------------------- */
@@ -24887,7 +24848,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .route-drawer {
   background: rgba(255, 255, 255, 0.9);
   border-color: var(--glass-border);
-  box-shadow: 0 18px 50px rgba(19, 26, 40, 0.21);
+  box-shadow: var(--shadow-elevated);
 }
 
 /* Subtle white-alpha panel controls that vanish on white → dark-alpha */
@@ -25019,8 +24980,7 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .track-avatar.track-avatar--library {
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 2px 6px rgba(19, 26, 40, 0.23);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28), var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .library-panel {
@@ -25277,8 +25237,7 @@ tr.data-intervals-row-missing {
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.97)),
     rgba(255, 255, 255, 0.92);
   box-shadow:
-    0 14px 34px rgba(19, 26, 40, 0.21),
-    0 0 18px color-mix(in srgb, var(--sleep-stage-color) 24%, transparent);
+    var(--shadow-card), 0 0 18px color-mix(in srgb, var(--sleep-stage-color) 24%, transparent);
   color: var(--text-primary);
 }
 
@@ -25293,7 +25252,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .sleep-metric-note {
   border-color: rgba(19, 26, 40, 0.17);
   background: rgba(250, 251, 253, 0.98);
-  box-shadow: 0 14px 34px rgba(19, 26, 40, 0.21);
+  box-shadow: var(--shadow-card);
 }
 
 /* VO2 widget — it sits on Personal now, beside the fitness scores, so it takes
@@ -25380,8 +25339,7 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .vo2-plateau:hover::before,
 :root[data-theme="paper"] .vo2-plateau:focus-visible::before {
   box-shadow:
-    0 3px 10px rgba(19, 26, 40, 0.23),
-    0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
+    var(--shadow-soft), 0 0 0 1px color-mix(in srgb, var(--vo2-tone) 55%, transparent);
 }
 
 :root[data-theme="paper"] .vo2-plateau-tip {
@@ -30026,8 +29984,7 @@ tr.data-intervals-row-missing {
   background:
     linear-gradient(180deg, rgba(29, 32, 37, 0.98), rgba(15, 17, 21, 0.98));
   box-shadow:
-    var(--glass-inset),
-    0 18px 44px rgba(0, 0, 0, 0.48);
+    var(--glass-inset), var(--shadow-elevated);
   scrollbar-color: var(--glass-border) transparent;
 }
 
@@ -30866,7 +30823,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   background: var(--bg-base);
-  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.52);
+  box-shadow: var(--shadow-elevated);
 }
 
 .workout-editor-header {
@@ -34133,7 +34090,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   border-radius: var(--radius-md);
   background: var(--glass-bg-elevated);
   backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-card);
 }
 
 .chat-coaches-panel-head {
@@ -34578,7 +34535,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
 }
 
 .mcp-session-modal-header {

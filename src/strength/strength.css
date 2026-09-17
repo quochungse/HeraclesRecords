@@ -575,7 +575,7 @@
     var(--body-stage-bottom) 100%
   );
   box-shadow:
-    var(--glass-shadow),
+    var(--shadow-card),
     inset 0 1px 0 var(--body-stage-edge);
 }
 
@@ -628,7 +628,7 @@
 .strength-legend {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
 }
 
 .strength-flip {
@@ -676,7 +676,7 @@
   letter-spacing: 0.06em;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease),
@@ -705,7 +705,7 @@
   color: var(--text-primary);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  box-shadow: var(--shadow-elevated);
 }
 
 .anatomy-layer-panel header {
@@ -907,8 +907,7 @@
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   backdrop-filter: blur(16px) saturate(140%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 10px 28px color-mix(in srgb, var(--panel-floor) 75%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-card);
   transition: transform var(--dur-slow) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1465,7 +1464,7 @@
   border-color: var(--accent-glow);
   background: var(--glass-bg-hover);
   color: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--shadow-soft);
 }
 
 .muscle-panel-back:hover svg {
@@ -2051,7 +2050,7 @@
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
   background: var(--sx-elevated);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-soft);
   color: var(--text-primary);
   font-size: 11px;
   font-weight: 600;
@@ -2953,7 +2952,7 @@
   border: 1px solid var(--surface-line, var(--sx-edge));
   border-radius: var(--radius-lg);
   background: var(--panel-bg-solid, var(--panel-bg));
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+  box-shadow: var(--shadow-elevated);
 }
 
 .strength-hevy-dialog > header {

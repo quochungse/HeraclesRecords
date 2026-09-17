@@ -527,6 +527,34 @@ over `src/**/*.css`:
    `.panel`'s `var(--glass-shadow), var(--glass-inset)` is an outer shadow with
    a top highlight, which is L1.
 
+**Rule 2 was narrowed in phase 7c, and that is a decision** (taken 2026-09-17).
+As written it asked every `box-shadow` to be a token, and the survey above
+already knew that could not hold: of the 348 left after phase 7b, **157 were
+not elevation at all** — 53 rings (`0 0 0 1px`, an edge drawn as a shadow), 30
+glows carrying a datum's colour, 74 insets that are a 1px highlight, a gridline
+between cells or a 3px marker bar. Forcing those into four elevation tokens
+would have invented tokens named after one site, which §4.5 set out to avoid;
+listing them forever would have made the allowlist a heap rather than a to-do.
+So the rule now reads: **every layer that lifts spends a token**, and a
+`box-shadow` drawing one of the other four devices is judged by the rule that
+owns it — the hairline, or colour-is-data. `layerKind` in the test draws the
+line and its sizes are the decision:
+
+| Kind | What it is | Sizes |
+|---|---|---|
+| hairline | a line drawn inside the box: a top highlight, a gridline, a marker bar | any inset with no blur, or a blurred pixel at the edge |
+| ring | an edge drawn as a shadow | no offset, no blur, spread ≤ 8px |
+| glow | colour bleeding out of the box | no offset, some blur |
+| tint | a lift painted in a **named signal colour** — accent, sport, sleep stage, tone, success, error | any outer layer whose colour comes from one of those custom properties |
+| lift | the crisp edge under a control, below the ladder's smallest step | offset < 3px, blur < 5px, spread ≤ 1px |
+| elevation / inner | anything further, in either direction | must spend `--shadow-soft`, `--shadow-card`, `--shadow-elevated` or `--shadow-inset` |
+
+`tint` is the one to revisit first if this reads wrong: it keeps the accent glow
+under a primary button, the Coach's send button and the sleep stage chips, which
+a neutral token would have flattened (55 sites). Elevation is spelled in ink; a
+neutral shadow behind a name (`--panel-floor`, `--bg-base`) is still elevation
+and still spends a token.
+
 *As built* (`scripts/test-elevation.mjs`, allowlist in
 `scripts/elevation-allowlist.json`): under the Q1 reading rule 1 starts at
 **109** rules, not 185 — the other 76 pair a border with an inset highlight, or
@@ -720,9 +748,31 @@ The sidebar's active mark and the Coach's active conversation row share
 highlight, which is the L2 reading of a selected row.
 
 **Rule 1 is now held across the app: 0 rules draw a visible border and an outer
-shadow**, from 185 measured in §4.1 and 109 when the test was written. Rule 2
-still allows 348 shadows outside the token set (elevation 137, inset 74, ring
-53, glow 30, token-outside-set 54); that is what is left of phase 7.
+shadow**, from 185 measured in §4.1 and 109 when the test was written.
+
+*As built, 7c* (2026-09-17 — **awaiting review**). Rule 2 was narrowed to what
+lifts (the table above), and everything that lifts now spends a token, so
+**both lists are empty and only the six `exempt` decisions remain**:
+
+- 89 declarations were rewritten by blur: ≥ 44px → `--shadow-elevated`,
+  ≥ 26px → `--shadow-card`, below that → `--shadow-soft`. Several rules had two
+  lifting layers (`0 18px 40px …, 0 2px 8px …`) and now spend one token.
+- Feature tokens that resolved to a lift were repointed rather than their call
+  sites rewritten: `--wf-shadow`, `--map-card-shadow`, `--map-panel-shadow` and
+  `--sidebar-glass-shadow` keep their insets and spend a token for the outer
+  part. `var(--glass-shadow)` at a call site became `var(--shadow-card)` — the
+  same value in dark, and the card token is what a card spends.
+- **Training Library's tiles stopped floating.** `.tl-card` and the catalog
+  tiles are boxes inside a panel, so they carry no shadow at rest and their
+  hover, active and selected states are drawn in colour — the edge ring and
+  wash they already had. Five `--tl-shadow-*` tokens went with them, and
+  `.plan-week` lost its plate the same way.
+- The globe card came to the card radius, which 7a had missed because *Where
+  you've been* was not in that batch.
+
+The test's own checks were re-proven: a literal drop shadow, a token outside
+the set and a deep inset each fail; a ring, a glow, a 1px highlight, a tinted
+lift, a 1–2px edge and the four tokens each pass.
 
 Measured before and after in the same sitting, 1600 and 1180, all fourteen
 screens (the eight the probe lists by default plus Training Library, Personal,
