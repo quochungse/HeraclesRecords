@@ -3283,8 +3283,8 @@ input::placeholder {
   position: relative;
   display: grid;
   gap: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
@@ -3451,7 +3451,7 @@ input::placeholder {
   gap: 0;
   overflow: hidden;
   border-color: var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     radial-gradient(ellipse 80% 60% at 20% 0%, var(--bg-ambient-primary), transparent 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
@@ -10960,7 +10960,7 @@ td span {
   gap: 14px;
   /* The Personal screen has not had the elevation ladder yet (phase 7 of
      docs/ui-system-refinement.md), so this card keeps the radius it had. */
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   border-color: color-mix(in srgb, var(--vo2-tone) 18%, rgba(255, 255, 255, 0.07));
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--vo2-tone) 5%, transparent), transparent 44%),
@@ -14161,7 +14161,7 @@ td span {
   gap: 12px;
   align-content: start;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
@@ -14424,7 +14424,7 @@ td span {
   align-items: start;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.18);
 }
 
@@ -14763,7 +14763,7 @@ td span {
   min-width: 0;
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 100% 0%, var(--bg-ambient-primary), transparent 58%),
@@ -14772,7 +14772,7 @@ td span {
 }
 
 .data-tool-card.training-backup-panel {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .data-intervals-connect-card {
@@ -14780,7 +14780,7 @@ td span {
   gap: 14px;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.16);
 }
 
@@ -15409,7 +15409,7 @@ tr.data-intervals-row-missing {
   gap: 18px;
   align-content: start;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
@@ -15459,7 +15459,7 @@ tr.data-intervals-row-missing {
   min-height: 132px;
   padding: 26px 40px;
   border: 1px solid rgba(216, 155, 34, 0.16);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background:
     radial-gradient(90% 120% at 50% 118%, rgba(216, 155, 34, 0.22), transparent 60%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
@@ -15639,7 +15639,7 @@ tr.data-intervals-row-missing {
   min-height: 148px;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background:
     radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 12%, transparent), transparent 62%),
     rgba(255, 255, 255, 0.025);
@@ -19158,7 +19158,7 @@ tr.data-intervals-row-missing {
   width: 100%;
   min-height: 44px;
   border: 1px solid transparent;
-  border-radius: calc(var(--radius-lg) - 2px);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   padding: 10px 10px 10px 12px;
@@ -23485,7 +23485,7 @@ tr.data-intervals-row-missing {
   max-width: calc(100% - 32px);
   max-height: calc(100% - 190px);
   overflow-y: auto;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -23583,7 +23583,7 @@ tr.data-intervals-row-missing {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
@@ -23687,7 +23687,7 @@ tr.data-intervals-row-missing {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-muted);
@@ -24242,7 +24242,7 @@ tr.data-intervals-row-missing {
   width: 100%;
   max-width: 1180px;
   padding: 11px 18px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 .route-statsbar.is-empty {
   justify-content: center;
@@ -26404,8 +26404,8 @@ tr.data-intervals-row-missing {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
@@ -26814,8 +26814,8 @@ tr.data-intervals-row-missing {
   width: min(560px, calc(100vw - 48px));
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
   background: var(--bg-base);
   box-shadow: var(--shadow-card);
   overflow: hidden;

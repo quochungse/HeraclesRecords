@@ -51,6 +51,17 @@
   --run-treadmill: color-mix(in srgb, var(--sport-run, #2fbe91) 35%, var(--text-secondary));
 }
 
+/*
+ * On paper a raised face is white and the hairline does the lifting, the same
+ * shape activities.css and strength.css settled on — an ink mix reads as a
+ * well there, and the cards at the top of this screen are cards, not wells.
+ */
+:root[data-theme="paper"] .running-view {
+  --run-hairline: rgba(19, 26, 40, 0.14);
+  --run-well: rgba(19, 26, 40, 0.06);
+  --run-raised: #ffffff;
+}
+
 .running-view.running-view-disconnected {
   align-content: start;
 }
@@ -123,13 +134,16 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+/* On the page, so L1 (docs/ui-system-refinement.md §4.3): the shadow is the
+   edge on paper, the hairline in dark. */
 .running-stat {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border: 1px solid var(--run-hairline);
+  border: 1px solid var(--surface-line, var(--run-hairline));
   border-radius: var(--radius-md);
-  background: var(--run-well);
+  background: var(--run-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .running-stat > span {
@@ -739,9 +753,10 @@
   align-content: start;
   gap: 6px;
   padding: 16px 18px;
-  border: 1px solid var(--run-hairline);
+  border: 1px solid var(--surface-line, var(--run-hairline));
   border-radius: var(--radius-md);
-  background: var(--run-well);
+  background: var(--run-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .run-hero-label {

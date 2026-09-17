@@ -557,8 +557,8 @@
 
 .tl-panel {
   min-width: 0;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
   background:
     radial-gradient(ellipse 90% 62% at 14% 0%, var(--bg-ambient-green), transparent 58%),
     linear-gradient(180deg, var(--tl-sheen), var(--tl-sheen-fade) 42%),

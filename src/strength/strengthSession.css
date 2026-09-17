@@ -14,7 +14,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -32,7 +32,7 @@
 .strength-session-row[aria-current="true"] {
   border-color: var(--sx-edge);
   background: var(--sx-raised);
-  box-shadow: var(--sx-lift);
+  box-shadow: none;
 }
 
 /* Inside: the session list sits in a panel that clips a ring drawn outside. */
