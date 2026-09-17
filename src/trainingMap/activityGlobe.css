@@ -128,7 +128,7 @@
   margin: 0 0 8px;
   color: var(--map-accent);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -177,11 +177,7 @@
 .training-map-page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .training-map-page-header > p:last-child {
@@ -294,7 +290,7 @@
 .training-map-date-range label > span {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -365,7 +361,7 @@
 
 .training-map-primary-stat dt span {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -407,7 +403,12 @@
 
 .training-map-secondary-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Sized to their contents, not to a quarter each: the four read "30",
+     "124 m", "7,495 TL" and "33,119 kcal", so equal columns starve the widest
+     while the first has room to spare — it ran 7px past its column once the
+     figures moved to the display face. */
+  grid-template-columns: repeat(4, minmax(0, auto));
+  justify-content: space-between;
   border-top: 1px solid var(--map-border);
   background: color-mix(in srgb, var(--map-text-primary) 2.5%, transparent);
   padding: 12px 10px;
@@ -416,9 +417,12 @@
 .training-map-secondary-stats > div {
   display: flex;
   align-items: center;
-  gap: 9px;
+  /* Tight on purpose: four cells, and the widest reads "33,119 kcal". The
+     figures are set in the display face now, which is wider than Inter at the
+     same size, and at 12px of padding the last cell ran 7px past its column. */
+  gap: 8px;
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 8px;
 }
 
 .training-map-secondary-stats > div + div {
@@ -541,7 +545,7 @@
   color: var(--map-accent);
   padding: 5px 10px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -570,7 +574,7 @@
 .training-map-location-metrics dt {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -608,7 +612,7 @@
 .training-map-location-trend > div:first-child span {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -760,7 +764,7 @@
 .training-map-overview-values dt {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }

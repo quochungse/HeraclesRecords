@@ -264,7 +264,20 @@ function declarations(line, prop) {
 
 // ---------------------------------------------------------------- per line
 for (const { file, text: source } of stylesheets) {
-  source.split("\n").forEach((raw, i) => {
+  // `@font-face` describes a file, it does not choose from the scale: a
+  // variable font's `font-weight: 300 700` is the range that file carries.
+  // Marked in one pass; asking `enclosingAtRule` per line is quadratic over a
+  // 34k-line stylesheet and took this from a second to minutes.
+  const lines = source.split("\n");
+  const inFontFace = [];
+  let openFace = false;
+  lines.forEach((raw, i) => {
+    if (/@font-face/.test(raw)) openFace = true;
+    inFontFace[i] = openFace;
+    if (openFace && raw.includes("}")) openFace = false;
+  });
+  lines.forEach((raw, i) => {
+    if (inFontFace[i]) return;
     const line = i + 1;
     const text = raw.replace(/!important/g, "").trim();
 

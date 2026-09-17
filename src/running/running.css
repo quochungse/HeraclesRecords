@@ -77,11 +77,7 @@
 .running-page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .running-page-header > p:last-child {
@@ -95,7 +91,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -240,7 +236,7 @@
   background: transparent;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -259,7 +255,7 @@
   padding: 11px 12px;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -341,7 +337,7 @@
   padding: 3px 8px;
   border-radius: var(--radius-pill);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -762,19 +758,15 @@
 .run-hero-label {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .run-hero-value {
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: 28px;
-  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Only the load ratio is coloured. Every other hero figure is a fact; this one
@@ -807,7 +799,7 @@
   background: var(--warning-bg);
   color: var(--warning-text);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   cursor: help;
@@ -960,7 +952,7 @@
 .run-intensity-title {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

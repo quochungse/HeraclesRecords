@@ -38,9 +38,6 @@
 .sleep-page-heading h1 {
   margin: 2px 0 0;
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
   background: linear-gradient(
     100deg,
     var(--text-primary),
@@ -371,8 +368,6 @@
 
 .sleep-detail-score strong {
   font-size: 28px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .sleep-detail-score span {

@@ -10,6 +10,7 @@
     "dev:renderer": "vite --host 127.0.0.1",
     "dev:electron": "wait-on tcp:5173 && npm run binaries:prepare && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "binaries:prepare": "node scripts/prepare-binaries.mjs",
+    "fonts:fetch": "node scripts/fetch-fonts.mjs",
     "prepare:google-client": "node scripts/prepare-google-client.mjs",
     "binaries:prepare:mac": "node scripts/prepare-binaries.mjs --platform=darwin --arch=arm64 && node scripts/prepare-binaries.mjs --platform=darwin --arch=x64",
     "binaries:prepare:win": "node scripts/prepare-binaries.mjs --platform=win32 --arch=x64",

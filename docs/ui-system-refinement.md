@@ -795,11 +795,15 @@ Nothing measured so far touches layout, and layout is where "simple, refined,
 elegant" mostly lives. The blind spot, measured:
 
 ```
-grid-template-columns: 543 uses, 216 distinct patterns
-max-width:             245 uses, 170 distinct values
+grid-template-columns: 542 uses, 216 distinct patterns
+max-width:             154 uses, 79 distinct values
 reading measure:       19 different `ch` values, from 24ch to 80ch
 .content:              padding: 0 28px 28px   — and NO max-width at all
 ```
+
+The max-width line read *245 uses, 170 distinct* until phase 8, and that was
+`measure-ui.mjs` counting the raw text: `@media (max-width: 700px)` is a
+condition, not a rule setting a width. It counts inside rule bodies now.
 
 216 column patterns means every screen reinvents its own structure. And with no
 `max-width` on the content column, a 27" display stretches every line of text
@@ -822,6 +826,51 @@ should be started without agreeing the direction first:
    the app a face without adding noise.
 4. **Density.** How many panels of equal weight sit side by side on a screen,
    and which of them deserves to be larger than the others.
+
+*As built* (phase 8, 2026-09-17 — **awaiting review**). Four of the six were
+taken, in the shape the decisions of that day set:
+
+- **A measure, at 1440px.** `.content` caps through its own padding —
+  `padding: 0 max(28px, (100% - 1440px) / 2) 28px` — so the scrollbar stays at
+  the window's edge and no screen needs a wrapper. Below about 1750px nothing
+  moves, because the content column is narrower than the cap anyway; past it
+  the margins grow instead of the tables. At 2560 a Settings row had been
+  running 1700px wide with its button 1400px from its label.
+- **One serif level.** `--font-title` is Source Serif 4, and it is spent on
+  eleven screen titles and nothing else: Overview's greeting, Personal,
+  Running, Sleep, Strength, Activities, Where you've been, Data, Watch Faces,
+  Training Library and the Calendar's month. Weight 600, no tracking, leading
+  1.3 — the sans titles carried 700, -0.02em and 1, and a serif needs none of
+  them. Each title rule gave up its own `font-family`, `font-weight`,
+  `letter-spacing` and `line-height` so the shared rule owns them; leaving them
+  in place meant the feature stylesheets, which load after `styles.css`,
+  silently kept the sans on five screens.
+- **The fonts are in the build.** `index.html` used to `<link>` Inter and Space
+  Grotesk from `fonts.googleapis.com`, so a fresh install with no network drew
+  the whole interface in a system fallback and every launch asked Google for a
+  stylesheet. All three families are now `.woff2` files in `src/assets/fonts`
+  (variable, latin + latin-ext + **vietnamese**, 434 kB in total), declared in
+  `src/fonts.css`; `scripts/fetch-fonts.mjs` re-fetches them.
+- **Eyebrows at 600.** 107 uppercase rules came off weight 700, which at 10px
+  was shouting. None is left at 700. *One eyebrow per panel* was not attempted:
+  it is a judgement per panel, not a value.
+- **One figure treatment.** The display face, weight 500, `-0.02em` and tabular
+  digits, shared by the app's hero figures. Each site keeps its own size and
+  its own leading — applying `line-height: 1` from the shared rule put the ink
+  of Running's totals 3px outside a box that had never carried it. The unit and
+  the delta are the other half of this and want markup most sites do not have.
+
+Three things the type change turned up, each fixed in the same pass: the
+variable Inter is fractionally wider than the static weights the `<link>`
+served, which cost the globe's four-cell stats row 7px it did not have (its
+cells were tightened); a serif's descender does not fit inside `line-height: 1`
+(1.3 for titles, 1.2 for the weekly tiles' figures); and `test:design-vocabulary`
+was reading a variable font's `font-weight: 300 700` as a weight off the scale,
+so it now skips `@font-face` — in one pass, because asking per line was
+quadratic over a 34k-line stylesheet.
+
+**Not taken**, and still open: the page grid (216 column patterns), density, and
+*light as a printed page* beyond what §4 already did.
 
 Two smaller ones, already half-solved and worth folding into whichever of the
 above gets done:
@@ -1029,7 +1078,7 @@ after each, `test:elevation` joining it from phase 3.
 | 5 | ~~Elevation ladder on **Sleep**~~ — done and approved 2026-09-17 (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
 | 6 | Ladder on Overview, Settings, then Activities — built 2026-09-17, **awaiting review** (§4.6) | 4.6 | M | 5 approved | yes |
 | 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) — **7a and 7b built 2026-09-17** (§4.7); rule 2 is what is left | 4 | L | 6 | yes, per file |
-| 8 | Composition | 5 | L | **decide first** | yes |
+| 8 | Composition — measure, one serif level, eyebrows, figures: built 2026-09-17, **awaiting review** (§5) | 5 | L | **decided 2026-09-17** | yes |
 
 The focus ring moved behind the elevation test: §3 composes its ring with
 elevation shadows, and the draft both told you to do §4 first and listed it

@@ -895,6 +895,24 @@ of them between 9px and 15px, half-pixels included), 45 spellings of letter-spac
 lists the exceptions and why each one is real. Adding a value means editing that file,
 which is the point.
 
+**The app carries its own typography, and one serif level.** `index.html` used to `<link>`
+Inter and Space Grotesk from `fonts.googleapis.com`, so a fresh install with no network drew
+the interface in a system fallback. The three families now ship as variable `.woff2` files in
+`src/assets/fonts` (latin, latin-ext and **vietnamese** — an athlete's activity names and the
+coach's answers are written in it), declared in `src/fonts.css`; `scripts/fetch-fonts.mjs`
+re-fetches them, and `test:design-vocabulary` skips `@font-face`, where `font-weight: 300 700`
+is a file's range rather than a choice off the scale. `--font-title` (Source Serif 4) is spent
+on a screen's own title and nothing else, at weight 600 and leading 1.3 — a serif's descender
+does not fit inside `line-height: 1`. Figures spend one treatment (the display face, weight
+500, `-0.02em`, tabular) and keep their own size and leading. A title or figure rule that
+restates `font-family` or `font-weight` locally wins over the shared rule, because the feature
+stylesheets load after `styles.css` — that is how five screens silently kept the sans.
+
+**`.content` caps the measure at 1440px**, through its own padding
+(`max(28px, (100% - 1440px) / 2)`) so the scrollbar stays at the window edge and no screen
+needs a wrapper. Below about 1750px nothing changes; past it the margins grow rather than the
+tables.
+
 **Motion is part of that vocabulary, and the same test holds it.** A `transition` spends
 `var(--ease)` — one decelerating curve; bare `ease` was 92% of every curve and is the browser
 default nobody chose — and a `--dur-fast` (a state: colour, opacity, border, shadow) /

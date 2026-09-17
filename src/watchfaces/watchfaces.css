@@ -1195,7 +1195,7 @@
 .watchface-shell .watchface-saved-login span {
   color: var(--text-secondary);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2132,7 +2132,7 @@
   margin: 20px 0;
   color: var(--text-muted);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2595,7 +2595,7 @@
   margin: 0;
   color: var(--text-primary);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2831,7 +2831,7 @@
   text-align: left;
   font: inherit;
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .watchface-shell .wf-layer-section-toggle:hover {
@@ -2871,7 +2871,7 @@
 .watchface-shell .wf-layer-state {
   color: var(--accent-strong);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
 }
 
@@ -2897,7 +2897,7 @@
   margin: 12px 7px 5px;
   color: var(--text-secondary);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -3750,7 +3750,7 @@
   padding: 0 4px;
   font: inherit;
   font-size: var(--wf-text-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-align: left;
 }
 
@@ -4420,7 +4420,7 @@
   gap: 4px;
   color: var(--text-secondary);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;
@@ -4489,7 +4489,7 @@
   align-self: end;
   color: var(--text-secondary);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;
@@ -5521,7 +5521,7 @@ body.wf-value-scrubbing * {
 .watchface-shell .wf-property-section-trigger {
   min-height: 38px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -6431,7 +6431,7 @@ body.wf-value-scrubbing * {
   flex: 0 0 auto;
   color: var(--accent);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -6784,7 +6784,7 @@ body.wf-value-scrubbing * {
 .watchface-raw-installer-kicker {
   color: var(--accent);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -7134,7 +7134,7 @@ body.wf-value-scrubbing * {
   margin-bottom: 3px;
   color: var(--accent-strong);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -8514,7 +8514,7 @@ body.wf-value-scrubbing * {
   margin-bottom: 12px;
   color: var(--accent-strong);
   font-size: var(--wf-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -8769,7 +8769,7 @@ body.wf-value-scrubbing * {
   color: var(--accent-strong);
   padding: 0 6px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;
@@ -9046,7 +9046,7 @@ body.wf-value-scrubbing * {
   gap: 5px;
   color: var(--text-tertiary);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -9112,7 +9112,7 @@ body.wf-value-scrubbing * {
 
 .watchface-shell .wf-layer-state {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -9348,7 +9348,7 @@ body.wf-value-scrubbing * {
 .watchface-shell .wf-property-section-trigger {
   min-height: 34px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

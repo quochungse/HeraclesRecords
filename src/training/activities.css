@@ -37,7 +37,6 @@
 .activities-head h2 {
   margin: 0;
   font-size: 22px;
-  font-weight: 600;
 }
 
 .activities-head h2 span {
@@ -80,7 +79,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -89,9 +88,6 @@
   margin: 0;
   color: var(--text-primary);
   font-size: 22px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
 }
 
 .activities-summary-caption {
@@ -435,7 +431,7 @@
   background: var(--ax-heading);
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -508,7 +504,7 @@
   color: var(--text-muted);
   font-size: 10px;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -722,7 +718,7 @@
 .activity-detail-headline span {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -790,7 +786,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -910,7 +906,7 @@
 .activity-lap-table th {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

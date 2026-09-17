@@ -312,11 +312,7 @@
 
 .tl-masthead h1 {
   margin: 0;
-  font-family: var(--font-display);
   font-size: 36px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
   /* The signature gradient: ink settling into the accent, left to right. */
   background: linear-gradient(
     100deg,

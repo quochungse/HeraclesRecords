@@ -174,9 +174,6 @@
 .strength-title h2 {
   margin: 0;
   font-size: clamp(28px, 3.4vw, 36px);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .strength-title p {
@@ -1495,7 +1492,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1559,7 +1556,7 @@
 .muscle-detail-rank > span {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1587,7 +1584,7 @@
   background: color-mix(in srgb, var(--tone) 13%, transparent);
   color: var(--tone);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1731,7 +1728,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1744,19 +1741,15 @@
 }
 
 .muscle-hero-value strong {
-  font-family: var(--font-display);
   font-size: 36px;
-  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 
 .muscle-hero-value small {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1815,7 +1808,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -2427,9 +2420,7 @@
 
 .strength-figure strong {
   font-size: 36px;
-  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .strength-figure em {

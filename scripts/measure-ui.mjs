@@ -49,11 +49,23 @@ function* rules() {
 }
 
 /** Every value of `prop`, counted per occurrence — not per line. */
+/**
+ * Declarations of `prop`, inside rule bodies only.
+ *
+ * Scanning the raw text counts a media query's own condition as a declaration:
+ * `@media (max-width: 700px)` is not a rule setting a max-width, and counting
+ * those put §5's figure at 245 uses over 170 values when the stylesheets hold
+ * 119 over 71.
+ */
 function declarations(prop) {
   const out = [];
+  const pattern = new RegExp(`(?<![-\\w])${prop}\\s*:\\s*([^;}]+)`, "g");
   for (const [file, src] of TEXT) {
-    for (const m of src.matchAll(new RegExp(`(?<![-\\w])${prop}\\s*:\\s*([^;}]+)`, "g"))) {
-      out.push({ file, value: m[1].replace(/!important/g, "").trim() });
+    for (const rule of src.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
+      if (rule[1].trim().startsWith("@")) continue;
+      for (const m of rule[2].matchAll(pattern)) {
+        out.push({ file, value: m[1].replace(/!important/g, "").trim() });
+      }
     }
   }
   return out;
