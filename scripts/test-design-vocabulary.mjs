@@ -155,6 +155,18 @@ function cssFiles(dir) {
   return out.sort();
 }
 
+/**
+ * Every stylesheet, read once. `code` is the text with comments blanked in
+ * place — every offset kept, so a reported line is still right — for the passes
+ * that read whole declarations and must not mistake prose quoting `ease` or a
+ * selector for CSS.
+ */
+const stylesheets = cssFiles(SRC).map((file) => {
+  const text = readFileSync(file, "utf8");
+  return { file, text, code: text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")) };
+});
+const lineAt = (code, index) => code.slice(0, index).split("\n").length;
+
 const violations = [];
 function fail(file, line, prop, value, why) {
   violations.push(`${relative(ROOT, file)}:${line}  ${prop}: ${value}   — ${why}`);
@@ -177,6 +189,67 @@ function clampSizesOk(value) {
   return px.length > 0 && px.every((p) => SIZES_PX.has(Number(p.slice(0, -2))));
 }
 
+/** Splits on `sep` at paren depth 0 — `var(--x, cubic-bezier(…))` nests two deep. */
+function splitTop(value, sep) {
+  const out = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && (sep === "," ? ch === "," : /\s/.test(ch))) {
+      out.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(value.slice(start));
+  return out.map((part) => part.trim()).filter(Boolean);
+}
+
+/** The last compound of a selector, at paren depth 0. */
+function lastCompound(selector) {
+  let depth = 0;
+  let cut = 0;
+  for (let i = 0; i < selector.length; i += 1) {
+    const ch = selector[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && /[\s>+~]/.test(ch)) cut = i + 1;
+  }
+  return selector.slice(cut);
+}
+
+/** `:focus-visible` on the element the rule paints — not inside :is()/:has(), not on a pseudo-element. */
+function targetsFocusedElement(selector) {
+  const last = lastCompound(selector);
+  if (last.includes("::")) return false;
+  let depth = 0;
+  for (let i = 0; i < last.length; i += 1) {
+    if (last[i] === "(") depth += 1;
+    else if (last[i] === ")") depth -= 1;
+    else if (depth === 0 && last.startsWith(":focus-visible", i)) return true;
+  }
+  return false;
+}
+
+/** The at-rule a position sits inside, if any. */
+function enclosingAtRule(code, index) {
+  let depth = 0;
+  for (let i = index; i >= 0; i -= 1) {
+    if (code[i] === "}") depth += 1;
+    else if (code[i] === "{") {
+      if (depth > 0) {
+        depth -= 1;
+        continue;
+      }
+      const head = code.slice(code.lastIndexOf("}", i - 1) + 1, i).trim();
+      if (head.startsWith("@")) return head;
+    }
+  }
+  return "";
+}
+
 /**
  * Declarations anywhere on the line, not just at its start. Single-line rules
  * are written throughout (`.chat-markdown h1 { font-size: 1.32em; }`), and 41
@@ -189,9 +262,9 @@ function declarations(line, prop) {
     .map((m) => m[1].trim());
 }
 
-for (const file of cssFiles(SRC)) {
-  const lines = readFileSync(file, "utf8").split("\n");
-  lines.forEach((raw, i) => {
+// ---------------------------------------------------------------- per line
+for (const { file, text: source } of stylesheets) {
+  source.split("\n").forEach((raw, i) => {
     const line = i + 1;
     const text = raw.replace(/!important/g, "").trim();
 
@@ -262,37 +335,17 @@ for (const file of cssFiles(SRC)) {
   });
 }
 
-/** Splits on `sep` at paren depth 0 — `var(--x, cubic-bezier(…))` nests two deep. */
-function splitTop(value, sep) {
-  const out = [];
-  let depth = 0;
-  let start = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    const ch = value[i];
-    if (ch === "(") depth += 1;
-    else if (ch === ")") depth -= 1;
-    else if (depth === 0 && (sep === "," ? ch === "," : /\s/.test(ch))) {
-      out.push(value.slice(start, i));
-      start = i + 1;
-    }
-  }
-  out.push(value.slice(start));
-  return out.map((part) => part.trim()).filter(Boolean);
-}
-
+// ------------------------------------------------------------------ motion
+// A transition list runs over several lines, so motion is read per declaration.
 const BARE_EASE = /(?<![-\w])ease\b(?!-)/;
 const TIME = /^(\d*\.?\d+)(ms|s)$/;
 const CURVE = /^(var\(--[\w-]*ease[\w-]*|cubic-bezier\(|steps\(|linear|ease-in|ease-out|ease-in-out|step-start|step-end)/;
 const designedUnused = new Set(DESIGNED_LENGTHS.map((entry) => entry.join("|")));
 
-// A transition list runs over several lines, so motion is read per declaration
-// rather than per line. Comments are blanked first, keeping every offset, so a
-// comment quoting `ease` is prose and a reported line number is still right.
-for (const file of cssFiles(SRC)) {
-  const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+for (const { file, code } of stylesheets) {
   const where = relative(ROOT, file);
   for (const m of code.matchAll(/(?<![-\w])(transition|transition-duration|transition-timing-function|animation|animation-timing-function):\s*([^;}]+)/g)) {
-    const line = code.slice(0, m.index).split("\n").length;
+    const line = lineAt(code, m.index);
     const [prop, raw] = [m[1], m[2]];
     const important = raw.includes("!important");
     const value = raw.replace(/!important/g, "").trim();
@@ -334,60 +387,18 @@ for (const file of cssFiles(SRC)) {
     }
   }
 }
-/** The last compound of a selector, at paren depth 0. */
-function lastCompound(selector) {
-  let depth = 0;
-  let cut = 0;
-  for (let i = 0; i < selector.length; i += 1) {
-    const ch = selector[i];
-    if (ch === "(") depth += 1;
-    else if (ch === ")") depth -= 1;
-    else if (depth === 0 && /[\s>+~]/.test(ch)) cut = i + 1;
-  }
-  return selector.slice(cut);
-}
-
-/** `:focus-visible` on the element the rule paints — not inside :is()/:has(), not on a pseudo-element. */
-function targetsFocusedElement(selector) {
-  const last = lastCompound(selector);
-  if (last.includes("::")) return false;
-  let depth = 0;
-  for (let i = 0; i < last.length; i += 1) {
-    if (last[i] === "(") depth += 1;
-    else if (last[i] === ")") depth -= 1;
-    else if (depth === 0 && last.startsWith(":focus-visible", i)) return true;
-  }
-  return false;
-}
-
-/** The at-rule a position sits inside, if any. */
-function enclosingAtRule(code, index) {
-  let depth = 0;
-  for (let i = index; i >= 0; i -= 1) {
-    if (code[i] === "}") depth += 1;
-    else if (code[i] === "{") {
-      if (depth > 0) {
-        depth -= 1;
-        continue;
-      }
-      const head = code.slice(code.lastIndexOf("}", i - 1) + 1, i).trim();
-      if (head.startsWith("@")) return head;
-    }
-  }
-  return "";
-}
-
+// ------------------------------------------------------------------- focus
 const RING_OUTLINE = /(?<![-\w])outline\s*:\s*var\(--focus-ring\)\s*(;|$)/;
 const RING_OFFSET = /(?<![-\w])outline-offset\s*:\s*-?2px\s*(;|$)/;
 
-for (const file of cssFiles(SRC)) {
-  const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+for (const { file, code } of stylesheets) {
   for (const m of code.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
     const selectorText = m[1].trim().replace(/\s+/g, " ");
-    if (!selectorText.includes(":focus-visible") || selectorText === ":focus-visible") continue;
+    // The rule that defines the ring is not a ring rule.
+    if (!selectorText.includes(":focus-visible") || /(?<![-\w])--focus-ring\s*:/.test(m[2])) continue;
     if (/prefers-reduced-motion|forced-colors/.test(enclosingAtRule(code, m.index))) continue;
     const selectors = splitTop(selectorText, ",");
-    const line = code.slice(0, m.index + m[1].search(/\S/)).split("\n").length;
+    const line = lineAt(code, m.index + m[1].search(/\S/));
     // `:is(:hover, :focus-visible)` is the same collapse, spelled inside one selector.
     const grouped = selectors.find((sel) => !lastCompound(sel).includes("::") && /:(is|where)\([^()]*:focus-visible/.test(lastCompound(sel)));
     if (grouped) {
@@ -417,9 +428,8 @@ assert.deepEqual(
   `design vocabulary broken in ${violations.length} place(s):\n\n${violations.join("\n")}\n`
 );
 
-const files = cssFiles(SRC).length;
 console.log(
-  `design vocabulary OK — ${files} stylesheets, ` +
+  `design vocabulary OK — ${stylesheets.length} stylesheets, ` +
     `${WEIGHTS.size} weights, ${SIZES_PX.size} sizes (+${RELATIVE.size} relative), ${TRACKING.size} tracking steps, ` +
     `${LEADING.size} leading steps, ` +
     `${DURATION_TOKENS.size} duration tokens (+${DESIGNED_LENGTHS.length} designed lengths), ` +

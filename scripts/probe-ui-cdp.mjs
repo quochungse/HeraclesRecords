@@ -12,8 +12,11 @@
  * exit code worth reading: 2 when a box clips or spills that did not before.
  *
  *   npm run build
- *   env -u ELECTRON_RUN_AS_NODE -u VITE_DEV_SERVER_URL npx electron . --remote-debugging-port=9222
- *       ^ as a background task, never with a trailing `&` — see the doc, §7
+ *   env -u ELECTRON_RUN_AS_NODE -u VITE_DEV_SERVER_URL \
+ *     ./node_modules/electron/dist/electron --ozone-platform=x11 --remote-debugging-port=9222 .
+ *       ^ as a background task, never with a trailing `&` — see the doc, §7.
+ *         XWayland, because a native Wayland window that is off screen gets no
+ *         frames and every capture this makes then waits forever.
  *   node scripts/probe-ui-cdp.mjs capture --label baseline-main
  *   node scripts/probe-ui-cdp.mjs compare .work/ui-probe/baseline-main/probe.json \
  *                                         .work/ui-probe/phase-1/probe.json
@@ -37,8 +40,8 @@
  * screen that was open reopened, and a collapsed sidebar group this had to open
  * is closed again (that key is `device` tier; it never travels).
  *
- * Why motion is frozen: a window nobody is looking at gets no frames on this
- * machine, so a transition started by the theme flip can sit at its first value
+ * Why motion is frozen: a transition started by the theme flip runs on frames,
+ * and a background window gets few or none, so it can sit at its first value
  * and `getComputedStyle` reports the old theme's colours. With durations forced
  * to 0 every element is measured, and shot, at its settled state.
  *

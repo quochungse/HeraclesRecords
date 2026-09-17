@@ -281,9 +281,9 @@ Hundreds of rules set a shadow, so that was a class of bug, not a case. The ring
 is therefore `outline: var(--focus-ring)` with `--focus-ring: 2px solid
 var(--focus-ring-color, var(--accent))`, at `outline-offset: 2px` — or `-2px` inside a
 container that clips: the ten rules that already drew their outline inside, plus
-six the running app showed being cut off (the Sleep night list, both Running
-tables, Strength sessions, the Activities mix bar and a Training Library card's
-open button), found by tabbing through nine screens and comparing each ring's
+seven the running app showed being cut off (the Sleep night list, both Running
+tables, Strength sessions, the Activities mix bar, and a Training Library card's
+open button and its reader's favourite button), found by tabbing through nine screens and comparing each ring's
 box against every clipping ancestor. Only
 49 non-focus rules set `outline` at all, the element keeps its own elevation
 while focused, the gap is transparent rather than a grey halo on a white card,
@@ -293,6 +293,10 @@ the focus rule that already followed them); nine features keep their own ring
 colour through `--focus-ring-color` (strength ember, chat signal, watch-face
 focus, the calendar chip and step colours, the map accent). `<tr>` rows were
 checked separately: Chromium paints both. Held by `test:design-vocabulary`.
+The review pass added one more: the Activities search pill wraps a borderless
+input that drops its outline, so nothing showed keyboard focus there at all; the
+pill now wears the ring through `:has(input:focus-visible)`, which is why
+`--focus-ring` is declared on `:focus-within` as well as `:focus-visible`.
 
 **Risk.** `box-shadow` on a focus ring conflicts with an element that already
 carries an elevation shadow. Those must compose:
@@ -526,8 +530,10 @@ over `src/**/*.css`:
 *As built* (`scripts/test-elevation.mjs`, allowlist in
 `scripts/elevation-allowlist.json`): under the Q1 reading rule 1 starts at
 **109** rules, not 185 — the other 76 pair a border with an inset highlight, or
-name a token that resolves to nothing (`--wf-shadow-soft` is used twice in
-`watchfaces.css` and defined nowhere, so that `box-shadow` computes to `none`).
+name a token that resolves to nothing (`--wf-shadow-soft` was used twice in
+`watchfaces.css` and defined nowhere, so both declarations computed to `none` —
+taking the watch preview's intended hairline with them; fixed in the review
+pass).
 Rule 2 starts at **378** declarations: 154 elevation, 73 inset, 60 ring, 33
 glow, and 58 that spend a token outside the set — mostly `--glass-shadow` and
 `--glass-inset`, which is what `.panel` itself spends. Rule 3 was not built.
@@ -676,13 +682,26 @@ GNOME Wayland session; CDP is the only way.
 
 ```sh
 npm run build
-env -u ELECTRON_RUN_AS_NODE -u VITE_DEV_SERVER_URL npx electron . --remote-debugging-port=9222
+env -u ELECTRON_RUN_AS_NODE -u VITE_DEV_SERVER_URL \
+  ./node_modules/electron/dist/electron --ozone-platform=x11 --remote-debugging-port=9222 .
 ```
+
+**`--ozone-platform=x11` is what makes this dependable.** Under native Wayland a
+window that is not on screen gets no frame callbacks from the compositor, so
+every `Page.captureScreenshot` waits for a frame that never comes and times out
+— the baseline for this document was taken while the window happened to be
+visible, and the first capture after it hung on its first screen. Under
+XWayland the same capture returns in ~50ms whatever the window's state. The
+two render identically for these purposes: a capture of `main` under each,
+compared with `probe-ui-cdp.mjs compare`, differed in nothing.
 
 Launch it as a *background task*, never with a trailing `&` — an orphaned
 Electron holds the single-instance lock and the next launch then exits 0
-immediately, and `pkill -f "remote-debugging-port=922[2]"` will not match it
-because the main process consumes the flag. Kill it by PID. An unfocused window
+immediately. **Kill the process group, not the PID:** killing only the main
+process leaves its zygote, GPU and renderer children running, and their
+`--user-data-dir=…/heracles-records` arguments then look exactly like a running
+installed app to anything that checks for one. Start it under `setsid` and
+`kill -- -<pid>`. An unfocused window
 gets no frames, so `requestAnimationFrame` never runs: take three or four
 throwaway `Page.captureScreenshot` calls to force frames before the real one,
 and read `getComputedStyle` *before* capturing, since the capture itself forces
@@ -794,13 +813,13 @@ after each, `test:elevation` joining it from phase 3.
 | # | Item | § | Effort | Blocked on | Needs an aesthetic call |
 |---|---|---|---|---|---|
 | 0 | ~~Corrections to this document, `probe-ui-cdp.mjs`, baseline on `main`~~ — done 2026-09-17 | 7 | S | — | no |
-| 1 | `line-height` into the vocabulary test | 1 | S | — | no |
-| 2 | Motion: one curve, three durations | 2 | S | Q3, Q4 | no |
-| 3 | `test:elevation` (static, keyed allowlists) | 4.5 | S | Q1 | no |
-| 4 | One focus ring | 3 | S | Q4 | no |
-| 5 | Elevation ladder on **Sleep** | 4 | M | Q1, Q2 | yes — **stop for review** before spreading |
+| 1 | ~~`line-height` into the vocabulary test~~ — done 2026-09-17 | 1 | S | — | no |
+| 2 | ~~Motion: one curve, three durations~~ — done 2026-09-17 | 2 | S | — | no |
+| 3 | ~~`test:elevation` (static, keyed allowlists)~~ — done 2026-09-17 | 4.5 | S | — | no |
+| 4 | ~~One focus ring~~ — done 2026-09-17, as an outline (§3) | 3 | S | — | no |
+| 5 | Elevation ladder on **Sleep** | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
 | 6 | Ladder on Overview, Settings, then Activities | 4.6 | M | 5 approved | yes |
-| 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's 303 literals | 4 | L | 6 | yes, per file |
+| 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) | 4 | L | 6 | yes, per file |
 | 8 | Composition | 5 | L | **decide first** | yes |
 
 The focus ring moved behind the elevation test: §3 composes its ring with

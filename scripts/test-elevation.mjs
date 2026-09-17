@@ -82,7 +82,7 @@ function splitTop(value, sep) {
 const blankComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
 
 /** Every innermost `selector { body }`, with keyframe steps named after their animation. */
-function* rules(file, code) {
+function* rules(code) {
   for (const m of code.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
     let selector = m[1].trim().replace(/\s+/g, " ");
     if (!selector || selector.startsWith("@")) continue;
@@ -91,7 +91,7 @@ function* rules(file, code) {
       selector = `@keyframes ${name} ${selector}`;
     }
     const start = m.index + m[1].search(/\S/);
-    yield { file, selector, body: m[2], line: code.slice(0, start).split("\n").length };
+    yield { selector, body: m[2], line: code.slice(0, start).split("\n").length };
   }
 }
 
@@ -152,8 +152,7 @@ function shadowKind(value) {
     if (x === 0 && y === 0) return "glow";
     return "elevation";
   });
-  for (const kind of ["elevation", "glow", "ring", "inset"]) if (kinds.includes(kind)) return kind;
-  return "inset";
+  return ["elevation", "glow", "ring"].find((kind) => kinds.includes(kind)) ?? "inset";
 }
 
 const spendsTokens = (value) =>
@@ -166,27 +165,29 @@ const spendsTokens = (value) =>
 // ------------------------------------------------------------------ measure
 
 const found = { borderAndShadow: {}, shadowOutsideTokens: {} };
+/** Where each counted violation is, per rule — a rule can break both. */
 const sites = new Map();
-const bump = (bucket, key, site) => {
+const bump = (label, bucket, key, site) => {
   bucket[key] = (bucket[key] ?? 0) + 1;
-  if (!sites.has(key)) sites.set(key, []);
-  sites.get(key).push(site);
+  const at = `${label}|${key}`;
+  if (!sites.has(at)) sites.set(at, []);
+  sites.get(at).push(site);
 };
 
 for (const { file, code } of files) {
-  for (const rule of rules(file, code)) {
+  for (const rule of rules(code)) {
     const key = `${relative(ROOT, file)}|${rule.selector}`;
     const site = `${relative(ROOT, file)}:${rule.line}`;
     const shadows = declarations(rule.body, "box-shadow");
     const borders = declarations(rule.body, "border");
     if (borders.some(drawsVisibleBorder) && shadows.some((v) => castsOuterShadow(v))) {
-      bump(found.borderAndShadow, key, site);
+      bump("border+shadow", found.borderAndShadow, key, site);
     }
     for (const value of shadows) {
       if (spendsTokens(value)) continue;
       const kind = shadowKind(value);
       found.shadowOutsideTokens[kind] ??= {};
-      bump(found.shadowOutsideTokens[kind], key, site);
+      bump(`shadow:${kind}`, found.shadowOutsideTokens[kind], key, site);
     }
   }
 }
@@ -208,7 +209,7 @@ function ratchet(label, actual, listed) {
   for (const [key, count] of Object.entries(actual)) {
     const limit = listed[key] ?? 0;
     if (count > limit) {
-      problems.push(`${label}  ${key.replace("|", "  ")}  ${count} (list allows ${limit})   at ${sites.get(key).join(", ")}`);
+      problems.push(`${label}  ${key.replace("|", "  ")}  ${count} (list allows ${limit})   at ${sites.get(`${label}|${key}`).join(", ")}`);
     }
   }
   for (const [key, limit] of Object.entries(listed)) {

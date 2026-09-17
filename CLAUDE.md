@@ -913,8 +913,8 @@ and every `box-shadow` spends `--shadow-soft|card|elevated|inset`. Neither holds
 `scripts/elevation-allowlist.json` lists what broke them when the test was written, keyed
 `file|selector` with a count — and it only shrinks: a converted rule whose entry stays listed
 fails the test too. Take the entry out in the same change. Tokens are judged by what they
-resolve to across every definition, which is how it noticed `--wf-shadow-soft` is defined
-nowhere. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+resolve to across every definition, which is how it found a `--wf-shadow-soft` defined nowhere
+— an invalid token silently voids the whole `box-shadow`, hairline and all. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
 
 **Focus is one ring, drawn with `outline`, and the same vocabulary test holds it.** A rule
 whose subject is the focused element stands alone — never beside `:hover`, `.is-active` or

@@ -2232,10 +2232,12 @@
   transform: translateY(-1px);
 }
 
-.tl-reader-favorite:focus-visible {
+/* Inside: the reader panel clips a ring drawn below the dock. Scoped, because
+   the view-wide focus rule outranks a bare class and its offset would win. */
+.training-library-view .tl-reader-favorite:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .tl-reader-favorite.is-active {

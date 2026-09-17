@@ -491,7 +491,6 @@
       "src/watchfaces/watchfaces.css|:is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-modal, .watchfaces-modal, .watchface-modal)": 1,
       "src/watchfaces/watchfaces.css|:is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-pane, .watchface-editor-layers, .watchface-editor-inspector)": 1,
       "src/watchfaces/watchfaces.css|:is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.wf-toast, .watchfaces-toast, .watchface-toast)": 1,
-      "src/watchfaces/watchfaces.css|.watchface-shell .wf-export-phone-preview": 1,
       "src/watchfaces/watchfaces.css|.watchface-shell .wf-layer-context-menu": 1,
       "src/watchfaces/watchfaces.css|.watchface-shell .wf-placement-popover": 1
     }

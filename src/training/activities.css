@@ -357,6 +357,12 @@
   outline: none;
 }
 
+/* The input is borderless inside the pill, so the pill wears the ring. */
+.activities-search:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .activities-search input::-webkit-search-cancel-button {
   display: none;
 }

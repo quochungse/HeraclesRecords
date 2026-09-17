@@ -128,13 +128,15 @@
  * set almost nowhere else, keep the shadow underneath, follow border-radius,
  * and forced-colors repaints them in the system colour.
  *
- * Declared here, on the focused element, and not on :root: a custom property
- * holding var() is resolved where it is declared and inherited as the result,
- * so a :root ring would carry the root accent into the chat scopes that
- * redefine --accent. A feature whose focus has its own signal colour sets
- * --focus-ring-color.
+ * Declared here, on the focused element and its ancestors, and not on :root: a
+ * custom property holding var() is resolved where it is declared and inherited
+ * as the result, so a :root ring would carry the root accent into the chat
+ * scopes that redefine --accent. The ancestors are for a field whose ring is
+ * drawn on the wrapper around it (`.x:has(input:focus-visible)`). A feature
+ * whose focus has its own signal colour sets --focus-ring-color.
  */
-:focus-visible {
+:focus-visible,
+:focus-within {
   --focus-ring: 2px solid var(--focus-ring-color, var(--accent));
 }
 

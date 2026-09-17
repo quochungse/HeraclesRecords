@@ -2001,16 +2001,15 @@
   border: 1px solid var(--wf-border-strong);
   border-radius: var(--wf-pane-radius);
   background: var(--wf-surface-raised);
-  box-shadow: var(--wf-shadow-soft);
 }
 
 .watchface-shell .wf-export-watch-preview {
   border: 8px solid color-mix(in srgb, var(--wf-surface-raised) 74%, #000);
   border-radius: 50%;
   background: #05090b;
-  box-shadow:
-    0 0 0 1px var(--wf-border-strong),
-    var(--wf-shadow-soft);
+  /* Was `…, var(--wf-shadow-soft)`: a token defined nowhere, which made the
+     whole declaration invalid and dropped this hairline with it. */
+  box-shadow: 0 0 0 1px var(--wf-border-strong);
 }
 
 .watchface-shell .wf-export-phone-preview img,
