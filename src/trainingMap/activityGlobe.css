@@ -264,7 +264,8 @@
 .training-map-recent-list > button:focus-visible,
 .training-map-reset:focus-visible,
 .training-map-recent-controls button:focus-visible {
-  outline: 2px solid var(--map-accent);
+  --focus-ring-color: var(--map-accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 

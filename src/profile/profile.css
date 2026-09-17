@@ -318,10 +318,16 @@
   cursor: pointer;
 }
 
-.profile-zone-model-button:hover,
+.profile-zone-model-button:hover {
+  border-bottom-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
 .profile-zone-model-button:focus-visible {
   border-bottom-color: var(--accent-gold);
   color: var(--accent-gold);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .profile-tabs {

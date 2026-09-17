@@ -35,9 +35,11 @@
   box-shadow: var(--sx-lift);
 }
 
+/* Inside: the session list sits in a panel that clips a ring drawn outside. */
 .strength-session-row:focus-visible {
-  outline: 2px solid var(--sx-ember);
-  outline-offset: 1px;
+  --focus-ring-color: var(--sx-ember);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .strength-session-row-icon {
@@ -356,8 +358,9 @@
 }
 
 .strength-session-records.is-list button:focus-visible {
-  outline: 2px solid var(--sx-ember);
-  outline-offset: 1px;
+  --focus-ring-color: var(--sx-ember);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .strength-session-record-figures {
@@ -432,8 +435,9 @@
 
 .strength-session-exercise-toggle:focus-visible,
 .strength-session-exercise-explore:focus-visible {
-  outline: 2px solid var(--sx-ember);
-  outline-offset: 1px;
+  --focus-ring-color: var(--sx-ember);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .strength-session-exercise-chevron {
@@ -650,13 +654,15 @@
   margin-top: 10px;
 }
 
-.strength-volume-row:hover,
-.strength-volume-row:focus-visible {
+.strength-volume-row:hover {
   background: var(--sx-well);
 }
 
 .strength-volume-row:focus-visible {
-  box-shadow: 0 0 0 2px var(--sx-ember);
+  --focus-ring-color: var(--sx-ember);
+  background: var(--sx-well);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .strength-volume-name {

@@ -119,14 +119,15 @@
   transition: height var(--dur-base) var(--ease);
 }
 
-.activities-mix-bar.is-probing,
-.activities-mix-bar:focus-visible {
+.activities-mix-bar.is-probing {
   height: 16px;
 }
 
+/* Inside: the bar is as wide as its column, which clips anything past it. */
 .activities-mix-bar:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  height: 16px;
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .activities-mix-bar i {

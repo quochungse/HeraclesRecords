@@ -272,6 +272,28 @@ Sleep, Running and Settings in both themes, and read `getComputedStyle(
 document.activeElement).boxShadow` over CDP at each stop: the ring is present,
 in that scope's accent, and differs from the hover state.
 
+**As built: an outline, not a box-shadow.** The recipe above was built first and
+failed in the app. Tabbing through Overview in paper found a button with no ring
+at all: `:root[data-theme="paper"] .training-upcoming-today` sets `box-shadow`
+at specificity 0,3,0 and beat `.training-upcoming-today-button:focus-visible` at
+0,2,0 — a different class on the same element, which no static scan can pair.
+Hundreds of rules set a shadow, so that was a class of bug, not a case. The ring
+is therefore `outline: var(--focus-ring)` with `--focus-ring: 2px solid
+var(--focus-ring-color, var(--accent))`, at `outline-offset: 2px` — or `-2px` inside a
+container that clips: the ten rules that already drew their outline inside, plus
+six the running app showed being cut off (the Sleep night list, both Running
+tables, Strength sessions, the Activities mix bar and a Training Library card's
+open button), found by tabbing through nine screens and comparing each ring's
+box against every clipping ancestor. Only
+49 non-focus rules set `outline` at all, the element keeps its own elevation
+while focused, the gap is transparent rather than a grey halo on a white card,
+and forced-colors mode needs no transparent-outline trick. 107 rules were
+rewritten, 44 of them split off a `:hover` (five of those then merged back into
+the focus rule that already followed them); nine features keep their own ring
+colour through `--focus-ring-color` (strength ember, chat signal, watch-face
+focus, the calendar chip and step colours, the map accent). `<tr>` rows were
+checked separately: Chromium paints both. Held by `test:design-vocabulary`.
+
 **Risk.** `box-shadow` on a focus ring conflicts with an element that already
 carries an elevation shadow. Those must compose:
 `box-shadow: var(--focus-ring), var(--shadow-card)`. Order: after

@@ -44,6 +44,18 @@
  *     property, and an entry that no longer matches fails, so the list cannot
  *     outlive the transitions it excuses.
  *
+ * Focus has one look too. 144 `:focus-visible` rules spelled 35 different
+ * rings, and 46 shared a rule with `:hover` — so a keyboard user got the
+ * mouse-over state and no way to tell the element was selected rather than
+ * merely under a cursor. A rule whose subject is the focused element therefore
+ * stands alone (no `:hover`, `.is-active` or `:focus` beside it, and not
+ * grouped inside `:is()`) and draws `outline: var(--focus-ring)` at
+ * `outline-offset: 2px` — or `-2px` where the container clips. A rule that
+ * styles something else while focus is inside (`:focus-visible .tip`,
+ * `::before`, `:has()`) is not a ring rule, and neither is a reduced-motion or
+ * forced-colors override. Why an outline and not a box-shadow is written above
+ * the `--focus-ring` definition in styles.css.
+ *
  * Run: npm run test:design-vocabulary
  */
 import assert from "node:assert/strict";
@@ -322,6 +334,79 @@ for (const file of cssFiles(SRC)) {
     }
   }
 }
+/** The last compound of a selector, at paren depth 0. */
+function lastCompound(selector) {
+  let depth = 0;
+  let cut = 0;
+  for (let i = 0; i < selector.length; i += 1) {
+    const ch = selector[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && /[\s>+~]/.test(ch)) cut = i + 1;
+  }
+  return selector.slice(cut);
+}
+
+/** `:focus-visible` on the element the rule paints — not inside :is()/:has(), not on a pseudo-element. */
+function targetsFocusedElement(selector) {
+  const last = lastCompound(selector);
+  if (last.includes("::")) return false;
+  let depth = 0;
+  for (let i = 0; i < last.length; i += 1) {
+    if (last[i] === "(") depth += 1;
+    else if (last[i] === ")") depth -= 1;
+    else if (depth === 0 && last.startsWith(":focus-visible", i)) return true;
+  }
+  return false;
+}
+
+/** The at-rule a position sits inside, if any. */
+function enclosingAtRule(code, index) {
+  let depth = 0;
+  for (let i = index; i >= 0; i -= 1) {
+    if (code[i] === "}") depth += 1;
+    else if (code[i] === "{") {
+      if (depth > 0) {
+        depth -= 1;
+        continue;
+      }
+      const head = code.slice(code.lastIndexOf("}", i - 1) + 1, i).trim();
+      if (head.startsWith("@")) return head;
+    }
+  }
+  return "";
+}
+
+const RING_OUTLINE = /(?<![-\w])outline\s*:\s*var\(--focus-ring\)\s*(;|$)/;
+const RING_OFFSET = /(?<![-\w])outline-offset\s*:\s*-?2px\s*(;|$)/;
+
+for (const file of cssFiles(SRC)) {
+  const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+  for (const m of code.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
+    const selectorText = m[1].trim().replace(/\s+/g, " ");
+    if (!selectorText.includes(":focus-visible") || selectorText === ":focus-visible") continue;
+    if (/prefers-reduced-motion|forced-colors/.test(enclosingAtRule(code, m.index))) continue;
+    const selectors = splitTop(selectorText, ",");
+    const line = code.slice(0, m.index + m[1].search(/\S/)).split("\n").length;
+    // `:is(:hover, :focus-visible)` is the same collapse, spelled inside one selector.
+    const grouped = selectors.find((sel) => !lastCompound(sel).includes("::") && /:(is|where)\([^()]*:focus-visible/.test(lastCompound(sel)));
+    if (grouped) {
+      fail(file, line, "selector", grouped.slice(0, 90), "give :focus-visible its own rule rather than grouping it with another state in :is()");
+    }
+    const focused = selectors.filter(targetsFocusedElement);
+    if (!focused.length) continue;
+    const body = m[2].trim();
+    if (focused.length < selectors.length) {
+      fail(file, line, "selector", selectorText.slice(0, 90),
+        "give :focus-visible its own rule — sharing one with :hover (or .is-active, or :focus) makes focus look like hover");
+    }
+    if (!RING_OUTLINE.test(body) || !RING_OFFSET.test(body)) {
+      fail(file, line, ":focus-visible", selectorText.slice(0, 90),
+        "draw outline: var(--focus-ring) at outline-offset: 2px (or -2px where the container clips)");
+    }
+  }
+}
+
 for (const key of designedUnused) {
   violations.push(`DESIGNED_LENGTHS  ${key.replaceAll("|", "  ")}   — no such literal transition any more; remove the entry`);
 }

@@ -208,7 +208,8 @@
     textarea,
     [tabindex]:not([tabindex="-1"])
   ):focus-visible {
-  outline: 2px solid var(--wf-focus);
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -304,7 +305,8 @@
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(input, select, textarea):focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-glow) 58%, transparent);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) input[type="range"] {
@@ -2993,7 +2995,8 @@
 }
 
 .watchface-shell .watchface-layer-lock:focus-visible {
-  outline: 2px solid var(--accent-strong);
+  --focus-ring-color: var(--accent-strong);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -3774,8 +3777,9 @@
 .watchface-shell .wf-stroke-row-action:focus-visible,
 .watchface-shell .wf-stroke-advanced-toggle:focus-visible,
 .watchface-shell .wf-nested-disclosure > summary:focus-visible {
-  outline: 2px solid var(--wf-focus);
-  outline-offset: 1px;
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-shell .wf-property-section-chevron {
@@ -3861,8 +3865,9 @@
 
 .watchface-shell .wf-property-section :is(input, select):focus-visible {
   border-color: var(--wf-accent-border);
-  outline: 2px solid color-mix(in srgb, var(--wf-focus) 52%, transparent);
-  outline-offset: 0;
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-shell .wf-property-icon-button,
@@ -4447,8 +4452,9 @@
 }
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.watchface-position-inputs, .wf-position-inputs) input:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: 1px;
+  --focus-ring-color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.watchface-inspector-position, .wf-position-section) {
@@ -5083,8 +5089,9 @@
 
 .watchface-shell .wf-property-section :is(input, select):focus-visible {
   border-color: var(--wf-focus);
-  outline: 1px solid var(--wf-focus);
-  outline-offset: -1px;
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .watchface-shell input.wf-scrubbable-number {
@@ -5142,8 +5149,9 @@ body.wf-value-scrubbing * {
 
 .watchface-shell .wf-linked-dimension-toggle:focus-visible {
   border-color: var(--wf-focus);
-  outline: 1px solid var(--wf-focus);
-  outline-offset: -1px;
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .watchface-shell .wf-property-section :is(.watchface-position-inputs, .wf-position-inputs) label {
@@ -5423,10 +5431,16 @@ body.wf-value-scrubbing * {
   font-size: 12px;
 }
 
-.watchface-shell .watchface-font-picker-trigger:hover:not(:disabled),
+.watchface-shell .watchface-font-picker-trigger:hover:not(:disabled) {
+  border-color: var(--wf-border-strong);
+  box-shadow: none;
+}
+
 .watchface-shell .watchface-font-picker-trigger:focus-visible {
   border-color: var(--wf-border-strong);
   box-shadow: none;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-shell .watchface-typography-controls {
@@ -7331,16 +7345,17 @@ body.wf-value-scrubbing * {
   transition: color var(--dur-fast) var(--ease);
 }
 
-.watchface-shell--hub .watchface-dashboard-tabs > button:hover,
-.watchface-shell--hub .watchface-dashboard-tabs > button:focus-visible {
+.watchface-shell--hub .watchface-dashboard-tabs > button:hover {
   background: transparent;
   color: var(--text-primary);
 }
 
 .watchface-shell--hub .watchface-dashboard-tabs > button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -4px;
+  background: transparent;
+  color: var(--text-primary);
   border-radius: var(--radius-sm);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .watchface-shell--hub .watchface-dashboard-tabs > button.is-active,
@@ -8805,10 +8820,10 @@ body.wf-value-scrubbing * {
 
 .watchface-shell--hub .watchface-model-field > select:focus-visible {
   border-color: var(--wf-focus);
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--accent) 24%, transparent),
-    0 8px 22px color-mix(in srgb, var(--accent-glow) 34%, transparent),
-    inset 3px 0 0 var(--accent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-glow) 34%, transparent), inset 3px 0 0 var(--accent);
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-shell--hub .watchface-template-grid,
@@ -8994,7 +9009,9 @@ body.wf-value-scrubbing * {
 
 .watchface-shell .wf-layer-search > input:focus-visible {
   border-color: var(--wf-focus);
-  outline: none;
+  --focus-ring-color: var(--wf-focus);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-shell .wf-layer-search-clear {

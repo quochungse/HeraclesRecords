@@ -207,7 +207,7 @@
 }
 
 .training-library-view :is(button, input, select, textarea, [role="checkbox"]):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -686,7 +686,8 @@
 }
 
 .tl-search input:focus-visible {
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* The field wakes up: accent ring, soft outer glow, and a little more room. */
@@ -1320,6 +1321,13 @@
   background: none;
   text-align: left;
   cursor: pointer;
+}
+
+/* The open button covers its card, which clips it: the ring goes inside. The
+   view-wide focus rule above outranks a bare .tl-card-open, hence the scope. */
+.training-library-view .tl-card-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .tl-card-top {
@@ -2226,8 +2234,8 @@
 
 .tl-reader-favorite:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .tl-reader-favorite.is-active {
@@ -2759,8 +2767,8 @@
 
 .tl-reader-schedule input:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .tl-reader-actions {
@@ -3571,6 +3579,8 @@
 
 .plan-editor-name:focus-visible {
   border-bottom-color: var(--accent);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-editor-header > div > p:last-of-type {
@@ -4126,9 +4136,14 @@
   transition: opacity var(--dur-fast) var(--ease);
 }
 
-.plan-day:hover .plan-day-heading button,
+.plan-day:hover .plan-day-heading button {
+  opacity: 1;
+}
+
 .plan-day-heading button:focus-visible {
   opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-day-entries {
@@ -4994,8 +5009,8 @@
 .plan-generator-segmented button:focus-visible,
 .plan-generator-stepper button:focus-visible,
 .plan-generator-examples button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-generator-inline-error {

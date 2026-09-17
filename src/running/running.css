@@ -271,10 +271,16 @@
   border-bottom: none;
 }
 
-.run-list tbody tr:hover,
-.run-list tbody tr:focus-visible {
+.run-list tbody tr:hover {
   background: var(--run-raised);
   outline: none;
+}
+
+/* Inside: a row spans the table, and the view clips a ring drawn outside it. */
+.run-list tbody tr:focus-visible {
+  background: var(--run-raised);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .run-list td {
@@ -707,10 +713,15 @@
   cursor: pointer;
 }
 
-.run-lap-table tbody tr.run-lap-row:hover,
-.run-lap-table tbody tr.run-lap-row:focus-visible {
+.run-lap-table tbody tr.run-lap-row:hover {
   background: var(--run-raised);
   outline: none;
+}
+
+.run-lap-table tbody tr.run-lap-row:focus-visible {
+  background: var(--run-raised);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 /* ------------------------------------------------------------------ hero -- */

@@ -12,14 +12,13 @@
  *
  *   1. No rule draws a visible border *and* an outer shadow. An outer shadow is
  *      the device a card floats on; a border is the device a well sits in. An
- *      inset is neither — it is a highlight or a recess — so it does not count,
- *      and neither does `--focus-ring`, which marks focus rather than height.
+ *      inset is neither — it is a highlight or a recess — so it does not count.
  *      A border spelled `var(--surface-line, …)` is the L1 recipe (transparent
  *      in paper, the glass border in dark) and is not a violation; nor is a
  *      transparent one, which only reserves the space.
  *   2. Every `box-shadow` spends a token: `--shadow-soft`, `--shadow-card`,
- *      `--shadow-elevated`, `--shadow-inset` or `--focus-ring`, alone or as a
- *      comma list — or is `none`.
+ *      `--shadow-elevated` or `--shadow-inset`, alone or as a comma list — or
+ *      is `none`. (The focus ring is an outline, so it never meets either rule.)
  *
  * A token is judged by what it resolves to, across every definition it has
  * (dark, paper, a feature scope): `var(--glass-shadow)` is an outer shadow even
@@ -49,9 +48,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const SRC = join(ROOT, "src");
 const ALLOWLIST_PATH = join(ROOT, "scripts/elevation-allowlist.json");
 
-const SHADOW_TOKENS = new Set(["--shadow-soft", "--shadow-card", "--shadow-elevated", "--shadow-inset", "--focus-ring"]);
-/** Marks focus, not height: never an elevation device. */
-const RING_TOKENS = new Set(["--focus-ring"]);
+const SHADOW_TOKENS = new Set(["--shadow-soft", "--shadow-card", "--shadow-elevated", "--shadow-inset"]);
 
 function cssFiles(dir) {
   const out = [];
@@ -129,7 +126,7 @@ function castsOuterShadow(value, seen = new Set()) {
     const token = layer.match(/^var\((--[\w-]+)\s*(?:,\s*(.+))?\)$/);
     if (token) {
       const [, name, fallback] = token;
-      if (RING_TOKENS.has(name) || seen.has(name)) return false;
+      if (seen.has(name)) return false;
       const values = definitions.get(name) ?? (fallback ? [fallback] : []);
       return values.some((v) => castsOuterShadow(v, new Set([...seen, name])));
     }

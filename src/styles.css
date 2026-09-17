@@ -116,6 +116,29 @@
 }
 
 /*
+ * The focus ring. Every `:focus-visible` rule spends it the same way —
+ * `outline: var(--focus-ring)` at `outline-offset: 2px`, or `-2px` where the
+ * container clips its children (a row in a scrolling list, a tab in a strip).
+ *
+ * An outline, not a box-shadow, and on purpose. A box-shadow ring loses to any
+ * rule that sets a shadow with more specificity — a paper override, an
+ * `.is-selected` — and hundreds of rules set one, so the ring vanished on
+ * elements nothing could enumerate. It also replaced the element's own
+ * elevation while focused and disappeared in forced-colors mode. Outlines are
+ * set almost nowhere else, keep the shadow underneath, follow border-radius,
+ * and forced-colors repaints them in the system colour.
+ *
+ * Declared here, on the focused element, and not on :root: a custom property
+ * holding var() is resolved where it is declared and inherited as the result,
+ * so a :root ring would carry the root accent into the chat scopes that
+ * redefine --accent. A feature whose focus has its own signal colour sets
+ * --focus-ring-color.
+ */
+:focus-visible {
+  --focus-ring: 2px solid var(--focus-ring-color, var(--accent));
+}
+
+/*
  * Paper light theme — a neutral cool-grey canvas carrying white surfaces.
  * Redefines the core tokens so everything that reads var(--…) reskins
  * automatically. Hardcoded hex/rgba values that bypass these tokens are
@@ -1551,7 +1574,7 @@ input::placeholder {
 }
 
 .update-prompt-changelog:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -1715,10 +1738,15 @@ input::placeholder {
     color var(--dur-fast) var(--ease);
 }
 
-.resources-link:hover,
-.resources-link:focus-visible {
+.resources-link:hover {
   background: var(--glass-bg-hover);
   outline: none;
+}
+
+.resources-link:focus-visible {
+  background: var(--glass-bg-hover);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .resources-link svg:first-child {
@@ -1810,10 +1838,15 @@ input::placeholder {
     color var(--dur-fast) var(--ease);
 }
 
-.startup-view-option:hover,
-.startup-view-option:focus-visible {
+.startup-view-option:hover {
   background: var(--glass-bg-hover);
   outline: none;
+}
+
+.startup-view-option:focus-visible {
+  background: var(--glass-bg-hover);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .startup-view-option.is-active {
@@ -2854,7 +2887,7 @@ input::placeholder {
 }
 
 .activity-globe-reset:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -2968,7 +3001,7 @@ input::placeholder {
 }
 
 .activity-globe-action:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -3025,7 +3058,7 @@ input::placeholder {
 }
 
 .dashboard-status.is-clickable:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -3158,10 +3191,16 @@ input::placeholder {
     opacity var(--dur-fast) var(--ease);
 }
 
-.connection-pill-action:hover:not(:disabled),
+.connection-pill-action:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  opacity: 1;
+}
+
 .connection-pill-action:focus-visible {
   background: var(--glass-bg-hover);
   opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .connection-pill-action:disabled {
@@ -3269,7 +3308,7 @@ input::placeholder {
 }
 
 .metric-tile-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -5442,7 +5481,7 @@ td span {
 }
 
 .wf-selectable-component input[role="switch"]:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -5479,10 +5518,15 @@ td span {
   cursor: pointer;
 }
 
-.watchface-font-picker-trigger:hover:not(:disabled),
-.watchface-font-picker-trigger:focus-visible {
+.watchface-font-picker-trigger:hover:not(:disabled) {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.watchface-font-picker-trigger:focus-visible {
+  border-color: var(--accent);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-font-picker-trigger:disabled {
@@ -5616,10 +5660,16 @@ td span {
   place-items: center;
 }
 
-.watchface-font-picker-close:hover,
+.watchface-font-picker-close:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
 .watchface-font-picker-close:focus-visible {
   background: var(--glass-bg-hover);
   color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .watchface-font-picker-browser {
@@ -5690,7 +5740,7 @@ td span {
 .watchface-font-picker-search > button:focus-visible,
 .watchface-font-picker-results button:focus-visible,
 .watchface-font-custom-option:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -6945,9 +6995,9 @@ td span {
 }
 
 .app-select-trigger:focus-visible {
-  outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .app-select-trigger:disabled {
@@ -7054,9 +7104,14 @@ td span {
 }
 
 .app-select-option:hover,
-.app-select-option.is-active,
+.app-select-option.is-active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .app-select-option:focus-visible {
   background: rgba(255, 255, 255, 0.06);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .app-select-option.is-selected {
@@ -7830,10 +7885,16 @@ td span {
     color var(--dur-fast) var(--ease);
 }
 
-.training-login-visibility:hover:not(:disabled),
+.training-login-visibility:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
 .training-login-visibility:focus-visible {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-login-actions .primary-button {
@@ -7937,12 +7998,20 @@ td span {
     transform var(--dur-base) var(--ease);
 }
 
-.training-login-browser-link:hover,
+.training-login-browser-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
 .training-login-browser-link:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: #ffffff;
   transform: translateY(-1px);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-login-footer {
@@ -8001,9 +8070,14 @@ td span {
   transition: color var(--dur-fast) var(--ease);
 }
 
-.training-login-text-button:hover:not(:disabled),
+.training-login-text-button:hover:not(:disabled) {
+  color: rgba(245, 245, 247, 0.95);
+}
+
 .training-login-text-button:focus-visible {
   color: rgba(245, 245, 247, 0.95);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-login-text-button:disabled {
@@ -11273,16 +11347,22 @@ td span {
 }
 
 .vo2-plateau:focus-visible {
-  outline: none;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /*
  * Grown on the cross axis only: the bar's widths are days, so widening a
  * segment would say the plateau lasted longer than it did.
  */
-.vo2-plateau:hover,
+.vo2-plateau:hover {
+  z-index: 3;
+}
+
 .vo2-plateau:focus-visible {
   z-index: 3;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .vo2-plateau:hover::before,
@@ -11470,10 +11550,16 @@ td span {
 }
 
 .sleep-panel.is-openable:hover .sleep-panel-open,
-.sleep-panel-open:hover,
+.sleep-panel-open:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+
 .sleep-panel-open:focus-visible {
   background: color-mix(in srgb, var(--text-primary) 10%, transparent);
   color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .sleep-panel-empty {
@@ -11640,8 +11726,7 @@ td span {
   border-radius: var(--radius-pill);
 }
 
-.sleep-stage-segment:hover,
-.sleep-stage-segment:focus-visible {
+.sleep-stage-segment:hover {
   z-index: 4;
   border-radius: var(--radius-pill);
   box-shadow:
@@ -11650,6 +11735,15 @@ td span {
     0 8px 18px rgba(0, 0, 0, 0.32);
   filter: saturate(1.18) brightness(1.12);
   transform: translateY(-3px) scaleY(1.72);
+}
+
+.sleep-stage-segment:focus-visible {
+  z-index: 4;
+  border-radius: var(--radius-pill);
+  filter: saturate(1.18) brightness(1.12);
+  transform: translateY(-3px) scaleY(1.72);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .sleep-stage-segment:hover::after,
@@ -11838,7 +11932,7 @@ td span {
 
 .sleep-metric dd.has-note:focus-visible,
 .sleep-detail-metric dd.has-note:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -12636,12 +12730,19 @@ td span {
   box-shadow: 0 0 14px color-mix(in srgb, var(--cell-color) 35%, transparent);
 }
 
-.training-heatmap-cell:not(.is-empty):hover,
-.training-heatmap-cell:not(.is-empty):focus-visible {
+.training-heatmap-cell:not(.is-empty):hover {
   scale: 1.1;
   filter: brightness(1.2);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
   z-index: 2;
+}
+
+.training-heatmap-cell:not(.is-empty):focus-visible {
+  scale: 1.1;
+  filter: brightness(1.2);
+  z-index: 2;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-heatmap-cell:not(.is-empty):hover::before,
@@ -12821,12 +12922,20 @@ td span {
 
 /* Cards are large enough that the square's 1.1 pop would shove its neighbours;
    the border and glow carry the hover instead. */
-.training-heatmap-cell.is-card:hover,
+.training-heatmap-cell.is-card:hover {
+  scale: 1;
+  filter: brightness(1.08);
+  border-color: color-mix(in srgb, var(--cell-color) 55%, var(--glass-border));
+  box-shadow: none;
+}
+
 .training-heatmap-cell.is-card:focus-visible {
   scale: 1;
   filter: brightness(1.08);
   border-color: color-mix(in srgb, var(--cell-color) 55%, var(--glass-border));
   box-shadow: none;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-heatmap-card-entries {
@@ -13696,10 +13805,9 @@ td span {
 
 .training-zone-select-trigger:focus-visible {
   border-color: rgba(79, 195, 243, 0.52);
-  box-shadow:
-    var(--glass-inset),
-    0 16px 38px rgba(0, 0, 0, 0.34),
-    0 0 0 3px rgba(79, 195, 243, 0.15);
+  box-shadow: var(--glass-inset), 0 16px 38px rgba(0, 0, 0, 0.34);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-zone-select-value {
@@ -13760,9 +13868,14 @@ td span {
 }
 
 .training-zone-select-option.is-active,
-.training-zone-select-option:hover,
+.training-zone-select-option:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .training-zone-select-option:focus-visible {
   background: rgba(255, 255, 255, 0.12);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-zone-select-option.is-selected {
@@ -15080,9 +15193,14 @@ tr.data-intervals-row-missing {
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
-.training-upcoming-today-button:hover,
+.training-upcoming-today-button:hover {
+  border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
+}
+
 .training-upcoming-today-button:focus-visible {
   border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-upcoming-today-button .training-upcoming-chevron {
@@ -15178,10 +15296,16 @@ tr.data-intervals-row-missing {
   transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-.training-upcoming-row:hover,
+.training-upcoming-row:hover {
+  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
+  background: rgba(255, 255, 255, 0.045);
+}
+
 .training-upcoming-row:focus-visible {
   border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
   background: rgba(255, 255, 255, 0.045);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-upcoming-row:hover .training-upcoming-chevron,
@@ -15783,9 +15907,14 @@ tr.data-intervals-row-missing {
   transition: background var(--dur-fast) var(--ease);
 }
 
-.training-export-option:hover,
+.training-export-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .training-export-option:focus-visible {
   background: rgba(255, 255, 255, 0.06);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-export-option-label {
@@ -18065,8 +18194,9 @@ tr.data-intervals-row-missing {
 }
 
 .chat-plan-list-item:focus-visible {
-  outline: 2px solid var(--chat-signal);
-  outline-offset: -1px;
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .chat-plan-list-item.is-selected {
@@ -20965,8 +21095,7 @@ tr.data-intervals-row-missing {
 }
 
 .chat-select-menu .app-select-option:hover,
-.chat-select-menu .app-select-option.is-active,
-.chat-select-menu .app-select-option:focus-visible {
+.chat-select-menu .app-select-option.is-active {
   border-color: color-mix(
     in srgb,
     var(--chat-select-tone) 22%,
@@ -20978,6 +21107,22 @@ tr.data-intervals-row-missing {
     var(--glass-bg-hover)
   );
   color: var(--text-primary);
+}
+
+.chat-select-menu .app-select-option:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--chat-select-tone) 22%,
+    transparent
+    );
+  background: color-mix(
+    in srgb,
+    var(--chat-select-tone-soft) 62%,
+    var(--glass-bg-hover)
+    );
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .chat-select-menu .app-select-option.is-active:not(.is-selected) {
@@ -21184,7 +21329,7 @@ tr.data-intervals-row-missing {
 }
 
 .chat-composer-new-chat:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -22041,7 +22186,8 @@ tr.data-intervals-row-missing {
 }
 
 .chat-plan-issues summary:focus-visible {
-  outline: 2px solid var(--chat-signal);
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -22580,7 +22726,8 @@ tr.data-intervals-row-missing {
 }
 
 .chat-workout-calendar-date > input:focus-visible {
-  outline: 2px solid var(--chat-signal);
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -22650,7 +22797,8 @@ tr.data-intervals-row-missing {
 .chat-plan-week-stepper button:focus-visible,
 .chat-plan-review:focus-visible,
 .chat-plan-upload:focus-visible {
-  outline: 2px solid var(--chat-signal);
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -24409,10 +24557,15 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .resources-link:hover,
+:root[data-theme="paper"] .startup-view-option:hover {
+  background: rgba(19, 26, 40, 0.06);
+}
+
 :root[data-theme="paper"] .resources-link:focus-visible,
-:root[data-theme="paper"] .startup-view-option:hover,
 :root[data-theme="paper"] .startup-view-option:focus-visible {
   background: rgba(19, 26, 40, 0.06);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :root[data-theme="paper"] .startup-view-option.is-active {
@@ -25365,9 +25518,14 @@ tr.data-intervals-row-missing {
   box-shadow: var(--shadow-elevated);
 }
 
-:root[data-theme="paper"] .training-export-option:hover,
+:root[data-theme="paper"] .training-export-option:hover {
+  background: rgba(19, 26, 40, 0.07);
+}
+
 :root[data-theme="paper"] .training-export-option:focus-visible {
   background: rgba(19, 26, 40, 0.07);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* --- Training Hub: graph menus (fitness metrics + zone select) ------------- */
@@ -25399,9 +25557,14 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .metric-select-option:hover,
 :root[data-theme="paper"] .metric-select-option.is-selected,
 :root[data-theme="paper"] .training-zone-select-option.is-active,
-:root[data-theme="paper"] .training-zone-select-option:hover,
+:root[data-theme="paper"] .training-zone-select-option:hover {
+  background: rgba(19, 26, 40, 0.09);
+}
+
 :root[data-theme="paper"] .training-zone-select-option:focus-visible {
   background: rgba(19, 26, 40, 0.09);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :root[data-theme="paper"] .metric-select-check {
@@ -25442,11 +25605,15 @@ tr.data-intervals-row-missing {
   background: transparent;
 }
 
-:root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):hover,
-:root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):focus-visible {
+:root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):hover {
   box-shadow:
     0 0 0 2px rgba(19, 26, 40, 0.23),
     0 6px 18px color-mix(in srgb, var(--accent-muted) 30%, transparent);
+}
+
+:root[data-theme="paper"] .training-heatmap-cell:not(.is-empty):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :root[data-theme="paper"] .training-heatmap-tooltip {
@@ -25830,10 +25997,16 @@ tr.data-intervals-row-missing {
   color: var(--text-muted);
 }
 
-:root[data-theme="paper"] .training-login-visibility:hover:not(:disabled),
+:root[data-theme="paper"] .training-login-visibility:hover:not(:disabled) {
+  background: rgba(19, 26, 40, 0.07);
+  color: var(--text-primary);
+}
+
 :root[data-theme="paper"] .training-login-visibility:focus-visible {
   background: rgba(19, 26, 40, 0.07);
   color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 :root[data-theme="paper"] .training-login-actions .primary-button {
@@ -27463,7 +27636,8 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-sport-chip:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--chip-sport) 68%, transparent);
+  --focus-ring-color: var(--chip-sport);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -27901,14 +28075,14 @@ tr.data-intervals-row-missing {
   transition: color var(--dur-fast) var(--ease);
 }
 
-.calendar-activity-search-toggle:hover:not(:disabled),
-.calendar-activity-search-toggle:focus-visible {
+.calendar-activity-search-toggle:hover:not(:disabled) {
   color: var(--accent-strong);
 }
 
 .calendar-activity-search-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-activity-sport-picker {
@@ -27989,7 +28163,7 @@ tr.data-intervals-row-missing {
    has to say which one has the caret. */
 .calendar-field .calendar-unit-control input:focus-visible,
 .calendar-field .calendar-duration-control input:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -28053,7 +28227,7 @@ tr.data-intervals-row-missing {
 
 .calendar-sport-card:focus-visible,
 .calendar-modal-tab:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -28328,15 +28502,16 @@ tr.data-intervals-row-missing {
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 
-.calendar-builder-order-buttons button:hover:not(:disabled),
-.calendar-builder-order-buttons button:focus-visible {
+.calendar-builder-order-buttons button:hover:not(:disabled) {
   background: var(--glass-bg-hover);
   color: var(--accent-strong);
 }
 
 .calendar-builder-order-buttons button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 68%, transparent);
-  outline-offset: 1px;
+  background: var(--glass-bg-hover);
+  color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-order-buttons button:active:not(:disabled) {
@@ -28365,8 +28540,8 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-row-toggle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 68%, transparent);
-  outline-offset: 4px;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-step-label {
@@ -28509,18 +28684,32 @@ tr.data-intervals-row-missing {
   display: none;
 }
 
-.calendar-modal .calendar-builder-duplicate:hover,
-.calendar-modal .calendar-builder-duplicate:focus-visible {
+.calendar-modal .calendar-builder-duplicate:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
-.calendar-modal .calendar-builder-delete:hover:not(:disabled),
+.calendar-modal .calendar-builder-duplicate:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.calendar-modal .calendar-builder-delete:hover:not(:disabled) {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
 .calendar-modal .calendar-builder-delete:focus-visible:not(:disabled) {
   border-color: var(--error-border);
   background: var(--error-bg);
   color: var(--error-text);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-primary-grid,
@@ -28752,18 +28941,24 @@ tr.data-intervals-row-missing {
   font-weight: 600;
 }
 
-.calendar-builder-repeat-count button:hover:not(:disabled),
+.calendar-builder-repeat-count button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .calendar-builder-repeat-count button:focus-visible {
   background: var(--accent-soft);
   color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-repeat-count button:focus-visible,
 .calendar-builder-repeat-count input:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid color-mix(in srgb, var(--accent) 68%, transparent);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-repeat-count button:disabled {
@@ -28905,7 +29100,7 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-repeat-child-toggle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 68%, transparent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -28929,23 +29124,37 @@ tr.data-intervals-row-missing {
   cursor: pointer;
 }
 
-.calendar-builder-repeat-child-actions button:hover:not(:disabled),
-.calendar-builder-repeat-child-actions button:focus-visible {
+.calendar-builder-repeat-child-actions button:hover:not(:disabled) {
   border-color: var(--glass-border);
   background: var(--glass-bg-hover);
   color: var(--accent-strong);
 }
 
-.calendar-builder-repeat-child-actions button.is-delete:hover:not(:disabled),
-.calendar-builder-repeat-child-actions button.is-delete:focus-visible:not(:disabled) {
+.calendar-builder-repeat-child-actions button:focus-visible {
+  border-color: var(--glass-border);
+  background: var(--glass-bg-hover);
+  color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.calendar-builder-repeat-child-actions button.is-delete:hover:not(:disabled) {
   border-color: var(--error-border);
   background: var(--error-bg);
   color: var(--error-text);
 }
 
+.calendar-builder-repeat-child-actions button.is-delete:focus-visible:not(:disabled) {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-text);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .calendar-builder-repeat-child-actions button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 64%, transparent);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-repeat-child-actions button:disabled {
@@ -29017,16 +29226,19 @@ tr.data-intervals-row-missing {
 .calendar-builder-repeat-add button[data-kind="cooldown"] { --chip: #27c2e5; }
 .calendar-builder-repeat-add button[data-kind="sendOff"] { --chip: #b48cff; }
 
-.calendar-builder-repeat-add button:hover,
-.calendar-builder-repeat-add button:focus-visible {
+.calendar-builder-repeat-add button:hover {
   border-color: color-mix(in srgb, var(--chip) 52%, var(--glass-border));
   background: color-mix(in srgb, var(--chip) 10%, transparent);
   color: var(--text-primary);
 }
 
 .calendar-builder-repeat-add button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--chip) 64%, transparent);
-  outline-offset: 1px;
+  --focus-ring-color: var(--chip);
+  border-color: color-mix(in srgb, var(--chip) 52%, var(--glass-border));
+  background: color-mix(in srgb, var(--chip) 10%, transparent);
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-repeat-add button:active:not(:disabled),
@@ -29188,7 +29400,8 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-add-chip:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--chip) 65%, transparent);
+  --focus-ring-color: var(--chip);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -29884,10 +30097,15 @@ tr.data-intervals-row-missing {
 }
 
 .exercise-combobox-menu [role="listbox"] > button:hover,
-.exercise-combobox-menu [role="listbox"] > button.is-active,
-.exercise-combobox-menu [role="listbox"] > button:focus-visible {
+.exercise-combobox-menu [role="listbox"] > button.is-active {
   background: rgba(255, 255, 255, 0.075);
   outline: none;
+}
+
+.exercise-combobox-menu [role="listbox"] > button:focus-visible {
+  background: rgba(255, 255, 255, 0.075);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .exercise-combobox-menu [role="listbox"] > button.is-selected {
@@ -30052,12 +30270,19 @@ tr.data-intervals-row-missing {
   transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.exercise-preview-angles > button:hover,
-.exercise-preview-angles > button:focus-visible {
+.exercise-preview-angles > button:hover {
   border-color: color-mix(in srgb, var(--step-color, var(--accent)) 54%, var(--glass-border));
   background: color-mix(in srgb, var(--step-color, var(--accent)) 14%, transparent);
   color: var(--text-primary);
   outline: none;
+}
+
+.exercise-preview-angles > button:focus-visible {
+  border-color: color-mix(in srgb, var(--step-color, var(--accent)) 54%, var(--glass-border));
+  background: color-mix(in srgb, var(--step-color, var(--accent)) 14%, transparent);
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .exercise-preview-note {
@@ -30183,9 +30408,14 @@ tr.data-intervals-row-missing {
 
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:hover,
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-active,
-:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:focus-visible,
 :root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-selected {
   background: rgba(19, 26, 40, 0.08);
+}
+
+:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:focus-visible {
+  background: rgba(19, 26, 40, 0.08);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -30340,8 +30570,9 @@ tr.data-intervals-row-missing {
 .calendar-builder-row .set-line select:focus-visible,
 .calendar-builder-row .rest-picker input:focus-visible,
 .calendar-builder-row .rest-picker button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--step-color, var(--accent)) 80%, transparent);
-  outline-offset: 3px;
+  --focus-ring-color: var(--step-color, var(--accent));
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-builder-row .set-line-cell > input {
@@ -31104,8 +31335,9 @@ tr.data-intervals-row-missing {
 .workout-step-card .set-line input:focus-visible,
 .workout-step-card .rest-picker input:focus-visible,
 .workout-step-card .rest-picker button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--step-color, var(--accent)) 80%, transparent);
-  outline-offset: 3px;
+  --focus-ring-color: var(--step-color, var(--accent));
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .workout-step-card .set-line-cell > input {
@@ -31397,12 +31629,16 @@ tr.data-intervals-row-missing {
 
 .workout-editor-modal input:focus,
 .workout-editor-modal select:focus,
-.workout-editor-modal textarea:focus,
+.workout-editor-modal textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .workout-library-select:focus-visible,
 .workout-icon-action:focus-visible,
 .workout-editor-header button:focus-visible,
 .calendar-library-modal button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -32018,7 +32254,7 @@ button.settings-about-link {
 }
 
 .settings-nav-row:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -32281,9 +32517,9 @@ button.settings-about-link {
 }
 
 .settings-compact-head.is-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
   border-radius: var(--radius-sm);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .settings-compact-head.is-link:hover .settings-compact-copy strong,
@@ -32519,7 +32755,7 @@ button.settings-about-link {
 }
 
 .settings-subpage-back:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -33476,7 +33712,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 .mcp-server-bearer button:focus-visible,
 .mcp-servers-preset-grid button:focus-visible,
 .mcp-servers-add-submit:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 

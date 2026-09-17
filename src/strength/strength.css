@@ -246,7 +246,7 @@
 
 .strength-segment button:focus-visible,
 .strength-action:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -987,9 +987,9 @@
 }
 
 .body-map-canvas:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
   border-radius: var(--radius-md);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .body-map-fallback {
@@ -1283,9 +1283,10 @@
 }
 
 .muscle-ranking-row:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: -2px;
   background: color-mix(in srgb, var(--row-heat) 10%, var(--glass-bg));
+  --focus-ring-color: var(--accent-strong);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .muscle-ranking-row.is-empty {

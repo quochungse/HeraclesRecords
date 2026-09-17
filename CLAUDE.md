@@ -908,14 +908,26 @@ time, so neither the build nor a render says anything. (`\bease\b` also matches 
 
 **Elevation is one device per level, held by `npm run test:elevation`.** A card floats on an
 outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
-(an inset is a highlight, `--focus-ring` marks focus, and a border spelled
-`var(--surface-line, …)` is the card recipe), and every `box-shadow` spends
-`--shadow-soft|card|elevated|inset` or `--focus-ring`. Neither holds across the app yet, so
+(an inset is a highlight, and a border spelled `var(--surface-line, …)` is the card recipe),
+and every `box-shadow` spends `--shadow-soft|card|elevated|inset`. Neither holds across the app yet, so
 `scripts/elevation-allowlist.json` lists what broke them when the test was written, keyed
 `file|selector` with a count — and it only shrinks: a converted rule whose entry stays listed
 fails the test too. Take the entry out in the same change. Tokens are judged by what they
 resolve to across every definition, which is how it noticed `--wf-shadow-soft` is defined
 nowhere. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+
+**Focus is one ring, drawn with `outline`, and the same vocabulary test holds it.** A rule
+whose subject is the focused element stands alone — never beside `:hover`, `.is-active` or
+`:focus`, never grouped in `:is()` — and draws `outline: var(--focus-ring)` at
+`outline-offset: 2px` (`-2px` where the container clips). `--focus-ring` is declared on
+`:focus-visible` itself, not `:root`, because a custom property holding `var()` resolves where
+it is declared and the chat scopes redefine `--accent`; a feature with its own signal colour
+sets `--focus-ring-color`. **It is an outline because a box-shadow ring did not survive the
+app:** built that way first, a paper override setting `box-shadow` on the same element with
+more specificity erased the ring, found only by tabbing through the running app — no static
+scan can pair two class names on one element, and hundreds of rules set a shadow. Outlines
+are set almost nowhere else, leave the element's elevation alone, and forced-colors mode
+keeps them.
 
 **Colour is data; chrome is the neutral surface plus one accent.** Hue belongs to sport,
 sleep stage, heart-rate zone, load band, the strength heatmap, a provider's own brand — and

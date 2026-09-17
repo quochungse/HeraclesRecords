@@ -42,8 +42,9 @@
 
 .strength-explore-all:focus-visible,
 .strength-lift-button:focus-visible {
-  outline: 2px solid var(--sx-ember);
-  outline-offset: 3px;
+  --focus-ring-color: var(--sx-ember);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .strength-lift-list li.is-interactive {
@@ -272,7 +273,8 @@
 }
 
 .exercise-explorer-close:focus-visible {
-  outline: 2px solid var(--xx-ember);
+  --focus-ring-color: var(--xx-ember);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -714,7 +716,8 @@
 }
 
 .exercise-history-trigger:focus-visible {
-  outline: 2px solid var(--xx-ember);
+  --focus-ring-color: var(--xx-ember);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
