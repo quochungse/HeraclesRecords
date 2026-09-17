@@ -10686,14 +10686,6 @@ td span {
   opacity: 0.85;
 }
 
-.training-stat-card:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.045);
-  transform: translateY(-1px);
-}
-
 .training-stat-card__icon {
   display: grid;
   grid-row: 1 / span 2;
@@ -10758,17 +10750,13 @@ td span {
 }
 
 /* ── Training Intelligence (Recovery + Fitness Trend) ───────────────── */
+/* A heading over a grid, not a frame. It was a card around three cards, which
+   put the tiles inside them a third layer deep; now the three are the cards,
+   sitting on the page like every other panel on the screen. */
 .training-intelligence {
   position: relative;
   display: grid;
   gap: 14px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: clamp(14px, 1.7vw, 22px);
-  background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--accent-muted) 13%, transparent), transparent 52%),
-    radial-gradient(110% 90% at 100% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 48%),
-    rgba(255, 255, 255, 0.015);
   animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -10868,23 +10856,18 @@ td span {
   gap: 8px 10px;
   min-height: 104px;
   padding: 14px 15px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* L2 (docs/ui-system-refinement.md §4.3): a wash in a hairline at the inner
+     radius, and no shadow. The tile is a figure, not a control, so it does not
+     lift under the pointer either. */
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: none;
   overflow: hidden;
 }
 
 .training-stat-card.is-widget::before {
   content: none;
-}
-
-.training-stat-card.is-widget:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 10px 28px rgba(0, 0, 0, 0.18);
-  transform: translateY(-1px);
 }
 
 .training-stat-card.is-widget .training-stat-card__icon {
@@ -10956,12 +10939,13 @@ td span {
   backdrop-filter: none;
 }
 
-/* Elegant matte card surfaces inside the intelligence block. */
+/* Matte cards in dark. Paper's `.panel` rule outranks this, so there they are
+   white cards on their shadow like every other panel. */
 .training-intelligence .training-ring-panel,
 .training-fitness-panel,
 .vo2-widget-panel {
   border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.022);
   box-shadow: none;
   backdrop-filter: none;
@@ -10974,6 +10958,9 @@ td span {
   display: grid;
   align-content: space-between;
   gap: 14px;
+  /* The Personal screen has not had the elevation ladder yet (phase 7 of
+     docs/ui-system-refinement.md), so this card keeps the radius it had. */
+  border-radius: var(--radius-lg);
   border-color: color-mix(in srgb, var(--vo2-tone) 18%, rgba(255, 255, 255, 0.07));
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--vo2-tone) 5%, transparent), transparent 44%),
@@ -11470,7 +11457,7 @@ td span {
   min-height: clamp(282px, 31vh, 392px);
   padding: clamp(16px, 1.55vw, 21px);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--sleep-tone) 16%, transparent), transparent 58%),
@@ -12882,7 +12869,7 @@ td span {
   aspect-ratio: auto;
   padding: 7px 8px 7px 11px;
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   text-align: left;
   /* The left accent is painted, not a border: a day with two sports splits it
@@ -13328,7 +13315,7 @@ td span {
   min-height: clamp(300px, 34vh, 430px);
   padding: clamp(18px, 1.8vw, 24px);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 0% 0%, var(--chart-panel-tint), transparent 58%),
@@ -13630,7 +13617,7 @@ td span {
   padding: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     rgba(255, 255, 255, 0.034);
@@ -15096,7 +15083,7 @@ tr.data-intervals-row-missing {
      eyebrow still lines up with theirs down the left edge of the column. */
   padding: clamp(18px, 1.8vw, 24px);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
     radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
@@ -15147,13 +15134,13 @@ tr.data-intervals-row-missing {
   gap: 16px;
   padding: 18px 20px;
   border: 1px solid color-mix(in srgb, var(--accent-muted) 48%, transparent);
-  border-radius: var(--radius-md);
+  /* Inside the panel, so L2: the accent wash and edge single it out, and it
+     does not float off the card on a glow of its own. */
+  border-radius: var(--radius-sm);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--accent-muted) 20%, transparent), color-mix(in srgb, var(--accent-muted) 6%, transparent)),
     rgba(255, 255, 255, 0.04);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--accent-strong) 16%, transparent),
-    0 16px 36px color-mix(in srgb, var(--accent-muted) 12%, transparent);
+  box-shadow: var(--shadow-inset);
 }
 
 .training-upcoming-today-empty {
@@ -17010,7 +16997,6 @@ tr.data-intervals-row-missing {
   }
 
   .metric-tile-button:hover,
-  .training-stat-card:hover,
   .primary-button:hover:not(:disabled),
   .secondary-button:hover:not(:disabled),
   .icon-button:hover:not(:disabled) {
@@ -25249,13 +25235,20 @@ tr.data-intervals-row-missing {
  * Panels use a 72%-white glass fill plus a white-on-white sheen that reads as
  * near-invisible over the cream page. Make them opaque white cards with a
  * crisper border + warm lift so they separate from the background. */
+/* The elevation ladder's L1 edge on paper is the card's shadow and nothing else
+ * (docs/ui-system-refinement.md §4.4). A screen joins this list when the
+ * ladder reaches it; once every screen has, the declaration moves to this
+ * theme's :root and the fallback colours that read it go. Settings' subpages
+ * are not in it yet: their rows are still drawn at the card's radius. */
+:root[data-theme="paper"] :is(.sleep-details-view, .training-dashboard, .settings-view:not(.settings-subpage)) {
+  --surface-line: transparent;
+}
+
 :root[data-theme="paper"] .panel:not(.is-disconnected):not(.strength-body-panel) {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.4)),
     var(--glass-bg-elevated);
-  /* This rule outranks `.panel`, so the token has to be read here too. Only
-     Sleep sets it so far (src/sleep/sleep.css); once the ladder has spread,
-     --surface-line moves to this theme's :root and this line goes. */
+  /* This rule outranks `.panel`, so the token has to be read here too. */
   border-color: var(--surface-line, rgba(19, 26, 40, 0.15));
   box-shadow: var(--shadow-card);
 }
@@ -25263,31 +25256,10 @@ tr.data-intervals-row-missing {
 /* A panel inside a panel is a nested surface, not a second card floating on
    the first. It recesses, and it drops the outer card's shadow — stacking two
    of those reads as a card that has come loose. */
-:root[data-theme="paper"] :is(.panel, .training-intelligence) .panel:not(.is-disconnected) {
+:root[data-theme="paper"] .panel .panel:not(.is-disconnected) {
   background: var(--glass-bg);
   border-color: var(--glass-border);
   box-shadow: var(--shadow-inset);
-}
-
-/* Training Intelligence + heatmap wrappers set their own near-transparent
- * fills (rgba white 0.015–0.02) that vanish on paper. Rebuild them as tinted
- * white cards so the whole section reads as one surface. */
-:root[data-theme="paper"] .training-intelligence {
-  background: var(--glass-bg-elevated);
-  border-color: rgba(19, 26, 40, 0.15);
-  box-shadow: var(--shadow-card);
-}
-
-/* Inner matte cards (recovery ring, weekly-activity chart) use white-alpha
- * fills that disappear on the white intelligence card. Recess them with a warm
- * tint + faint border so they read as nested panels. */
-:root[data-theme="paper"] .training-intelligence .training-ring-panel,
-:root[data-theme="paper"] .training-intelligence .training-fitness-panel {
-  background: rgba(19, 26, 40, 0.03);
-  border-color: rgba(19, 26, 40, 0.1);
-  box-shadow: var(--shadow-inset);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 :root[data-theme="paper"] .sleep-stage-bar,
@@ -25420,22 +25392,6 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .vo2-plateau-tip {
   border-color: var(--glass-border);
   background: rgba(250, 251, 253, 0.98);
-}
-
-:root[data-theme="paper"] .training-stat-card.is-widget:hover {
-  box-shadow: var(--glass-inset), var(--shadow-soft);
-}
-
-:root[data-theme="paper"] .training-stat-card,
-:root[data-theme="paper"] .training-stat-card:hover {
-  border-color: rgba(19, 26, 40, 0.12);
-  background:
-    linear-gradient(145deg, rgba(19, 26, 40, 0.05), rgba(19, 26, 40, 0.02)),
-    rgba(19, 26, 40, 0.03);
-}
-
-:root[data-theme="paper"] .training-stat-card:hover {
-  box-shadow: var(--shadow-soft);
 }
 
 :root[data-theme="paper"] .training-stat-card.is-widget .training-stat-card__detail {
@@ -25793,7 +25749,7 @@ tr.data-intervals-row-missing {
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), color-mix(in srgb, var(--accent) 4%, transparent)),
     rgba(255, 255, 255, 0.6);
-  box-shadow: var(--shadow-inset), var(--shadow-soft);
+  box-shadow: var(--shadow-inset);
 }
 
 :root[data-theme="paper"] .training-upcoming-today-empty {
@@ -31918,7 +31874,7 @@ tr.data-intervals-row-missing {
 
 .settings-appearance-panel {
   padding: 20px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 56%),
     var(--glass-bg);
@@ -32205,7 +32161,7 @@ button.settings-about-link {
   gap: 13px;
   padding: 12px 14px;
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--glass-bg);
 }
 
@@ -32244,7 +32200,7 @@ button.settings-about-link {
   gap: 12px;
   width: 100%;
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--glass-bg);
   padding: 12px 14px;
   color: var(--text-primary);

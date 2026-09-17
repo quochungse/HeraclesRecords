@@ -95,7 +95,7 @@
   gap: 6px 16px;
   padding: 10px 14px;
   border: 1px solid var(--chart-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--chart-well);
   color: var(--text-primary);
   font-size: 13px;

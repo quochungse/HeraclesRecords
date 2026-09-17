@@ -50,6 +50,16 @@
  * visible border or a visible box-shadow), padding summing to 8px or more, an
  * element child, and at least 80×32. A legend dot or a bar segment paints but
  * groups nothing, and counting those makes every chart look four deep.
+ *
+ * **`layers` counts a divider as a layer; `boxes` does not.** Under that
+ * definition a column with a one-sided rule (`border-right` on a list pane,
+ * `border-left` on a detail pane) is a container, so everything inside it is a
+ * level deeper than anything beside it — Sleep's selected night and Activities'
+ * detail tiles sat at layer 3 on a card with no box between them and it. The
+ * ladder (doc §4.3) is about boxes inside boxes, so `boxes` counts only a
+ * container that draws one — a background, a four-sided border or a shadow —
+ * and walks past rules. `layers` is kept as it was, so older captures still
+ * compare; read `boxes` for the ladder.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -294,6 +304,10 @@ function measure() {
 
   const tally = (map, key, by = 1) => map.set(key, (map.get(key) ?? 0) + by);
   const histogram = new Map();
+  const boxHistogram = new Map();
+  const boxChains = new Map();
+  /** A rule — one to three sides of border and nothing else — divides; it does not enclose. */
+  const isBox = (treatment) => treatment.split(" + ").some((part) => part === "bg" || part === "border" || /shadow|inset/.test(part));
   const treatments = new Map();
   const chains = new Map();
   const all = document.body.querySelectorAll("*");
@@ -308,6 +322,14 @@ function measure() {
     tally(histogram, depth);
     tally(treatments, `${depth}|${treatment}`);
     if (depth >= 2) tally(chains, `${depth}|${path.reverse().join(" > ")}`);
+    if (!isBox(treatment)) continue;
+    const boxes = [];
+    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+      const drawnAs = container(node);
+      if (drawnAs && isBox(drawnAs)) boxes.push(name(node));
+    }
+    tally(boxHistogram, boxes.length);
+    if (boxes.length >= 2) tally(boxChains, `${boxes.length}|${boxes.reverse().join(" > ")}`);
   }
 
   // Overflow. A scroll container overflowing is its job; an ellipsis or a line
@@ -346,6 +368,8 @@ function measure() {
     histogram: Object.fromEntries([...histogram].sort((a, b) => a[0] - b[0])),
     treatments: Object.fromEntries([...treatments].sort((a, b) => b[1] - a[1])),
     chains: Object.fromEntries([...chains].sort((a, b) => b[1] - a[1])),
+    boxes: Object.fromEntries([...boxHistogram].sort((a, b) => a[0] - b[0])),
+    boxChains: Object.fromEntries([...boxChains].sort((a, b) => b[1] - a[1])),
     overflow: Object.fromEntries([...overflow].sort()),
     pageOverflowX: Math.max(0, scroller.scrollWidth - scroller.clientWidth),
   };
@@ -485,7 +509,9 @@ function printSummary(report) {
     for (const theme of Object.keys(data).filter((k) => k !== "settle")) {
       const m = data[theme];
       const deep = Object.entries(m.chains).filter(([k]) => Number(k.split("|")[0]) >= 3);
+      const deepBoxes = Object.entries(m.boxChains).filter(([k]) => Number(k.split("|")[0]) >= 3);
       console.log(`  ${screen.padEnd(11)} ${theme.padEnd(6)} layers ${JSON.stringify(m.histogram).padEnd(24)} 3+ chains ${String(deep.length).padStart(2)}${deep[0] ? `  e.g. ${deep[0][1]}× ${deep[0][0].split("|")[1]}` : ""}`);
+      console.log(`  ${"".padEnd(18)} boxes  ${JSON.stringify(m.boxes).padEnd(24)} 3+ chains ${String(deepBoxes.length).padStart(2)}${deepBoxes[0] ? `  e.g. ${deepBoxes[0][1]}× ${deepBoxes[0][0].split("|")[1]}` : ""}`);
     }
   }
 }
@@ -520,6 +546,19 @@ function compare(beforePath, afterPath) {
       const lines = [];
       const depths = new Set([...Object.keys(ma.histogram), ...Object.keys(mb.histogram)]);
       const histogram = [...depths].sort().map((d) => `${d}:${ma.histogram[d] ?? 0}→${mb.histogram[d] ?? 0}`).join(" ");
+      // Captures older than the `boxes` count have none; say so rather than print zeros.
+      const boxDepths = new Set([...Object.keys(ma.boxes ?? {}), ...Object.keys(mb.boxes ?? {})]);
+      const boxes = ma.boxes && mb.boxes
+        ? [...boxDepths].sort().map((d) => `${d}:${ma.boxes[d] ?? 0}→${mb.boxes[d] ?? 0}`).join(" ")
+        : "n/a (a capture predates the count)";
+      if (ma.boxChains && mb.boxChains) {
+        for (const [key, n] of Object.entries(mb.boxChains)) {
+          if (Number(key.split("|")[0]) >= 3 && !(key in ma.boxChains)) lines.push(`   + deep box  ${n}× B${key.replace("|", "  ")}`);
+        }
+        for (const [key, n] of Object.entries(ma.boxChains)) {
+          if (Number(key.split("|")[0]) >= 3 && !(key in mb.boxChains)) lines.push(`   - deep box  ${n}× B${key.replace("|", "  ")}`);
+        }
+      }
       for (const [key, n] of Object.entries(mb.chains)) {
         if (Number(key.split("|")[0]) >= 3 && !(key in ma.chains)) lines.push(`   + deep  ${n}× L${key.replace("|", "  ")}`);
       }
@@ -544,7 +583,7 @@ function compare(beforePath, afterPath) {
         lines.push(`   NEW  page scrolls sideways by ${mb.pageOverflowX}px`);
         regressions += 1;
       }
-      console.log(`\n${screen} / ${theme}   layers ${histogram}`);
+      console.log(`\n${screen} / ${theme}   layers ${histogram}   boxes ${boxes}`);
       for (const line of lines) console.log(line);
     }
   }

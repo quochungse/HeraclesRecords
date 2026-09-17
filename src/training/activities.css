@@ -60,14 +60,20 @@
   gap: 10px;
 }
 
+/*
+ * The four totals sit on the page, so they are L1 cards like the panel below
+ * them (docs/ui-system-refinement.md §4.3): on paper the shadow is the edge and
+ * the border goes transparent, in dark the hairline stays.
+ */
 .activities-summary-tile {
   display: grid;
   gap: 2px;
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--ax-edge);
+  border: 1px solid var(--surface-line, var(--ax-edge));
   border-radius: var(--radius-md);
   background: var(--ax-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .activities-summary-label {
@@ -701,14 +707,16 @@
   gap: 10px;
 }
 
+/* Inside the split panel, so L2: a wash in a hairline at the inner radius. On
+   paper `--ax-raised` is white, which drew these as cards on the white card. */
 .activity-detail-headline > div {
   display: grid;
   gap: 2px;
   min-width: 0;
   padding: 12px 14px;
   border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-md);
-  background: var(--ax-raised);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
 }
 
 .activity-detail-headline span {
@@ -740,8 +748,8 @@
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   overflow: hidden;
   border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-md);
-  background: var(--ax-heading);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
 }
 
 .activity-detail-figures > div {

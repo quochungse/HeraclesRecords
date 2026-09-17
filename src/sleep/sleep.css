@@ -15,17 +15,6 @@
      off at whatever height the window happened to leave. */
 }
 
-/*
- * The elevation ladder, tried here first (docs/ui-system-refinement.md §4.6).
- * A panel is L1: in paper it floats on its shadow with no border, and what sits
- * inside it is L2 — a wash in a hairline at the smaller radius — or no box
- * at all. Scoped to this screen until it has been looked at; spreading it is
- * moving this declaration to paper's :root.
- */
-:root[data-theme="paper"] .sleep-details-view {
-  --surface-line: transparent;
-}
-
 .sleep-details-panel {
   /* Tall enough that one short night does not collapse the pane into a strip.
      No max, and no hidden overflow: the pane grows and the page scrolls. */

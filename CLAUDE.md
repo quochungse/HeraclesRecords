@@ -915,10 +915,14 @@ and every `box-shadow` spends `--shadow-soft|card|elevated|inset`. Neither holds
 fails the test too. Take the entry out in the same change. Tokens are judged by what they
 resolve to across every definition, which is how it found a `--wf-shadow-soft` defined nowhere
 — an invalid token silently voids the whole `box-shadow`, hairline and all. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
-Paper's `--surface-line: transparent` is set on the Sleep screen only, while the ladder is
-reviewed there; `.panel`'s paper override reads the token with its old border colour as the
-fallback, so a `var(--surface-line, …)` border elsewhere still draws in paper until that one
-declaration moves to paper's `:root`.
+Paper's `--surface-line: transparent` is set only on the screens the ladder has reached — one
+`:is()` list beside the paper `.panel` rule in `styles.css` (Sleep, Overview and Activities
+through `.training-dashboard`, Settings without its subpages). `.panel`'s paper override reads
+the token with its old border colour as the fallback, so a `var(--surface-line, …)` border on
+any other screen still draws in paper until that declaration moves to paper's `:root`. A
+screen joins the list when its inner boxes are L2 as well, not before: a borderless card
+round 12px rows reads as half-converted. The probe's `boxes` count, not `layers`, is the one
+to hold a screen's depth against — `layers` counts a one-sided divider as a level.
 
 **Focus is one ring, drawn with `outline`, and the same vocabulary test holds it.** A rule
 whose subject is the focused element stands alone — never beside `:hover`, `.is-active` or

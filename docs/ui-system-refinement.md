@@ -570,9 +570,12 @@ Then, in order:
   switch) and should be exempted from the ladder, not forced into L2.
 - **Activities (27, at 1600px only)** — missing from the draft because its table
   was taken below the split breakpoint (§4.1). Ten of the 27 are controls under
-  the rule just stated. The 17 tiles inside `training-activities-detail` are
-  the same shape as Overview's: a pane that is itself a surface, holding tiles
-  that are surfaces. Take it after Overview, and check it at both widths.
+  the rule just stated. The 17 tiles inside `training-activities-detail` were
+  described here as Overview's shape — a pane that is itself a surface, holding
+  tiles that are surfaces — and that is wrong: the pane draws only a
+  `border-left`, a divider, and the probe counted it as a layer (§7, `layers`
+  and `boxes`). The tiles are L2 on the split panel; what they needed was the
+  L2 recipe, not a level removed. Check it at both widths.
 
 **Acceptance.** `npm run test:elevation` passes with an empty allowlist for the
 converted files. `probe-ui-cdp.mjs capture` on the change, then `compare`
@@ -582,7 +585,7 @@ in the list on the day it was taken — so check it against the baseline, not
 against this document. Look at the screenshots in both themes; dark must not
 change on the screens you touched unless you intended it to.
 
-*As built* (phase 5, 2026-09-17 — **awaiting review**):
+*As built* (phase 5, 2026-09-17 — **approved on review** the same day):
 
 - **The token is inert until a scope sets it.** `.panel` reads
   `border: 1px solid var(--surface-line, var(--glass-border))`, and the paper
@@ -605,7 +608,8 @@ change on the screens you touched unless you intended it to.
   `--glass-bg` under the pointer; selection keeps its sleep-hue tint at 8px.
   The hairlines either side of a drawn row step aside (`:has()`), so none cuts
   across a rounded corner.
-- **Depth 3: 29 → 1, not 0.** The one left is the selected row. The list
+- **Depth 3: 29 → 1, not 0** — and 0 in `boxes`, the count added in phase 6
+  for exactly this. The one left is the selected row. The list
   column's divider is a `border-right` on a padded box, so the probe counts
   the column as a layer and any surface inside it lands at depth 3. This
   section prescribes a surface for the selection *and* no container at depth
@@ -616,9 +620,58 @@ change on the screens you touched unless you intended it to.
   no entries to begin with. The Tab walk over Sleep in both themes finds a ring
   on 13 of 14 stops; the refresh button draws the browser's own outline, as it
   did before.
-- **Left for phase 6**, being shared with Overview: `.sleep-metric-note` (the
+- **Left for later**, being shared with Overview: `.sleep-metric-note` (the
   tile's hover note, an overlay still on literals) and `.training-chart-panel`'s
   20px radius, which makes the HRV panel the one card on the screen not at 12px.
+  Phase 6 took the radius; the note is an overlay, which phase 6 did not touch.
+
+*As built* (phase 6, 2026-09-17 — **awaiting review**):
+
+- **The scope is one list.** `--surface-line: transparent` moved out of
+  `sleep.css` into `styles.css`, beside the paper `.panel` rule, on
+  `:is(.sleep-details-view, .training-dashboard, .settings-view:not(.settings-subpage))`.
+  `.training-dashboard` is the root of both Overview and Activities and of
+  nothing else. Settings' subpages (MCP servers, Coach models, Storage) stay
+  out: their rows are still drawn at 12px, and a borderless card round them is
+  a half-converted screen.
+- **Overview.** `.training-intelligence` is a heading over a grid: no border,
+  radius, padding or background, in either theme, and its paper card rule is
+  gone. The nested-panel rule it was part of is now `.panel .panel` only, and
+  the paper rule that recessed the recovery and weekly-activity panels is
+  deleted, so the three panels are L1 cards like the rest of the screen. In
+  dark they keep their matte finish. Every L1 card on the screen is at
+  `--radius-md` — the recovery, weekly-activity and sleep panels, Upcoming
+  Workouts, both zone-distribution panels and both trend charts were at 20px
+  (the zone panels have no padding, so the probe never saw them; a scan for
+  any painted box over 14px found them). The four weekly tiles are L2
+  (`--glass-bg`, `--glass-border`, `--radius-sm`, no shadow), and **no longer
+  lift under the pointer**: they are figures, not controls, and a lift with
+  the shadow gone was a tile moving for no reason. The heatmap's day cards and
+  today's workout card are L2 at 8px, the latter without the accent glow that
+  floated it off its panel (its top highlight now spends `--shadow-inset`).
+- **Settings.** The appearance panel came to 12px and the rows
+  (`.settings-nav-row`, `.settings-startup-row`) to 8px; they already spent the
+  L2 tokens. The three boxes left at depth 3 are the controls §4.6 exempts.
+- **Activities.** The four totals sit on the page, so they are L1: a
+  `var(--surface-line, var(--ax-edge))` border and `--shadow-card`. The detail
+  pane's headline tiles and figure grid are L2 on `--glass-bg` at 8px — on
+  paper `--ax-raised` is white, which drew them as white cards on the white
+  card. `.activity-chart-segment` came to 8px; it is shared with Running,
+  where it is not on screen at rest.
+- **Measured** at 1600 and 1180, both themes, against a capture taken in the
+  same sitting: Overview's depth 3 is 6 → 0 in `layers` and 5 → 0 in `boxes`;
+  Sleep, Settings and Activities have no box at depth 3 other than Settings'
+  three controls; no clip or spill appeared. On paper every L1 card on the four
+  screens is `bg + shadow + r12`. Running, Strength, Coach and Calendar are
+  unchanged in every treatment (a Calendar dark box at r18 was a transient
+  present only in the *before* capture, whose layer count is one above every
+  other capture of that screen). `test:elevation`: 108 → 107 rules with a border
+  and an outer shadow, 372 → 368 shadows outside the tokens.
+- **Not done here**, and on purpose: overlays (`.sleep-metric-note`, the mix
+  bar's tooltip) and rule 2's inset highlights, which §8 leaves to phase 7; the
+  strength body figure's panel on Overview, which belongs to the Strength
+  screen; and the Personal screen's VO2max card, which shares the matte rule
+  and keeps its 20px through its own rule until that screen is taken.
 
 **Risk, and it is real.** Removing the border from L1 in paper is the first
 change on this branch that alters `paper`'s appearance in a way a person will
@@ -795,7 +848,7 @@ node scripts/probe-ui-cdp.mjs compare .work/ui-probe/baseline-main/probe.json \
 `capture` writes `probe.json` and a screenshot per screen and theme into
 `.work/ui-probe/<name>/`, which is git-ignored because the screenshots are the
 athlete's own data. `compare` exits 2 when a box clips or spills that did not
-in the baseline. Its header says what it measures; three properties matter here:
+in the baseline. Its header says what it measures; four properties matter here:
 
 - **It never changes a setting.** `coros-theme` is a `preference`-tier key, so
   switching theme the app's way — or with `localStorage.setItem` and a reload,
@@ -810,6 +863,16 @@ in the baseline. Its header says what it measures; three properties matter here:
   so the numbers are comparable — but pass the window size you mean. The
   default is 1600×980; the draft's table was taken at the window's own
   ~1180px, and Activities is a different screen on either side of 1200px.
+- **It reports depth twice: `layers` and `boxes`.** `layers` is the §4.1
+  count, and it counts a divider as a layer: a pane with a one-sided rule
+  (`border-right` on Sleep's list column, `border-left` on Activities' detail
+  pane) is a container, so everything inside it reads one level deeper than
+  anything beside it. That is how Sleep's selected night and Activities' 17
+  detail tiles came out at depth 3 on a card with nothing between them and it.
+  `boxes` (added in phase 6) counts only a container that draws a box — a
+  background, a four-sided border or a shadow — and walks past rules. **Read
+  `boxes` for the ladder**; `layers` stays so older captures still compare, and
+  a capture older than the count prints `n/a`.
 
 The baselines for this branch are `.work/ui-probe/baseline-main/` (1600×980,
 with screenshots) and `.work/ui-probe/baseline-main-1180/` (1180×695, JSON
@@ -855,8 +918,8 @@ after each, `test:elevation` joining it from phase 3.
 | 2 | ~~Motion: one curve, three durations~~ — done 2026-09-17 | 2 | S | — | no |
 | 3 | ~~`test:elevation` (static, keyed allowlists)~~ — done 2026-09-17 | 4.5 | S | — | no |
 | 4 | ~~One focus ring~~ — done 2026-09-17, as an outline (§3) | 3 | S | — | no |
-| 5 | Elevation ladder on **Sleep** — built 2026-09-17, **awaiting review** (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
-| 6 | Ladder on Overview, Settings, then Activities | 4.6 | M | 5 approved | yes |
+| 5 | ~~Elevation ladder on **Sleep**~~ — done and approved 2026-09-17 (§4.6) | 4 | M | — (Q1, Q2 decided) | yes — **stop for review** before spreading |
+| 6 | Ladder on Overview, Settings, then Activities — built 2026-09-17, **awaiting review** (§4.6) | 4.6 | M | 5 approved | yes |
 | 7 | Ladder on the rest: `watchfaces.css` (34), `trainingLibrary.css` (18), `activityGlobe.css` (9), `strength.css` (8), the remainder of `styles.css`; then rule 2's allowlisted shadows (372 after phase 4) | 4 | L | 6 | yes, per file |
 | 8 | Composition | 5 | L | **decide first** | yes |
 
