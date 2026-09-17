@@ -20,10 +20,10 @@
 }
 
 :root[data-theme="paper"] .activities-view {
-  --ax-edge: rgba(38, 34, 28, 0.11);
+  --ax-edge: rgba(19, 26, 40, 0.14);
   --ax-raised: #ffffff;
-  --ax-well: rgba(38, 34, 28, 0.05);
-  --ax-heading: #f7f4ee;
+  --ax-well: rgba(19, 26, 40, 0.06);
+  --ax-heading: #eef1f6;
 }
 
 .activities-view > .activities-head,
@@ -37,7 +37,7 @@
 .activities-head h2 {
   margin: 0;
   font-size: 22px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .activities-head h2 span {
@@ -82,8 +82,8 @@
 .activities-summary-value {
   margin: 0;
   color: var(--text-primary);
-  font-size: 24px;
-  font-weight: 650;
+  font-size: 22px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
 }
@@ -194,13 +194,13 @@
   margin: 0;
   color: var(--text-primary);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .activities-mix-tip-name i {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--sport-mix-color, var(--sport-other));
 }
 
@@ -217,7 +217,7 @@
 .activities-mix-tip-figures strong {
   color: var(--text-primary);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -313,7 +313,7 @@
 .activities-sport-toggle i {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--sport-mix-color, var(--sport-other));
 }
 
@@ -423,7 +423,7 @@
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -493,7 +493,7 @@
 
 .activity-row-date em {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -502,14 +502,14 @@
 
 .activity-row-date strong {
   color: var(--text-primary);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 18px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .activity-row-date i {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
@@ -657,8 +657,8 @@
 .activity-detail-pane-title h2 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 19px;
-  font-weight: 650;
+  font-size: 18px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -751,7 +751,7 @@
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -776,7 +776,7 @@
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -821,7 +821,7 @@
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--zone-color);
 }
 
@@ -896,7 +896,7 @@
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

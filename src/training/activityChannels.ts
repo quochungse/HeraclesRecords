@@ -219,7 +219,11 @@ const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = 
   groundTime: { stroke: "#b45309", fill: "rgba(180, 83, 9, 0.16)" },
   verticalOscillation: { stroke: "#be185d", fill: "rgba(190, 24, 93, 0.16)" },
   verticalRatio: { stroke: "#4d7c0f", fill: "rgba(77, 124, 15, 0.16)" },
-  altitude: { stroke: "rgba(60, 50, 35, 0.2)", fill: "rgba(60, 50, 35, 0.08)" }
+  // The one channel that is a backdrop rather than a series, so it takes the
+  // theme's ink the way every border and well does — rgb(19, 26, 40) here,
+  // white-alpha in the dark table. It was the cream theme's warm ink and got
+  // missed when that was swept out of the stylesheets, because it lives in TS.
+  altitude: { stroke: "rgba(19, 26, 40, 0.2)", fill: "rgba(19, 26, 40, 0.08)" }
 };
 
 export function activityChannelColors(theme: Theme): Record<ActivityChannelKey, ActivityChannelColors> {

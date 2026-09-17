@@ -83,14 +83,14 @@ const PAPER_CHART_COLORS: TrainingChartColors = {
   accentGlow: "#0f7f5f",
   accentSoft: "rgba(18, 148, 110, 0.2)",
   gold: "#b9791a",
-  grid: "rgba(38, 34, 28, 0.08)",
-  text: "#57544e",
-  cursor: "rgba(38, 34, 28, 0.08)",
-  cursorBand: "rgba(38, 34, 28, 0.06)",
+  grid: "rgba(19, 26, 40, 0.1)",
+  text: "#4a5265",
+  cursor: "rgba(19, 26, 40, 0.1)",
+  cursorBand: "rgba(19, 26, 40, 0.07)",
   dotStroke: "rgba(255, 255, 255, 0.9)",
   tooltipBg: "rgba(255, 255, 255, 0.98)",
-  tooltipBorder: "rgba(38, 34, 28, 0.12)",
-  neutralFill: "#a5a097"
+  tooltipBorder: "rgba(19, 26, 40, 0.15)",
+  neutralFill: "#98a0ae"
 };
 
 export function getTrainingChartColors(theme: Theme): TrainingChartColors {
