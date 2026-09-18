@@ -266,6 +266,14 @@ interface Palette {
   sky: Color;
   ground: Color;
   exposure: number;
+  /**
+   * How hard a hovered or selected belly is lit from inside. On a dark stage
+   * the glow is what picks it out; on a light one the same amount washes the
+   * heat colour toward white, so the muscle you just clicked reads *paler*
+   * than it did before you clicked it. Paper leans on the dimming of
+   * everything around it instead, and keeps barely any glow.
+   */
+  focusGlow: number;
 }
 
 function readPalette(element: HTMLElement): Palette {
@@ -278,9 +286,10 @@ function readPalette(element: HTMLElement): Palette {
       return new Color(fallback);
     }
   };
-  const exposure = Number.parseFloat(
-    styles.getPropertyValue("--m3d-exposure").trim()
-  );
+  const readNumber = (name: string, fallback: number) => {
+    const value = Number.parseFloat(styles.getPropertyValue(name).trim());
+    return Number.isFinite(value) ? value : fallback;
+  };
 
   return {
     base: readColor("--m3d-base", "#39424b"),
@@ -292,7 +301,8 @@ function readPalette(element: HTMLElement): Palette {
     rim: readColor("--m3d-rim", "#7fe8c4"),
     sky: readColor("--m3d-sky", "#93b8dc"),
     ground: readColor("--m3d-ground", "#151a1f"),
-    exposure: Number.isFinite(exposure) ? exposure : 1
+    exposure: readNumber("--m3d-exposure", 1),
+    focusGlow: readNumber("--m3d-focus-glow", 0.42)
   };
 }
 
@@ -1044,7 +1054,7 @@ function createWorld(
       }
       group.material.emissive.copy(group.material.color);
       const focused = id === active || id === selected;
-      const wantedGlow = focused ? 0.42 : dimmed ? 0 : 0.025;
+      const wantedGlow = focused ? palette.focusGlow : dimmed ? 0 : 0.025;
       if (Math.abs(group.material.emissiveIntensity - wantedGlow) > 0.002) {
         group.material.emissiveIntensity +=
           (wantedGlow - group.material.emissiveIntensity) * colorStep;
@@ -1546,7 +1556,7 @@ export function BodyMapV2({
             aria-controls="anatomy-muscle-layers"
             onClick={() => setLayersOpen((current) => !current)}
           >
-            <Layers3 size={15} aria-hidden="true" />
+            <Layers3 size={13} aria-hidden="true" />
             <span>Muscle groups</span>
           </button>
           {layersOpen ? (
@@ -1567,7 +1577,7 @@ export function BodyMapV2({
                   title="Reset groups"
                   onClick={resetLayers}
                 >
-                  <RotateCcw size={14} aria-hidden="true" />
+                  <RotateCcw size={12} aria-hidden="true" />
                 </button>
               </header>
               <ul aria-label="Muscle group layer priority, highest first">
@@ -1585,9 +1595,9 @@ export function BodyMapV2({
                         onClick={() => toggleLayer(muscle)}
                       >
                         {hidden ? (
-                          <EyeOff size={14} aria-hidden="true" />
+                          <EyeOff size={12} aria-hidden="true" />
                         ) : (
-                          <Eye size={14} aria-hidden="true" />
+                          <Eye size={12} aria-hidden="true" />
                         )}
                       </button>
                       <span>{label}</span>
@@ -1599,7 +1609,7 @@ export function BodyMapV2({
                           disabled={index === 0}
                           onClick={() => moveLayer(muscle, -1)}
                         >
-                          <ChevronUp size={14} aria-hidden="true" />
+                          <ChevronUp size={12} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
@@ -1608,7 +1618,7 @@ export function BodyMapV2({
                           disabled={index === layerPreferences.order.length - 1}
                           onClick={() => moveLayer(muscle, 1)}
                         >
-                          <ChevronDown size={14} aria-hidden="true" />
+                          <ChevronDown size={12} aria-hidden="true" />
                         </button>
                       </div>
                     </li>

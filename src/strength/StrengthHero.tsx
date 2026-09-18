@@ -168,16 +168,6 @@ export function StrengthHero({
           onViewChange={requestView}
           showLayerControls={showDevelopmentTools}
         />
-
-        <div className="strength-legend" aria-hidden="true">
-          <span>Light</span>
-          <span className="strength-legend-ramp">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <i key={level} data-level={level} />
-            ))}
-          </span>
-          <span>Hammered</span>
-        </div>
       </section>
 
       <section className="panel strength-muscle-panel">
