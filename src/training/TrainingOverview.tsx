@@ -55,7 +55,6 @@ export function TrainingOverview({
   snapshot,
   snapshotStatus = "ready",
   activitiesStatus = "ready",
-  rpeBackfill,
   busy,
   sleepConnecting,
   onOpenSleepDetails,
@@ -471,7 +470,6 @@ export function TrainingOverview({
             <TrainingHeatmapPanel
               snapshot={snapshot}
               activities={activities}
-              rpeBackfill={rpeBackfill}
               loading={snapshotPending || activitiesPending}
             />
           </div>

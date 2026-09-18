@@ -92,7 +92,6 @@ export function buildHeatmapCells(
     return {
       happenDay,
       trainingLoad: day?.trainingLoad,
-      rpeLoad: day?.rpeLoad,
       value,
       distance: day?.distance,
       duration: day?.duration,

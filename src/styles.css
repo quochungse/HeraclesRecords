@@ -13553,19 +13553,6 @@ td span {
   padding-top: 4px;
 }
 
-.training-heatmap-legends {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-}
-
-.training-heatmap-legend {
-  display: flex;
-  align-items: center;
-  gap: clamp(5px, 0.6vw, 8px);
-}
-
 .training-heatmap-sport-legend {
   display: flex;
   flex-wrap: wrap;
@@ -13591,46 +13578,6 @@ td span {
   border-radius: var(--radius-xs);
   background: var(--cell-color);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
-}
-
-.training-heatmap-legend-label {
-  color: var(--text-secondary);
-  font-size: clamp(11px, 1vw, 13px);
-  font-weight: 600;
-}
-
-/* The Less -> More scale must stay hue-neutral: grid cells encode sport as hue
-   and load as alpha, so a tinted ramp claims a meaning it does not have. It
-   used --accent-muted, which sat next to the sport legend looking like a sixth
-   sport and collided outright with --sport-bike's gold. Neutral ink stepped by
-   alpha says "amount of shading" and nothing else. */
-.training-heatmap-legend-cell {
-  --heatmap-legend-ink: #ffffff;
-  width: clamp(14px, 1.4vw, 18px);
-  height: clamp(14px, 1.4vw, 18px);
-  border-radius: clamp(3px, 0.4vw, 5px);
-  transition: transform var(--dur-base) var(--ease);
-}
-
-.training-heatmap-legend-cell[data-level="0"] {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.training-heatmap-legend-cell[data-level="1"] {
-  background: color-mix(in srgb, var(--heatmap-legend-ink) 20%, transparent);
-}
-
-.training-heatmap-legend-cell[data-level="2"] {
-  background: color-mix(in srgb, var(--heatmap-legend-ink) 38%, transparent);
-}
-
-.training-heatmap-legend-cell[data-level="3"] {
-  background: color-mix(in srgb, var(--heatmap-legend-ink) 60%, transparent);
-}
-
-.training-heatmap-legend-cell[data-level="4"] {
-  background: color-mix(in srgb, var(--heatmap-legend-ink) 85%, transparent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--heatmap-legend-ink) 22%, transparent);
 }
 
 .training-heatmap-summary {
@@ -25566,15 +25513,8 @@ tr.data-intervals-row-missing {
     var(--glass-bg-elevated);
 }
 
-:root[data-theme="paper"] .training-heatmap-cell[data-level="0"],
-:root[data-theme="paper"] .training-heatmap-legend-cell[data-level="0"] {
+:root[data-theme="paper"] .training-heatmap-cell[data-level="0"] {
   background: rgba(19, 26, 40, 0.1);
-}
-
-/* Warm grey rather than the near-black #26221c: on cream, 85% of the ink is
-   the ramp's top step and must read as "most", not as a hole in the page. */
-:root[data-theme="paper"] .training-heatmap-legend-cell {
-  --heatmap-legend-ink: #4a4238;
 }
 
 :root[data-theme="paper"] .training-heatmap-cell.is-empty {

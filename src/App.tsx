@@ -471,10 +471,6 @@ export default function App() {
     useState<TrainingHubDashboard | null>(null);
   const [trainingHubDailyMetrics, setTrainingHubDailyMetrics] =
     useState<TrainingHubDailyMetrics | null>(null);
-  const [rpeBackfill, setRpeBackfill] = useState<{
-    pending: number;
-    running: boolean;
-  } | null>(null);
   const [trainingHubSportTypes, setTrainingHubSportTypes] = useState<
     TrainingHubSportType[]
   >([]);
@@ -2542,9 +2538,9 @@ export default function App() {
     trainingHubDailyHealthData,
   ]);
 
-  // Kick the RPE backfill and poll until the heatmap window is fully fetched,
-  // merging freshly-cached sRPE into the daily metrics so the RPE view fills in
-  // live (and the header can show a loading indicator).
+  // Kick the RPE backfill and poll until the window is fully fetched, merging
+  // freshly-cached sRPE into the daily metrics so the trend chart's RPE series
+  // fills in live.
   useEffect(() => {
     if (!api || !trainingHubStatus?.authenticated || !trainingHubDailyMetrics) {
       return;
@@ -2586,7 +2582,6 @@ export default function App() {
         if (cancelled) {
           return;
         }
-        setRpeBackfill(status);
         mergeRpe(record);
         if (status.pending > 0 || status.running) {
           timer = setTimeout(tick, 3000);
@@ -2790,7 +2785,6 @@ export default function App() {
                         snapshot={trainingHubSnapshot}
                         snapshotStatus={trainingHubSnapshotStatus}
                         activitiesStatus={trainingHubActivitiesStatus}
-                        rpeBackfill={rpeBackfill}
                         busy={busy}
                         sleepConnecting={sleepConnecting}
                         onOpenSleepDetails={() => setActiveView("sleep")}

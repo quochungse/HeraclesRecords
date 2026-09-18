@@ -15,6 +15,7 @@ import type {
 import {
   formatDistanceMeters,
   formatDurationSeconds,
+  formatDurationSpan,
   formatOptionalNumber
 } from "../formatters";
 import { OptionGroup } from "../../components/OptionGroup";
@@ -67,7 +68,7 @@ import {
 const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
   key: "training.heatmapMetric",
   defaultValue: "trainingLoad",
-  validate: selectionIsOneOf(["trainingLoad", "rpeLoad"])
+  validate: selectionIsOneOf(["trainingLoad", "duration"])
 });
 
 const HEATMAP_RANGE_PREFERENCE = defineSelectionPreference<TrainingHeatmapRange>({
@@ -79,7 +80,6 @@ const HEATMAP_RANGE_PREFERENCE = defineSelectionPreference<TrainingHeatmapRange>
 interface TrainingHeatmapPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
-  rpeBackfill?: { pending: number; running: boolean } | null;
   /**
    * The loads behind the grid are still running. A grid with nothing in it
    * otherwise reports "No training data in the last 365 days", which is a
@@ -106,7 +106,6 @@ const HEATMAP_WEEK_LABELS = [
 const HEATMAP_STRIP_COLUMNS = HEATMAP_WEEK_LABELS.length;
 /** Entries a card lists before the rest collapse into a "+N more" line. */
 const HEATMAP_CARD_MAX_ENTRIES = 3;
-const LEGEND_LEVELS = [0, 1, 2, 3, 4] as const;
 const HEATMAP_PROXIMITY_RADIUS = 120;
 const HEATMAP_WAVE_SETTLE_MS = 220;
 const HEATMAP_WAVE_COLUMN_MS = 16;
@@ -152,23 +151,18 @@ function pieBackground(
 
 function formatCellAriaLabel(
   cell: HeatmapCell,
-  metric: HeatmapMetric,
   unitSystem: UnitSystem
 ): string {
   const distance = formatDistanceMeters(cell.distance, unitSystem);
   const duration = formatDurationSeconds(cell.duration);
-  const metricLabel =
-    metric === "rpeLoad"
-      ? `RPE load ${formatOptionalNumber(cell.rpeLoad)} AU`
-      : `training load ${formatOptionalNumber(cell.trainingLoad)}`;
+  const load = formatOptionalNumber(cell.trainingLoad);
 
-  return `${cell.label}: ${metricLabel}, distance ${distance}, duration ${duration}`;
+  return `${cell.label}: training load ${load}, distance ${distance}, duration ${duration}`;
 }
 
 export function TrainingHeatmapPanel({
   snapshot,
   activities = [],
-  rpeBackfill = null,
   loading = false
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
@@ -187,7 +181,7 @@ export function TrainingHeatmapPanel({
   const proximityCellsRef = useRef<ProximityCell[]>([]);
   const activeProximityCellsRef = useRef<Set<HTMLSpanElement>>(new Set());
   const heatmapWaveHasPlayedRef = useRef(false);
-  const isRpe = metric === "rpeLoad";
+  const isDuration = metric === "duration";
   const rangeDays = TRAINING_HEATMAP_RANGE_DAYS[range];
   // The short range keeps the weekday columns but trades squares for cards:
   // thirty days fit as calendar weeks of cards, each carrying its own date in
@@ -209,9 +203,6 @@ export function TrainingHeatmapPanel({
     () => buildHeatmapCells(dayList, rangeDays, metric),
     [dayList, rangeDays, metric]
   );
-  // RPE feelTypes may still be backfilling from the COROS detail endpoint.
-  const rpeBackfillActive =
-    rpeBackfill !== null && (rpeBackfill.pending > 0 || rpeBackfill.running);
   const grid = useMemo(() => buildHeatmapGrid(cells), [cells]);
   const summary = useMemo(() => buildHeatmapSummary(cells), [cells]);
   // Color each day by the sport of that day's highest-training-load activity.
@@ -600,18 +591,18 @@ export function TrainingHeatmapPanel({
       <div className="training-heatmap-header">
         <div>
           <p className="eyebrow">Training Activity</p>
-          <h2>{isRpe ? "RPE load heatmap" : "Load heatmap"}</h2>
+          <h2>{isDuration ? "Duration heatmap" : "Load heatmap"}</h2>
         </div>
         <div className="training-heatmap-controls">
           <OptionGroup
             label="Heatmap metric"
-            value={isRpe ? "rpeLoad" : "trainingLoad"}
+            value={metric}
             options={[
               { value: "trainingLoad", label: "Training Load" },
-              { value: "rpeLoad", label: "RPE" }
+              { value: "duration", label: "Duration" }
             ]}
             onChange={(next) =>
-              setMetric(next === "rpeLoad" ? "rpeLoad" : "trainingLoad")
+              setMetric(next === "duration" ? "duration" : "trainingLoad")
             }
           />
           {/* Left open. It folded while the labels were "Last 365 days" and
@@ -632,15 +623,6 @@ export function TrainingHeatmapPanel({
         </div>
       </div>
 
-      {isRpe && rpeBackfill && rpeBackfillActive ? (
-        <div className="training-heatmap-loading" role="status">
-          <Loader2 size={14} className="spin" aria-hidden="true" />
-          <span>
-            Loading RPE data… {rpeBackfill.pending} to go
-          </span>
-        </div>
-      ) : null}
-
       {hasData ? (
         <>
           {isCompactRange ? (
@@ -648,7 +630,7 @@ export function TrainingHeatmapPanel({
               className="training-heatmap-strip"
               role="list"
               aria-label={`${
-                isRpe ? "RPE load" : "Training load"
+                isDuration ? "Duration" : "Training load"
               } over the last ${rangeDays} days`}
               style={
                 {
@@ -705,7 +687,6 @@ export function TrainingHeatmapPanel({
                         tabIndex={0}
                         aria-label={`${formatCellAriaLabel(
                           cell,
-                          metric,
                           unitSystem
                         )}${spoken ? `, ${spoken}` : ""}`}
                         style={cardStyle as CSSProperties}
@@ -767,10 +748,7 @@ export function TrainingHeatmapPanel({
                         <span className="training-heatmap-tooltip" role="tooltip">
                           <strong>{cell.label}</strong>
                           <span>
-                            {isRpe ? "RPE load" : "Load"}:{" "}
-                            {isRpe
-                              ? `${formatOptionalNumber(cell.rpeLoad)} AU`
-                              : formatOptionalNumber(cell.trainingLoad)}
+                            Load: {formatOptionalNumber(cell.trainingLoad)}
                           </span>
                           <span>
                             Distance:{" "}
@@ -827,7 +805,7 @@ export function TrainingHeatmapPanel({
                 onPointerMove={handleGridPointerMove}
                 onPointerLeave={handleGridPointerLeave}
                 aria-label={`${
-                  isRpe ? "RPE load" : "Training load"
+                  isDuration ? "Duration" : "Training load"
                 } over the last ${rangeDays} days`}
               >
                 {grid.cells.map((cell, index) => {
@@ -842,9 +820,7 @@ export function TrainingHeatmapPanel({
                     );
                   }
 
-                  const loadLabel = isRpe
-                    ? `${formatOptionalNumber(cell.rpeLoad)} AU`
-                    : formatOptionalNumber(cell.trainingLoad);
+                  const loadLabel = formatOptionalNumber(cell.trainingLoad);
                   const distanceLabel = formatDistanceMeters(cell.distance, unitSystem);
                   const durationLabel = formatDurationSeconds(cell.duration);
                   const dominantSport =
@@ -875,12 +851,12 @@ export function TrainingHeatmapPanel({
                       }
                       role="gridcell"
                       tabIndex={0}
-                      aria-label={formatCellAriaLabel(cell, metric, unitSystem)}
+                      aria-label={formatCellAriaLabel(cell, unitSystem)}
                       style={cellStyle as CSSProperties}
                     >
                       <span className="training-heatmap-tooltip" role="tooltip">
                         <strong>{cell.label}</strong>
-                        <span>{isRpe ? "RPE load" : "Load"}: {loadLabel}</span>
+                        <span>Load: {loadLabel}</span>
                         <span>Distance: {distanceLabel}</span>
                         <span>Duration: {durationLabel}</span>
                       </span>
@@ -893,47 +869,34 @@ export function TrainingHeatmapPanel({
           )}
 
           <div className="training-heatmap-footer">
-            <div className="training-heatmap-legends">
-              <div className="training-heatmap-legend" aria-hidden="true">
-                <span className="training-heatmap-legend-label">Less</span>
-                {LEGEND_LEVELS.map((level) => (
-                  <span
-                    key={level}
-                    className="training-heatmap-legend-cell"
-                    data-level={level}
-                  />
+            {presentSports.length > 0 ? (
+              <ul className="training-heatmap-sport-legend">
+                {presentSports.map((cat) => (
+                  <li key={cat} className="training-heatmap-sport-legend-item">
+                    <span
+                      className="training-heatmap-sport-swatch"
+                      style={
+                        {
+                          "--cell-color": `var(--sport-${cat})`
+                        } as CSSProperties
+                      }
+                      aria-hidden="true"
+                    />
+                    <span>{SPORT_COLOR_LABELS[cat]}</span>
+                  </li>
                 ))}
-                <span className="training-heatmap-legend-label">More</span>
-              </div>
-
-              {presentSports.length > 0 ? (
-                <ul className="training-heatmap-sport-legend">
-                  {presentSports.map((cat) => (
-                    <li key={cat} className="training-heatmap-sport-legend-item">
-                      <span
-                        className="training-heatmap-sport-swatch"
-                        style={
-                          {
-                            "--cell-color": `var(--sport-${cat})`
-                          } as CSSProperties
-                        }
-                        aria-hidden="true"
-                      />
-                      <span>{SPORT_COLOR_LABELS[cat]}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
+              </ul>
+            ) : null}
 
             <div className="training-heatmap-summary">
-              <span>{summary.activeDays} {isRpe ? "rated" : "active"} days</span>
+              <span>{summary.activeDays} active days</span>
               <span aria-hidden="true">·</span>
               <span>{summary.currentStreak}-day streak</span>
               <span aria-hidden="true">·</span>
               <span>
-                {formatOptionalNumber(summary.totalLoad)}
-                {isRpe ? " total AU" : " total load"}
+                {isDuration
+                  ? `${formatDurationSpan(summary.totalLoad)} total time`
+                  : `${formatOptionalNumber(summary.totalLoad)} total load`}
               </span>
             </div>
           </div>
@@ -948,11 +911,7 @@ export function TrainingHeatmapPanel({
           <p>
             {loading
               ? "Reading your training history from COROS…"
-              : isRpe
-                ? rpeBackfillActive
-                  ? "RPE data is still loading — rate activities in COROS to see it here."
-                  : `No rated sessions in the last ${rangeDays} days.`
-                : `No training data in the last ${rangeDays} days.`}
+              : `No training data in the last ${rangeDays} days.`}
           </p>
         </div>
       )}
