@@ -620,6 +620,44 @@ Overview, Media, Data, and Settings are in the main bundle.
   "non-JavaScript MIME type text/html". `import workerUrl from
   "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"` is what makes it emit; do not remove
   that import because it looks unused.
+- **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
+  visit coordinates and names each cluster through `places:reverseGeocode`.
+  **It asks more than one geocoder, because one host is a single point of failure the app
+  cannot route around.** A resolver that answers `*.openstreetmap.org` with loopback — which
+  a number of ISPs do, and which `nslookup` against `8.8.8.8` is what proves — took Nominatim
+  off that machine entirely: every lookup threw, every place on the screen fell back to a pair
+  of coordinates, and nothing anywhere said why. Photon (`photon.komoot.io`) serves the same
+  OSM data from a different domain, so the two are blocked independently. Nominatim stays
+  first for its `display_name`; a provider that could not be reached is **stood down for five
+  minutes** rather than retried per cluster, or one blocked domain costs the screenful the
+  globe asks about all at once one timeout each. Both providers are keyless, like the base
+  map styles, and for the same reason.
+  **A lookup that failed is not an answer, and must not be cached as one.** The two cases are
+  deliberately different return values: a provider that answered about nowhere (open water)
+  returns a coordinate label, which the renderer remembers; nobody answering *throws*, and the
+  renderer shows coordinates without remembering them, retrying after a minute
+  (`PLACE_LABEL_FAILURES`). Caching the fallback is what made a single blocked request
+  permanent for the life of the window.
+  **Names are fetched for what is on the screen, which is not the same as the first few.**
+  Recent places is paged five at a time, so a fixed head of eight left every page but the
+  first reading coordinates for good, and Most visited can sit anywhere in the list.
+  `npm run test:reverse-geocode` drives the chain, both parsers against verbatim live
+  payloads, and the throw-vs-return split.
+  **A name is kept across launches, and only a name.** `src/trainingMap/placeLabels.ts`
+  holds the caches out of the view for the reason `activityFilters.ts` sits outside
+  `ActivitiesView` — it is the only part of naming a place a test can reach. A cluster key is
+  a ~55 km grid cell (`GEO_HEAT_STEP`) and the name of the city in it does not change, so a
+  resolved name is written to localStorage (`coroslink.activity-globe.place-labels.v1`,
+  `derived`) and is on the screen in the first paint of the next launch. Held only in memory,
+  every launch re-asked about every place on the screen, serialised behind the provider
+  throttle, and the screen read coordinates for the ten-odd seconds that took.
+  **A coordinate fallback is never written there**, and neither is a cluster in open water —
+  read back, the two are indistinguishable from a failure, and storing either would turn one
+  blocked launch into a permanent one. That is why `toPlaceLabel` returns `undefined` for
+  "named nowhere" rather than a label, and why the bare-coordinates test compares against
+  `coordinateLabel` instead of looking for letters: `21.0° N` has letters in it.
+  `npm run test:place-labels` drives all of this against a fake `window`, and fails on either
+  shortcut.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls

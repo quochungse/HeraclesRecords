@@ -386,8 +386,12 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // "I dismissed the prompt for version X" — about this install, not the person.
   "coroslink.updatePrompt.dismissedVersion": "device",
 
-  // Reverse-geocoding results for the activity globe; refetched on demand.
-  "coroslink.activity-globe.geo-cache.v1": "derived"
+  // Visit centroids and route polylines for the activity globe, read back out
+  // of the activity details; refetched on demand.
+  "coroslink.activity-globe.geo-cache.v1": "derived",
+  // Place names for the globe's visit clusters, as a public geocoder answered
+  // them. Refetched on demand, and about the map rather than the athlete.
+  "coroslink.activity-globe.place-labels.v1": "derived"
 };
 
 export const DYNAMIC_LOCAL_STORAGE_RULES: ReadonlyArray<{

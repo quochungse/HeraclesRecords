@@ -57,6 +57,12 @@ import {
   type GlobePoint,
 } from "./activityVisitHeatmap";
 import {
+  coordinateLabel,
+  knownPlaceLabels,
+  loadPlaceLabel,
+  type PlaceLabel,
+} from "./placeLabels";
+import {
   ActivityGlobeStreetMap,
   type StreetMapFocus,
 } from "./ActivityGlobeStreetMap";
@@ -124,12 +130,6 @@ const ACTIVITY_PERIOD_PREFERENCE =
     },
   });
 
-interface PlaceLabel {
-  city: string;
-  country: string;
-  full: string;
-}
-
 interface LocationSummary {
   key: string;
   bucket: GeoHeatBucket;
@@ -142,9 +142,6 @@ interface LocationSummary {
   routeCount: number;
   trend: Array<{ order: number; elevation: number; distance: number }>;
 }
-
-const PLACE_LABEL_CACHE = new Map<string, PlaceLabel>();
-const PLACE_LABEL_REQUESTS = new Map<string, Promise<PlaceLabel>>();
 
 function activityTimestampMs(value?: number): number {
   if (!value || !Number.isFinite(value)) {
@@ -163,65 +160,6 @@ function formatVisitDate(value?: number): string {
     day: "numeric",
     year: "numeric",
   }).format(new Date(timestamp));
-}
-
-function coordinateLabel(point: GlobePoint): PlaceLabel {
-  const lat = `${Math.abs(point.lat).toFixed(1)}° ${point.lat >= 0 ? "N" : "S"}`;
-  const lon = `${Math.abs(point.lon).toFixed(1)}° ${point.lon >= 0 ? "E" : "W"}`;
-  return {
-    city: `${lat}, ${lon}`,
-    country: "Location",
-    full: `${lat}, ${lon}`,
-  };
-}
-
-function parsePlaceLabel(label: string, point: GlobePoint): PlaceLabel {
-  const parts = label
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length === 0) {
-    return coordinateLabel(point);
-  }
-  return {
-    city: parts[0]!,
-    country: parts.length > 1 ? parts[parts.length - 1]! : "Location",
-    full: label,
-  };
-}
-
-function loadPlaceLabel(summary: LocationSummary): Promise<PlaceLabel> {
-  const cached = PLACE_LABEL_CACHE.get(summary.key);
-  if (cached) {
-    return Promise.resolve(cached);
-  }
-  const pending = PLACE_LABEL_REQUESTS.get(summary.key);
-  if (pending) {
-    return pending;
-  }
-  const api = window.corosLink;
-  if (!api?.reverseGeocodeLocation) {
-    return Promise.resolve(coordinateLabel(summary.bucket));
-  }
-  const request = api
-    .reverseGeocodeLocation(summary.bucket.lat, summary.bucket.lon)
-    .then((result) =>
-      result.city
-        ? {
-            city: result.city,
-            country: result.country ?? "Location",
-            full: result.label,
-          }
-        : parsePlaceLabel(result.label, summary.bucket),
-    )
-    .catch(() => coordinateLabel(summary.bucket))
-    .then((result) => {
-      PLACE_LABEL_CACHE.set(summary.key, result);
-      PLACE_LABEL_REQUESTS.delete(summary.key);
-      return result;
-    });
-  PLACE_LABEL_REQUESTS.set(summary.key, request);
-  return request;
 }
 
 function formatLocationDuration(seconds: number): string {
@@ -365,8 +303,10 @@ export function ActivityGlobeCard({
     null,
   );
   const [recentStart, setRecentStart] = useState(0);
+  // Seeded from storage, so the names a previous launch resolved are on the
+  // screen in the first paint instead of arriving one request later.
   const [placeLabels, setPlaceLabels] = useState<Record<string, PlaceLabel>>(
-    () => Object.fromEntries(PLACE_LABEL_CACHE),
+    knownPlaceLabels,
   );
   const [globeError, setGlobeError] = useState(false);
 
@@ -552,6 +492,14 @@ export function ActivityGlobeCard({
     return entries;
   }, [locationSummaries, placeLabels, selectedLocation]);
 
+  const mostVisited = useMemo(
+    () =>
+      [...locationSummaries].sort(
+        (left, right) => right.activities.length - left.activities.length,
+      )[0],
+    [locationSummaries],
+  );
+
   useEffect(() => {
     setRecentStart((current) =>
       Math.min(current, Math.max(0, locationSummaries.length - 5)),
@@ -567,17 +515,37 @@ export function ActivityGlobeCard({
     }
   }, [locationSummaries, selectedLocationKey]);
 
+  // Names are fetched for every place whose name is on the screen, which is not
+  // the same as the first few. Recent places is paged, and its second page
+  // starts at index 5, so a fixed head of eight left every page but the first
+  // showing coordinates for good; Most visited can sit anywhere in the list and
+  // was as often outside that head as in it.
   useEffect(() => {
     let cancelled = false;
-    const summaries = locationSummaries.slice(0, 8);
-    if (
-      selectedLocation &&
-      !summaries.some((summary) => summary.key === selectedLocation.key)
-    ) {
-      summaries.push(selectedLocation);
+    const summaries: LocationSummary[] = [];
+    const seen = new Set<string>();
+    const want = (summary: LocationSummary | undefined) => {
+      if (!summary || seen.has(summary.key)) {
+        return;
+      }
+      seen.add(summary.key);
+      summaries.push(summary);
+    };
+    // The globe's own pins, then the panels beside it.
+    for (const summary of locationSummaries.slice(0, 8)) {
+      want(summary);
     }
+    for (const summary of locationSummaries.slice(
+      recentStart,
+      recentStart + 5,
+    )) {
+      want(summary);
+    }
+    want(mostVisited);
+    want(locationSummaries[0]);
+    want(selectedLocation ?? undefined);
     for (const summary of summaries) {
-      void loadPlaceLabel(summary).then((label) => {
+      void loadPlaceLabel(summary.key, summary.bucket).then((label) => {
         if (cancelled) {
           return;
         }
@@ -591,7 +559,7 @@ export function ActivityGlobeCard({
     return () => {
       cancelled = true;
     };
-  }, [locationSummaries, selectedLocation]);
+  }, [locationSummaries, mostVisited, recentStart, selectedLocation]);
 
   useEffect(() => {
     if (streetEnterTimerRef.current !== null) {
@@ -816,9 +784,6 @@ export function ActivityGlobeCard({
   const mapHasVisits = visits.length > 0;
   const mapPlaceCount = locationSummaries.length;
   const recentPlaces = locationSummaries.slice(recentStart, recentStart + 5);
-  const mostVisited = [...locationSummaries].sort(
-    (left, right) => right.activities.length - left.activities.length,
-  )[0];
   const latestPlace = locationSummaries[0];
   const selectedPlaceLabel = selectedLocation
     ? (placeLabels[selectedLocation.key] ??
