@@ -277,8 +277,13 @@ export function StrengthView({
       <div className="strength-header-controls">
         {withControls ? (
           <>
+          {/* Both folded. Seven chips between them is more than this header
+              has room for, and neither is read often: the source is set once
+              per athlete and the window once per session. Folded, each reads
+              as what it currently is — which is what a header is for. */}
           <OptionGroup
             label="Strength source"
+            mode="collapsible"
             value={source}
             options={[
               {
@@ -291,14 +296,9 @@ export function StrengthView({
             ]}
             onChange={setSource}
           />
-          {/* Folded: four windows, and the source picker beside it already
-              spends the header's width. The source stays open because it
-              decides what the screen is about, which is the distinction this
-              screen drew for itself in colour and now draws in shape. */}
           <OptionGroup
             label="Time covered"
             mode="collapsible"
-            tone="quiet"
             value={periodValue(days as PeriodDays)}
             options={STRENGTH_PERIOD_OPTIONS}
             onChange={(next) => setDays(periodDaysFromValue(next) ?? 90)}
