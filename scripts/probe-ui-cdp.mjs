@@ -36,9 +36,12 @@
  * and put back afterwards. The cost: whatever paints from React's theme state
  * (map styles, the globe, chart palettes) stays in the stored theme, and the
  * JSON records which one that was. Everything else is undone the same way:
- * the viewport override is cleared, the injected motion freeze removed, the
- * screen that was open reopened, and a collapsed sidebar group this had to open
- * is closed again (that key is `device` tier; it never travels).
+ * the viewport override is cleared, the injected motion freeze removed, and
+ * the screen that was open reopened — account rows included, which are reached
+ * by `data-nav-label` because one wears the athlete's name and the other is
+ * icon-only. There is nothing else to put back: the rail's index stands open,
+ * so no group has to be unfolded to reach a screen and none is left unfolded
+ * afterwards.
  *
  * Why motion is frozen: a transition started by the theme flip runs on frames,
  * and a background window gets few or none, so it can sit at its first value
@@ -159,7 +162,12 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 // Each is stringified into the page, so each must be self-contained.
 
 function pageState() {
-  const active = document.querySelector(".app-sidebar-nav-item.active:not(.is-group) .app-sidebar-nav-label");
+  const activeRow = document.querySelector(".app-sidebar-nav-item.active .app-sidebar-nav-label");
+  const activeAccount = document.querySelector(
+    ".app-sidebar-identity-main.active, .app-sidebar-identity-settings.active",
+  );
+  const active =
+    activeRow?.textContent.trim() ?? activeAccount?.getAttribute("data-nav-label") ?? null;
   let storedTheme = null;
   try {
     storedTheme = localStorage.getItem("coros-theme");
@@ -168,7 +176,7 @@ function pageState() {
     theme: document.documentElement.dataset.theme ?? "dark",
     accent: document.documentElement.dataset.accent ?? "gold",
     storedTheme: storedTheme ?? "dark",
-    activeScreen: active?.textContent.trim() ?? null,
+    activeScreen: active,
     window: { width: innerWidth, height: innerHeight },
   };
 }
@@ -193,32 +201,27 @@ function setFreeze({ id, on }) {
   return true;
 }
 
-/** A collapsed group does not render its items, so a screen inside one has no button to click. */
-function openGroupsIfHidden(label) {
-  const labelOf = (b) => b.querySelector(".app-sidebar-nav-label")?.textContent.trim() ?? "";
-  const items = document.querySelectorAll(".app-sidebar-nav-item:not(.is-group)");
-  if ([...items].some((b) => labelOf(b) === label)) return [];
-  const opened = [];
-  for (const group of document.querySelectorAll('.app-sidebar-nav-item.is-group[aria-expanded="false"]')) {
-    opened.push(labelOf(group));
-    group.click();
-  }
-  return opened;
-}
-
+/**
+ * Every destination the rail offers: the index, whose rows carry their label as
+ * text, plus the two account rows at its foot, which do not — one wears the
+ * athlete's name and the other is icon-only — and carry `data-nav-label`
+ * instead. Nothing has to be opened first: the index stands open, which is why
+ * the group handling this replaced is gone.
+ */
 function clickNav(label) {
-  const button = [...document.querySelectorAll(".app-sidebar-nav-item:not(.is-group)")].find(
+  const row = [...document.querySelectorAll(".app-sidebar-nav-item")].find(
     (b) => b.querySelector(".app-sidebar-nav-label")?.textContent.trim() === label,
   );
-  if (!button) return false;
-  button.click();
-  return true;
-}
-
-function toggleGroups(labels) {
-  for (const group of document.querySelectorAll(".app-sidebar-nav-item.is-group")) {
-    if (labels.includes(group.querySelector(".app-sidebar-nav-label")?.textContent.trim() ?? "")) group.click();
+  if (row) {
+    row.click();
+    return true;
   }
+
+  const account = document.querySelector(
+    `.app-sidebar-identity [data-nav-label="${label}"]`,
+  );
+  if (!account) return false;
+  account.click();
   return true;
 }
 
@@ -451,17 +454,12 @@ async function capture(options) {
     note: "Theme is flipped on data-theme only; React-painted colour (maps, globe, charts) stays in app.storedTheme.",
     screens: {},
   };
-  const openedGroups = new Set();
-
   try {
     await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1, mobile: false });
     await cdp.run(setFreeze, { id: FREEZE_ID, on: freeze });
 
     for (const screen of screens) {
       process.stdout.write(`${screen.padEnd(12)} `);
-      const opened = await cdp.run(openGroupsIfHidden, screen);
-      opened.forEach((group) => openedGroups.add(group));
-      if (opened.length) await cdp.pump(2);
       if (!(await cdp.run(clickNav, screen))) {
         report.screens[screen] = { missing: true };
         console.log("not in the sidebar — skipped");
@@ -490,7 +488,6 @@ async function capture(options) {
   } finally {
     await cdp.run(setThemeAttribute, before.theme).catch(() => {});
     await cdp.run(setFreeze, { id: FREEZE_ID, on: false }).catch(() => {});
-    if (openedGroups.size) await cdp.run(toggleGroups, [...openedGroups]).catch(() => {});
     if (before.activeScreen) await cdp.run(clickNav, before.activeScreen).catch(() => {});
     await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => {});
     cdp.close();

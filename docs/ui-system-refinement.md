@@ -354,6 +354,11 @@ Dark reads one more layer-2 box on every screen than paper does: the sidebar's
 collapse toggle (`div.app-sidebar-footer > button.app-sidebar-toggle`) paints a
 surface in dark and none in paper. It is chrome, identical everywhere.
 
+> Since this capture the rail has been rewritten (phase 9): the footer and that
+> full-width toggle are gone — the control moved into the brand line as
+> `button.app-sidebar-brand-toggle`, which paints nothing at rest — so this row
+> no longer appears in a probe on either theme.
+
 So depth is **not** the disease. The app is already at two layers nearly
 everywhere. The disease is in how the layers are drawn — the same capture at
 1180px, all eight screens, grouped by treatment (`rule-b` is a bottom-only
@@ -1070,8 +1075,8 @@ the charts, which cannot read a custom property — change both together.
 ## 8. Order of work
 
 One commit per phase, on `ui_system_refinement`. The suite in §7 ran before and
-after each, `test:elevation` joining it from phase 3. All eight are built; 7c
-and 8 are the ones still waiting to be looked at.
+after each, `test:elevation` joining it from phase 3. All nine are built; 7c, 8
+and 9 are the ones still waiting to be looked at.
 
 | # | Item | § | Effort | Blocked on | Needs an aesthetic call |
 |---|---|---|---|---|---|
@@ -1084,6 +1089,7 @@ and 8 are the ones still waiting to be looked at.
 | 6 | ~~Ladder on Overview, Settings, then Activities~~ — done and approved 2026-09-17 (§4.6) | 4.6 | M | 5 approved | yes |
 | 7 | ~~Ladder on the rest, then rule 2's shadows~~ — done 2026-09-17 in three batches (§4.7): 7a the radius, 7b the edge device, 7c the shadows. Both rules of the ladder hold app-wide | 4 | L | 6 | yes, per file |
 | 8 | Composition — the measure, one serif level, eyebrows and the figures: built 2026-09-17, **awaiting review** (§5). The page grid and density are not done | 5 | L | **decided 2026-09-17** | yes |
+| 9 | The rail becomes an index: four standing headings over thirteen rows, no disclosure, the account in a row of its own at the foot, a hairline edge, a bar for the active row and a wash for hover — built 2026-09-18, **awaiting review**. An alternative that keeps the tree and changes only the material is on `stash@{0}` ("Left panel option A") | 4, 5 | M | — | yes |
 
 The focus ring moved behind the elevation test: §3 composes its ring with
 elevation shadows, and the draft both told you to do §4 first and listed it

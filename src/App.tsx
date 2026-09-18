@@ -2603,7 +2603,47 @@ export default function App() {
     error ?? watchStatus?.error ?? null,
   );
 
-  // The sidebar's Coros Connect row wears the watch's name while one is on USB.
+  // The rail's identity row. The snapshot is served from the main process's
+  // hour-long cache, so asking for it here costs no COROS request; a failure
+  // just leaves the row on the account's email, which is already to hand.
+  const [athleteIdentity, setAthleteIdentity] = useState<{
+    name: string | null;
+    avatarUrl: string | null;
+  }>({ name: null, avatarUrl: null });
+
+  useEffect(() => {
+    if (!api || !trainingHubStatus?.authenticated) {
+      setAthleteIdentity({ name: null, avatarUrl: null });
+      return;
+    }
+
+    let cancelled = false;
+    void api
+      .getCorosProfileSnapshot()
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+        setAthleteIdentity({
+          name: snapshot.profile.nickname?.trim() || null,
+          avatarUrl: snapshot.profile.avatarUrl ?? null,
+        });
+      })
+      .catch(() => {
+        // The rail falls back to the email; nothing here is worth a toast.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, trainingHubStatus?.authenticated]);
+
+  const athleteName =
+    athleteIdentity.name ??
+    trainingHubStatus?.email?.split("@")[0]?.trim() ??
+    null;
+
+  // The rail's Device heading wears the watch's name while one is on USB.
   const connectedWatchName = useMemo(() => {
     if (!watchStatus?.connected) {
       return null;
@@ -2647,6 +2687,8 @@ export default function App() {
           coachBusy={coachBusy}
           showDevelopmentItems={showDevelopmentTools}
           connectedWatchName={connectedWatchName}
+          athleteName={athleteName}
+          athleteAvatarUrl={athleteIdentity.avatarUrl}
           appLogo={appLogo}
           expanded={sidebarExpanded}
           onExpandedChange={setSidebarExpanded}

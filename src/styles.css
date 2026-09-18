@@ -76,6 +76,25 @@
   --dur-slow: 320ms;
 
   --sidebar-float-gap: 14px;
+  /* The app rail is chrome: a hairline down its edge and a text colour, with
+     nothing lifting it off the page. The --sidebar-glass-* set below still
+     dresses the Coach conversation rail, which is a panel inside a screen
+     rather than the window's own edge. */
+  --sidebar-divider: rgba(255, 255, 255, 0.08);
+  --sidebar-drawer-bg: #0b0f15;
+  /*
+   * The rail's rows at rest, and they are not --text-secondary.
+   *
+   * That token is the right weight for prose sitting beside a heading; a rail
+   * is not prose, it *is* the navigation, and at 13px with no fill behind it
+   * every row read as grey. So the label steps up close to the ink and the
+   * icon stays a shade back, which puts the reading order inside the row —
+   * label first, icon second — instead of flattening the two together.
+   * Active still separates: it takes full --text-primary, weight 600, the
+   * accent on the icon and the bar at the column's edge.
+   */
+  --sidebar-row-text: #dadadf;
+  --sidebar-row-icon: #9b9ba1;
   --sidebar-radius: var(--radius-xl);
   --sidebar-glass-border: rgba(255, 255, 255, 0.14);
   --sidebar-glass-highlight: rgba(255, 255, 255, 0.12);
@@ -233,6 +252,12 @@
   --error-text: #b3261e;
   --error-dot: #d92d20;
 
+  /* A hairline that divides rather than encloses, so it does not read
+     --surface-line — that token is transparent here. */
+  --sidebar-divider: rgba(19, 26, 40, 0.1);
+  --sidebar-drawer-bg: #ffffff;
+  --sidebar-row-text: #262d3c;
+  --sidebar-row-icon: #5c6478;
   --sidebar-glass-border: rgba(19, 26, 40, 0.13);
   --sidebar-glass-highlight: rgba(255, 255, 255, 0.9);
   --sidebar-glass-shadow:
@@ -682,6 +707,18 @@ input::placeholder {
   pointer-events: auto;
 }
 
+/*
+ * The rail is an index, and chrome: one hairline down its edge and no fill, no
+ * shell blur, no highlight gradient, no inset ring, no shadow, no corner. It
+ * spent all six on being seen, beside the screen it exists to get out of the
+ * way of.
+ *
+ * The hairline reads --sidebar-divider and *not* --surface-line: this line
+ * divides rather than encloses, and --surface-line is transparent on paper, so
+ * the rail would lose its only edge there. The --sidebar-glass-* set still
+ * dresses the Coach conversation rail, which is a panel inside a screen rather
+ * than the window's own edge.
+ */
 .app-sidebar {
   position: relative;
   isolation: isolate;
@@ -692,51 +729,27 @@ input::placeholder {
   min-height: 0;
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
-  border-radius: 0 var(--sidebar-radius) 0 0;
-  background: var(--sidebar-glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  box-shadow: var(--sidebar-glass-shadow);
+  border-right: 1px solid var(--sidebar-divider);
+  background: transparent;
   -webkit-app-region: no-drag;
 }
 
-.app-sidebar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    var(--sidebar-glass-highlight) 0%,
-    transparent 34%
-  );
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.app-sidebar::after {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  z-index: 0;
-  border-radius: 0 calc(var(--sidebar-radius) - 1px) 0 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  pointer-events: none;
-}
-
+/* The narrow-window drawer is the one place the rail really floats: it sits
+   over the content on its own scrim, so it takes a fill and the lift that says
+   so — and drops the hairline, since a border and an outer shadow are two
+   devices for one edge. */
 .app-sidebar.is-overlay {
   position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
   z-index: 40;
-  width: min(280px, 100vw);
+  width: min(272px, 100vw);
   min-width: 0;
   height: auto;
-  background: var(--sidebar-overlay-bg);
-  box-shadow: var(--sidebar-overlay-shadow);
+  border-right: 0;
+  background: var(--sidebar-drawer-bg);
+  box-shadow: var(--shadow-elevated);
 }
 
 .app-sidebar.is-overlay:not(.is-open) {
@@ -750,23 +763,27 @@ input::placeholder {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: 16px 12px 14px;
-  gap: 14px;
+  padding: 14px 10px 10px;
+  gap: 12px;
 }
+
+/* --- Brand line --------------------------------------------------------- */
 
 .app-sidebar-brand {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 42px;
-  padding: 4px 8px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 10px;
+  min-height: 32px;
+  padding: 0 6px;
 }
 
+/* No ring and no glow: the mark is a logo, not a lit tile. */
 .app-sidebar-brand .brand-mark {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 10px 24px var(--accent-glow);
+  width: 30px;
+  height: 30px;
+  box-shadow: none;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .app-sidebar-brand-copy {
@@ -774,45 +791,121 @@ input::placeholder {
   white-space: nowrap;
 }
 
+/* The app's own name inside the app: it identifies the window, it is not a
+   headline, so it reads at row weight rather than shouting over the index. */
 .app-sidebar-brand-copy strong {
-  font-size: 18px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.app-sidebar-nav {
-  position: relative;
+/*
+ * Collapsing is done once and then forgotten, so the control does not hold a
+ * row of its own — it waits in the brand line and comes out under the pointer.
+ */
+.app-sidebar-brand-toggle {
   display: grid;
-  gap: 4px;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.app-sidebar:hover .app-sidebar-brand-toggle {
+  opacity: 1;
+}
+
+.app-sidebar-brand-toggle:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+/* Focus brings it out too: a control that exists only under the pointer cannot
+   be tabbed to, and this one is the only way back from the icon rail. Its own
+   rule, so focus never reads as hover. */
+.app-sidebar-brand-toggle:focus-visible {
+  opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- The index ---------------------------------------------------------- */
+
+/*
+ * The index scrolls, and it does so without a scrollbar.
+ *
+ * A 6px thumb sat a few pixels inside the rail's own hairline, so a window
+ * short enough to scroll drew two vertical lines down the same edge — and it
+ * was there for a list of thirteen rows that fits whenever the window is not
+ * cramped. What a reader actually needs is not a handle to drag but a sign
+ * that the list continues, so the cut edge fades instead: `--fade-top` and
+ * `--fade-bottom` are opened by a class only while there is something past
+ * that edge, which the rail measures (`has-fade-top`/`has-fade-bottom`). At
+ * rest both are 0px, the two stops collapse onto each other, and the mask is
+ * a solid pass — no fade over the first and last row when nothing is hidden.
+ */
+.app-sidebar-nav {
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   flex: 1;
-  align-content: start;
   isolation: isolate;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 42%, transparent)
-    transparent;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
 }
 
 .app-sidebar-nav::-webkit-scrollbar {
-  width: 6px;
+  width: 0;
+  height: 0;
 }
 
-.app-sidebar-nav::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
+.app-sidebar-nav.has-fade-top {
+  --fade-top: 16px;
 }
 
+.app-sidebar-nav.has-fade-bottom {
+  --fade-bottom: 16px;
+}
+
+/*
+ * The active row is marked at the column's edge rather than boxed. The element
+ * still spans the row — that is what the measured top/height drive, and what
+ * lets the mark slide between rows — but only the bar inside it is drawn.
+ */
 .app-sidebar-indicator {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 0;
-  border: 1px solid var(--sidebar-indicator-border);
-  border-radius: calc(var(--radius-lg) - 2px);
-  background: var(--sidebar-indicator-bg);
-  box-shadow: none;
   pointer-events: none;
   will-change: transform, height;
   transition:
@@ -821,162 +914,137 @@ input::placeholder {
     opacity var(--dur-base) var(--ease);
 }
 
+.app-sidebar-indicator::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 2px;
+  height: 14px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+}
+
+.app-sidebar-section {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.app-sidebar-section + .app-sidebar-section {
+  margin-top: 14px;
+}
+
+/*
+ * A standing heading, not a control: it does not open, close or remember
+ * anything, which is what lets the whole index stand open and is why the rail
+ * needs no chevrons and no stored state.
+ */
+.app-sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-sidebar-section-name {
+  flex: 0 0 auto;
+}
+
+/* A watch on USB belongs to the heading of the section that is about it, which
+   is a truer home than the label of a row that also has to name a screen. */
+.app-sidebar-section-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--success-text);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+
+.app-sidebar-section-dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--success-dot);
+}
+
 .app-sidebar-nav-item {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  min-height: 44px;
+  min-height: 34px;
   overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-lg) - 2px);
+  border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
-  padding: 0 12px;
+  color: var(--sidebar-row-text);
+  padding: 0 10px;
   text-align: left;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
+  line-height: 1.3;
   cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease),
-    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
+    color var(--dur-fast) var(--ease);
 }
 
+/*
+ * Hover is a wash and nothing else. It used to draw a whole card — fill,
+ * border, inset highlight, shadow and a 2px shove — under every row the
+ * pointer crossed, which is thirteen cards lighting up on the way down a list.
+ */
 .app-sidebar-nav-item:hover {
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-border);
+  background: var(--glass-bg);
   color: var(--text-primary);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
-  transform: translateX(2px);
 }
 
+.app-sidebar-nav-item:hover .app-sidebar-nav-icon {
+  color: var(--text-primary);
+}
+
+/* The rail had no focus ring at all; the row clips, so the ring is drawn
+   inside it. */
+.app-sidebar-nav-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Weight and ink carry the selection, with the indicator's bar at the edge.
+   No second box. */
 .app-sidebar-nav-item.active {
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .app-sidebar-nav-item.active .app-sidebar-nav-icon {
   color: var(--accent-strong);
 }
 
-/* A watch on USB tints the Coros Connect row's icon, even while that row is
-   the active one — the connection outranks the selection here. */
+/* The connection outranks the selection: a watch on USB tints the screen that
+   reports it, which is the one signal the collapsed rail can still show once
+   the Device heading is out of sight. */
 .app-sidebar-nav-item.is-watch-connected .app-sidebar-nav-icon,
 .app-sidebar-nav-item.is-watch-connected.active .app-sidebar-nav-icon {
   color: var(--success-dot);
-}
-
-/* --- Grouped navigation ------------------------------------------------- */
-
-.app-sidebar-nav-group {
-  display: grid;
-  gap: 4px;
-}
-
-.app-sidebar-nav-item.is-group .app-sidebar-nav-copy {
-  flex: 1;
-}
-
-.app-sidebar-nav-chevron {
-  flex: 0 0 auto;
-  margin-left: auto;
-  opacity: 0.65;
-  transform: rotate(-90deg);
-  transition: transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.app-sidebar-nav-chevron.is-open {
-  transform: rotate(0deg);
-}
-
-.app-sidebar-nav-children {
-  position: relative;
-  display: grid;
-  gap: 4px;
-}
-
-/* Rail sits under the group icon's centre so the nesting reads at a glance. */
-.app-sidebar-nav-children::before {
-  content: "";
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 23px;
-  width: 1px;
-  background: linear-gradient(
-    180deg,
-    var(--glass-border),
-    color-mix(in srgb, var(--glass-border) 20%, transparent)
-  );
-  pointer-events: none;
-}
-
-/*
- * Nested rows keep the full-width button box — only their contents shift — so
- * the shared active indicator still lines up with every row.
- */
-.app-sidebar-nav-item.is-nested {
-  min-height: 40px;
-  padding-left: 34px;
-  font-size: 14px;
-}
-
-@keyframes sidebar-nav-child-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-.app-sidebar-nav-children > .app-sidebar-nav-item {
-  animation: sidebar-nav-child-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-indicator {
-  left: 0;
-  right: 0;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-brand {
-  justify-content: center;
-  padding-inline: 0;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-inner {
-  padding-inline: 8px;
-}
-
-.app-sidebar.is-collapsed .brand-mark {
-  width: 34px;
-  height: 34px;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-nav-item,
-.app-sidebar.is-collapsed .app-sidebar-toggle {
-  justify-content: center;
-  padding-inline: 0;
-  gap: 0;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-nav-item:hover {
-  transform: none;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-nav-copy,
-.app-sidebar.is-collapsed .app-sidebar-brand-copy,
-.app-sidebar.is-collapsed .app-sidebar-toggle-label {
-  display: none;
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
 }
 
 .app-sidebar-nav-icon {
@@ -985,29 +1053,34 @@ input::placeholder {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  color: inherit;
+  width: 20px;
+  color: var(--sidebar-row-icon);
   transition: color var(--dur-fast) var(--ease);
 }
 
 .app-sidebar-nav-activity {
   position: absolute;
   top: -1px;
-  right: -3px;
+  right: 0;
 }
 
 .app-sidebar-nav-copy {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
+.app-sidebar-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .app-sidebar-brand-copy.is-hidden,
 .app-sidebar-nav-copy.is-hidden,
-.app-sidebar-toggle-label.is-hidden {
+.app-sidebar-identity-copy.is-hidden {
   flex: 0 0 0;
   width: 0;
   min-width: 0;
@@ -1017,49 +1090,221 @@ input::placeholder {
   pointer-events: none;
 }
 
-.app-sidebar-nav-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* --- The identity row --------------------------------------------------- */
 
-.app-sidebar-footer {
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.app-sidebar-toggle {
+/*
+ * The account and its settings sit at the foot of the rail, where they are
+ * looked for — and out of the index above, which is what brings it down to a
+ * length that stands open without folding.
+ */
+.app-sidebar-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-lg) - 2px);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-secondary);
-  padding: 0 12px;
+  gap: 4px;
+  margin-top: auto;
+  /* The one horizontal rule in the rail, and it earns its place: below it the
+     subject stops being training. At full height the whitespace says that on
+     its own, but the index scrolls on a development build or a short window,
+     and then the last destination would run straight into the account. */
+  border-top: 1px solid var(--sidebar-divider);
+  padding-top: 8px;
+}
+
+.app-sidebar-identity-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sidebar-row-text);
+  padding: 0 6px;
+  text-align: left;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.3;
   cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+    color var(--dur-fast) var(--ease);
 }
 
-.app-sidebar-toggle:hover {
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-border);
+.app-sidebar-identity-main:hover {
+  background: var(--glass-bg);
   color: var(--text-primary);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
 }
 
-.app-sidebar-toggle-label {
+.app-sidebar-identity-main.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Marked the same way a destination is. The nav's sliding bar cannot reach
+   down here — it is measured inside the index — so this row draws its own, at
+   the same size and the same distance from the column's edge. */
+.app-sidebar-identity-main.active::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 2px;
+  height: 14px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+}
+
+.app-sidebar-identity-main:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.app-sidebar-identity-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--sidebar-row-text);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.app-sidebar-identity-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-sidebar-identity-copy {
   overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar-identity-settings {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sidebar-row-icon);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.app-sidebar-identity-settings:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.app-sidebar-identity-settings.active {
+  color: var(--accent-strong);
+}
+
+.app-sidebar-identity-settings:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- The collapsed rail ------------------------------------------------- */
+
+.app-sidebar.is-collapsed .app-sidebar-inner {
+  padding-inline: 8px;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* The rail is too narrow for the mark and the control side by side, so the
+   control takes the mark's place while the pointer is over the rail. */
+.app-sidebar.is-collapsed .app-sidebar-brand-toggle {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  background: var(--bg-base);
+}
+
+.app-sidebar.is-collapsed:hover .brand-mark {
+  opacity: 0;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-nav-item,
+.app-sidebar.is-collapsed .app-sidebar-identity-main {
+  justify-content: center;
+  padding-inline: 0;
+  gap: 0;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-nav-copy,
+.app-sidebar.is-collapsed .app-sidebar-brand-copy,
+.app-sidebar.is-collapsed .app-sidebar-identity-copy {
+  display: none;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/*
+ * A heading has nowhere to go at 64px, so the nesting it carried becomes a
+ * short rule between sections. It is hidden rather than removed, because the
+ * section's accessible name is read from it.
+ */
+.app-sidebar.is-collapsed .app-sidebar-section-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-section + .app-sidebar-section {
+  margin-top: 8px;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-section + .app-sidebar-section::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 1px;
+  margin: 0 auto 8px;
+  background: var(--sidebar-divider);
+}
+
+.app-sidebar.is-collapsed .app-sidebar-identity {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-identity-main {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-identity-settings {
+  width: 100%;
 }
 
 .app-body > .content {
@@ -1070,17 +1315,11 @@ input::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .app-sidebar-indicator,
   .app-sidebar-nav-item,
-  .app-sidebar-nav-chevron,
+  .app-sidebar-brand-toggle,
+  .app-sidebar-identity-main,
+  .app-sidebar-identity-settings,
   .app-sidebar-overlay {
     transition: none;
-  }
-
-  .app-sidebar-nav-item:hover {
-    transform: none;
-  }
-
-  .app-sidebar-nav-children > .app-sidebar-nav-item {
-    animation: none;
   }
 }
 
@@ -1223,8 +1462,11 @@ input::placeholder {
     padding: 0 10px;
   }
 
-  .primary-tab-label,
-  .primary-tab-beta {
+  /* Scoped to the tab strip. Unscoped, this also hid the rail's Beta badge at
+     any window under 1080px — a stylesheet with no scoping means a class name
+     belongs to whoever wrote it first. */
+  .primary-tab .primary-tab-label,
+  .primary-tab .primary-tab-beta {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -24638,48 +24880,24 @@ tr.data-intervals-row-missing {
   background: transparent;
 }
 
-:root[data-theme="paper"] .app-sidebar {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-/* Both of these paint white onto white on this theme. The rail's edge is the
-   border and the shadow now, so they are switched off rather than left to
-   render as nothing. */
-:root[data-theme="paper"] .app-sidebar::before {
-  opacity: 0;
-}
-
-:root[data-theme="paper"] .app-sidebar::after {
-  box-shadow: none;
-}
-
 :root[data-theme="paper"] .app-sidebar-overlay {
   background: rgba(17, 22, 34, 0.32);
   -webkit-backdrop-filter: blur(10px) saturate(115%);
   backdrop-filter: blur(10px) saturate(115%);
 }
 
-:root[data-theme="paper"] .app-sidebar-brand {
-  border-bottom-color: rgba(19, 26, 40, 0.09);
-}
-
-:root[data-theme="paper"] .app-sidebar-brand .brand-mark {
-  box-shadow:
-    0 0 0 1px rgba(19, 26, 40, 0.07),
-    0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-/* The rail is white now, so a white hover has nothing to say. Hover, and the
-   collapse control's resting state, are ink washes here — the light-theme
-   direction is down into the surface, not up off it. */
-:root[data-theme="paper"] .app-sidebar-nav-item:hover {
-  background: var(--glass-bg);
-  border-color: rgba(19, 26, 40, 0.1);
-  box-shadow: none;
+/* --accent-strong is the lift this theme's accent takes off a dark page; on a
+   light one the mark and the settings control read as the accent itself. */
+:root[data-theme="paper"] .app-sidebar-indicator::before,
+:root[data-theme="paper"] .app-sidebar-identity-main.active::before {
+  background: var(--accent);
 }
 
 :root[data-theme="paper"] .app-sidebar-nav-item.active .app-sidebar-nav-icon {
+  color: var(--accent);
+}
+
+:root[data-theme="paper"] .app-sidebar-identity-settings.active {
   color: var(--accent);
 }
 
@@ -24688,20 +24906,6 @@ tr.data-intervals-row-missing {
 :root[data-theme="paper"] .app-sidebar-nav-item.is-watch-connected .app-sidebar-nav-icon,
 :root[data-theme="paper"] .app-sidebar-nav-item.is-watch-connected.active .app-sidebar-nav-icon {
   color: var(--success-dot);
-}
-
-:root[data-theme="paper"] .app-sidebar-footer {
-  border-top-color: rgba(19, 26, 40, 0.09);
-}
-
-:root[data-theme="paper"] .app-sidebar-toggle {
-  background: transparent;
-}
-
-:root[data-theme="paper"] .app-sidebar-toggle:hover {
-  background: var(--glass-bg);
-  border-color: rgba(19, 26, 40, 0.1);
-  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-settings-backdrop {

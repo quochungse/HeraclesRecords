@@ -975,6 +975,70 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 "update ready" is the same mistake in miniature: it means success, so it reads
 `var(--success-text)` and follows the theme.
 
+**The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over thirteen
+destinations, and a heading is a label: it does not open, close or remember anything. The
+disclosure groups this replaced existed only because eighteen equal rows did not fit, and
+they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
+whenever the app navigated into it, and a second indicator key for a collapsed group's
+header. The sections answer *when* a screen is reached for rather than where its data comes
+from, which is the grouping the athlete already has. `coroslink.sidebarCollapsedGroups` is
+gone from `syncPolicy.ts` with the state it classified — `test:sync-policy` fails on a
+localStorage key that `src/` no longer writes, in both directions.
+**Personal and Settings are not in the index.** They are about the person rather than the
+training, so they sit in the identity row at the rail's foot (`PRIMARY_NAV_ACCOUNT_ITEMS`),
+which is also what brings the index down to a length that stands open. That row wears the
+COROS nickname and avatar from `getCorosProfileSnapshot`, which is served from the main
+process's hour-long cache and so costs no request; it falls back to the account email's
+local part, then to "Personal". Because one row shows a name and the other is icon-only,
+neither is findable by its text — both carry **`data-nav-label`**, and
+`probe-ui-cdp.mjs` navigates by it.
+
+**Chrome is quiet, and three devices carry the whole rail.** `.app-sidebar` draws one
+hairline down its right edge and nothing else — no fill, no shell blur, no highlight
+gradient, no inset ring, no shadow, no corner. It spent all six on being seen, beside the
+screen it exists to get out of the way of. That hairline reads `--sidebar-divider` and
+**not** `--surface-line`: this line divides rather than encloses, and `--surface-line` is
+transparent on paper, so the rail would lose its only edge there. The `--sidebar-glass-*`
+set still dresses the **Coach conversation rail**, which is a panel inside a screen rather
+than the window's own edge; the two are not the same thing.
+The active row is marked by a 2×14px bar at the column's edge plus weight 600 and
+`--accent-strong` on the icon. **The indicator element still spans the row** — its measured
+`top`/`height` are what let the mark slide — and only the bar inside it is drawn; the
+identity row draws its own, at the same size and offset, because the nav's mark is measured
+inside the index and cannot reach down there. Hover is a single `--glass-bg` wash: it used
+to draw a whole card (fill, border, inset highlight, shadow and a 2px shove) under every row
+the pointer crossed. Collapsing, done once and then forgotten, no longer holds a row —
+`.app-sidebar-brand-toggle` waits in the brand line and comes out on hover *or* focus, in
+two separate rules, because a control that exists only under the pointer cannot be tabbed to
+and this one is the only way back from the icon rail.
+**The rows are not `--text-secondary`, and the index carries no scrollbar.** That token is
+the right weight for prose beside a heading; a rail is not prose, it *is* the navigation, and
+at 13px with no fill behind it every row read as grey — so `--sidebar-row-text` steps up
+close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) while
+`--sidebar-row-icon` stays a shade back, which puts the reading order inside the row instead
+of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
+bar. The heading sits between the two, one step quieter than a row rather than two.
+The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
+a short window drew **two vertical lines down the same edge** — for a list of thirteen rows
+that fits whenever the window is not cramped. What a reader needs there is not a handle to
+drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
+are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**
+`scrollTop`/`scrollHeight` on scroll and on every resize (the rows are observed as well as the
+nav — a development build adds two destinations without the nav's own box changing size, and
+that is exactly when it starts to scroll). At rest both are `0px`, the mask's stops collapse
+onto each other and it is a solid pass, so the first and last row are never fogged when
+nothing is hidden. The gutter stays 0 either way, so nothing reflows when the fade appears.
+
+There is exactly **one horizontal rule**, above the identity row, and it earns its place:
+below it the subject stops being training, and the index scrolls on a short window or a
+development build, where the last destination would otherwise run into the account. On the
+64px rail a heading has nowhere to go, so it becomes a 16px rule between sections and is
+*hidden rather than removed* — the section's accessible name is read from it. The
+narrow-window drawer is the one deliberate exception to all of this: it floats over the
+content, so it takes a fill and `--shadow-elevated` and drops the hairline, rather than
+drawing two devices for one edge.
+
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
 of the page under it: the shell, the sidebar and every panel read as one flat sheet, and the
@@ -987,8 +1051,8 @@ outrank it. **And `--bg-base` carries no accent hue**: the cream one left Sky an
 sitting on a yellow page, while the window chrome is painted from
 `THEME_WINDOW_BACKGROUND`, a flat string written on a theme change but *not* on an accent
 change — so an accent-derived base would drift out of step with the frame around it. The
-accent reaches the page through `--bg-ambient-*` and the sidebar's top gradient, which read
-`var(--accent)` at use time. Paper accents are measured against `--bg-base` for WCAG AA and
+accent reaches the page through `--bg-ambient-*` and the Coach rail's top gradient, which
+read `var(--accent)` at use time. Paper accents are measured against `--bg-base` for WCAG AA and
 mirrored in `src/theme/accentPalette.ts` for the globe and the charts, which cannot read a
 custom property — change both. Every paper rule is scoped `:root[data-theme="paper"]`, which
 is what keeps dark out of reach of a light-theme edit; nothing in the file relies on a bare
