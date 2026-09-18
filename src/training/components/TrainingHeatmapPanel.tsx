@@ -17,6 +17,8 @@ import {
   formatDurationSeconds,
   formatOptionalNumber
 } from "../formatters";
+import { OptionGroup } from "../../components/OptionGroup";
+import { periodLabel, type PeriodDays } from "../../preferences/periodScale";
 import {
   TRAINING_HEATMAP_RANGE_DAYS,
   TRAINING_HEATMAP_RANGES,
@@ -594,47 +596,31 @@ export function TrainingHeatmapPanel({
           <h2>{isRpe ? "RPE load heatmap" : "Load heatmap"}</h2>
         </div>
         <div className="training-heatmap-controls">
-          <div
-            className="training-metric-toggle"
-            role="group"
-            aria-label="Heatmap metric"
-          >
-            <button
-              type="button"
-              className={`training-metric-option${!isRpe ? " is-active" : ""}`}
-              aria-pressed={!isRpe}
-              onClick={() => setMetric("trainingLoad")}
-            >
-              Training Load
-            </button>
-            <button
-              type="button"
-              className={`training-metric-option${isRpe ? " is-active" : ""}`}
-              aria-pressed={isRpe}
-              onClick={() => setMetric("rpeLoad")}
-            >
-              RPE
-            </button>
-          </div>
-          <div
-            className="training-metric-toggle"
-            role="group"
-            aria-label="Heatmap range"
-          >
-            {TRAINING_HEATMAP_RANGES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`training-metric-option${
-                  range === option ? " is-active" : ""
-                }`}
-                aria-pressed={range === option}
-                onClick={() => setRange(option)}
-              >
-                Last {TRAINING_HEATMAP_RANGE_DAYS[option]} days
-              </button>
-            ))}
-          </div>
+          <OptionGroup
+            label="Heatmap metric"
+            value={isRpe ? "rpeLoad" : "trainingLoad"}
+            options={[
+              { value: "trainingLoad", label: "Training Load" },
+              { value: "rpeLoad", label: "RPE" }
+            ]}
+            onChange={(next) =>
+              setMetric(next === "rpeLoad" ? "rpeLoad" : "trainingLoad")
+            }
+          />
+          {/* Folded: two labels this long ("Last 365 days") were the widest
+              thing in the header, for a choice made once a session. */}
+          <OptionGroup
+            label="Heatmap range"
+            mode="collapsible"
+            value={range}
+            options={TRAINING_HEATMAP_RANGES.map((option) => ({
+              value: option,
+              label: periodLabel(
+                TRAINING_HEATMAP_RANGE_DAYS[option] as PeriodDays
+              )
+            }))}
+            onChange={setRange}
+          />
         </div>
       </div>
 

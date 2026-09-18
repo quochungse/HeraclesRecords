@@ -6,6 +6,10 @@ import type {
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import {
+  periodOptions,
+  type PeriodDays
+} from "../preferences/periodScale";
+import {
   defineSelectionPreference,
   selectionIsOneOf,
   useSelectionPreference
@@ -16,17 +20,20 @@ import {
   type StrengthAnalytics
 } from "./strengthAnalytics";
 
-export const WINDOW_OPTIONS = [
-  { days: 30, label: "30 days", phrase: "the last 30 days" },
-  { days: 90, label: "3 months", phrase: "the last 3 months" },
-  { days: 180, label: "6 months", phrase: "the last 6 months" },
-  { days: 365, label: "1 year", phrase: "the last year" }
-];
+/**
+ * The windows this screen offers. 28 rather than the 30 it used to open on:
+ * the labels are the shared scale's now (src/preferences/periodScale.ts), and
+ * it has one four-week window rather than the app's former three spellings of
+ * roughly a month.
+ */
+export const STRENGTH_PERIOD_DAYS: readonly PeriodDays[] = [28, 90, 180, 365];
+
+export const WINDOW_OPTIONS = periodOptions(STRENGTH_PERIOD_DAYS);
 
 export const STRENGTH_DAYS_PREFERENCE = defineSelectionPreference<number>({
   key: "strength.days",
   defaultValue: 90,
-  validate: selectionIsOneOf([30, 90, 180, 365])
+  validate: selectionIsOneOf([28, 90, 180, 365])
 });
 
 export const STRENGTH_SOURCE_PREFERENCE =

@@ -119,9 +119,10 @@ const DURATION_TOKENS = new Set(["--dur-fast", "--dur-base", "--dur-slow"]);
  */
 const DESIGNED_LENGTHS = [
   // Springs: the curve overshoots, and its length is part of that shape.
-  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "margin-left"],
-  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "max-width"],
-  ["src/strength/strength.css", ".strength-segment:is(:hover, :has(:focus-visible)) button:not(.is-active)", "padding-inline"],
+  // Strength's header pickers had three of these — the bloom that opened them
+  // on hover. They are gone with the pickers themselves: OptionGroup's
+  // collapsible mode opens on a click and animates a grid column, which is a
+  // reaction time and spends --dur-base like everything else.
   ["src/strength/strength.css", ".strength-flip", "transform"],
   // Fills growing to their value.
   ["src/strength/strength.css", ".muscle-ranking-fill", "transform"],

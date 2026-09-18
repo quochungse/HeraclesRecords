@@ -375,29 +375,6 @@
   padding-bottom: 4px;
 }
 
-.gear-type-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.gear-type-picker button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  color: var(--text-secondary);
-  padding: 11px 8px;
-}
-
-.gear-type-picker button.is-active {
-  border-color: color-mix(in srgb, var(--gear-accent) 44%, transparent);
-  background: color-mix(in srgb, var(--gear-accent) 12%, transparent);
-  color: var(--gear-accent);
-}
 
 .gear-distance-fields {
   display: grid;

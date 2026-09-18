@@ -4,6 +4,8 @@ import { CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import { trainingChartTooltipStyle } from "../chartConfig";
 import type { TrainingMetricPalette } from "../chartConfig";
+import { OptionGroup } from "../../components/OptionGroup";
+import { periodLabel, type PeriodDays } from "../../preferences/periodScale";
 import { useChartColors } from "../useChartColors";
 import type { TrainingTrendPoint } from "../types";
 
@@ -199,6 +201,10 @@ export function EmptyChartNotice({
  * The day-window chips a panel's heading carries. Every trend panel offers a
  * different list of windows, so the options are the caller's — the markup and
  * the pressed state are not, or three panels would drift apart.
+ *
+ * It is a thin wrapper over `OptionGroup` rather than markup of its own: the
+ * windows are numbers here and option values are strings everywhere else, and
+ * putting that conversion in one place keeps every caller on plain numbers.
  */
 export function TrendWindowToggle<T extends number>({
   options,
@@ -209,25 +215,20 @@ export function TrendWindowToggle<T extends number>({
   options: readonly T[];
   value: T;
   onChange: (next: T) => void;
-  /** Names the group for a screen reader; the chips themselves read as "7d". */
+  /** Names the group for a screen reader; the chips themselves read as "7 days". */
   label: string;
 }) {
   return (
-    <div className="training-metric-toggle" role="group" aria-label={label}>
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          className={`training-metric-option${
-            value === option ? " is-active" : ""
-          }`}
-          aria-pressed={value === option}
-          onClick={() => onChange(option)}
-        >
-          {option}d
-        </button>
-      ))}
-    </div>
+    <OptionGroup
+      label={label}
+      value={String(value)}
+      options={options.map((option) => ({
+        value: String(option),
+        label: periodLabel(option as PeriodDays)
+      }))}
+      onChange={(next) => onChange(Number(next) as T)}
+      tone="quiet"
+    />
   );
 }
 

@@ -318,6 +318,7 @@ import {
   XCircle,
   MoonStar
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import {
   resizeWatchfaceDimensions,
   watchfaceMasterPixelsFromDevice,
@@ -7159,25 +7160,27 @@ export function WatchfaceEditor({
               <button type="button" aria-label="Zoom out" onClick={() => setStageZoom((zoom) => Math.max(0.6, (zoom === "fit" ? 1 : zoom) - 0.1))}><Minus size={15} aria-hidden="true" /></button>
               <button type="button" aria-label="Zoom in" onClick={() => setStageZoom((zoom) => Math.min(1.4, (zoom === "fit" ? 1 : zoom) + 0.1))}><Plus size={15} aria-hidden="true" /></button>
             </div>
-            <div className="wf-preview-mode-switch" role="group" aria-label="Watch display preview">
-              <button
-                type="button"
-                aria-pressed={previewMode === "current"}
-                onClick={() => setPreviewMode("current")}
-              >
-                <SunMedium size={14} aria-hidden="true" /> Current
-              </button>
-              <button
-                type="button"
-                aria-pressed={previewMode === "aod"}
-                title={supportsAod
-                  ? "Preview and edit always-on assets"
-                  : "This MIP template uses the current face when always on"}
-                onClick={() => setPreviewMode("aod")}
-              >
-                <MoonStar size={14} aria-hidden="true" /> Always-on
-              </button>
-            </div>
+            <OptionGroup
+              label="Watch display preview"
+              className="wf-preview-mode-switch"
+              value={previewMode}
+              options={[
+                {
+                  value: "current",
+                  label: "Current",
+                  icon: <SunMedium size={14} aria-hidden="true" />
+                },
+                {
+                  value: "aod",
+                  label: "Always-on",
+                  title: supportsAod
+                    ? "Preview and edit always-on assets"
+                    : "This MIP template uses the current face when always on",
+                  icon: <MoonStar size={14} aria-hidden="true" />
+                }
+              ]}
+              onChange={(next) => setPreviewMode(next as WatchfacePreviewMode)}
+            />
             {previewDetails && previewDetails.resolutions.length > 1 ? (
               <label className="wf-preview-resolution">
                 Watch preview
@@ -7699,6 +7702,44 @@ export function WatchfaceEditor({
               "config",
               "Config files",
               <div className="wf-property-stack wf-raw-config-editor">
+                <p className="wf-archive-note">
+                  Edit the template’s raw layout files. Studio layer moves still
+                  apply on top when you export.
+                </p>
+                {resolutionOptions.length > 1 ? (
+                  <label className="field">
+                    Resolution
+                    <select
+                      value={editorDirectory}
+                      onChange={(event) =>
+                        setConfigEditorDirectory(event.target.value)
+                      }
+                    >
+                      {resolutionOptions.map((resolution) => (
+                        <option
+                          key={resolution.directory}
+                          value={resolution.directory}
+                        >
+                          {resolution.width}×{resolution.height}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <OptionGroup
+                  label="Config file"
+                  className="wf-raw-config-tabs"
+                  value={previewMode}
+                  options={[
+                    {
+                      value: "current",
+                      label: "Current",
+                      disabled: !hasCurrentConfig
+                    },
+                    { value: "aod", label: "AOD", disabled: !hasAodConfig }
+                  ]}
+                  onChange={(next) => setPreviewMode(next as WatchfacePreviewMode)}
+                />
                 <p className="wf-archive-note">
                   Edit the template’s raw layout files. Studio layer moves still
                   apply on top when you export.

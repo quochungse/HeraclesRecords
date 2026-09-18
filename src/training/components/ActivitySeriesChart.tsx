@@ -20,6 +20,7 @@ import type {
   UnitSystem
 } from "../../../electron/types";
 import { downsampleActivitySeries } from "../../../electron/activitySeries";
+import { OptionChips, OptionGroup } from "../../components/OptionGroup";
 import { useTheme } from "../../theme/ThemeProvider";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
@@ -361,61 +362,46 @@ export function ActivitySeriesChart({
     <section className={surfaceClass}>
       <div className="activity-chart-head">
         {heading}
-        <div
-          className="training-metric-toggle activity-chart-axis"
-          role="group"
-          aria-label="X axis"
-        >
-          <button
-            type="button"
-            disabled={!hasElapsed}
-            className={`training-metric-option${axis === "elapsed" ? " is-active" : ""}`}
-            aria-pressed={axis === "elapsed"}
-            onClick={() => setAxis("elapsed")}
-          >
-            Time
-          </button>
-          <button
-            type="button"
-            disabled={!hasDistance}
-            className={`training-metric-option${axis === "distance" ? " is-active" : ""}`}
-            aria-pressed={axis === "distance"}
-            onClick={() => setAxis("distance")}
-          >
-            Distance
-          </button>
-        </div>
+        <OptionGroup
+          label="X axis"
+          className="activity-chart-axis"
+          value={axis}
+          options={[
+            { value: "elapsed", label: "Time", disabled: !hasElapsed },
+            { value: "distance", label: "Distance", disabled: !hasDistance }
+          ]}
+          onChange={(next) =>
+            setAxis(next === "distance" ? "distance" : "elapsed")
+          }
+        />
       </div>
 
-      <div className="activity-chart-chips">
-        {available.map((channel) => {
-          const active = channel.background
-            ? showAltitude
-            : selected.includes(channel.key);
-          const color = palette[channel.key];
-          return (
-            <button
-              key={channel.key}
-              type="button"
-              className={`activity-chart-chip${active ? " is-active" : ""}`}
-              aria-pressed={active}
-              style={
-                active
-                  ? { borderColor: color.stroke, background: color.fill, color: color.stroke }
-                  : undefined
-              }
-              onClick={() =>
-                channel.background
-                  ? setShowAltitude((previous) => !previous)
-                  : setSelected((previous) => toggleActivityChannel(previous, channel.key))
-              }
-            >
-              <span className="activity-chart-chip-dot" style={{ background: color.stroke }} />
-              {channel.label}
-            </button>
+      {/* The chip wears its own series colour, because that colour is how the
+          line is found in the plot — it is data, not decoration. */}
+      <OptionChips
+        label="Series"
+        className="activity-chart-chips"
+        options={available.map((channel) => ({
+          value: channel.key,
+          label: channel.label
+        }))}
+        values={available
+          .filter((channel) =>
+            channel.background ? showAltitude : selected.includes(channel.key)
+          )
+          .map((channel) => channel.key)}
+        colorOf={(key) => palette[key as ActivityChannelKey]?.stroke}
+        onToggle={(key) => {
+          const channel = available.find((entry) => entry.key === key);
+          if (channel?.background) {
+            setShowAltitude((previous) => !previous);
+            return;
+          }
+          setSelected((previous) =>
+            toggleActivityChannel(previous, key as ActivityChannelKey)
           );
-        })}
-      </div>
+        }}
+      />
 
       <div className="activity-chart-plot">
         <ResponsiveContainer width="100%" height={340}>

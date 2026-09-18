@@ -171,61 +171,30 @@
   line-height: 1.45;
 }
 
+/*
+ * The globe card carries its own palette (`--map-*`) and keeps it on both
+ * themes — it is a dark card on the paper page. The shared option control
+ * would otherwise take the app's chrome colours and draw dark ink on that dark
+ * card, so it is re-based here. Custom properties resolve where they are
+ * declared, which is what makes this work without the component knowing.
+ */
+.training-map-period-wrap .option-group {
+  --option-edge: var(--map-border);
+  --option-well: var(--map-secondary-surface);
+  --option-raised: var(--map-elevated-surface);
+  --option-lift: 0 3px 10px color-mix(in srgb, var(--map-accent) 30%, transparent);
+  --accent: var(--map-accent);
+  --accent-ink: var(--map-on-accent);
+  --text-primary: var(--map-text-primary);
+  --text-secondary: var(--map-text-secondary);
+}
+
 .training-map-period-wrap {
   display: grid;
   gap: 10px;
 }
 
-.training-map-periods {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  border: 1px solid var(--map-border);
-  border-radius: var(--radius-md);
-  background: var(--map-secondary-surface);
-  box-shadow:
-    inset 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);
-  padding: 4px;
-}
 
-.training-map-periods button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  min-height: 36px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--map-text-secondary);
-  padding: 0 7px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--map-ease),
-    background var(--dur-fast) var(--map-ease),
-    box-shadow var(--dur-fast) var(--map-ease),
-    transform var(--dur-base) var(--map-ease);
-}
-
-.training-map-periods button:hover {
-  color: var(--map-text-primary);
-  background: color-mix(in srgb, var(--map-elevated-surface) 84%, transparent);
-}
-
-.training-map-periods button.is-selected {
-  background: var(--map-accent-gradient);
-  color: var(--map-on-accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 3px 10px color-mix(in srgb, var(--map-accent) 30%, transparent);
-}
-
-.training-map-periods button:active,
 .training-map-view-action:active,
 .training-map-recent-list > button:active,
 .training-map-reset:active,
@@ -233,7 +202,6 @@
   transform: translateY(1px);
 }
 
-.training-map-periods button:focus-visible,
 .training-map-date-range input:focus-visible,
 .training-map-view-action:focus-visible,
 .training-map-recent-list > button:focus-visible,
@@ -1396,12 +1364,6 @@
   .training-map-header > p:last-child {
     font-size: 13px;
   }
-
-  .training-map-periods button {
-    min-height: 33px;
-    font-size: 11px;
-  }
-
   .training-map-primary-stats {
     padding-inline: 6px;
   }
@@ -1478,11 +1440,6 @@
   .training-map-header h2 {
     font-size: 28px;
   }
-
-  .training-map-periods {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .training-map-primary-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 6px 0;
@@ -1581,7 +1538,6 @@
     animation: none;
   }
 
-  .training-map-periods button,
   .training-map-view-action,
   .training-map-view-action svg,
   .training-map-recent-list > button,

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   CorosGear,
@@ -431,23 +432,23 @@ export function GearView({ api }: { api: CorosLinkApi }) {
               />
             </label>
 
-            <div className="gear-type-picker" role="group" aria-label="Gear type">
-              {([1, 2] as CorosGearType[]).map((gearType) => {
-                const Icon = gearType === 1 ? Footprints : Bike;
-                return (
-                  <button
-                    key={gearType}
-                    type="button"
-                    className={type === gearType ? "is-active" : ""}
-                    aria-pressed={type === gearType}
-                    onClick={() => setType(gearType)}
-                  >
-                    <Icon size={18} />
-                    {typeLabel(gearType)}
-                  </button>
-                );
-              })}
-            </div>
+            <OptionGroup
+              label="Gear type"
+              size="md"
+              className="gear-type-picker"
+              value={String(type)}
+              options={([1, 2] as CorosGearType[]).map((gearType) => ({
+                value: String(gearType),
+                label: typeLabel(gearType),
+                icon:
+                  gearType === 1 ? (
+                    <Footprints size={18} aria-hidden="true" />
+                  ) : (
+                    <Bike size={18} aria-hidden="true" />
+                  )
+              }))}
+              onChange={(next) => setType(Number(next) as CorosGearType)}
+            />
 
             <label className="field">
               <span>First use</span>

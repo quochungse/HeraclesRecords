@@ -9,6 +9,7 @@ import {
   RefreshCw,
   UserRound
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import type { CorosLinkApi } from "../coroslink-api";
 import type {
   GoogleAccountInfo,
@@ -397,46 +398,38 @@ export function SyncPanel({ api }: SyncPanelProps) {
             <strong>Where this machine syncs</strong>
             {destinationHint ? <span>{destinationHint}</span> : null}
           </span>
-          <span
+          {/* Only the switch is held during a switch, and the already-selected
+              side stays clickable-looking rather than greyed: a disabled
+              control is how this row used to read as broken. A build with no
+              OAuth client is the one real block — it cannot offer Drive at
+              all. */}
+          <OptionGroup
+            label="Where this machine syncs"
             className="sync-backend-switch"
-            role="group"
-            aria-label="Where this machine syncs"
-          >
-            {BACKENDS.map(({ value, label, Icon }) => {
-              const active = backend === value;
-              const unavailable =
-                value === "google" && !status.googleClientConfigured;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  className={active ? "is-active" : undefined}
-                  aria-pressed={active}
-                  // Only the switch is held during a switch, and the
-                  // already-selected side stays clickable-looking rather than
-                  // greyed: a disabled control is how this row used to read as
-                  // broken. `unavailable` is the one real block — a build with
-                  // no OAuth client cannot offer Drive at all.
-                  disabled={busy === "backend" || unavailable}
-                  title={
-                    unavailable
-                      ? "This build ships no Google OAuth client, so Drive cannot be offered."
-                      : undefined
+            value={backend}
+            options={BACKENDS.map(({ value, label, Icon }) => ({
+              value,
+              label,
+              disabled:
+                busy === "backend" ||
+                (value === "google" && !status.googleClientConfigured),
+              ...(value === "google" && !status.googleClientConfigured
+                ? {
+                    title:
+                      "This build ships no Google OAuth client, so Drive cannot be offered."
                   }
-                  onClick={() => {
-                    if (!active) switchBackend(value);
-                  }}
-                >
-                  {active && busy === "backend" ? (
-                    <Loader2 size={14} strokeWidth={2} className="spin" />
-                  ) : (
-                    <Icon size={14} strokeWidth={2} />
-                  )}
-                  {label}
-                </button>
-              );
-            })}
-          </span>
+                : {}),
+              icon:
+                backend === value && busy === "backend" ? (
+                  <Loader2 size={14} strokeWidth={2} className="spin" />
+                ) : (
+                  <Icon size={14} strokeWidth={2} />
+                )
+            }))}
+            onChange={(next) => {
+              if (next !== backend) switchBackend(next);
+            }}
+          />
 
           <span className="sync-row-footer">
             <span className="sync-destination-detail">{destinationDetail}</span>

@@ -265,33 +265,6 @@
   gap: 8px 12px;
 }
 
-.activities-period {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-pill);
-  background: var(--ax-well);
-}
-
-.activities-period-option {
-  padding: 5px 12px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activities-period-option:hover:not(.is-active) {
-  color: var(--text-secondary);
-}
-
-.activities-period-option.is-active {
-  background: var(--ax-raised);
-  color: var(--text-primary);
-}
 
 .activities-sports {
   display: flex;
@@ -299,37 +272,6 @@
   gap: 6px;
 }
 
-.activities-sport-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activities-sport-toggle i {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-xs);
-  background: var(--sport-mix-color, var(--sport-other));
-}
-
-.activities-sport-toggle:hover:not(.is-active) {
-  color: var(--text-secondary);
-  border-color: color-mix(in srgb, var(--text-secondary) 40%, transparent);
-}
-
-.activities-sport-toggle.is-active {
-  border-color: color-mix(in srgb, var(--sport-mix-color) 45%, transparent);
-  background: color-mix(in srgb, var(--sport-mix-color) 14%, transparent);
-  color: var(--text-primary);
-}
 
 .activities-search {
   display: inline-flex;

@@ -6,26 +6,29 @@
  * "which of these does the athlete mean" is arithmetic, not layout.
  */
 import type { TrainingHubActivity } from "../../electron/types";
+import {
+  periodOptions,
+  type PeriodDays,
+  type PeriodOption
+} from "../preferences/periodScale";
 import { activityStartTimeMs, startOfWeekMs, weekWindowStartMs } from "./activityWindow";
 import { type SportColorCategory, sportColorCategory } from "./sportColors";
 
-export interface ActivityPeriodOption {
-  /** null means the whole history. */
-  days: number | null;
-  label: string;
-}
+export type ActivityPeriodOption = PeriodOption;
 
 /**
  * The whole history is offered but is not the default: the renderer holds
  * every activity COROS has, and tallying years of them on every keystroke is
  * work nobody asked for while looking at this block.
+ *
+ * Which windows this screen offers is its own decision; what they are called
+ * is not — the labels come from the shared scale, so "3 months" here and on
+ * Strength and on the Data screen cannot drift into three spellings again.
  */
-export const ACTIVITY_PERIOD_OPTIONS: readonly ActivityPeriodOption[] = [
-  { days: 28, label: "4 weeks" },
-  { days: 90, label: "3 months" },
-  { days: 365, label: "1 year" },
-  { days: null, label: "All" }
-];
+export const ACTIVITY_PERIOD_DAYS: readonly PeriodDays[] = [28, 90, 365, null];
+
+export const ACTIVITY_PERIOD_OPTIONS: readonly ActivityPeriodOption[] =
+  periodOptions(ACTIVITY_PERIOD_DAYS);
 
 export const DEFAULT_ACTIVITY_PERIOD_DAYS = 90;
 

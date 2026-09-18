@@ -32,6 +32,7 @@ import type {
 } from "../../electron/types";
 import { AppUpdateControl } from "../components/AppUpdateControls";
 import { ResourcesMenu } from "../components/ResourcesMenu";
+import { OptionGroup } from "../components/OptionGroup";
 import { StartupViewMenu } from "../components/StartupViewMenu";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { getPrimaryViewIcon } from "../navigation/startupView";
@@ -604,27 +605,17 @@ export function SettingsView({
               throughout Heracles Records.
             </span>
           </div>
-          <div
-            className="settings-segment"
-            role="radiogroup"
-            aria-label="Unit system"
-          >
-            {UNIT_SYSTEMS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={unitSystem === option.value}
-                title={option.detail}
-                className={`settings-segment-option${
-                  unitSystem === option.value ? " is-active" : ""
-                }`}
-                onClick={() => setUnitSystem(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <OptionGroup
+            label="Unit system"
+            size="md"
+            value={unitSystem}
+            options={UNIT_SYSTEMS.map((option) => ({
+              value: option.value,
+              label: option.label,
+              title: option.detail
+            }))}
+            onChange={setUnitSystem}
+          />
         </div>
       </div>
 
@@ -647,30 +638,27 @@ export function SettingsView({
               <p>Colour mode, accent palette and the colours sports wear.</p>
             </div>
           </div>
-          <div
-            className="settings-segment"
-            role="group"
-            aria-label="Color mode"
-          >
-            {THEME_MODES.map((mode) => (
-              <button
-                key={mode.id}
-                className={`settings-segment-option${theme === mode.id ? " is-active" : ""}`}
-                type="button"
-                aria-pressed={theme === mode.id}
-                onClick={(event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setTheme(mode.id, {
-                    x: rect.left + rect.width / 2,
-                    y: rect.top + rect.height / 2
-                  });
-                }}
-              >
-                <mode.icon size={15} aria-hidden="true" />
-                {mode.label}
-              </button>
-            ))}
-          </div>
+          {/* The swap animates out of the point that was pressed, so the chip
+              that produced the change comes back with it. */}
+          <OptionGroup
+            label="Color mode"
+            size="md"
+            value={theme}
+            options={THEME_MODES.map((mode) => ({
+              value: mode.id,
+              label: mode.label,
+              icon: <mode.icon size={15} aria-hidden="true" />
+            }))}
+            onChange={(next, from) => {
+              const rect = from?.getBoundingClientRect();
+              setTheme(
+                next,
+                rect
+                  ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+                  : undefined
+              );
+            }}
+          />
         </div>
 
         <div className="settings-palette-row">

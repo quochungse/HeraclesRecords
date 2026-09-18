@@ -1,4 +1,5 @@
 import { Laptop, ShieldCheck } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 
 /**
  * Picks which credential store Claude Code runs against: a Heracles
@@ -26,31 +27,29 @@ export function ClaudeAuthScopeToggle({
   };
 
   return (
-    <div
+    <OptionGroup
+      label="Claude credentials"
       className="chat-auth-scope-switch"
-      role="group"
-      aria-label="Claude credentials"
-    >
-      <button
-        type="button"
-        className={appScoped ? "is-active" : ""}
-        aria-pressed={appScoped}
-        disabled={disabled}
-        onClick={() => select(true)}
-      >
-        <ShieldCheck size={14} aria-hidden="true" />
-        Heracles Records-only Claude login
-      </button>
-      <button
-        type="button"
-        className={appScoped ? "" : "is-active"}
-        aria-pressed={!appScoped}
-        disabled={disabled}
-        onClick={() => select(false)}
-      >
-        <Laptop size={14} aria-hidden="true" />
-        Your device Claude
-      </button>
-    </div>
+      value={appScoped ? "app" : "device"}
+      // The labels are short and the full sentence is the title: the long
+      // spellings ("Heracles Records-only Claude login") made this the widest
+      // control in Settings, for a choice of two.
+      options={[
+        {
+          value: "app",
+          label: "App only",
+          title: "A Claude login this app keeps to itself",
+          icon: <ShieldCheck size={14} aria-hidden="true" />
+        },
+        {
+          value: "device",
+          label: "This device",
+          title: "The machine-wide Claude login your terminal already uses",
+          icon: <Laptop size={14} aria-hidden="true" />
+        }
+      ]}
+      disabled={disabled}
+      onChange={(next) => select(next === "app")}
+    />
   );
 }
