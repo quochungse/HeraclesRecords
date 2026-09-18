@@ -5346,6 +5346,22 @@ td span {
   font-weight: 700;
 }
 
+/*
+ * No `backdrop-filter` here, and that is a fix rather than an omission. A field
+ * sits on a `.panel`, which already blurs the page behind it and is therefore
+ * the backdrop root this box would sample from — so the nested blur reads a
+ * surface that has been blurred once already, over a smooth gradient, and
+ * changes nothing: measured against a build that had it, the middle of every
+ * input matched to the byte and only the rim moved, by 23/255 where the
+ * panel's gradient runs out.
+ *
+ * What it did cost was a compositing layer per input, and a layer that samples
+ * its backdrop is repainted whenever a layer near it changes. Hovering Save or
+ * Cancel does exactly that — both take a new shadow and the primary button a
+ * `translateY(-1px)` — and Chromium then repainted these boxes short, leaving a
+ * lighter band down the right-hand edge of every field in one column. It looked
+ * like the inputs lighting up in response to a hover two panels away.
+ */
 .field input,
 .field textarea {
   width: 100%;
@@ -5354,8 +5370,6 @@ td span {
   border-radius: var(--radius-sm);
   outline: none;
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
   padding: 0 12px;
 }
 
