@@ -883,6 +883,34 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
 
+**There is one way to offer a choice between options, and `npm run test:option-groups`
+closes it.** `OptionGroup` (`src/components/OptionGroup.tsx`) has three modes that share a
+chip and differ only in which chips are on screen: `expanded` (all of them — the default),
+`collapsible` (the selected one, opening in place and pushing what sits beside it) and
+`dropdown` (a floating menu, through `SelectDropdown`). Multi-select is `OptionChips`, a
+separate export rather than a flag, because several pressed chips inside one track read as a
+segmented control gone wrong. It replaced ~30 hand-written versions whose chips disagreed
+about height, weight, radius, how the chosen one is marked (`.is-active`, `.is-selected`,
+`.active`, `[data-active]`) and which ARIA role a row of exclusive buttons takes.
+**There is deliberately no automatic fallback** from `expanded` to `collapsible` when a row
+does not fit: it was written that way first and it oscillates, because the measurement that
+says "this does not fit" can only be taken while the row is laid out in full, and folding it
+makes the same measurement say it fits. A screen that cannot spare the width says
+`mode="collapsible"`. **Escape is caught in the capture phase** — a collapsible group can sit
+in a dialog that closes on Escape from its own `document` listener, and two listeners on one
+node are not separated by `stopPropagation()`.
+**The words are `src/preferences/periodScale.ts`, not the screen's.** Six screens used to
+answer "how far back" in their own vocabulary — ninety days was "3 months", "90 days" and
+"Last 90 days" depending on where you looked. A screen declares the windows it offers and
+takes the labels from the scale; the test fails on a period label written anywhere else.
+Two windows moved to fit it: the trend charts and the load heatmap run 28 days rather than 30,
+which is the four whole weeks this app already cuts its periods by.
+**Seventeen controls are exempt**, each named in the test by file *and* by a string from the
+element, so an exemption covers one control rather than a whole file. They are four kinds and
+none is a row of options: a grid whose arrangement carries meaning (the route sport picker,
+the Studio's alignment grids), cards that need a sentence (export formats, analysis starters),
+a list of records (plans, places, search results) and a table's sort header.
+
 **The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
 Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
 `em` steps for text that must follow its parent, four tracking steps
