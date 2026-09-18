@@ -37,6 +37,7 @@
     "test:design-vocabulary": "node scripts/test-design-vocabulary.mjs",
     "test:elevation": "node scripts/test-elevation.mjs",
     "test:css-tokens": "node scripts/test-css-tokens.mjs",
+    "test:option-groups": "node scripts/test-option-groups.mjs",
     "test:sport-colors": "node --experimental-strip-types scripts/test-sport-colors.mjs",
     "test:vo2-trend": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-vo2-trend.mjs",
     "test:hr-zone-model": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-hr-zone-model.mjs",

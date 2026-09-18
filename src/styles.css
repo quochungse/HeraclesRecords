@@ -4919,17 +4919,10 @@ input::placeholder {
   background: var(--option-chip-color, var(--accent));
 }
 
-/* The caret belongs to a trigger that opens a floating menu and nowhere else.
-   A collapsible chip carries no mark: at rest it has to read as the current
-   value first and as a control second. */
-.option-group-caret {
-  color: var(--text-secondary);
-  transition: transform var(--dur-base) var(--ease);
-}
-
-[aria-expanded="true"] > .option-group-caret {
-  transform: rotate(180deg);
-}
+/* There is no caret here on purpose. The dropdown mode gets one from
+   SelectDropdown, which is a trigger for a floating menu; a collapsible chip
+   carries no mark, because at rest it has to read as the current value first
+   and as a control second. */
 
 .primary-button {
   display: inline-flex;

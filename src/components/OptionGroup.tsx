@@ -1,4 +1,3 @@
-import { ChevronDown } from "lucide-react";
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -430,12 +429,5 @@ export function OptionChips<T extends string>({
         );
       })}
     </div>
-  );
-}
-
-/** Chevron for a trigger that opens a floating menu. Never on a collapsible chip. */
-export function OptionGroupCaret() {
-  return (
-    <ChevronDown className="option-group-caret" size={14} aria-hidden="true" />
   );
 }
