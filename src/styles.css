@@ -7537,12 +7537,17 @@ td span {
   position: relative;
   display: block;
   min-width: 0;
+  /* Declared on the control so the trigger and the menu cannot disagree. A
+     portalled menu hangs off <body> and cannot inherit it, so the component
+     hands it the trigger's computed value under the same name. */
+  --app-select-font-size: 14px;
 }
 
 .app-select-trigger {
   display: flex;
   width: 100%;
   min-height: 44px;
+  font-size: var(--app-select-font-size);
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -7629,10 +7634,20 @@ td span {
   left: 0;
   display: grid;
   gap: 2px;
-  max-height: 280px;
+  /* Only a non-portalled menu is bounded here, and only because nothing
+     measures the room for one. A portalled menu overrides this with the height
+     it was measured to need — 280px was a guess that opened every longer list
+     already scrolled. */
+  max-height: min(70vh, 520px);
   margin: 0;
   padding: 6px;
   overflow-y: auto;
+  /* The open list reads at the size of the control that opened it. A portalled
+     menu hangs off <body> and would otherwise inherit the page's 14px, so a
+     12px pill opened a 14px list. The trigger's computed size is passed in as
+     --app-select-font-size; the fallback is for the non-portalled case, where
+     inheriting from the control is already right. */
+  font-size: var(--app-select-font-size, inherit);
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -7645,6 +7660,9 @@ td span {
   z-index: 420;
   right: auto;
   bottom: auto;
+  /* The inline max-height is measured against the window; this cap is not,
+     and leaving it on would scroll a list that had room to open in full. */
+  max-height: none;
 }
 
 .app-select-menu-list {
@@ -7665,6 +7683,7 @@ td span {
   padding: 8px 10px;
   text-align: left;
   font: inherit;
+  font-size: inherit;
   font-weight: 600;
   cursor: pointer;
 }
@@ -7700,12 +7719,15 @@ td span {
   width: 100%;
 }
 
+.app-select--pill {
+  --app-select-font-size: 12px;
+}
+
 .app-select--pill .app-select-trigger {
   min-height: auto;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.04);
   padding: 5px 13px;
-  font-size: 12px;
   font-weight: 600;
 }
 
@@ -7727,7 +7749,6 @@ td span {
 
 .app-select--watch-smoke .app-select-menu {
   min-width: 180px;
-  max-height: 360px;
 }
 
 .app-select--pill .app-select-menu {
@@ -21162,8 +21183,6 @@ tr.data-intervals-row-missing {
   --chat-select-tone-strong: var(--accent-strong);
   --chat-select-tone-soft: var(--accent-soft);
   --chat-select-tone-shadow: var(--accent-glow);
-  --chat-menu-offset: -10px;
-  --chat-option-offset: -5px;
   min-width: 220px;
   padding: 7px;
   border-color: color-mix(
@@ -21192,15 +21211,6 @@ tr.data-intervals-row-missing {
     )
     transparent;
   scrollbar-width: thin;
-}
-
-.chat-select-menu[data-side="top"] {
-  --chat-menu-offset: 10px;
-  --chat-option-offset: 5px;
-}
-
-.chat-select-menu.is-closing {
-  pointer-events: none;
 }
 
 .chat-select-menu .app-select-menu-list {
@@ -21340,32 +21350,6 @@ tr.data-intervals-row-missing {
     padding-box;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .chat-select-menu.is-opening {
-    animation: chat-select-menu-surface-in 220ms ease-out;
-  }
-
-  .chat-select-menu.is-opening .app-select-menu-list {
-    animation: chat-select-menu-content-in 300ms
-      cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .chat-select-menu.is-opening .app-select-option {
-    animation: chat-select-option-in 220ms cubic-bezier(0.16, 1, 0.3, 1)
-      backwards;
-    animation-delay: var(--app-select-delay);
-  }
-
-  .chat-select-menu.is-closing {
-    animation: chat-select-menu-surface-out 160ms ease-in forwards;
-  }
-
-  .chat-select-menu.is-closing .app-select-menu-list {
-    animation: chat-select-menu-content-out 160ms cubic-bezier(0.4, 0, 1, 1)
-      forwards;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .chat-provider-select .app-select-trigger,
   .chat-model-select .app-select-trigger,
@@ -21382,9 +21366,6 @@ tr.data-intervals-row-missing {
     transform: none;
   }
 
-  .chat-select-menu.is-closing {
-    opacity: 0;
-  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -21392,62 +21373,6 @@ tr.data-intervals-row-missing {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-}
-
-@keyframes chat-select-menu-surface-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes chat-select-menu-content-in {
-  from {
-    opacity: 0.35;
-    transform: translateY(var(--chat-menu-offset)) scale(0.965);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes chat-select-option-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--chat-option-offset)) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes chat-select-menu-surface-out {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes chat-select-menu-content-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(var(--chat-menu-offset)) scale(0.975);
   }
 }
 
