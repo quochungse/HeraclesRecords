@@ -76,7 +76,6 @@ import type {
   ApplePodcastEpisode,
   ApplePodcastShow,
   ApplePodcastShowDetail,
-  CommunityWatchfaceOpenRequest,
 } from "../electron/types";
 import { TRAINING_HUB_EXPORT_FORMATS } from "../electron/types";
 import { buildTrainingHubSnapshot } from "./training/parsers";
@@ -167,16 +166,6 @@ const APPLE_MUSIC_SELECTED_PLAYLIST_STORAGE_KEY =
   "coroslink.appleMusic.selectedPlaylistId";
 const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
 
-const LazyMapsView = lazy(() =>
-  import("./maps/MapsView").then(({ MapsView }) => ({ default: MapsView })),
-);
-const LazyWatchfacesView = IS_DEVELOPMENT_BUILD
-  ? lazy(() =>
-      import("./watchfaces/WatchfacesView").then(({ WatchfacesView }) => ({
-        default: WatchfacesView,
-      })),
-    )
-  : null;
 const LazyTrainingOverview = lazy(() =>
   import("./training/TrainingOverview").then(({ TrainingOverview }) => ({
     default: TrainingOverview,
@@ -187,13 +176,6 @@ const LazyActivitiesView = lazy(() =>
     default: ActivitiesView,
   })),
 );
-const LazyGearView = IS_DEVELOPMENT_BUILD
-  ? lazy(() =>
-      import("./gear/GearView").then(({ GearView }) => ({
-        default: GearView,
-      })),
-    )
-  : null;
 const LazyTrainingLibraryView = lazy(() =>
   import("./training-library/TrainingLibraryView").then(({ TrainingLibraryView }) => ({
     default: TrainingLibraryView,
@@ -387,9 +369,6 @@ export default function App() {
     () => new Set(),
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
-  const [watchfacesMounted, setWatchfacesMounted] = useState(
-    activeView === "watchfaces",
-  );
   const [coachPrefill, setCoachPrefill] = useState<string | null>(null);
   const [pendingCoachPlan, setPendingCoachPlan] = useState<TrainingPlanDocument | null>(null);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
@@ -399,9 +378,6 @@ export default function App() {
   const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null);
   const [transferProgress, setTransferProgress] =
     useState<TrackTransferProgress | null>(null);
-  const [communityWatchfaceOpenRequest, setCommunityWatchfaceOpenRequest] =
-    useState<(CommunityWatchfaceOpenRequest & { requestId: number }) | null>(null);
-  const communityWatchfaceRequestSequence = useRef(0);
   const [downloads, setDownloads] = useState<LocalTrack[]>([]);
   const [spotifyConfig, setSpotifyConfig] = useState<SpotifyConfig>({
     clientId: "",
@@ -547,43 +523,16 @@ export default function App() {
     return startLocalStoragePublisher(api);
   }, [api]);
 
-  useEffect(() => {
-    // Watch Faces is the only destination that can handle a community deep
-    // link, so a production build has nowhere to send one.
-    if (!api || !IS_DEVELOPMENT_BUILD) return;
-    let active = true;
-    const openCommunityWatchface = (request: CommunityWatchfaceOpenRequest) => {
-      if (!active) return;
-      communityWatchfaceRequestSequence.current += 1;
-      setCommunityWatchfaceOpenRequest({
-        ...request,
-        requestId: communityWatchfaceRequestSequence.current,
-      });
-      setActiveView("watchfaces");
-    };
-    const unsubscribe = api.onCommunityWatchfaceOpenRequest(openCommunityWatchface);
-    void api
-      .consumeCommunityWatchfaceOpenRequest()
-      .then((request) => {
-        if (request) openCommunityWatchface(request);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [api]);
-
   // Tell the main process this window is listening — and only once every effect
   // above has run, which is what `setTimeout` buys: mount effects all fire
   // inside the same commit, so a call made from within one of them could beat a
   // subscription declared below it, and the push it unblocks would arrive
   // before there was anything to receive it.
   //
-  // Unconditional on purpose. This used to ride along on a watchfaces call that
-  // only development builds make, so no packaged build ever announced itself
-  // and every unasked-for push — merged sync writes, a COROS session restored
-  // at start-up — was dropped for the whole run.
+  // Unconditional on purpose. This used to ride along on a call only
+  // development builds make, so no packaged build ever announced itself and
+  // every unasked-for push — merged sync writes, a COROS session restored at
+  // start-up — was dropped for the whole run.
   useEffect(() => {
     if (!api) return;
     const timer = window.setTimeout(() => {
@@ -697,9 +646,6 @@ export default function App() {
   useEffect(() => {
     if (activeView === "coach") {
       setCoachMounted(true);
-    }
-    if (activeView === "watchfaces") {
-      setWatchfacesMounted(true);
     }
   }, [activeView]);
 
@@ -2907,34 +2853,6 @@ export default function App() {
                 )}
               </MediaView>
             ) : null}
-            {activeView === "maps" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="maps" />}>
-                <LazyMapsView
-                  api={api}
-                  watchStatus={watchStatus}
-                  onWatchStatusChange={setWatchStatus}
-                  onMessage={setMessage}
-                  onError={setError}
-                />
-              </Suspense>
-            ) : null}
-            {LazyWatchfacesView &&
-            (watchfacesMounted || activeView === "watchfaces") ? (
-              <Suspense
-                fallback={<DeferredSurfaceFallback label="Watch Studio" />}
-              >
-                <LazyWatchfacesView
-                  api={api}
-                  active={activeView === "watchfaces"}
-                  showDevelopmentTools={showDevelopmentTools}
-                  watchStatus={watchStatus}
-                  communityOpenRequest={communityWatchfaceOpenRequest}
-                  onCommunityOpenRequestHandled={() =>
-                    setCommunityWatchfaceOpenRequest(null)
-                  }
-                />
-              </Suspense>
-            ) : null}
             {activeView === "training" ? (
               <Suspense fallback={<DeferredSurfaceFallback label="activities" />}>
                 <LazyActivitiesView
@@ -2956,14 +2874,6 @@ export default function App() {
                     setActiveView(request.view);
                   }}
                 />
-              </Suspense>
-            ) : null}
-            {IS_DEVELOPMENT_BUILD &&
-            showDevelopmentTools &&
-            LazyGearView &&
-            activeView === "gear" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="gear" />}>
-                <LazyGearView api={api} />
               </Suspense>
             ) : null}
             {activeView === "library" ? (
@@ -8523,10 +8433,6 @@ function viewTitle(view: View): string {
 
   if (view === "media") {
     return "Media";
-  }
-
-  if (view === "maps") {
-    return "Maps";
   }
 
   return "Training Hub";

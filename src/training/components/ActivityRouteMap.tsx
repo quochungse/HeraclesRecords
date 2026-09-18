@@ -5,14 +5,14 @@ import { createPortal } from "react-dom";
 import { Info, MapPin, Maximize2, X } from "lucide-react";
 import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
-  ROUTE_BASE_LAYERS,
-  ROUTE_OVERLAY_LAYERS,
+  BASE_LAYERS,
+  TRAIL_OVERLAY_LAYERS,
   type BaseLayerConfig,
-  type RouteBaseLayer,
-  type RouteOverlayId
-} from "../../maps/routes/constants";
-import { createBaseLayer } from "../../maps/routes/baseLayers";
-import { MapLayerControl } from "../../maps/routes/panels";
+  type BaseLayerId,
+  type TrailOverlayId
+} from "../../mapBase/constants";
+import { createBaseLayer } from "../../mapBase/baseLayers";
+import { MapLayerControl } from "../../mapBase/MapLayerControl";
 import { useTheme } from "../../theme/ThemeProvider";
 import {
   defineSelectionPreference,
@@ -36,7 +36,7 @@ const END_COLOR = "#d89b22";
 const ROUTE_ANIMATION_MS = 2200;
 
 const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE =
-  defineSelectionPreference<RouteBaseLayer>({
+  defineSelectionPreference<BaseLayerId>({
     key: "training.activityRoute.baseLayer",
     defaultValue: "outdoors",
     validate: selectionIsOneOf([
@@ -50,7 +50,7 @@ const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE =
   });
 
 const ACTIVITY_ROUTE_OVERLAYS_PREFERENCE =
-  defineSelectionPreference<RouteOverlayId[]>({
+  defineSelectionPreference<TrailOverlayId[]>({
     key: "training.activityRoute.overlays",
     defaultValue: [],
     validate: selectionIsArrayOf(
@@ -147,15 +147,15 @@ interface MapStyle {
 }
 
 /** The theme-matched layer used when no explicit layer is chosen. */
-function themeBaseLayer(theme: string): RouteBaseLayer {
+function themeBaseLayer(theme: string): BaseLayerId {
   return theme === "paper" ? "light" : "dark";
 }
 
-function resolveMapStyle(theme: string, baseLayer?: RouteBaseLayer): MapStyle {
+function resolveMapStyle(theme: string, baseLayer?: BaseLayerId): MapStyle {
   const layer = baseLayer ?? themeBaseLayer(theme);
   const isDarkGround = layer === "dark" || layer === "satellite";
   return {
-    tile: ROUTE_BASE_LAYERS[layer],
+    tile: BASE_LAYERS[layer],
     routeColor: isDarkGround ? ROUTE_COLOR : ROUTE_COLOR_PAPER,
     ghostOpacity: isDarkGround ? 0.18 : 0.28
   };
@@ -185,8 +185,8 @@ function RouteMapCanvas({
    * with what is laid over it while the part left clear stays put.
    */
   visibleBand?: number;
-  baseLayer?: RouteBaseLayer;
-  overlays?: RouteOverlayId[];
+  baseLayer?: BaseLayerId;
+  overlays?: TrailOverlayId[];
   ariaLabel: string;
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -194,7 +194,7 @@ function RouteMapCanvas({
   const tileLayerRef = useRef<L.Layer | null>(null);
   const ghostLineRef = useRef<L.Polyline | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
-  const overlayLayersRef = useRef(new Map<RouteOverlayId, L.TileLayer>());
+  const overlayLayersRef = useRef(new Map<TrailOverlayId, L.TileLayer>());
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
   const baseLayerPropRef = useRef(baseLayer);
@@ -384,7 +384,7 @@ function RouteMapCanvas({
       if (active.has(id)) {
         continue;
       }
-      const config = ROUTE_OVERLAY_LAYERS[id];
+      const config = TRAIL_OVERLAY_LAYERS[id];
       const layer = L.tileLayer(config.url, {
         // `maxZoom` is the base map's to set, not an overlay's: an overlay
         // that ran out of tiles used to drag the whole map's zoom limit down

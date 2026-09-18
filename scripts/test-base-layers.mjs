@@ -19,13 +19,13 @@ import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const constantsUrl =
-  pathToFileURL(path.join(repoRoot, "src/maps/routes/constants.ts")).href +
+  pathToFileURL(path.join(repoRoot, "src/mapBase/constants.ts")).href +
   "?cacheBust=" +
   Date.now();
 
-const { ROUTE_BASE_LAYERS, ROUTE_BASE_LAYER_ORDER } = await import(constantsUrl);
+const { BASE_LAYERS, BASE_LAYER_ORDER } = await import(constantsUrl);
 
-const ids = Object.keys(ROUTE_BASE_LAYERS);
+const ids = Object.keys(BASE_LAYERS);
 
 // A style that reads as "needs credentials" in any of the usual spellings.
 const KEY_SHAPED = /(api[_-]?key|access[_-]?token|apikey=|[?&]key=|\{key\}|subscription)/i;
@@ -35,13 +35,13 @@ const KEY_SHAPED = /(api[_-]?key|access[_-]?token|apikey=|[?&]key=|\{key\}|subsc
 const WATERMARKING_HOSTS = [/cartocdn\.com/i, /basemaps\.carto\.com/i];
 
 assert.deepEqual(
-  [...ROUTE_BASE_LAYER_ORDER].sort(),
+  [...BASE_LAYER_ORDER].sort(),
   [...ids].sort(),
-  "ROUTE_BASE_LAYER_ORDER must list every style exactly once"
+  "BASE_LAYER_ORDER must list every style exactly once"
 );
 
 for (const id of ids) {
-  const config = ROUTE_BASE_LAYERS[id];
+  const config = BASE_LAYERS[id];
 
   assert.ok(
     config.kind === "raster" || config.kind === "vector",
@@ -100,7 +100,7 @@ for (const id of ids) {
 // exactly these two ids, so they are the ones that must never regress.
 for (const id of ["light", "dark"]) {
   assert.equal(
-    ROUTE_BASE_LAYERS[id].kind,
+    BASE_LAYERS[id].kind,
     "vector",
     `${id}: the theme-matched styles are vector (OpenFreeMap) since the CARTO watermark`
   );
@@ -125,7 +125,7 @@ assert.match(
   "main must let WebGL fall back to software rendering, or a blocklisted GPU costs every map its style"
 );
 
-const baseLayerSource = read("src/maps/routes/baseLayers.ts");
+const baseLayerSource = read("src/mapBase/baseLayers.ts");
 assert.match(
   baseLayerSource,
   /BASEMAP_FALLBACK_CLASS = "is-basemap-fallback"/,

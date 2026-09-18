@@ -2,10 +2,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import {
-  ROUTE_BASE_LAYERS,
-  type RouteBaseLayer,
-} from "../maps/routes/constants";
-import { createBaseLayer } from "../maps/routes/baseLayers";
+  BASE_LAYERS,
+  type BaseLayerId,
+} from "../mapBase/constants";
+import { createBaseLayer } from "../mapBase/baseLayers";
 import { useTheme } from "../theme/ThemeProvider";
 import type {
   ActivityRoutePolyline,
@@ -58,7 +58,7 @@ type HeatLayerInstance = L.Layer & {
   setLightBasemap: (light: boolean) => void;
 };
 
-function themeBaseLayer(theme: string): RouteBaseLayer {
+function themeBaseLayer(theme: string): BaseLayerId {
   return theme === "paper" ? "light" : "dark";
 }
 
@@ -310,7 +310,7 @@ export function ActivityGlobeStreetMap({
     }
 
     const layer = themeBaseLayer(theme);
-    const tile = ROUTE_BASE_LAYERS[layer];
+    const tile = BASE_LAYERS[layer];
     const lightBasemap = layer === "light" || layer === "street";
     lightBasemapRef.current = lightBasemap;
     const map = L.map(container, {

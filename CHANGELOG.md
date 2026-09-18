@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Claude sign-in now actually completes.** The old flow spawned `claude auth login` detached with `stdio: "ignore"`, but the CLI prints an authorize URL and then waits on stdin for a pasted code — with no pipes it produced nothing and could never finish. The app now pipes the process, surfaces the URL, and forwards the code.
 - Custom coach instructions now have the wrapper delimiters stripped from athlete-entered text, so a pasted `</athlete_custom_instructions>` can no longer close the block early and promote the rest of the paste to operating rules.
 
+### Removed
+
+- **Maps, Watch Faces and Gear are gone.** Three screens and everything behind them: COROS map packages over USB, the route builder and its GPX export and share link, the watch-face designer and community catalog, and the activity-gear editor. The app no longer registers the `coroslink://` deep link, asks for Bluetooth or location, or keeps a route/map database.
+- **Their stored data is deleted, not stranded.** On first launch the `generated_routes` and `cached_coros_maps` tables are dropped and the folders they described are removed from the app's data directory — downloaded map packages, route GPX, saved watch-face projects and generated archives. Everything else, conversations included, is untouched.
+
 ## [0.1.29] - 2026-08-24
 
 ### Added

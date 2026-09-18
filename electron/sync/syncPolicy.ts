@@ -105,7 +105,6 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // `favorite`, `tags_json` and `collection_id` are pure user intent and cannot
   // be rebuilt; the `cached_*` columns ride along as dead weight.
   training_workout_metadata: "personal",
-  generated_routes: "personal",
   // Server config only. The bearer tokens and OAuth client info live in
   // app_settings under `mcp.<id>.*`, and stay on the machine that authorised
   // them — so a restored machine lists its servers and signs in to them again.
@@ -123,7 +122,6 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   strength_sessions: "derived",
   hevy_workouts: "derived",
   hevy_exercise_templates: "derived",
-  cached_coros_maps: "derived",
   // Mostly computed plan/activity matching. The `manual` column marks rows a
   // person confirmed by hand, which *is* user intent and is lost on a new
   // machine — a row-level rule for those belongs in the sync engine, not in a
@@ -178,8 +176,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "hevy.identity": "device",
   "intervals.apiKey": "device",
   "intervals.athleteId": "device",
-  "maps.openRouteServiceApiKey": "device",
-  "watchfaces.mobileSession": "device",
   "corosMcp.tokens": "device",
   "corosMcp.clientInfo": "device",
   // Just the server address, and it mirrors mcp_servers.url.
@@ -211,7 +207,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.compactContext.keep": "preference",
   "updater.autoCheck": "preference",
   "updater.autoDownload": "preference",
-  "maps.routeBackend": "preference",
   "hevy.includeWarmups": "preference",
   // Pausing analyses is a decision about the account, not about one laptop.
   "coachAutomation.pause": "preference",
@@ -232,8 +227,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.local.baseUrl": "device",
   // Pure UI state.
   "chat.sidebar.open": "device",
-  // Per-install identity for the COROS mobile session.
-  "watchfaces.mobileInstallId": "device",
   // Timestamps recording when *this* machine last authenticated or synced.
   "chat.authUpdatedAt": "device",
   "appleMusic.authUpdatedAt": "device",
@@ -313,7 +306,6 @@ export const DEVICE_ENCRYPTED_SETTINGS: ReadonlySet<string> = new Set([
   "chat.local.apiKey", // chatService
   "hevy.apiKey", // hevyService
   "intervals.apiKey", // intervalsService
-  "watchfaces.mobileSession", // corosWatchfaceService
   "corosMcp.tokens", // mcpClientManager
   "corosMcp.clientInfo", // mcpClientManager
   "sync.google.clientKey", // googleOAuth

@@ -42,9 +42,8 @@
  * is recomputed here, so a label cannot drift from the shadow it describes.
  *
  * **An `exempt` entry is a decision, not a to-do.** A few rules break rule 1
- * and are right to: a watch face's bezel is a 9px border around a preview and
- * the ring beside it is the strap's edge, not a card's; the recovery ring's
- * halo is the datum. Those sit in `exempt` with the reason written out, are
+ * and are right to: the recovery ring's halo is the datum, not a lift. Those
+ * sit in `exempt` with the reason written out, are
  * counted nowhere, and still have to *apply* — an exempt entry matching no
  * violating rule fails, so a deleted or converted rule takes its reason with
  * it rather than leaving a claim nobody can check.

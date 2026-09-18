@@ -211,8 +211,6 @@ export async function getWatchStatus(): Promise<WatchStatus> {
       rootPath: selected.rootPath,
       musicPath,
       mapPath,
-      mapSizeBytes: selected.mapSizeBytes,
-      mapFileCount: selected.mapFileCount,
       totalBytes: selected.totalBytes,
       freeBytes: selected.freeBytes,
       usedBytes: selected.usedBytes,
@@ -420,13 +418,11 @@ async function findDriveCandidates(
     }
 
     const storage = getStorageStats(volume.rootPath, volume.name);
-    const mapStats = hasMapFolder ? getDirectoryStats(mapPath) : {};
     candidates.push({
       name: volume.name,
       rootPath: volume.rootPath,
       musicPath: hasMusicFolder ? musicPath : undefined,
       mapPath: hasMapFolder ? mapPath : undefined,
-      ...mapStats,
       ...storage,
       reason:
         hasMusicFolder && hasMapFolder
@@ -592,42 +588,6 @@ function getStorageStats(rootPath: string, volumeName: string): StorageStats {
     return {
       totalBytes: fallbackBytesForModel(model)
     };
-  }
-}
-
-function getDirectoryStats(directoryPath: string): {
-  mapSizeBytes?: number;
-  mapFileCount?: number;
-} {
-  let sizeBytes = 0;
-  let fileCount = 0;
-
-  function walk(currentPath: string): void {
-    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-      const absolutePath = path.join(currentPath, entry.name);
-      if (entry.isDirectory()) {
-        walk(absolutePath);
-        continue;
-      }
-
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      const stats = fs.statSync(absolutePath);
-      sizeBytes += stats.size;
-      fileCount += 1;
-    }
-  }
-
-  try {
-    walk(directoryPath);
-    return {
-      mapSizeBytes: sizeBytes,
-      mapFileCount: fileCount
-    };
-  } catch {
-    return {};
   }
 }
 

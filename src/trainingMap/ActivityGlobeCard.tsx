@@ -200,11 +200,11 @@ function loadPlaceLabel(summary: LocationSummary): Promise<PlaceLabel> {
     return pending;
   }
   const api = window.corosLink;
-  if (!api?.reverseGeocodeRouteLocation) {
+  if (!api?.reverseGeocodeLocation) {
     return Promise.resolve(coordinateLabel(summary.bucket));
   }
   const request = api
-    .reverseGeocodeRouteLocation(summary.bucket.lat, summary.bucket.lon)
+    .reverseGeocodeLocation(summary.bucket.lat, summary.bucket.lon)
     .then((result) =>
       result.city
         ? {

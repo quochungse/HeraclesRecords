@@ -4,17 +4,14 @@ import {
   CalendarDays,
   Database,
   Dumbbell,
-  Footprints,
   Gauge,
   Globe,
   LayoutGrid,
-  Map as MapIcon,
   MessageCircle,
   Moon,
   Music,
   Settings,
   User,
-  Watch,
   type LucideIcon,
 } from "lucide-react";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -26,14 +23,11 @@ export type PrimaryView =
   | "media"
   | "training"
   | "running"
-  | "gear"
   | "library"
   | "strength"
   | "sleep"
   | "data"
   | "calendar"
-  | "maps"
-  | "watchfaces"
   | "coach"
   | "places"
   | "settings";
@@ -63,7 +57,7 @@ export interface PrimaryNavSection {
 }
 
 /**
- * The rail reads as an index: four standing headings, thirteen destinations,
+ * The rail reads as an index: four standing headings, twelve destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
@@ -126,21 +120,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     items: [
       { id: "coros-overview", label: "Coros Overview", icon: Gauge },
       { id: "media", label: "Media", icon: Music },
-      { id: "maps", label: "Maps", icon: MapIcon, beta: true },
-      {
-        id: "watchfaces",
-        label: "Watch Faces",
-        icon: Watch,
-        beta: true,
-        developmentOnly: true,
-      },
       { id: "data", label: "Data", icon: Database },
-      {
-        id: "gear",
-        label: "Gear",
-        icon: Footprints,
-        developmentOnly: true,
-      },
     ],
   },
 ];
@@ -149,7 +129,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to thirteen rows that fit without folding.
+ * is what brings it down to twelve rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   { id: "profile", label: "Personal", icon: User },

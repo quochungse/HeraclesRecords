@@ -23,37 +23,6 @@ const STORAGE_LOCATION_SPECS: StorageLocationSpec[] = [
     resolvePath: () => path.join(app.getPath("userData"), "downloads")
   },
   {
-    id: "map-cache",
-    label: "Map downloads",
-    description:
-      "COROS map packages cached locally before they are installed to the watch.",
-    kind: "directory",
-    resolvePath: () => path.join(app.getPath("userData"), "map-cache")
-  },
-  {
-    id: "routes",
-    label: "Saved routes",
-    description: "Routes generated, drawn, or imported in the route builder.",
-    kind: "directory",
-    resolvePath: () => path.join(app.getPath("userData"), "routes")
-  },
-  {
-    id: "watchface-projects",
-    label: "Watchface projects",
-    description:
-      "Saved editable designs together with private copies of their starter templates.",
-    kind: "directory",
-    resolvePath: () => path.join(app.getPath("userData"), "watchface-projects")
-  },
-  {
-    id: "watchface-archives",
-    label: "Generated watchface archives",
-    description:
-      "Upload-ready .dat archives created by the watchface designer.",
-    kind: "directory",
-    resolvePath: () => path.join(app.getPath("userData"), "watchface-archives")
-  },
-  {
     id: "database",
     label: "Library database",
     description:

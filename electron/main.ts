@@ -13,7 +13,6 @@ import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { listLocalFontFamilies } from "./fontService";
 import {
   createDefaultSyncDeps,
   SyncService
@@ -107,7 +106,6 @@ import {
 import { getAppInfo, openAppStorageLocation } from "./appInfoService";
 import {
   backfillFeelTypes,
-  getActivityPaceBaselines,
   getDailyMetrics,
   getRacePredictor,
   getRpeBackfillStatus,
@@ -184,43 +182,6 @@ import {
 } from "./trainingLibraryService";
 import { normalizeUnitSystem } from "./unitSystem.js";
 import {
-  cacheCorosWatchfaceProjectPreview,
-  createCorosWatchfaceArchive,
-  createCorosWatchfaceShareLink,
-  duplicateCorosWatchfaceProject,
-  describeCorosWatchfaceTemplate,
-  downloadCorosWatchfaceTheme,
-  exportCorosWatchfaceProject,
-  exportCorosWatchfaceArchive,
-  getCorosBatteryReport,
-  getCorosWatchfaceStatus,
-  importCorosWatchfaceShareLink,
-  listCorosPairedDevices,
-  listCorosWatchfaceThemes,
-  loadCorosWatchfaceArtwork,
-  loadCorosWatchfaceTemplateAssets,
-  loadCorosWatchfaceTemplateConfigTexts,
-  loadCorosWatchfaceProject,
-  loginCorosWatchfaces,
-  loginCorosWatchfacesWithSavedCredentials,
-  logoutCorosWatchfaces,
-  listCorosWatchfaceProjects,
-  publishCorosWatchface,
-  queryCorosGear,
-  saveCorosGear,
-  saveCorosWatchfaceProject,
-  deleteCorosWatchfaceProject,
-  selectCorosWatchfaceArchive
-} from "./corosWatchfaceService";
-import {
-  cleanupCommunityWatchfaceImports,
-  getCommunityWatchface,
-  importCommunityWatchface,
-  listCommunityWatchfaces,
-  parseCommunityWatchfaceDeepLink,
-  setCommunityWatchfaceProgressListener
-} from "./communityWatchfaceService";
-import {
   getIntervalsStatus,
   connectIntervals,
   disconnectIntervals,
@@ -231,50 +192,12 @@ import {
   RECENT_IMPORT_WINDOW_MS
 } from "./intervalsService";
 import { isAlreadyOnCoros } from "./intervalsMatch";
+import { reverseGeocodeLocation } from "./reverseGeocodeService";
 import { buildManualTcx } from "./tcxBuilder";
-import {
-  cancelCorosMapDownload,
-  cancelCorosMapInstall,
-  chooseCorosMapFolder,
-  clearCorosMapDownloadJob,
-  deleteCachedCorosMap,
-  deleteGeneratedRoute,
-  downloadCorosMapPackage,
-  exportGeneratedRoute,
-  generateRoute,
-  geocodeRouteLocation,
-  reverseGeocodeRouteLocation,
-  getCorosMapInstallProgress,
-  getCorosMapManifest,
-  getRouteBuilderConfig,
-  importRouteFromGpx,
-  installCachedCorosMap,
-  installCachedCorosMaps,
-  installCorosMapFolder,
-  listCachedCorosMaps,
-  listCorosMapDownloadJobs,
-  listGeneratedRoutes,
-  openCorosMapDownload,
-  routeWaypoints,
-  saveDrawnRoute,
-  saveRouteBuilderConfig,
-  searchRouteLocations,
-  setCorosMapDownloadListener,
-  setCorosMapInstallProgressListener,
-  toCorosMapInstallIpcError,
-  validateRouteApiKey
-} from "./mapService";
-import { startRouteShare, stopRouteShare } from "./routeShareServer";
 import type {
   CombinedDownloadResult,
-  CorosMapPackage,
   DownloadJob,
   DownloadQueueItem,
-  DrawnRoutePayload,
-  GenerateRouteRequest,
-  RouteActivityType,
-  RouteBuilderConfig,
-  RouteWaypointRequest,
   SpotifyConfig,
   TrainingHubActivity,
   TrainingHubActivityFileType,
@@ -282,30 +205,9 @@ import type {
   WatchConnectionSmokeOptionId,
   YouTubeMusicConfig,
   IntervalsActivityWithStatus,
-  ManualActivityInput
-} from "./types";
-import type {
-  CorosLegacy614aCarrierPatchInput,
-  CorosWatchfaceCreatorInput,
-  CorosWatchfaceExistingShareInput,
-  CorosWatchfaceProjectExportInput,
-  CorosWatchfaceArchiveExportInput,
-  CorosWatchfacePublishInput,
-  CorosWatchfaceRasterFontFolder,
-  CorosWatchfaceRegion,
-  CorosWatchfaceThemeDownloadInput,
-  CorosWatchfaceThemeListInput,
-  CorosBatteryQueryInput,
-  CorosGearSaveInput,
-  CorosBluetoothDeviceChoice,
+  ManualActivityInput,
   WatchTransferProgress
 } from "./types";
-import type { CommunityWatchfaceOpenRequest } from "./types";
-import {
-  MULTIDATA_ELEV_416_PROFILE,
-  inspectLegacy614aCarrier,
-  patchLegacy614aFeatures
-} from "./legacy614a";
 import {
   deleteWatchTrack,
   getWatchConnectionSmokeOption,
@@ -495,16 +397,6 @@ import type {
 
 let mainWindow: BrowserWindow | undefined;
 let rendererReady = false;
-let pendingCommunityWatchfaceOpen: CommunityWatchfaceOpenRequest | undefined;
-let pendingCorosBluetoothSelection:
-  | {
-      callback: (deviceId: string) => void;
-      timeout: ReturnType<typeof setTimeout>;
-    }
-  | undefined;
-
-const legacy614aCarrierSelections = new Map<string, { sourcePath: string }>();
-const MAX_RASTER_FONT_SPRITE_FOLDER_BYTES = 12 * 1024 * 1024;
 
 /** Matches --bg-base in styles.css; updated when the renderer theme changes. */
 const DEFAULT_WINDOW_BACKGROUND = "#05080b";
@@ -551,53 +443,6 @@ function sanitizeExportFileName(name?: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
-}
-
-async function loadRasterFontSpriteFolder(
-  folderPath: string
-): Promise<CorosWatchfaceRasterFontFolder> {
-  const sprites: CorosWatchfaceRasterFontFolder["sprites"] = [];
-  let totalBytes = 0;
-
-  async function walk(directoryPath: string, relativeDirectory = ""): Promise<void> {
-    const entries = (await fs.promises.readdir(directoryPath, {
-      withFileTypes: true
-    })).sort((left, right) =>
-      left.name.localeCompare(right.name, "en", {
-        sensitivity: "base",
-        numeric: true
-      })
-    );
-    for (const entry of entries) {
-      const absolutePath = path.join(directoryPath, entry.name);
-      const relativePath = path.join(relativeDirectory, entry.name);
-      if (entry.isDirectory()) {
-        await walk(absolutePath, relativePath);
-        continue;
-      }
-      if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".png") {
-        continue;
-      }
-
-      const image = await fs.promises.readFile(absolutePath);
-      totalBytes += image.byteLength;
-      if (totalBytes > MAX_RASTER_FONT_SPRITE_FOLDER_BYTES) {
-        throw new Error("PNG sprite folders must be 12 MB or smaller.");
-      }
-      sprites.push({
-        name: entry.name,
-        relativePath,
-        dataUrl: `data:image/png;base64,${image.toString("base64")}`,
-        sizeBytes: image.byteLength
-      });
-    }
-  }
-
-  await walk(folderPath);
-  if (sprites.length === 0) {
-    throw new Error("The selected folder does not contain any PNG files.");
-  }
-  return { label: path.basename(folderPath), sprites };
 }
 
 function formatYyyymmddDay(date: Date): string {
@@ -703,7 +548,6 @@ function applyAppIcon(): void {
 }
 
 const ALLOWED_PERMISSIONS = new Set([
-  "geolocation",
   // Lets the renderer copy text (e.g. the Spotify Redirect URI) via
   // navigator.clipboard.writeText.
   "clipboard-sanitized-write"
@@ -719,32 +563,6 @@ function configureAppPermissions(): void {
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
     ALLOWED_PERMISSIONS.has(permission)
   );
-}
-
-function configureCorosBluetoothSelection(window: BrowserWindow): void {
-  // Electron does not provide a built-in Web Bluetooth chooser. A PACE Pro
-  // does not reliably advertise its full name, so the renderer receives the
-  // nearby-device list and lets the user explicitly choose the watch.
-  window.webContents.on("select-bluetooth-device", (event, devices, callback) => {
-    event.preventDefault();
-    if (pendingCorosBluetoothSelection) {
-      clearTimeout(pendingCorosBluetoothSelection.timeout);
-    }
-    const timeout = setTimeout(() => {
-      const pending = pendingCorosBluetoothSelection;
-      pendingCorosBluetoothSelection = undefined;
-      pending?.callback("");
-      if (!window.isDestroyed()) {
-        window.webContents.send("watchfaces:bluetoothDevices", []);
-      }
-    }, 45_000);
-    pendingCorosBluetoothSelection = { callback, timeout };
-    const choices: CorosBluetoothDeviceChoice[] = devices.map((device) => ({
-      deviceId: device.deviceId,
-      deviceName: device.deviceName
-    }));
-    window.webContents.send("watchfaces:bluetoothDevices", choices);
-  });
 }
 
 function createWindow(): void {
@@ -798,8 +616,6 @@ function createWindow(): void {
     rendererReady = false;
     mainWindow = undefined;
   });
-  configureCorosBluetoothSelection(mainWindow);
-
   // macOS fullscreen exposes the window background in the title-bar inset;
   // re-apply after transitions so it stays in sync with the active theme.
   mainWindow.on("enter-full-screen", () => {
@@ -823,46 +639,48 @@ function createWindow(): void {
   initializeAppUpdater(mainWindow);
 }
 
-function deepLinkFromArguments(argumentsList: string[]): CommunityWatchfaceOpenRequest | null {
-  for (const argument of argumentsList) {
-    const request = parseCommunityWatchfaceDeepLink(argument);
-    if (request) return request;
-  }
-  return null;
-}
-
-function handleCommunityWatchfaceOpen(request: CommunityWatchfaceOpenRequest): void {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-    if (rendererReady) {
-      mainWindow.webContents.send("watchfaces:communityOpenRequested", request);
-      return;
+/**
+ * Deletes what the Maps, Watch Faces and Gear screens left on disk.
+ *
+ * Their SQLite tables are dropped when the database opens, and these are the
+ * files those rows described — downloaded COROS map packages (often a gigabyte
+ * of them), route GPX, saved watchface projects and the archives built from
+ * them. Nothing reads any of it, and an install that had used those screens
+ * would otherwise carry the whole of it forever with nothing in the app even
+ * naming the folders. Best effort: a folder that will not delete is not worth
+ * a failed launch, and the next one tries again.
+ */
+async function removeRetiredFeatureStorage(): Promise<void> {
+  const retired = [
+    "map-cache",
+    "routes",
+    "watchface-projects",
+    "watchface-archives",
+    "watchface-share-imports",
+    "community-watchface-imports"
+  ];
+  for (const name of retired) {
+    const target = path.join(app.getPath("userData"), name);
+    try {
+      if (!fs.existsSync(target)) continue;
+      await fs.promises.rm(target, { recursive: true, force: true });
+      console.log(`[cleanup] removed retired storage: ${name}`);
+    } catch (error) {
+      console.warn(`[cleanup] could not remove ${name}`, error);
     }
   }
-  pendingCommunityWatchfaceOpen = request;
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  const initialDeepLink = deepLinkFromArguments(process.argv);
-  if (initialDeepLink) pendingCommunityWatchfaceOpen = initialDeepLink;
-  app.on("second-instance", (_event, commandLine) => {
-    const request = deepLinkFromArguments(commandLine);
-    if (request) handleCommunityWatchfaceOpen(request);
-    else if (mainWindow && !mainWindow.isDestroyed()) {
+  app.on("second-instance", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
-  });
-  app.on("open-url", (event, url) => {
-    event.preventDefault();
-    const request = parseCommunityWatchfaceDeepLink(url);
-    if (request) handleCommunityWatchfaceOpen(request);
   });
 }
 
@@ -885,13 +703,6 @@ app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient("coroslink", process.execPath, [
-      path.resolve(process.argv[1])
-    ]);
-  } else {
-    app.setAsDefaultProtocolClient("coroslink");
-  }
   configureAppPermissions();
   configureYouTubeBrowserSession();
   registerYouTubeBrowserHandlers();
@@ -948,16 +759,6 @@ app.whenReady().then(() => {
       mainWindow.webContents.send("youtube:jobsUpdate", jobs);
     }
   });
-  setCorosMapDownloadListener((jobs) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("maps:downloadJobsUpdate", jobs);
-    }
-  });
-  setCorosMapInstallProgressListener((progress) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("maps:installProgressUpdate", progress);
-    }
-  });
   setTrainingHubSessionListener((status) => {
     announceTrainingHubSessionChanged(status);
   });
@@ -966,14 +767,9 @@ app.whenReady().then(() => {
       mainWindow.webContents.send("trainingHub:backupProgress", progress);
     }
   });
-  setCommunityWatchfaceProgressListener((progress) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("watchfaces:communityDownloadProgress", progress);
-    }
-  });
-  void cleanupCommunityWatchfaceImports();
   createWindow();
   applyAppIcon();
+  void removeRetiredFeatureStorage();
 
   // Silently restore previously-authorized MCP sessions (COROS + any other
   // configured servers), no browser popup.
@@ -1060,9 +856,8 @@ const QUIT_FLUSH_TIMEOUT_MS = 5_000;
 let quitFlushStarted = false;
 
 app.on("before-quit", (event) => {
-  // Idempotent, all three, which is what lets the quit be cancelled and retried
+  // Idempotent, both, which is what lets the quit be cancelled and retried
   // below without them running against half-torn-down state.
-  stopRouteShare();
   stopCoachActivityWatcher();
   stopCoachAnalysisScheduler();
 
@@ -1537,323 +1332,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle("window:isFullscreen", () => mainWindow?.isFullScreen() ?? false);
 
   ipcMain.handle("watch:getStatus", () => getWatchStatus());
-
-  ipcMain.handle("watchfaces:getStatus", () => getCorosWatchfaceStatus());
-
-  // Font names are host-local metadata only. Glyph rendering remains in the
-  // renderer, where they are baked into the watchface's PNG sprites.
-  ipcMain.handle("watchfaces:listLocalFontFamilies", () => listLocalFontFamilies());
-
-  ipcMain.handle(
-    "watchfaces:login",
-    (
-      _event,
-      email: string,
-      password: string,
-      region?: CorosWatchfaceRegion,
-      remember?: boolean
-    ) => loginCorosWatchfaces(email, password, region, remember)
-  );
-
-  ipcMain.handle(
-    "watchfaces:loginSaved",
-    (_event, region?: CorosWatchfaceRegion) =>
-      loginCorosWatchfacesWithSavedCredentials(region)
-  );
-
-  ipcMain.handle("watchfaces:logout", () => logoutCorosWatchfaces());
-
-  ipcMain.handle("watchfaces:listPairedDevices", () => listCorosPairedDevices());
-  ipcMain.handle(
-    "watchfaces:selectBluetoothDevice",
-    (_event, deviceId: string) => {
-      const pending = pendingCorosBluetoothSelection;
-      pendingCorosBluetoothSelection = undefined;
-      if (!pending) {
-        throw new Error("There is no active Bluetooth device scan.");
-      }
-      clearTimeout(pending.timeout);
-      pending.callback(deviceId);
-    }
-  );
-  ipcMain.handle("watchfaces:cancelBluetoothDevice", () => {
-    const pending = pendingCorosBluetoothSelection;
-    pendingCorosBluetoothSelection = undefined;
-    if (pending) {
-      clearTimeout(pending.timeout);
-      pending.callback("");
-    }
-  });
-
-  ipcMain.handle(
-    "watchfaces:getBatteryReport",
-    (_event, input: CorosBatteryQueryInput) => getCorosBatteryReport(input)
-  );
-
-  if (!app.isPackaged) {
-    ipcMain.handle("gear:query", () => queryCorosGear());
-    ipcMain.handle(
-      "gear:save",
-      (_event, input: CorosGearSaveInput) => saveCorosGear(input)
-    );
-  }
-
-  ipcMain.handle(
-    "watchfaces:listThemes",
-    (_event, input: CorosWatchfaceThemeListInput) => listCorosWatchfaceThemes(input)
-  );
-
-  ipcMain.handle(
-    "watchfaces:downloadTheme",
-    (_event, input: CorosWatchfaceThemeDownloadInput) =>
-      downloadCorosWatchfaceTheme(input)
-  );
-
-  ipcMain.handle("watchfaces:importShareLink", (_event, shareUrl: string) =>
-    importCorosWatchfaceShareLink(shareUrl)
-  );
-
-  ipcMain.handle("watchfaces:listCommunity", (_event, input) =>
-    listCommunityWatchfaces(input)
-  );
-  ipcMain.handle("watchfaces:getCommunity", (_event, slug: string) =>
-    getCommunityWatchface(slug)
-  );
-  ipcMain.handle("watchfaces:importCommunity", (_event, slug: string) =>
-    importCommunityWatchface(slug)
-  );
-  ipcMain.handle("watchfaces:consumeCommunityOpenRequest", () => {
-    const request = pendingCommunityWatchfaceOpen ?? null;
-    pendingCommunityWatchfaceOpen = undefined;
-    return request;
-  });
-
-  ipcMain.handle("watchfaces:chooseArchive", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose a COROS custom watchface archive",
-      properties: ["openFile"],
-      filters: [
-        {
-          name: "Watchface archive",
-          extensions: ["zip", "dat"]
-        }
-      ]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    const archivePath = result.filePaths[0];
-    return result.canceled || !archivePath
-      ? null
-      : selectCorosWatchfaceArchive(archivePath);
-  });
-
-  ipcMain.handle("watchfaces:chooseLegacy614aCarrier", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose the original MULTIDATA ELEV legacy carrier",
-      properties: ["openFile"],
-      filters: [{ name: "COROS legacy watchface BIN", extensions: ["bin"] }]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    const sourcePath = result.filePaths[0];
-    if (result.canceled || !sourcePath) return null;
-
-    const reference = await fs.promises.readFile(sourcePath);
-    // This validates the exact file hash in addition to its 614A shape. A
-    // previously patched carrier, another model, or a similar lookalike BIN
-    // cannot become the base for another edit.
-    const carrier = inspectLegacy614aCarrier(reference, MULTIDATA_ELEV_416_PROFILE);
-    const selectionId = `legacy614a-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    legacy614aCarrierSelections.set(selectionId, { sourcePath });
-    return {
-      selectionId,
-      inspection: {
-        profile: "multidata-elev-416" as const,
-        profileName: carrier.profileName,
-        fileName: path.basename(sourcePath),
-        watchFaceId: carrier.watchFaceId,
-        sizeBytes: carrier.sizeBytes,
-        payloadCrc16: carrier.payloadCrc16,
-        fullFileCrc16: carrier.fullFileCrc16,
-        weatherSpriteSize: carrier.weatherSpriteSize,
-        weatherPosition: carrier.weatherPosition,
-        temperatureRect: carrier.temperatureRect
-      }
-    };
-  });
-
-  ipcMain.handle(
-    "watchfaces:exportLegacy614aCarrier",
-    async (_event, selectionId: string, patch: CorosLegacy614aCarrierPatchInput) => {
-      const selection = legacy614aCarrierSelections.get(selectionId);
-      if (!selection) {
-        throw new Error("Choose and validate the original MULTIDATA ELEV carrier again before exporting.");
-      }
-      const reference = await fs.promises.readFile(selection.sourcePath);
-      const output = patchLegacy614aFeatures(reference, patch, MULTIDATA_ELEV_416_PROFILE);
-      const saveOptions = {
-        title: "Export guarded MULTIDATA carrier",
-        defaultPath: "MULTIDATA-ELEV-SLENDER-614A.bin",
-        filters: [{ name: "COROS legacy watchface BIN", extensions: ["bin"] }]
-      };
-      const result =
-        mainWindow && !mainWindow.isDestroyed()
-          ? await dialog.showSaveDialog(mainWindow, saveOptions)
-          : await dialog.showSaveDialog(saveOptions);
-      if (result.canceled || !result.filePath) {
-        return { saved: false, watchFaceId: MULTIDATA_ELEV_416_PROFILE.watchFaceId };
-      }
-      // Never overwrite the downloaded public reference or another export by
-      // mistake. The user can choose a fresh filename in the save dialog.
-      await fs.promises.writeFile(result.filePath, output, { flag: "wx" });
-      return {
-        saved: true,
-        filePath: result.filePath,
-        watchFaceId: MULTIDATA_ELEV_416_PROFILE.watchFaceId
-      };
-    }
-  );
-
-  ipcMain.handle("watchfaces:chooseArtwork", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose watchface artwork",
-      properties: ["openFile"],
-      filters: [
-        {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "webp"]
-        }
-      ]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    const artworkPath = result.filePaths[0];
-    return result.canceled || !artworkPath
-      ? null
-      : loadCorosWatchfaceArtwork(artworkPath);
-  });
-
-  ipcMain.handle("watchfaces:chooseRasterFontFolder", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose a PNG watchface sprite folder",
-      properties: ["openDirectory"]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    const folderPath = result.filePaths[0];
-    return result.canceled || !folderPath
-      ? null
-      : loadRasterFontSpriteFolder(folderPath);
-  });
-
-  ipcMain.handle(
-    "watchfaces:createArchive",
-    (_event, input: CorosWatchfaceCreatorInput) =>
-      createCorosWatchfaceArchive(input)
-  );
-  ipcMain.handle(
-    "watchfaces:exportProject",
-    async (_event, input: CorosWatchfaceProjectExportInput) => {
-      const baseName =
-        sanitizeExportFileName(input?.name) || "Heracles-Records-watch-face";
-      const saveOptions = {
-        title: "Export editable watch face for website",
-        defaultPath: `${baseName}.zip`,
-        filters: [{ name: "Watch-face ZIP archive", extensions: ["zip"] }]
-      };
-      const result =
-        mainWindow && !mainWindow.isDestroyed()
-          ? await dialog.showSaveDialog(mainWindow, saveOptions)
-          : await dialog.showSaveDialog(saveOptions);
-      if (result.canceled || !result.filePath) {
-        return { saved: false };
-      }
-      const destinationPath = result.filePath.toLowerCase().endsWith(".zip")
-        ? result.filePath
-        : `${result.filePath}.zip`;
-      await exportCorosWatchfaceProject(input, destinationPath);
-      return { saved: true, filePath: destinationPath };
-    }
-  );
-  ipcMain.handle(
-    "watchfaces:exportArchive",
-    async (_event, input: CorosWatchfaceArchiveExportInput) => {
-      if (!input || typeof input.archiveId !== "string") {
-        throw new Error("Build a final watch-face archive before exporting it.");
-      }
-      const baseName =
-        sanitizeExportFileName(input.name) || "Heracles-Records-watch-face";
-      const saveOptions = {
-        title: "Export final watch-face ZIP",
-        defaultPath: `${baseName}.zip`,
-        filters: [{ name: "Final watch-face ZIP", extensions: ["zip"] }]
-      };
-      const result =
-        mainWindow && !mainWindow.isDestroyed()
-          ? await dialog.showSaveDialog(mainWindow, saveOptions)
-          : await dialog.showSaveDialog(saveOptions);
-      if (result.canceled || !result.filePath) return { saved: false };
-      const destinationPath = result.filePath.toLowerCase().endsWith(".zip")
-        ? result.filePath
-        : `${result.filePath}.zip`;
-      await exportCorosWatchfaceArchive(input.archiveId, destinationPath);
-      return { saved: true, filePath: destinationPath };
-    }
-  );
-  ipcMain.handle("watchfaces:listProjects", () => listCorosWatchfaceProjects());
-  ipcMain.handle("watchfaces:saveProject", (_event, input) =>
-    saveCorosWatchfaceProject(input)
-  );
-  ipcMain.handle("watchfaces:loadProject", (_event, projectId: string) =>
-    loadCorosWatchfaceProject(projectId)
-  );
-  ipcMain.handle(
-    "watchfaces:cacheProjectPreview",
-    (_event, projectId: string, previewDataUrl: string) =>
-      cacheCorosWatchfaceProjectPreview(projectId, previewDataUrl)
-  );
-  ipcMain.handle("watchfaces:duplicateProject", (_event, projectId: string) =>
-    duplicateCorosWatchfaceProject(projectId)
-  );
-  ipcMain.handle("watchfaces:deleteProject", (_event, projectId: string) =>
-    deleteCorosWatchfaceProject(projectId)
-  );
-
-  ipcMain.handle(
-    "watchfaces:describeTemplate",
-    (_event, archiveId: string) => describeCorosWatchfaceTemplate(archiveId)
-  );
-
-  ipcMain.handle(
-    "watchfaces:loadTemplateAssets",
-    (_event, archiveId: string, paths: string[]) =>
-      loadCorosWatchfaceTemplateAssets(archiveId, paths)
-  );
-
-  ipcMain.handle(
-    "watchfaces:loadTemplateConfigTexts",
-    (_event, archiveId: string) =>
-      loadCorosWatchfaceTemplateConfigTexts(archiveId)
-  );
-
-  ipcMain.handle(
-    "watchfaces:publish",
-    (_event, input: CorosWatchfacePublishInput) => publishCorosWatchface(input)
-  );
-
-  ipcMain.handle(
-    "watchfaces:createShareLink",
-    (_event, input: CorosWatchfaceExistingShareInput) =>
-      createCorosWatchfaceShareLink(input)
-  );
 
   ipcMain.handle("watch:getConnectionSmokeOption", () =>
     getWatchConnectionSmokeOption()
@@ -2772,10 +2250,6 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getSportTypeMap", () => getSportTypeMap());
 
-  ipcMain.handle("trainingHub:getActivityPaceBaselines", () =>
-    getActivityPaceBaselines()
-  );
-
   ipcMain.handle("trainingHub:getUpcomingWorkouts", (_event, days?: number) =>
     getUpcomingWorkouts(days)
   );
@@ -2936,127 +2410,12 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle("maps:getCorosManifest", () => getCorosMapManifest());
-
-  ipcMain.handle("maps:openCorosDownload", (_event, downloadUrl: string) =>
-    openCorosMapDownload(downloadUrl)
+  // "Where you've been" turns a cluster of visit coordinates into a place
+  // name. The renderer caches the answers, so this is asked rarely and only
+  // about somewhere the athlete has actually trained.
+  ipcMain.handle("places:reverseGeocode", (_event, lat: number, lon: number) =>
+    reverseGeocodeLocation(lat, lon)
   );
-
-  ipcMain.handle("maps:downloadCorosPackage", (_event, pkg: CorosMapPackage) =>
-    downloadCorosMapPackage(pkg)
-  );
-
-  ipcMain.handle("maps:listCorosMapDownloadJobs", () =>
-    listCorosMapDownloadJobs()
-  );
-
-  ipcMain.handle("maps:cancelCorosMapDownload", (_event, id: string) =>
-    cancelCorosMapDownload(id)
-  );
-
-  ipcMain.handle("maps:clearCorosMapDownloadJob", (_event, id: string) =>
-    clearCorosMapDownloadJob(id)
-  );
-
-  ipcMain.handle("maps:listCachedCorosMaps", () => listCachedCorosMaps());
-
-  ipcMain.handle("maps:getCorosMapInstallProgress", () =>
-    getCorosMapInstallProgress()
-  );
-
-  ipcMain.handle("maps:cancelCorosMapInstall", () => cancelCorosMapInstall());
-
-  ipcMain.handle("maps:installCachedCorosMap", async (_event, packageId: string) => {
-    try {
-      return await installCachedCorosMap(packageId);
-    } catch (error) {
-      throw toCorosMapInstallIpcError(error);
-    }
-  });
-
-  ipcMain.handle(
-    "maps:installCachedCorosMaps",
-    async (_event, packageIds: string[]) => {
-      try {
-        return await installCachedCorosMaps(packageIds);
-      } catch (error) {
-        throw toCorosMapInstallIpcError(error);
-      }
-    }
-  );
-
-  ipcMain.handle("maps:deleteCachedCorosMap", (_event, packageId: string) =>
-    deleteCachedCorosMap(packageId)
-  );
-
-  ipcMain.handle("maps:chooseCorosMapFolder", () => chooseCorosMapFolder());
-
-  ipcMain.handle("maps:installCorosMapFolder", async (_event, sourcePath: string) => {
-    try {
-      return await installCorosMapFolder(sourcePath);
-    } catch (error) {
-      throw toCorosMapInstallIpcError(error);
-    }
-  });
-
-  ipcMain.handle("maps:getRouteBuilderConfig", () => getRouteBuilderConfig());
-
-  ipcMain.handle(
-    "maps:saveRouteBuilderConfig",
-    (_event, config: RouteBuilderConfig) => saveRouteBuilderConfig(config)
-  );
-
-  ipcMain.handle("maps:listGeneratedRoutes", () => listGeneratedRoutes());
-
-  ipcMain.handle("maps:geocodeRouteLocation", (_event, query: string) =>
-    geocodeRouteLocation(query)
-  );
-
-  ipcMain.handle("maps:searchRouteLocations", (_event, query: string) =>
-    searchRouteLocations(query)
-  );
-
-  ipcMain.handle(
-    "maps:reverseGeocodeRouteLocation",
-    (_event, lat: number, lon: number) => reverseGeocodeRouteLocation(lat, lon)
-  );
-
-  ipcMain.handle("maps:generateRoute", (_event, request: GenerateRouteRequest) =>
-    generateRoute(request)
-  );
-
-  ipcMain.handle(
-    "maps:routeWaypoints",
-    (_event, request: RouteWaypointRequest) => routeWaypoints(request)
-  );
-
-  ipcMain.handle(
-    "maps:importRouteGpx",
-    (_event, activityType?: RouteActivityType) =>
-      importRouteFromGpx(activityType)
-  );
-
-  ipcMain.handle("maps:saveDrawnRoute", (_event, payload: DrawnRoutePayload) =>
-    saveDrawnRoute(payload)
-  );
-
-  ipcMain.handle("maps:exportGeneratedRoute", (_event, id: string) =>
-    exportGeneratedRoute(id)
-  );
-
-  ipcMain.handle("maps:deleteGeneratedRoute", (_event, id: string) =>
-    deleteGeneratedRoute(id)
-  );
-
-  ipcMain.handle("maps:validateRouteApiKey", (_event, apiKey: string) =>
-    validateRouteApiKey(apiKey)
-  );
-
-  ipcMain.handle("maps:startRouteShare", (_event, id: string) =>
-    startRouteShare(id)
-  );
-
-  ipcMain.handle("maps:stopRouteShare", () => stopRouteShare());
 
   ipcMain.handle("app:getUpdateStatus", () => getAppUpdateSnapshot());
 
@@ -3081,13 +2440,13 @@ function registerIpcHandlers(): void {
    * carries. `did-finish-load` cannot stand in: the page having loaded says
    * nothing about whether React has subscribed yet.
    *
-   * This used to be announced from `watchfaces:consumeCommunityOpenRequest`,
-   * which the renderer only calls on a development build — so no packaged build
-   * ever set the flag, and every one of those pushes was dropped for the life of
-   * the process. A start-up re-login would mint a session the renderer never
-   * heard about, leaving it on whatever it read at mount: no data, no sign-in
-   * form, and nothing to do but restart. Keep this on a channel of its own, and
-   * keep it out of any build-conditional code path.
+   * This used to ride along on a call the renderer only made on a development
+   * build — so no packaged build ever set the flag, and every one of those
+   * pushes was dropped for the life of the process. A start-up re-login would
+   * mint a session the renderer never heard about, leaving it on whatever it
+   * read at mount: no data, no sign-in form, and nothing to do but restart.
+   * Keep this on a channel of its own, and keep it out of any
+   * build-conditional code path.
    */
   ipcMain.handle("app:rendererReady", () => {
     markRendererReady();

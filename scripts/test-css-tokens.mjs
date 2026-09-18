@@ -17,10 +17,10 @@
  * were found on 2026-09-18, each alive for months — the Training Library's
  * whole background stack (`--bg-ambient-green`, a name from a palette that
  * predates the accent tokens), the Hevy dialog's fill, the backup-restore
- * cards, two Watch Face device panels, the Gear screen's error tint and its
- * sign-in panel, and a `--danger` nothing has ever declared.
- * `--wf-shadow-soft` was the same bug found by hand one phase earlier, which
- * is what suggested the sweep.
+ * cards, and a `--danger` nothing has ever declared. (Five more lived on the
+ * Watch Faces and Gear screens, which have since been removed.) The same bug
+ * had been found by hand one phase earlier, which is what suggested the
+ * sweep.
  *
  * Two assertions, both at zero and meant to stay there:
  *

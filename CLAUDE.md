@@ -47,15 +47,23 @@ earlier `keepLegacyUserDataDirectory()` that pinned the app to it has been remov
 fresh install elsewhere starts empty by design — re-enabling that is not enough, the
 migration would have to be rewritten.
 
-**Watch Faces keeps CorosLink branding on purpose — do not "fix" it.** The community catalog
-is vendor-run infrastructure at `watchfaces.coroslink.com`, so the `"CorosLink Faces"` kicker
-in [WatchfacesView.tsx](src/watchfaces/WatchfacesView.tsx) and the
-`user-agent: CorosLink/<version>` sent from
-[communityWatchfaceService.ts](electron/communityWatchfaceService.ts) are credit to that
-service, not leftovers. The same goes for the "Website" and "Support the project" links in
+**Three screens upstream has were removed here on 2026-09-18: Maps, Watch Faces and Gear.**
+Fork divergence, not a refactor to finish — there is nothing half-done to pick up, and a
+cherry-pick that touches any of them has to be judged against that decision rather than
+merged. Gone with them: `mapService`, `routeShareServer`, `electron/routing/`,
+`corosWatchfaceService`, `communityWatchfaceService`, `legacy614a`, `fontService`, 71 IPC
+channels, the `generated_routes` and `cached_coros_maps` tables (dropped on open by
+`dropRetiredMapTables`, with `<userData>/map-cache`, `routes`, `watchface-*` and
+`community-watchface-imports` swept by `removeRetiredFeatureStorage` in main.ts), the
+`coroslink://` deep link and its `open-url`/`second-instance` plumbing, the Web Bluetooth
+chooser, and the macOS location entitlement. **The base map code survived the Maps screen
+and moved** — see `src/mapBase/` below. So did reverse geocoding, as `places:reverseGeocode`
+(`reverseGeocodeService.ts`), because "Where you've been" names its clusters with it.
+
+**The "Website" and "Support the project" links still point upstream on purpose** —
 [ResourcesMenu.tsx](src/components/ResourcesMenu.tsx) and
-[SettingsView.tsx](src/settings/SettingsView.tsx), which still point upstream. Only "Source on
-GitHub" and "Report an issue" were repointed at this fork, because issues belong here.
+[SettingsView.tsx](src/settings/SettingsView.tsx). Only "Source on GitHub" and "Report an
+issue" were repointed at this fork, because issues belong here.
 
 **`website/` is left untouched, branding included.** `website/public/icon.png` and
 `og-image.png` are still byte-identical to upstream's, and the site is not deployed from this
@@ -79,7 +87,7 @@ npm run build            # tsc electron (emits dist-electron) + tsc --noEmit ren
 npm start                # build, then run the packaged-style app
 ```
 
-There is **no linter and no test runner**. Tests are ~91 standalone `scripts/test-*.mjs`
+There is **no linter and no test runner**. Tests are ~122 standalone `scripts/test-*.mjs`
 files using `node:assert/strict`, each wired to its own npm script. `npm run build` is the
 only typecheck. CI (`.github/workflows/build.yml`, `release.yml`) **builds installers but
 runs no tests** — nothing catches a broken test except running it.
@@ -106,13 +114,12 @@ defeat the ESM module cache between fixtures. Keep that when adding tests.
 > opens a window from a tool call. Prefix GUI launches with `env -u ELECTRON_RUN_AS_NODE`.
 > Leave scripts that set or clear the variable themselves alone.
 
-> **This machine's Node cannot run the 27 tests launched by plain `node
+> **A Node built without Amaro cannot run the 14 tests launched by plain `node
 > --experimental-strip-types`.** (Recount with `grep -c '"test:[a-z0-9-]*": "node
 > --experimental-strip-types' package.json` rather than trusting this number.)
-> `/usr/bin/node` v22.22.1 is a distro build compiled without Amaro
-> (`node_use_amaro: false`), so every one of them fails with `ERR_NO_TYPESCRIPT` —
-> including `test:sport-colors`, `test:strength-*`, `test:watchface-studio`, and
-> `test:mcp-*`. The `dist-electron` and Electron-runtime modes are unaffected, which is
+> The Linux box's `/usr/bin/node` v22.22.1 is a distro build compiled without Amaro
+> (`node_use_amaro: false`), so every one of them fails there with `ERR_NO_TYPESCRIPT` —
+> including `test:sport-colors`, `test:strength-*` and `test:mcp-*`. The `dist-electron` and Electron-runtime modes are unaffected, which is
 > why a growing set of strip-types suites are launched through Electron instead —
 > list them with `grep -o '"test:[a-z0-9-]*": "cross-env ELECTRON_RUN_AS_NODE=1
 > electron --experimental-strip-types' package.json`, and say so in the test's own
@@ -131,9 +138,9 @@ resolution). Both are `strict`.
 ```
 src/ (renderer, React)  →  src/coroslink-api.ts (types only, window.coroslink)
                         ↓
-electron/preload.ts     →  contextBridge, ~254 ipcRenderer.invoke wrappers
+electron/preload.ts     →  contextBridge, ~212 ipcRenderer.invoke wrappers
                         ↓
-electron/main.ts        →  ~254 ipcMain.handle registrations + app lifecycle
+electron/main.ts        →  ~212 ipcMain.handle registrations + app lifecycle
                         ↓
 electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 ```
@@ -146,9 +153,9 @@ start-up — each carry the only copy of what they say. So both wait on `rendere
 the renderer raises itself through **`app:rendererReady`**; `did-finish-load` cannot stand in,
 because the page having loaded says nothing about whether listeners exist.
 
-This flag was raised from inside `watchfaces:consumeCommunityOpenRequest`, which App.tsx only
-calls on a development build — so **no packaged build ever raised it**, and every such push was
-dropped for the life of the process. It typechecks, throws nothing, and never shows up in a dev
+This flag used to ride along on a Watch Faces deep-link channel that App.tsx only called on
+a development build — so **no packaged build ever raised it**, and every such push was
+dropped for the life of the process. That screen is gone; the trap is not. It typechecks, throws nothing, and never shows up in a dev
 run. What it did show up as: a start-up re-login minting a session the window never heard about,
 leaving it with no data, no sign-in form, and nothing to do but restart. Keep the flag on its
 own channel, keep the renderer's call out of any build-conditional path, and keep it deferred a
@@ -163,8 +170,8 @@ A channel name is a bare string in `electron/main.ts`, `electron/preload.ts`, an
 directions — a handler nothing invokes fails just as loudly as an invoke with no handler.
 
 **Adding or renaming an IPC channel means editing all three files, then running
-`npm run test:ipc-surface`.** Channels are namespaced `domain:verb` (`chat:`, `maps:`,
-`trainingHub:`, `watchfaces:`, `analysis:`, `trainingLibrary:`, …).
+`npm run test:ipc-surface`.** Channels are namespaced `domain:verb` (`chat:`,
+`trainingHub:`, `analysis:`, `trainingLibrary:`, `places:`, …).
 
 ### Data
 
@@ -222,9 +229,8 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Maps, Training Hub, Training Library, Strength, Calendar, Coach, and the dev-only
-Watch Faces and Gear views — both are `IS_DEVELOPMENT_BUILD` in App.tsx and `developmentOnly`
-in primaryNav.ts, so a packaged build carries neither their code nor their stylesheet); Overview, Media, Data, and Settings are in the main bundle.
+ones (Training Hub, Training Library, Strength, Calendar, Coach, Where you've been);
+Overview, Media, Data, and Settings are in the main bundle.
 
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.
@@ -556,19 +562,22 @@ in primaryNav.ts, so a packaged build carries neither their code nor their style
 - **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.
-- **Maps / Routes** (`mapService.ts`, `routeShareServer.ts`) — COROS map packages over USB;
-  route generation exported as GPX. Routing is **keyless by default** (BRouter + Nominatim);
-  OpenRouteService is an opt-in backend a power user enables by saving their own key, and
-  `resolveRouteBackend()` falls back to keyless unless both the opt-in and a key are present.
-  **Base map styles all live in `ROUTE_BASE_LAYERS` (`src/maps/routes/constants.ts`) and must
+- **Base maps** (`src/mapBase/`) — not a screen. The Maps screen that owned this code was
+  removed, but two surfaces still draw a Leaflet map: the activity detail replay
+  (`ActivityRouteMap`) and the globe's street view (`ActivityGlobeStreetMap`). What they need
+  is `constants.ts` (the styles), `baseLayers.ts` (`createBaseLayer`), `onewayArrows.ts` and
+  `MapLayerControl.tsx`, and that is the whole of the directory. The route-flavoured names
+  went with the screen: `BASE_LAYERS`, `BASE_LAYER_ORDER`, `BaseLayerId`,
+  `TRAIL_OVERLAY_LAYERS`, `TrailOverlayId`, and `.basemap-*` in the CSS.
+  **Base map styles all live in `BASE_LAYERS` (`src/mapBase/constants.ts`) and must
   stay keyless** — the app holds no map provider key, offers no field to enter one, and bakes
   none into the build, so a style that needs one is not a degraded map, it is no map.
   `light` and `dark` are **OpenFreeMap vector styles rendered by MapLibre**, not raster tiles.
   They were CARTO's `light_all`/`dark_all` until August 2026, when CARTO began answering
   keyless requests with a perfectly valid 200 PNG that has "API KEY REQUIRED" printed across
   it — a watermark, not an error, which is why nothing in the app noticed and why checking a
-  provider by status code proves nothing. Both theme-driven screens (Overview map, activity
-  detail map) resolve to those two ids through `themeBaseLayer(theme)`, so both wore it.
+  provider by status code proves nothing. Both theme-driven screens resolve to those two ids
+  through `themeBaseLayer(theme)`, so both wore it.
   `npm run test:base-layers` fails on a key-shaped endpoint, on anything pointing back at
   CARTO, and on `light`/`dark` ceasing to be vector.
 
@@ -576,13 +585,13 @@ in primaryNav.ts, so a packaged build carries neither their code nor their style
   **`createBaseLayer` (`baseLayers.ts`) is the only way to build a base layer** — raster or
   vector — so no screen has to know which kind it asked for, and every base map lands in the
   `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where trail overlays and
-  route lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
+  track lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
   code needed on every swap; a vector layer has no `bringToBack()` to call.
   **It also binds the map's max zoom, and that is not decoration.** Leaflet reads a zoom limit
   off a layer in exactly one place — `GridLayer.beforeAdd` — so a raster base map bounded the
   map for free, while `L.maplibreGL`, a plain `L.Layer`, bounds nothing and `getMaxZoom()`
   falls back to `Infinity`. That is not merely "zooms too far": `fitBounds` clamps to
-  `getMaxZoom()`, so a route whose points share one spot resolves to zoom `Infinity`, the
+  `getMaxZoom()`, so a track whose points share one spot resolves to zoom `Infinity`, the
   pixel origin goes infinite with it, and every polyline collapses to `M0 0` — a blank map on
   the two screens whose *default* style is vector. `createBaseLayer` calls `setMaxZoom` for
   both kinds, which is also why the trail overlays carry `maxNativeZoom` rather than
@@ -611,8 +620,6 @@ in primaryNav.ts, so a packaged build carries neither their code nor their style
   "non-JavaScript MIME type text/html". `import workerUrl from
   "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"` is what makes it emit; do not remove
   that import because it looks unused.
-- **Watch Faces** (`corosWatchfaceService.ts`, ~4.1k lines, 41 renderer files) — the most
-  intricate binary-format area; several tests need a real Electron window for canvas.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
@@ -885,14 +892,17 @@ by construction. Wire it where a test can see it.
 
 ### Renderer
 
-`src/App.tsx` is a ~7.9k-line monolith holding view routing and most cross-cutting state.
-`src/navigation/primaryNav.ts` defines `PrimaryView`; the Gear view is dev-build-only
-(`import.meta.env.DEV`).
+`src/App.tsx` is a ~8.5k-line monolith holding view routing and most cross-cutting state.
+`src/navigation/primaryNav.ts` defines `PrimaryView`. Its `developmentOnly` and `beta` flags
+are still honoured by the rail, the tab bar and the start-up picker, but no destination sets
+either since Watch Faces and Gear were removed — the first one to need them again just sets
+the flag.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~33k lines) holds the design tokens and most rules; six feature
-stylesheets sit beside their components (strength ×2, gear, watchfaces, training-library,
-overview). Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
+`src/styles.css` (~31k lines) holds the design tokens and most rules; ten feature
+stylesheets sit beside their components (strength ×3, training ×2, profile, running, sleep,
+training-library, activity globe). Twelve in all, counting `fonts.css` — which is the number
+the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
@@ -958,9 +968,9 @@ drew at the page's 16px, a size that is not on the scale and two steps above the
 trigger stands in a row with.
 **Seventeen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
-none is a row of options: a grid whose arrangement carries meaning (the route sport picker,
-the Studio's alignment grids), cards that need a sentence (export formats, analysis starters),
-a list of records (plans, places, search results) and a table's sort header.
+none is a row of options: a grid whose arrangement carries meaning, cards that need a
+sentence (export formats, analysis starters), a list of records (plans, places, search
+results) and a table's sort header.
 
 **The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
 Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
@@ -1000,9 +1010,9 @@ ink (all three measured in Chromium). Nothing reports it: the stylesheet parses,
 passes, the screen just loses its ground. Twelve dead token names across twenty-four uses were
 found on 2026-09-18, each alive for months — the Training Library's entire background stack
 (`--bg-ambient-green`, a name from a palette that predates the accent tokens), the Hevy
-dialog's fill, the backup-restore cards, two Watch Face device panels, the Gear screen's error
-tint and its sign-in panel, and a `--danger` nothing has ever declared; `--wf-shadow-soft`,
-found by hand one phase earlier, was the same bug. The test holds two things at zero and has no allowlist:
+dialog's fill, the backup-restore cards, and a `--danger` nothing has ever declared (five
+more lived on the Watch Faces and Gear screens, which have since been removed); one found by
+hand a phase earlier was the same bug. The test holds two things at zero and has no allowlist:
 every `var(--x)` names a token some stylesheet declares or the renderer writes (**a fallback
 does not excuse it** — `var(--phantom, 12px)` renders correctly and still claims a token that
 is not there, which is how four of them survived a reader's eye), and every declared token is
@@ -1028,16 +1038,16 @@ time, so neither the build nor a render says anything. (`\bease\b` also matches 
 outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
 (an inset is a highlight, and a border spelled `var(--surface-line, …)` is the card recipe),
 and every layer that **lifts** spends `--shadow-soft|card|elevated|inset`. Both rules hold
-across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty but for six
-`exempt` decisions and a new violation fails outright. A `box-shadow` draws four other things
+across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty but for one
+`exempt` decision and a new violation fails outright. A `box-shadow` draws four other things
 and those are not elevation: a hairline (an inset with no blur — a highlight, a gridline, a
 marker bar), a ring (`0 0 0 Npx`, up to 8px), a glow (no offset), a tint (a lift painted in a
 named signal colour — accent, sport, sleep stage, tone) and the 1–2px edge under a control.
 `layerKind` in the test draws that line; the sizes are written up in §4.5 of the doc. Tokens
-are judged by what they resolve to across every definition, which is how it found a
-`--wf-shadow-soft` defined nowhere — an invalid token silently voids the whole `box-shadow`,
-hairline and all — and it is why a feature token that lifts (`--wf-shadow`, `--map-card-shadow`)
-spends one of the four rather than restating a shadow. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+are judged by what they resolve to across every definition, which is how it found a feature
+shadow token defined nowhere — an invalid token silently voids the whole `box-shadow`,
+hairline and all — and it is why a feature token that lifts spends one of the four rather
+than restating a shadow. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
 Paper defines `--surface-line: transparent` on its `:root`, so a card that spells its border
 `var(--surface-line, …)` floats on its shadow there and keeps a lit hairline in dark; the
 paper `.panel` rule reads the token **without a fallback**, which is what puts it over the
@@ -1075,7 +1085,7 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 `var(--success-text)` and follows the theme.
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
-(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over thirteen
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over twelve
 destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
@@ -1119,7 +1129,7 @@ close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) 
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
 The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
-a short window drew **two vertical lines down the same edge** — for a list of thirteen rows
+a short window drew **two vertical lines down the same edge** — for a list of twelve rows
 that fits whenever the window is not cramped. What a reader needs there is not a handle to
 drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
 are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**

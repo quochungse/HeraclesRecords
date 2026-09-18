@@ -5,11 +5,12 @@
 // behind `rendererReady` — `webContents.send` before React has subscribed
 // reaches nobody, and both carry the only copy of what they say.
 //
-// The flag was raised from inside `watchfaces:consumeCommunityOpenRequest`,
-// which App.tsx only calls on a development build. So no packaged build ever
-// raised it: `trainingHub:sessionChanged` was never delivered to a real user,
-// and a start-up re-login minted a session the window never heard about —
-// leaving it with no data, no sign-in form, and nothing to do but restart.
+// The flag used to ride along on a Watch Faces deep-link channel that App.tsx
+// only called on a development build. So no packaged build ever raised it:
+// `trainingHub:sessionChanged` was never delivered to a real user, and a
+// start-up re-login minted a session the window never heard about — leaving it
+// with no data, no sign-in form, and nothing to do but restart. That screen is
+// gone; the shape of the bug is not, which is what the cases below hold down.
 //
 // It typechecks either way and no runtime error is raised, so what holds it
 // down is this: the flag is set from exactly one channel, that channel is
@@ -53,14 +54,28 @@ test("the flag is raised from one place, and that place is its own channel", () 
   );
 });
 
-test("no build-conditional handler raises it", () => {
+test("nothing else in main can raise it", () => {
   // The original bug in one line: the call sat in a handler the renderer only
-  // reaches on a development build.
+  // reaches on a development build. Any handler but its own raising the flag
+  // is that shape again, whichever feature owns it — so every call site is
+  // attributed to the channel it sits under, by position.
+  const handles = [...main.matchAll(/ipcMain\.handle\(\s*"([^"]+)"/g)];
+  let checked = 0;
+  for (const call of main.matchAll(/markRendererReady\(\)/g)) {
+    const enclosing = handles.filter((h) => h.index < call.index).pop();
+    // The declaration's own body sits above every handler and has none.
+    if (!enclosing) continue;
+    checked += 1;
+    assert.equal(
+      enclosing[1],
+      CHANNEL,
+      `${enclosing[1]} raises the ready flag; it belongs to ${CHANNEL} alone`
+    );
+  }
   assert.equal(
-    /consumeCommunityOpenRequest"[\s\S]{0,200}?markRendererReady/.test(main),
-    false,
-    "the watchfaces deep-link handler is development-only; the flag cannot " +
-      "depend on it again"
+    checked,
+    1,
+    "expected exactly one handler to raise the flag — its own"
   );
 });
 

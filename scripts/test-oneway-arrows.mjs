@@ -17,7 +17,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const moduleUrl =
-  pathToFileURL(path.join(repoRoot, "src/maps/routes/onewayArrows.ts")).href +
+  pathToFileURL(path.join(repoRoot, "src/mapBase/onewayArrows.ts")).href +
   "?cacheBust=" +
   Date.now();
 

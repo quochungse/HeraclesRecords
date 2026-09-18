@@ -29,8 +29,8 @@ every night of sleep — and puts a coach next to it that has actually read all 
 Everything lives in a SQLite file on your machine. The only thing that leaves is what you
 send to your chosen AI provider, and what a COROS sign-in needs.
 
-It also talks to a COROS watch over USB — music and maps. That part is a convenience, not
-the point.
+It also talks to a COROS watch over USB, to put music on it. That part is a convenience,
+not the point.
 
 ---
 
@@ -114,7 +114,6 @@ Secondary features for people who own a COROS watch. Connect over USB:
 | | |
 |---|---|
 | **Media** | Download MP3s from YouTube, Spotify, YouTube Music, Apple Music or Apple Podcasts and copy them to the watch |
-| **Maps** | Install official COROS map packages; build routes with OpenRouteService and export GPX |
 | **Data** | Browse the raw records the app holds |
 
 <p align="center">
@@ -167,8 +166,7 @@ Nothing but the app to start. Everything else is optional and only for the featu
 
 - **COROS account** — activities, analytics, plans, calendar
 - **An AI provider** — Claude subscription, Anthropic key, OpenRouter key, or a local model
-- **USB cable** — music and maps on the watch
-- **OpenRouteService key** — route generation
+- **USB cable** — music on the watch
 - **Spotify / Google OAuth apps, Apple Music headers, `ytmusicapi`** — the matching media source
 
 ---

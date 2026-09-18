@@ -29,8 +29,8 @@
  *   - `font-size: 0`, which is not a size: it is how a narrow layout drops a
  *     button's label and leaves the icon.
  *   - percentages and `50%` for radius — a circle is not a corner.
- *   - `clamp()` for letter-spacing in a container query: the watchface editor
- *     tracks a label against its own container width, which no fixed em can do.
+ *   - `clamp()` for letter-spacing in a container query, where a label tracks
+ *     its own container's width and no fixed em can follow it.
  *
  * Motion is held the same way, because it drifted the same way: 26 duration
  * steps, and 92% of every curve was the browser's `ease`, which nobody chose —

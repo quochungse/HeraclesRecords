@@ -19,34 +19,17 @@ import type {
   ActivityDetailSummary,
   ActivityDetailSummarySync,
   BinaryStatus,
-  CachedCorosMapPackage,
   CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
-  CorosMapDownloadJob,
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
-  CorosMapInstallResult,
-  CorosMapInstallProgress,
-  CorosMapLocalSelection,
-  CorosMapManifest,
-  CorosMapPackage,
   DownloadAudioResult,
   DownloadJob,
   DownloadQueueItem,
-  DrawnRoutePayload,
-  GenerateRouteRequest,
-  GeneratedRoute,
   LocalTrack,
-  RouteActivityType,
-  RouteApiKeyValidation,
-  RouteBuilderConfig,
-  RouteGeocodeResult,
-  RouteGeometry,
-  RouteWaypointRequest,
-  ActivityPaceBaselines,
-  RouteShareSession,
+  ReverseGeocodeResult,
   SaveChatSessionOptions,
   SpotifyConfig,
   SpotifyPlaylist,
@@ -158,203 +141,18 @@ import type {
   DeleteWorkoutResult,
   ManualActivityInput
 } from "./types";
-import type {
-  CorosLegacy614aCarrierExportResult,
-  CorosLegacy614aCarrierPatchInput,
-  CorosLegacy614aCarrierSelection,
-  CorosWatchfaceArchive,
-  CorosWatchfaceProjectExportInput,
-  CorosWatchfaceProjectExportResult,
-  CorosWatchfaceArchiveExportInput,
-  CorosWatchfaceArtwork,
-  CorosWatchfaceCreatorInput,
-  CorosWatchfaceExistingShareInput,
-  CorosWatchfaceRasterFontFolder,
-  CorosWatchfaceProject,
-  CorosWatchfaceProjectSaveInput,
-  CorosWatchfaceProjectSummary,
-  CorosWatchfacePublishInput,
-  CorosWatchfaceRegion,
-  CorosWatchfaceShareImport,
-  CorosWatchfaceShareLink,
-  CorosWatchfaceStatus,
-  CorosWatchfaceConfigTextFile,
-  CorosWatchfaceTemplateAsset,
-  CorosWatchfaceTemplateDetails,
-  CorosWatchfaceTheme,
-  CorosWatchfaceThemeDownload,
-  CorosWatchfaceThemeDownloadInput,
-  CorosWatchfaceThemeListInput,
-  CorosBatteryQueryInput,
-  CorosBatteryReport,
-  CorosGearCatalog,
-  CorosGearSaveInput,
-  CorosPairedDevice,
-  CorosBluetoothDeviceChoice,
-  CommunityWatchface,
-  CommunityWatchfaceCatalogPage,
-  CommunityWatchfaceCatalogQuery,
-  CommunityWatchfaceDownloadProgress,
-  CommunityWatchfaceImport,
-  CommunityWatchfaceOpenRequest
-} from "./types";
-
 const api = {
   // Host OS, so the renderer can reserve space for the macOS traffic lights.
   platform: process.platform,
   getWatchStatus: (): Promise<WatchStatus> =>
     ipcRenderer.invoke("watch:getStatus"),
-  getCorosWatchfaceStatus: (): Promise<CorosWatchfaceStatus> =>
-    ipcRenderer.invoke("watchfaces:getStatus"),
-  listLocalFontFamilies: (): Promise<string[]> =>
-    ipcRenderer.invoke("watchfaces:listLocalFontFamilies"),
-  loginCorosWatchfaces: (
-    email: string,
-    password: string,
-    region: CorosWatchfaceRegion,
-    remember: boolean
-  ): Promise<CorosWatchfaceStatus> =>
-    ipcRenderer.invoke("watchfaces:login", email, password, region, remember),
-  loginCorosWatchfacesWithSavedCredentials: (
-    region: CorosWatchfaceRegion
-  ): Promise<CorosWatchfaceStatus> =>
-    ipcRenderer.invoke("watchfaces:loginSaved", region),
-  logoutCorosWatchfaces: (): Promise<CorosWatchfaceStatus> =>
-    ipcRenderer.invoke("watchfaces:logout"),
-  listCorosPairedDevices: (): Promise<CorosPairedDevice[]> =>
-    ipcRenderer.invoke("watchfaces:listPairedDevices"),
-  selectCorosBluetoothDevice: (deviceId: string): Promise<void> =>
-    ipcRenderer.invoke("watchfaces:selectBluetoothDevice", deviceId),
-  cancelCorosBluetoothDeviceSelection: (): Promise<void> =>
-    ipcRenderer.invoke("watchfaces:cancelBluetoothDevice"),
-  onCorosBluetoothDevices: (
-    callback: (devices: CorosBluetoothDeviceChoice[]) => void
-  ): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, devices: CorosBluetoothDeviceChoice[]) =>
-      callback(devices);
-    ipcRenderer.on("watchfaces:bluetoothDevices", listener);
-    return () => ipcRenderer.removeListener("watchfaces:bluetoothDevices", listener);
-  },
-  getCorosBatteryReport: (
-    input: CorosBatteryQueryInput
-  ): Promise<CorosBatteryReport> => ipcRenderer.invoke("watchfaces:getBatteryReport", input),
-  queryCorosGear: (): Promise<CorosGearCatalog> =>
-    ipcRenderer.invoke("gear:query"),
-  saveCorosGear: (input: CorosGearSaveInput): Promise<CorosGearCatalog> =>
-    ipcRenderer.invoke("gear:save", input),
-  listCorosWatchfaceThemes: (
-    input: CorosWatchfaceThemeListInput
-  ): Promise<CorosWatchfaceTheme[]> => ipcRenderer.invoke("watchfaces:listThemes", input),
-  downloadCorosWatchfaceTheme: (
-    input: CorosWatchfaceThemeDownloadInput
-  ): Promise<CorosWatchfaceThemeDownload> =>
-    ipcRenderer.invoke("watchfaces:downloadTheme", input),
-  importCorosWatchfaceShareLink: (
-    shareUrl: string
-  ): Promise<CorosWatchfaceShareImport> =>
-    ipcRenderer.invoke("watchfaces:importShareLink", shareUrl),
-  listCommunityWatchfaces: (
-    input: CommunityWatchfaceCatalogQuery
-  ): Promise<CommunityWatchfaceCatalogPage> =>
-    ipcRenderer.invoke("watchfaces:listCommunity", input),
-  getCommunityWatchface: (slug: string): Promise<CommunityWatchface> =>
-    ipcRenderer.invoke("watchfaces:getCommunity", slug),
-  importCommunityWatchface: (slug: string): Promise<CommunityWatchfaceImport> =>
-    ipcRenderer.invoke("watchfaces:importCommunity", slug),
+  reverseGeocodeLocation: (
+    lat: number,
+    lon: number
+  ): Promise<ReverseGeocodeResult> =>
+    ipcRenderer.invoke("places:reverseGeocode", lat, lon),
   notifyRendererReady: (): Promise<void> =>
     ipcRenderer.invoke("app:rendererReady"),
-  consumeCommunityWatchfaceOpenRequest:
-    (): Promise<CommunityWatchfaceOpenRequest | null> =>
-      ipcRenderer.invoke("watchfaces:consumeCommunityOpenRequest"),
-  onCommunityWatchfaceOpenRequest: (
-    callback: (request: CommunityWatchfaceOpenRequest) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      request: CommunityWatchfaceOpenRequest
-    ) => callback(request);
-    ipcRenderer.on("watchfaces:communityOpenRequested", listener);
-    return () =>
-      ipcRenderer.removeListener("watchfaces:communityOpenRequested", listener);
-  },
-  onCommunityWatchfaceDownloadProgress: (
-    callback: (progress: CommunityWatchfaceDownloadProgress) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      progress: CommunityWatchfaceDownloadProgress
-    ) => callback(progress);
-    ipcRenderer.on("watchfaces:communityDownloadProgress", listener);
-    return () =>
-      ipcRenderer.removeListener("watchfaces:communityDownloadProgress", listener);
-  },
-  chooseCorosWatchfaceArchive: (): Promise<CorosWatchfaceArchive | null> =>
-    ipcRenderer.invoke("watchfaces:chooseArchive"),
-  chooseLegacy614aCarrier: (): Promise<CorosLegacy614aCarrierSelection | null> =>
-    ipcRenderer.invoke("watchfaces:chooseLegacy614aCarrier"),
-  exportLegacy614aCarrier: (
-    selectionId: string,
-    patch: CorosLegacy614aCarrierPatchInput
-  ): Promise<CorosLegacy614aCarrierExportResult> =>
-    ipcRenderer.invoke("watchfaces:exportLegacy614aCarrier", selectionId, patch),
-  chooseCorosWatchfaceArtwork: (): Promise<CorosWatchfaceArtwork | null> =>
-    ipcRenderer.invoke("watchfaces:chooseArtwork"),
-  chooseCorosWatchfaceRasterFontFolder: (): Promise<CorosWatchfaceRasterFontFolder | null> =>
-    ipcRenderer.invoke("watchfaces:chooseRasterFontFolder"),
-  createCorosWatchfaceArchive: (
-    input: CorosWatchfaceCreatorInput
-  ): Promise<CorosWatchfaceArchive> =>
-    ipcRenderer.invoke("watchfaces:createArchive", input),
-  exportCorosWatchfaceProject: (
-    input: CorosWatchfaceProjectExportInput
-  ): Promise<CorosWatchfaceProjectExportResult> =>
-    ipcRenderer.invoke("watchfaces:exportProject", input),
-  exportCorosWatchfaceArchive: (
-    input: CorosWatchfaceArchiveExportInput
-  ): Promise<CorosWatchfaceProjectExportResult> =>
-    ipcRenderer.invoke("watchfaces:exportArchive", input),
-  listCorosWatchfaceProjects: (): Promise<CorosWatchfaceProjectSummary[]> =>
-    ipcRenderer.invoke("watchfaces:listProjects"),
-  saveCorosWatchfaceProject: (
-    input: CorosWatchfaceProjectSaveInput
-  ): Promise<CorosWatchfaceProject> =>
-    ipcRenderer.invoke("watchfaces:saveProject", input),
-  loadCorosWatchfaceProject: (
-    projectId: string
-  ): Promise<CorosWatchfaceProject> =>
-    ipcRenderer.invoke("watchfaces:loadProject", projectId),
-  cacheCorosWatchfaceProjectPreview: (
-    projectId: string,
-    previewDataUrl: string
-  ): Promise<void> =>
-    ipcRenderer.invoke("watchfaces:cacheProjectPreview", projectId, previewDataUrl),
-  duplicateCorosWatchfaceProject: (
-    projectId: string
-  ): Promise<CorosWatchfaceProject> =>
-    ipcRenderer.invoke("watchfaces:duplicateProject", projectId),
-  deleteCorosWatchfaceProject: (projectId: string): Promise<void> =>
-    ipcRenderer.invoke("watchfaces:deleteProject", projectId),
-  describeCorosWatchfaceTemplate: (
-    archiveId: string
-  ): Promise<CorosWatchfaceTemplateDetails> =>
-    ipcRenderer.invoke("watchfaces:describeTemplate", archiveId),
-  loadCorosWatchfaceTemplateAssets: (
-    archiveId: string,
-    paths: string[]
-  ): Promise<CorosWatchfaceTemplateAsset[]> =>
-    ipcRenderer.invoke("watchfaces:loadTemplateAssets", archiveId, paths),
-  loadCorosWatchfaceTemplateConfigTexts: (
-    archiveId: string
-  ): Promise<CorosWatchfaceConfigTextFile[]> =>
-    ipcRenderer.invoke("watchfaces:loadTemplateConfigTexts", archiveId),
-  publishCorosWatchface: (
-    input: CorosWatchfacePublishInput
-  ): Promise<CorosWatchfaceShareLink> =>
-    ipcRenderer.invoke("watchfaces:publish", input),
-  createCorosWatchfaceShareLink: (
-    input: CorosWatchfaceExistingShareInput
-  ): Promise<CorosWatchfaceShareLink> =>
-    ipcRenderer.invoke("watchfaces:createShareLink", input),
   getWatchConnectionSmokeOption: (): Promise<WatchConnectionSmokeOptionId> =>
     ipcRenderer.invoke("watch:getConnectionSmokeOption"),
   setWatchConnectionSmokeOption: (
@@ -820,8 +618,6 @@ const api = {
     ipcRenderer.invoke("trainingHub:getRpeLoadByDay"),
   getSportTypeMap: (): Promise<TrainingHubSportType[]> =>
     ipcRenderer.invoke("trainingHub:getSportTypeMap"),
-  getActivityPaceBaselines: (): Promise<ActivityPaceBaselines> =>
-    ipcRenderer.invoke("trainingHub:getActivityPaceBaselines"),
   getUpcomingWorkouts: (
     days?: number
   ): Promise<TrainingHubUpcomingWorkout[]> =>
@@ -869,105 +665,6 @@ const api = {
     input: ManualActivityInput
   ): Promise<{ importId: string }> =>
     ipcRenderer.invoke("coros:addManualActivity", input),
-  getCorosMapManifest: (): Promise<CorosMapManifest> =>
-    ipcRenderer.invoke("maps:getCorosManifest"),
-  openCorosMapDownload: (downloadUrl: string): Promise<void> =>
-    ipcRenderer.invoke("maps:openCorosDownload", downloadUrl),
-  downloadCorosMapPackage: (
-    pkg: CorosMapPackage
-  ): Promise<CorosMapDownloadJob[]> =>
-    ipcRenderer.invoke("maps:downloadCorosPackage", pkg),
-  listCorosMapDownloadJobs: (): Promise<CorosMapDownloadJob[]> =>
-    ipcRenderer.invoke("maps:listCorosMapDownloadJobs"),
-  cancelCorosMapDownload: (id: string): Promise<CorosMapDownloadJob[]> =>
-    ipcRenderer.invoke("maps:cancelCorosMapDownload", id),
-  clearCorosMapDownloadJob: (id: string): Promise<CorosMapDownloadJob[]> =>
-    ipcRenderer.invoke("maps:clearCorosMapDownloadJob", id),
-  onCorosMapDownloadJobsUpdate: (
-    callback: (jobs: CorosMapDownloadJob[]) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      jobs: CorosMapDownloadJob[]
-    ) => {
-      callback(jobs);
-    };
-    ipcRenderer.on("maps:downloadJobsUpdate", listener);
-    return () =>
-      ipcRenderer.removeListener("maps:downloadJobsUpdate", listener);
-  },
-  listCachedCorosMaps: (): Promise<CachedCorosMapPackage[]> =>
-    ipcRenderer.invoke("maps:listCachedCorosMaps"),
-  getCorosMapInstallProgress: (): Promise<CorosMapInstallProgress | null> =>
-    ipcRenderer.invoke("maps:getCorosMapInstallProgress"),
-  cancelCorosMapInstall: (): Promise<CorosMapInstallProgress | null> =>
-    ipcRenderer.invoke("maps:cancelCorosMapInstall"),
-  onCorosMapInstallProgressUpdate: (
-    callback: (progress: CorosMapInstallProgress | null) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      progress: CorosMapInstallProgress | null
-    ) => {
-      callback(progress);
-    };
-    ipcRenderer.on("maps:installProgressUpdate", listener);
-    return () =>
-      ipcRenderer.removeListener("maps:installProgressUpdate", listener);
-  },
-  installCachedCorosMap: (packageId: string): Promise<CorosMapInstallResult> =>
-    ipcRenderer.invoke("maps:installCachedCorosMap", packageId),
-  installCachedCorosMaps: (
-    packageIds: string[]
-  ): Promise<CorosMapInstallResult> =>
-    ipcRenderer.invoke("maps:installCachedCorosMaps", packageIds),
-  deleteCachedCorosMap: (
-    packageId: string
-  ): Promise<CachedCorosMapPackage[]> =>
-    ipcRenderer.invoke("maps:deleteCachedCorosMap", packageId),
-  chooseCorosMapFolder: (): Promise<CorosMapLocalSelection | undefined> =>
-    ipcRenderer.invoke("maps:chooseCorosMapFolder"),
-  installCorosMapFolder: (
-    sourcePath: string
-  ): Promise<CorosMapInstallResult> =>
-    ipcRenderer.invoke("maps:installCorosMapFolder", sourcePath),
-  getRouteBuilderConfig: (): Promise<RouteBuilderConfig> =>
-    ipcRenderer.invoke("maps:getRouteBuilderConfig"),
-  saveRouteBuilderConfig: (
-    config: RouteBuilderConfig
-  ): Promise<RouteBuilderConfig> =>
-    ipcRenderer.invoke("maps:saveRouteBuilderConfig", config),
-  listGeneratedRoutes: (): Promise<GeneratedRoute[]> =>
-    ipcRenderer.invoke("maps:listGeneratedRoutes"),
-  geocodeRouteLocation: (query: string): Promise<RouteGeocodeResult> =>
-    ipcRenderer.invoke("maps:geocodeRouteLocation", query),
-  searchRouteLocations: (query: string): Promise<RouteGeocodeResult[]> =>
-    ipcRenderer.invoke("maps:searchRouteLocations", query),
-  reverseGeocodeRouteLocation: (
-    lat: number,
-    lon: number
-  ): Promise<RouteGeocodeResult> =>
-    ipcRenderer.invoke("maps:reverseGeocodeRouteLocation", lat, lon),
-  generateRoute: (request: GenerateRouteRequest): Promise<GeneratedRoute> =>
-    ipcRenderer.invoke("maps:generateRoute", request),
-  routeWaypoints: (request: RouteWaypointRequest): Promise<RouteGeometry> =>
-    ipcRenderer.invoke("maps:routeWaypoints", request),
-  saveDrawnRoute: (payload: DrawnRoutePayload): Promise<GeneratedRoute> =>
-    ipcRenderer.invoke("maps:saveDrawnRoute", payload),
-  importRouteGpx: (
-    activityType?: RouteActivityType
-  ): Promise<GeneratedRoute | null> =>
-    ipcRenderer.invoke("maps:importRouteGpx", activityType),
-  exportGeneratedRoute: (id: string): Promise<string | null> =>
-    ipcRenderer.invoke("maps:exportGeneratedRoute", id),
-  deleteGeneratedRoute: (id: string): Promise<boolean> =>
-    ipcRenderer.invoke("maps:deleteGeneratedRoute", id),
-  startRouteShare: (id: string): Promise<RouteShareSession> =>
-    ipcRenderer.invoke("maps:startRouteShare", id),
-  stopRouteShare: (): Promise<void> =>
-    ipcRenderer.invoke("maps:stopRouteShare"),
-  validateRouteApiKey: (apiKey: string): Promise<RouteApiKeyValidation> =>
-    ipcRenderer.invoke("maps:validateRouteApiKey", apiKey),
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke("app:getInfo"),
   openAppStorageLocation: (id: string): Promise<void> =>
     ipcRenderer.invoke("app:openStorageLocation", id),

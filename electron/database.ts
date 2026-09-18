@@ -13,9 +13,7 @@ import {
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
   ActivityDetailSummary,
-  CachedCorosMapPackage,
   CoachAnalysisRunQuery,
-  GeneratedRoute,
   LocalTrack,
   NativeCorosPlanDetail,
   SpotifySyncTrack,
@@ -70,26 +68,6 @@ interface YouTubeHistoryRow {
   downloaded_at: string | null;
 }
 
-interface GeneratedRouteRow {
-  id: string;
-  name: string;
-  created_at: string;
-  start_location: string;
-  destination_location: string | null;
-  distance_meters: number;
-  duration_seconds: number | null;
-  ascent_meters: number | null;
-  descent_meters: number | null;
-  mode: GeneratedRoute["mode"];
-  activity_type: string | null;
-  surface_preference: GeneratedRoute["surfacePreference"];
-  avoid_highways: number;
-  elevation_preference: GeneratedRoute["elevationPreference"];
-  points_json: string;
-  bounds_json: string | null;
-  gpx_path: string | null;
-}
-
 interface TrainingActivityRow {
   activity_id: string;
   name: string | null;
@@ -104,19 +82,6 @@ interface TrainingActivityRow {
   calories: number | null;
   training_load: number | null;
   elevation_gain: number | null;
-}
-
-interface CachedCorosMapRow {
-  package_id: string;
-  title: string;
-  region: string;
-  parent: string;
-  type: CachedCorosMapPackage["type"];
-  size_bytes: number;
-  download_url: string;
-  file_path: string;
-  extracted_path: string | null;
-  downloaded_at: string;
 }
 
 let db: Database.Database | undefined;
@@ -192,26 +157,6 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       downloaded_at TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS generated_routes (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      start_location TEXT NOT NULL,
-      destination_location TEXT,
-      distance_meters INTEGER NOT NULL,
-      duration_seconds REAL,
-      ascent_meters REAL,
-      descent_meters REAL,
-      mode TEXT NOT NULL,
-      surface_preference TEXT NOT NULL,
-      avoid_highways INTEGER NOT NULL,
-      elevation_preference TEXT NOT NULL,
-      points_json TEXT NOT NULL,
-      bounds_json TEXT,
-      gpx_path TEXT,
-      activity_type TEXT
-    );
-
     CREATE TABLE IF NOT EXISTS training_activities (
       activity_id TEXT PRIMARY KEY,
       name TEXT,
@@ -266,19 +211,6 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       template_id TEXT PRIMARY KEY,
       payload_json TEXT NOT NULL,
       synced_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS cached_coros_maps (
-      package_id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      region TEXT NOT NULL,
-      parent TEXT NOT NULL,
-      type TEXT NOT NULL,
-      size_bytes INTEGER NOT NULL,
-      download_url TEXT NOT NULL,
-      file_path TEXT NOT NULL UNIQUE,
-      extracted_path TEXT,
-      downloaded_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -560,7 +492,6 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     );
   `);
 
-  ensureColumn(db, "generated_routes", "activity_type", "TEXT");
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
   // 1..5; 0 = unrated). NULL = never fetched from the detail endpoint yet.
   ensureColumn(db, "training_activities", "feel_type", "INTEGER");
@@ -580,6 +511,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // Nothing else here belongs to the analyses. Their table was created new
   // rather than grown, so every column it has is in the CREATE block above.
   dropLegacyAutomationTables(db);
+  dropRetiredMapTables(db);
   migrateChatTranscriptsToSessions(db);
 
   // Seed the built-in COROS MCP server so existing users get a registry entry
@@ -746,6 +678,21 @@ function dropLegacyAutomationTables(database: Database.Database): void {
     "idx_automation_runs_started"
   ]) {
     database.exec(`DROP INDEX IF EXISTS ${index}`);
+  }
+}
+
+/**
+ * Drops the tables the Maps screen owned. Nothing reads them any more, and both
+ * described files on disk (a downloaded map package, a route's GPX) that the
+ * startup sweep in main.ts removes — so leaving the rows would leave a record
+ * of files that are gone. There is nothing to migrate: a drawn route belongs to
+ * a route builder this app no longer has.
+ */
+function dropRetiredMapTables(database: Database.Database): void {
+  for (const table of ["generated_routes", "cached_coros_maps"]) {
+    if (!tableExists(database, table)) continue;
+    console.log(`[db] dropping retired maps table: ${table}`);
+    database.exec(`DROP TABLE ${table}`);
   }
 }
 
@@ -2080,111 +2027,6 @@ function getYouTubeHistoryEntry(url: string): YouTubeHistoryEntry {
   return toYouTubeHistoryEntry(row);
 }
 
-function toGeneratedRoute(row: GeneratedRouteRow): GeneratedRoute {
-  return {
-    id: row.id,
-    name: row.name,
-    createdAt: row.created_at,
-    startLocation: row.start_location,
-    destinationLocation: row.destination_location ?? undefined,
-    distanceMeters: row.distance_meters,
-    durationSeconds: row.duration_seconds ?? undefined,
-    ascentMeters: row.ascent_meters ?? undefined,
-    descentMeters: row.descent_meters ?? undefined,
-    mode: row.mode,
-    activityType:
-      (row.activity_type as GeneratedRoute["activityType"] | null) ??
-      (row.surface_preference === "trail" ? "hiking" : "walking"),
-    surfacePreference: row.surface_preference,
-    avoidHighways: Boolean(row.avoid_highways),
-    elevationPreference: row.elevation_preference,
-    points: JSON.parse(row.points_json) as GeneratedRoute["points"],
-    bounds: row.bounds_json
-      ? (JSON.parse(row.bounds_json) as GeneratedRoute["bounds"])
-      : undefined,
-    gpxPath: row.gpx_path ?? undefined
-  };
-}
-
-export function listGeneratedRoutes(limit = 20): GeneratedRoute[] {
-  const rows = requireDatabase()
-    .prepare(
-      `SELECT id, name, created_at, start_location, destination_location,
-              distance_meters, duration_seconds, ascent_meters, descent_meters,
-              mode, activity_type, surface_preference, avoid_highways,
-              elevation_preference, points_json, bounds_json, gpx_path
-       FROM generated_routes
-       ORDER BY created_at DESC
-       LIMIT ?`
-    )
-    .all(limit) as GeneratedRouteRow[];
-
-  return rows.map(toGeneratedRoute);
-}
-
-export function getGeneratedRoute(id: string): GeneratedRoute | undefined {
-  const row = requireDatabase()
-    .prepare(
-      `SELECT id, name, created_at, start_location, destination_location,
-              distance_meters, duration_seconds, ascent_meters, descent_meters,
-              mode, activity_type, surface_preference, avoid_highways,
-              elevation_preference, points_json, bounds_json, gpx_path
-       FROM generated_routes
-       WHERE id = ?`
-    )
-    .get(id) as GeneratedRouteRow | undefined;
-
-  return row ? toGeneratedRoute(row) : undefined;
-}
-
-export function addGeneratedRoute(route: GeneratedRoute): GeneratedRoute {
-  requireDatabase()
-    .prepare(
-      `INSERT INTO generated_routes (
-         id, name, created_at, start_location, destination_location,
-         distance_meters, duration_seconds, ascent_meters, descent_meters,
-         mode, activity_type, surface_preference, avoid_highways,
-         elevation_preference, points_json, bounds_json, gpx_path
-       )
-       VALUES (
-         @id, @name, @createdAt, @startLocation, @destinationLocation,
-         @distanceMeters, @durationSeconds, @ascentMeters, @descentMeters,
-         @mode, @activityType, @surfacePreference, @avoidHighways,
-         @elevationPreference, @pointsJson, @boundsJson, @gpxPath
-       )`
-    )
-    .run({
-      id: route.id,
-      name: route.name,
-      createdAt: route.createdAt,
-      startLocation: route.startLocation,
-      destinationLocation: route.destinationLocation ?? null,
-      distanceMeters: route.distanceMeters,
-      durationSeconds: route.durationSeconds ?? null,
-      ascentMeters: route.ascentMeters ?? null,
-      descentMeters: route.descentMeters ?? null,
-      mode: route.mode,
-      activityType: route.activityType,
-      surfacePreference: route.surfacePreference,
-      avoidHighways: route.avoidHighways ? 1 : 0,
-      elevationPreference: route.elevationPreference,
-      pointsJson: JSON.stringify(route.points),
-      boundsJson: route.bounds ? JSON.stringify(route.bounds) : null,
-      gpxPath: route.gpxPath ?? null
-    });
-
-  notifySyncedRow("generated_routes", ["id"], [route.id]);
-  return route;
-}
-
-export function deleteGeneratedRoute(id: string): boolean {
-  const result = requireDatabase()
-    .prepare(`DELETE FROM generated_routes WHERE id = ?`)
-    .run(id);
-  if (result.changes > 0) notifySyncedDelete("generated_routes", id);
-  return result.changes > 0;
-}
-
 function toTrainingActivity(row: TrainingActivityRow): TrainingHubActivity {
   return {
     activityId: row.activity_id,
@@ -2390,21 +2232,6 @@ export function listTrainingActivityRpeInputs(
     duration: row.duration ?? undefined,
     feelType: row.feel_type
   }));
-}
-
-export function listStoredTrainingActivities(limit = 500): TrainingHubActivity[] {
-  const rows = requireDatabase()
-    .prepare(
-      `SELECT activity_id, name, sport_type, sport_name, start_time, end_time,
-              duration, distance, avg_hr, max_hr, calories, training_load,
-              elevation_gain
-       FROM training_activities
-       ORDER BY start_time DESC
-       LIMIT ?`
-    )
-    .all(limit) as TrainingActivityRow[];
-
-  return enrichActivitiesWithSportNames(rows.map(toTrainingActivity));
 }
 
 /** One stored activity by id, as every activity list call has written it. */
@@ -2857,115 +2684,6 @@ export function clearHevyCache(): void {
     database.prepare("DELETE FROM hevy_workouts").run();
     database.prepare("DELETE FROM hevy_exercise_templates").run();
   })();
-}
-
-function toCachedCorosMap(row: CachedCorosMapRow): CachedCorosMapPackage {
-  return {
-    packageId: row.package_id,
-    title: row.title,
-    region: row.region,
-    parent: row.parent,
-    type: row.type,
-    sizeBytes: row.size_bytes,
-    downloadUrl: row.download_url,
-    filePath: row.file_path,
-    extractedPath: row.extracted_path ?? undefined,
-    downloadedAt: row.downloaded_at
-  };
-}
-
-export function listCachedCorosMaps(): CachedCorosMapPackage[] {
-  const rows = requireDatabase()
-    .prepare(
-      `SELECT package_id, title, region, parent, type, size_bytes,
-              download_url, file_path, extracted_path, downloaded_at
-       FROM cached_coros_maps
-       ORDER BY downloaded_at DESC`
-    )
-    .all() as CachedCorosMapRow[];
-
-  return rows.map(toCachedCorosMap);
-}
-
-export function getCachedCorosMap(
-  packageId: string
-): CachedCorosMapPackage | undefined {
-  const row = requireDatabase()
-    .prepare(
-      `SELECT package_id, title, region, parent, type, size_bytes,
-              download_url, file_path, extracted_path, downloaded_at
-       FROM cached_coros_maps
-       WHERE package_id = ?`
-    )
-    .get(packageId) as CachedCorosMapRow | undefined;
-
-  return row ? toCachedCorosMap(row) : undefined;
-}
-
-export function upsertCachedCorosMap(
-  cached: CachedCorosMapPackage
-): CachedCorosMapPackage {
-  requireDatabase()
-    .prepare(
-      `INSERT INTO cached_coros_maps (
-         package_id, title, region, parent, type, size_bytes, download_url,
-         file_path, extracted_path, downloaded_at
-       )
-       VALUES (
-         @packageId, @title, @region, @parent, @type, @sizeBytes,
-         @downloadUrl, @filePath, @extractedPath, @downloadedAt
-       )
-       ON CONFLICT(package_id) DO UPDATE SET
-         title = excluded.title,
-         region = excluded.region,
-         parent = excluded.parent,
-         type = excluded.type,
-         size_bytes = excluded.size_bytes,
-         download_url = excluded.download_url,
-         file_path = excluded.file_path,
-         extracted_path = excluded.extracted_path,
-         downloaded_at = excluded.downloaded_at`
-    )
-    .run({
-      packageId: cached.packageId,
-      title: cached.title,
-      region: cached.region,
-      parent: cached.parent,
-      type: cached.type,
-      sizeBytes: cached.sizeBytes,
-      downloadUrl: cached.downloadUrl,
-      filePath: cached.filePath,
-      extractedPath: cached.extractedPath ?? null,
-      downloadedAt: cached.downloadedAt
-    });
-
-  return cached;
-}
-
-export function updateCachedCorosMapExtractedPath(
-  packageId: string,
-  extractedPath: string
-): CachedCorosMapPackage {
-  requireDatabase()
-    .prepare(
-      `UPDATE cached_coros_maps
-       SET extracted_path = ?
-       WHERE package_id = ?`
-    )
-    .run(extractedPath, packageId);
-
-  const cached = getCachedCorosMap(packageId);
-  if (!cached) {
-    throw new Error("Cached COROS map package was not found.");
-  }
-
-  return cached;
-}
-
-export function deleteCachedCorosMapRecord(packageId: string): void {
-  requireDatabase()
-    .prepare("DELETE FROM cached_coros_maps WHERE package_id = ?")
-    .run(packageId);
 }
 
 interface ChatPlanDraftRow {

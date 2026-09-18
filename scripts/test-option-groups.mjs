@@ -13,7 +13,7 @@
  *
  *   1. No native `<select>`. It is the one control the operating system draws,
  *      so it never follows the theme — on paper it read as borrowed, and on
- *      the Watch Face Studio's dark panels it read as broken.
+ *      a dark panel it read as broken.
  *   2. No hand-written option group: a list of buttons carrying `aria-pressed`
  *      or `aria-checked`, or a container with a `radiogroup` role, outside
  *      `OptionGroup` itself and the handful of decisions listed below.
@@ -50,24 +50,9 @@ const SRC = join(ROOT, "src");
  */
 const EXEMPT = [
   {
-    file: "src/maps/routes/panels.tsx",
-    marker: "route-sport-picker",
-    why: "A five-cell grid with the label under the icon — a row of chips reads as a different control."
-  },
-  {
-    file: "src/maps/routes/panels.tsx",
-    marker: "route-overlay-item",
-    why: "Trail overlays are a vertical list, each with a swatch and a sentence — independent switches, not a set to choose from."
-  },
-  {
-    file: "src/maps/routes/panels.tsx",
-    marker: "route-basemap-option",
+    file: "src/mapBase/MapLayerControl.tsx",
+    marker: "basemap-option",
     why: "The floating base-map popup mixes a base-map choice with overlay switches under a divider; it is a menu, not one group."
-  },
-  {
-    file: "src/watchfaces/WatchfaceEditor.tsx",
-    marker: "wf-align-icon-grid",
-    why: "The alignment grids are 3×3: a button's position in the grid is the alignment it sets."
   },
   {
     file: "src/data/components/ActivityBackupPanel.tsx",
@@ -128,11 +113,6 @@ const EXEMPT = [
     file: "src/strength/BodyMapV2.tsx",
     marker: "layerPreferences.order.map",
     why: "Muscle layer visibility is a reorderable list, not a choice between options."
-  },
-  {
-    file: "src/maps/routes/SavedRoutesDrawer.tsx",
-    marker: "routes.map",
-    why: "Saved routes: each row is a record."
   }
 ];
 

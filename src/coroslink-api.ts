@@ -16,34 +16,17 @@ import type {
 import type {
   ActivityBackupProgress,
   BinaryStatus,
-  CachedCorosMapPackage,
   CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
   CombinedDownloadResult,
-  CorosMapDownloadJob,
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
-  CorosMapInstallResult,
-  CorosMapInstallProgress,
-  CorosMapLocalSelection,
-  CorosMapManifest,
-  CorosMapPackage,
   DownloadAudioResult,
   DownloadJob,
   DownloadQueueItem,
-  DrawnRoutePayload,
-  GenerateRouteRequest,
-  GeneratedRoute,
   LocalTrack,
-  RouteActivityType,
-  RouteApiKeyValidation,
-  RouteBuilderConfig,
-  RouteGeocodeResult,
-  RouteGeometry,
-  RouteWaypointRequest,
-  ActivityPaceBaselines,
-  RouteShareSession,
+  ReverseGeocodeResult,
   SaveChatSessionOptions,
   SpotifyConfig,
   SpotifyPlaylist,
@@ -157,88 +140,14 @@ import type {
   ActivityDetailSummary,
   ActivityDetailSummarySync
 } from "../electron/types";
-import type {
-  CorosLegacy614aCarrierExportResult,
-  CorosLegacy614aCarrierPatchInput,
-  CorosLegacy614aCarrierSelection,
-  CorosWatchfaceArchive,
-  CorosWatchfaceProjectExportInput,
-  CorosWatchfaceProjectExportResult,
-  CorosWatchfaceArchiveExportInput,
-  CorosWatchfaceArtwork,
-  CorosWatchfaceCreatorInput,
-  CorosWatchfaceExistingShareInput,
-  CorosWatchfaceRasterFontFolder,
-  CorosWatchfaceProject,
-  CorosWatchfaceProjectSaveInput,
-  CorosWatchfaceProjectSummary,
-  CorosWatchfacePublishInput,
-  CorosWatchfaceRegion,
-  CorosWatchfaceShareImport,
-  CorosWatchfaceShareLink,
-  CorosWatchfaceStatus,
-  CorosWatchfaceConfigTextFile,
-  CorosWatchfaceTemplateAsset,
-  CorosWatchfaceTemplateDetails,
-  CorosWatchfaceTheme,
-  CorosWatchfaceThemeDownload,
-  CorosWatchfaceThemeDownloadInput,
-  CorosWatchfaceThemeListInput,
-  CorosBatteryQueryInput,
-  CorosBatteryReport,
-  CorosGearCatalog,
-  CorosGearSaveInput,
-  CorosPairedDevice,
-  CorosBluetoothDeviceChoice,
-  CommunityWatchface,
-  CommunityWatchfaceCatalogPage,
-  CommunityWatchfaceCatalogQuery,
-  CommunityWatchfaceDownloadProgress,
-  CommunityWatchfaceImport,
-  CommunityWatchfaceOpenRequest
-} from "../electron/types";
-
 export interface CorosLinkApi {
   platform: string;
   getWatchStatus: () => Promise<WatchStatus>;
-  getCorosWatchfaceStatus: () => Promise<CorosWatchfaceStatus>;
-  /** Font families installed on this computer, for local watchface rasterization. */
-  listLocalFontFamilies: () => Promise<string[]>;
-  loginCorosWatchfaces: (
-    email: string,
-    password: string,
-    region: CorosWatchfaceRegion,
-    remember: boolean
-  ) => Promise<CorosWatchfaceStatus>;
-  loginCorosWatchfacesWithSavedCredentials: (
-    region: CorosWatchfaceRegion
-  ) => Promise<CorosWatchfaceStatus>;
-  logoutCorosWatchfaces: () => Promise<CorosWatchfaceStatus>;
-  listCorosPairedDevices: () => Promise<CorosPairedDevice[]>;
-  selectCorosBluetoothDevice: (deviceId: string) => Promise<void>;
-  cancelCorosBluetoothDeviceSelection: () => Promise<void>;
-  onCorosBluetoothDevices: (
-    callback: (devices: CorosBluetoothDeviceChoice[]) => void
-  ) => () => void;
-  getCorosBatteryReport: (
-    input: CorosBatteryQueryInput
-  ) => Promise<CorosBatteryReport>;
-  queryCorosGear: () => Promise<CorosGearCatalog>;
-  saveCorosGear: (input: CorosGearSaveInput) => Promise<CorosGearCatalog>;
-  listCorosWatchfaceThemes: (
-    input: CorosWatchfaceThemeListInput
-  ) => Promise<CorosWatchfaceTheme[]>;
-  downloadCorosWatchfaceTheme: (
-    input: CorosWatchfaceThemeDownloadInput
-  ) => Promise<CorosWatchfaceThemeDownload>;
-  importCorosWatchfaceShareLink: (
-    shareUrl: string
-  ) => Promise<CorosWatchfaceShareImport>;
-  listCommunityWatchfaces: (
-    input: CommunityWatchfaceCatalogQuery
-  ) => Promise<CommunityWatchfaceCatalogPage>;
-  getCommunityWatchface: (slug: string) => Promise<CommunityWatchface>;
-  importCommunityWatchface: (slug: string) => Promise<CommunityWatchfaceImport>;
+  /** Coordinates → a place name, for "Where you've been". */
+  reverseGeocodeLocation: (
+    lat: number,
+    lon: number
+  ) => Promise<ReverseGeocodeResult>;
   /**
    * Tell the main process this window has its IPC listeners attached.
    *
@@ -247,62 +156,6 @@ export interface CorosLinkApi {
    * arrives, and dropped forever if it never does.
    */
   notifyRendererReady: () => Promise<void>;
-  consumeCommunityWatchfaceOpenRequest: () =>
-    Promise<CommunityWatchfaceOpenRequest | null>;
-  onCommunityWatchfaceOpenRequest: (
-    callback: (request: CommunityWatchfaceOpenRequest) => void
-  ) => () => void;
-  onCommunityWatchfaceDownloadProgress: (
-    callback: (progress: CommunityWatchfaceDownloadProgress) => void
-  ) => () => void;
-  chooseCorosWatchfaceArchive: () => Promise<CorosWatchfaceArchive | null>;
-  chooseLegacy614aCarrier: () => Promise<CorosLegacy614aCarrierSelection | null>;
-  exportLegacy614aCarrier: (
-    selectionId: string,
-    patch: CorosLegacy614aCarrierPatchInput
-  ) => Promise<CorosLegacy614aCarrierExportResult>;
-  chooseCorosWatchfaceArtwork: () => Promise<CorosWatchfaceArtwork | null>;
-  chooseCorosWatchfaceRasterFontFolder: () => Promise<CorosWatchfaceRasterFontFolder | null>;
-  createCorosWatchfaceArchive: (
-    input: CorosWatchfaceCreatorInput
-  ) => Promise<CorosWatchfaceArchive>;
-  exportCorosWatchfaceProject: (
-    input: CorosWatchfaceProjectExportInput
-  ) => Promise<CorosWatchfaceProjectExportResult>;
-  exportCorosWatchfaceArchive: (
-    input: CorosWatchfaceArchiveExportInput
-  ) => Promise<CorosWatchfaceProjectExportResult>;
-  listCorosWatchfaceProjects: () => Promise<CorosWatchfaceProjectSummary[]>;
-  saveCorosWatchfaceProject: (
-    input: CorosWatchfaceProjectSaveInput
-  ) => Promise<CorosWatchfaceProject>;
-  loadCorosWatchfaceProject: (
-    projectId: string
-  ) => Promise<CorosWatchfaceProject>;
-  cacheCorosWatchfaceProjectPreview: (
-    projectId: string,
-    previewDataUrl: string
-  ) => Promise<void>;
-  duplicateCorosWatchfaceProject: (
-    projectId: string
-  ) => Promise<CorosWatchfaceProject>;
-  deleteCorosWatchfaceProject: (projectId: string) => Promise<void>;
-  describeCorosWatchfaceTemplate: (
-    archiveId: string
-  ) => Promise<CorosWatchfaceTemplateDetails>;
-  loadCorosWatchfaceTemplateAssets: (
-    archiveId: string,
-    paths: string[]
-  ) => Promise<CorosWatchfaceTemplateAsset[]>;
-  loadCorosWatchfaceTemplateConfigTexts: (
-    archiveId: string
-  ) => Promise<CorosWatchfaceConfigTextFile[]>;
-  publishCorosWatchface: (
-    input: CorosWatchfacePublishInput
-  ) => Promise<CorosWatchfaceShareLink>;
-  createCorosWatchfaceShareLink: (
-    input: CorosWatchfaceExistingShareInput
-  ) => Promise<CorosWatchfaceShareLink>;
   getWatchConnectionSmokeOption: () => Promise<WatchConnectionSmokeOptionId>;
   setWatchConnectionSmokeOption: (
     optionId: WatchConnectionSmokeOptionId
@@ -576,7 +429,6 @@ export interface CorosLinkApi {
   getRpeBackfillStatus: () => Promise<{ pending: number; running: boolean }>;
   getRpeLoadByDay: () => Promise<Record<string, number>>;
   getSportTypeMap: () => Promise<TrainingHubSportType[]>;
-  getActivityPaceBaselines: () => Promise<ActivityPaceBaselines>;
   getUpcomingWorkouts: (days?: number) => Promise<TrainingHubUpcomingWorkout[]>;
   getTrainingSleepData: (days?: number) => Promise<TrainingHubSleepSummary>;
   getSleepHistory: (request?: {
@@ -607,56 +459,6 @@ export interface CorosLinkApi {
   addManualActivityToCoros: (
     input: ManualActivityInput
   ) => Promise<{ importId: string }>;
-  getCorosMapManifest: () => Promise<CorosMapManifest>;
-  openCorosMapDownload: (downloadUrl: string) => Promise<void>;
-  downloadCorosMapPackage: (
-    pkg: CorosMapPackage
-  ) => Promise<CorosMapDownloadJob[]>;
-  listCorosMapDownloadJobs: () => Promise<CorosMapDownloadJob[]>;
-  cancelCorosMapDownload: (id: string) => Promise<CorosMapDownloadJob[]>;
-  clearCorosMapDownloadJob: (id: string) => Promise<CorosMapDownloadJob[]>;
-  onCorosMapDownloadJobsUpdate: (
-    callback: (jobs: CorosMapDownloadJob[]) => void
-  ) => () => void;
-  listCachedCorosMaps: () => Promise<CachedCorosMapPackage[]>;
-  getCorosMapInstallProgress: () => Promise<CorosMapInstallProgress | null>;
-  cancelCorosMapInstall: () => Promise<CorosMapInstallProgress | null>;
-  onCorosMapInstallProgressUpdate: (
-    callback: (progress: CorosMapInstallProgress | null) => void
-  ) => () => void;
-  installCachedCorosMap: (packageId: string) => Promise<CorosMapInstallResult>;
-  installCachedCorosMaps: (
-    packageIds: string[]
-  ) => Promise<CorosMapInstallResult>;
-  deleteCachedCorosMap: (
-    packageId: string
-  ) => Promise<CachedCorosMapPackage[]>;
-  chooseCorosMapFolder: () => Promise<CorosMapLocalSelection | undefined>;
-  installCorosMapFolder: (
-    sourcePath: string
-  ) => Promise<CorosMapInstallResult>;
-  getRouteBuilderConfig: () => Promise<RouteBuilderConfig>;
-  saveRouteBuilderConfig: (
-    config: RouteBuilderConfig
-  ) => Promise<RouteBuilderConfig>;
-  listGeneratedRoutes: () => Promise<GeneratedRoute[]>;
-  geocodeRouteLocation: (query: string) => Promise<RouteGeocodeResult>;
-  searchRouteLocations: (query: string) => Promise<RouteGeocodeResult[]>;
-  reverseGeocodeRouteLocation: (
-    lat: number,
-    lon: number
-  ) => Promise<RouteGeocodeResult>;
-  generateRoute: (request: GenerateRouteRequest) => Promise<GeneratedRoute>;
-  routeWaypoints: (request: RouteWaypointRequest) => Promise<RouteGeometry>;
-  saveDrawnRoute: (payload: DrawnRoutePayload) => Promise<GeneratedRoute>;
-  importRouteGpx: (
-    activityType?: RouteActivityType
-  ) => Promise<GeneratedRoute | null>;
-  exportGeneratedRoute: (id: string) => Promise<string | null>;
-  deleteGeneratedRoute: (id: string) => Promise<boolean>;
-  startRouteShare: (id: string) => Promise<RouteShareSession>;
-  stopRouteShare: () => Promise<void>;
-  validateRouteApiKey: (apiKey: string) => Promise<RouteApiKeyValidation>;
   getAppInfo: () => Promise<AppInfo>;
   openAppStorageLocation: (id: string) => Promise<void>;
   getAppUpdateStatus: () => Promise<AppUpdateSnapshot>;

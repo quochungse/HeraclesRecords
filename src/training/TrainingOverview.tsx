@@ -377,8 +377,8 @@ export function TrainingOverview({
               <span>
                 Save this COROS account
                 <small>
-                  Securely stores an encrypted password digest so Training
-                  Hub and Watch Face Studio can each create their own session.
+                  Securely stores an encrypted password digest so Training Hub
+                  can sign back in on its own after a session expires.
                 </small>
               </span>
             </label>

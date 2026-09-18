@@ -64,8 +64,7 @@ function seedDatabase() {
     "chat_sessions",
     "training_activities",
     "downloads",
-    "training_collections",
-    "generated_routes"
+    "training_collections"
   ]) {
     db.prepare(`DELETE FROM ${table}`).run();
   }
