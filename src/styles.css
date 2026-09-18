@@ -189,6 +189,31 @@
 }
 
 /*
+ * Chromium's SVG user-agent sheet still spells its focus ring `:focus`, where
+ * html.css moved to `:focus-visible` years ago — so an `<svg tabindex="0">`
+ * draws `outline: auto 5px` on a plain mouse click, which nothing else in the
+ * app does. Every recharts surface carries that tabindex (its accessibility
+ * layer, on by default in v3), so clicking any chart — a trend, a sparkline
+ * inside a stat tile — boxed it in a 5px line no rule here asked for. Measured
+ * in the running app: `:focus-visible` reads false on that element while its
+ * computed outline is `auto 5px`, the user-agent `:focus` rule being the only
+ * one matched.
+ *
+ * So the pointer's ring is taken back and the keyboard's is drawn the way the
+ * rest of the app draws it — a chart is a real tab stop, its arrow keys walk
+ * the series, and it has to say where focus is.
+ */
+svg:focus:not(:focus-visible),
+svg :focus:not(:focus-visible) {
+  outline: none;
+}
+
+svg:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/*
  * Paper light theme — a neutral cool-grey canvas carrying white surfaces.
  * Redefines the core tokens so everything that reads var(--…) reskins
  * automatically. Hardcoded hex/rgba values that bypass these tokens are
