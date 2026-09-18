@@ -220,7 +220,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
               aria-selected={group.type === activeGroup?.type}
               className={
                 group.type === activeGroup?.type
-                  ? "training-records-tab active"
+                  ? "training-records-tab is-active"
                   : "training-records-tab"
               }
               onClick={() => setActiveGroupType(group.type)}

@@ -3172,7 +3172,7 @@ function MediaView({ activeTab, onTabChange, children }: MediaViewProps) {
               key={tab.id}
               type="button"
               className={
-                activeTab === tab.id ? "media-tab active" : "media-tab"
+                activeTab === tab.id ? "media-tab is-active" : "media-tab"
               }
               onClick={() => onTabChange(tab.id)}
             >

@@ -138,7 +138,7 @@ export function PrimaryTabs({
           <button
             key={tab.id}
             type="button"
-            className={isActive ? "primary-tab active" : "primary-tab"}
+            className={isActive ? "primary-tab is-active" : "primary-tab"}
             aria-current={isActive ? "page" : undefined}
             ref={(element) => {
               if (element) {

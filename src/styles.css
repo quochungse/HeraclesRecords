@@ -1427,12 +1427,12 @@ input::placeholder {
     background var(--dur-fast) var(--ease);
 }
 
-.primary-tab:hover:not(.active) {
+.primary-tab:hover:not(.is-active) {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
 }
 
-.primary-tab.active {
+.primary-tab.is-active {
   border-color: transparent;
   background: transparent;
   color: var(--text-primary);
@@ -1475,7 +1475,7 @@ input::placeholder {
   text-transform: uppercase;
 }
 
-.primary-tab.active .primary-tab-beta {
+.primary-tab.is-active .primary-tab-beta {
   border-color: rgba(216, 155, 34, 0.46);
   background: rgba(216, 155, 34, 0.2);
   color: #ffe3a3;
@@ -2507,7 +2507,7 @@ input::placeholder {
   color: var(--text-primary);
 }
 
-.media-tab.active {
+.media-tab.is-active {
   border-color: rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
@@ -2861,14 +2861,6 @@ input::placeholder {
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1;
-}
-
-.activity-globe-period {
-  margin: 6px 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
 }
 
 .activity-globe-heroes {
@@ -7520,7 +7512,6 @@ td span {
   min-width: 220px;
 }
 
-.maps-select,
 .maps-number-input {
   min-height: 44px;
   min-width: 0;
@@ -7536,7 +7527,6 @@ td span {
   width: 100%;
 }
 
-.maps-select:focus,
 .maps-number-input:focus {
   outline: none;
   border-color: var(--accent);
@@ -15690,7 +15680,7 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
 }
 
-.training-records-tab.active {
+.training-records-tab.is-active {
   border-color: color-mix(in srgb, var(--accent-muted) 35%, transparent);
   background: color-mix(in srgb, var(--accent-muted) 14%, transparent);
   color: var(--accent-strong);
@@ -19121,45 +19111,6 @@ tr.data-intervals-row-missing {
 
 .chat-sidebar.is-overlay.is-open {
   transform: translateX(0);
-}
-
-.chat-sidebar-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 12px 12px 10px;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.chat-sidebar-tabs button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 36px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.chat-sidebar-tabs button:hover {
-  color: var(--text-primary);
-  background: var(--glass-bg-hover);
-}
-
-.chat-sidebar-tabs button.active {
-  color: var(--text-primary);
-  border-color: var(--glass-border);
-  background: var(--glass-bg-elevated);
-  box-shadow: var(--glass-inset);
 }
 
 .chat-sidebar-body {
@@ -24708,11 +24659,11 @@ tr.data-intervals-row-missing {
   background: rgba(34, 197, 94, 0.1);
 }
 
-:root[data-theme="paper"] .primary-tab:hover:not(.active) {
+:root[data-theme="paper"] .primary-tab:hover:not(.is-active) {
   background: rgba(19, 26, 40, 0.06);
 }
 
-:root[data-theme="paper"] .primary-tab.active {
+:root[data-theme="paper"] .primary-tab.is-active {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -24722,7 +24673,7 @@ tr.data-intervals-row-missing {
   color: #8a5f10;
 }
 
-:root[data-theme="paper"] .primary-tab.active .primary-tab-beta {
+:root[data-theme="paper"] .primary-tab.is-active .primary-tab-beta {
   color: #7a520c;
 }
 
@@ -25033,11 +24984,11 @@ tr.data-intervals-row-missing {
   border-color: var(--glass-border);
 }
 
-:root[data-theme="paper"] .media-tab:hover:not(.active) {
+:root[data-theme="paper"] .media-tab:hover:not(.is-active) {
   background: rgba(19, 26, 40, 0.06);
 }
 
-:root[data-theme="paper"] .media-tab.active {
+:root[data-theme="paper"] .media-tab.is-active {
   border-color: rgba(19, 26, 40, 0.15);
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-inset);
@@ -25575,57 +25526,6 @@ tr.data-intervals-row-missing {
   outline-offset: 2px;
 }
 
-/* --- Training Hub: graph menus (fitness metrics + zone select) ------------- */
-:root[data-theme="paper"] .metric-select-trigger,
-:root[data-theme="paper"] .training-zone-select-trigger {
-  background: rgba(19, 26, 40, 0.06);
-  border-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .metric-select-trigger:hover,
-:root[data-theme="paper"] .metric-select-trigger[aria-expanded="true"],
-:root[data-theme="paper"] .training-zone-select-trigger:hover,
-:root[data-theme="paper"] .training-zone-select-trigger[aria-expanded="true"] {
-  background: rgba(19, 26, 40, 0.11);
-  border-color: rgba(19, 26, 40, 0.25);
-}
-
-:root[data-theme="paper"] .training-zone-select-icon {
-  color: var(--text-secondary);
-}
-
-:root[data-theme="paper"] .metric-select-menu,
-:root[data-theme="paper"] .training-zone-select-menu {
-  border-color: var(--glass-border);
-  background: var(--glass-bg-elevated);
-  box-shadow: var(--shadow-elevated), var(--glass-inset);
-}
-
-:root[data-theme="paper"] .metric-select-option:hover,
-:root[data-theme="paper"] .metric-select-option.is-selected,
-:root[data-theme="paper"] .training-zone-select-option.is-active,
-:root[data-theme="paper"] .training-zone-select-option:hover {
-  background: rgba(19, 26, 40, 0.09);
-}
-
-:root[data-theme="paper"] .training-zone-select-option:focus-visible {
-  background: rgba(19, 26, 40, 0.09);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-:root[data-theme="paper"] .metric-select-check {
-  border-color: rgba(19, 26, 40, 0.28);
-}
-
-:root[data-theme="paper"] .training-zone-select-option.is-selected {
-  color: var(--accent-strong);
-}
-
-:root[data-theme="paper"] .training-zone-select-option svg {
-  color: var(--accent);
-}
-
 /* --- Training Hub: load heatmap boxes -------------------------------------
  * Empty and level-0 cells (plus the legend/summary chips) are white-alpha and
  * vanish on paper; drop them to a warm dark-alpha "empty" tone. The green
@@ -25874,7 +25774,7 @@ tr.data-intervals-row-missing {
   border-color: rgba(19, 26, 40, 0.2);
 }
 
-:root[data-theme="paper"] .training-records-tab.active {
+:root[data-theme="paper"] .training-records-tab.is-active {
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-strong);
@@ -33678,7 +33578,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
     color var(--dur-fast) var(--ease);
 }
 
-.coach-analysis-tab[data-active="true"] {
+.coach-analysis-tab.is-active {
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-weight: 600;
@@ -34224,7 +34124,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   opacity: 0.6;
 }
 
-.coach-analysis-fieldset:disabled .coach-analysis-chip,
 .coach-analysis-starter:disabled {
   cursor: not-allowed;
 }

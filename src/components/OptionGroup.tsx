@@ -2,7 +2,6 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -33,9 +32,15 @@ import { SelectDropdown, type SelectOption } from "./SelectDropdown";
  *   dropdown    a trigger and a floating menu, for a list that cannot be a row
  *               at all — nine sports, a watch model, a collection.
  *
- * `mode` is a hint, not a promise: an `expanded` group whose options do not
- * fit falls back to `collapsible` on its own (see `useOverflowFallback`), the
- * way PrimaryTabs has always dropped to a select when the window narrows.
+ * `mode` is the caller's, and there is deliberately no automatic fallback from
+ * `expanded` to `collapsible` when a row does not fit. It was written that way
+ * first and it oscillates: the measurement that says "this does not fit" can
+ * only be taken while the row is laid out in full, and folding it makes the
+ * same measurement say it fits, which unfolds it, which makes it not fit. Every
+ * way around that is worse than the problem — a hidden twin of the row to
+ * measure against, or a width remembered from a layout that has since changed.
+ * A screen that cannot spare the width says `mode="collapsible"`, which its
+ * author knows and a measurement has to guess.
  *
  * Multi-select lives in `OptionChips` below rather than behind a flag on this
  * one. They differ in more than arity: several pressed chips inside a single
@@ -97,48 +102,6 @@ const MODE_CLASS: Record<OptionGroupMode, string> = {
   dropdown: "option-group--dropdown"
 };
 
-/**
- * An `expanded` group that does not fit becomes `collapsible`. Measured rather
- * than guessed at a breakpoint: what overflows depends on the labels, the
- * font and what else is in the header, none of which a media query can see.
- *
- * The measurement is taken with the group laid out, so the element has to be
- * expanded to know it should not be. That is why the fallback is a state and
- * the first paint is always the expanded one — at this size (a row of chips on
- * one line) the reflow lands inside the same frame.
- */
-function useOverflowFallback(
-  enabled: boolean,
-  ref: RefObject<HTMLDivElement | null>
-) {
-  const [overflowing, setOverflowing] = useState(false);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!enabled || !element) {
-      setOverflowing(false);
-      return;
-    }
-
-    const measure = () => {
-      // scrollWidth beats clientWidth only once the row has run out of room.
-      // The 1px tolerance is for sub-pixel layout, not for slack.
-      setOverflowing(element.scrollWidth - element.clientWidth > 1);
-    };
-
-    measure();
-
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    const parent = element.parentElement;
-    if (parent) observer.observe(parent);
-
-    return () => observer.disconnect();
-  }, [enabled, ref]);
-
-  return overflowing;
-}
-
 export function OptionGroup<T extends string>({
   options,
   value,
@@ -158,10 +121,6 @@ export function OptionGroup<T extends string>({
   /** Set by a selection, so focus returns to the lead only when the athlete chose. */
   const returnFocusRef = useRef(false);
 
-  const overflowing = useOverflowFallback(mode === "expanded", trackRef);
-  const effectiveMode: OptionGroupMode =
-    mode === "expanded" && overflowing ? "collapsible" : mode;
-
   const selected =
     options.find((option) => option.value === value) ?? options[0] ?? null;
 
@@ -170,11 +129,17 @@ export function OptionGroup<T extends string>({
   }, []);
 
   useEffect(() => {
-    if (effectiveMode !== "collapsible" || !open) return;
+    if (mode !== "collapsible" || !open) return;
 
     const onPointerDown = (event: PointerEvent) => {
       if (!trackRef.current?.contains(event.target as Node)) close();
     };
+    // Escape is caught on the way down, not on the way up. A collapsible group
+    // can sit inside a dialog that closes on Escape from its own listener on
+    // `document` — the Profile zone families do — and two listeners on the same
+    // node are not separated by stopPropagation(), so the athlete would have
+    // folded the chips and closed the dialog with one key. Capturing stops it
+    // before it ever reaches the bubble phase those listeners are in.
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopPropagation();
@@ -183,19 +148,19 @@ export function OptionGroup<T extends string>({
     };
 
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [effectiveMode, open, close]);
+  }, [mode, open, close]);
 
   // Focus follows the fold: opening puts the keyboard on the row that just
   // appeared, and choosing hands it back to the chip that replaced it. It
   // deliberately does not move when the group closes because the pointer went
   // elsewhere — taking focus back then would steal it from wherever it went.
   useEffect(() => {
-    if (effectiveMode !== "collapsible") return;
+    if (mode !== "collapsible") return;
     if (open) {
       restRef.current
         ?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
@@ -206,9 +171,9 @@ export function OptionGroup<T extends string>({
       returnFocusRef.current = false;
       leadRef.current?.focus();
     }
-  }, [effectiveMode, open]);
+  }, [mode, open]);
 
-  if (effectiveMode === "dropdown") {
+  if (mode === "dropdown") {
     const selectOptions: SelectOption<T>[] = options.map((option) => ({
       value: option.value,
       label: option.label,
@@ -281,7 +246,7 @@ export function OptionGroup<T extends string>({
         disabled={disabled || option.disabled}
         // Roving tabindex: the group is one tab stop, and it is the selected
         // chip. A folded group's row is not reachable by Tab at all.
-        tabIndex={isSelected && (effectiveMode === "expanded" || open) ? 0 : -1}
+        tabIndex={isSelected && (mode === "expanded" || open) ? 0 : -1}
         {...(option.title ? { title: option.title } : {})}
         onClick={(event) => {
           onChange(option.value, event.currentTarget);
@@ -301,7 +266,7 @@ export function OptionGroup<T extends string>({
 
   const classes = [
     "option-group",
-    MODE_CLASS[effectiveMode],
+    MODE_CLASS[mode],
     `option-group--${size}`,
     tone === "quiet" ? "option-group--quiet" : "",
     iconOnly ? "option-group--icon" : "",
@@ -311,7 +276,7 @@ export function OptionGroup<T extends string>({
     .filter(Boolean)
     .join(" ");
 
-  if (effectiveMode === "collapsible") {
+  if (mode === "collapsible") {
     return (
       <div
         ref={trackRef}

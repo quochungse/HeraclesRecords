@@ -273,8 +273,9 @@ export function AnalysisDetailView({
             type="button"
             role="tab"
             aria-selected={tab === entry.id}
-            className="coach-analysis-tab"
-            data-active={tab === entry.id ? "true" : undefined}
+            className={
+              tab === entry.id ? "coach-analysis-tab is-active" : "coach-analysis-tab"
+            }
             onClick={() => setTab(entry.id)}
           >
             {entry.label}
