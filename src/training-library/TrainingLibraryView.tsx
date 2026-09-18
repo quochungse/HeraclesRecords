@@ -43,6 +43,7 @@ import {
   workoutSportFromType
 } from "../../electron/trainingPlanDomain";
 import type { CorosLinkApi } from "../coroslink-api";
+import { OptionGroup } from "../components/OptionGroup";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import {
   PlanSourceBadge,
@@ -830,18 +831,16 @@ function PlanIndex({
             placeholder={`Search ${noun}s, goals, and tags`}
           />
         </label>
-        <div className="tl-chips" role="group" aria-label={`Filter ${noun}s`}>
-          {scopes.map((option) => (
-            <button
-              type="button"
-              key={option.id}
-              aria-pressed={scope === option.id}
-              onClick={() => setScope(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <OptionGroup
+          label={`Filter ${noun}s`}
+          className="tl-chips"
+          value={scope}
+          options={scopes.map((option) => ({
+            value: option.id,
+            label: option.label
+          }))}
+          onChange={setScope}
+        />
         <div className="tl-filters-tail">
           <SelectDropdown
             className="tl-quiet-select"
@@ -852,28 +851,26 @@ function PlanIndex({
               setSort({ column: value, descending: value !== "name" })
             }
           />
-          <div className="tl-layout-switch" role="group" aria-label={`${noun} layout`}>
-            <button
-              type="button"
-              aria-pressed={layout === "grid"}
-              aria-label="Show tiles"
-              onClick={() => setLayout("grid")}
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              type="button"
-              aria-pressed={layout === "list"}
-              aria-label="Show list"
-              onClick={() => setLayout("list")}
-            >
-              <List size={14} />
-            </button>
-          </div>
-          <button type="button" className={noun === "plan" && onGenerate ? "ghost-button" : "primary-button"} onClick={onCreate}>
-            <Plus size={14} /> New {noun}
-          </button>
-          {noun === "plan" && onGenerate ? <button type="button" className="primary-button tl-generate-button" onClick={onGenerate}><Sparkles size={14} /> Generate plan</button> : null}
+          <OptionGroup
+            label={`${noun} layout`}
+            className="tl-layout-switch"
+            tone="quiet"
+            iconOnly
+            value={layout}
+            options={[
+              {
+                value: "grid",
+                label: "Tiles",
+                icon: <LayoutGrid size={14} aria-hidden="true" />
+              },
+              {
+                value: "list",
+                label: "List",
+                icon: <List size={14} aria-hidden="true" />
+              }
+            ]}
+            onChange={(next) => setLayout(next as "grid" | "list")}
+          />
         </div>
       </div>
 
@@ -1407,18 +1404,20 @@ function AdherenceSection({
 
       <div className="tl-panel">
         <div className="tl-filters">
-          <div className="tl-chips" role="group" aria-label="Filter planned sessions">
-            {statesPresent.map((option) => (
-              <button
-                type="button"
-                key={option.id}
-                aria-pressed={state === option.id}
-                onClick={() => setState(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {/* Folded: how many states there are depends on the plan, so the
+              row grew and shrank between plans — a chip that stays one width
+              is steadier to come back to. */}
+          <OptionGroup
+            label="Filter planned sessions"
+            mode="collapsible"
+            className="tl-chips"
+            value={state}
+            options={statesPresent.map((option) => ({
+              value: option.id,
+              label: option.label
+            }))}
+            onChange={setState}
+          />
         </div>
 
         {visible.length === 0 ? (

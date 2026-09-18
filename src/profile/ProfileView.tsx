@@ -10,6 +10,7 @@ import {
   User,
   X
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   CorosProfile,
@@ -810,25 +811,28 @@ export function ProfileView({
                     <X size={18} aria-hidden="true" />
                   </button>
                 </header>
-                <div className="profile-tabs" role="tablist" aria-label="Zone family">
-                  {zoneTabs.map((tab) => (
-                    <button
-                      key={tab.family}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeZoneTab === tab.family}
-                      className={activeZoneTab === tab.family ? "is-active" : ""}
-                      onClick={() => setZoneTab(tab.family)}
-                    >
-                      {/* A dot, not the words "in use": the label has to stay
-                          one line for the tab row to keep its height. */}
-                      {activeModel?.family === tab.family ? (
-                        <span className="profile-tab-dot" aria-hidden="true" />
-                      ) : null}
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Folded: up to five families, and the one in use is the one
+                    the athlete came to read. A dot, not the words "in use":
+                    the label has to stay one line. */}
+                <OptionGroup
+                  label="Zone family"
+                  mode="collapsible"
+                  className="profile-tabs"
+                  value={activeZoneTab}
+                  options={zoneTabs.map((tab) => ({
+                    value: tab.family,
+                    label: tab.label,
+                    ...(activeModel?.family === tab.family
+                      ? {
+                          icon: (
+                            <span className="profile-tab-dot" aria-hidden="true" />
+                          ),
+                          title: "The zones COROS is using"
+                        }
+                      : {})
+                  }))}
+                  onChange={setZoneTab}
+                />
                 {zoneRowCount === 0 ? (
                   <p className="profile-note">
                     COROS has no zones for this metric yet.

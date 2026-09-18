@@ -1,3 +1,4 @@
+import { OptionChips } from "../../components/OptionGroup";
 import type {
   AnalysisConditions,
   AnalysisThresholdMetric,
@@ -234,29 +235,26 @@ export function TriggerForm({
       {activityTrigger ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
           <legend>Fires after a new activity</legend>
-          <div className="coach-analysis-sports">
-            {SPORT_FILTER_OPTIONS.map((sport) => {
-              const checked = activityTrigger.sportTypes.includes(sport.value);
-              return (
-                <label key={sport.value} className="coach-analysis-chip">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      patchActivity({
-                        sportTypes: checked
-                          ? activityTrigger.sportTypes.filter(
-                              (value) => value !== sport.value
-                            )
-                          : [...activityTrigger.sportTypes, sport.value]
-                      })
-                    }
-                  />
-                  <span>{sport.label}</span>
-                </label>
-              );
-            })}
-          </div>
+          <OptionChips
+            label="Sports that fire this analysis"
+            className="coach-analysis-sports"
+            values={activityTrigger.sportTypes.map(String)}
+            options={SPORT_FILTER_OPTIONS.map((sport) => ({
+              value: String(sport.value),
+              label: sport.label
+            }))}
+            disabled={disabled}
+            onToggle={(value) => {
+              const sportType = Number(value);
+              patchActivity({
+                sportTypes: activityTrigger.sportTypes.includes(sportType)
+                  ? activityTrigger.sportTypes.filter(
+                      (entry) => entry !== sportType
+                    )
+                  : [...activityTrigger.sportTypes, sportType]
+              });
+            }}
+          />
           <p className="coach-analysis-hint">
             {activityTrigger.sportTypes.length === 0
               ? "No sport selected means every sport."

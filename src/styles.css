@@ -4714,6 +4714,11 @@ input::placeholder {
     box-shadow var(--dur-fast) var(--ease);
 }
 
+/* Icons alone, so the chip is square rather than a pill holding one glyph. */
+.option-group--icon button {
+  padding: 0 7px;
+}
+
 .option-group--md button {
   min-height: 32px;
   padding: 0 14px;
@@ -24039,31 +24044,8 @@ tr.data-intervals-row-missing {
 }.route-distance-presets {
   display: flex;
   gap: 6px;
-}.route-distance-presets button {
-  flex: 1;
-  padding: 7px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-}.route-distance-presets button:hover {
-  border-color: var(--accent-soft);
-  color: var(--text-primary);
-}.route-distance-presets button.is-active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
 }
-.route-distance-presets button {
-  flex: none;
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
+
 
 .route-field-inline {
   display: flex;
@@ -27826,97 +27808,12 @@ tr.data-intervals-row-missing {
 .calendar-builder-save-card {
   display: none;
 }
-
-/* --- builder sport picker (icon chips tinted per sport) --- */
-
-.calendar-builder-sport-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
 .calendar-builder-field-label {
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
 
-.calendar-builder-sport-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.calendar-builder-sport-chip {
-  --chip-sport: var(--accent);
-  display: inline-flex;
-  min-width: 0;
-  min-height: 52px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 7px 4px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.2;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.calendar-builder-sport-chip svg {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  transition: color var(--dur-fast) var(--ease);
-}
-
-.calendar-builder-sport-chip span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-builder-sport-chip:hover:not(.is-active) {
-  border-color: color-mix(in srgb, var(--chip-sport) 45%, var(--glass-border));
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-}
-
-.calendar-builder-sport-chip:hover:not(.is-active) svg {
-  color: color-mix(in srgb, var(--chip-sport) 78%, var(--text-primary));
-}
-
-.calendar-builder-sport-chip:active {
-  transform: translateY(1px);
-}
-
-.calendar-builder-sport-chip.is-active {
-  border-color: color-mix(in srgb, var(--chip-sport) 62%, var(--glass-border));
-  background: color-mix(in srgb, var(--chip-sport) 13%, var(--glass-bg));
-  color: var(--text-primary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 7%, transparent);
-}
-
-.calendar-builder-sport-chip.is-active svg {
-  color: color-mix(in srgb, var(--chip-sport) 85%, var(--text-primary));
-}
-
-.calendar-builder-sport-chip:focus-visible {
-  --focus-ring-color: var(--chip-sport);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
 
 .calendar-modal-header {
   display: flex;
@@ -28182,35 +28079,6 @@ tr.data-intervals-row-missing {
   font-variant-numeric: tabular-nums;
 }
 
-.calendar-quick-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.calendar-quick-presets button {
-  min-height: 27px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
-}
-
-.calendar-quick-presets button:hover,
-.calendar-quick-presets button.is-active {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--glass-border));
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-.calendar-quick-presets button:active {
-  transform: translateY(1px);
-}
 
 .calendar-field-help {
   color: var(--text-muted);
@@ -29943,11 +29811,6 @@ tr.data-intervals-row-missing {
       radial-gradient(circle at -8% 112%, color-mix(in srgb, var(--builder-sport, var(--accent)) 7%, transparent), transparent 32%),
       var(--bg-base);
   }
-
-  .calendar-builder-sport-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .calendar-modal-builder .calendar-modal-header {
     margin-bottom: 12px;
   }
@@ -29972,12 +29835,6 @@ tr.data-intervals-row-missing {
     gap: 16px;
     padding: 4px 22px 8px 0;
   }
-
-  .calendar-builder-sport-field {
-    padding-bottom: 16px;
-    border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 76%, transparent);
-  }
-
   .calendar-builder-settings .calendar-field {
     flex: 0 0 auto;
   }
@@ -30946,30 +30803,6 @@ tr.data-intervals-row-missing {
   gap: 6px;
 }
 
-.calendar-builder-row .rest-picker > button {
-  min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.calendar-builder-row .rest-picker > button:hover {
-  border-color: color-mix(in srgb, var(--text-primary) 22%, var(--glass-border));
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-}
-
-.calendar-builder-row .rest-picker > button.is-selected {
-  border-color: color-mix(in srgb, var(--step-color, var(--accent)) 55%, transparent);
-  background: color-mix(in srgb, var(--step-color, var(--accent)) 18%, transparent);
-  color: var(--text-primary);
-}
 
 .rest-picker-custom {
   display: flex;
@@ -31017,8 +30850,7 @@ tr.data-intervals-row-missing {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .set-line-cell,
-  .calendar-builder-row .rest-picker > button {
+  .set-line-cell {
     transition: none;
   }
 }
@@ -31644,30 +31476,6 @@ tr.data-intervals-row-missing {
   font-size: 22px;
 }
 
-.workout-step-card .rest-picker > button {
-  min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.workout-step-card .rest-picker > button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--text-primary) 22%, var(--glass-border));
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-}
-
-.workout-step-card .rest-picker > button.is-selected {
-  border-color: color-mix(in srgb, var(--step-color, var(--accent)) 55%, transparent);
-  background: color-mix(in srgb, var(--step-color, var(--accent)) 18%, transparent);
-  color: var(--text-primary);
-}
 
 .workout-step-card .rest-picker-custom input {
   width: 66px;
@@ -34177,25 +33985,6 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--text-muted);
 }
 
-.coach-analysis-sports {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.coach-analysis-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--glass-bg) 60%, transparent);
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
 .coach-analysis-run-row {
   display: flex;
   align-items: flex-start;
@@ -34744,20 +34533,12 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--error-text);
 }
 
-/* On/off switches, and the sport filter chips, follow the same rule. */
-.coach-analysis-switch input,
-.coach-analysis-chip input {
+.coach-analysis-switch input {
   accent-color: var(--accent);
 }
 
 .coach-analysis-switch:has(input:checked) {
   color: var(--accent);
-}
-
-.coach-analysis-chip:has(input:checked) {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--glass-border));
-  background: var(--accent-soft);
-  color: var(--accent-strong);
 }
 
 .coach-analysis-save-row {

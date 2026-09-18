@@ -420,30 +420,27 @@ export function GeneratePanel({
                 )
               }
             />
-            <div
+            <OptionGroup
+              label="Distance presets"
               className="route-distance-presets"
-              role="group"
-              aria-label="Distance presets"
-            >
-              {presets.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  className={
-                    Math.abs(displayDistance - preset.value) < 0.05
-                      ? "is-active"
-                      : ""
-                  }
-                  onClick={() =>
-                    onDistanceChange(
-                      displayDistanceToMeters(preset.value, unitSystem) / 1_000
-                    )
-                  }
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+              tone="quiet"
+              value={
+                presets.find(
+                  (preset) => Math.abs(displayDistance - preset.value) < 0.05
+                )?.label ?? ""
+              }
+              options={presets.map((preset) => ({
+                value: preset.label,
+                label: preset.label
+              }))}
+              onChange={(next) => {
+                const preset = presets.find((entry) => entry.label === next);
+                if (!preset) return;
+                onDistanceChange(
+                  displayDistanceToMeters(preset.value, unitSystem) / 1_000
+                );
+              }}
+            />
           </div>
         ) : null}
 

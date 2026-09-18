@@ -76,6 +76,13 @@ export interface OptionGroupProps<T extends string> {
   /** `sm` is the header default (28px); `md` (32px) suits a form row. */
   size?: "sm" | "md";
   /**
+   * Draws the icons alone and leaves each label to the screen reader. Only for
+   * options whose icon is unmistakable on its own — a grid and a list — and
+   * never as a way to fit labels that are simply too long, which is what the
+   * collapsible mode is for.
+   */
+  iconOnly?: boolean;
+  /**
    * `accent` fills the chosen chip with the accent — right when the choice
    * decides what the screen is about. `quiet` keeps it neutral, for a filter
    * narrowing something the screen already shows.
@@ -141,6 +148,7 @@ export function OptionGroup<T extends string>({
   mode = "expanded",
   size = "sm",
   tone = "accent",
+  iconOnly = false,
   className,
   disabled = false
 }: OptionGroupProps<T>) {
@@ -285,7 +293,9 @@ export function OptionGroup<T extends string>({
         }}
       >
         {option.icon}
-        <span className="option-group-label">{option.label}</span>
+        <span className={iconOnly ? "sr-only" : "option-group-label"}>
+          {option.label}
+        </span>
       </button>
     );
   };
@@ -295,6 +305,7 @@ export function OptionGroup<T extends string>({
     MODE_CLASS[effectiveMode],
     `option-group--${size}`,
     tone === "quiet" ? "option-group--quiet" : "",
+    iconOnly ? "option-group--icon" : "",
     disabled ? "is-disabled" : "",
     className
   ]

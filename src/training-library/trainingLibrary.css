@@ -680,46 +680,6 @@
     0 6px 18px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.tl-chips {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tl-chips button {
-  padding: 5px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  color: var(--text-muted);
-  background: none;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--tl-ease-out);
-}
-
-.tl-chips button:hover {
-  color: var(--text-secondary);
-  border-color: color-mix(in srgb, var(--text-muted) 34%, transparent);
-  background: var(--glass-bg);
-  transform: translateY(-1px);
-}
-
-.tl-chips button[aria-pressed="true"] {
-  color: var(--accent-strong);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 15%, transparent), color-mix(in srgb, var(--accent) 8%, transparent));
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--accent) 20%, transparent),
-    0 3px 10px color-mix(in srgb, var(--accent) 12%, transparent);
-  font-weight: 600;
-}
 
 /* The "show more" control spans the whole tile grid rather than one cell. */
 .tl-grid > li:has(> .tl-load-more) {
@@ -1814,44 +1774,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* -------------------------------------------------------- Layout switch */
-
-.tl-layout-switch {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.tl-layout-switch button {
-  display: inline-flex;
-  width: 27px;
-  height: 25px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: none;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-
-.tl-layout-switch button:hover {
-  color: var(--text-secondary);
-}
-
-.tl-layout-switch button[aria-pressed="true"] {
-  color: var(--accent-strong);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent);
-}
 
 /* ------------------------------------------------- The ridge (the signature) */
 
@@ -4937,45 +4859,9 @@
   font-weight: 600;
 }
 
-.plan-generator-sports,
-.plan-generator-days {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.plan-generator-sports button,
-.plan-generator-days button {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--tl-rule);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--glass-bg);
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
-}
-
-.plan-generator-sports button svg { flex: none; opacity: 0.72; }
-
-.plan-generator-sports button:hover:not(:disabled):not(.is-selected),
-.plan-generator-days button:hover:not(:disabled):not(.is-selected) {
-  border-color: var(--glass-border);
-  color: var(--text-primary);
-  background: var(--glass-bg-hover);
-}
-
-.plan-generator-sports button:active:not(:disabled),
-.plan-generator-days button:active:not(:disabled) { transform: translateY(0.5px); }
 
 .plan-generator-form button:disabled { cursor: default; opacity: 0.5; }
 
-.plan-generator-sports button:focus-visible,
-.plan-generator-days button:focus-visible,
 .plan-generator-segmented button:focus-visible,
 .plan-generator-stepper button:focus-visible,
 .plan-generator-examples button:focus-visible {
@@ -4989,28 +4875,6 @@
   font-size: 11px;
 }
 
-.plan-generator-sports button.is-selected {
-  border-color: color-mix(in srgb, var(--sport-accent, var(--accent)) 52%, transparent);
-  color: var(--sport-accent, var(--accent));
-  background: color-mix(in srgb, var(--sport-accent, var(--accent)) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sport-accent, var(--accent)) 18%, transparent);
-  font-weight: 600;
-}
-
-.plan-generator-sports button.is-selected svg { opacity: 1; }
-
-.plan-generator-days button.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  font-weight: 600;
-}
-
-.plan-generator-days button {
-  min-width: 44px;
-  justify-content: center;
-  padding: 0;
-}
 
 .plan-generator-grid {
   display: grid;

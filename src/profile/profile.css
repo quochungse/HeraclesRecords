@@ -261,26 +261,6 @@
   min-width: 0;
 }
 
-/* One row of equal tabs that never wraps, so the dialog keeps its height as
-   the user moves between families. */
-.profile-dialog .profile-tabs {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-}
-
-.profile-dialog .profile-tabs button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 6px 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .profile-tab-dot {
   width: 5px;
   height: 5px;
@@ -328,28 +308,6 @@
   outline-offset: 2px;
 }
 
-.profile-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.profile-tabs button {
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  padding: 6px 13px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.profile-tabs button.is-active {
-  border-color: color-mix(in srgb, var(--accent-gold) 45%, transparent);
-  background: color-mix(in srgb, var(--accent-gold) 14%, transparent);
-  color: var(--accent-gold);
-}
 
 .profile-zone-table {
   width: 100%;

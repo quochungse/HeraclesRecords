@@ -34,6 +34,7 @@ import {
   Zap,
   type LucideIcon
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -1285,17 +1286,16 @@ function BuilderStrengthStepFields({
         <section className="strength-block">
           <h4>Rest between sets</h4>
           <div className="rest-picker">
-            {STRENGTH_REST_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={restSeconds === preset ? "is-selected" : ""}
-                aria-pressed={restSeconds === preset}
-                onClick={() => onChange({ restSeconds: String(preset) })}
-              >
-                {formatRestChip(preset)}
-              </button>
-            ))}
+            <OptionGroup
+              label="Rest between sets"
+              tone="quiet"
+              value={Number.isFinite(restSeconds) ? String(restSeconds) : ""}
+              options={STRENGTH_REST_PRESETS.map((preset) => ({
+                value: String(preset),
+                label: formatRestChip(preset)
+              }))}
+              onChange={(next) => onChange({ restSeconds: next })}
+            />
             <label className="rest-picker-custom">
               <input
                 type="number"
@@ -2255,18 +2255,19 @@ export function AddWorkoutModal({
                       />
                       <span aria-hidden="true">{distanceUnit(unitSystem)}</span>
                     </span>
-                    <span className="calendar-quick-presets" role="group" aria-label="Common distances">
-                      {QUICK_DISTANCE_PRESETS.map((distance) => (
-                        <button
-                          key={distance}
-                          type="button"
-                          className={quickDistance === distance ? "is-active" : ""}
-                          onClick={() => setQuickDistanceKm(String(distance))}
-                        >
-                          {distance} {distanceUnit(unitSystem)}
-                        </button>
-                      ))}
-                    </span>
+                    <OptionGroup
+                      label="Common distances"
+                      className="calendar-quick-presets"
+                      tone="quiet"
+                      value={
+                        Number.isFinite(quickDistance) ? String(quickDistance) : ""
+                      }
+                      options={QUICK_DISTANCE_PRESETS.map((distance) => ({
+                        value: String(distance),
+                        label: `${distance} ${distanceUnit(unitSystem)}`
+                      }))}
+                      onChange={(next) => setQuickDistanceKm(next)}
+                    />
                   </label>
 
                   <label className="calendar-field">
@@ -2444,32 +2445,30 @@ export function AddWorkoutModal({
                     <h4>Workout settings</h4>
                     <p>Set the basics for your workout.</p>
                   </div>
-                  <div className="calendar-builder-sport-field">
-                    <span className="calendar-builder-field-label" id="calendar-builder-sport-label">Sport</span>
-                    <div
-                      className="calendar-builder-sport-grid"
-                      role="group"
-                      aria-labelledby="calendar-builder-sport-label"
-                    >
-                      {WORKOUT_SPORTS.map((sport) => {
-                        const meta = BUILDER_SPORT_META[sport];
-                        const selected = sport === builderSport;
-                        return (
-                          <button
-                            key={sport}
-                            type="button"
-                            aria-pressed={selected}
-                            className={`calendar-builder-sport-chip ${selected ? "is-active" : ""}`}
-                            style={{ "--chip-sport": meta.colorVar } as CSSProperties}
-                            onClick={() => selectBuilderSport(sport)}
-                          >
-                            <meta.Icon size={16} aria-hidden="true" />
-                            <span>{formatWorkoutSport(sport)}</span>
-                          </button>
-                        );
+                  {/* Nine sports with an icon apiece: a grid of them was the
+                      tallest thing in this modal, for a choice made once per
+                      workout. The icon rides along in the trigger, so the
+                      chosen sport still reads at a glance. */}
+                  <label className="calendar-field">
+                    <span className="calendar-field-label">
+                      <span>Sport</span>
+                    </span>
+                    <OptionGroup
+                      label="Sport"
+                      mode="dropdown"
+                      size="md"
+                      value={builderSport}
+                      options={WORKOUT_SPORTS.map((sport) => {
+                        const { Icon } = BUILDER_SPORT_META[sport];
+                        return {
+                          value: sport,
+                          label: formatWorkoutSport(sport),
+                          icon: <Icon size={16} aria-hidden="true" />
+                        };
                       })}
-                    </div>
-                  </div>
+                      onChange={selectBuilderSport}
+                    />
+                  </label>
                   {builderSport === "swim" ? <div className="calendar-field-row"><label className="calendar-field"><span>Pool length ({swimDistanceUnit(unitSystem)})</span><input type="number" min="1" value={builderPoolLength} onChange={(event) => { setBuilderPoolLength(event.target.value); setBuilderPoolUnit(unitSystem === "imperial" ? "yd" : "m"); }} /></label></div> : null}
                   {(builderSport === "indoorClimb" || builderSport === "bouldering") ? <label className="calendar-field"><span>Grading system</span><SelectDropdown label="Grading system" value={builderGradeSystem} options={(Object.keys(CLIMB_SYSTEM_IDS) as Array<keyof typeof CLIMB_SYSTEM_IDS>).map((system) => ({ value: system, label: formatBuilderToken(system) }))} portal onChange={setBuilderGradeSystem} /></label> : null}
                   <label className="calendar-field">

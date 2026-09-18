@@ -28,6 +28,7 @@ import type {
   WorkoutEditorDocument
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import { OptionGroup } from "../components/OptionGroup";
 import { formatHappenDayLabel } from "../training/formatters";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { workoutSportFromType } from "../../electron/trainingPlanDomain";
@@ -666,18 +667,16 @@ export function WorkoutWorkspace({
               placeholder="Search workouts and tags"
             />
           </label>
-          <div className="tl-chips" role="group" aria-label="Filter workouts">
-            {scopes.map((option) => (
-              <button
-                type="button"
-                key={option.id}
-                aria-pressed={scope === option.id}
-                onClick={() => setScope(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <OptionGroup
+            label="Filter workouts"
+            className="tl-chips"
+            value={scope}
+            options={scopes.map((option) => ({
+              value: option.id,
+              label: option.label
+            }))}
+            onChange={setScope}
+          />
           <div className="tl-filters-tail">
             <SelectDropdown
               className="tl-quiet-select"
@@ -686,24 +685,26 @@ export function WorkoutWorkspace({
               options={WORKOUT_SORT_OPTIONS}
               onChange={(value) => setSort({ column: value, descending: value !== "name" })}
             />
-            <div className="tl-layout-switch" role="group" aria-label="Workout layout">
-              <button
-                type="button"
-                aria-pressed={layout === "grid"}
-                aria-label="Show tiles"
-                onClick={() => setLayout("grid")}
-              >
-                <LayoutGrid size={14} />
-              </button>
-              <button
-                type="button"
-                aria-pressed={layout === "list"}
-                aria-label="Show list"
-                onClick={() => setLayout("list")}
-              >
-                <List size={14} />
-              </button>
-            </div>
+            <OptionGroup
+              label="Workout layout"
+              className="tl-layout-switch"
+              tone="quiet"
+              iconOnly
+              value={layout}
+              options={[
+                {
+                  value: "grid",
+                  label: "Tiles",
+                  icon: <LayoutGrid size={14} aria-hidden="true" />
+                },
+                {
+                  value: "list",
+                  label: "List",
+                  icon: <List size={14} aria-hidden="true" />
+                }
+              ]}
+              onChange={(next) => setLayout(next as "grid" | "list")}
+            />
             <button type="button" className="primary-button" onClick={() => setCreating(true)}>
               <Plus size={14} /> New workout
             </button>
