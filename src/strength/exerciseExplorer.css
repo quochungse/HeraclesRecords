@@ -31,7 +31,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .strength-explore-all:hover {
@@ -42,8 +42,9 @@
 
 .strength-explore-all:focus-visible,
 .strength-lift-button:focus-visible {
-  outline: 2px solid var(--sx-ember);
-  outline-offset: 3px;
+  --focus-ring-color: var(--sx-ember);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .strength-lift-list li.is-interactive {
@@ -68,7 +69,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .strength-lift-list li:first-child .strength-lift-button {
@@ -94,7 +95,7 @@
 
 .strength-lift-open-icon {
   color: var(--text-muted);
-  transition: color 150ms ease, transform 150ms ease;
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
 .strength-lift-button:hover .strength-lift-open-icon {
@@ -114,7 +115,7 @@
   background: rgba(0, 0, 0, 0.58);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  animation: exercise-explorer-fade 180ms ease both;
+  animation: exercise-explorer-fade 180ms var(--ease) both;
 }
 
 :root[data-theme="paper"] .exercise-explorer-backdrop {
@@ -155,11 +156,11 @@
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--xx-edge);
+  border: 1px solid var(--surface-line, var(--xx-edge));
   border-radius: var(--radius-xl);
   background: var(--xx-surface);
   color: var(--text-primary);
-  box-shadow: -16px 20px 70px rgba(0, 0, 0, 0.42);
+  box-shadow: var(--shadow-elevated);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Segoe UI", sans-serif;
   font-kerning: normal;
@@ -184,7 +185,7 @@
   /* On paper the charcoal can be the real thing. */
   --xx-slate: #46535a;
 
-  box-shadow: -12px 18px 60px rgba(19, 26, 40, 0.22);
+  box-shadow: var(--shadow-elevated);
 }
 
 /* ---------- Header ---------- */
@@ -208,7 +209,7 @@
   margin: 0 0 6px;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -221,7 +222,7 @@
   margin: 0;
   font-size: clamp(22px, 3vw, 28px);
   font-weight: 600;
-  line-height: 1.08;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -263,7 +264,7 @@
   background: var(--xx-well);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .exercise-explorer-close:hover {
@@ -272,7 +273,8 @@
 }
 
 .exercise-explorer-close:focus-visible {
-  outline: 2px solid var(--xx-ember);
+  --focus-ring-color: var(--xx-ember);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -291,7 +293,7 @@
   border-left: 2px solid var(--xx-verdict, var(--text-muted));
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .exercise-explorer-verdict svg {
@@ -414,7 +416,7 @@
   flex: 0 0 auto;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -437,7 +439,7 @@
   margin: 0 0 2px;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -450,7 +452,7 @@
   display: grid;
   gap: 3px;
   padding: 10px 12px;
-  border: 1px solid var(--xx-edge);
+  border: 1px solid var(--surface-line, var(--xx-edge));
   border-radius: var(--radius-md);
   background: var(--xx-elevated);
   box-shadow: var(--shadow-soft);
@@ -492,7 +494,7 @@
 .exercise-stat-rail dt {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -589,7 +591,7 @@
   margin: 8px 0 0;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 /* A record board is a list, not a grid of cards: one ruled line per rep range,
@@ -706,7 +708,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .exercise-history-trigger:hover {
@@ -714,13 +716,14 @@
 }
 
 .exercise-history-trigger:focus-visible {
-  outline: 2px solid var(--xx-ember);
+  --focus-ring-color: var(--xx-ember);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
 .exercise-history-trigger > svg {
   color: var(--text-muted);
-  transition: transform 180ms ease;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 .exercise-history-trigger[aria-expanded="true"] > svg {
@@ -844,7 +847,7 @@
 .exercise-set-table th {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

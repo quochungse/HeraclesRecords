@@ -15,7 +15,6 @@
  * which the embedded chart does not carry.
  */
 .activity-chart-panel,
-.activity-chart-chip,
 .activity-chart-segment {
   --chart-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --chart-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
@@ -44,42 +43,6 @@
   color: var(--text-secondary);
 }
 
-.activity-chart-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.activity-chart-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 11px;
-  border: 1px solid var(--chart-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--chart-well);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease;
-}
-
-.activity-chart-chip:hover {
-  color: var(--text-primary);
-}
-
-/* The dot keeps a channel's colour legible while its chip is off, so the chips
-   double as the chart's legend whether or not the line is drawn. */
-.activity-chart-chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
 
 .activity-chart-plot {
   /* Recharts measures its own width; without a floor the container collapses to
@@ -95,7 +58,7 @@
   gap: 6px 16px;
   padding: 10px 14px;
   border: 1px solid var(--chart-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--chart-well);
   color: var(--text-primary);
   font-size: 13px;
@@ -105,7 +68,7 @@
 .activity-chart-segment-label {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -114,5 +77,5 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }

@@ -73,6 +73,7 @@ Those URLs and these patterns must change together.
 npm install
 npm run rebuild          # electron-builder install-app-deps — rebuilds better-sqlite3 against Electron's ABI. Required after install.
 npm run binaries:prepare # downloads pinned yt-dlp + copies ffmpeg-static into bin/<platform>-<arch>/
+npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs binaries:prepare and build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm start                # build, then run the packaged-style app
@@ -221,8 +222,9 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Maps, Watch Faces, Training Hub, Training Library, Strength, Calendar, Coach, and the
-dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
+ones (Maps, Training Hub, Training Library, Strength, Calendar, Coach, and the dev-only
+Watch Faces and Gear views — both are `IS_DEVELOPMENT_BUILD` in App.tsx and `developmentOnly`
+in primaryNav.ts, so a packaged build carries neither their code nor their stylesheet); Overview, Media, Data, and Settings are in the main bundle.
 
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.
@@ -537,6 +539,20 @@ dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
   stress series' `score` is a stress band). The nap windows sum to the day's
   reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its
   hover note from them.
+  **An MCP failure is one of two things and never one boolean.** Every payload MCP
+  serves carries `mcpState: McpAvailability` — `"ready"`, `"disconnected"` (no COROS MCP
+  server set up here, so connect it) or `"unreachable"` (one that *is* set up and did not
+  answer, so there is nothing to do in Settings). It was `mcpConnected: boolean`, and a
+  failed connection, a server with no sleep tool and a round of calls that all threw were
+  all reported as `false` — which every surface read out as "the COROS MCP server is not
+  connected. Please connect it in Settings → Connections → MCP Servers", sending the athlete
+  to a panel where the server was already there and already authorized.
+  `corosMcpFailureState()` is the only place that tells the two apart, and it asks after an
+  attempt, not instead of one; the copy is
+  built by `mcpNotice`/`mcpShortTextOr`/`mcpTitleOr` (`src/mcp/mcpNotice.ts`) so a surface
+  names its subject and nothing else. `undefined` — nothing has answered yet — must blame
+  nobody. `npm run test:mcp-notice` asserts both sentences for all three subjects and fails
+  wherever the unreachable one starts telling people to connect something.
 - **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.
@@ -881,17 +897,170 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
 
+**An empty result and an unfinished load are different screens.** An array that has not
+arrived reads exactly like one that came back empty, so a view that branches on `length`
+alone tells the athlete they have no strength sessions, no HRV readings and no training in
+the last 365 days — every launch, for as long as COROS takes to answer. `busy` cannot stand
+in: it is one string for the whole app. Each load says where it stands instead
+(`TrainingHubLoadStatus` for the activity list and the snapshot, `initializing` from
+`useStrengthData`, `loading` on the panels that own a fetch), and the loading copy outranks
+both the empty copy and the MCP copy above it. `initializing` is not `loading`: a flag
+raised when a request starts is `false` for the renders before the effect that starts it,
+which is one of the three ways the Strength screen used to flash "No strength sessions in
+the last 3 months" at an athlete with hundreds.
+
+**There is one way to offer a choice between options, and `npm run test:option-groups`
+closes it.** `OptionGroup` (`src/components/OptionGroup.tsx`) has three modes that share a
+chip and differ only in which chips are on screen: `expanded` (all of them — the default),
+`collapsible` (the selected one, opening in place and pushing what sits beside it) and
+`dropdown` (a floating menu, through `SelectDropdown`). Multi-select is `OptionChips`, a
+separate export rather than a flag, because several pressed chips inside one track read as a
+segmented control gone wrong. It replaced ~30 hand-written versions whose chips disagreed
+about height, weight, radius, how the chosen one is marked (`.is-active`, `.is-selected`,
+`.active`, `[data-active]`) and which ARIA role a row of exclusive buttons takes.
+**There is deliberately no automatic fallback** from `expanded` to `collapsible` when a row
+does not fit: it was written that way first and it oscillates, because the measurement that
+says "this does not fit" can only be taken while the row is laid out in full, and folding it
+makes the same measurement say it fits. A screen that cannot spare the width says
+`mode="collapsible"`. **Escape is caught in the capture phase** — a collapsible group can sit
+in a dialog that closes on Escape from its own `document` listener, and two listeners on one
+node are not separated by `stopPropagation()`.
+**The chosen chip is a wash of the accent with the accent's own ink** — the Calendar's
+Month/Week switch, which had the mark right before the component existed and is now where it
+comes from. A solid accent fill was the first answer and it shouts: a period picker is chrome,
+and a filled pill pulled the eye off the chart it describes. The rule that marks the
+**collapsed** group's lead chip has to be `.option-group .option-group-trigger`, two classes,
+because a flat `.option-group-trigger` loses to `.option-group button` — a class and an
+element — and a folded group then drew its one visible chip as though nothing were chosen,
+which is the whole of what the folded state has to say. `--accent-ink` is gone with the fill
+it was mixed for.
+**`fill` splits a form row equally between the options.** A `.field` hands its control the
+whole width, every input in one is `width: 100%`, and a chip row that keeps its text width
+ends in dead space with the options at two sizes nobody picked. Stated by the caller for the
+reason `mode` is, and nothing in `dropdown` mode, which already fills what holds it.
+**The words are `src/preferences/periodScale.ts`, not the screen's.** Six screens used to
+answer "how far back" in their own vocabulary — ninety days was "3 months", "90 days" and
+"Last 90 days" depending on where you looked. A screen declares the windows it offers and
+takes the labels from the scale; the test fails on a period label written anywhere else.
+Two windows moved to fit it: the trend charts and the load heatmap run 28 days rather than 30,
+which is the four whole weeks this app already cuts its periods by.
+**A dropdown opens at the size of what it holds**, between a floor (the trigger, so the list
+is never narrower than the control it came from) and a cap (the window). It was handed one
+width, `max(trigger, 220px)`, which was wrong in both directions at once — a 90px pill opened a
+220px menu half of it empty, and a list of model names was ellipsised inside the same 220px.
+The one exception is a menu whose options carry a `detail`: that is a sentence, and a sentence
+has no natural width, so those cap at the floor and wrap, with the caller raising the floor to
+suit. Its ground is `--menu-surface`, **not** `--surface`, which carries a green cast that
+reads as chrome under a panel and as a tint under a sheet hanging over the page. And
+`.app-select-trigger` states `font-size` **after** `font: inherit`, never before — the
+shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
+drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
+trigger stands in a row with.
+**Seventeen controls are exempt**, each named in the test by file *and* by a string from the
+element, so an exemption covers one control rather than a whole file. They are four kinds and
+none is a row of options: a grid whose arrangement carries meaning (the route sport picker,
+the Studio's alignment grids), cards that need a sentence (export formats, analysis starters),
+a list of records (plans, places, search results) and a table's sort header.
+
 **The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
 Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
 `em` steps for text that must follow its parent, four tracking steps
-(`-0.02em` / `0` / `0.06em` / `0.1em`) and six radius tokens — every literal in those four
-properties must come from that set. It is enforced because it cannot be maintained by
-intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
+(`-0.02em` / `0` / `0.06em` / `0.1em`), five unitless leading steps (`1` for figures and
+chips, `1.2` display, `1.3` headings and dense rows, `1.45` body, `1.6` long prose) and six
+radius tokens — every literal in those five properties must come from that set. A box that
+has to match a neighbour's height says so with a height, not with a leading inflated to fit.
+It is enforced because it cannot be maintained by intention: nobody writes `font-weight: 650` on purpose, they write it once because 600 read
 a shade light beside a heading, and the file had grown to **20 weights, 18 sizes (thirteen
 of them between 9px and 15px, half-pixels included), 45 spellings of letter-spacing down to
 `-0.004em`, and ~150 hand-written radii** alongside the five tokens. The test's header
 lists the exceptions and why each one is real. Adding a value means editing that file,
 which is the point.
+
+**The app carries its own typography, and one serif level.** `index.html` used to `<link>`
+Inter and Space Grotesk from `fonts.googleapis.com`, so a fresh install with no network drew
+the interface in a system fallback. The three families now ship as variable `.woff2` files in
+`src/assets/fonts` (latin, latin-ext and **vietnamese** — an athlete's activity names and the
+coach's answers are written in it), declared in `src/fonts.css`; `npm run fonts:fetch`
+(`scripts/fetch-fonts.mjs`) re-fetches them, and `test:design-vocabulary` skips `@font-face`, where `font-weight: 300 700`
+is a file's range rather than a choice off the scale. `--font-title` (Source Serif 4) is spent
+on a screen's own title and nothing else, at weight 600 and leading 1.3 — a serif's descender
+does not fit inside `line-height: 1`. Figures spend one treatment (the display face, weight
+500, `-0.02em`, tabular) and keep their own size and leading. A title or figure rule that
+restates `font-family` or `font-weight` locally wins over the shared rule, because the feature
+stylesheets load after `styles.css` — that is how five screens silently kept the sans. Code,
+ids and hashes spend `--font-mono`, the one monospace stack: it replaced four spellings written
+out by hand and two phantom tokens (`--mono`, `--font-mono`) that fell back to them.
+
+**A `var()` naming a token nothing declares deletes the whole declaration, and
+`npm run test:css-tokens` is what stops that shipping.** Not the one layer — the declaration:
+an undeclared custom property resolves to the guaranteed-invalid value, so
+`background: radial-gradient(…, var(--missing), …), var(--real)` computes to *transparent*,
+`border: 1px solid var(--missing)` to *no border*, and `color: var(--missing)` to the inherited
+ink (all three measured in Chromium). Nothing reports it: the stylesheet parses, the build
+passes, the screen just loses its ground. Twelve dead token names across twenty-four uses were
+found on 2026-09-18, each alive for months — the Training Library's entire background stack
+(`--bg-ambient-green`, a name from a palette that predates the accent tokens), the Hevy
+dialog's fill, the backup-restore cards, two Watch Face device panels, the Gear screen's error
+tint and its sign-in panel, and a `--danger` nothing has ever declared; `--wf-shadow-soft`,
+found by hand one phase earlier, was the same bug. The test holds two things at zero and has no allowlist:
+every `var(--x)` names a token some stylesheet declares or the renderer writes (**a fallback
+does not excuse it** — `var(--phantom, 12px)` renders correctly and still claims a token that
+is not there, which is how four of them survived a reader's eye), and every declared token is
+read by someone. A name the renderer builds (`--m3d-heat-${level}`) counts through its prefix.
+
+**`.content` caps the measure at 1440px**, through its own padding
+(`max(28px, (100% - 1440px) / 2)`) so the scrollbar stays at the window edge and no screen
+needs a wrapper. Below about 1750px nothing changes; past it the margins grow rather than the
+tables.
+
+**Motion is part of that vocabulary, and the same test holds it.** A `transition` spends
+`var(--ease)` — one decelerating curve; bare `ease` was 92% of every curve and is the browser
+default nobody chose — and a `--dur-fast` (a state: colour, opacity, border, shadow) /
+`--dur-base` (something that moves or resizes) / `--dur-slow` (a drawer that travels) token.
+A length that is designed rather than reactive — a fill growing to its value, a staged
+reveal, a spring — stays literal only as an entry in `DESIGNED_LENGTHS`, which fails once the
+transition it names is gone. Check a rewritten shorthand in a renderer, not by eye: a
+`transition` holding `var()` always parses, and an invalid one is dropped at computed-value
+time, so neither the build nor a render says anything. (`\bease\b` also matches inside
+`var(--map-ease)`; the keyword pattern is `(?<![-\w])ease\b(?!-)`.)
+
+**Elevation is one device per level, held by `npm run test:elevation`.** A card floats on an
+outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
+(an inset is a highlight, and a border spelled `var(--surface-line, …)` is the card recipe),
+and every layer that **lifts** spends `--shadow-soft|card|elevated|inset`. Both rules hold
+across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty but for six
+`exempt` decisions and a new violation fails outright. A `box-shadow` draws four other things
+and those are not elevation: a hairline (an inset with no blur — a highlight, a gridline, a
+marker bar), a ring (`0 0 0 Npx`, up to 8px), a glow (no offset), a tint (a lift painted in a
+named signal colour — accent, sport, sleep stage, tone) and the 1–2px edge under a control.
+`layerKind` in the test draws that line; the sizes are written up in §4.5 of the doc. Tokens
+are judged by what they resolve to across every definition, which is how it found a
+`--wf-shadow-soft` defined nowhere — an invalid token silently voids the whole `box-shadow`,
+hairline and all — and it is why a feature token that lifts (`--wf-shadow`, `--map-card-shadow`)
+spends one of the four rather than restating a shadow. The ladder itself is in [docs/ui-system-refinement.md](docs/ui-system-refinement.md) §4.
+Paper defines `--surface-line: transparent` on its `:root`, so a card that spells its border
+`var(--surface-line, …)` floats on its shadow there and keeps a lit hairline in dark; the
+paper `.panel` rule reads the token **without a fallback**, which is what puts it over the
+cards that set a border colour of their own. A hairline that divides rather than encloses —
+a column rule, a row separator — does not read the token. Rule 1 is held everywhere now, so
+a new rule drawing a border *and* an outer shadow fails `test:elevation`; if it is genuinely
+right (a watch bezel, a ring that is the datum), it goes in the allowlist's `exempt` with the
+reason written out, and it has to still apply or the test fails on the stale claim. The
+probe's `boxes` count, not `layers`, is the one to hold a screen's depth against — `layers`
+counts a one-sided divider as a level.
+
+**Focus is one ring, drawn with `outline`, and the same vocabulary test holds it.** A rule
+whose subject is the focused element stands alone — never beside `:hover`, `.is-active` or
+`:focus`, never grouped in `:is()` — and draws `outline: var(--focus-ring)` at
+`outline-offset: 2px` (`-2px` where the container clips). `--focus-ring` is declared on
+`:focus-visible` itself, not `:root`, because a custom property holding `var()` resolves where
+it is declared and the chat scopes redefine `--accent`; a feature with its own signal colour
+sets `--focus-ring-color`. **It is an outline because a box-shadow ring did not survive the
+app:** built that way first, a paper override setting `box-shadow` on the same element with
+more specificity erased the ring, found only by tabbing through the running app — no static
+scan can pair two class names on one element, and hundreds of rules set a shadow. Outlines
+are set almost nowhere else, leave the element's elevation alone, and forced-colors mode
+keeps them.
 
 **Colour is data; chrome is the neutral surface plus one accent.** Hue belongs to sport,
 sleep stage, heart-rate zone, load band, the strength heatmap, a provider's own brand — and
@@ -905,6 +1074,70 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 "update ready" is the same mistake in miniature: it means success, so it reads
 `var(--success-text)` and follows the theme.
 
+**The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over thirteen
+destinations, and a heading is a label: it does not open, close or remember anything. The
+disclosure groups this replaced existed only because eighteen equal rows did not fit, and
+they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
+whenever the app navigated into it, and a second indicator key for a collapsed group's
+header. The sections answer *when* a screen is reached for rather than where its data comes
+from, which is the grouping the athlete already has. `coroslink.sidebarCollapsedGroups` is
+gone from `syncPolicy.ts` with the state it classified — `test:sync-policy` fails on a
+localStorage key that `src/` no longer writes, in both directions.
+**Personal and Settings are not in the index.** They are about the person rather than the
+training, so they sit in the identity row at the rail's foot (`PRIMARY_NAV_ACCOUNT_ITEMS`),
+which is also what brings the index down to a length that stands open. That row wears the
+COROS nickname and avatar from `getCorosProfileSnapshot`, which is served from the main
+process's hour-long cache and so costs no request; it falls back to the account email's
+local part, then to "Personal". Because one row shows a name and the other is icon-only,
+neither is findable by its text — both carry **`data-nav-label`**, and
+`probe-ui-cdp.mjs` navigates by it.
+
+**Chrome is quiet, and three devices carry the whole rail.** `.app-sidebar` draws one
+hairline down its right edge and nothing else — no fill, no shell blur, no highlight
+gradient, no inset ring, no shadow, no corner. It spent all six on being seen, beside the
+screen it exists to get out of the way of. That hairline reads `--sidebar-divider` and
+**not** `--surface-line`: this line divides rather than encloses, and `--surface-line` is
+transparent on paper, so the rail would lose its only edge there. The `--sidebar-glass-*`
+set still dresses the **Coach conversation rail**, which is a panel inside a screen rather
+than the window's own edge; the two are not the same thing.
+The active row is marked by a 2×14px bar at the column's edge plus weight 600 and
+`--accent-strong` on the icon. **The indicator element still spans the row** — its measured
+`top`/`height` are what let the mark slide — and only the bar inside it is drawn; the
+identity row draws its own, at the same size and offset, because the nav's mark is measured
+inside the index and cannot reach down there. Hover is a single `--glass-bg` wash: it used
+to draw a whole card (fill, border, inset highlight, shadow and a 2px shove) under every row
+the pointer crossed. Collapsing, done once and then forgotten, no longer holds a row —
+`.app-sidebar-brand-toggle` waits in the brand line and comes out on hover *or* focus, in
+two separate rules, because a control that exists only under the pointer cannot be tabbed to
+and this one is the only way back from the icon rail.
+**The rows are not `--text-secondary`, and the index carries no scrollbar.** That token is
+the right weight for prose beside a heading; a rail is not prose, it *is* the navigation, and
+at 13px with no fill behind it every row read as grey — so `--sidebar-row-text` steps up
+close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) while
+`--sidebar-row-icon` stays a shade back, which puts the reading order inside the row instead
+of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
+bar. The heading sits between the two, one step quieter than a row rather than two.
+The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
+a short window drew **two vertical lines down the same edge** — for a list of thirteen rows
+that fits whenever the window is not cramped. What a reader needs there is not a handle to
+drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
+are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**
+`scrollTop`/`scrollHeight` on scroll and on every resize (the rows are observed as well as the
+nav — a development build adds two destinations without the nav's own box changing size, and
+that is exactly when it starts to scroll). At rest both are `0px`, the mask's stops collapse
+onto each other and it is a solid pass, so the first and last row are never fogged when
+nothing is hidden. The gutter stays 0 either way, so nothing reflows when the fade appears.
+
+There is exactly **one horizontal rule**, above the identity row, and it earns its place:
+below it the subject stops being training, and the index scrolls on a short window or a
+development build, where the last destination would otherwise run into the account. On the
+64px rail a heading has nowhere to go, so it becomes a 16px rule between sections and is
+*hidden rather than removed* — the section's accessible name is read from it. The
+narrow-window drawer is the one deliberate exception to all of this: it floats over the
+content, so it takes a fill and `--shadow-elevated` and drops the hairline, rather than
+drawing two devices for one edge.
+
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
 of the page under it: the shell, the sidebar and every panel read as one flat sheet, and the
@@ -917,8 +1150,8 @@ outrank it. **And `--bg-base` carries no accent hue**: the cream one left Sky an
 sitting on a yellow page, while the window chrome is painted from
 `THEME_WINDOW_BACKGROUND`, a flat string written on a theme change but *not* on an accent
 change — so an accent-derived base would drift out of step with the frame around it. The
-accent reaches the page through `--bg-ambient-*` and the sidebar's top gradient, which read
-`var(--accent)` at use time. Paper accents are measured against `--bg-base` for WCAG AA and
+accent reaches the page through `--bg-ambient-*` and the Coach rail's top gradient, which
+read `var(--accent)` at use time. Paper accents are measured against `--bg-base` for WCAG AA and
 mirrored in `src/theme/accentPalette.ts` for the globe and the charts, which cannot read a
 custom property — change both. Every paper rule is scoped `:root[data-theme="paper"]`, which
 is what keeps dark out of reach of a light-theme edit; nothing in the file relies on a bare

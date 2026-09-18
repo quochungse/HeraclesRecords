@@ -17,6 +17,13 @@ import {
   formatPaceSecondsPerKm
 } from "../training/formatters";
 import type { CorosLinkApi } from "../coroslink-api";
+import { OptionGroup } from "../components/OptionGroup";
+import {
+  periodDaysFromValue,
+  periodGroupOptions,
+  periodValue,
+  type PeriodDays
+} from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunDetailView } from "./RunDetailView";
@@ -70,23 +77,14 @@ export interface RunningViewProps {
   onOpenRequestHandled?: () => void;
 }
 
-interface PeriodOption {
-  /** null means the whole history. */
-  days: number | null;
-  label: string;
-}
-
 /**
  * The whole history is a deliberate choice rather than the default: the
  * renderer holds every activity COROS has, and tallying years of them on every
  * filter change is work nobody asked for while looking at this month.
+ *
+ * The labels are the scale's, not this screen's — see periodScale.ts.
  */
-const PERIOD_OPTIONS: readonly PeriodOption[] = [
-  { days: 28, label: "4 weeks" },
-  { days: 90, label: "3 months" },
-  { days: 365, label: "1 year" },
-  { days: null, label: "All" }
-];
+const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
 
@@ -481,49 +479,35 @@ export function RunningView({
       <RunningPageHeader />
 
       <div className="running-controls">
-        {/* The same chips as the load heatmap on Training Overview, class for
-            class, so a filter reads the same wherever it sits in the app. */}
-        <div className="training-metric-toggle" role="group" aria-label="Surface">
-          <button
-            type="button"
-            className={`training-metric-option${surface === null ? " is-active" : ""}`}
-            aria-pressed={surface === null}
-            onClick={() => setSurface(null)}
-          >
-            All
-          </button>
-          {availableSurfaces.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={`training-metric-option${surface === option ? " is-active" : ""}`}
-              aria-pressed={surface === option}
-              onClick={() => setSurface(option)}
-            >
-              {RUN_SURFACE_LABELS[option]}
-            </button>
-          ))}
-        </div>
+        {/* The same control as the load heatmap on Training Overview — the
+            same component now, not merely the same class, so a filter reads
+            the same wherever it sits in the app. */}
+        <OptionGroup
+          label="Surface"
+          value={surface ?? "all"}
+          options={[
+            { value: "all", label: "All" },
+            ...availableSurfaces.map((option) => ({
+              value: option,
+              label: RUN_SURFACE_LABELS[option]
+            }))
+          ]}
+          onChange={(next) =>
+            setSurface(next === "all" ? null : (next as RunSurface))
+          }
+        />
 
-        <div
-          className="training-metric-toggle running-period"
-          role="group"
-          aria-label="Period"
-        >
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              className={`training-metric-option${
-                periodDays === option.days ? " is-active" : ""
-              }`}
-              aria-pressed={periodDays === option.days}
-              onClick={() => setPeriodDays(option.days)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {/* Folded at rest: the period is read far more often than it is
+            changed, and the header has a surface picker and the run count to
+            fit beside it. */}
+        <OptionGroup
+          label="Period"
+          mode="collapsible"
+          className="running-period"
+          value={periodValue(periodDays as PeriodDays)}
+          options={PERIOD_OPTIONS}
+          onChange={(next) => setPeriodDays(periodDaysFromValue(next))}
+        />
       </div>
 
       <div className="running-body">

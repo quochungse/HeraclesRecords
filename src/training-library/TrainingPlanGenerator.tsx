@@ -11,6 +11,7 @@ import {
   Sparkles,
   X
 } from "lucide-react";
+import { OptionChips } from "../components/OptionGroup";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type {
@@ -366,27 +367,23 @@ export function TrainingPlanGenerator({ api, onClose, onGenerated, onOpenCoach }
 
             <fieldset>
               <legend>Sports</legend>
-              <div className="plan-generator-sports">
-                {WORKOUT_SPORTS.map((sport) => {
+              <OptionChips
+                label="Sports"
+                className="plan-generator-sports"
+                values={sports}
+                options={WORKOUT_SPORTS.map((sport) => {
                   const theme = sportTheme(sport);
                   const SportIcon = theme.icon;
-                  const selected = sports.includes(sport);
-                  return (
-                    <button
-                      type="button"
-                      key={sport}
-                      className={selected ? "is-selected" : ""}
-                      style={{ "--sport-accent": theme.color } as CSSProperties}
-                      aria-pressed={selected}
-                      disabled={generating}
-                      onClick={() => toggleSport(sport)}
-                    >
-                      <SportIcon size={13} />
-                      {formatWorkoutSport(sport)}
-                    </button>
-                  );
+                  return {
+                    value: sport,
+                    label: formatWorkoutSport(sport),
+                    icon: <SportIcon size={13} aria-hidden="true" />
+                  };
                 })}
-              </div>
+                colorOf={(sport) => sportTheme(sport as WorkoutSport).color}
+                disabled={generating}
+                onToggle={(sport) => toggleSport(sport as WorkoutSport)}
+              />
             </fieldset>
 
             <fieldset>
@@ -428,21 +425,18 @@ export function TrainingPlanGenerator({ api, onClose, onGenerated, onOpenCoach }
 
             <fieldset>
               <legend>Available days</legend>
-              <div className="plan-generator-days">
-                {DAY_NAMES.map((day, index) => (
-                  <button
-                    type="button"
-                    key={day}
-                    title={DAY_NAMES_FULL[index]}
-                    aria-pressed={availableDays.includes(index)}
-                    className={availableDays.includes(index) ? "is-selected" : ""}
-                    disabled={generating}
-                    onClick={() => toggleDay(index)}
-                  >
-                    {day}
-                  </button>
-                ))}
-              </div>
+              <OptionChips
+                label="Available days"
+                className="plan-generator-days"
+                values={availableDays.map(String)}
+                options={DAY_NAMES.map((day, index) => ({
+                  value: String(index),
+                  label: day,
+                  title: DAY_NAMES_FULL[index]
+                }))}
+                disabled={generating}
+                onToggle={(value) => toggleDay(Number(value))}
+              />
             </fieldset>
             {sessionsPerWeek > availableDays.length ? <p className="plan-generator-inline-error" role="alert">Choose at least {sessionsPerWeek} available days.</p> : null}
             {!isValidStartDate(startDate) ? <p className="plan-generator-inline-error" role="alert">Choose today or a future start date.</p> : null}

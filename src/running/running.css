@@ -40,6 +40,11 @@
   gap: 18px;
   min-height: 0;
   overflow-y: auto;
+  /* The page scrolls here, so it carries `.content`'s measure itself — see the
+     `.content-fill:has(> .running-view)` rule in styles.css. Without this the
+     gutter sits outside the scroller and the scrollbar is drawn a gutter's
+     width inside the window instead of at its edge. */
+  padding: 0 var(--content-gutter, 28px) var(--content-pad-bottom, 28px);
 
   --run-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --run-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
@@ -49,6 +54,17 @@
   --run-trail: var(--sport-trail, #4c8dff);
   --run-track: color-mix(in srgb, var(--sport-run, #2fbe91) 55%, var(--accent-gold, #d89b22));
   --run-treadmill: color-mix(in srgb, var(--sport-run, #2fbe91) 35%, var(--text-secondary));
+}
+
+/*
+ * On paper a raised face is white and the hairline does the lifting, the same
+ * shape activities.css and strength.css settled on — an ink mix reads as a
+ * well there, and the cards at the top of this screen are cards, not wells.
+ */
+:root[data-theme="paper"] .running-view {
+  --run-hairline: rgba(19, 26, 40, 0.14);
+  --run-well: rgba(19, 26, 40, 0.06);
+  --run-raised: #ffffff;
 }
 
 .running-view.running-view-disconnected {
@@ -66,25 +82,21 @@
 .running-page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1.02;
-  letter-spacing: -0.02em;
 }
 
 .running-page-header > p:last-child {
   margin: 7px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .running-eyebrow {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -123,13 +135,16 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+/* On the page, so L1 (docs/ui-system-refinement.md §4.3): the shadow is the
+   edge on paper, the hairline in dark. */
 .running-stat {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border: 1px solid var(--run-hairline);
+  border: 1px solid var(--surface-line, var(--run-hairline));
   border-radius: var(--radius-md);
-  background: var(--run-well);
+  background: var(--run-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .running-stat > span {
@@ -226,7 +241,7 @@
   background: transparent;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -245,7 +260,7 @@
   padding: 11px 12px;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -264,17 +279,23 @@
 .run-list tbody tr {
   border-bottom: 1px solid var(--run-hairline);
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .run-list tbody tr:last-child {
   border-bottom: none;
 }
 
-.run-list tbody tr:hover,
-.run-list tbody tr:focus-visible {
+.run-list tbody tr:hover {
   background: var(--run-raised);
   outline: none;
+}
+
+/* Inside: a row spans the table, and the view clips a ring drawn outside it. */
+.run-list tbody tr:focus-visible {
+  background: var(--run-raised);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .run-list td {
@@ -321,7 +342,7 @@
   padding: 3px 8px;
   border-radius: var(--radius-pill);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -388,7 +409,7 @@
   font-family: var(--font-display);
   font-size: clamp(22px, 2.8vw, 36px);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -406,8 +427,8 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .run-detail-back:hover {
@@ -598,8 +619,8 @@
   background: color-mix(in srgb, var(--bg-base) 70%, transparent);
   color: var(--text-muted);
   transition:
-    opacity 0.25s ease,
-    visibility 0.25s ease;
+    opacity var(--dur-base) var(--ease),
+    visibility var(--dur-base) var(--ease);
 }
 
 .run-detail-cover:not(.is-credit-open) .leaflet-control-attribution.leaflet-control {
@@ -707,10 +728,15 @@
   cursor: pointer;
 }
 
-.run-lap-table tbody tr.run-lap-row:hover,
-.run-lap-table tbody tr.run-lap-row:focus-visible {
+.run-lap-table tbody tr.run-lap-row:hover {
   background: var(--run-raised);
   outline: none;
+}
+
+.run-lap-table tbody tr.run-lap-row:focus-visible {
+  background: var(--run-raised);
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 /* ------------------------------------------------------------------ hero -- */
@@ -728,27 +754,24 @@
   align-content: start;
   gap: 6px;
   padding: 16px 18px;
-  border: 1px solid var(--run-hairline);
+  border: 1px solid var(--surface-line, var(--run-hairline));
   border-radius: var(--radius-md);
-  background: var(--run-well);
+  background: var(--run-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .run-hero-label {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .run-hero-value {
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: 28px;
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 /* Only the load ratio is coloured. Every other hero figure is a fact; this one
@@ -781,7 +804,7 @@
   background: var(--warning-bg);
   color: var(--warning-text);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   cursor: help;
@@ -874,7 +897,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .run-block-note {
@@ -934,7 +957,7 @@
 .run-intensity-title {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { OptionGroup } from "../../components/OptionGroup";
 import type { TrainingHubActivity } from "../../../electron/types";
 import { formatHappenDayLabel } from "../formatters";
 import { mergeTrainingDayLists } from "../parsers";
@@ -50,6 +50,12 @@ const LEGACY_FITNESS_METRICS_PREFERENCE =
 interface FitnessTrendPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
+  /**
+   * The activities and the snapshot these read are still arriving. An empty
+   * result says "you have not trained" otherwise, which is a claim about the
+   * athlete made while the app has simply not looked yet.
+   */
+  loading?: boolean;
 }
 
 interface MetricSelectProps {
@@ -61,99 +67,32 @@ interface MetricSelectProps {
  * Picks the one metric the columns measure. Deliberately colourless: hue on this
  * chart belongs to the sport a block stands for, and a swatch here would claim
  * it stands for the unit instead.
+ *
+ * It was a listbox written out here — trigger, menu, outside-click, Escape —
+ * which is what `SelectDropdown` already is, keyboard handling and portal
+ * included.
  */
 function MetricSelect({ selected, onChange }: MetricSelectProps) {
   const { unitSystem } = useUnitSystem();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
 
   return (
-    <div className="metric-select" ref={rootRef}>
-      <button
-        type="button"
-        className="metric-select-trigger"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <span className="metric-select-label">
-          {getWeeklyActivityMetricLabel(selected, unitSystem)}
-        </span>
-        <ChevronDown
-          className={
-            isOpen ? "metric-select-icon is-open" : "metric-select-icon"
-          }
-          size={16}
-          strokeWidth={2.4}
-          aria-hidden="true"
-        />
-      </button>
-
-      {isOpen ? (
-        <div className="metric-select-menu" role="listbox">
-          {WEEKLY_ACTIVITY_METRICS.map((metric) => {
-            const isSelected = metric === selected;
-
-            return (
-              <button
-                type="button"
-                key={metric}
-                className={
-                  isSelected
-                    ? "metric-select-option is-selected"
-                    : "metric-select-option"
-                }
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => {
-                  onChange(metric);
-                  setIsOpen(false);
-                }}
-              >
-                <span className="metric-select-check">
-                  {isSelected ? (
-                    <Check size={13} strokeWidth={3} aria-hidden="true" />
-                  ) : null}
-                </span>
-                <span>{getWeeklyActivityMetricLabel(metric, unitSystem)}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+    <OptionGroup
+      label="Weekly metric"
+      mode="dropdown"
+      value={selected}
+      options={WEEKLY_ACTIVITY_METRICS.map((metric) => ({
+        value: metric,
+        label: getWeeklyActivityMetricLabel(metric, unitSystem)
+      }))}
+      onChange={onChange}
+    />
   );
 }
 
 export function FitnessTrendPanel({
   snapshot,
-  activities = []
+  activities = [],
+  loading = false
 }: FitnessTrendPanelProps) {
   const { unitSystem } = useUnitSystem();
   const [barsVisible, setBarsVisible] = useState(false);
@@ -409,7 +348,11 @@ export function FitnessTrendPanel({
           </div>
         </div>
       ) : (
-        <p className="training-empty-state">No weekly activity data yet.</p>
+        <p className="training-empty-state" aria-busy={loading || undefined}>
+          {loading
+            ? "Reading your weeks from COROS…"
+            : "No weekly activity data yet."}
+        </p>
       )}
     </section>
   );

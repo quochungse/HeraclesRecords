@@ -1,3 +1,4 @@
+import { OptionChips, OptionGroup } from "../../components/OptionGroup";
 import type {
   AnalysisConditions,
   AnalysisThresholdMetric,
@@ -89,16 +90,20 @@ export function TriggerForm({
     <>
       <label className="chat-local-field">
         <span>Run it</span>
-        <select
+        <OptionGroup
+          label="Run it"
+          mode="dropdown"
+          size="md"
           value={trigger?.kind ?? "manual"}
+          options={[
+            { value: "manual", label: "Only when I ask" },
+            { value: "activity", label: "After a new activity" },
+            { value: "schedule", label: "On a schedule" },
+            { value: "threshold", label: "When a metric crosses a threshold" }
+          ]}
           disabled={disabled}
-          onChange={(event) => setTrigger(blankTrigger(event.target.value))}
-        >
-          <option value="manual">Only when I ask</option>
-          <option value="activity">After a new activity</option>
-          <option value="schedule">On a schedule</option>
-          <option value="threshold">When a metric crosses a threshold</option>
-        </select>
+          onChange={(kind) => setTrigger(blankTrigger(kind))}
+        />
       </label>
 
       {!trigger ? (
@@ -115,28 +120,26 @@ export function TriggerForm({
           <div className="coach-analysis-row">
             <label className="chat-local-field">
               <span>Metric</span>
-              <select
+              <OptionGroup
+                label="Metric"
+                mode="dropdown"
+                size="md"
                 value={thresholdTrigger.metric}
-                onChange={(event) =>
+                options={THRESHOLD_METRIC_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label
+                }))}
+                onChange={(metric) =>
                   setTrigger({
                     kind: "threshold",
-                    metric: event.target.value as AnalysisThresholdMetric,
+                    metric,
                     // The number means something different per metric — per
                     // cent, bpm, hours — so switching carries the metric's own
                     // starting point rather than the last one's number.
-                    value:
-                      THRESHOLD_METRIC_DEFAULTS[
-                        event.target.value as AnalysisThresholdMetric
-                      ]
+                    value: THRESHOLD_METRIC_DEFAULTS[metric]
                   })
                 }
-              >
-                {THRESHOLD_METRIC_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="chat-local-field">
               <span>{thresholdOption?.unit ?? "Threshold"}</span>
@@ -170,14 +173,21 @@ export function TriggerForm({
           <div className="coach-analysis-row">
             <label className="chat-local-field">
               <span>Repeats</span>
-              <select
+              <OptionGroup
+                label="Repeats"
+                size="md"
+                fill
                 value={scheduleTrigger.cadence}
-                onChange={(event) =>
+                options={[
+                  { value: "daily", label: "Every day" },
+                  { value: "weekly", label: "Every week" }
+                ]}
+                onChange={(cadence) =>
                   // Rebuilt rather than merged: a daily trigger carries no
                   // `dayOfWeek`, and leaving a stale one behind would make the
                   // form read as edited after a save that dropped it.
                   setTrigger(
-                    event.target.value === "weekly"
+                    cadence === "weekly"
                       ? {
                           kind: "schedule",
                           cadence: "weekly",
@@ -191,26 +201,22 @@ export function TriggerForm({
                         }
                   )
                 }
-              >
-                <option value="daily">Every day</option>
-                <option value="weekly">Every week</option>
-              </select>
+              />
             </label>
             {scheduleTrigger.cadence === "weekly" ? (
               <label className="chat-local-field">
                 <span>Day</span>
-                <select
-                  value={scheduleTrigger.dayOfWeek ?? 1}
-                  onChange={(event) =>
-                    patchSchedule({ dayOfWeek: Number(event.target.value) })
-                  }
-                >
-                  {WEEKDAY_OPTIONS.map((day, index) => (
-                    <option key={day} value={index}>
-                      {day}
-                    </option>
-                  ))}
-                </select>
+                <OptionGroup
+                  label="Day"
+                  mode="dropdown"
+                  size="md"
+                  value={String(scheduleTrigger.dayOfWeek ?? 1)}
+                  options={WEEKDAY_OPTIONS.map((day, index) => ({
+                    value: String(index),
+                    label: day
+                  }))}
+                  onChange={(day) => patchSchedule({ dayOfWeek: Number(day) })}
+                />
               </label>
             ) : null}
             <label className="chat-local-field">
@@ -234,29 +240,26 @@ export function TriggerForm({
       {activityTrigger ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
           <legend>Fires after a new activity</legend>
-          <div className="coach-analysis-sports">
-            {SPORT_FILTER_OPTIONS.map((sport) => {
-              const checked = activityTrigger.sportTypes.includes(sport.value);
-              return (
-                <label key={sport.value} className="coach-analysis-chip">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      patchActivity({
-                        sportTypes: checked
-                          ? activityTrigger.sportTypes.filter(
-                              (value) => value !== sport.value
-                            )
-                          : [...activityTrigger.sportTypes, sport.value]
-                      })
-                    }
-                  />
-                  <span>{sport.label}</span>
-                </label>
-              );
-            })}
-          </div>
+          <OptionChips
+            label="Sports that fire this analysis"
+            className="coach-analysis-sports"
+            values={activityTrigger.sportTypes.map(String)}
+            options={SPORT_FILTER_OPTIONS.map((sport) => ({
+              value: String(sport.value),
+              label: sport.label
+            }))}
+            disabled={disabled}
+            onToggle={(value) => {
+              const sportType = Number(value);
+              patchActivity({
+                sportTypes: activityTrigger.sportTypes.includes(sportType)
+                  ? activityTrigger.sportTypes.filter(
+                      (entry) => entry !== sportType
+                    )
+                  : [...activityTrigger.sportTypes, sportType]
+              });
+            }}
+          />
           <p className="coach-analysis-hint">
             {activityTrigger.sportTypes.length === 0
               ? "No sport selected means every sport."

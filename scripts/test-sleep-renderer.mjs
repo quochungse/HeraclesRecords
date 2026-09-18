@@ -82,7 +82,7 @@ const SNAPSHOT = {
       ...(index === 1 ? TWO_NAPS : {})
     })
   ),
-  mcpConnected: true,
+  mcpState: "ready",
   source: "cache",
   fetchedAt: Date.UTC(2026, 8, 16, 8, 0)
 };
@@ -108,7 +108,7 @@ function series(happenDay, hourOfDay) {
     windowStart: base,
     windowEnd: base + 11 * 600_000,
     source: "cache",
-    mcpConnected: true
+    mcpState: "ready"
   };
 }
 
@@ -329,7 +329,7 @@ async function main() {
       hrv: [],
       stress: [],
       source: "network",
-      mcpConnected: true,
+      mcpState: "ready",
       error: "This night has no sleep window, so nothing can be placed on a clock."
     }),
     true
@@ -357,7 +357,7 @@ async function main() {
       hrv: [],
       stress: [],
       source: "cache",
-      mcpConnected: false
+      mcpState: "disconnected"
     }),
     true,
     "Refresh re-asked past the memory"
@@ -378,7 +378,7 @@ async function main() {
       hrv: [],
       stress: [],
       source: "network",
-      mcpConnected: true,
+      mcpState: "ready",
       error: "This night has no sleep window, so nothing can be placed on a clock."
     }),
     true

@@ -12,6 +12,7 @@ import {
   Ungroup,
   X
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -1065,18 +1066,19 @@ function StrengthStepFields({
         <section className="strength-block">
           <h4>Rest between sets</h4>
           <div className="rest-picker">
-            {STRENGTH_REST_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={restSeconds === preset ? "is-selected" : ""}
-                aria-pressed={restSeconds === preset}
-                disabled={disabled}
-                onClick={() => onChange({ ...step, restType: 1, restValue: preset })}
-              >
-                {strengthRestLabel(preset)}
-              </button>
-            ))}
+            <OptionGroup
+              label="Rest between sets"
+              tone="quiet"
+              value={String(restSeconds)}
+              options={STRENGTH_REST_PRESETS.map((preset) => ({
+                value: String(preset),
+                label: strengthRestLabel(preset)
+              }))}
+              disabled={disabled}
+              onChange={(next) =>
+                onChange({ ...step, restType: 1, restValue: Number(next) })
+              }
+            />
             <label className="rest-picker-custom">
               <input
                 type="number"

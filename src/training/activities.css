@@ -37,7 +37,6 @@
 .activities-head h2 {
   margin: 0;
   font-size: 22px;
-  font-weight: 600;
 }
 
 .activities-head h2 span {
@@ -60,21 +59,27 @@
   gap: 10px;
 }
 
+/*
+ * The four totals sit on the page, so they are L1 cards like the panel below
+ * them (docs/ui-system-refinement.md §4.3): on paper the shadow is the edge and
+ * the border goes transparent, in dark the hairline stays.
+ */
 .activities-summary-tile {
   display: grid;
   gap: 2px;
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--ax-edge);
+  border: 1px solid var(--surface-line, var(--ax-edge));
   border-radius: var(--radius-md);
   background: var(--ax-raised);
+  box-shadow: var(--shadow-card);
 }
 
 .activities-summary-label {
   margin: 0;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -83,9 +88,6 @@
   margin: 0;
   color: var(--text-primary);
   font-size: 22px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
 }
 
 .activities-summary-caption {
@@ -116,25 +118,26 @@
   border-radius: var(--radius-pill);
   background: var(--ax-well);
   cursor: default;
-  transition: height 0.14s ease;
+  transition: height var(--dur-base) var(--ease);
 }
 
-.activities-mix-bar.is-probing,
-.activities-mix-bar:focus-visible {
+.activities-mix-bar.is-probing {
   height: 16px;
 }
 
+/* Inside: the bar is as wide as its column, which clips anything past it. */
 .activities-mix-bar:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  height: 16px;
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .activities-mix-bar i {
   min-width: 2px;
   background: var(--sport-mix-color, var(--sport-other));
   transition:
-    opacity 0.14s ease,
-    filter 0.14s ease;
+    opacity var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
 }
 
 /*
@@ -173,7 +176,7 @@
   display: grid;
   gap: 2px;
   padding: 7px 11px;
-  border: 1px solid var(--ax-edge);
+  border: 1px solid var(--surface-line, var(--ax-edge));
   border-radius: var(--radius-md);
   /*
    * `--surface`, not `--ax-raised`: a raised face on this screen is a tint of
@@ -262,33 +265,6 @@
   gap: 8px 12px;
 }
 
-.activities-period {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-pill);
-  background: var(--ax-well);
-}
-
-.activities-period-option {
-  padding: 5px 12px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activities-period-option:hover:not(.is-active) {
-  color: var(--text-secondary);
-}
-
-.activities-period-option.is-active {
-  background: var(--ax-raised);
-  color: var(--text-primary);
-}
 
 .activities-sports {
   display: flex;
@@ -296,37 +272,6 @@
   gap: 6px;
 }
 
-.activities-sport-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activities-sport-toggle i {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-xs);
-  background: var(--sport-mix-color, var(--sport-other));
-}
-
-.activities-sport-toggle:hover:not(.is-active) {
-  color: var(--text-secondary);
-  border-color: color-mix(in srgb, var(--text-secondary) 40%, transparent);
-}
-
-.activities-sport-toggle.is-active {
-  border-color: color-mix(in srgb, var(--sport-mix-color) 45%, transparent);
-  background: color-mix(in srgb, var(--sport-mix-color) 14%, transparent);
-  color: var(--text-primary);
-}
 
 .activities-search {
   display: inline-flex;
@@ -354,6 +299,12 @@
 
 .activities-search input:focus {
   outline: none;
+}
+
+/* The input is borderless inside the pill, so the pill wears the ring. */
+.activities-search:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .activities-search input::-webkit-search-cancel-button {
@@ -422,7 +373,7 @@
   background: var(--ax-heading);
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -464,8 +415,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background-color 0.14s ease,
-    border-color 0.14s ease;
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .activity-row-open:hover {
@@ -488,14 +439,14 @@
   padding: 2px 0;
   border-radius: var(--radius-sm);
   background: var(--ax-well);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .activity-row-date em {
   color: var(--text-muted);
   font-size: 10px;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -570,7 +521,7 @@
    * loudest thing on the screen and the rarest action on it.
    */
   opacity: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .activity-row:hover .activity-row-actions,
@@ -694,20 +645,22 @@
   gap: 10px;
 }
 
+/* Inside the split panel, so L2: a wash in a hairline at the inner radius. On
+   paper `--ax-raised` is white, which drew these as cards on the white card. */
 .activity-detail-headline > div {
   display: grid;
   gap: 2px;
   min-width: 0;
   padding: 12px 14px;
   border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-md);
-  background: var(--ax-raised);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
 }
 
 .activity-detail-headline span {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -733,8 +686,8 @@
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   overflow: hidden;
   border: 1px solid var(--ax-edge);
-  border-radius: var(--radius-md);
-  background: var(--ax-heading);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
 }
 
 .activity-detail-figures > div {
@@ -775,7 +728,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -895,7 +848,7 @@
 .activity-lap-table th {
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

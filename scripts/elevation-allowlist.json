@@ -1,0 +1,13 @@
+{
+  "about": "Both rules of the elevation ladder are held across the app as of 2026-09-17 (phase 7c of docs/ui-system-refinement.md), so the two lists below are empty and a new violation fails the test outright. `exempt` is the other thing: a rule that breaks a rule and is right to, with the reason written out. An exempt entry is counted nowhere and must still apply — one matching no violating rule fails, so a converted rule cannot leave its reason behind. If a list has to grow again, say why in the change that grows it.",
+  "exempt": {
+    "src/gear/gear.css|.gear-auth-copy::after": "The dev-only Gear screen sign-in halo: two 55px rings of 4% accent drawn as a shadow. It is a light source behind the copy, not an edge round a box.",
+    "src/styles.css|.training-recovery-ring::before": "The recovery ring itself. The ring is the datum and the glow is its colour; neither is elevation.",
+    "src/styles.css|.watchface-studio-preview": "A watch, drawn: the 9px border is the case, the 2px ring the bezel and the drop shadow the watch sitting on the page.",
+    "src/watchfaces/watchfaces.css|:is(.watchfaces-view, .wf-watchfaces, .watchface-shell) :where(.watchface-studio-preview, .wf-preview-canvas)": "The same watch, scoped to the studio shell.",
+    "src/watchfaces/watchfaces.css|.watchface-create-preview-stack img": "A stack of face previews, each an image of a watch on its strap.",
+    "src/watchfaces/watchfaces.css|.watchface-shell .watchface-auth-gallery-face": "Gallery faces on the sign-in screen: images of watches, not cards."
+  },
+  "borderAndShadow": {},
+  "shadowOutsideTokens": {}
+}

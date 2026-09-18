@@ -1,6 +1,7 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { Check, ChevronDown, Footprints, Heart } from "lucide-react";
+import { Footprints, Heart } from "lucide-react";
+import { OptionGroup } from "../../components/OptionGroup";
 import {
   Cell,
   Pie,
@@ -48,6 +49,12 @@ interface TrainingZoneDistributionChartsProps {
   lthrZones: TrainingHubThresholdZone[];
   activities: TrainingHubActivity[];
   analytics: TrainingHubAnalytics | null;
+  /**
+   * The activities and the snapshot these read are still arriving. An empty
+   * result says "you have not trained" otherwise, which is a claim about the
+   * athlete made while the app has simply not looked yet.
+   */
+  loading?: boolean;
 }
 
 interface ZoneDistributionPanelProps {
@@ -641,151 +648,14 @@ function MetricDropdown<TValue extends string>({
   options,
   onChange
 }: MetricDropdownProps<TValue>) {
-  const dropdownId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [highlightedValue, setHighlightedValue] = useState<TValue>(value);
-  const selectedOption = options.find((option) => option.value === value);
-  const selectedLabel = selectedOption?.label ?? "Select metric";
-  const labelId = `${dropdownId}-label`;
-  const valueId = `${dropdownId}-value`;
-  const menuId = `${dropdownId}-menu`;
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setHighlightedValue(value);
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape" || event.key === "Tab") {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleDocumentKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleDocumentKeyDown);
-    };
-  }, [isOpen, value]);
-
-  function moveHighlight(direction: 1 | -1) {
-    if (options.length === 0) {
-      return;
-    }
-
-    const currentIndex = options.findIndex(
-      (option) => option.value === highlightedValue
-    );
-    const fallbackIndex = options.findIndex((option) => option.value === value);
-    const startIndex =
-      currentIndex >= 0 ? currentIndex : Math.max(fallbackIndex, 0);
-    const nextIndex = (startIndex + direction + options.length) % options.length;
-    const nextOption = options[nextIndex];
-
-    if (nextOption) {
-      setHighlightedValue(nextOption.value);
-    }
-  }
-
-  function selectOption(nextValue: TValue) {
-    onChange(nextValue);
-    setIsOpen(false);
-  }
-
-  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-
-      if (!isOpen) {
-        setIsOpen(true);
-        setHighlightedValue(value);
-        return;
-      }
-
-      moveHighlight(event.key === "ArrowDown" ? 1 : -1);
-      return;
-    }
-
-    if ((event.key === "Enter" || event.key === " ") && isOpen) {
-      event.preventDefault();
-      selectOption(highlightedValue);
-    }
-  }
-
   return (
-    <div className="training-zone-select" ref={rootRef}>
-      <span className="sr-only" id={labelId}>
-        {label}
-      </span>
-      <button
-        type="button"
-        className="training-zone-select-trigger"
-        aria-controls={menuId}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        aria-labelledby={`${labelId} ${valueId}`}
-        onClick={() => setIsOpen((current) => !current)}
-        onKeyDown={handleTriggerKeyDown}
-      >
-        <span className="training-zone-select-value" id={valueId}>
-          {selectedLabel}
-        </span>
-        <ChevronDown
-          className="training-zone-select-icon"
-          size={17}
-          strokeWidth={2.4}
-          aria-hidden="true"
-        />
-      </button>
-
-      {isOpen ? (
-        <div
-          className="training-zone-select-menu"
-          id={menuId}
-          role="listbox"
-          aria-label={label}
-        >
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            const isActive = option.value === highlightedValue;
-
-            return (
-              <button
-                type="button"
-                className={[
-                  "training-zone-select-option",
-                  isSelected ? "is-selected" : "",
-                  isActive ? "is-active" : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                key={option.value}
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => selectOption(option.value)}
-                onMouseEnter={() => setHighlightedValue(option.value)}
-              >
-                <span>{option.label}</span>
-                {isSelected ? (
-                  <Check size={15} strokeWidth={2.6} aria-hidden="true" />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+    <OptionGroup
+      label={label}
+      mode="dropdown"
+      value={value}
+      options={options}
+      onChange={onChange}
+    />
   );
 }
 
@@ -793,7 +663,8 @@ export function TrainingZoneDistributionCharts({
   hrZoneModel,
   lthrZones,
   activities,
-  analytics
+  analytics,
+  loading = false
 }: TrainingZoneDistributionChartsProps) {
   const { unitSystem } = useUnitSystem();
   const [heartRateMetric, setHeartRateMetric] = useSelectionPreference(
@@ -848,7 +719,11 @@ export function TrainingZoneDistributionCharts({
         <ZoneDistributionPanel
           title={heartRateTitle}
           subtitle="Training Load"
-          emptyMessage="No heart rate zone distribution data loaded."
+          emptyMessage={
+            loading
+              ? "Reading your activities from COROS…"
+              : "No heart rate zone distribution data loaded."
+          }
           variant="heart"
           heroKicker="Primary zone"
           metricColumnLabel={HEART_RATE_METRIC_LABELS[heartRateMetric]}
@@ -867,7 +742,11 @@ export function TrainingZoneDistributionCharts({
         <ZoneDistributionPanel
           title="Distance Zones"
           subtitle="Distribution"
-          emptyMessage="No activities with a recorded distance in the last four weeks."
+          emptyMessage={
+            loading
+              ? "Reading your activities from COROS…"
+              : "No activities with a recorded distance in the last four weeks."
+          }
           variant="distance"
           heroKicker="Most sessions"
           coverageNote="Sports that record distance — running, cycling, swimming…"

@@ -32,6 +32,7 @@ import {
   Watch,
   X
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import type {
   CorosWatchfaceArchive,
   CorosWatchfaceDesignState,
@@ -1143,19 +1144,17 @@ export function WatchfacesView({
               ) : null}
               <label className="field">
                 Region
-                <select
+                <OptionGroup
+                  label="Region"
+                  mode="dropdown"
+                  size="md"
                   value={region}
-                  onChange={(event) => {
-                    setRegion(event.target.value as CorosWatchfaceRegion);
+                  options={REGION_OPTIONS}
+                  onChange={(next) => {
+                    setRegion(next);
                     setRegionTouched(true);
                   }}
-                >
-                  {REGION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label className="field">
                 Email
@@ -1899,46 +1898,57 @@ function CommunityWatchfaceBrowser({
         </label>
         <label>
           <span>Watch model</span>
-          <select
+          <OptionGroup
+            label="Watch model"
+            mode="dropdown"
             value={model}
-            onChange={(event) => {
+            options={[
+              { value: "", label: "All watches" },
+              ...(catalog?.facets.models ??
+                (connectedModel ? [connectedModel] : [])
+              ).map((item) => ({ value: item, label: item }))
+            ]}
+            onChange={(next) => {
               modelTouchedRef.current = true;
-              setModel(event.target.value);
+              setModel(next);
               setPage(1);
             }}
-          >
-            <option value="">All watches</option>
-            {(catalog?.facets.models ?? (connectedModel ? [connectedModel] : []))
-              .map((item) => <option key={item}>{item}</option>)}
-          </select>
+          />
         </label>
         <label>
           <span>Style</span>
-          <select
+          <OptionGroup
+            label="Style"
+            mode="dropdown"
             value={style}
-            onChange={(event) => {
-              setStyle(event.target.value);
+            options={[
+              { value: "", label: "All styles" },
+              ...(catalog?.facets.styles ?? []).map((item) => ({
+                value: item.value,
+                label: item.label
+              }))
+            ]}
+            onChange={(next) => {
+              setStyle(next);
               setPage(1);
             }}
-          >
-            <option value="">All styles</option>
-            {(catalog?.facets.styles ?? []).map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
+          />
         </label>
         <label>
           <span>Sort</span>
-          <select
+          <OptionGroup
+            label="Sort"
+            mode="dropdown"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value === "title" ? "title" : "newest");
+            options={[
+              { value: "newest", label: "Newest first" },
+              { value: "title", label: "Name A–Z" }
+            ]}
+            onChange={(next) => {
+              setSort(next === "title" ? "title" : "newest");
               setPage(1);
             }}
-          >
-            <option value="newest">Newest first</option>
-            <option value="title">Name A–Z</option>
-          </select>
+          />
         </label>
       </div>
 
@@ -2795,41 +2805,49 @@ function TemplatesPanel(props: TemplatesPanelProps) {
       <form className="watchface-template-controls" onSubmit={props.onSubmit}>
         <label className="field">
           Catalog
-          <select
-            id="watchface-template-catalog"
+          <OptionGroup
+            label="Catalog"
+            mode="dropdown"
+            size="md"
             value={props.catalog}
-            onChange={(event) =>
-              props.onCatalogChange(event.target.value as CorosWatchfaceThemeCatalog)
-            }
-          >
-            <option value="editable">Editable templates</option>
-            <option value="official">Official watch faces</option>
-            <option value="custom">My custom watch faces</option>
-          </select>
+            options={[
+              { value: "editable", label: "Editable templates" },
+              { value: "official", label: "Official watch faces" },
+              { value: "custom", label: "My custom watch faces" }
+            ]}
+            onChange={props.onCatalogChange}
+          />
         </label>
         <label className="field watchface-model-field">
           <span className="watchface-model-label">
             <span>Watch model</span>
             <span>Match your device</span>
           </span>
-          <select
-            aria-describedby="watchface-model-guidance"
+          <OptionGroup<WatchModelId | "">
+            label="Watch model"
+            mode="dropdown"
+            size="md"
             value={props.watchModel}
-            onChange={(event) =>
-              props.onWatchModelChange(event.target.value as WatchModelId)
-            }
-          >
-            {props.watchModel === "" ? (
-              <option value="" disabled>
-                Custom firmware (advanced)
-              </option>
-            ) : null}
-            {TEMPLATE_WATCH_OPTIONS.map((option) => (
-              <option key={option.model} value={option.model}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={[
+              // Only offered while it is what the project already has: a face
+              // built against custom firmware names no model, and picking that
+              // deliberately is not something this control can do.
+              ...(props.watchModel === ""
+                ? [
+                    {
+                      value: "" as const,
+                      label: "Custom firmware (advanced)",
+                      disabled: true
+                    }
+                  ]
+                : []),
+              ...TEMPLATE_WATCH_OPTIONS.map((option) => ({
+                value: option.model,
+                label: option.label
+              }))
+            ]}
+            onChange={(next) => props.onWatchModelChange(next as WatchModelId)}
+          />
           <span className="sr-only" id="watchface-model-guidance">
             Choose the exact COROS model that will receive this watch face.
           </span>
@@ -3167,19 +3185,14 @@ function PublishDialog(props: PublishDialogProps) {
               ) : null}
               <label className="field">
                 Account region
-                <select
-                  autoFocus
+                <OptionGroup
+                  label="Account region"
+                  mode="dropdown"
+                  size="md"
                   value={props.region}
-                  onChange={(event) =>
-                    props.onRegionChange(event.target.value as CorosWatchfaceRegion)
-                  }
-                >
-                  {REGION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  options={REGION_OPTIONS}
+                  onChange={props.onRegionChange}
+                />
               </label>
               <label className="field">
                 Email

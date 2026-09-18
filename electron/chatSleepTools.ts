@@ -337,11 +337,22 @@ export function formatSleepSummaryForChat(
     : undefined;
 
   if (records.length === 0) {
-    if (!snapshot.mcpConnected) {
+    if (snapshot.mcpState === "disconnected") {
       return (
         "No sleep data: COROS MCP is not connected. Ask the athlete to connect it " +
         "in Settings → MCP Servers."
       );
+    }
+    if (snapshot.mcpState === "unreachable") {
+      // The error, where there is one, belongs here rather than in the generic
+      // line below: this is the branch where a failed fetch is the whole story.
+      return [
+        "No sleep data: the COROS MCP server is connected but did not answer.",
+        "It may be offline; nothing needs connecting.",
+        errorNote
+      ]
+        .filter(Boolean)
+        .join(" ");
     }
     return [`No sleep recorded in the last ${nights} nights.`, errorNote].filter(Boolean).join(" ");
   }
@@ -529,10 +540,12 @@ export function formatSleepNightForChat(
 
   if (!hrv && !stress) {
     lines.push(
-      series.mcpConnected
+      series.mcpState === "ready"
         ? "- No HRV or stress samples for this night. COROS keeps them about a week, so " +
             "older nights have none."
-        : "- No samples: COROS MCP is not connected."
+        : series.mcpState === "unreachable"
+          ? "- No samples: the COROS MCP server did not answer."
+          : "- No samples: COROS MCP is not connected."
     );
   }
   if (series.error) {

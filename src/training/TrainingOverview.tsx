@@ -53,6 +53,8 @@ export function TrainingOverview({
   upcomingWorkouts,
   sportTypes,
   snapshot,
+  snapshotStatus = "ready",
+  activitiesStatus = "ready",
   rpeBackfill,
   busy,
   sleepConnecting,
@@ -68,6 +70,11 @@ export function TrainingOverview({
   onReconnect
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
+  // Every panel below draws from one of these two loads, and each answers an
+  // empty result with a sentence about the athlete's training. Neither may be
+  // said before the load it describes has finished.
+  const snapshotPending = snapshotStatus === "pending" && !snapshot;
+  const activitiesPending = activitiesStatus === "pending" && activities.length === 0;
   // The zone distribution is labelled with whichever heart-rate model the
   // Personal screen has selected, not LTHR by default.
   const { model: hrZoneModel } = useHeartRateZoneModel({ api, corosConnected: connected });
@@ -97,7 +104,7 @@ export function TrainingOverview({
         weekLoadTotal: undefined,
         rhrDelta: undefined,
         steps: undefined,
-        mcpConnected: undefined
+        mcpState: undefined
       },
     [snapshot]
   );
@@ -429,10 +436,18 @@ export function TrainingOverview({
             </div>
             <div className="training-intelligence-grid">
               <div className="training-intelligence-column">
-                <RecoveryRing summary={summary} weekTotals={weekTotals} />
+                <RecoveryRing
+                  summary={summary}
+                  weekTotals={weekTotals}
+                  loading={snapshotPending}
+                />
               </div>
               <div className="training-intelligence-column">
-                <FitnessTrendPanel snapshot={snapshot} activities={activities} />
+                <FitnessTrendPanel
+                  snapshot={snapshot}
+                  activities={activities}
+                  loading={snapshotPending || activitiesPending}
+                />
                 <SleepSummaryPanel
                   sleep={snapshot?.sleep}
                   connecting={sleepConnecting}
@@ -457,6 +472,7 @@ export function TrainingOverview({
               snapshot={snapshot}
               activities={activities}
               rpeBackfill={rpeBackfill}
+              loading={snapshotPending || activitiesPending}
             />
           </div>
           <TrainingZoneDistributionCharts
@@ -464,13 +480,16 @@ export function TrainingOverview({
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             activities={activities}
             analytics={snapshot?.analytics ?? null}
+            loading={snapshotPending || activitiesPending}
           />
           <Suspense fallback={null}>
             <LazyStrengthDistributionSection api={api} status={status} />
           </Suspense>
           <TrainingTrendCharts
             points={snapshot?.trendPoints ?? []}
-            mcpConnected={snapshot?.sleep?.mcpConnected}
+            mcpState={snapshot?.sleep?.mcpState}
+            loading={snapshotPending}
+            sleepLoading={sleepConnecting && !snapshot?.sleep}
           />
         </>
       ) : null}

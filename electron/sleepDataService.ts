@@ -1,5 +1,6 @@
 import {
   callCorosMcpTool,
+  corosMcpFailureState,
   ensureCorosMcpConnected,
   getCorosMcpTools,
   listCorosMcpTools
@@ -1912,22 +1913,31 @@ function pinnedHappenDay(args: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/**
+ * `refused` separates "the server has no nights for this window" from "every
+ * call threw". Both come back with no records, and only the second is the
+ * server's fault — an empty list reported as fine is what put "Sync your watch
+ * to see it here" on a screen whose every request had errored.
+ */
 async function fetchSleepRecords(
   sleepTool: CorosMcpTool,
   days: number
-): Promise<TrainingHubSleepRecord[]> {
+): Promise<{ records: TrainingHubSleepRecord[]; refused: boolean }> {
   // The candidates are ordered best-first now that they are built from the
   // tool's own schema, so the first answer carrying nights is *the* answer and
   // the rest of the list exists only for a server that refused it. Scoring the
   // responses against each other made sense while twenty of them were fired
   // blind; ranking a list of one does not.
+  let answered = false;
+
   for (const args of buildSleepToolArgs(sleepTool, days)) {
     try {
       const response = await callCorosMcpTool(sleepTool.name, args);
       const records = parseSleepDataResponse(response, pinnedHappenDay(args));
+      answered = true;
 
       if (records.length > 0) {
-        return records;
+        return { records, refused: false };
       }
     } catch (error) {
       console.warn(
@@ -1937,7 +1947,7 @@ async function fetchSleepRecords(
     }
   }
 
-  return [];
+  return { records: [], refused: !answered };
 }
 
 export async function getTrainingSleepData(
@@ -1950,7 +1960,7 @@ export async function getTrainingSleepData(
   if (!connected) {
     return {
       records: [],
-      mcpConnected: false
+      mcpState: corosMcpFailureState()
     };
   }
 
@@ -1962,25 +1972,28 @@ export async function getTrainingSleepData(
 
   const sleepTool = resolveSleepTool(getCorosMcpTools());
   if (!sleepTool) {
+    // Connected, and it offers nothing that reads sleep. Nothing in Settings
+    // fixes that, so it reads as a server that could not serve rather than one
+    // waiting to be connected.
     return {
       records: [],
-      mcpConnected: true
+      mcpState: "unreachable"
     };
   }
 
   try {
-    const records = await fetchSleepRecords(sleepTool, days);
+    const { records, refused } = await fetchSleepRecords(sleepTool, days);
 
     return {
       latest: pickLatestSleepRecord(records),
       records,
-      mcpConnected: true
+      mcpState: refused ? "unreachable" : "ready"
     };
   } catch (error) {
     console.warn("[sleepDataService] Failed to fetch sleep data:", error);
     return {
       records: [],
-      mcpConnected: true
+      mcpState: "unreachable"
     };
   }
 }

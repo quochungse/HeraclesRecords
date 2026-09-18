@@ -1336,9 +1336,24 @@ export async function getCoachCorosProfile(): Promise<CorosProfile | null> {
   }
 }
 
+/**
+ * The snapshot being read right now, shared by everyone who asks while it is
+ * still in the air.
+ *
+ * The cache only answers once a read has *finished*, and three places in the
+ * renderer ask for this the moment the window mounts — the rail's identity row,
+ * the heart-rate zone model and the Personal screen — so on a cold cache each
+ * of them opened its own `/account/query` plus dashboard pair. COROS is asked
+ * once instead, and the other callers await the same promise.
+ */
+let corosProfileSnapshotInFlight: Promise<CorosProfileSnapshot> | null = null;
+
 export function invalidateCorosProfileCache(): void {
   corosProfileCache = null;
   coachProfileCache = null;
+  // A read still in the air was started against the account that has just gone;
+  // let it finish for whoever asked, but do not hand it to anyone new.
+  corosProfileSnapshotInFlight = null;
 }
 
 /**
@@ -1349,22 +1364,36 @@ export function invalidateCorosProfileCache(): void {
 export async function getCorosProfileSnapshot(
   options?: { refresh?: boolean }
 ): Promise<CorosProfileSnapshot> {
-  if (
-    !options?.refresh &&
-    corosProfileCache &&
-    Date.now() < corosProfileCache.expiresAt
-  ) {
-    return corosProfileCache.snapshot;
+  if (!options?.refresh) {
+    if (corosProfileCache && Date.now() < corosProfileCache.expiresAt) {
+      return corosProfileCache.snapshot;
+    }
+    if (corosProfileSnapshotInFlight) {
+      return corosProfileSnapshotInFlight;
+    }
   }
 
-  // A failed dashboard only empties two panels, so it must not cost the user
-  // the profile as well.
-  const [profile, dashboard] = await Promise.all([
-    getCorosProfile(),
-    getTrainingDashboard().catch(() => null)
-  ]);
+  const request = (async () => {
+    // A failed dashboard only empties two panels, so it must not cost the user
+    // the profile as well.
+    const [profile, dashboard] = await Promise.all([
+      getCorosProfile(),
+      getTrainingDashboard().catch(() => null)
+    ]);
 
-  return storeCorosProfileSnapshot(profile, dashboard);
+    return storeCorosProfileSnapshot(profile, dashboard);
+  })();
+
+  corosProfileSnapshotInFlight = request;
+  try {
+    return await request;
+  } finally {
+    // Only if this is still the read others are waiting on: an explicit
+    // refresh started meanwhile owns the slot from then on.
+    if (corosProfileSnapshotInFlight === request) {
+      corosProfileSnapshotInFlight = null;
+    }
+  }
 }
 
 /**

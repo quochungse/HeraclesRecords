@@ -1,5 +1,4 @@
 :root {
-  --map-app-background: #080b0e;
   --map-panel-background: #0d1115;
   --map-secondary-surface: #11161b;
   --map-elevated-surface: #151b20;
@@ -11,7 +10,6 @@
   --map-text-secondary: #a5afb6;
   --map-text-muted: #748089;
   --map-accent: var(--accent);
-  --map-accent-hover: var(--accent-strong);
   --map-accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
   --map-accent-gradient: var(--accent-gradient);
   /* Neutral, not gold-tinted: it sits on whichever palette is active. */
@@ -21,26 +19,17 @@
   --map-globe-rim-light: rgba(121, 184, 226, 0.08);
   --map-globe-star: rgba(181, 216, 239, 0.42);
   --map-globe-star-dim: rgba(124, 164, 192, 0.22);
-  --map-globe-geography: rgba(205, 218, 221, 0.34);
-  --map-globe-selected: var(--accent-strong);
   --map-globe-label-bg: rgba(6, 12, 14, 0.92);
   --map-globe-label-border: rgba(131, 243, 206, 0.16);
   --map-globe-label-text: #eaf8f3;
-  --map-globe-control-shadow: rgba(1, 8, 12, 0.3);
-  --map-heat-low: rgba(231, 176, 76, 0.2);
-  --map-heat-medium: rgba(72, 204, 160, 0.6);
-  --map-heat-high: rgba(194, 247, 226, 0.94);
   --map-panel-shadow:
     inset 0 1px 0 rgba(235, 242, 246, 0.04),
-    0 24px 54px rgba(0, 0, 0, 0.28);
-  --map-card-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.18),
-    0 12px 30px rgba(0, 0, 0, 0.16);
+    var(--shadow-elevated);
+  --map-card-shadow: var(--shadow-card);
   --map-ease: cubic-bezier(0.22, 0.61, 0.21, 1);
 }
 
 :root[data-theme="paper"] {
-  --map-app-background: #eef1f3;
   --map-panel-background: #f7f8f9;
   --map-secondary-surface: #eef1f2;
   --map-elevated-surface: #e7ebed;
@@ -52,7 +41,6 @@
   --map-text-secondary: #4d575e;
   --map-text-muted: #737e85;
   --map-accent: var(--accent);
-  --map-accent-hover: var(--accent-strong);
   --map-accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
   --map-accent-gradient: var(--accent-gradient);
   --map-on-accent: #f4fbf8;
@@ -61,22 +49,13 @@
   --map-globe-rim-light: rgba(82, 132, 166, 0.045);
   --map-globe-star: rgba(65, 91, 108, 0.14);
   --map-globe-star-dim: rgba(65, 91, 108, 0.07);
-  --map-globe-geography: rgba(84, 95, 103, 0.56);
-  --map-globe-selected: var(--accent);
   --map-globe-label-bg: rgba(32, 39, 43, 0.91);
   --map-globe-label-border: rgba(8, 123, 91, 0.2);
   --map-globe-label-text: #f5faf8;
-  --map-globe-control-shadow: rgba(42, 61, 72, 0.14);
-  --map-heat-low: rgba(36, 174, 132, 0.2);
-  --map-heat-medium: rgba(20, 157, 116, 0.58);
-  --map-heat-high: rgba(4, 111, 80, 0.92);
   --map-panel-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 1px 2px rgba(19, 26, 40, 0.05),
-    0 18px 44px rgba(19, 26, 40, 0.1);
-  --map-card-shadow:
-    0 1px 2px rgba(19, 26, 40, 0.07),
-    0 10px 26px rgba(19, 26, 40, 0.08);
+    var(--shadow-elevated);
+  --map-card-shadow: var(--shadow-card);
 }
 
 .training-map {
@@ -92,8 +71,8 @@
   margin-inline: auto;
   padding: clamp(18px, 1.6vw, 26px);
   overflow: hidden;
-  border: 1px solid var(--map-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--map-border));
+  border-radius: var(--radius-md);
   background:
     radial-gradient(
       ellipse 52% 38% at 100% 0%,
@@ -133,7 +112,7 @@
   margin: 0 0 8px;
   color: var(--map-accent);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -153,7 +132,7 @@
   font-family: var(--font-display);
   font-size: clamp(28px, 2.3vw, 36px);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -161,7 +140,7 @@
   margin: 7px 0 0;
   color: var(--map-text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 /* The screen before a COROS session exists: the same title the card wears, over
@@ -182,18 +161,31 @@
 .training-map-page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1.02;
-  letter-spacing: -0.02em;
 }
 
 .training-map-page-header > p:last-child {
   margin: 7px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
+}
+
+/*
+ * The globe card carries its own palette (`--map-*`) and keeps it on both
+ * themes — it is a dark card on the paper page. The shared option control
+ * would otherwise take the app's chrome colours and draw dark ink on that dark
+ * card, so it is re-based here. Custom properties resolve where they are
+ * declared, which is what makes this work without the component knowing.
+ */
+.training-map-period-wrap .option-group {
+  --option-edge: var(--map-border);
+  --option-well: var(--map-secondary-surface);
+  --option-raised: var(--map-elevated-surface);
+  --option-lift: 0 3px 10px color-mix(in srgb, var(--map-accent) 30%, transparent);
+  --accent: var(--map-accent);
+  --text-primary: var(--map-text-primary);
+  --text-secondary: var(--map-text-secondary);
 }
 
 .training-map-period-wrap {
@@ -201,56 +193,7 @@
   gap: 10px;
 }
 
-.training-map-periods {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  border: 1px solid var(--map-border);
-  border-radius: var(--radius-md);
-  background: var(--map-secondary-surface);
-  box-shadow:
-    inset 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);
-  padding: 4px;
-}
 
-.training-map-periods button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  min-height: 36px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--map-text-secondary);
-  padding: 0 7px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color 200ms var(--map-ease),
-    background 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease),
-    transform 120ms var(--map-ease);
-}
-
-.training-map-periods button:hover {
-  color: var(--map-text-primary);
-  background: color-mix(in srgb, var(--map-elevated-surface) 84%, transparent);
-}
-
-.training-map-periods button.is-selected {
-  background: var(--map-accent-gradient);
-  color: var(--map-on-accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 3px 10px color-mix(in srgb, var(--map-accent) 30%, transparent);
-}
-
-.training-map-periods button:active,
 .training-map-view-action:active,
 .training-map-recent-list > button:active,
 .training-map-reset:active,
@@ -258,13 +201,13 @@
   transform: translateY(1px);
 }
 
-.training-map-periods button:focus-visible,
 .training-map-date-range input:focus-visible,
 .training-map-view-action:focus-visible,
 .training-map-recent-list > button:focus-visible,
 .training-map-reset:focus-visible,
 .training-map-recent-controls button:focus-visible {
-  outline: 2px solid var(--map-accent);
+  --focus-ring-color: var(--map-accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -272,7 +215,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  animation: training-map-content-in 200ms ease both;
+  animation: training-map-content-in 200ms var(--ease) both;
 }
 
 .training-map-date-range label {
@@ -286,8 +229,8 @@
   background: var(--map-card-surface);
   padding: 4px 10px 4px 12px;
   transition:
-    border-color 180ms var(--map-ease),
-    box-shadow 180ms var(--map-ease);
+    border-color var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-date-range label:focus-within {
@@ -298,7 +241,7 @@
 .training-map-date-range label > span {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -316,7 +259,7 @@
 
 .training-map-stats {
   overflow: hidden;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background:
     linear-gradient(
@@ -364,12 +307,12 @@
   color: var(--map-text-muted);
   font-size: 10px;
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .training-map-primary-stat dt span {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -399,7 +342,7 @@
   font-family: var(--font-display);
   font-size: clamp(28px, 2vw, 36px);
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
@@ -411,7 +354,12 @@
 
 .training-map-secondary-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Sized to their contents, not to a quarter each: the four read "30",
+     "124 m", "7,495 TL" and "33,119 kcal", so equal columns starve the widest
+     while the first has room to spare — it ran 7px past its column once the
+     figures moved to the display face. */
+  grid-template-columns: repeat(4, minmax(0, auto));
+  justify-content: space-between;
   border-top: 1px solid var(--map-border);
   background: color-mix(in srgb, var(--map-text-primary) 2.5%, transparent);
   padding: 12px 10px;
@@ -420,9 +368,12 @@
 .training-map-secondary-stats > div {
   display: flex;
   align-items: center;
-  gap: 9px;
+  /* Tight on purpose: four cells, and the widest reads "33,119 kcal". The
+     figures are set in the display face now, which is wider than Inter at the
+     same size, and at 12px of padding the last cell ran 7px past its column. */
+  gap: 8px;
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 8px;
 }
 
 .training-map-secondary-stats > div + div {
@@ -480,7 +431,7 @@
   flex: 1;
   min-height: 214px;
   overflow: hidden;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background:
     linear-gradient(
@@ -526,7 +477,7 @@
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
@@ -545,7 +496,7 @@
   color: var(--map-accent);
   padding: 5px 10px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -574,7 +525,7 @@
 .training-map-location-metrics dt {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -612,7 +563,7 @@
 .training-map-location-trend > div:first-child span {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -636,7 +587,7 @@
   margin: 0;
   color: var(--map-text-muted);
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .training-map-view-action {
@@ -659,13 +610,13 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 4px 14px color-mix(in srgb, var(--map-accent) 26%, transparent);
   transition:
-    filter 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    filter var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-view-action svg {
-  transition: transform 180ms var(--map-ease);
+  transition: transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-view-action:hover {
@@ -740,7 +691,7 @@
   margin: 0;
   color: var(--map-text-secondary);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .training-map-overview-values {
@@ -764,7 +715,7 @@
 .training-map-overview-values dt {
   color: var(--map-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -869,7 +820,7 @@
     radial-gradient(circle at 92% 58%, var(--map-globe-star-dim) 0 0.65px, transparent 1.15px);
   opacity: 0.82;
   pointer-events: none;
-  transition: opacity 220ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-panel.is-street-mode::before {
@@ -888,7 +839,7 @@
   inset: 0;
   min-height: 0;
   opacity: 1;
-  transition: opacity 240ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-stage .activity-globe-webgl > div {
@@ -921,7 +872,7 @@
   height: 1px;
   opacity: 1;
   pointer-events: none;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .training-map-globe-label-anchor::after {
@@ -949,10 +900,10 @@
   max-width: 176px;
   transform: translateX(-50%);
   overflow: hidden;
-  border: 1px solid var(--map-globe-label-border);
+  border: 1px solid var(--surface-line, var(--map-globe-label-border));
   border-radius: var(--radius-sm);
   background: var(--map-globe-label-bg);
-  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
   color: var(--map-globe-label-text);
   padding: 0 10px;
   font-family: var(--font-display);
@@ -999,12 +950,12 @@
   align-items: center;
   gap: 8px;
   min-height: 32px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 64%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  box-shadow: 0 8px 22px var(--map-globe-control-shadow);
+  box-shadow: var(--shadow-soft);
   color: var(--map-text-secondary);
   padding: 0 13px;
   font-size: 11px;
@@ -1026,14 +977,13 @@
   align-items: center;
   gap: 7px;
   min-height: 32px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--map-secondary-surface) 72%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--map-text-primary) 8%, transparent),
-    0 8px 22px var(--map-globe-control-shadow);
+    inset 0 1px 0 color-mix(in srgb, var(--map-text-primary) 8%, transparent), var(--shadow-soft);
   color: var(--map-text-secondary);
   padding: 0 13px;
   font-size: 11px;
@@ -1041,10 +991,10 @@
   letter-spacing: 0;
   cursor: pointer;
   transition:
-    color 180ms var(--map-ease),
-    background 180ms var(--map-ease),
-    border-color 180ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-reset:hover:not(:disabled) {
@@ -1175,10 +1125,10 @@
   color: var(--map-text-secondary);
   cursor: pointer;
   transition:
-    color 180ms var(--map-ease),
-    border-color 180ms var(--map-ease),
-    background 180ms var(--map-ease),
-    transform 160ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-recent-controls button:hover:not(:disabled) {
@@ -1205,7 +1155,7 @@
   gap: 9px;
   min-width: 0;
   min-height: 76px;
-  border: 1px solid var(--map-border);
+  border: 1px solid var(--surface-line, var(--map-border));
   border-radius: var(--radius-lg);
   background: var(--map-card-surface);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--map-text-primary) 4%, transparent);
@@ -1216,17 +1166,17 @@
   animation: training-map-content-in 300ms var(--map-ease) both;
   animation-delay: var(--recent-delay, 0ms);
   transition:
-    color 200ms var(--map-ease),
-    border-color 200ms var(--map-ease),
-    background 200ms var(--map-ease),
-    transform 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    border-color var(--dur-fast) var(--map-ease),
+    background var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-recent-list > button:hover {
   border-color: var(--map-border-strong);
   background: var(--map-card-surface-hover);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--map-text-primary) 8%, transparent);
+  box-shadow: var(--shadow-card);
   transform: translateY(-2px);
 }
 
@@ -1247,9 +1197,9 @@
   background: var(--map-accent-muted);
   color: var(--map-accent);
   transition:
-    background 200ms var(--map-ease),
-    color 200ms var(--map-ease),
-    box-shadow 200ms var(--map-ease);
+    background var(--dur-fast) var(--map-ease),
+    color var(--dur-fast) var(--map-ease),
+    box-shadow var(--dur-fast) var(--map-ease);
 }
 
 .training-map-recent-list > button.is-selected .training-map-recent-pin {
@@ -1299,8 +1249,8 @@
 .training-map-recent-chevron {
   color: var(--map-text-muted);
   transition:
-    color 180ms var(--map-ease),
-    transform 180ms var(--map-ease);
+    color var(--dur-fast) var(--map-ease),
+    transform var(--dur-base) var(--map-ease);
 }
 
 .training-map-recent-list > button:hover .training-map-recent-chevron {
@@ -1413,12 +1363,6 @@
   .training-map-header > p:last-child {
     font-size: 13px;
   }
-
-  .training-map-periods button {
-    min-height: 33px;
-    font-size: 11px;
-  }
-
   .training-map-primary-stats {
     padding-inline: 6px;
   }
@@ -1495,11 +1439,6 @@
   .training-map-header h2 {
     font-size: 28px;
   }
-
-  .training-map-periods {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .training-map-primary-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 6px 0;
@@ -1598,7 +1537,6 @@
     animation: none;
   }
 
-  .training-map-periods button,
   .training-map-view-action,
   .training-map-view-action svg,
   .training-map-recent-list > button,

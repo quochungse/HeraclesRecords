@@ -34,8 +34,9 @@ export interface SelectDropdownProps<T extends string> {
   portal?: boolean;
   title?: string;
   /**
-   * Floor for the open menu's width. Raise it for options whose text would
-   * otherwise wrap over several lines; the closed trigger is unaffected.
+   * Floor for the open menu's width, over and above the trigger's own. Raise it
+   * for options whose text would otherwise wrap over several lines; the closed
+   * trigger is unaffected.
    */
   minMenuWidth?: number;
 }
@@ -43,14 +44,22 @@ export interface SelectDropdownProps<T extends string> {
 interface MenuPosition {
   left: number;
   top: number;
-  width: number;
+  minWidth: number;
+  maxWidth: number;
   maxHeight: number;
   transform?: string;
 }
 
 type PortalTheme = CSSProperties & Record<`--${string}`, string>;
 
+/*
+ * Carried onto the portalled menu because it hangs off <body> and so inherits
+ * from :root, not from the scope the trigger sits in — the Coach rail
+ * redefines --accent and --surface for itself, and a menu that missed them
+ * came out in the app's colours inside a screen wearing its own.
+ */
 const PORTAL_THEME_VARIABLES = [
+  "--menu-surface",
   "--surface",
   "--glass-border",
   "--glass-bg-hover",
@@ -58,11 +67,16 @@ const PORTAL_THEME_VARIABLES = [
   "--text-secondary",
   "--accent",
   "--accent-soft",
+  "--accent-strong",
   "--radius-sm"
 ] as const;
 
-const MENU_CLOSE_DURATION_MS = 180;
-const DEFAULT_MIN_MENU_WIDTH = 220;
+/**
+ * The gap between the trigger and the menu, and the margin the menu keeps from
+ * the edge of the window. Named because the height arithmetic spends both.
+ */
+const MENU_GAP = 6;
+const VIEWPORT_MARGIN = 8;
 
 export function SelectDropdown<T extends string>({
   value,
@@ -81,40 +95,35 @@ export function SelectDropdown<T extends string>({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
   const typeaheadRef = useRef({ query: "", updatedAt: 0 });
   const [isOpen, setIsOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
   const [highlightedValue, setHighlightedValue] = useState<T>(value);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [portalTheme, setPortalTheme] = useState<PortalTheme>({});
   const selectedOption = options.find((option) => option.value === value);
   const selectedLabel = selectedOption?.label ?? "Select";
   const selectedIcon = renderIcon?.(value);
-  const isMenuMounted = isOpen || isClosing;
+  // A boolean rather than the array itself, because this feeds the position
+  // callback: `options` is rebuilt by most callers on every render, and a
+  // callback that changed with it would re-run the layout effect, which sets
+  // state, which renders again — a loop with no exit.
+  const hasDetail = options.some((option) => option.detail !== undefined);
   const labelId = `${dropdownId}-label`;
   const valueId = `${dropdownId}-value`;
   const menuId = `${dropdownId}-menu`;
 
   const openMenu = useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    setIsClosing(false);
     setIsOpen(true);
   }, []);
 
+  /**
+   * Closing is immediate. There was a 180ms window where the menu stayed
+   * mounted to play a close animation out, which is the one thing a picker
+   * should not spend time on: the choice is made, and the list sitting there
+   * fading is in the way of reading the result of it.
+   */
   const closeMenu = useCallback(() => {
     setIsOpen(false);
-    setIsClosing(true);
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setIsClosing(false);
-      closeTimerRef.current = null;
-    }, MENU_CLOSE_DURATION_MS);
   }, []);
 
   const updateMenuPosition = useCallback(() => {
@@ -122,29 +131,85 @@ export function SelectDropdown<T extends string>({
 
     const trigger = triggerRef.current.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(triggerRef.current);
-    const viewportMargin = 8;
-    const menuGap = 6;
-    const menuWidth = Math.min(
-      Math.max(trigger.width, minMenuWidth ?? DEFAULT_MIN_MENU_WIDTH),
-      window.innerWidth - viewportMargin * 2
+
+    /*
+     * The menu is sized by its own content — `width: max-content` in the
+     * stylesheet — between a floor and a cap given here. The floor is the
+     * trigger, so the open list never comes out narrower than the control it
+     * belongs to; anything wider than that is the list's own doing.
+     *
+     * It used to be handed one width, max(trigger, 220px), which was wrong in
+     * both directions at once: a period pill 90px wide opened a 220px menu that
+     * was half empty, and a list of model names was ellipsised inside the same
+     * 220px. Neither number was measured.
+     *
+     * The cap is the window, except where an option carries a `detail` — that
+     * is a sentence, and a sentence has no natural width, so `max-content`
+     * would run it off the screen. Those menus cap at the floor instead, which
+     * is what `.app-select-option-label.has-detail` wraps inside; their caller
+     * raises the floor to suit (ModelSwitch asks for 420).
+     */
+    const viewportCap = window.innerWidth - VIEWPORT_MARGIN * 2;
+    const minWidth = Math.min(
+      Math.max(trigger.width, minMenuWidth ?? 0),
+      viewportCap
     );
-    const preferredHeight = Math.min(menuRef.current?.scrollHeight ?? 280, 280);
-    const roomBelow = window.innerHeight - trigger.bottom - viewportMargin;
-    const roomAbove = trigger.top - viewportMargin;
-    const opensUp = roomBelow < Math.min(preferredHeight, 180) && roomAbove > roomBelow;
-    const availableRoom = Math.max(96, (opensUp ? roomAbove : roomBelow) - menuGap);
+    const maxWidth = hasDetail ? minWidth : viewportCap;
+
+    /*
+     * The height the list actually wants, not a number picked in advance. It
+     * used to be capped at 280px whatever the list held, so a nine-sport
+     * picker and every model list opened already scrolled — with the scrollbar
+     * as the only sign there was more. `scrollHeight` is the content, and the
+     * border it does not include is added back, so a list that fits shows a
+     * menu exactly as tall as itself and no scrollbar at all. What is left
+     * bounding it is the window, which is a real limit rather than a guess.
+     */
+    const menu = menuRef.current;
+    // Only trusted once the menu has been laid out. Before that there is
+    // nothing to read, and a height taken from a box with no width reports
+    // every label wrapped onto its own lines — several times the real one,
+    // which would open every menu at the full height of the window.
+    const measured = menu !== null && menu.clientWidth > 0;
+    const border = measured ? menu.offsetHeight - menu.clientHeight : 0;
+
+    const roomBelow = window.innerHeight - trigger.bottom - VIEWPORT_MARGIN;
+    const roomAbove = trigger.top - VIEWPORT_MARGIN;
+    const availableBelow = Math.max(96, roomBelow - MENU_GAP);
+    const availableAbove = Math.max(96, roomAbove - MENU_GAP);
+    const wanted = measured ? menu.scrollHeight + border : availableBelow;
+    const opensUp = roomBelow < Math.min(wanted, 180) && roomAbove > roomBelow;
+    const availableRoom = opensUp ? availableAbove : availableBelow;
+
+    // Keeping it on screen needs the width it settled at, which only the
+    // second pass knows; the first uses the floor, which is the trigger's own
+    // and so is already where the menu belongs.
+    const width = measured ? menu.offsetWidth : minWidth;
 
     setMenuPosition({
-      left: Math.max(viewportMargin, Math.min(trigger.left, window.innerWidth - menuWidth - viewportMargin)),
-      top: opensUp ? trigger.top - menuGap : trigger.bottom + menuGap,
-      width: menuWidth,
-      maxHeight: Math.min(preferredHeight, availableRoom),
+      left: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(trigger.left, window.innerWidth - width - VIEWPORT_MARGIN)
+      ),
+      top: opensUp ? trigger.top - MENU_GAP : trigger.bottom + MENU_GAP,
+      minWidth,
+      maxWidth,
+      maxHeight: Math.min(wanted, availableRoom),
       transform: opensUp ? "translateY(-100%)" : undefined
     });
-    setPortalTheme(Object.fromEntries(
-      PORTAL_THEME_VARIABLES.map((name) => [name, computedStyle.getPropertyValue(name)])
-    ) as PortalTheme);
-  }, [portal, minMenuWidth]);
+    setPortalTheme({
+      ...(Object.fromEntries(
+        PORTAL_THEME_VARIABLES.map((name) => [
+          name,
+          computedStyle.getPropertyValue(name)
+        ])
+      ) as PortalTheme),
+      // The open list reads at the size the closed control does. Portalled to
+      // <body>, the menu inherits the page's 14px, so a 12px pill used to open
+      // a 14px list — the same control in two type sizes, a step apart.
+      "--app-select-font-size": computedStyle.fontSize
+    });
+  }, [portal, minMenuWidth, hasDetail]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -175,32 +240,37 @@ export function SelectDropdown<T extends string>({
     };
   }, [closeMenu, isOpen, value]);
 
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current !== null) {
-        window.clearTimeout(closeTimerRef.current);
-      }
-    };
-  }, []);
-
   useLayoutEffect(() => {
-    if (!isMenuMounted || !portal) {
+    if (!isOpen || !portal) {
       setMenuPosition(null);
       return;
     }
 
     updateMenuPosition();
+    // Measured twice: the first pass runs before the menu has been laid out at
+    // the width this pass gives it, and a list that wraps is taller at 200px
+    // than it was at its natural width. The second reading is the one that
+    // decides whether it scrolls.
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+
     const observer = typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver(updateMenuPosition);
     if (triggerRef.current) observer?.observe(triggerRef.current);
+    if (menuRef.current) observer?.observe(menuRef.current);
     window.addEventListener("resize", updateMenuPosition);
+    // A portalled menu is positioned in viewport coordinates, so anything that
+    // scrolls underneath moves the trigger out from under it. `capture` is what
+    // reaches the scroll of a panel or dialog, which does not bubble to window.
+    window.addEventListener("scroll", updateMenuPosition, true);
 
     return () => {
+      window.cancelAnimationFrame(frame);
       observer?.disconnect();
       window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [isMenuMounted, portal, updateMenuPosition]);
+  }, [isOpen, portal, updateMenuPosition]);
 
   function moveHighlight(direction: 1 | -1) {
     if (options.length === 0) {
@@ -272,13 +342,11 @@ export function SelectDropdown<T extends string>({
     }
   }
 
-  const menu = isMenuMounted ? (
+  const menu = isOpen ? (
     <div
       className={[
         "app-select-menu",
         portal ? "is-portaled" : "",
-        isOpen && (!portal || menuPosition) ? "is-opening" : "",
-        isClosing ? "is-closing" : "",
         menuClassName
       ]
         .filter(Boolean)
@@ -287,20 +355,20 @@ export function SelectDropdown<T extends string>({
       ref={menuRef}
       role="listbox"
       aria-label={label}
-      aria-hidden={isClosing || undefined}
       data-side={menuPosition?.transform ? "top" : "bottom"}
       style={portal ? ({
         ...portalTheme,
         left: menuPosition?.left ?? 0,
         top: menuPosition?.top ?? 0,
-        width: menuPosition?.width ?? 0,
+        minWidth: menuPosition?.minWidth ?? 0,
+        maxWidth: menuPosition?.maxWidth ?? "100%",
         maxHeight: menuPosition?.maxHeight ?? 280,
         transform: menuPosition?.transform,
         visibility: menuPosition ? "visible" : "hidden"
       } satisfies CSSProperties) : undefined}
     >
       <div className="app-select-menu-list">
-        {options.map((option, index) => {
+        {options.map((option) => {
           const isSelected = option.value === value;
           const isActive = option.value === highlightedValue;
           const optionIcon = renderIcon?.(option.value);
@@ -320,9 +388,6 @@ export function SelectDropdown<T extends string>({
               key={option.value}
               role="option"
               aria-selected={isSelected}
-              style={{
-                "--app-select-delay": `${40 + index * 18}ms`
-              } as CSSProperties}
               onClick={() => selectOption(option.value)}
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => setHighlightedValue(option.value)}

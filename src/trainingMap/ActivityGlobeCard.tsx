@@ -64,6 +64,8 @@ import {
   ActivityGlobeRenderer,
   type ActivityGlobeRendererHandle,
 } from "./ActivityGlobeRenderer";
+import { OptionGroup } from "../components/OptionGroup";
+import { periodLabel } from "../preferences/periodScale";
 import {
   defineSelectionPreference,
   useSelectionPreference,
@@ -905,36 +907,32 @@ export function ActivityGlobeCard({
           </header>
 
           <div className="training-map-period-wrap">
-            <div
+            {/* Folded: four options with labels this long were the widest
+                thing on the card, and the period is chosen once and then
+                looked at. "Custom" keeps its icon — it is the one option that
+                opens something rather than answering. */}
+            <OptionGroup
+              label="Training period"
+              mode="collapsible"
               className="training-map-periods"
-              role="group"
-              aria-label="Training period"
-            >
-              {([
-                ["all", "All time"],
-                ["year", "This year"],
-                ["90-days", "Last 90 days"],
-                ["custom", "Custom"],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={period === value ? "is-selected" : undefined}
-                  aria-pressed={period === value}
-                  onClick={() =>
-                    setPeriodPreference((current) => ({
-                      ...current,
-                      period: value,
-                    }))
-                  }
-                >
-                  {label}
-                  {value === "custom" ? (
-                    <CalendarDays size={14} aria-hidden="true" />
-                  ) : null}
-                </button>
-              ))}
-            </div>
+              value={period}
+              options={[
+                { value: "all", label: "All time" },
+                { value: "year", label: "This year" },
+                { value: "90-days", label: periodLabel(90) },
+                {
+                  value: "custom",
+                  label: "Custom",
+                  icon: <CalendarDays size={14} aria-hidden="true" />
+                }
+              ]}
+              onChange={(next) =>
+                setPeriodPreference((current) => ({
+                  ...current,
+                  period: next as ActivityPeriod
+                }))
+              }
+            />
             {period === "custom" ? (
               <div className="training-map-date-range">
                 <label>

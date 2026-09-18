@@ -15,7 +15,7 @@ import {
   formatSleepDurationMinutes
 } from "../../training/formatters";
 import { useChartColors } from "../../training/useChartColors";
-import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
+import { mcpShortTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import { isSleepDayRecord, totalSleepMinutes } from "../../../electron/sleepMetrics";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
@@ -33,8 +33,11 @@ interface SleepTrendChartProps {
    * of its own decide, which is how Overview drops this into a chart shell.
    */
   height?: number | `${number}%`;
-  /** `false` names the server the missing nights were meant to come from. */
-  mcpConnected?: McpConnectionState;
+  /** Names the server the missing nights were meant to come from, when it is
+   *  the server that is missing rather than the nights. */
+  mcpState?: McpConnectionState;
+  /** The nights are still being read. Outranks every other empty line here. */
+  loading?: boolean;
 }
 
 interface TrendPoint {
@@ -58,7 +61,8 @@ export function SleepTrendChart({
   selectedDay,
   onSelectDay,
   height = 200,
-  mcpConnected
+  mcpState,
+  loading = false
 }: SleepTrendChartProps) {
   const { colors } = useChartColors();
 
@@ -82,11 +86,13 @@ export function SleepTrendChart({
   if (points.length < 2) {
     return (
       <p className="sleep-trend-empty">
-        {mcpTextOr(
-          mcpConnected,
-          `No nights to trend. ${MCP_UNAVAILABLE_SHORT}`,
-          "A trend needs more than one night. Keep syncing and it fills in here."
-        )}
+        {loading
+          ? "Reading your nights…"
+          : mcpShortTextOr(
+              mcpState,
+              "No nights to trend.",
+              "A trend needs more than one night. Keep syncing and it fills in here."
+            )}
       </p>
     );
   }

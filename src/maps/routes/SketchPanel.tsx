@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { RouteActivityType } from "../../../electron/types";
 import type { SketchFidelity } from "../../../electron/routing/sketchGeometry";
+import { OptionGroup } from "../../components/OptionGroup";
 import { SportPicker } from "./panels";
 import { SKETCH_TEMPLATES } from "./sketchShapes";
 import { isSketchTextSupported } from "./strokeFont";
@@ -81,22 +82,17 @@ export function SketchPanel({
     <div className="route-panel-body">
       <SportPicker value={activityType} onChange={onActivityChange} />
 
-      <div className="route-toggle route-sketch-tools" role="group" aria-label="Sketch tool">
-        {TOOL_OPTIONS.map((option) => {
-          const Icon = option.icon;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              className={option.id === sketch.tool ? "is-active" : ""}
-              onClick={() => sketch.setTool(option.id)}
-            >
-              <Icon size={14} aria-hidden="true" />
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      <OptionGroup
+        label="Sketch tool"
+        className="route-sketch-tools"
+        value={sketch.tool}
+        options={TOOL_OPTIONS.map((option) => ({
+          value: option.id,
+          label: option.label,
+          icon: <option.icon size={14} aria-hidden="true" />
+        }))}
+        onChange={(next) => sketch.setTool(next as SketchTool)}
+      />
 
       {sketch.tool === "freehand" ? (
         <div className="route-draw-hint">
@@ -209,18 +205,16 @@ export function SketchPanel({
 
       <div className="route-field-inline">
         <label>Fidelity</label>
-        <div className="route-chip-group" role="group" aria-label="Shape fidelity">
-          {FIDELITY_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={option.value === sketch.fidelity ? "is-active" : ""}
-              onClick={() => sketch.setFidelity(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <OptionGroup
+          label="Shape fidelity"
+          fill
+          value={sketch.fidelity}
+          options={FIDELITY_OPTIONS.map((option) => ({
+            value: option.value,
+            label: option.label
+          }))}
+          onChange={(next) => sketch.setFidelity(next as SketchFidelity)}
+        />
       </div>
 
       {sketch.ghost.length >= 2 ? (

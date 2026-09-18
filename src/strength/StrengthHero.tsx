@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Info, RotateCw } from "lucide-react";
 import type { StrengthDataSource } from "../../electron/types";
+import { OptionGroup } from "../components/OptionGroup";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -125,24 +126,16 @@ export function StrengthHero({
     >
       <section className="panel strength-body-panel">
         <div className="strength-body-controls">
-          <div className="strength-segmented" role="group" aria-label="Body view">
-            <button
-              type="button"
-              className={view === "front" ? "is-active" : ""}
-              aria-pressed={view === "front"}
-              onClick={() => requestView("front")}
-            >
-              Front
-            </button>
-            <button
-              type="button"
-              className={view === "back" ? "is-active" : ""}
-              aria-pressed={view === "back"}
-              onClick={() => requestView("back")}
-            >
-              Back
-            </button>
-          </div>
+          <OptionGroup
+            label="Body view"
+            tone="quiet"
+            value={view}
+            options={[
+              { value: "front", label: "Front" },
+              { value: "back", label: "Back" }
+            ]}
+            onChange={(next) => requestView(next as BodyView)}
+          />
           <button
             type="button"
             className="strength-flip"
@@ -151,21 +144,15 @@ export function StrengthHero({
           >
             <RotateCw size={15} aria-hidden="true" />
           </button>
-          <div className="strength-segmented is-quiet" role="group" aria-label="Heat metric">
-            {METRIC_OPTIONS.filter(
+          <OptionGroup
+            label="Heat metric"
+            tone="quiet"
+            value={metric}
+            options={METRIC_OPTIONS.filter(
               (option) => source === "coros" || option.id !== "time"
-            ).map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={metric === option.id ? "is-active" : ""}
-                aria-pressed={metric === option.id}
-                onClick={() => setMetric(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+            ).map((option) => ({ value: option.id, label: option.label }))}
+            onChange={(next) => setMetric(next as HeatMetric)}
+          />
         </div>
 
         <BodyMapV2
@@ -181,16 +168,6 @@ export function StrengthHero({
           onViewChange={requestView}
           showLayerControls={showDevelopmentTools}
         />
-
-        <div className="strength-legend" aria-hidden="true">
-          <span>Light</span>
-          <span className="strength-legend-ramp">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <i key={level} data-level={level} />
-            ))}
-          </span>
-          <span>Hammered</span>
-        </div>
       </section>
 
       <section className="panel strength-muscle-panel">

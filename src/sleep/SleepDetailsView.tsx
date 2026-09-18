@@ -6,7 +6,7 @@ import { SleepTrendChart } from "./components/SleepTrendChart";
 import { useSleepHistory } from "./useSleepHistory";
 import { useSleepNightSeries } from "./useSleepNightSeries";
 import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
-import { MCP_SLEEP_NOTICE } from "../mcp/mcpNotice";
+import { MCP_SLEEP_SUBJECT, mcpNotice } from "../mcp/mcpNotice";
 import type { CorosLinkApi } from "../coroslink-api";
 import type { TrainingTrendPoint } from "../training/types";
 import "./sleep.css";
@@ -20,6 +20,8 @@ interface SleepDetailsViewProps {
    * COROS sends no HRV with a sleep record at all — it lives in daily metrics.
    */
   trendPoints: TrainingTrendPoint[];
+  /** Whether that snapshot has arrived; `[]` alone cannot say. */
+  trendPointsLoading?: boolean;
   onOpenOverview: () => void;
 }
 
@@ -40,6 +42,7 @@ export function SleepDetailsView({
   api,
   connected,
   trendPoints,
+  trendPointsLoading = false,
   onOpenOverview
 }: SleepDetailsViewProps) {
   const { snapshot, loading, refreshing, error, refresh } = useSleepHistory(
@@ -50,7 +53,8 @@ export function SleepDetailsView({
 
   const records = useMemo(() => snapshot?.records ?? [], [snapshot]);
   // Re-answered on every read, cache hits included — as current as the screen.
-  const mcpConnected = snapshot?.mcpConnected;
+  const mcpState = snapshot?.mcpState;
+  const mcpBanner = mcpNotice(MCP_SLEEP_SUBJECT, mcpState);
 
   // Follow the newest night until the athlete picks one, and let go of a
   // selection whose night has fallen out of the window.
@@ -154,8 +158,8 @@ export function SleepDetailsView({
 
       {/* The one place here that says where to connect; the empties inside
           name the cause and stop. */}
-      {mcpConnected === false ? (
-        <p className="sleep-details-error">{MCP_SLEEP_NOTICE}</p>
+      {mcpBanner ? (
+        <p className="sleep-details-error">{mcpBanner}</p>
       ) : null}
 
       <section className="panel sleep-details-panel">
@@ -168,7 +172,7 @@ export function SleepDetailsView({
                 selectedDay={selectedDay}
                 onSelect={setSelectedDay}
                 loading={loading}
-                mcpConnected={mcpConnected}
+                mcpState={mcpState}
               />
             </div>
           </div>
@@ -180,7 +184,7 @@ export function SleepDetailsView({
               seriesLoading={seriesLoading}
               pending={loading && records.length === 0}
               hasNights={records.length > 0}
-              mcpConnected={mcpConnected}
+              mcpState={mcpState}
             />
           </div>
         </div>
@@ -192,11 +196,12 @@ export function SleepDetailsView({
           records={records}
           selectedDay={selectedDay ?? undefined}
           onSelectDay={setSelectedDay}
-          mcpConnected={mcpConnected}
+          mcpState={mcpState}
+          loading={loading && records.length === 0}
         />
       </section>
 
-      <HrvBaselineChart points={trendPoints} />
+      <HrvBaselineChart points={trendPoints} loading={trendPointsLoading} />
     </div>
   );
 }

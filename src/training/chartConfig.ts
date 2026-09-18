@@ -5,8 +5,16 @@ export const TRAINING_HEATMAP_DAYS = 365;
 /** Days the HRV and sleep trend charts open on before the athlete picks. */
 export const TRAINING_SHORT_TREND_DAYS = 7;
 
-/** Windows the HRV and sleep trend charts switch between, in render order. */
-export const TRAINING_TREND_WINDOWS = [7, 30] as const;
+/**
+ * Windows the HRV and sleep trend charts switch between, in render order.
+ *
+ * 28 rather than the 30 this used to carry: the app cuts its periods at a
+ * Monday, so four whole weeks is the window an athlete actually compares
+ * against, and 28 is what every other screen already calls "4 weeks". Two
+ * days of trend is the price of the six spellings of this window becoming one
+ * (src/preferences/periodScale.ts).
+ */
+export const TRAINING_TREND_WINDOWS = [7, 28] as const;
 
 export type TrainingTrendWindow = (typeof TRAINING_TREND_WINDOWS)[number];
 
@@ -24,9 +32,16 @@ export type TrainingHeatmapRange = "year" | "month";
 
 export const TRAINING_HEATMAP_RANGES = ["year", "month"] as const;
 
+/**
+ * 28 rather than 30 for the short range, for the reason the trend windows
+ * took the same step: the scale in src/preferences/periodScale.ts has one
+ * four-week window and every screen spells it the same way. A heatmap gains
+ * something extra by it — 28 days is four whole week columns, where 30 left a
+ * fifth column holding two days.
+ */
 export const TRAINING_HEATMAP_RANGE_DAYS: Record<TrainingHeatmapRange, number> = {
   year: TRAINING_HEATMAP_DAYS,
-  month: 30
+  month: 28
 };
 
 export interface TrainingChartColors {

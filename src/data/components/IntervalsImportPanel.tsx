@@ -26,25 +26,34 @@ import {
   formatDistanceMeters,
   formatTrainingTimestamp
 } from "../../training/formatters";
+import { OptionGroup } from "../../components/OptionGroup";
+import {
+  periodDaysFromValue,
+  periodGroupOptions,
+  periodValue,
+  type PeriodDays
+} from "../../preferences/periodScale";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 
-const DEFAULT_DAYS_BACK = 30;
+const DEFAULT_DAYS_BACK = 28;
 
-const RANGE_OPTIONS = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
-  { days: 365, label: "1 year" }
-] as const;
+/**
+ * 28 rather than 30, and "3 months" rather than "90 days": the windows are
+ * this panel's to choose and the words are the scale's
+ * (src/preferences/periodScale.ts).
+ */
+const RANGE_DAYS: readonly PeriodDays[] = [7, 28, 90, 365];
+
+const INTERVALS_RANGE_OPTIONS = periodGroupOptions(RANGE_DAYS);
 
 const INTERVALS_RANGE_PREFERENCE = defineSelectionPreference<number>({
   key: "data.intervalsDaysBack",
   defaultValue: DEFAULT_DAYS_BACK,
-  validate: selectionIsOneOf([7, 30, 90, 365])
+  validate: selectionIsOneOf([7, 28, 90, 365])
 });
 
 interface RowState {
@@ -356,25 +365,18 @@ export function IntervalsImportPanel({ api }: { api: CorosLinkApi }) {
           </div>
 
           <div className="data-intervals-toolbar">
-            <div
+            {/* Folded: the toolbar beside it carries Refresh and Import all,
+                and the range is set once before an import rather than swept
+                through. */}
+            <OptionGroup
+              label="How far back to look"
+              mode="collapsible"
               className="data-intervals-range"
-              role="radiogroup"
-              aria-label="How far back to look"
-            >
-              {RANGE_OPTIONS.map((option) => (
-                <button
-                  key={option.days}
-                  type="button"
-                  role="radio"
-                  aria-checked={daysBack === option.days}
-                  className={daysBack === option.days ? "active" : undefined}
-                  disabled={refreshing || importingAll || anyRowBusy}
-                  onClick={() => setDaysBack(option.days)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+              value={periodValue(daysBack as PeriodDays)}
+              options={INTERVALS_RANGE_OPTIONS}
+              onChange={(next) => setDaysBack(periodDaysFromValue(next) ?? 28)}
+              disabled={refreshing || importingAll || anyRowBusy}
+            />
 
             <div className="data-intervals-toolbar-actions">
               <button

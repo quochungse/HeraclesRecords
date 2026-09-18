@@ -10,6 +10,7 @@ import {
   User,
   X
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   CorosProfile,
@@ -518,13 +519,17 @@ export function ProfileView({
                   </label>
                   <label className="field">
                     <span>Sex</span>
-                    <select
+                    <OptionGroup
+                      label="Sex"
+                      size="md"
+                      fill
                       value={draft.sex}
-                      onChange={(event) => updateDraft("sex", event.target.value)}
-                    >
-                      <option value="0">Male</option>
-                      <option value="1">Female</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Male" },
+                        { value: "1", label: "Female" }
+                      ]}
+                      onChange={(next) => updateDraft("sex", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Height (cm)</span>
@@ -600,18 +605,17 @@ export function ProfileView({
                 <div className="profile-fields">
                   <label className="field">
                     <span>Zone model</span>
-                    <select
+                    <OptionGroup
+                      label="Zone model"
+                      mode="dropdown"
+                      size="md"
                       value={draft.hrZoneType}
-                      onChange={(event) =>
-                        updateDraft("hrZoneType", event.target.value)
-                      }
-                    >
-                      {HR_ZONE_MODELS.map((model) => (
-                        <option key={model.value} value={model.value}>
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={HR_ZONE_MODELS.map((model) => ({
+                        value: String(model.value),
+                        label: model.label
+                      }))}
+                      onChange={(next) => updateDraft("hrZoneType", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Max heart rate (bpm)</span>
@@ -714,25 +718,31 @@ export function ProfileView({
                 <div className="profile-fields">
                   <label className="field">
                     <span>Measurement</span>
-                    <select
+                    <OptionGroup
+                      label="Measurement"
+                      size="md"
+                      fill
                       value={draft.unit}
-                      onChange={(event) => updateDraft("unit", event.target.value)}
-                    >
-                      <option value="0">Metric</option>
-                      <option value="1">Imperial</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Metric" },
+                        { value: "1", label: "Imperial" }
+                      ]}
+                      onChange={(next) => updateDraft("unit", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Temperature</span>
-                    <select
+                    <OptionGroup
+                      label="Temperature"
+                      size="md"
+                      fill
                       value={draft.temperatureUnit}
-                      onChange={(event) =>
-                        updateDraft("temperatureUnit", event.target.value)
-                      }
-                    >
-                      <option value="0">Celsius</option>
-                      <option value="1">Fahrenheit</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Celsius" },
+                        { value: "1", label: "Fahrenheit" }
+                      ]}
+                      onChange={(next) => updateDraft("temperatureUnit", next)}
+                    />
                   </label>
                   <p className="profile-note">
                     These are COROS account settings — they change what your
@@ -810,25 +820,28 @@ export function ProfileView({
                     <X size={18} aria-hidden="true" />
                   </button>
                 </header>
-                <div className="profile-tabs" role="tablist" aria-label="Zone family">
-                  {zoneTabs.map((tab) => (
-                    <button
-                      key={tab.family}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeZoneTab === tab.family}
-                      className={activeZoneTab === tab.family ? "is-active" : ""}
-                      onClick={() => setZoneTab(tab.family)}
-                    >
-                      {/* A dot, not the words "in use": the label has to stay
-                          one line for the tab row to keep its height. */}
-                      {activeModel?.family === tab.family ? (
-                        <span className="profile-tab-dot" aria-hidden="true" />
-                      ) : null}
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Folded: up to five families, and the one in use is the one
+                    the athlete came to read. A dot, not the words "in use":
+                    the label has to stay one line. */}
+                <OptionGroup
+                  label="Zone family"
+                  mode="collapsible"
+                  className="profile-tabs"
+                  value={activeZoneTab}
+                  options={zoneTabs.map((tab) => ({
+                    value: tab.family,
+                    label: tab.label,
+                    ...(activeModel?.family === tab.family
+                      ? {
+                          icon: (
+                            <span className="profile-tab-dot" aria-hidden="true" />
+                          ),
+                          title: "The zones COROS is using"
+                        }
+                      : {})
+                  }))}
+                  onChange={setZoneTab}
+                />
                 {zoneRowCount === 0 ? (
                   <p className="profile-note">
                     COROS has no zones for this metric yet.

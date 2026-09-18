@@ -52,7 +52,7 @@ const week = formatSleepSummaryForChat(
       night(2, 480),
       night(3, 450)
     ],
-    mcpConnected: true,
+    mcpState: "ready",
     source: "cache"
   },
   7,
@@ -86,7 +86,7 @@ assert.ok(week.indexOf("09-08 Tue") < week.indexOf("09-11 Fri"), "oldest night f
 // A surplus nets out as a surplus, not as a negative deficit.
 assert.match(
   formatSleepSummaryForChat(
-    { records: [night(0, 540), night(1, 540)], mcpConnected: true, source: "cache" },
+    { records: [night(0, 540), night(1, 540)], mcpState: "ready", source: "cache" },
     7,
     today
   ),
@@ -106,7 +106,7 @@ assert.match(
           deepMinutes: 96
         })
       ],
-      mcpConnected: true,
+      mcpState: "ready",
       source: "cache"
     },
     7,
@@ -117,12 +117,23 @@ assert.match(
 
 // --- The states that are not a week of sleep ---
 assert.match(
-  formatSleepSummaryForChat({ records: [], mcpConnected: false, source: "cache" }, 7, today),
+  formatSleepSummaryForChat({ records: [], mcpState: "disconnected", source: "cache" }, 7, today),
   /COROS MCP is not connected/
 );
+// A server that is connected and did not answer must not be reported as one
+// the athlete has yet to connect — there is nothing for them to do in Settings.
+{
+  const unreachable = formatSleepSummaryForChat(
+    { records: [], mcpState: "unreachable", source: "cache" },
+    7,
+    today
+  );
+  assert.match(unreachable, /did not answer/);
+  assert.doesNotMatch(unreachable, /is not connected/);
+}
 assert.match(
   formatSleepSummaryForChat(
-    { records: [], mcpConnected: true, source: "cache", error: "boom" },
+    { records: [], mcpState: "ready", source: "cache", error: "boom" },
     7,
     today
   ),
@@ -130,7 +141,7 @@ assert.match(
 );
 assert.match(
   formatSleepSummaryForChat(
-    { records: [night(1, 450)], mcpConnected: true, source: "cache" },
+    { records: [night(1, 450)], mcpState: "ready", source: "cache" },
     7,
     today
   ),
@@ -141,7 +152,7 @@ assert.match(
 const month = formatSleepSummaryForChat(
   {
     records: Array.from({ length: 20 }, (_, offset) => night(offset, 450)),
-    mcpConnected: true,
+    mcpState: "ready",
     source: "cache"
   },
   30,
@@ -181,7 +192,7 @@ const nightDetail = formatSleepNightForChat(key(1), night(1, 420), {
     evaluation: "Balanced"
   },
   source: "cache",
-  mcpConnected: true
+  mcpState: "ready"
 });
 assert.match(nightDetail, /^Sleep detail for 09-10 Thu \(wake-up day\):/);
 // A single night reads once, so it is written the way it would be said rather
@@ -208,7 +219,7 @@ assert.match(
     hrv: [],
     stress: [],
     source: "cache",
-    mcpConnected: true
+    mcpState: "ready"
   }),
   /COROS keeps them about a week/
 );
@@ -218,10 +229,21 @@ assert.match(
     hrv: [],
     stress: [],
     source: "cache",
-    mcpConnected: false
+    mcpState: "disconnected"
   }),
   /- No sleep record for this night\.[\s\S]*COROS MCP is not connected/
 );
+{
+  const unreachable = formatSleepNightForChat(key(1), undefined, {
+    happenDay: key(1),
+    hrv: [],
+    stress: [],
+    source: "cache",
+    mcpState: "unreachable"
+  });
+  assert.match(unreachable, /did not answer/);
+  assert.doesNotMatch(unreachable, /is not connected/);
+}
 
 // The window answer points at the detail, or nothing would ever ask for it.
 assert.match(week, /night=YYYYMMDD/);
@@ -253,7 +275,7 @@ const withNaps = formatSleepSummaryForChat(
       },
       night(2, 480)
     ],
-    mcpConnected: true,
+    mcpState: "ready",
     source: "cache"
   },
   7,

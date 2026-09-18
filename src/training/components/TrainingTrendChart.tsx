@@ -9,7 +9,11 @@ interface TrainingTrendChartsProps {
    * Only the sleep panel reads it: HRV and RHR are web-API series and are
    * unaffected by an MCP server being down.
    */
-  mcpConnected?: McpConnectionState;
+  mcpState?: McpConnectionState;
+  /** The training snapshot both panels read has not arrived yet. */
+  loading?: boolean;
+  /** The MCP wellness load is still running, which only sleep waits on. */
+  sleepLoading?: boolean;
 }
 
 /**
@@ -20,13 +24,19 @@ interface TrainingTrendChartsProps {
  */
 export function TrainingTrendCharts({
   points,
-  mcpConnected
+  mcpState,
+  loading = false,
+  sleepLoading = false
 }: TrainingTrendChartsProps) {
   return (
     <div className="training-chart-grid">
-      <HrvBaselineChart points={points} />
+      <HrvBaselineChart points={points} loading={loading} />
 
-      <SleepTrendPanel points={points} mcpConnected={mcpConnected} />
+      <SleepTrendPanel
+        points={points}
+        mcpState={mcpState}
+        loading={loading || sleepLoading}
+      />
     </div>
   );
 }

@@ -1,11 +1,9 @@
 import {
   Activity,
   BookOpen,
-  Cable,
   CalendarDays,
   Database,
   Dumbbell,
-  Flame,
   Footprints,
   Gauge,
   Globe,
@@ -40,7 +38,7 @@ export type PrimaryView =
   | "places"
   | "settings";
 
-export type PrimaryNavGroupId = "training-group" | "coros-connect";
+export type PrimaryNavSectionId = "today" | "plan" | "history" | "device";
 
 export interface PrimaryNavItem {
   id: PrimaryView;
@@ -54,71 +52,77 @@ export interface PrimaryNavItem {
   excludeFromStartup?: boolean;
 }
 
-export interface PrimaryNavGroup {
-  id: PrimaryNavGroupId;
+/**
+ * A run of destinations under one standing heading. The heading is a label and
+ * nothing more — it does not open, close or remember anything.
+ */
+export interface PrimaryNavSection {
+  id: PrimaryNavSectionId;
   label: string;
-  icon: LucideIcon;
   items: PrimaryNavItem[];
 }
 
 /**
- * One row of the sidebar tree: either a top-level destination or a group that
- * holds destinations one level in.
+ * The rail reads as an index: four standing headings, thirteen destinations,
+ * nothing to open first.
+ *
+ * The sections answer *when the athlete reaches for a screen*, not where the
+ * data came from. That is the one grouping the athlete already has in their
+ * head — the morning check, the week being planned, the work on file, the watch
+ * on the desk — and it is what lets the whole list stand open at once. The
+ * disclosure groups this replaced existed only because eighteen equal rows did
+ * not fit, and they cost two rows, a chevron, a remembered open/closed state and
+ * a rule that reopened a group whenever the app navigated into it.
  */
-export type PrimaryNavEntry =
-  | { kind: "item"; item: PrimaryNavItem }
-  | { kind: "group"; group: PrimaryNavGroup };
-
-function item(entry: PrimaryNavItem): PrimaryNavEntry {
-  return { kind: "item", item: entry };
-}
-
-function group(entry: PrimaryNavGroup): PrimaryNavEntry {
-  return { kind: "group", group: entry };
-}
-
-export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
-  item({ id: "overview", label: "Overview", icon: LayoutGrid }),
-  item({ id: "profile", label: "Personal", icon: User }),
-  item({
-    id: "coach",
-    label: "Coach",
-    icon: MessageCircle,
-    showActivity: true,
-  }),
-  item({ id: "calendar", label: "Calendar", icon: CalendarDays }),
-  // The library is what an athlete reaches for while planning the calendar
-  // above it, so it reads as a peer of that screen rather than a drawer inside
-  // the group of things already done.
-  item({ id: "library", label: "Training Library", icon: BookOpen }),
-  group({
-    id: "training-group",
-    label: "Your Training",
-    icon: Flame,
+export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
+  {
+    id: "today",
+    label: "Today",
+    // What the morning is read from: the app's own account of it, and the
+    // night it is all judged against.
+    items: [
+      { id: "overview", label: "Overview", icon: LayoutGrid },
+      { id: "sleep", label: "Sleep", icon: Moon },
+    ],
+  },
+  {
+    id: "plan",
+    label: "Plan",
+    // What is ahead, in the order it is decided: the coach settles what the
+    // next session should be, the calendar is where it lands, and the library
+    // is reached for while filling that calendar — a peer of it rather than a
+    // drawer inside it.
+    items: [
+      {
+        id: "coach",
+        label: "Coach",
+        icon: MessageCircle,
+        showActivity: true,
+      },
+      { id: "calendar", label: "Calendar", icon: CalendarDays },
+      { id: "library", label: "Training Library", icon: BookOpen },
+    ],
+  },
+  {
+    id: "history",
+    label: "History",
+    // What is behind. Activities holds every sport; Running and Strength are
+    // separate destinations because they are read through different numbers,
+    // not because they are filters. The globe is the same history seen from
+    // above.
     items: [
       { id: "training", label: "Activities", icon: Activity },
-      // One screen per sport, under the list that holds every sport. Running
-      // and cycling are read through different numbers, so they are separate
-      // destinations rather than a filter on Activities.
-      //
-      // The icon is ours rather than lucide's: lucide draws no running figure,
-      // and Footprints — the nearest thing — already belongs to Gear.
       { id: "running", label: "Running", icon: RunnerIcon },
       { id: "strength", label: "Strength", icon: Dumbbell },
+      { id: "places", label: "Where you’ve been", icon: Globe },
     ],
-  }),
-  // Sleep sits beside Training rather than inside it: it is recovery, it is
-  // reached from the Overview card, and burying it a level down made the one
-  // screen an athlete opens every morning the hardest one to find.
-  item({ id: "sleep", label: "Sleep", icon: Moon }),
-  // The training map used to be the last block on Overview. It is a screen the
-  // athlete opens to browse rather than to check, so it reads as a destination
-  // of its own rather than the tail of the morning dashboard.
-  item({ id: "places", label: "Where you’ve been", icon: Globe }),
-  group({
-    id: "coros-connect",
-    label: "Coros Connect",
-    icon: Cable,
+  },
+  {
+    id: "device",
+    label: "Device",
+    // The watch itself: what is on it, what goes onto it. This is the one
+    // section about a piece of hardware rather than about training, which is
+    // why the heading carries the watch's name while one is on USB.
     items: [
       { id: "coros-overview", label: "Coros Overview", icon: Gauge },
       { id: "media", label: "Media", icon: Music },
@@ -138,23 +142,30 @@ export const PRIMARY_NAV_TREE: PrimaryNavEntry[] = [
         developmentOnly: true,
       },
     ],
-  }),
-  item({
+  },
+];
+
+/**
+ * The two destinations that are about the person rather than the training.
+ * They sit in the identity row at the foot of the rail, which is where an
+ * account and its settings are looked for — and keeping them out of the index
+ * is what brings it down to thirteen rows that fit without folding.
+ */
+export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
+  { id: "profile", label: "Personal", icon: User },
+  {
     id: "settings",
     label: "Settings",
     icon: Settings,
     excludeFromStartup: true,
-  }),
+  },
 ];
 
-/** Every destination, flattened in tree order. */
-export const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = PRIMARY_NAV_TREE.flatMap(
-  (entry) => (entry.kind === "item" ? [entry.item] : entry.group.items),
-);
-
-export const PRIMARY_NAV_GROUPS: PrimaryNavGroup[] = PRIMARY_NAV_TREE.flatMap(
-  (entry) => (entry.kind === "group" ? [entry.group] : []),
-);
+/** Every destination, flattened in rail order. */
+export const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
+  ...PRIMARY_NAV_SECTIONS.flatMap((section) => section.items),
+  ...PRIMARY_NAV_ACCOUNT_ITEMS,
+];
 
 export function visiblePrimaryNavItems(
   showDevelopmentItems: boolean,
@@ -164,35 +175,17 @@ export function visiblePrimaryNavItems(
   );
 }
 
-/** The tree with development-only destinations — and any group they empty — removed. */
-export function visiblePrimaryNavTree(
+/** The sections with development-only destinations — and any they empty — removed. */
+export function visiblePrimaryNavSections(
   showDevelopmentItems: boolean,
-): PrimaryNavEntry[] {
-  const isVisible = (entry: PrimaryNavItem) =>
-    !entry.developmentOnly || showDevelopmentItems;
-
-  return PRIMARY_NAV_TREE.flatMap<PrimaryNavEntry>((entry) => {
-    if (entry.kind === "item") {
-      return isVisible(entry.item) ? [entry] : [];
-    }
-
-    const items = entry.group.items.filter(isVisible);
-    return items.length > 0
-      ? [{ kind: "group", group: { ...entry.group, items } }]
-      : [];
+): PrimaryNavSection[] {
+  return PRIMARY_NAV_SECTIONS.flatMap((section) => {
+    const items = section.items.filter(
+      (item) => !item.developmentOnly || showDevelopmentItems,
+    );
+    return items.length > 0 ? [{ ...section, items }] : [];
   });
 }
 
-/** The group a destination lives in, or null when it sits at the top level. */
-export function findPrimaryNavGroupId(
-  view: PrimaryView,
-): PrimaryNavGroupId | null {
-  return (
-    PRIMARY_NAV_GROUPS.find((group) =>
-      group.items.some((item) => item.id === view),
-    )?.id ?? null
-  );
-}
-
-export const SIDEBAR_EXPANDED_WIDTH = 248;
-export const SIDEBAR_COLLAPSED_WIDTH = 72;
+export const SIDEBAR_EXPANDED_WIDTH = 236;
+export const SIDEBAR_COLLAPSED_WIDTH = 64;

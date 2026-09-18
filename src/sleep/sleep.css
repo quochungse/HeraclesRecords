@@ -38,9 +38,6 @@
 .sleep-page-heading h1 {
   margin: 2px 0 0;
   font-size: clamp(28px, 3.2vw, 36px);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
   background: linear-gradient(
     100deg,
     var(--text-primary),
@@ -139,7 +136,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 0 4px 0 0;
   overflow-y: auto;
@@ -171,30 +168,48 @@
   font-size: 13px;
 }
 
+/*
+ * A night is a row, not a box. Each one used to be a surface of its own, which
+ * made a month of nights a third layer inside the panel's list; now a hairline
+ * divides them and a surface is drawn only under the pointer and for the night
+ * on screen. The hairline sits on the item, and steps aside for a drawn row so
+ * it does not cut across its corners.
+ */
+.sleep-night-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.sleep-night-list > li:has(> .sleep-night-row:is(:hover, .is-selected)),
+.sleep-night-list > li:has(> .sleep-night-row:is(:hover, .is-selected)) + li {
+  border-top-color: transparent;
+}
+
 .sleep-night-row {
   display: flex;
   flex-direction: column;
   gap: 7px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: 10px 11px;
-  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    background 140ms ease,
-    border-color 140ms ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .sleep-night-row:hover {
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  background: var(--glass-bg);
 }
 
+/* Inside: the night list scrolls, and clips a ring drawn outside its rows. */
 .sleep-night-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .sleep-night-row.is-selected {
@@ -353,8 +368,6 @@
 
 .sleep-detail-score strong {
   font-size: 28px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .sleep-detail-score span {
@@ -384,7 +397,7 @@
   background: var(--warning-bg);
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* Stands where the stage breakdown would be, for a day that has none. */
@@ -395,7 +408,7 @@
   padding: 9px 11px;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .sleep-detail-stages {
@@ -551,7 +564,7 @@
   gap: 8px;
   min-height: 120px;
   border: 1px dashed color-mix(in srgb, var(--text-primary) 14%, transparent);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: 14px;
   color: var(--text-muted);
   font-size: 12px;
@@ -629,10 +642,11 @@
   /* The containing block for `.sleep-metric-note` (src/styles.css), which has
      to hang outside the value's own clipped box to be seen at all. */
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
-  border-radius: var(--radius-md);
+  /* L2: a wash in a hairline, no shadow, the inner radius. */
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
   padding: 9px 11px;
-  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  background: var(--glass-bg);
 }
 
 .sleep-detail-metric dt {

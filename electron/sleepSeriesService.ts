@@ -1,8 +1,9 @@
 import {
   callCorosMcpTool,
+  corosMcpAvailability,
+  corosMcpFailureState,
   ensureCorosMcpConnected,
   getCorosMcpTools,
-  isCorosMcpUsable,
   listCorosMcpTools
 } from "./corosMcpService";
 import {
@@ -21,6 +22,7 @@ import {
   sleepWindowDays
 } from "./sleepSeriesParser";
 import type {
+  McpAvailability,
   SleepHrvAssessment,
   SleepNightSeries,
   SleepSeriesPoint,
@@ -73,8 +75,15 @@ export interface SleepSeriesDeps {
   readCache: () => SleepNightSeriesRow[];
   writeCache: (row: SleepNightSeriesRow) => void;
   pruneCache: (beforeDay: string) => void;
-  /** Whether COROS could be reached at all, for cache hits that do not try. */
-  mcpUsable: () => boolean;
+  /** How the server stands, for a cache hit that does not try. */
+  mcpState: () => McpAvailability;
+  /**
+   * Why an attempt failed, asked only once one has — and the reason this is a
+   * second dep rather than a call to `mcpState`. That one reads stored tokens,
+   * so it still answers `"ready"` for a server `ensureConnected` has just
+   * failed against; here, having tried beats having asked.
+   */
+  failureState: () => Exclude<McpAvailability, "ready">;
 }
 
 export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
@@ -99,7 +108,8 @@ export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
     readCache: listSleepNightSeries,
     writeCache: upsertSleepNightSeries,
     pruneCache: pruneSleepNightSeries,
-    mcpUsable: isCorosMcpUsable
+    mcpState: corosMcpAvailability,
+    failureState: corosMcpFailureState
   };
 }
 
@@ -234,20 +244,21 @@ export async function getSleepNightSeries(
       ...cached.series,
       source: "cache",
       fetchedAt: cached.fetchedAt,
-      mcpConnected: deps.mcpUsable()
+      mcpState: deps.mcpState()
     };
   }
 
   const connected = await deps.ensureConnected();
   if (!connected) {
+    const mcpState = deps.failureState();
     return cached
       ? {
           ...cached.series,
           source: "cache",
           fetchedAt: cached.fetchedAt,
-          mcpConnected: false
+          mcpState
         }
-      : { happenDay, hrv: [], stress: [], source: "cache", mcpConnected: false };
+      : { happenDay, hrv: [], stress: [], source: "cache", mcpState };
   }
 
   await deps.listTools();
@@ -259,7 +270,7 @@ export async function getSleepNightSeries(
       hrv: [],
       stress: [],
       source: "network",
-      mcpConnected: true,
+      mcpState: "ready",
       error: "No sleep record for this night."
     };
   }
@@ -280,7 +291,7 @@ export async function getSleepNightSeries(
     windowStart: bounds?.startLocal,
     windowEnd: bounds?.endLocal,
     source: "network",
-    mcpConnected: true,
+    mcpState: "ready",
     error:
       fetched.error ??
       (bounds ? undefined : "This night has no sleep window, so nothing can be placed on a clock.")

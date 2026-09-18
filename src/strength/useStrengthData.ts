@@ -6,6 +6,10 @@ import type {
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import {
+  periodOptions,
+  type PeriodDays
+} from "../preferences/periodScale";
+import {
   defineSelectionPreference,
   selectionIsOneOf,
   useSelectionPreference
@@ -16,17 +20,20 @@ import {
   type StrengthAnalytics
 } from "./strengthAnalytics";
 
-export const WINDOW_OPTIONS = [
-  { days: 30, label: "30 days", phrase: "the last 30 days" },
-  { days: 90, label: "3 months", phrase: "the last 3 months" },
-  { days: 180, label: "6 months", phrase: "the last 6 months" },
-  { days: 365, label: "1 year", phrase: "the last year" }
-];
+/**
+ * The windows this screen offers. 28 rather than the 30 it used to open on:
+ * the labels are the shared scale's now (src/preferences/periodScale.ts), and
+ * it has one four-week window rather than the app's former three spellings of
+ * roughly a month.
+ */
+export const STRENGTH_PERIOD_DAYS: readonly PeriodDays[] = [28, 90, 180, 365];
+
+export const WINDOW_OPTIONS = periodOptions(STRENGTH_PERIOD_DAYS);
 
 export const STRENGTH_DAYS_PREFERENCE = defineSelectionPreference<number>({
   key: "strength.days",
   defaultValue: 90,
-  validate: selectionIsOneOf([30, 90, 180, 365])
+  validate: selectionIsOneOf([28, 90, 180, 365])
 });
 
 export const STRENGTH_SOURCE_PREFERENCE =
@@ -69,6 +76,18 @@ export interface StrengthData {
   sessions: StrengthSession[];
   analytics: StrengthAnalytics;
   loading: boolean;
+  /**
+   * Nothing has been read yet — not "no sessions", which is what an empty list
+   * says on its own and what the screen used to draw over it.
+   *
+   * It cannot be `loading`. That starts `false`, stays `false` through the Hevy
+   * status round trip, and is still `false` for the render between the status
+   * settling and the effect that starts the first sync — three chances to paint
+   * "No strength sessions in the last 90 days" at an athlete who has hundreds.
+   * So the hook says when it has finished a read instead, and the screen reads
+   * the absence of one.
+   */
+  initializing: boolean;
   pending: number;
   error: string | null;
   warnings: string[];
@@ -102,6 +121,7 @@ export function useStrengthData({
   const [sampleMode, setSampleMode] = useState(false);
   const [pending, setPending] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -209,6 +229,7 @@ export function useStrengthData({
       } finally {
         if (syncSequenceRef.current === sequence) {
           setLoading(false);
+          setSettled(true);
           if (source !== "coros") {
             void api.getHevyStatus().then(setHevyStatus).catch(() => undefined);
           }
@@ -273,6 +294,11 @@ export function useStrengthData({
     [sessions, days]
   );
 
+  // A connected source with no finished read behind it is a screen still
+  // filling, whatever `loading` happens to say this render. Sample mode has its
+  // history in hand, and a source that is not connected has a screen of its own.
+  const initializing = !sampleMode && !settled && (hevyStatusLoading || anyConnected);
+
   return {
     days,
     setDays,
@@ -285,6 +311,7 @@ export function useStrengthData({
     sessions,
     analytics,
     loading,
+    initializing,
     pending,
     error,
     warnings,

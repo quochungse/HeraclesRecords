@@ -14,6 +14,7 @@ import {
   Undo2,
   X
 } from "lucide-react";
+import { OptionGroup } from "../../components/OptionGroup";
 import { useEffect, useRef, useState } from "react";
 import type {
   RouteActivityType,
@@ -199,17 +200,21 @@ export function SportPicker({
   onChange: (activity: RouteActivityType) => void;
 }) {
   return (
-    <div className="route-sport-picker" role="group" aria-label="Activity">
+    /* A five-cell grid with the label under the icon, not a row of chips —
+       the same kind of control as the Studio's alignment grid, and kept for
+       the same reason: the shape carries meaning a row would lose. */
+    <div className="route-sport-picker" role="radiogroup" aria-label="Activity">
       {ROUTE_ACTIVITY_OPTIONS.map((option) => {
         const Icon = option.icon;
         return (
           <button
             key={option.value}
             type="button"
+            role="radio"
             className={option.value === value ? "is-active" : ""}
             onClick={() => onChange(option.value)}
             title={option.label}
-            aria-pressed={option.value === value}
+            aria-checked={option.value === value}
           >
             <Icon size={16} aria-hidden="true" />
             <em>{option.shortLabel}</em>
@@ -415,48 +420,42 @@ export function GeneratePanel({
                 )
               }
             />
-            <div
+            <OptionGroup
+              label="Distance presets"
               className="route-distance-presets"
-              role="group"
-              aria-label="Distance presets"
-            >
-              {presets.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  className={
-                    Math.abs(displayDistance - preset.value) < 0.05
-                      ? "is-active"
-                      : ""
-                  }
-                  onClick={() =>
-                    onDistanceChange(
-                      displayDistanceToMeters(preset.value, unitSystem) / 1_000
-                    )
-                  }
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+              tone="quiet"
+              value={
+                presets.find(
+                  (preset) => Math.abs(displayDistance - preset.value) < 0.05
+                )?.label ?? ""
+              }
+              options={presets.map((preset) => ({
+                value: preset.label,
+                label: preset.label
+              }))}
+              onChange={(next) => {
+                const preset = presets.find((entry) => entry.label === next);
+                if (!preset) return;
+                onDistanceChange(
+                  displayDistanceToMeters(preset.value, unitSystem) / 1_000
+                );
+              }}
+            />
           </div>
         ) : null}
 
         <div className="route-field-inline">
           <label>Elevation</label>
-          <div className="route-chip-group" role="group" aria-label="Elevation preference">
-            {ROUTE_ELEVATION_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={option.value === elevationPreference ? "is-active" : ""}
-                aria-pressed={option.value === elevationPreference}
-                onClick={() => onElevationChange(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <OptionGroup
+            label="Elevation preference"
+            fill
+            value={elevationPreference}
+            options={ROUTE_ELEVATION_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label
+            }))}
+            onChange={(next) => onElevationChange(next as RouteElevationPreference)}
+          />
         </div>
       </section>
 

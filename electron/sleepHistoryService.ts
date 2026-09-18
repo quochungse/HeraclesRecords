@@ -4,10 +4,11 @@ import {
   upsertSleepNights,
   type SleepNightRow
 } from "./database";
-import { isCorosMcpUsable } from "./corosMcpService";
+import { corosMcpAvailability } from "./corosMcpService";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
 import type {
+  McpAvailability,
   SleepHistorySnapshot,
   TrainingHubDailyHealthRecord,
   TrainingHubSleepRecord
@@ -68,7 +69,7 @@ export interface SleepHistoryDeps {
   now: () => number;
   fetchFromCoros: (days: number) => Promise<{
     records: TrainingHubSleepRecord[];
-    mcpConnected: boolean;
+    mcpState: McpAvailability;
   }>;
   /**
    * The night's heart rate, which `querySleepData` does not carry. COROS puts
@@ -79,8 +80,8 @@ export interface SleepHistoryDeps {
   readCache: (fromDay: string) => SleepNightRow[];
   writeCache: (rows: SleepNightRow[]) => void;
   pruneCache: (beforeDay: string) => void;
-  /** For answers returned without asking COROS. See `isCorosMcpUsable`. */
-  mcpUsable: () => boolean;
+  /** For answers returned without asking COROS. See `corosMcpAvailability`. */
+  mcpState: () => McpAvailability;
 }
 
 export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
@@ -88,7 +89,7 @@ export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
     now: () => Date.now(),
     fetchFromCoros: async (days) => {
       const summary = await getTrainingSleepData(days);
-      return { records: summary.records, mcpConnected: summary.mcpConnected };
+      return { records: summary.records, mcpState: summary.mcpState };
     },
     fetchHeartRate: async (days) => {
       const summary = await getTrainingDailyHealthData(days);
@@ -97,7 +98,7 @@ export function createDefaultSleepHistoryDeps(): SleepHistoryDeps {
     readCache: listSleepNights,
     writeCache: upsertSleepNights,
     pruneCache: pruneSleepNights,
-    mcpUsable: isCorosMcpUsable
+    mcpState: corosMcpAvailability
   };
 }
 
@@ -458,14 +459,14 @@ export async function getSleepHistory(
   // that had gone away as fine — for as long as the cache stayed fresh, which
   // is exactly when the screen has old nights on it and none arriving. An
   // attempt below overwrites this: having tried beats having asked.
-  let mcpConnected = deps.mcpUsable();
+  let mcpState = deps.mcpState();
   let error: string | undefined;
   let filled = false;
 
   if (wantsNetwork) {
     try {
       const answer = await deps.fetchFromCoros(days);
-      mcpConnected = answer.mcpConnected;
+      mcpState = answer.mcpState;
       // Stamped on every answer COROS gives, including an empty one: the point
       // of the stamp is "we asked", not "we got something".
       cache.lastNetworkAt = now;
@@ -477,6 +478,9 @@ export async function getSleepHistory(
       // A failed fill is not a failed screen: the cache is still the truth we
       // have, and saying so beats an empty list.
       error = caught instanceof Error ? caught.message : String(caught);
+      // The fill threw, so the server is what went wrong — not the watch, and
+      // not something a trip to Settings mends.
+      mcpState = "unreachable";
     }
   }
 
@@ -485,7 +489,7 @@ export async function getSleepHistory(
   return {
     records,
     latest: records.find((record) => record.happenDay === dayKeyOffset(now, 0)),
-    mcpConnected,
+    mcpState,
     fetchedAt,
     source: filled ? "network" : "cache",
     error
@@ -502,13 +506,13 @@ export async function getCachedSleepSummary(
 ): Promise<{
   latest?: TrainingHubSleepRecord;
   records: TrainingHubSleepRecord[];
-  mcpConnected: boolean;
+  mcpState: McpAvailability;
 }> {
   const snapshot = await getSleepHistory({ days }, deps);
   return {
     latest: snapshot.latest,
     records: snapshot.records,
-    mcpConnected: snapshot.mcpConnected
+    mcpState: snapshot.mcpState
   };
 }
 

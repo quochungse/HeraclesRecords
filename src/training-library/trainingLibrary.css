@@ -49,8 +49,8 @@
   padding: 30px 34px 24px;
   color: var(--text-primary);
   background:
-    radial-gradient(1100px 460px at 16% -8%, var(--bg-ambient-green), transparent 62%),
-    radial-gradient(880px 420px at 90% -12%, var(--bg-ambient-teal), transparent 58%),
+    radial-gradient(1100px 460px at 16% -8%, var(--bg-ambient-primary), transparent 62%),
+    radial-gradient(880px 420px at 90% -12%, var(--bg-ambient-secondary), transparent 58%),
     var(--tl-ground, var(--bg-base));
   background-attachment: local;
   overflow: hidden;
@@ -113,14 +113,6 @@
   --tl-shimmer: rgba(255, 255, 255, 0.09);
   --tl-scrim: rgba(22, 23, 27, 0.76);
 
-  --tl-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16), 0 10px 26px rgba(0, 0, 0, 0.14);
-  --tl-shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.18), 0 18px 38px rgba(0, 0, 0, 0.2);
-  --tl-shadow-card-held: 0 1px 2px rgba(0, 0, 0, 0.16), 0 12px 28px rgba(0, 0, 0, 0.15);
-  --tl-shadow-plate: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --tl-shadow-plate-hover: 0 2px 5px rgba(0, 0, 0, 0.34), 0 14px 30px rgba(0, 0, 0, 0.28);
-  --tl-shadow-plate-held: 0 2px 5px rgba(0, 0, 0, 0.32);
-  --tl-shadow-week: 0 1px 2px rgba(0, 0, 0, 0.14), 0 8px 22px rgba(0, 0, 0, 0.12);
-  --tl-shadow-lift: 0 4px 14px rgba(0, 0, 0, 0.14);
 
   /* Provenance: where a plan came from, never what it contains. */
   --tl-source-coach: #c084fc;
@@ -177,15 +169,7 @@
   --tl-shimmer: rgba(255, 255, 255, 0.9);
   --tl-scrim: rgba(19, 26, 40, 0.34);
 
-  --tl-shadow-card: 0 1px 2px rgba(19, 26, 40, 0.09), 0 10px 26px rgba(19, 26, 40, 0.12);
-  --tl-shadow-card-hover: 0 2px 4px rgba(19, 26, 40, 0.12), 0 18px 38px rgba(19, 26, 40, 0.18);
-  --tl-shadow-card-held: 0 1px 2px rgba(19, 26, 40, 0.09), 0 12px 28px rgba(19, 26, 40, 0.14);
   /* Sunk, so the plate's shadow falls inward — until hover lifts it clear. */
-  --tl-shadow-plate: inset 0 1px 3px rgba(19, 26, 40, 0.09);
-  --tl-shadow-plate-hover: 0 2px 5px rgba(19, 26, 40, 0.1), 0 14px 30px rgba(19, 26, 40, 0.14);
-  --tl-shadow-plate-held: 0 2px 6px rgba(19, 26, 40, 0.13);
-  --tl-shadow-week: 0 1px 2px rgba(19, 26, 40, 0.07), 0 8px 22px rgba(19, 26, 40, 0.09);
-  --tl-shadow-lift: 0 4px 14px rgba(19, 26, 40, 0.13);
 
   --tl-source-coach: #7c3aed;
   --tl-source-template: #a16207;
@@ -207,7 +191,7 @@
 }
 
 .training-library-view :is(button, input, select, textarea, [role="checkbox"]):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -238,9 +222,9 @@
     0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.14);
   transition:
-    transform 170ms var(--tl-ease-out),
-    box-shadow 170ms var(--tl-ease-out),
-    filter 170ms ease;
+    transform var(--dur-base) var(--tl-ease-out),
+    box-shadow var(--dur-fast) var(--tl-ease-out),
+    filter var(--dur-fast) var(--ease);
 }
 
 .training-library-view .primary-button:hover:not(:disabled) {
@@ -262,18 +246,18 @@
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    transform 170ms var(--tl-ease-out),
-    box-shadow 170ms var(--tl-ease-out);
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out),
+    box-shadow var(--dur-fast) var(--tl-ease-out);
 }
 
 .training-library-view .ghost-button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   color: var(--text-primary);
   background: var(--glass-bg-hover);
-  box-shadow: var(--tl-shadow-lift);
+  box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
 
@@ -299,7 +283,7 @@
   color: var(--text-muted);
   background: none;
   cursor: pointer;
-  transition: color 150ms ease, background 150ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .training-library-view .icon-button:hover:not(:disabled) {
@@ -328,11 +312,7 @@
 
 .tl-masthead h1 {
   margin: 0;
-  font-family: var(--font-display);
   font-size: 36px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
   /* The signature gradient: ink settling into the accent, left to right. */
   background: linear-gradient(
     100deg,
@@ -422,7 +402,7 @@
 .tl-notice {
   margin-bottom: 18px;
   padding: 11px 14px;
-  border: 1px solid var(--warning-border);
+  border: 1px solid var(--surface-line, var(--warning-border));
   border-radius: var(--radius-md);
   color: var(--warning-text);
   background:
@@ -494,16 +474,16 @@
   white-space: nowrap;
   cursor: pointer;
   transition:
-    color 180ms ease,
-    background 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .tl-sections button svg {
   width: 15px;
   height: 15px;
-  transition: color 180ms ease, transform 220ms var(--tl-ease-out);
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-sections button:hover:not(:disabled) {
@@ -534,7 +514,7 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   text-align: center;
-  transition: color 180ms ease, background 180ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-sections button[aria-current="page"] {
@@ -557,10 +537,10 @@
 
 .tl-panel {
   min-width: 0;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
   background:
-    radial-gradient(ellipse 90% 62% at 14% 0%, var(--bg-ambient-green), transparent 58%),
+    radial-gradient(ellipse 90% 62% at 14% 0%, var(--bg-ambient-primary), transparent 58%),
     linear-gradient(180deg, var(--tl-sheen), var(--tl-sheen-fade) 42%),
     var(--tl-panel-bg);
   box-shadow: var(--shadow-card), var(--glass-inset);
@@ -665,10 +645,10 @@
   color: var(--text-muted);
   background: var(--glass-bg);
   transition:
-    border-color 170ms ease,
-    box-shadow 170ms ease,
-    color 170ms ease,
-    flex-basis 240ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    flex-basis var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-search input {
@@ -686,7 +666,8 @@
 }
 
 .tl-search input:focus-visible {
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* The field wakes up: accent ring, soft outer glow, and a little more room. */
@@ -699,46 +680,6 @@
     0 6px 18px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.tl-chips {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tl-chips button {
-  padding: 5px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  color: var(--text-muted);
-  background: none;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 170ms var(--tl-ease-out);
-}
-
-.tl-chips button:hover {
-  color: var(--text-secondary);
-  border-color: color-mix(in srgb, var(--text-muted) 34%, transparent);
-  background: var(--glass-bg);
-  transform: translateY(-1px);
-}
-
-.tl-chips button[aria-pressed="true"] {
-  color: var(--accent-strong);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 15%, transparent), color-mix(in srgb, var(--accent) 8%, transparent));
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--accent) 20%, transparent),
-    0 3px 10px color-mix(in srgb, var(--accent) 12%, transparent);
-  font-weight: 600;
-}
 
 /* The "show more" control spans the whole tile grid rather than one cell. */
 .tl-grid > li:has(> .tl-load-more) {
@@ -866,7 +807,7 @@
 
 .tl-index-head .tl-sortable {
   cursor: pointer;
-  transition: color 140ms ease;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .tl-index-head .tl-sortable:hover {
@@ -884,7 +825,7 @@
 .tl-row {
   align-items: center;
   border-bottom: 1px solid var(--tl-rule-soft);
-  transition: background 170ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-row:last-child {
@@ -949,7 +890,7 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.25;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1026,7 +967,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  line-height: 1.5;
+  line-height: 1.45;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1134,10 +1075,10 @@
   background: none;
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-mark:hover {
@@ -1173,7 +1114,7 @@
   justify-content: flex-end;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-row:hover .tl-row-actions,
@@ -1200,7 +1141,7 @@
   color: var(--text-muted);
   background: none;
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-row-actions button:hover {
@@ -1252,17 +1193,19 @@
   flex-direction: column;
   /* --tl-rule, not --glass-border: a tile needs a defined edge, and the glass
      border is a 0.1-alpha dark that disappears on a white paper tile. */
-  border: 1px solid var(--tl-rule);
+  border: 1px solid var(--surface-line, var(--tl-rule));
   border-radius: var(--radius-md);
   background:
     linear-gradient(158deg, var(--tl-sheen), var(--tl-sheen-fade) 46%),
     var(--tl-card, var(--glass-bg));
-  box-shadow: var(--tl-shadow-card);
+  /* A tile inside the panel, so no shadow: its states are drawn in colour
+     below (docs/ui-system-refinement.md §4.3). */
+  box-shadow: none;
   overflow: hidden;
   transition:
-    border-color 190ms ease,
-    box-shadow 220ms var(--tl-ease-out),
-    transform 220ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--tl-ease-out),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 /* A wash of accent light that rises from the top edge when the tile is touched. */
@@ -1275,13 +1218,12 @@
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: opacity 240ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-hover),
     0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
     0 10px 30px color-mix(in srgb, var(--accent) 10%, transparent);
   transform: translateY(-3px);
@@ -1295,7 +1237,6 @@
 .tl-card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 62%, transparent);
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
     0 8px 26px color-mix(in srgb, var(--accent) 16%, transparent);
 }
@@ -1303,7 +1244,6 @@
 .tl-card.is-active {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
@@ -1320,6 +1260,13 @@
   background: none;
   text-align: left;
   cursor: pointer;
+}
+
+/* The open button covers its card, which clips it: the ring goes inside. The
+   view-wide focus rule above outranks a bare .tl-card-open, hence the scope. */
+.training-library-view .tl-card-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .tl-card-top {
@@ -1350,7 +1297,7 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.28;
+  line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -1359,7 +1306,7 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1429,7 +1376,7 @@
   display: flex;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover .tl-card-actions,
@@ -1449,7 +1396,7 @@
   color: var(--text-muted);
   background: color-mix(in srgb, var(--tl-card, var(--surface)) 88%, transparent);
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .tl-card-actions button:hover {
@@ -1498,8 +1445,7 @@
   border-color: var(--tl-rule-soft);
   background: var(--tl-tile);
   box-shadow:
-    inset 0 1px 0 var(--tl-well),
-    var(--tl-shadow-plate);
+    inset 0 1px 0 var(--tl-well);
 }
 
 /* ::before is the accent wash, ::after the sport stripe. Neither survives. */
@@ -1514,8 +1460,7 @@
   border-color: color-mix(in srgb, var(--text-muted) 48%, transparent);
   background: var(--tl-tile-hover);
   box-shadow:
-    inset 0 1px 0 var(--tl-well),
-    var(--tl-shadow-plate-hover);
+    inset 0 1px 0 var(--tl-well);
   transform: translateY(-2px);
 }
 
@@ -1526,8 +1471,7 @@
   background: var(--tl-tile-hover);
   box-shadow:
     inset 0 1px 0 var(--tl-well),
-    0 0 0 1px color-mix(in srgb, var(--text-primary) 14%, transparent),
-    var(--tl-shadow-plate-held);
+    0 0 0 1px color-mix(in srgb, var(--text-primary) 14%, transparent);
 }
 
 .tl-catalog .tl-card.is-selected,
@@ -1535,8 +1479,7 @@
   border-color: color-mix(in srgb, var(--text-primary) 58%, transparent);
   box-shadow:
     inset 0 1px 0 var(--tl-well),
-    0 0 0 1px color-mix(in srgb, var(--text-primary) 24%, transparent),
-    var(--tl-shadow-plate-held);
+    0 0 0 1px color-mix(in srgb, var(--text-primary) 24%, transparent);
 }
 
 .tl-catalog .tl-card-open {
@@ -1552,7 +1495,7 @@
 
 .tl-catalog .tl-card-name {
   font-size: 18px;
-  line-height: 1.24;
+  line-height: 1.2;
 }
 
 /* Centred on the sport badge opposite it, not on the tile corner. */
@@ -1578,8 +1521,8 @@
   pointer-events: none;
   mask-image: radial-gradient(circle at 78% 78%, #000, transparent 72%);
   transition:
-    opacity 260ms var(--tl-ease-out),
-    transform 320ms var(--tl-ease-out);
+    opacity var(--dur-base) var(--tl-ease-out),
+    transform var(--dur-slow) var(--tl-ease-out);
 }
 
 .tl-card:hover .tl-wk-glyph,
@@ -1604,7 +1547,7 @@
   color: var(--text-secondary);
   font-size: 10px;
   font-style: normal;
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: nowrap;
 }
 
@@ -1697,7 +1640,7 @@
   flex-basis: 0;
   border-radius: var(--radius-xs);
   background: var(--tl-sport-accent, var(--accent));
-  transition: filter 150ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 /* A long interval set has more steps than a tile has pixels for pills, so the
@@ -1780,7 +1723,7 @@
   background: color-mix(in srgb, var(--tl-sport-accent, var(--accent)) 78%, transparent);
   transform-origin: left;
   animation: tl-wk-fill 560ms var(--tl-ease-out) backwards;
-  transition: filter 200ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-card:hover .tl-wk-track i {
@@ -1806,7 +1749,7 @@
   border-top: 1px solid var(--tl-rule-soft);
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .tl-wk-foot > span {
@@ -1831,44 +1774,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* -------------------------------------------------------- Layout switch */
-
-.tl-layout-switch {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.tl-layout-switch button {
-  display: inline-flex;
-  width: 27px;
-  height: 25px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: none;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.tl-layout-switch button:hover {
-  color: var(--text-secondary);
-}
-
-.tl-layout-switch button[aria-pressed="true"] {
-  color: var(--accent-strong);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent);
-}
 
 /* ------------------------------------------------- The ridge (the signature) */
 
@@ -1901,7 +1806,7 @@
     linear-gradient(180deg, color-mix(in srgb, var(--accent-strong) 82%, transparent), color-mix(in srgb, var(--accent) 46%, transparent));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transform-origin: bottom;
-  transition: filter 180ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-ridge-bar.is-empty {
@@ -1961,7 +1866,6 @@
 .tl-card[data-accent]:hover {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 42%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-hover),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 14%, transparent),
     0 10px 30px color-mix(in srgb, var(--tl-sport-accent) 12%, transparent);
 }
@@ -1969,7 +1873,6 @@
 .tl-card[data-accent].is-selected {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 62%, transparent);
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 30%, transparent),
     0 8px 26px color-mix(in srgb, var(--tl-sport-accent) 16%, transparent);
 }
@@ -1977,7 +1880,6 @@
 .tl-card[data-accent].is-active {
   border-color: color-mix(in srgb, var(--tl-sport-accent) 58%, var(--glass-border));
   box-shadow:
-    var(--tl-shadow-card-held),
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 22%, transparent);
 }
 
@@ -2033,7 +1935,7 @@
   height: var(--tl-bar-height);
   border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) var(--radius-xs);
   transform-origin: bottom;
-  transition: filter 180ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 .tl-bullet b {
@@ -2134,7 +2036,7 @@
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.16;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
@@ -2156,7 +2058,7 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2211,10 +2113,10 @@
   background: none;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    background 170ms ease,
-    border-color 170ms ease,
-    transform 170ms var(--tl-ease-out);
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .tl-reader-favorite:hover {
@@ -2224,10 +2126,12 @@
   transform: translateY(-1px);
 }
 
-.tl-reader-favorite:focus-visible {
+/* Inside: the reader panel clips a ring drawn below the dock. Scoped, because
+   the view-wide focus rule outranks a bare class and its offset would win. */
+.training-library-view .tl-reader-favorite:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .tl-reader-favorite.is-active {
@@ -2297,7 +2201,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2347,7 +2251,7 @@
   flex-basis: 0;
   border-radius: var(--radius-xs);
   background: var(--tl-sport-accent, var(--accent));
-  transition: filter 160ms ease;
+  transition: filter var(--dur-fast) var(--ease);
 }
 
 /* A long interval set closes the pills up rather than overflowing the panel. */
@@ -2501,7 +2405,7 @@
   padding: 10px 20px 10px 54px;
   border-bottom: 1px solid var(--tl-rule-soft);
   counter-increment: tl-step;
-  transition: background 160ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-steps li:first-child {
@@ -2623,7 +2527,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .tl-reader-references svg {
@@ -2657,8 +2561,7 @@
     linear-gradient(145deg, var(--tl-sheen-lit), var(--tl-sheen-fade) 54%),
     color-mix(in srgb, var(--tl-reader-bg, var(--surface)) 86%, transparent);
   box-shadow:
-    inset 0 1px 0 var(--tl-edge-light),
-    0 -18px 42px color-mix(in srgb, var(--tl-reader-bg, var(--surface)) 72%, transparent);
+    inset 0 1px 0 var(--tl-edge-light), var(--shadow-card);
   backdrop-filter: blur(24px) saturate(145%);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
@@ -2726,7 +2629,7 @@
 .tl-reader-schedule-heading strong {
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .tl-reader-schedule-heading small {
@@ -2754,13 +2657,13 @@
   color: var(--text-primary);
   background: var(--glass-bg);
   font-size: 13px;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
 .tl-reader-schedule input:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
-  outline: 0;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .tl-reader-actions {
@@ -3014,7 +2917,7 @@
 .tl-tally div {
   padding: 14px 20px;
   background: var(--tl-panel-bg);
-  transition: background 180ms ease;
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .tl-tally div:hover {
@@ -3226,7 +3129,7 @@
   color: var(--text-primary);
   background:
     radial-gradient(circle at 50% 22%, var(--accent-soft), transparent 44%),
-    radial-gradient(900px 420px at 82% -10%, var(--bg-ambient-teal), transparent 55%),
+    radial-gradient(900px 420px at 82% -10%, var(--bg-ambient-secondary), transparent 55%),
     var(--tl-ground, var(--bg-base));
   text-align: center;
 }
@@ -3236,7 +3139,7 @@
   width: 34px;
   height: 34px;
   padding: 18px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: 50%;
   color: var(--accent-strong);
   background:
@@ -3325,9 +3228,9 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    transform 180ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)),
-    box-shadow 180ms ease,
-    filter 180ms ease;
+    transform var(--dur-base) var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)),
+    box-shadow var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
 }
 
 .training-library-gate .primary-button:hover {
@@ -3342,7 +3245,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
@@ -3391,7 +3294,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(8px);
   place-items: center;
-  animation: tl-fade-in 200ms ease both;
+  animation: tl-fade-in 200ms var(--ease) both;
 }
 
 @keyframes tl-fade-in {
@@ -3406,11 +3309,11 @@
 .tl-dialog {
   width: min(460px, 100%);
   padding: 22px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(ellipse 110% 60% at 20% 0%, var(--bg-ambient-green), transparent 60%),
+    radial-gradient(ellipse 110% 60% at 20% 0%, var(--bg-ambient-primary), transparent 60%),
     var(--surface);
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   animation: tl-dialog-in 280ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)) both;
@@ -3474,14 +3377,12 @@
   color: #fff;
   background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 6px 18px rgba(239, 68, 68, 0.32);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--shadow-soft);
 }
 
 .tl-dialog .primary-button.danger:hover:not(:disabled) {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 10px 26px rgba(239, 68, 68, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.26), var(--shadow-card);
 }
 
 /* ----------------------------------------------- Plan editor and comparison */
@@ -3490,11 +3391,11 @@
 .plan-compare {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(ellipse 70% 40% at 50% 0%, var(--bg-ambient-green), transparent 55%),
+    radial-gradient(ellipse 70% 40% at 50% 0%, var(--bg-ambient-primary), transparent 55%),
     color-mix(in srgb, var(--tl-ground, var(--bg-base)) 94%, var(--surface));
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   overflow: hidden;
@@ -3532,7 +3433,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(10px);
   content: "";
-  animation: tl-fade-in 240ms ease both;
+  animation: tl-fade-in 240ms var(--ease) both;
 }
 
 .plan-editor-header,
@@ -3562,7 +3463,7 @@
   font-weight: 600;
   letter-spacing: -0.02em;
   outline: 0;
-  transition: border-color 160ms ease;
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .plan-editor-name:hover {
@@ -3571,6 +3472,8 @@
 
 .plan-editor-name:focus-visible {
   border-bottom-color: var(--accent);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-editor-header > div > p:last-of-type {
@@ -3790,9 +3693,9 @@
   color: var(--text-muted);
   background: var(--glass-bg);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .plan-editor-sidebar .plan-editor-library-search input {
@@ -3805,7 +3708,7 @@
   color: var(--text-primary);
   background: transparent;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   outline: 0;
 }
 
@@ -3869,9 +3772,9 @@
   text-align: left;
   cursor: pointer;
   transition:
-    color 150ms ease,
-    background 150ms ease,
-    transform 120ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .plan-editor-library-list button:hover {
@@ -3901,10 +3804,10 @@
   color: var(--text-muted);
   opacity: 0.72;
   transition:
-    color 150ms ease,
-    background 150ms ease,
-    border-color 150ms ease,
-    opacity 150ms ease;
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 
 .plan-editor-library-list button:hover > .plan-editor-library-add {
@@ -3984,9 +3887,9 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 40%, transparent);
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .plan-holding-area.is-drop-target {
@@ -4020,12 +3923,11 @@
 }
 
 .plan-week {
-  border: 1px solid var(--tl-rule);
+  border: 1px solid var(--surface-line, var(--tl-rule));
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, var(--tl-sheen), transparent 30%),
     color-mix(in srgb, var(--surface) 30%, transparent);
-  box-shadow: var(--tl-shadow-week);
   overflow: hidden;
 }
 
@@ -4050,7 +3952,7 @@
   display: flex;
   gap: 2px;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .plan-week:hover > header > div:last-child,
@@ -4074,8 +3976,8 @@
   padding: 9px;
   border-right: 1px solid var(--tl-rule-soft);
   transition:
-    background 160ms ease,
-    box-shadow 160ms ease;
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 /* A dragged card lights the day it is over — the clearest answer to "where
@@ -4123,12 +4025,17 @@
   background: none;
   opacity: 0;
   cursor: pointer;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
-.plan-day:hover .plan-day-heading button,
+.plan-day:hover .plan-day-heading button {
+  opacity: 1;
+}
+
 .plan-day-heading button:focus-visible {
   opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-day-entries {
@@ -4161,9 +4068,9 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 16%, transparent);
   cursor: grab;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms var(--tl-ease-out);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out);
 }
 
 .plan-entry-card:hover {
@@ -4203,7 +4110,7 @@
   overflow: hidden;
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4236,10 +4143,10 @@
   font-size: 13px;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    border-color 170ms ease,
-    background 170ms ease,
-    box-shadow 170ms ease;
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .plan-add-week:hover {
@@ -4349,11 +4256,11 @@
   background: none;
   cursor: pointer;
   transition:
-    color 170ms ease,
-    border-color 170ms ease,
-    background 170ms ease,
-    box-shadow 170ms ease,
-    transform 170ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1));
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1));
 }
 
 .plan-compare-picker button:hover:not(:disabled) {
@@ -4818,7 +4725,7 @@
   background: var(--tl-scrim);
   backdrop-filter: blur(10px);
   place-items: center;
-  animation: tl-fade-in 180ms ease both;
+  animation: tl-fade-in 180ms var(--ease) both;
 }
 
 .plan-generator,
@@ -4828,11 +4735,11 @@
   max-height: calc(100dvh - 40px);
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(760px 240px at 12% 0%, var(--bg-ambient-green), transparent 62%),
+    radial-gradient(760px 240px at 12% 0%, var(--bg-ambient-primary), transparent 62%),
     var(--tl-reader-bg, var(--bg-base));
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   animation: tl-dialog-in 240ms var(--tl-ease-out) both;
@@ -4883,7 +4790,7 @@
   margin: 7px 0 0;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .plan-generator-body {
@@ -4952,50 +4859,14 @@
   font-weight: 600;
 }
 
-.plan-generator-sports,
-.plan-generator-days {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.plan-generator-sports button,
-.plan-generator-days button {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--tl-rule);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--glass-bg);
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease, transform 120ms ease;
-}
-
-.plan-generator-sports button svg { flex: none; opacity: 0.72; }
-
-.plan-generator-sports button:hover:not(:disabled):not(.is-selected),
-.plan-generator-days button:hover:not(:disabled):not(.is-selected) {
-  border-color: var(--glass-border);
-  color: var(--text-primary);
-  background: var(--glass-bg-hover);
-}
-
-.plan-generator-sports button:active:not(:disabled),
-.plan-generator-days button:active:not(:disabled) { transform: translateY(0.5px); }
 
 .plan-generator-form button:disabled { cursor: default; opacity: 0.5; }
 
-.plan-generator-sports button:focus-visible,
-.plan-generator-days button:focus-visible,
 .plan-generator-segmented button:focus-visible,
 .plan-generator-stepper button:focus-visible,
 .plan-generator-examples button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .plan-generator-inline-error {
@@ -5004,28 +4875,6 @@
   font-size: 11px;
 }
 
-.plan-generator-sports button.is-selected {
-  border-color: color-mix(in srgb, var(--sport-accent, var(--accent)) 52%, transparent);
-  color: var(--sport-accent, var(--accent));
-  background: color-mix(in srgb, var(--sport-accent, var(--accent)) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sport-accent, var(--accent)) 18%, transparent);
-  font-weight: 600;
-}
-
-.plan-generator-sports button.is-selected svg { opacity: 1; }
-
-.plan-generator-days button.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  font-weight: 600;
-}
-
-.plan-generator-days button {
-  min-width: 44px;
-  justify-content: center;
-  padding: 0;
-}
 
 .plan-generator-grid {
   display: grid;
@@ -5095,7 +4944,7 @@
   background: transparent;
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-examples button:hover:not(:disabled) {
@@ -5123,7 +4972,7 @@
   background: var(--glass-bg);
   cursor: pointer;
   text-align: left;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-segmented button strong { color: inherit; font-size: 11px; font-weight: 600; }
@@ -5163,7 +5012,7 @@
   background: transparent;
   cursor: pointer;
   place-items: center;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .plan-generator-stepper button:first-child { border-right: 1px solid var(--tl-rule-soft); }
@@ -5265,7 +5114,7 @@
 .plan-generator-provider.is-blocked { color: var(--warning-text); }
 .plan-generator-provider span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .plan-generator-provider strong { color: var(--text-primary); font-size: 12px; }
-.plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
+.plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.45; }
 .plan-generator-status > .ghost-button { width: 100%; margin-top: 9px; }
 
 .plan-generator-progress,
@@ -5351,7 +5200,7 @@
 .plan-generator-privacy strong { font-size: 12px; }
 .plan-generator-progress p,
 .plan-generator-failure p,
-.plan-generator-privacy p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.plan-generator-privacy p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .plan-generator-progress .ghost-button { margin-top: 12px; }
 .plan-generator-failure > svg { color: var(--warning-text); }
 .plan-generator-failure > div { display: flex; flex-direction: column; gap: 7px; margin-top: 11px; }
@@ -5401,7 +5250,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .plan-calendar-loading {
@@ -5485,7 +5334,7 @@
 }
 
 .plan-entry-card .plan-entry-actions button:hover { color: var(--text-primary); background: var(--glass-bg-hover); }
-.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 36%, transparent); border-radius: var(--radius-sm); color: var(--danger, #e5484d); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
+.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid var(--surface-line, color-mix(in srgb, var(--error-text) 36%, transparent)); border-radius: var(--radius-sm); color: var(--error-text); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
 .plan-editor-workout-error button { display: inline-flex; margin-left: auto; border: 0; color: inherit; background: none; cursor: pointer; }
 
 @media (max-width: 840px) {

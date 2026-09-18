@@ -1,4 +1,5 @@
 import { Check, ChevronDown, Info, Loader2, Search, Type, X } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CorosWatchfaceRasterFont } from "../../electron/types";
@@ -436,32 +437,38 @@ export function LocalFontPicker({
         <div className="watchface-typography-controls">
           <label>
             Weight
-            <select
-              value={fontWeight}
+            <OptionGroup
+              label="Font weight"
+              mode="dropdown"
+              value={String(fontWeight)}
+              options={[100, 200, 300, 400, 500, 600, 700, 800, 900].map(
+                (weight) => ({
+                  value: String(weight),
+                  label: `${weight}${
+                    weight === 400 ? " · Regular" : weight === 700 ? " · Bold" : ""
+                  }`
+                })
+              )}
               disabled={fontShapeControlsDisabled}
-              onChange={(event) => updateTypography({ fontWeight: Number(event.target.value) })}
-            >
-              {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((weight) => (
-                <option key={weight} value={weight}>
-                  {weight}{weight === 400 ? " · Regular" : weight === 700 ? " · Bold" : ""}
-                </option>
-              ))}
-            </select>
+              onChange={(weight) =>
+                updateTypography({ fontWeight: Number(weight) })
+              }
+            />
           </label>
           <label>
             Style
-            <select
+            <OptionGroup
+              label="Font style"
               value={fontStyle}
+              options={[
+                { value: "normal", label: "Normal" },
+                { value: "italic", label: "Italic" }
+              ]}
               disabled={fontShapeControlsDisabled}
-              onChange={(event) =>
-                updateTypography({
-                  fontStyle: event.target.value as "normal" | "italic"
-                })
+              onChange={(next) =>
+                updateTypography({ fontStyle: next as "normal" | "italic" })
               }
-            >
-              <option value="normal">Normal</option>
-              <option value="italic">Italic</option>
-            </select>
+            />
           </label>
           <label className="watchface-typography-tracking">
             Sprite spacing <span>{Math.round(letterSpacing * 100)}%</span>

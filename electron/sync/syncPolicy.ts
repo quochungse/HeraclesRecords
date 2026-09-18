@@ -389,7 +389,6 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
 
   // Window chrome, sized to whatever display this machine has.
   "coroslink.sidebarCollapsed": "device",
-  "coroslink.sidebarCollapsedGroups": "device",
   // A transient pick in the Apple Music browser.
   "coroslink.appleMusic.selectedPlaylistId": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.

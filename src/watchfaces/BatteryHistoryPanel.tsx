@@ -6,6 +6,7 @@ import {
   Loader2,
   RefreshCw
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import type { CorosBatteryReport, CorosPairedDevice } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 
@@ -121,21 +122,24 @@ export function BatteryHistoryPanel({
             <form className="watchfaces-battery-form" onSubmit={handleSubmit}>
               <label className="field">
                 Paired watch
-                <select
+                <OptionGroup
+                  label="Watch"
+                  mode="dropdown"
                   value={selectedDeviceId}
+                  options={
+                    devices.length === 0
+                      ? [{ value: "", label: "No paired watch found" }]
+                      : devices.map((device) => ({
+                          value: device.deviceId,
+                          label: `${device.firmwareType} · ${shortUuid(device.uuid)}`
+                        }))
+                  }
                   disabled={disabled || loadingDevices || devices.length === 0}
-                  onChange={(event) => {
-                    setSelectedDeviceId(event.target.value);
+                  onChange={(deviceId) => {
+                    setSelectedDeviceId(deviceId);
                     setReport(null);
                   }}
-                >
-                  {devices.length === 0 ? <option value="">No paired watch found</option> : null}
-                  {devices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.firmwareType} · {shortUuid(device.uuid)}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <button
                 className="secondary-button"

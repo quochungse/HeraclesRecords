@@ -96,6 +96,7 @@ import type { CorosLinkApi } from "./coroslink-api";
 import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
 import { subscribeToToasts } from "./toast";
+import { isMcpFailure } from "./mcp/mcpNotice";
 import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
 import {
   AppSidebar,
@@ -454,6 +455,16 @@ export default function App() {
   >([]);
   const [trainingHubActivitiesStatus, setTrainingHubActivitiesStatus] =
     useState<TrainingHubLoadStatus>("pending");
+  /**
+   * Where the *snapshot* load stands, which the activity status cannot answer:
+   * the two are separate requests and the trend panels read the snapshot. Until
+   * this existed, `snapshot === null` was the only thing Overview had, and it
+   * says the same thing during a load, after a failure and for an athlete with
+   * no history — so every launch drew "No HRV readings" for as long as COROS
+   * took to reply.
+   */
+  const [trainingHubSnapshotStatus, setTrainingHubSnapshotStatus] =
+    useState<TrainingHubLoadStatus>("pending");
   const [trainingHubAnalytics, setTrainingHubAnalytics] =
     useState<TrainingHubAnalytics | null>(null);
   const [trainingHubDashboard, setTrainingHubDashboard] =
@@ -781,6 +792,7 @@ export default function App() {
     trainingWellnessLoadSequenceRef.current += 1;
     setTrainingHubActivities([]);
     setTrainingHubActivitiesStatus("pending");
+    setTrainingHubSnapshotStatus("pending");
     setTrainingHubAnalytics(null);
     setTrainingHubDashboard(null);
     setTrainingHubDailyMetrics(null);
@@ -809,6 +821,7 @@ export default function App() {
     }
 
     const loadSequence = ++trainingCoreLoadSequenceRef.current;
+    setTrainingHubSnapshotStatus("pending");
     const publish = <T,>(
       request: Promise<T>,
       onFulfilled: (value: T) => void,
@@ -828,6 +841,24 @@ export default function App() {
         },
       );
 
+    // The three the snapshot is built from, marked as they land rather than
+    // read back out of `results` by index: the array's order is an ordinary
+    // edit away from changing, and nothing would report it.
+    let snapshotArrived = false;
+    const publishSnapshotPart = <T,>(
+      request: Promise<T>,
+      onFulfilled: (value: T) => void,
+      onRejected: () => void,
+    ): Promise<void> =>
+      publish(
+        request,
+        (value) => {
+          snapshotArrived = true;
+          onFulfilled(value);
+        },
+        onRejected,
+      );
+
     const dateList = recentTrainingHubDateList(TRAINING_HEATMAP_DAYS);
     const results = await Promise.allSettled([
       publish(
@@ -841,17 +872,17 @@ export default function App() {
           setTrainingHubActivitiesStatus("failed");
         },
       ),
-      publish(
+      publishSnapshotPart(
         api.getTrainingAnalytics(),
         setTrainingHubAnalytics,
         () => setTrainingHubAnalytics(null),
       ),
-      publish(
+      publishSnapshotPart(
         fetchTrainingDashboard(api),
         setTrainingHubDashboard,
         () => setTrainingHubDashboard(null),
       ),
-      publish(
+      publishSnapshotPart(
         api.getDailyMetrics(dateList),
         setTrainingHubDailyMetrics,
         () => setTrainingHubDailyMetrics(null),
@@ -867,6 +898,13 @@ export default function App() {
         () => setTrainingHubUpcomingWorkouts([]),
       ),
     ]);
+
+    if (trainingCoreLoadSequenceRef.current === loadSequence) {
+      // One of the three answering is enough for the panels to have something
+      // real to draw; none of them is a failure, not an athlete who has never
+      // trained — and the two must not read alike, which is the whole point.
+      setTrainingHubSnapshotStatus(snapshotArrived ? "ready" : "failed");
+    }
 
     const failures = results
       .filter((result) => result.status === "rejected")
@@ -975,17 +1013,21 @@ export default function App() {
   // their copy. Nothing pushes an MCP status change (`mcp:*` is all invoke).
   //
   // Either feed is enough to trigger it, and it has to be: daily health always
-  // attempts a connection, so its flag reports a failed attempt, while sleep is
-  // often served from cache and answers with `isCorosMcpUsable()` — which reads
-  // true on stored tokens COROS may since have rejected. Gating on sleep alone
-  // meant the retry never ran in exactly the case that needs it: steps and
+  // attempts a connection, so its state reports a failed attempt, while sleep is
+  // often served from cache and answers with `corosMcpAvailability()` — which
+  // reads ready on stored tokens COROS may since have rejected. Gating on sleep
+  // alone meant the retry never ran in exactly the case that needs it: steps and
   // calories saying "connect MCP" while sleep called the server fine.
   //
-  // No loop: a still-dead retry writes the same flags, and those values are the
+  // Both failures count. `"unreachable"` is the one worth retrying most — the
+  // server is there and did not answer this time — and `"disconnected"` covers
+  // a server connected in Settings while this screen was elsewhere.
+  //
+  // No loop: a still-dead retry writes the same state, and those values are the
   // deps. The Sleep screen needs none of this — its hook fetches on mount.
   const wellnessMissedMcp =
-    trainingHubSleepData?.mcpConnected === false ||
-    trainingHubDailyHealthData?.mcpConnected === false;
+    isMcpFailure(trainingHubSleepData?.mcpState) ||
+    isMcpFailure(trainingHubDailyHealthData?.mcpState);
 
   useEffect(() => {
     if (!api || activeView !== "overview" || !wellnessMissedMcp) {
@@ -2603,7 +2645,47 @@ export default function App() {
     error ?? watchStatus?.error ?? null,
   );
 
-  // The sidebar's Coros Connect row wears the watch's name while one is on USB.
+  // The rail's identity row. The snapshot is served from the main process's
+  // hour-long cache, so asking for it here costs no COROS request; a failure
+  // just leaves the row on the account's email, which is already to hand.
+  const [athleteIdentity, setAthleteIdentity] = useState<{
+    name: string | null;
+    avatarUrl: string | null;
+  }>({ name: null, avatarUrl: null });
+
+  useEffect(() => {
+    if (!api || !trainingHubStatus?.authenticated) {
+      setAthleteIdentity({ name: null, avatarUrl: null });
+      return;
+    }
+
+    let cancelled = false;
+    void api
+      .getCorosProfileSnapshot()
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+        setAthleteIdentity({
+          name: snapshot.profile.nickname?.trim() || null,
+          avatarUrl: snapshot.profile.avatarUrl ?? null,
+        });
+      })
+      .catch(() => {
+        // The rail falls back to the email; nothing here is worth a toast.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, trainingHubStatus?.authenticated]);
+
+  const athleteName =
+    athleteIdentity.name ??
+    trainingHubStatus?.email?.split("@")[0]?.trim() ??
+    null;
+
+  // The rail's Device heading wears the watch's name while one is on USB.
   const connectedWatchName = useMemo(() => {
     if (!watchStatus?.connected) {
       return null;
@@ -2647,6 +2729,8 @@ export default function App() {
           coachBusy={coachBusy}
           showDevelopmentItems={showDevelopmentTools}
           connectedWatchName={connectedWatchName}
+          athleteName={athleteName}
+          athleteAvatarUrl={athleteIdentity.avatarUrl}
           appLogo={appLogo}
           expanded={sidebarExpanded}
           onExpandedChange={setSidebarExpanded}
@@ -2704,6 +2788,8 @@ export default function App() {
                         upcomingWorkouts={trainingHubUpcomingWorkouts}
                         sportTypes={trainingHubSportTypes}
                         snapshot={trainingHubSnapshot}
+                        snapshotStatus={trainingHubSnapshotStatus}
+                        activitiesStatus={trainingHubActivitiesStatus}
                         rpeBackfill={rpeBackfill}
                         busy={busy}
                         sleepConnecting={sleepConnecting}
@@ -2954,6 +3040,9 @@ export default function App() {
                   api={api}
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   trendPoints={trainingHubSnapshot?.trendPoints ?? []}
+                  trendPointsLoading={
+                    trainingHubSnapshotStatus === "pending" && !trainingHubSnapshot
+                  }
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>
@@ -3130,7 +3219,7 @@ function MediaView({ activeTab, onTabChange, children }: MediaViewProps) {
               key={tab.id}
               type="button"
               className={
-                activeTab === tab.id ? "media-tab active" : "media-tab"
+                activeTab === tab.id ? "media-tab is-active" : "media-tab"
               }
               onClick={() => onTabChange(tab.id)}
             >

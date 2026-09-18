@@ -35,7 +35,19 @@ import {
   totalWeightParts,
   type FigurePart
 } from "./strengthFormat";
-import { WINDOW_OPTIONS, activeStrengthWindow, useStrengthData } from "./useStrengthData";
+import { OptionGroup } from "../components/OptionGroup";
+import {
+  periodDaysFromValue,
+  periodGroupOptions,
+  periodValue,
+  type PeriodDays
+} from "../preferences/periodScale";
+import {
+  STRENGTH_PERIOD_DAYS,
+  WINDOW_OPTIONS,
+  activeStrengthWindow,
+  useStrengthData
+} from "./useStrengthData";
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -54,6 +66,8 @@ interface StrengthViewProps {
   /** Taken, so the same session is not re-selected on the next render. */
   onOpenRequestHandled?: () => void;
 }
+
+const STRENGTH_PERIOD_OPTIONS = periodGroupOptions(STRENGTH_PERIOD_DAYS);
 
 function Figure({ parts }: { parts: FigurePart[] }) {
   return (
@@ -91,6 +105,7 @@ export function StrengthView({
     sessions,
     analytics,
     loading,
+    initializing,
     pending,
     error,
     warnings,
@@ -117,7 +132,7 @@ export function StrengthView({
    * gap before the first sync starts.
    *
    * The window is widened first where it has to be. Activities lists the whole
-   * history and this screen keeps a window of its own — 30 days, for some
+   * history and this screen keeps a window of its own — four weeks, for some
    * athletes — so a session from March would otherwise not be among the ones it
    * is being asked to select from.
    */
@@ -133,8 +148,10 @@ export function StrengthView({
         // The narrowest window that reaches back far enough. None does for a
         // session over a year old, and the window is then left alone rather
         // than widened to no purpose.
-        const wider = WINDOW_OPTIONS.find((option) => option.days >= ageDays);
-        if (wider) {
+        const wider = WINDOW_OPTIONS.find(
+          (option) => option.days !== null && option.days >= ageDays
+        );
+        if (wider?.days != null) {
           setDays(wider.days);
         }
       }
@@ -155,6 +172,9 @@ export function StrengthView({
   const activeWindow = activeStrengthWindow(days);
   const summary = analytics.summary;
   const hasSessions = summary.sessions > 0;
+  // An empty history and a history that has not arrived look identical from
+  // here, and only one of them is worth a headline. See `initializing`.
+  const awaitingFirstSessions = !hasSessions && (initializing || loading);
   const coverage = analyticsCoverage(analytics);
   const attributedSetCount = Math.round(coverage.attributed);
   const genericSetCount = Math.round(coverage.generic);
@@ -255,45 +275,40 @@ export function StrengthView({
               ? `You trained ${summary.sessions} ${
                   summary.sessions === 1 ? "time" : "times"
                 } in ${activeWindow.phrase}.`
-              : `Your lifting from ${activeWindow.phrase}, muscle by muscle.`}
+              : awaitingFirstSessions
+                ? `Reading your sessions from ${activeWindow.phrase}…`
+                : `Your lifting from ${activeWindow.phrase}, muscle by muscle.`}
         </p>
       </div>
       <div className="strength-header-controls">
         {withControls ? (
           <>
-          <div className="strength-segment strength-source" role="group" aria-label="Strength source">
-            {(
-              [
-                ["combined", "Combined", !(corosConnected && hevyConnected)],
-                ["hevy", "Hevy", !hevyConnected],
-                ["coros", "COROS", !corosConnected]
-              ] as const
-            ).map(([id, label, disabled]) => (
-              <button
-                key={id}
-                type="button"
-                disabled={disabled}
-                className={source === id ? "is-active" : ""}
-                aria-pressed={source === id}
-                onClick={() => setSource(id)}
-              >
-                <span className="strength-segment-label">{label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="strength-segment strength-window" role="group" aria-label="Time covered">
-            {WINDOW_OPTIONS.map((option) => (
-              <button
-                key={option.days}
-                type="button"
-                className={days === option.days ? "is-active" : ""}
-                aria-pressed={days === option.days}
-                onClick={() => setDays(option.days)}
-              >
-                <span className="strength-segment-label">{option.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Both folded. Seven chips between them is more than this header
+              has room for, and neither is read often: the source is set once
+              per athlete and the window once per session. Folded, each reads
+              as what it currently is — which is what a header is for. */}
+          <OptionGroup
+            label="Strength source"
+            mode="collapsible"
+            value={source}
+            options={[
+              {
+                value: "combined",
+                label: "Combined",
+                disabled: !(corosConnected && hevyConnected)
+              },
+              { value: "hevy", label: "Hevy", disabled: !hevyConnected },
+              { value: "coros", label: "COROS", disabled: !corosConnected }
+            ]}
+            onChange={setSource}
+          />
+          <OptionGroup
+            label="Time covered"
+            mode="collapsible"
+            value={periodValue(days as PeriodDays)}
+            options={STRENGTH_PERIOD_OPTIONS}
+            onChange={(next) => setDays(periodDaysFromValue(next) ?? 90)}
+          />
           </>
         ) : null}
         <div className="strength-header-actions">
@@ -437,7 +452,18 @@ export function StrengthView({
         <div className="strength-sample-cta">{sampleButton}</div>
       ) : null}
 
-      {!hasSessions ? (
+      {awaitingFirstSessions ? (
+        <section className="panel strength-card strength-blank" aria-busy="true">
+          <h3>
+            <Loader2 className="spin" size={16} aria-hidden="true" />
+            Reading your strength sessions
+          </h3>
+          <p>
+            Your history for {activeWindow.phrase} is being read from{" "}
+            {source === "hevy" ? "Hevy" : source === "coros" ? "COROS" : "COROS and Hevy"}.
+          </p>
+        </section>
+      ) : !hasSessions ? (
         <section className="panel strength-card strength-blank">
           <h3>No strength sessions in {activeWindow.phrase}</h3>
           <p>

@@ -1,9 +1,18 @@
 import { Search, X } from "lucide-react";
+import { OptionChips, OptionGroup } from "../../components/OptionGroup";
 import {
-  ACTIVITY_PERIOD_OPTIONS,
+  periodDaysFromValue,
+  periodGroupOptions,
+  periodValue,
+  type PeriodDays
+} from "../../preferences/periodScale";
+import {
+  ACTIVITY_PERIOD_DAYS,
   type ActivityFilters
 } from "../activityFilters";
 import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
+
+const ACTIVITY_PERIOD_GROUP_OPTIONS = periodGroupOptions(ACTIVITY_PERIOD_DAYS);
 
 interface ActivitiesFilterBarProps {
   filters: ActivityFilters;
@@ -32,47 +41,32 @@ export function ActivitiesFilterBar({
 
   return (
     <div className="activities-filters">
-      <div
+      {/* Folded at rest: the period is read every time the screen opens and
+          changed a few times a session, and the search field beside it is
+          worth more room than three chips nobody is looking at. */}
+      <OptionGroup
+        label="Period"
+        mode="collapsible"
         className="activities-period"
-        role="radiogroup"
-        aria-label="Period"
-      >
-        {ACTIVITY_PERIOD_OPTIONS.map((option) => {
-          const active = filters.periodDays === option.days;
-          return (
-            <button
-              key={option.label}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              className={`activities-period-option${active ? " is-active" : ""}`}
-              onClick={() => onChange({ ...filters, periodDays: option.days })}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+        value={periodValue(filters.periodDays as PeriodDays)}
+        options={ACTIVITY_PERIOD_GROUP_OPTIONS}
+        onChange={(next) =>
+          onChange({ ...filters, periodDays: periodDaysFromValue(next) })
+        }
+      />
 
       {available.length > 1 ? (
-        <div className="activities-sports" aria-label="Sports">
-          {available.map((category) => {
-            const active = filters.sports.includes(category);
-            return (
-              <button
-                key={category}
-                type="button"
-                aria-pressed={active}
-                data-sport={category}
-                className={`activities-sport-toggle${active ? " is-active" : ""}`}
-                onClick={() => toggleSport(category)}
-              >
-                <i aria-hidden="true" />
-                {SPORT_COLOR_LABELS[category]}
-              </button>
-            );
-          })}
-        </div>
+        <OptionChips
+          label="Sports"
+          className="activities-sports"
+          options={available.map((category) => ({
+            value: category,
+            label: SPORT_COLOR_LABELS[category]
+          }))}
+          values={filters.sports}
+          colorOf={(category) => `var(--sport-${category})`}
+          onToggle={(category) => toggleSport(category as SportColorCategory)}
+        />
       ) : null}
 
       <div className="activities-search">

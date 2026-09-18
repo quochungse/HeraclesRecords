@@ -17,6 +17,8 @@ import {
   formatDurationSeconds,
   formatOptionalNumber
 } from "../formatters";
+import { OptionGroup } from "../../components/OptionGroup";
+import { periodLabel, type PeriodDays } from "../../preferences/periodScale";
 import {
   TRAINING_HEATMAP_RANGE_DAYS,
   TRAINING_HEATMAP_RANGES,
@@ -78,6 +80,12 @@ interface TrainingHeatmapPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
   rpeBackfill?: { pending: number; running: boolean } | null;
+  /**
+   * The loads behind the grid are still running. A grid with nothing in it
+   * otherwise reports "No training data in the last 365 days", which is a
+   * verdict on the athlete rather than on the request.
+   */
+  loading?: boolean;
 }
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -160,7 +168,8 @@ function formatCellAriaLabel(
 export function TrainingHeatmapPanel({
   snapshot,
   activities = [],
-  rpeBackfill = null
+  rpeBackfill = null,
+  loading = false
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = usePrefersReducedMotion();
@@ -594,47 +603,32 @@ export function TrainingHeatmapPanel({
           <h2>{isRpe ? "RPE load heatmap" : "Load heatmap"}</h2>
         </div>
         <div className="training-heatmap-controls">
-          <div
-            className="training-metric-toggle"
-            role="group"
-            aria-label="Heatmap metric"
-          >
-            <button
-              type="button"
-              className={`training-metric-option${!isRpe ? " is-active" : ""}`}
-              aria-pressed={!isRpe}
-              onClick={() => setMetric("trainingLoad")}
-            >
-              Training Load
-            </button>
-            <button
-              type="button"
-              className={`training-metric-option${isRpe ? " is-active" : ""}`}
-              aria-pressed={isRpe}
-              onClick={() => setMetric("rpeLoad")}
-            >
-              RPE
-            </button>
-          </div>
-          <div
-            className="training-metric-toggle"
-            role="group"
-            aria-label="Heatmap range"
-          >
-            {TRAINING_HEATMAP_RANGES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`training-metric-option${
-                  range === option ? " is-active" : ""
-                }`}
-                aria-pressed={range === option}
-                onClick={() => setRange(option)}
-              >
-                Last {TRAINING_HEATMAP_RANGE_DAYS[option]} days
-              </button>
-            ))}
-          </div>
+          <OptionGroup
+            label="Heatmap metric"
+            value={isRpe ? "rpeLoad" : "trainingLoad"}
+            options={[
+              { value: "trainingLoad", label: "Training Load" },
+              { value: "rpeLoad", label: "RPE" }
+            ]}
+            onChange={(next) =>
+              setMetric(next === "rpeLoad" ? "rpeLoad" : "trainingLoad")
+            }
+          />
+          {/* Left open. It folded while the labels were "Last 365 days" and
+              "Last 30 days", which were the widest thing in the header; on the
+              shared scale they are "1 year" and "4 weeks", and two chips that
+              short cost less room than the fold they were hiding behind. */}
+          <OptionGroup
+            label="Heatmap range"
+            value={range}
+            options={TRAINING_HEATMAP_RANGES.map((option) => ({
+              value: option,
+              label: periodLabel(
+                TRAINING_HEATMAP_RANGE_DAYS[option] as PeriodDays
+              )
+            }))}
+            onChange={setRange}
+          />
         </div>
       </div>
 
@@ -945,14 +939,20 @@ export function TrainingHeatmapPanel({
           </div>
         </>
       ) : (
-        <div className="training-heatmap-empty">
-          <CalendarDays size={22} aria-hidden="true" />
+        <div className="training-heatmap-empty" aria-busy={loading || undefined}>
+          {loading ? (
+            <Loader2 size={22} className="spin" aria-hidden="true" />
+          ) : (
+            <CalendarDays size={22} aria-hidden="true" />
+          )}
           <p>
-            {isRpe
-              ? rpeBackfillActive
-                ? "RPE data is still loading — rate activities in COROS to see it here."
-                : `No rated sessions in the last ${rangeDays} days.`
-              : `No training data in the last ${rangeDays} days.`}
+            {loading
+              ? "Reading your training history from COROS…"
+              : isRpe
+                ? rpeBackfillActive
+                  ? "RPE data is still loading — rate activities in COROS to see it here."
+                  : `No rated sessions in the last ${rangeDays} days.`
+                : `No training data in the last ${rangeDays} days.`}
           </p>
         </div>
       )}
