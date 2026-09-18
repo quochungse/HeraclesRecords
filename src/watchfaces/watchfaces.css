@@ -1728,7 +1728,7 @@
 
 .watchface-shell .watchface-template-results-count strong {
   color: var(--text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--wf-text-lg);
 }
 
@@ -3260,7 +3260,7 @@
 
 .watchface-shell .wf-raw-config-textarea {
   min-height: 240px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--wf-text-xs);
   line-height: 1.45;
   white-space: pre;
@@ -3693,7 +3693,7 @@
   background: color-mix(in srgb, var(--wf-canvas) 94%, transparent);
   color: var(--text-secondary);
   padding: 5px 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--wf-text-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -6371,7 +6371,7 @@ body.wf-value-scrubbing * {
   padding: 11px 12px;
   border: 1px solid var(--wf-border);
   border-radius: var(--wf-control-radius);
-  background: color-mix(in srgb, var(--wf-surface) 90%, var(--wf-surface-strong));
+  background: color-mix(in srgb, var(--wf-surface) 90%, var(--wf-surface-raised));
 }
 
 .coros-device-info-protected > div {
@@ -6401,7 +6401,7 @@ body.wf-value-scrubbing * {
   overflow: hidden;
   border: 1px solid var(--wf-border);
   border-radius: var(--wf-control-radius);
-  background: color-mix(in srgb, var(--wf-surface) 86%, var(--wf-surface-strong));
+  background: color-mix(in srgb, var(--wf-surface) 86%, var(--wf-surface-raised));
 }
 
 .coros-device-gatt-map-heading {

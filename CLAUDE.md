@@ -222,8 +222,9 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Maps, Watch Faces, Training Hub, Training Library, Strength, Calendar, Coach, and the
-dev-only Gear view); Overview, Media, Data, and Settings are in the main bundle.
+ones (Maps, Training Hub, Training Library, Strength, Calendar, Coach, and the dev-only
+Watch Faces and Gear views — both are `IS_DEVELOPMENT_BUILD` in App.tsx and `developmentOnly`
+in primaryNav.ts, so a packaged build carries neither their code nor their stylesheet); Overview, Media, Data, and Settings are in the main bundle.
 
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.
@@ -907,7 +908,26 @@ on a screen's own title and nothing else, at weight 600 and leading 1.3 — a se
 does not fit inside `line-height: 1`. Figures spend one treatment (the display face, weight
 500, `-0.02em`, tabular) and keep their own size and leading. A title or figure rule that
 restates `font-family` or `font-weight` locally wins over the shared rule, because the feature
-stylesheets load after `styles.css` — that is how five screens silently kept the sans.
+stylesheets load after `styles.css` — that is how five screens silently kept the sans. Code,
+ids and hashes spend `--font-mono`, the one monospace stack: it replaced four spellings written
+out by hand and two phantom tokens (`--mono`, `--font-mono`) that fell back to them.
+
+**A `var()` naming a token nothing declares deletes the whole declaration, and
+`npm run test:css-tokens` is what stops that shipping.** Not the one layer — the declaration:
+an undeclared custom property resolves to the guaranteed-invalid value, so
+`background: radial-gradient(…, var(--missing), …), var(--real)` computes to *transparent*,
+`border: 1px solid var(--missing)` to *no border*, and `color: var(--missing)` to the inherited
+ink (all three measured in Chromium). Nothing reports it: the stylesheet parses, the build
+passes, the screen just loses its ground. Twelve dead token names across twenty-four uses were
+found on 2026-09-18, each alive for months — the Training Library's entire background stack
+(`--bg-ambient-green`, a name from a palette that predates the accent tokens), the Hevy
+dialog's fill, the backup-restore cards, two Watch Face device panels, the Gear screen's error
+tint and its sign-in panel, and a `--danger` nothing has ever declared; `--wf-shadow-soft`,
+found by hand one phase earlier, was the same bug. The test holds two things at zero and has no allowlist:
+every `var(--x)` names a token some stylesheet declares or the renderer writes (**a fallback
+does not excuse it** — `var(--phantom, 12px)` renders correctly and still claims a token that
+is not there, which is how four of them survived a reader's eye), and every declared token is
+read by someone. A name the renderer builds (`--m3d-heat-${level}`) counts through its prefix.
 
 **`.content` caps the measure at 1440px**, through its own padding
 (`max(28px, (100% - 1440px) / 2)`) so the scrollbar stays at the window edge and no screen

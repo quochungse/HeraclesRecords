@@ -1,5 +1,4 @@
 :root {
-  --map-app-background: #080b0e;
   --map-panel-background: #0d1115;
   --map-secondary-surface: #11161b;
   --map-elevated-surface: #151b20;
@@ -11,7 +10,6 @@
   --map-text-secondary: #a5afb6;
   --map-text-muted: #748089;
   --map-accent: var(--accent);
-  --map-accent-hover: var(--accent-strong);
   --map-accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
   --map-accent-gradient: var(--accent-gradient);
   /* Neutral, not gold-tinted: it sits on whichever palette is active. */
@@ -21,14 +19,9 @@
   --map-globe-rim-light: rgba(121, 184, 226, 0.08);
   --map-globe-star: rgba(181, 216, 239, 0.42);
   --map-globe-star-dim: rgba(124, 164, 192, 0.22);
-  --map-globe-geography: rgba(205, 218, 221, 0.34);
-  --map-globe-selected: var(--accent-strong);
   --map-globe-label-bg: rgba(6, 12, 14, 0.92);
   --map-globe-label-border: rgba(131, 243, 206, 0.16);
   --map-globe-label-text: #eaf8f3;
-  --map-heat-low: rgba(231, 176, 76, 0.2);
-  --map-heat-medium: rgba(72, 204, 160, 0.6);
-  --map-heat-high: rgba(194, 247, 226, 0.94);
   --map-panel-shadow:
     inset 0 1px 0 rgba(235, 242, 246, 0.04),
     var(--shadow-elevated);
@@ -37,7 +30,6 @@
 }
 
 :root[data-theme="paper"] {
-  --map-app-background: #eef1f3;
   --map-panel-background: #f7f8f9;
   --map-secondary-surface: #eef1f2;
   --map-elevated-surface: #e7ebed;
@@ -49,7 +41,6 @@
   --map-text-secondary: #4d575e;
   --map-text-muted: #737e85;
   --map-accent: var(--accent);
-  --map-accent-hover: var(--accent-strong);
   --map-accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
   --map-accent-gradient: var(--accent-gradient);
   --map-on-accent: #f4fbf8;
@@ -58,14 +49,9 @@
   --map-globe-rim-light: rgba(82, 132, 166, 0.045);
   --map-globe-star: rgba(65, 91, 108, 0.14);
   --map-globe-star-dim: rgba(65, 91, 108, 0.07);
-  --map-globe-geography: rgba(84, 95, 103, 0.56);
-  --map-globe-selected: var(--accent);
   --map-globe-label-bg: rgba(32, 39, 43, 0.91);
   --map-globe-label-border: rgba(8, 123, 91, 0.2);
   --map-globe-label-text: #f5faf8;
-  --map-heat-low: rgba(36, 174, 132, 0.2);
-  --map-heat-medium: rgba(20, 157, 116, 0.58);
-  --map-heat-high: rgba(4, 111, 80, 0.92);
   --map-panel-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
     var(--shadow-elevated);

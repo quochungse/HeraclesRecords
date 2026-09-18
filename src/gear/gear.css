@@ -58,9 +58,9 @@
 }
 
 .gear-message.is-error {
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  color: var(--danger);
+  border-color: color-mix(in srgb, var(--error-text) 40%, transparent);
+  background: color-mix(in srgb, var(--error-text) 10%, transparent);
+  color: var(--error-text);
 }
 
 .gear-message.is-success {
@@ -107,7 +107,7 @@
   background:
     radial-gradient(circle at 82% 22%, color-mix(in srgb, var(--gear-accent) 21%, transparent), transparent 30%),
     linear-gradient(145deg, color-mix(in srgb, var(--gear-accent) 8%, transparent), transparent 60%),
-    var(--panel);
+    var(--glass-bg);
   padding: clamp(34px, 6vw, 76px);
 }
 

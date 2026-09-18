@@ -205,7 +205,7 @@
 }
 
 .profile-mono {
-  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", monospace);
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 

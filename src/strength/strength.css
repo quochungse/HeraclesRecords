@@ -71,12 +71,8 @@
   --m3d-rim: #7fe8c4;
   --m3d-sky: #93b8dc;
   --m3d-ground: #151a1f;
-  --m3d-ambient: 0.55;
-  --m3d-key: 1;
-  --m3d-shadow: 0.5;
   --m3d-exposure: 1;
 
-  --panel-key: rgba(255, 255, 255, 0.05);
   --panel-floor: rgba(0, 0, 0, 0.28);
   --muscle-focus-vignette: rgba(5, 8, 11, 0.24);
 
@@ -139,12 +135,8 @@
   --m3d-rim: #f4efe4;
   --m3d-sky: #fdf8ec;
   --m3d-ground: #8c857a;
-  --m3d-ambient: 0.35;
-  --m3d-key: 0.22;
-  --m3d-shadow: 0.2;
   --m3d-exposure: 1;
 
-  --panel-key: rgba(255, 255, 255, 0.55);
   --panel-floor: rgba(19, 26, 40, 0.09);
   --muscle-focus-vignette: rgba(19, 26, 40, 0.12);
 
@@ -2942,7 +2934,7 @@
   padding: 24px;
   border: 1px solid var(--surface-line, var(--sx-edge));
   border-radius: var(--radius-lg);
-  background: var(--panel-bg-solid, var(--panel-bg));
+  background: var(--sx-elevated);
   box-shadow: var(--shadow-elevated);
 }
 
@@ -3072,15 +3064,15 @@
 }
 
 .strength-hevy-dialog .danger {
-  color: var(--danger, #e16068);
+  color: var(--error-text);
 }
 
 .strength-hevy-error {
   margin: 16px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--danger, #e16068) 12%, transparent);
-  color: var(--danger, #e16068);
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+  color: var(--error-text);
   font-size: 13px;
   line-height: 1.45;
 }

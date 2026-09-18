@@ -126,6 +126,10 @@
      docs/ui-system-refinement.md). Figures keep --font-display: a serif's
      digits are for reading in a line, not for scanning down a column. */
   --font-title: "Source Serif 4", Georgia, "Times New Roman", serif;
+  /* Code, ids and hashes — one stack, named here so the four spellings that
+     used to be written out (and two phantom tokens that fell back to them)
+     cannot drift apart. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   color: var(--text-primary);
   background: var(--bg-base);
@@ -315,7 +319,6 @@
   --palette-accent-strong: #f3bf5c;
   --palette-accent-2: #c78f38;
   --palette-accent-hover: #cf9a3d;
-  --palette-accent-muted: #b8892f;
   --palette-accent-glow: rgba(231, 176, 76, .32);
   --palette-accent-soft: rgba(231, 176, 76, .12);
   --palette-accent-gradient: linear-gradient(135deg, #e7b04c 0%, #c78f38 100%);
@@ -336,7 +339,6 @@
   --palette-accent-strong: #4fd6a6;
   --palette-accent-2: #1fb6a6;
   --palette-accent-hover: #26a37c;
-  --palette-accent-muted: #2d9a74;
   --palette-accent-glow: rgba(47, 190, 145, .32);
   --palette-accent-soft: rgba(47, 190, 145, .12);
   --palette-accent-gradient: linear-gradient(135deg, #2fbe91 0%, #1fb6a6 100%);
@@ -357,7 +359,6 @@
   --palette-accent-strong: #99a2ff;
   --palette-accent-2: #5965d4;
   --palette-accent-hover: #6d78e4;
-  --palette-accent-muted: #5862c0;
   --palette-accent-glow: rgba(129, 140, 248, .32);
   --palette-accent-soft: rgba(129, 140, 248, .12);
   --palette-accent-gradient: linear-gradient(135deg, #818cf8 0%, #5965d4 100%);
@@ -378,7 +379,6 @@
   --palette-accent-strong: #ff8799;
   --palette-accent-2: #d74b60;
   --palette-accent-hover: #e75f72;
-  --palette-accent-muted: #c34c5d;
   --palette-accent-glow: rgba(251, 113, 133, .32);
   --palette-accent-soft: rgba(251, 113, 133, .12);
   --palette-accent-gradient: linear-gradient(135deg, #fb7185 0%, #d74b60 100%);
@@ -399,7 +399,6 @@
   --palette-accent-strong: #4ec9ff;
   --palette-accent-2: #1b9bd4;
   --palette-accent-hover: #2aabe4;
-  --palette-accent-muted: #208fc0;
   --palette-accent-glow: rgba(56, 189, 248, .32);
   --palette-accent-soft: rgba(56, 189, 248, .12);
   --palette-accent-gradient: linear-gradient(135deg, #38bdf8 0%, #1b9bd4 100%);
@@ -420,7 +419,6 @@
   --palette-accent-strong: #734a0e;
   --palette-accent-2: #825511;
   --palette-accent-hover: #65410c;
-  --palette-accent-muted: #ae7218;
   --palette-accent-glow: rgba(145, 94, 19, .22);
   --palette-accent-soft: rgba(145, 94, 19, .12);
   --palette-accent-gradient: linear-gradient(135deg, #ae7218 0%, #825511 100%);
@@ -441,7 +439,6 @@
   --palette-accent-strong: #0c674d;
   --palette-accent-2: #0f7067;
   --palette-accent-hover: #0a5a42;
-  --palette-accent-muted: #0f7859;
   --palette-accent-glow: rgba(15, 120, 89, .22);
   --palette-accent-soft: rgba(15, 120, 89, .12);
   --palette-accent-gradient: linear-gradient(135deg, #138665 0%, #0f7067 100%);
@@ -462,7 +459,6 @@
   --palette-accent-strong: #3d46a6;
   --palette-accent-2: #4853b7;
   --palette-accent-hover: #303a93;
-  --palette-accent-muted: #6874e0;
   --palette-accent-glow: rgba(83, 94, 200, .22);
   --palette-accent-soft: rgba(83, 94, 200, .12);
   --palette-accent-gradient: linear-gradient(135deg, #6874e0 0%, #4853b7 100%);
@@ -483,7 +479,6 @@
   --palette-accent-strong: #9c2537;
   --palette-accent-2: #ad2f41;
   --palette-accent-hover: #881d2c;
-  --palette-accent-muted: #d74a5e;
   --palette-accent-glow: rgba(190, 56, 75, .22);
   --palette-accent-soft: rgba(190, 56, 75, .12);
   --palette-accent-gradient: linear-gradient(135deg, #d74a5e 0%, #ad2f41 100%);
@@ -504,7 +499,6 @@
   --palette-accent-strong: #00587f;
   --palette-accent-2: #006590;
   --palette-accent-hover: #004b6c;
-  --palette-accent-muted: #0a84b9;
   --palette-accent-glow: rgba(0, 112, 162, .22);
   --palette-accent-soft: rgba(0, 112, 162, .12);
   --palette-accent-gradient: linear-gradient(135deg, #0a84b9 0%, #006590 100%);
@@ -3190,7 +3184,7 @@ input::placeholder {
 }
 
 .activity-globe-reset:hover {
-  color: var(--text);
+  color: var(--text-primary);
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(14, 16, 20, 0.72);
 }
@@ -3206,7 +3200,7 @@ input::placeholder {
 }
 
 :root[data-theme="paper"] .activity-globe-reset:hover {
-  color: var(--text);
+  color: var(--text-primary);
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -3905,7 +3899,7 @@ input::placeholder {
 .library-transfer-progress-track {
   height: 6px;
   border-radius: var(--radius-pill);
-  background: var(--surface-muted, rgba(148, 163, 184, 0.25));
+  background: var(--glass-bg-hover);
   overflow: hidden;
 }
 
@@ -4431,7 +4425,7 @@ input::placeholder {
 .watch-storage-track {
   height: 6px;
   border-radius: var(--radius-pill);
-  background: var(--surface-muted, rgba(148, 163, 184, 0.25));
+  background: var(--glass-bg-hover);
   overflow: hidden;
 }
 
@@ -7812,7 +7806,7 @@ td span {
   text-align: center;
   color: var(--accent);
   font-size: 12px;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
 }
 
 .route-share-note {
@@ -11250,7 +11244,6 @@ td span {
 
 .vo2-widget-panel {
   --vo2-tone: var(--text-muted);
-  --vo2-glow: color-mix(in srgb, var(--vo2-tone) 32%, transparent);
   position: relative;
   display: grid;
   align-content: space-between;
@@ -16175,7 +16168,7 @@ tr.data-intervals-row-missing {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
@@ -16845,7 +16838,7 @@ tr.data-intervals-row-missing {
 .apple-music-login {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   overflow: hidden;
   background: #0f0f0f;
@@ -16857,8 +16850,8 @@ tr.data-intervals-row-missing {
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2, rgba(255, 255, 255, 0.02));
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .music-login-url,
@@ -18839,15 +18832,15 @@ tr.data-intervals-row-missing {
   text-align: left;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: var(--surface-raised);
+  background: var(--glass-bg);
   color: inherit;
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .backup-restore-option:hover:not(:disabled) {
-  border-color: var(--accent-soft-border);
-  background: var(--surface-hover);
+  border-color: var(--accent-glow);
+  background: var(--glass-bg-hover);
 }
 
 .backup-restore-option:disabled {
@@ -18861,12 +18854,12 @@ tr.data-intervals-row-missing {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  background: var(--glass-bg-elevated);
   color: var(--text-secondary);
 }
 
 .backup-restore-option.is-destructive .backup-restore-option-icon {
-  color: var(--danger);
+  color: var(--error-text);
 }
 
 .backup-restore-option-copy {
@@ -19894,7 +19887,7 @@ tr.data-intervals-row-missing {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: var(--surface-raised, rgba(255, 255, 255, 0.03));
+  background: var(--glass-bg);
 }
 
 .chat-claude-login-flow-header {
@@ -21795,7 +21788,7 @@ tr.data-intervals-row-missing {
 
 /* Inline code chip */
 .chat-markdown code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid var(--glass-border);
@@ -23491,7 +23484,7 @@ tr.data-intervals-row-missing {
 }
 
 .chat-delete-card {
-  border-color: color-mix(in srgb, var(--danger, #e5484d) 35%, var(--glass-border));
+  border-color: color-mix(in srgb, var(--error-text) 35%, var(--glass-border));
 }
 
 .chat-delete-details {
@@ -23524,16 +23517,16 @@ tr.data-intervals-row-missing {
   gap: 6px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 45%, transparent);
-  background: color-mix(in srgb, var(--danger, #e5484d) 12%, transparent);
-  color: var(--danger, #e5484d);
+  border: 1px solid color-mix(in srgb, var(--error-text) 45%, transparent);
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+  color: var(--error-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .chat-delete-confirm:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger, #e5484d) 18%, transparent);
+  background: color-mix(in srgb, var(--error-text) 18%, transparent);
 }
 
 .chat-delete-confirm:disabled {
@@ -23598,7 +23591,7 @@ tr.data-intervals-row-missing {
 }
 
 .chat-mcp-panel li code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--chat-signal-strong);
 }
@@ -33999,7 +33992,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   gap: 12px;
   margin: 0;
   padding: 8px 11px;
-  border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.24));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   color: var(--text-secondary, inherit);
   font-size: 13px;

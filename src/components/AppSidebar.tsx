@@ -100,28 +100,6 @@ function initialsFrom(name: string): string {
   return letters.toLocaleUpperCase();
 }
 
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  });
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handleChange = () => setReduced(media.matches);
-
-    handleChange();
-    media.addEventListener("change", handleChange);
-
-    return () => media.removeEventListener("change", handleChange);
-  }, []);
-
-  return reduced;
-}
-
 export interface AppSidebarProps {
   activeView: PrimaryView;
   onChange: (view: PrimaryView) => void;
@@ -156,7 +134,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const overlayMode = useMediaQuery("(max-width: 720px)");
   const sections = visiblePrimaryNavSections(showDevelopmentItems);
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const navRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<PrimaryView, HTMLButtonElement>());
   const [indicator, setIndicator] = useState({
@@ -372,6 +350,11 @@ export function AppSidebar({
         .filter(Boolean)
         .join(" ")}
       aria-hidden={!isOpen}
+      /* aria-hidden alone hides the drawer from a screen reader while leaving
+         thirteen buttons in the tab order off the left edge of the window —
+         and focus landing inside an aria-hidden subtree is a violation Chrome
+         warns about. `inert` is what takes them out of it. */
+      inert={!isOpen}
       initial={false}
       animate={
         overlayMode

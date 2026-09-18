@@ -49,8 +49,8 @@
   padding: 30px 34px 24px;
   color: var(--text-primary);
   background:
-    radial-gradient(1100px 460px at 16% -8%, var(--bg-ambient-green), transparent 62%),
-    radial-gradient(880px 420px at 90% -12%, var(--bg-ambient-teal), transparent 58%),
+    radial-gradient(1100px 460px at 16% -8%, var(--bg-ambient-primary), transparent 62%),
+    radial-gradient(880px 420px at 90% -12%, var(--bg-ambient-secondary), transparent 58%),
     var(--tl-ground, var(--bg-base));
   background-attachment: local;
   overflow: hidden;
@@ -540,7 +540,7 @@
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
   background:
-    radial-gradient(ellipse 90% 62% at 14% 0%, var(--bg-ambient-green), transparent 58%),
+    radial-gradient(ellipse 90% 62% at 14% 0%, var(--bg-ambient-primary), transparent 58%),
     linear-gradient(180deg, var(--tl-sheen), var(--tl-sheen-fade) 42%),
     var(--tl-panel-bg);
   box-shadow: var(--shadow-card), var(--glass-inset);
@@ -3207,7 +3207,7 @@
   color: var(--text-primary);
   background:
     radial-gradient(circle at 50% 22%, var(--accent-soft), transparent 44%),
-    radial-gradient(900px 420px at 82% -10%, var(--bg-ambient-teal), transparent 55%),
+    radial-gradient(900px 420px at 82% -10%, var(--bg-ambient-secondary), transparent 55%),
     var(--tl-ground, var(--bg-base));
   text-align: center;
 }
@@ -3391,7 +3391,7 @@
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(ellipse 110% 60% at 20% 0%, var(--bg-ambient-green), transparent 60%),
+    radial-gradient(ellipse 110% 60% at 20% 0%, var(--bg-ambient-primary), transparent 60%),
     var(--surface);
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   animation: tl-dialog-in 280ms var(--tl-ease-out, cubic-bezier(0.2, 0.8, 0.25, 1)) both;
@@ -3473,7 +3473,7 @@
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(ellipse 70% 40% at 50% 0%, var(--bg-ambient-green), transparent 55%),
+    radial-gradient(ellipse 70% 40% at 50% 0%, var(--bg-ambient-primary), transparent 55%),
     color-mix(in srgb, var(--tl-ground, var(--bg-base)) 94%, var(--surface));
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   overflow: hidden;
@@ -4817,7 +4817,7 @@
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   background:
-    radial-gradient(760px 240px at 12% 0%, var(--bg-ambient-green), transparent 62%),
+    radial-gradient(760px 240px at 12% 0%, var(--bg-ambient-primary), transparent 62%),
     var(--tl-reader-bg, var(--bg-base));
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   animation: tl-dialog-in 240ms var(--tl-ease-out) both;
@@ -5470,7 +5470,7 @@
 }
 
 .plan-entry-card .plan-entry-actions button:hover { color: var(--text-primary); background: var(--glass-bg-hover); }
-.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid var(--surface-line, color-mix(in srgb, var(--danger, #e5484d) 36%, transparent)); border-radius: var(--radius-sm); color: var(--danger, #e5484d); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
+.plan-editor-workout-error { position: fixed; right: 22px; bottom: 22px; z-index: 95; display: flex; align-items: center; gap: 8px; max-width: 420px; padding: 10px 12px; border: 1px solid var(--surface-line, color-mix(in srgb, var(--error-text) 36%, transparent)); border-radius: var(--radius-sm); color: var(--error-text); background: var(--surface); box-shadow: var(--shadow-elevated); font-size: 11px; }
 .plan-editor-workout-error button { display: inline-flex; margin-left: auto; border: 0; color: inherit; background: none; cursor: pointer; }
 
 @media (max-width: 840px) {
