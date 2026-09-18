@@ -40,6 +40,11 @@
   gap: 18px;
   min-height: 0;
   overflow-y: auto;
+  /* The page scrolls here, so it carries `.content`'s measure itself — see the
+     `.content-fill:has(> .running-view)` rule in styles.css. Without this the
+     gutter sits outside the scroller and the scrollbar is drawn a gutter's
+     width inside the window instead of at its edge. */
+  padding: 0 var(--content-gutter, 28px) var(--content-pad-bottom, 28px);
 
   --run-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --run-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
