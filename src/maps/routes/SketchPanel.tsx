@@ -207,6 +207,7 @@ export function SketchPanel({
         <label>Fidelity</label>
         <OptionGroup
           label="Shape fidelity"
+          fill
           value={sketch.fidelity}
           options={FIDELITY_OPTIONS.map((option) => ({
             value: option.value,

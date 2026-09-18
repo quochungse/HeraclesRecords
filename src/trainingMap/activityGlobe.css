@@ -184,7 +184,6 @@
   --option-raised: var(--map-elevated-surface);
   --option-lift: 0 3px 10px color-mix(in srgb, var(--map-accent) 30%, transparent);
   --accent: var(--map-accent);
-  --accent-ink: var(--map-on-accent);
   --text-primary: var(--map-text-primary);
   --text-secondary: var(--map-text-secondary);
 }

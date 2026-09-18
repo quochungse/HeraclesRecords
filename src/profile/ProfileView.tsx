@@ -522,6 +522,7 @@ export function ProfileView({
                     <OptionGroup
                       label="Sex"
                       size="md"
+                      fill
                       value={draft.sex}
                       options={[
                         { value: "0", label: "Male" },
@@ -720,6 +721,7 @@ export function ProfileView({
                     <OptionGroup
                       label="Measurement"
                       size="md"
+                      fill
                       value={draft.unit}
                       options={[
                         { value: "0", label: "Metric" },
@@ -733,6 +735,7 @@ export function ProfileView({
                     <OptionGroup
                       label="Temperature"
                       size="md"
+                      fill
                       value={draft.temperatureUnit}
                       options={[
                         { value: "0", label: "Celsius" },

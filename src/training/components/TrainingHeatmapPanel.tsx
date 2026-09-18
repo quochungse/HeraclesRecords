@@ -607,11 +607,12 @@ export function TrainingHeatmapPanel({
               setMetric(next === "rpeLoad" ? "rpeLoad" : "trainingLoad")
             }
           />
-          {/* Folded: two labels this long ("Last 365 days") were the widest
-              thing in the header, for a choice made once a session. */}
+          {/* Left open. It folded while the labels were "Last 365 days" and
+              "Last 30 days", which were the widest thing in the header; on the
+              shared scale they are "1 year" and "4 weeks", and two chips that
+              short cost less room than the fold they were hiding behind. */}
           <OptionGroup
             label="Heatmap range"
-            mode="collapsible"
             value={range}
             options={TRAINING_HEATMAP_RANGES.map((option) => ({
               value: option,

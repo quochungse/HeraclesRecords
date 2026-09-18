@@ -176,6 +176,7 @@ export function TriggerForm({
               <OptionGroup
                 label="Repeats"
                 size="md"
+                fill
                 value={scheduleTrigger.cadence}
                 options={[
                   { value: "daily", label: "Every day" },

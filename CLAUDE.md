@@ -899,12 +899,37 @@ makes the same measurement say it fits. A screen that cannot spare the width say
 `mode="collapsible"`. **Escape is caught in the capture phase** — a collapsible group can sit
 in a dialog that closes on Escape from its own `document` listener, and two listeners on one
 node are not separated by `stopPropagation()`.
+**The chosen chip is a wash of the accent with the accent's own ink** — the Calendar's
+Month/Week switch, which had the mark right before the component existed and is now where it
+comes from. A solid accent fill was the first answer and it shouts: a period picker is chrome,
+and a filled pill pulled the eye off the chart it describes. The rule that marks the
+**collapsed** group's lead chip has to be `.option-group .option-group-trigger`, two classes,
+because a flat `.option-group-trigger` loses to `.option-group button` — a class and an
+element — and a folded group then drew its one visible chip as though nothing were chosen,
+which is the whole of what the folded state has to say. `--accent-ink` is gone with the fill
+it was mixed for.
+**`fill` splits a form row equally between the options.** A `.field` hands its control the
+whole width, every input in one is `width: 100%`, and a chip row that keeps its text width
+ends in dead space with the options at two sizes nobody picked. Stated by the caller for the
+reason `mode` is, and nothing in `dropdown` mode, which already fills what holds it.
 **The words are `src/preferences/periodScale.ts`, not the screen's.** Six screens used to
 answer "how far back" in their own vocabulary — ninety days was "3 months", "90 days" and
 "Last 90 days" depending on where you looked. A screen declares the windows it offers and
 takes the labels from the scale; the test fails on a period label written anywhere else.
 Two windows moved to fit it: the trend charts and the load heatmap run 28 days rather than 30,
 which is the four whole weeks this app already cuts its periods by.
+**A dropdown opens at the size of what it holds**, between a floor (the trigger, so the list
+is never narrower than the control it came from) and a cap (the window). It was handed one
+width, `max(trigger, 220px)`, which was wrong in both directions at once — a 90px pill opened a
+220px menu half of it empty, and a list of model names was ellipsised inside the same 220px.
+The one exception is a menu whose options carry a `detail`: that is a sentence, and a sentence
+has no natural width, so those cap at the floor and wrap, with the caller raising the floor to
+suit. Its ground is `--menu-surface`, **not** `--surface`, which carries a green cast that
+reads as chrome under a panel and as a tint under a sheet hanging over the page. And
+`.app-select-trigger` states `font-size` **after** `font: inherit`, never before — the
+shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
+drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
+trigger stands in a row with.
 **Seventeen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (the route sport picker,

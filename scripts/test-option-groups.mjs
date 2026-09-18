@@ -22,8 +22,9 @@
  *      and "Last 90 days" depending on where you looked — so a screen that
  *      writes a period label of its own fails here.
  *   4. The component's own vocabulary is present: a chip states its size once,
- *      the chosen chip takes the accent through `--accent-ink`, and the
- *      collapsible mode animates a grid column rather than a magic max-width.
+ *      the chosen chip is marked the same way whether the group is open or
+ *      folded, and the collapsible mode animates a grid column rather than a
+ *      magic max-width.
  *
  * Run: npm run test:option-groups
  */
@@ -286,8 +287,26 @@ assert.match(
 );
 assert.match(
   styles,
-  /\.option-group button\[aria-checked="true"\] \{[^}]*color: var\(--accent-ink\);/,
-  "the chosen chip takes its ink from --accent-ink, which each theme states for itself"
+  /\.option-group button\[aria-checked="true"\] \{\s*background: var\(--accent-soft\);\s*color: var\(--accent-strong\);/,
+  "the chosen chip is a wash of the accent with the accent's own ink — the Calendar's Month/Week mark"
+);
+
+/*
+ * A folded group shows one chip, and it is the chosen one, so it has to be
+ * marked as chosen. The rule has to outrank `.option-group button` (a class
+ * and an element) or it loses outright and the collapsed state says nothing —
+ * which is what a bare `.option-group-trigger` did.
+ */
+assert.match(
+  styles,
+  /\.option-group \.option-group-trigger \{\s*background: var\(--accent-soft\);\s*color: var\(--accent-strong\);/,
+  "the collapsed group's lead chip wears the chosen mark, at a specificity that beats .option-group button"
+);
+
+assert.doesNotMatch(
+  styles,
+  /--accent-ink/,
+  "--accent-ink is gone: the chosen chip is a wash now, so there is no filled accent to find ink for"
 );
 assert.match(
   styles,

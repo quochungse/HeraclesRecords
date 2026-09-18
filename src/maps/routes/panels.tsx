@@ -448,6 +448,7 @@ export function GeneratePanel({
           <label>Elevation</label>
           <OptionGroup
             label="Elevation preference"
+            fill
             value={elevationPreference}
             options={ROUTE_ELEVATION_OPTIONS.map((option) => ({
               value: option.value,

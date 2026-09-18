@@ -34,8 +34,9 @@ export interface SelectDropdownProps<T extends string> {
   portal?: boolean;
   title?: string;
   /**
-   * Floor for the open menu's width. Raise it for options whose text would
-   * otherwise wrap over several lines; the closed trigger is unaffected.
+   * Floor for the open menu's width, over and above the trigger's own. Raise it
+   * for options whose text would otherwise wrap over several lines; the closed
+   * trigger is unaffected.
    */
   minMenuWidth?: number;
 }
@@ -43,14 +44,22 @@ export interface SelectDropdownProps<T extends string> {
 interface MenuPosition {
   left: number;
   top: number;
-  width: number;
+  minWidth: number;
+  maxWidth: number;
   maxHeight: number;
   transform?: string;
 }
 
 type PortalTheme = CSSProperties & Record<`--${string}`, string>;
 
+/*
+ * Carried onto the portalled menu because it hangs off <body> and so inherits
+ * from :root, not from the scope the trigger sits in — the Coach rail
+ * redefines --accent and --surface for itself, and a menu that missed them
+ * came out in the app's colours inside a screen wearing its own.
+ */
 const PORTAL_THEME_VARIABLES = [
+  "--menu-surface",
   "--surface",
   "--glass-border",
   "--glass-bg-hover",
@@ -58,10 +67,9 @@ const PORTAL_THEME_VARIABLES = [
   "--text-secondary",
   "--accent",
   "--accent-soft",
+  "--accent-strong",
   "--radius-sm"
 ] as const;
-
-const DEFAULT_MIN_MENU_WIDTH = 220;
 
 /**
  * The gap between the trigger and the menu, and the margin the menu keeps from
@@ -95,6 +103,11 @@ export function SelectDropdown<T extends string>({
   const selectedOption = options.find((option) => option.value === value);
   const selectedLabel = selectedOption?.label ?? "Select";
   const selectedIcon = renderIcon?.(value);
+  // A boolean rather than the array itself, because this feeds the position
+  // callback: `options` is rebuilt by most callers on every render, and a
+  // callback that changed with it would re-run the layout effect, which sets
+  // state, which renders again — a loop with no exit.
+  const hasDetail = options.some((option) => option.detail !== undefined);
   const labelId = `${dropdownId}-label`;
   const valueId = `${dropdownId}-value`;
   const menuId = `${dropdownId}-menu`;
@@ -118,10 +131,30 @@ export function SelectDropdown<T extends string>({
 
     const trigger = triggerRef.current.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(triggerRef.current);
-    const menuWidth = Math.min(
-      Math.max(trigger.width, minMenuWidth ?? DEFAULT_MIN_MENU_WIDTH),
-      window.innerWidth - VIEWPORT_MARGIN * 2
+
+    /*
+     * The menu is sized by its own content — `width: max-content` in the
+     * stylesheet — between a floor and a cap given here. The floor is the
+     * trigger, so the open list never comes out narrower than the control it
+     * belongs to; anything wider than that is the list's own doing.
+     *
+     * It used to be handed one width, max(trigger, 220px), which was wrong in
+     * both directions at once: a period pill 90px wide opened a 220px menu that
+     * was half empty, and a list of model names was ellipsised inside the same
+     * 220px. Neither number was measured.
+     *
+     * The cap is the window, except where an option carries a `detail` — that
+     * is a sentence, and a sentence has no natural width, so `max-content`
+     * would run it off the screen. Those menus cap at the floor instead, which
+     * is what `.app-select-option-label.has-detail` wraps inside; their caller
+     * raises the floor to suit (ModelSwitch asks for 420).
+     */
+    const viewportCap = window.innerWidth - VIEWPORT_MARGIN * 2;
+    const minWidth = Math.min(
+      Math.max(trigger.width, minMenuWidth ?? 0),
+      viewportCap
     );
+    const maxWidth = hasDetail ? minWidth : viewportCap;
 
     /*
      * The height the list actually wants, not a number picked in advance. It
@@ -133,10 +166,10 @@ export function SelectDropdown<T extends string>({
      * bounding it is the window, which is a real limit rather than a guess.
      */
     const menu = menuRef.current;
-    // Only trusted once the menu has the width this function gave it. On the
-    // first pass it has none, and a list measured at zero width wraps every
-    // label onto its own lines and reports a height several times its real
-    // one — which would open every menu at the full height of the window.
+    // Only trusted once the menu has been laid out. Before that there is
+    // nothing to read, and a height taken from a box with no width reports
+    // every label wrapped onto its own lines — several times the real one,
+    // which would open every menu at the full height of the window.
     const measured = menu !== null && menu.clientWidth > 0;
     const border = measured ? menu.offsetHeight - menu.clientHeight : 0;
 
@@ -148,13 +181,19 @@ export function SelectDropdown<T extends string>({
     const opensUp = roomBelow < Math.min(wanted, 180) && roomAbove > roomBelow;
     const availableRoom = opensUp ? availableAbove : availableBelow;
 
+    // Keeping it on screen needs the width it settled at, which only the
+    // second pass knows; the first uses the floor, which is the trigger's own
+    // and so is already where the menu belongs.
+    const width = measured ? menu.offsetWidth : minWidth;
+
     setMenuPosition({
       left: Math.max(
         VIEWPORT_MARGIN,
-        Math.min(trigger.left, window.innerWidth - menuWidth - VIEWPORT_MARGIN)
+        Math.min(trigger.left, window.innerWidth - width - VIEWPORT_MARGIN)
       ),
       top: opensUp ? trigger.top - MENU_GAP : trigger.bottom + MENU_GAP,
-      width: menuWidth,
+      minWidth,
+      maxWidth,
       maxHeight: Math.min(wanted, availableRoom),
       transform: opensUp ? "translateY(-100%)" : undefined
     });
@@ -170,7 +209,7 @@ export function SelectDropdown<T extends string>({
       // a 14px list — the same control in two type sizes, a step apart.
       "--app-select-font-size": computedStyle.fontSize
     });
-  }, [portal, minMenuWidth]);
+  }, [portal, minMenuWidth, hasDetail]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -321,7 +360,8 @@ export function SelectDropdown<T extends string>({
         ...portalTheme,
         left: menuPosition?.left ?? 0,
         top: menuPosition?.top ?? 0,
-        width: menuPosition?.width ?? 0,
+        minWidth: menuPosition?.minWidth ?? 0,
+        maxWidth: menuPosition?.maxWidth ?? "100%",
         maxHeight: menuPosition?.maxHeight ?? 280,
         transform: menuPosition?.transform,
         visibility: menuPosition ? "visible" : "hidden"

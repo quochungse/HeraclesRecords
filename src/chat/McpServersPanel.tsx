@@ -352,6 +352,7 @@ export function McpServersPanel({
             <OptionGroup
               label="Authentication"
               size="md"
+              fill
               value={addAuth}
               options={[
                 { value: "oauth", label: "OAuth" },

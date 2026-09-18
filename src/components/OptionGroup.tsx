@@ -87,11 +87,21 @@ export interface OptionGroupProps<T extends string> {
    */
   iconOnly?: boolean;
   /**
-   * `accent` fills the chosen chip with the accent — right when the choice
-   * decides what the screen is about. `quiet` keeps it neutral, for a filter
-   * narrowing something the screen already shows.
+   * `accent` marks the chosen chip with a wash of the accent and the accent's
+   * own ink — the Calendar's Month/Week switch, which is where the mark comes
+   * from. `quiet` keeps it neutral, for a filter narrowing something the screen
+   * already shows.
    */
   tone?: "accent" | "quiet";
+  /**
+   * Spans the row and splits it equally between the options. For a labelled
+   * form row, where every input beside it is already full width and a chip row
+   * that keeps its text width ends in dead space — two options at two
+   * different sizes, which nobody chose. It is stated rather than measured for
+   * the reason `mode` is: the author knows whether the control owns its row.
+   * Nothing in `dropdown` mode, which already fills whatever holds it.
+   */
+  fill?: boolean;
   className?: string;
   disabled?: boolean;
 }
@@ -111,6 +121,7 @@ export function OptionGroup<T extends string>({
   size = "sm",
   tone = "accent",
   iconOnly = false,
+  fill = false,
   className,
   disabled = false
 }: OptionGroupProps<T>) {
@@ -270,6 +281,7 @@ export function OptionGroup<T extends string>({
     `option-group--${size}`,
     tone === "quiet" ? "option-group--quiet" : "",
     iconOnly ? "option-group--icon" : "",
+    fill ? "option-group--fill" : "",
     disabled ? "is-disabled" : "",
     className
   ]

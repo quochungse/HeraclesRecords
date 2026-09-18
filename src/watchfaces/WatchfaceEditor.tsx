@@ -11438,7 +11438,7 @@ export function WatchfaceEditor({
                   <label>Size<EditableNumberInput min="12" max="200" step="1" value={element.fontSize} fallback={12} onValueChange={(fontSize) => set({ fontSize: Math.max(12, fontSize) })} /></label>
                   <label>Weight<EditableNumberInput min="100" max="900" step="100" value={element.weight} fallback={400} onValueChange={(weight) => set({ weight: Math.max(100, Math.min(900, Math.round(weight / 100) * 100)) })} /></label>
                 </div>
-                <label className="field">Text align<OptionGroup label="Text align" value={element.align} options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} onChange={(align) => set({ align: align as CorosWatchfaceBackgroundText["align"] })} /></label>
+                <label className="field">Text align<OptionGroup label="Text align" fill value={element.align} options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} onChange={(align) => set({ align: align as CorosWatchfaceBackgroundText["align"] })} /></label>
               </div>,
               { disabled: locked }
             )

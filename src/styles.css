@@ -31,15 +31,6 @@
   --shadow-inset: var(--glass-inset);
 
   /*
-   * Ink on a filled accent. It was written out as #06110e wherever a chip took
-   * the accent, on both themes — which is right on the dark theme's gold and
-   * close to invisible on paper's brown. A near-black on a mid-brown is not a
-   * subtle contrast failure; it is the selected chip being the hardest one to
-   * read. So the ink is a token and each theme states its own.
-   */
-  --accent-ink: #06110e;
-
-  /*
    * The option control's three surfaces (src/components/OptionGroup.tsx). They
    * are the same three --ax-* and --sx-* had each defined for themselves, at
    * 11%/5% and 8%/4% respectively — nobody chose the difference, and a period
@@ -56,6 +47,16 @@
   --text-muted: #6e6e73;
 
   --surface: #0c1814;
+
+  /*
+   * The ground under a floating menu. It is not --surface, which carries a
+   * green cast (#0c1814) that reads as a tint rather than as chrome once it is
+   * a panel-sized sheet hanging over the page — a dropdown is the one surface
+   * the eye lands on with nothing else around it, so the cast has nowhere to
+   * hide. Neutral, one step above --bg-base, so the menu reads as lifted
+   * without saying anything about the accent.
+   */
+  --menu-surface: #141920;
 
   --accent-gold: #d89b22;
 
@@ -255,9 +256,6 @@
   --shadow-elevated: 0 24px 54px rgba(19, 26, 40, 0.18);
   --shadow-inset: inset 0 1px 0 rgba(19, 26, 40, 0.05);
 
-  /* White on this theme's brown accent — 5.9:1. See the dark theme's note. */
-  --accent-ink: #ffffff;
-
   /* A raised face here is white and the hairline does the lifting, which is the
      same move the paper --ax-* and --sx-* sets already made. */
   --option-edge: rgba(19, 26, 40, 0.14);
@@ -270,6 +268,7 @@
   --text-muted: #61687a;
 
   --surface: #ffffff;
+  --menu-surface: #ffffff;
 
   --accent-gold: #905e0e;
 
@@ -4731,12 +4730,21 @@ input::placeholder {
   cursor: not-allowed;
 }
 
-/* The chosen chip. `accent` is for a choice that decides what the screen is
-   about; `quiet` for one that only narrows what it already shows — the
-   distinction Strength's two pickers drew for themselves, kept and generalised. */
+/*
+ * The chosen chip: the accent as a wash, with the accent's own ink on top.
+ * This is the Calendar's Month/Week switch, which had the mark right before
+ * the component existed and is now where it comes from. A solid accent fill
+ * was the first answer and it shouts — a period picker is chrome, and a filled
+ * pill in the header pulled the eye off the chart it describes. A wash reads
+ * as clearly chosen at a glance and stays in its place.
+ *
+ * `quiet` is for a choice that only narrows what the screen already shows: it
+ * takes no hue at all, which is the distinction Strength's two pickers drew
+ * for themselves and this keeps.
+ */
 .option-group button[aria-checked="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .option-group--quiet button[aria-checked="true"] {
@@ -4747,6 +4755,25 @@ input::placeholder {
 
 .option-group.is-disabled {
   opacity: 0.55;
+}
+
+/*
+ * A form row hands its control the whole width — every input in a `.field` is
+ * `width: 100%` — so a chip row that keeps its text width ends in dead space,
+ * with the two options different sizes for no reason anyone chose. `fill`
+ * splits the row equally between them. It is the caller's word rather than
+ * something measured, for the reason the mode is: the author knows whether the
+ * control owns its row, and a measurement can only guess.
+ */
+.option-group--fill {
+  display: flex;
+  width: 100%;
+}
+
+.option-group--fill button {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 0;
 }
 
 /*
@@ -4788,11 +4815,17 @@ input::placeholder {
   overflow: hidden;
 }
 
-/* The lead is the selected chip: it wears the chosen state because it is the
-   chosen option, not because it is a trigger. */
-.option-group-trigger {
-  background: var(--accent);
-  color: var(--accent-ink);
+/*
+ * The lead is the selected chip: it wears the chosen state because it is the
+ * chosen option, not because it is a trigger. It has to outrank
+ * `.option-group button`, which is a class and an element — the flat
+ * `.option-group-trigger` this replaces lost to it, so a collapsed group drew
+ * its one visible chip as though nothing were chosen, which is the whole of
+ * what the collapsed state has to say.
+ */
+.option-group .option-group-trigger {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .option-group--quiet .option-group-trigger {
@@ -7547,7 +7580,6 @@ td span {
   display: flex;
   width: 100%;
   min-height: 44px;
-  font-size: var(--app-select-font-size);
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -7557,7 +7589,12 @@ td span {
   background: var(--glass-bg);
   color: var(--text-primary);
   padding: 0 12px;
+  /* After `font: inherit`, never before it: the shorthand resets font-size, so
+     the declared size sat above it doing nothing and every trigger in the app
+     drew at the page's 16px — a size that is not on the scale, and two steps
+     above the 12px chips a pill trigger stands in a row with. */
   font: inherit;
+  font-size: var(--app-select-font-size);
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -7566,9 +7603,13 @@ td span {
     box-shadow var(--dur-fast) var(--ease);
 }
 
+/* A white edge is invisible on paper, where the card under it is also white —
+   the trigger disappeared at the moment it was opened, which is the one moment
+   it has to stay put. Mixed from the ink instead, so it follows the theme the
+   way --option-edge beside it does. */
 .app-select-trigger:hover,
 .app-select-trigger[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: color-mix(in srgb, var(--text-primary) 20%, transparent);
   background: var(--glass-bg-hover);
 }
 
@@ -7650,7 +7691,7 @@ td span {
   font-size: var(--app-select-font-size, inherit);
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--menu-surface);
   box-shadow: var(--shadow-elevated);
 }
 
@@ -7660,6 +7701,15 @@ td span {
   z-index: 420;
   right: auto;
   bottom: auto;
+  /*
+   * The menu is as wide as what it holds, between a floor and a cap the
+   * component measures: the floor is the trigger, so the open list is never
+   * narrower than the control it came out of, and the cap is the window. It
+   * used to be given one width — max(trigger, 220px) — which is two wrongs at
+   * once: a 90px pill opened a 220px menu with half of it empty, and a list of
+   * model names was ellipsised inside it.
+   */
+  width: max-content;
   /* The inline max-height is measured against the window; this cap is not,
      and leaving it on would scroll a list that had room to open in full. */
   max-height: none;
@@ -7726,14 +7776,16 @@ td span {
 .app-select--pill .app-select-trigger {
   min-height: auto;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.04);
+  /* The shared glass, not a white wash of its own: the two were within a
+     percent of each other on dark and the wash was nothing at all on paper. */
+  background: var(--glass-bg);
   padding: 5px 13px;
   font-weight: 600;
 }
 
 .app-select--pill .app-select-trigger:hover,
 .app-select--pill .app-select-trigger[aria-expanded="true"] {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-hover);
 }
 
 .app-select--watch-smoke .app-select-trigger {
@@ -21183,7 +21235,6 @@ tr.data-intervals-row-missing {
   --chat-select-tone-strong: var(--accent-strong);
   --chat-select-tone-soft: var(--accent-soft);
   --chat-select-tone-shadow: var(--accent-glow);
-  min-width: 220px;
   padding: 7px;
   border-color: color-mix(
     in srgb,
