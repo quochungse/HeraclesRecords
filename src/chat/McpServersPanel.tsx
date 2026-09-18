@@ -12,6 +12,7 @@ import {
   Trash2,
   Unplug
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import type { CorosLinkApi } from "../coroslink-api";
 import type {
   McpServerConfig,
@@ -348,16 +349,17 @@ export function McpServersPanel({
           </label>
           <label className="mcp-server-field">
             <span>Authentication</span>
-            <select
+            <OptionGroup
+              label="Authentication"
+              size="md"
               value={addAuth}
-              onChange={(event) =>
-                setAddAuth(event.target.value as "oauth" | "bearer" | "none")
-              }
-            >
-              <option value="oauth">OAuth</option>
-              <option value="bearer">API key</option>
-              <option value="none">None</option>
-            </select>
+              options={[
+                { value: "oauth", label: "OAuth" },
+                { value: "bearer", label: "API key" },
+                { value: "none", label: "None" }
+              ]}
+              onChange={setAddAuth}
+            />
           </label>
           <button
             type="submit"

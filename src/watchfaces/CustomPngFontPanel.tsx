@@ -1,4 +1,5 @@
 import { ImagePlus } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import { useEffect, useRef, useState } from "react";
 import type {
   CorosWatchfaceRasterFont,
@@ -391,10 +392,20 @@ export function CustomPngFontPanel({
       {supportsComponentScope ? (
         <label className="field">
           Apply PNG sprites to
-          <select disabled={controlsDisabled} value={scope} onChange={(event) => setScope(event.target.value as "component" | "all")}>
-            <option value="component">This component{componentLabel ? ` (${componentLabel})` : ""}</option>
-            <option value="all">All text components</option>
-          </select>
+          <OptionGroup
+            label="Apply to"
+            mode="dropdown"
+            value={scope}
+            options={[
+              {
+                value: "component",
+                label: `This component${componentLabel ? ` (${componentLabel})` : ""}`
+              },
+              { value: "all", label: "All text components" }
+            ]}
+            disabled={controlsDisabled}
+            onChange={(next) => setScope(next as "component" | "all")}
+          />
         </label>
       ) : null}
       <label className="watchface-raster-font-upload">

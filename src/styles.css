@@ -6161,18 +6161,6 @@ td span {
   font-size: 11px;
   font-weight: 700;
 }
-
-.watchface-typography-controls select {
-  min-width: 0;
-  min-height: 34px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  outline: none;
-  background: var(--glass-bg);
-  color: var(--text-primary);
-  padding: 0 8px;
-}
-
 .watchface-typography-tracking {
   grid-column: 1 / -1;
 }
@@ -12854,115 +12842,6 @@ td span {
   text-overflow: ellipsis;
 }
 
-/* Glassmorphic picker for the one metric the weekly columns measure. It carries
-   no colour of its own: hue on this chart belongs to the sport a block stands
-   for, so a swatch here would claim it stands for the unit instead. */
-.metric-select {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.metric-select-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  color: var(--text-primary);
-  padding: 5px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
-}
-
-.metric-select-trigger:hover,
-.metric-select-trigger[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.metric-select-label {
-  white-space: nowrap;
-}
-
-.metric-select-icon {
-  color: var(--text-secondary);
-  transition: transform var(--dur-base) var(--ease);
-}
-
-.metric-select-icon.is-open {
-  transform: rotate(180deg);
-}
-
-.metric-select-menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 8px);
-  right: 0;
-  display: grid;
-  gap: 2px;
-  min-width: 230px;
-  padding: 8px;
-  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.14));
-  border-radius: var(--radius-md);
-  background: rgba(20, 24, 28, 0.68);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  backdrop-filter: blur(22px) saturate(1.3);
-  box-shadow:
-    var(--shadow-elevated), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.metric-select-option {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-primary);
-  padding: 8px 10px;
-  text-align: left;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.metric-select-option:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.metric-select-option.is-selected {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* Round, because exactly one option can be on — the square read as a checkbox
-   back when the chart stacked several metrics at once. */
-.metric-select-check {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--bg-base);
-}
-
-.metric-select-option.is-selected .metric-select-check {
-  border-color: transparent;
-  background: var(--accent);
-}
 
 .training-fitness-date {
   display: block;
@@ -14300,133 +14179,6 @@ td span {
   font-weight: 600;
 }
 
-.training-zone-select {
-  display: block;
-  width: fit-content;
-  min-width: 168px;
-  position: relative;
-  z-index: 6;
-}
-
-.training-zone-select-trigger {
-  display: flex;
-  width: 100%;
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-pill);
-  outline: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-  padding: 0 12px 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-
-.training-zone-select-trigger:hover,
-.training-zone-select-trigger[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.training-zone-panel-heart .training-zone-select-trigger:hover,
-.training-zone-panel-heart .training-zone-select-trigger[aria-expanded="true"] {
-  border-color: rgba(255, 111, 128, 0.35);
-}
-
-.training-zone-panel-distance .training-zone-select-trigger:hover,
-.training-zone-panel-distance .training-zone-select-trigger[aria-expanded="true"] {
-  border-color: rgba(79, 195, 243, 0.35);
-}
-
-.training-zone-select-trigger:focus-visible {
-  border-color: rgba(79, 195, 243, 0.52);
-  box-shadow: var(--glass-inset), var(--shadow-card);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.training-zone-select-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.training-zone-select-icon {
-  flex: 0 0 auto;
-  color: rgba(245, 245, 247, 0.8);
-  transition: transform var(--dur-base) var(--ease);
-}
-
-.training-zone-select-trigger[aria-expanded="true"] .training-zone-select-icon {
-  transform: rotate(180deg);
-}
-
-.training-zone-select-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.18));
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, rgba(31, 35, 38, 0.82), rgba(13, 15, 16, 0.78)),
-    rgba(255, 255, 255, 0.08);
-  -webkit-backdrop-filter: blur(24px) saturate(155%);
-  backdrop-filter: blur(24px) saturate(155%);
-  box-shadow:
-    var(--glass-inset), var(--shadow-elevated);
-  padding: 6px;
-}
-
-.training-zone-select-option {
-  display: flex;
-  width: 100%;
-  min-height: 38px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-primary);
-  padding: 0 10px;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 600;
-  outline: none;
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.training-zone-select-option.is-active,
-.training-zone-select-option:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.training-zone-select-option:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.training-zone-select-option.is-selected {
-  color: #b9f3dd;
-}
-
-.training-zone-select-option svg {
-  flex: 0 0 auto;
-  color: #6ee7a8;
-}
 
 .sr-only {
   position: absolute;
@@ -17916,8 +17668,7 @@ tr.data-intervals-row-missing {
   }
 
   .training-zone-header-actions,
-  .training-zone-metric-pill,
-  .training-zone-select {
+  .training-zone-metric-pill {
     width: 100%;
   }
 

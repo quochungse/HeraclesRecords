@@ -319,6 +319,27 @@ import {
   MoonStar
 } from "lucide-react";
 import { OptionGroup } from "../components/OptionGroup";
+
+/** The four ways a progress rectangle can fill, shared by every such control. */
+const FILL_DIRECTION_OPTIONS = [
+  { value: "left", label: "Left to right" },
+  { value: "right", label: "Right to left" },
+  { value: "top", label: "Top to bottom" },
+  { value: "bottom", label: "Bottom to top" }
+];
+
+/** The nine anchor points a sprite can be transformed around. */
+const TRANSFORM_ORIGIN_OPTIONS = [
+  { value: "0,0", label: "Top left" },
+  { value: "0.5,0", label: "Top center" },
+  { value: "1,0", label: "Top right" },
+  { value: "0,0.5", label: "Center left" },
+  { value: "0.5,0.5", label: "Center" },
+  { value: "1,0.5", label: "Center right" },
+  { value: "0,1", label: "Bottom left" },
+  { value: "0.5,1", label: "Bottom center" },
+  { value: "1,1", label: "Bottom right" }
+];
 import {
   resizeWatchfaceDimensions,
   watchfaceMasterPixelsFromDevice,
@@ -7184,26 +7205,29 @@ export function WatchfaceEditor({
             {previewDetails && previewDetails.resolutions.length > 1 ? (
               <label className="wf-preview-resolution">
                 Watch preview
-                <select
+                <OptionGroup
+                  label="Watch preview"
+                  mode="dropdown"
                   value={watchPreviewResolution?.directory ?? ""}
-                  onChange={(event) => setWatchPreviewDirectory(event.target.value)}
-                >
-                  {[...previewDetails.resolutions]
+                  options={[...previewDetails.resolutions]
                     .sort((left, right) => left.width - right.width)
-                    .map((resolution) => (
-                      <option key={resolution.directory} value={resolution.directory}>
-                        {resolution.width === 240 &&
-                        (targetWatchModel === "apex-4" || targetFirmwareType?.toUpperCase() === "COROS W541")
+                    .map((resolution) => ({
+                      value: resolution.directory,
+                      label:
+                        resolution.width === 240 &&
+                        (targetWatchModel === "apex-4" ||
+                          targetFirmwareType?.toUpperCase() === "COROS W541")
                           ? "APEX 4 42 mm · 240×240"
                           : resolution.width === 260 &&
-                              (targetWatchModel === "apex-4" || targetFirmwareType?.toUpperCase() === "COROS W541")
+                              (targetWatchModel === "apex-4" ||
+                                targetFirmwareType?.toUpperCase() === "COROS W541")
                             ? "APEX 4 46 mm · 260×260"
                             : resolution.width === 800
                               ? "Master · 800×800"
-                              : `${resolution.width}×${resolution.height}`}
-                      </option>
-                    ))}
-                </select>
+                              : `${resolution.width}×${resolution.height}`
+                    }))}
+                  onChange={setWatchPreviewDirectory}
+                />
               </label>
             ) : null}
             {canEditActiveMode ? <div className="wf-placement-menu" ref={placementMenuRef}>
@@ -7259,29 +7283,32 @@ export function WatchfaceEditor({
                   </label>
                   <label className="field wf-placement-field">
                     Grid
-                    <select
+                    <OptionGroup
+                      label="Grid"
+                      mode="dropdown"
                       value={
                         placementPreferences.gridVisible
                           ? String(placementPreferences.gridStep)
                           : "off"
                       }
-                      onChange={(event) => {
-                        if (event.target.value === "off") {
+                      options={[
+                        { value: "off", label: "Off" },
+                        { value: "4", label: "4 px" },
+                        { value: "8", label: "8 px" },
+                        { value: "16", label: "16 px" },
+                        { value: "32", label: "32 px" }
+                      ]}
+                      onChange={(next) => {
+                        if (next === "off") {
                           patchPlacementPreferences({ gridVisible: false });
                           return;
                         }
                         patchPlacementPreferences({
                           gridVisible: true,
-                          gridStep: Number(event.target.value) as WatchfaceGridStep
+                          gridStep: Number(next) as WatchfaceGridStep
                         });
                       }}
-                    >
-                      <option value="off">Off</option>
-                      <option value="4">4 px</option>
-                      <option value="8">8 px</option>
-                      <option value="16">16 px</option>
-                      <option value="32">32 px</option>
-                    </select>
+                    />
                   </label>
                   <label className="field watchface-zoom-control wf-placement-safe-area">
                     Safe-area inset
@@ -7709,21 +7736,16 @@ export function WatchfaceEditor({
                 {resolutionOptions.length > 1 ? (
                   <label className="field">
                     Resolution
-                    <select
+                    <OptionGroup
+                      label="Resolution"
+                      mode="dropdown"
                       value={editorDirectory}
-                      onChange={(event) =>
-                        setConfigEditorDirectory(event.target.value)
-                      }
-                    >
-                      {resolutionOptions.map((resolution) => (
-                        <option
-                          key={resolution.directory}
-                          value={resolution.directory}
-                        >
-                          {resolution.width}×{resolution.height}
-                        </option>
-                      ))}
-                    </select>
+                      options={resolutionOptions.map((resolution) => ({
+                        value: resolution.directory,
+                        label: `${resolution.width}×${resolution.height}`
+                      }))}
+                      onChange={setConfigEditorDirectory}
+                    />
                   </label>
                 ) : null}
                 <OptionGroup
@@ -7747,21 +7769,16 @@ export function WatchfaceEditor({
                 {resolutionOptions.length > 1 ? (
                   <label className="field">
                     Resolution
-                    <select
+                    <OptionGroup
+                      label="Resolution"
+                      mode="dropdown"
                       value={editorDirectory}
-                      onChange={(event) =>
-                        setConfigEditorDirectory(event.target.value)
-                      }
-                    >
-                      {resolutionOptions.map((resolution) => (
-                        <option
-                          key={resolution.directory}
-                          value={resolution.directory}
-                        >
-                          {resolution.width}×{resolution.height}
-                        </option>
-                      ))}
-                    </select>
+                      options={resolutionOptions.map((resolution) => ({
+                        value: resolution.directory,
+                        label: `${resolution.width}×${resolution.height}`
+                      }))}
+                      onChange={setConfigEditorDirectory}
+                    />
                   </label>
                 ) : null}
                 <div
@@ -8463,21 +8480,20 @@ export function WatchfaceEditor({
           </div>
           <label className="watchface-inspector-field">
             <span>Fill direction</span>
-            <select
+            <OptionGroup
+              label="Fill direction"
+              mode="dropdown"
               value={exerciseProgress.rect.direction}
-              onChange={(event) =>
+              options={FILL_DIRECTION_OPTIONS}
+              onChange={(direction) =>
                 updateExerciseProgress({
                   rect: {
-                    direction: event.target.value as CorosWatchfaceExerciseProgressStyle["rect"]["direction"]
+                    direction:
+                      direction as CorosWatchfaceExerciseProgressStyle["rect"]["direction"]
                   }
                 })
               }
-            >
-              <option value="left">Left to right</option>
-              <option value="right">Right to left</option>
-              <option value="top">Top to bottom</option>
-              <option value="bottom">Bottom to top</option>
-            </select>
+            />
           </label>
         </details>
         <p className="muted">
@@ -8883,19 +8899,20 @@ export function WatchfaceEditor({
             <div className="wf-stroke-geometry">
               <label className="wf-stroke-control">
                 <span>Position</span>
-                <select
+                <OptionGroup
+                  label="Position"
                   value={selectedStroke.position}
-                  onChange={(event) =>
+                  options={[
+                    { value: "inside", label: "Inside" },
+                    { value: "center", label: "Center" },
+                    { value: "outside", label: "Outside" }
+                  ]}
+                  onChange={(position) =>
                     patchStroke(selectedStroke.id, {
-                      position: event.target
-                        .value as CorosWatchfaceStroke["position"]
+                      position: position as CorosWatchfaceStroke["position"]
                     })
                   }
-                >
-                  <option value="inside">Inside</option>
-                  <option value="center">Center</option>
-                  <option value="outside">Outside</option>
-                </select>
+                />
               </label>
               <label className="wf-stroke-control">
                 <span>Weight</span>
@@ -8930,10 +8947,16 @@ export function WatchfaceEditor({
               <div className="wf-stroke-advanced">
                 <label className="field">
                   Paint
-                  <select
+                  <OptionGroup
+                    label="Paint"
+                    mode="dropdown"
                     value={selectedStroke.paint.kind}
-                    onChange={(event) => {
-                      if (event.target.value === "linear-gradient") {
+                    options={[
+                      { value: "solid", label: "Solid color" },
+                      { value: "linear-gradient", label: "Linear gradient" }
+                    ]}
+                    onChange={(next) => {
+                      if (next === "linear-gradient") {
                         const baseColor =
                           selectedStroke.paint.kind === "solid"
                             ? selectedStroke.paint.color
@@ -8958,10 +8981,7 @@ export function WatchfaceEditor({
                         });
                       }
                     }}
-                  >
-                    <option value="solid">Solid color</option>
-                    <option value="linear-gradient">Linear gradient</option>
-                  </select>
+                  />
                 </label>
                 {selectedGradient ? (
                   <>
@@ -9162,15 +9182,19 @@ export function WatchfaceEditor({
         </span>
         <label className="field wf-effect-style-select">
           Effect style
-          <select
+          <OptionGroup
+            label="Effect style"
+            mode="dropdown"
             value={binding?.kind === "style" ? binding.styleId : ""}
-            onChange={(event) => bindLayerEffectStyle(layerId, event.target.value)}
-          >
-            <option value="">Local effects</option>
-            {(design.effectStyles ?? []).map((style) => (
-              <option key={style.id} value={style.id}>{style.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Local effects" },
+              ...(design.effectStyles ?? []).map((style) => ({
+                value: style.id,
+                label: style.name
+              }))
+            ]}
+            onChange={(styleId) => bindLayerEffectStyle(layerId, styleId)}
+          />
         </label>
         <div className="wf-effect-style-actions">
           {binding?.kind === "style" ? (
@@ -9207,10 +9231,20 @@ export function WatchfaceEditor({
             </div>
             <label className="field">
               Type
-              <select value={effect.kind} onChange={(event) => patchEffect(effect.id, { kind: event.target.value as CorosWatchfaceShadowEffect["kind"] })}>
-                <option value="outer-shadow">Outer shadow</option>
-                <option value="inner-shadow">Inner shadow</option>
-              </select>
+              <OptionGroup
+                label="Shadow kind"
+                mode="dropdown"
+                value={effect.kind}
+                options={[
+                  { value: "outer-shadow", label: "Outer shadow" },
+                  { value: "inner-shadow", label: "Inner shadow" }
+                ]}
+                onChange={(kind) =>
+                  patchEffect(effect.id, {
+                    kind: kind as CorosWatchfaceShadowEffect["kind"]
+                  })
+                }
+              />
             </label>
             <label className="field">
               Color
@@ -9984,12 +10018,20 @@ export function WatchfaceEditor({
                     </div>
                     <label className="watchface-inspector-field">
                       <span>Fill direction</span>
-                      <select value={progress.rect.direction} onChange={(event) => updateKcalProgress({ rect: { direction: event.target.value as CorosWatchfaceKcalProgressStyle["rect"]["direction"] } })}>
-                        <option value="left">Left to right</option>
-                        <option value="right">Right to left</option>
-                        <option value="top">Top to bottom</option>
-                        <option value="bottom">Bottom to top</option>
-                      </select>
+                      <OptionGroup
+                        label="Fill direction"
+                        mode="dropdown"
+                        value={progress.rect.direction}
+                        options={FILL_DIRECTION_OPTIONS}
+                        onChange={(direction) =>
+                          updateKcalProgress({
+                            rect: {
+                              direction:
+                                direction as CorosWatchfaceKcalProgressStyle["rect"]["direction"]
+                            }
+                          })
+                        }
+                      />
                     </label>
                   </details>
                   <p className="muted">
@@ -10207,7 +10249,7 @@ export function WatchfaceEditor({
                 <label>Skew X<EditableNumberInput min="-80" max="80" step="1" value={normalizeWatchfaceSkew(sprite.skewX)} fallback={0} onValueChange={(skewX) => updateSprite(sprite.id, { skewX: normalizeWatchfaceSkew(skewX) })} /></label>
                 <label>Skew Y<EditableNumberInput min="-80" max="80" step="1" value={normalizeWatchfaceSkew(sprite.skewY)} fallback={0} onValueChange={(skewY) => updateSprite(sprite.id, { skewY: normalizeWatchfaceSkew(skewY) })} /></label>
               </div>
-              <label className="field">Transform origin<select value={(() => { const origin = normalizeWatchfaceTransformOrigin(sprite.origin); return `${origin.x},${origin.y}`; })()} onChange={(event) => { const [x, y] = event.target.value.split(",").map(Number); updateSprite(sprite.id, { origin: normalizeWatchfaceTransformOrigin({ x, y }) }); }}><option value="0,0">Top left</option><option value="0.5,0">Top center</option><option value="1,0">Top right</option><option value="0,0.5">Center left</option><option value="0.5,0.5">Center</option><option value="1,0.5">Center right</option><option value="0,1">Bottom left</option><option value="0.5,1">Bottom center</option><option value="1,1">Bottom right</option></select></label>
+              <label className="field">Transform origin<OptionGroup label="Transform origin" mode="dropdown" value={(() => { const origin = normalizeWatchfaceTransformOrigin(sprite.origin); return `${origin.x},${origin.y}`; })()} options={TRANSFORM_ORIGIN_OPTIONS} onChange={(next) => { const [x, y] = next.split(",").map(Number); updateSprite(sprite.id, { origin: normalizeWatchfaceTransformOrigin({ x, y }) }); }} /></label>
               <div className={`wf-crop-controls${cropSpriteId === sprite.id ? " is-active" : ""}`}>
                 <div className="wf-crop-heading"><strong>Crop</strong>{cropSpriteId === sprite.id ? <span>Enter applies, Esc cancels</span> : null}</div>
                 {cropSpriteId === sprite.id ? (
@@ -10433,11 +10475,20 @@ export function WatchfaceEditor({
         </section>
         <label className="field">
           Preview data
-          <select
+          <OptionGroup
+            label="Preview component"
+            mode="dropdown"
             value={selected}
+            options={
+              previewChoices.length === 0
+                ? [{ value: "", label: "No components enabled" }]
+                : previewChoices.map((complication) => ({
+                    value: complication.id,
+                    label: complication.label
+                  }))
+            }
             disabled={previewChoices.length === 0}
-            onChange={(event) => {
-              const previewComplication = event.target.value;
+            onChange={(previewComplication) => {
               setDesign((current) => ({
                 ...current,
                 previewComplication,
@@ -10451,16 +10502,7 @@ export function WatchfaceEditor({
                   : current.metricStyles
               }));
             }}
-          >
-            {previewChoices.length === 0 ? (
-              <option value="">No components enabled</option>
-            ) : null}
-            {previewChoices.map((complication) => (
-              <option key={complication.id} value={complication.id}>
-                {complication.label}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         {selectedComplication ? (
           <>
@@ -11396,7 +11438,7 @@ export function WatchfaceEditor({
                   <label>Size<EditableNumberInput min="12" max="200" step="1" value={element.fontSize} fallback={12} onValueChange={(fontSize) => set({ fontSize: Math.max(12, fontSize) })} /></label>
                   <label>Weight<EditableNumberInput min="100" max="900" step="100" value={element.weight} fallback={400} onValueChange={(weight) => set({ weight: Math.max(100, Math.min(900, Math.round(weight / 100) * 100)) })} /></label>
                 </div>
-                <label className="field">Text align<select value={element.align} onChange={(event) => set({ align: event.target.value as CorosWatchfaceBackgroundText["align"] })}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+                <label className="field">Text align<OptionGroup label="Text align" value={element.align} options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} onChange={(align) => set({ align: align as CorosWatchfaceBackgroundText["align"] })} /></label>
               </div>,
               { disabled: locked }
             )

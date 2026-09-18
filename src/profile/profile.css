@@ -163,11 +163,6 @@
   display: grid;
   gap: 13px;
 }
-
-.profile-fields select {
-  min-height: 44px;
-}
-
 .profile-list {
   display: grid;
   gap: 11px;

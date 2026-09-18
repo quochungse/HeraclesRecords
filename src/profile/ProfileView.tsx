@@ -519,13 +519,16 @@ export function ProfileView({
                   </label>
                   <label className="field">
                     <span>Sex</span>
-                    <select
+                    <OptionGroup
+                      label="Sex"
+                      size="md"
                       value={draft.sex}
-                      onChange={(event) => updateDraft("sex", event.target.value)}
-                    >
-                      <option value="0">Male</option>
-                      <option value="1">Female</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Male" },
+                        { value: "1", label: "Female" }
+                      ]}
+                      onChange={(next) => updateDraft("sex", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Height (cm)</span>
@@ -601,18 +604,17 @@ export function ProfileView({
                 <div className="profile-fields">
                   <label className="field">
                     <span>Zone model</span>
-                    <select
+                    <OptionGroup
+                      label="Zone model"
+                      mode="dropdown"
+                      size="md"
                       value={draft.hrZoneType}
-                      onChange={(event) =>
-                        updateDraft("hrZoneType", event.target.value)
-                      }
-                    >
-                      {HR_ZONE_MODELS.map((model) => (
-                        <option key={model.value} value={model.value}>
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={HR_ZONE_MODELS.map((model) => ({
+                        value: String(model.value),
+                        label: model.label
+                      }))}
+                      onChange={(next) => updateDraft("hrZoneType", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Max heart rate (bpm)</span>
@@ -715,25 +717,29 @@ export function ProfileView({
                 <div className="profile-fields">
                   <label className="field">
                     <span>Measurement</span>
-                    <select
+                    <OptionGroup
+                      label="Measurement"
+                      size="md"
                       value={draft.unit}
-                      onChange={(event) => updateDraft("unit", event.target.value)}
-                    >
-                      <option value="0">Metric</option>
-                      <option value="1">Imperial</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Metric" },
+                        { value: "1", label: "Imperial" }
+                      ]}
+                      onChange={(next) => updateDraft("unit", next)}
+                    />
                   </label>
                   <label className="field">
                     <span>Temperature</span>
-                    <select
+                    <OptionGroup
+                      label="Temperature"
+                      size="md"
                       value={draft.temperatureUnit}
-                      onChange={(event) =>
-                        updateDraft("temperatureUnit", event.target.value)
-                      }
-                    >
-                      <option value="0">Celsius</option>
-                      <option value="1">Fahrenheit</option>
-                    </select>
+                      options={[
+                        { value: "0", label: "Celsius" },
+                        { value: "1", label: "Fahrenheit" }
+                      ]}
+                      onChange={(next) => updateDraft("temperatureUnit", next)}
+                    />
                   </label>
                   <p className="profile-note">
                     These are COROS account settings — they change what your

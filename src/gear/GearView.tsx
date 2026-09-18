@@ -343,19 +343,17 @@ export function GearView({ api }: { api: CorosLinkApi }) {
             </label>
             <label className="field">
               <span>Account region</span>
-              <select
+              <OptionGroup
+                label="Region"
+                mode="dropdown"
+                size="md"
                 value={region}
-                onChange={(event) => {
-                  setRegion(event.target.value as CorosWatchfaceRegion);
+                options={REGION_OPTIONS}
+                onChange={(next) => {
+                  setRegion(next);
                   setRegionTouched(true);
                 }}
-              >
-                {REGION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="gear-checkbox gear-remember">
               <input

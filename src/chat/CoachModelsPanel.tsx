@@ -12,6 +12,7 @@ import {
   Terminal,
   UserRound
 } from "lucide-react";
+import { OptionGroup } from "../components/OptionGroup";
 import type {
   AnthropicApiConnectionTest,
   AnthropicEffort,
@@ -813,13 +814,12 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         <div className="chat-claude-model-row">
           <label className="chat-local-field">
             <span>Claude model</span>
-            <select
+            <OptionGroup
+              label="Claude model"
+              mode="dropdown"
+              size="md"
               value={chatSettings.claudeCode.model ?? ""}
-              onChange={(event) =>
-                updateClaudeCode({ model: event.target.value })
-              }
-            >
-              {(
+              options={(
                 claudeStatus?.availableModels?.length
                   ? claudeStatus.availableModels
                   : chatSettings.claudeCode.availableModels?.length
@@ -828,30 +828,27 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                         CLAUDE_MODEL_OPTIONS,
                         chatSettings.claudeCode.defaultModel
                       )
-              ).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {formatModelOptionLabel(option)}
-                </option>
-              ))}
-            </select>
+              ).map((option) => ({
+                value: option.value,
+                label: formatModelOptionLabel(option)
+              }))}
+              onChange={(model) => updateClaudeCode({ model })}
+            />
           </label>
 
           <label className="chat-local-field">
             <span>Reasoning effort</span>
-            <select
+            <OptionGroup
+              label="Reasoning effort"
+              mode="dropdown"
+              size="md"
               value={chatSettings.claudeCode.effort}
-              onChange={(event) =>
-                updateClaudeCode({
-                  effort: event.target.value as AnthropicEffort
-                })
-              }
-            >
-              {REASONING_EFFORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {formatEffortOption(option)}
-                </option>
-              ))}
-            </select>
+              options={REASONING_EFFORT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: formatEffortOption(option)
+              }))}
+              onChange={(effort) => updateClaudeCode({ effort })}
+            />
           </label>
         </div>
         <p className="chat-settings-copy">
@@ -938,36 +935,32 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
 
           <label className="chat-local-field">
             <span>Model</span>
-            <select
+            <OptionGroup
+              label="Model"
+              mode="dropdown"
+              size="md"
               value={chatSettings.anthropic.model}
-              onChange={(event) =>
-                updateAnthropic({ model: event.target.value })
-              }
-            >
-              {ANTHROPIC_MODEL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={ANTHROPIC_MODEL_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label
+              }))}
+              onChange={(model) => updateAnthropic({ model })}
+            />
           </label>
 
           <label className="chat-local-field">
             <span>Reasoning effort</span>
-            <select
+            <OptionGroup
+              label="Reasoning effort"
+              mode="dropdown"
+              size="md"
               value={chatSettings.anthropic.effort}
-              onChange={(event) =>
-                updateAnthropic({
-                  effort: event.target.value as AnthropicEffort
-                })
-              }
-            >
-              {REASONING_EFFORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {formatEffortOption(option)}
-                </option>
-              ))}
-            </select>
+              options={REASONING_EFFORT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: formatEffortOption(option)
+              }))}
+              onChange={(effort) => updateAnthropic({ effort })}
+            />
           </label>
           <p className="chat-settings-copy">
             Higher effort spends more tokens on reasoning before answering.
@@ -1166,11 +1159,22 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             <label className="chat-local-field">
               <span>Server</span>
               {availableLocalServers.length > 0 ? (
-                <select
-                  value={selectedLocalServer?.baseUrl ?? chatSettings.local.baseUrl}
-                  onChange={(event) => {
+                <OptionGroup
+                  label="Local server"
+                  mode="dropdown"
+                  size="md"
+                  value={
+                    selectedLocalServer?.baseUrl ?? chatSettings.local.baseUrl
+                  }
+                  options={availableLocalServers.map((server) => ({
+                    value: server.baseUrl,
+                    label: `${server.label} · ${server.models.length} model${
+                      server.models.length === 1 ? "" : "s"
+                    }`
+                  }))}
+                  onChange={(baseUrl) => {
                     const server = availableLocalServers.find(
-                      (entry) => entry.baseUrl === event.target.value
+                      (entry) => entry.baseUrl === baseUrl
                     );
                     if (!server) return;
                     updateLocalDraft({
@@ -1180,14 +1184,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                         : server.models[0] ?? ""
                     });
                   }}
-                >
-                  {availableLocalServers.map((server) => (
-                    <option key={server.baseUrl} value={server.baseUrl}>
-                      {server.label} · {server.models.length} model
-                      {server.models.length === 1 ? "" : "s"}
-                    </option>
-                  ))}
-                </select>
+                />
               ) : (
                 <input
                   value={chatSettings.local.baseUrl}
@@ -1202,22 +1199,21 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             <label className="chat-local-field">
               <span>Model</span>
               {discoveredLocalModels.length > 0 ? (
-                <select
+                <OptionGroup
+                  label="Local model"
+                  mode="dropdown"
+                  size="md"
                   value={
                     discoveredLocalModels.includes(chatSettings.local.model)
                       ? chatSettings.local.model
-                      : discoveredLocalModels[0]
+                      : discoveredLocalModels[0] ?? ""
                   }
-                  onChange={(event) =>
-                    updateLocalDraft({ model: event.target.value })
-                  }
-                >
-                  {discoveredLocalModels.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
+                  options={discoveredLocalModels.map((model) => ({
+                    value: model,
+                    label: model
+                  }))}
+                  onChange={(model) => updateLocalDraft({ model })}
+                />
               ) : (
                 <input
                   value={chatSettings.local.model}
