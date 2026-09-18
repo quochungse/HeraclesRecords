@@ -50,7 +50,7 @@ function harness({
   fail = false,
   heartRate = [],
   heartRateFails = false,
-  mcpUsable = true
+  mcpState = "ready"
 } = {}) {
   const state = {
     now,
@@ -68,7 +68,7 @@ function harness({
       if (fail) {
         throw new Error("COROS is unreachable");
       }
-      return { records: state.records, mcpConnected: true };
+      return { records: state.records, mcpState: "ready" };
     },
     fetchHeartRate: async () => {
       state.heartRateFetches += 1;
@@ -94,7 +94,7 @@ function harness({
         }
       }
     },
-    mcpUsable: () => mcpUsable
+    mcpState: () => mcpState
   };
 
   return { state, deps };
@@ -662,15 +662,15 @@ clearSleepHistoryCache();
 
   const filled = await getSleepHistory({ days: 30 }, deps);
   assert.equal(state.fetches, 1);
-  assert.equal(filled.mcpConnected, true, "a live fetch reports what it found");
+  assert.equal(filled.mcpState, "ready", "a live fetch reports what it found");
 
   // Same process, same cache: the nights are in memory, so this read is free.
-  const gone = harness({ rows: [], mcpUsable: false });
+  const gone = harness({ rows: [], mcpState: "disconnected" });
   const cached = await getSleepHistory({ days: 30 }, gone.deps);
   assert.equal(gone.state.fetches, 0, "the window was fresh, so nothing was fetched");
   assert.equal(
-    cached.mcpConnected,
-    false,
+    cached.mcpState,
+    "disconnected",
     "a cache hit reports the server as it is now, not as it was when fetched"
   );
   assert.ok(cached.records.length > 0, "and still serves the nights it holds");

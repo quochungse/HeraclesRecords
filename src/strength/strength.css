@@ -2613,6 +2613,19 @@
   letter-spacing: -0.02em;
 }
 
+/* The loading form of this card puts a spinner beside its heading; a bare
+   inline <svg> sits on the text baseline, which reads as a dropped glyph at
+   22px. */
+.strength-blank[aria-busy="true"] h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.strength-blank[aria-busy="true"] h3 svg {
+  color: var(--sport-strength);
+}
+
 .strength-connect p,
 .strength-blank p {
   max-width: 44ch;

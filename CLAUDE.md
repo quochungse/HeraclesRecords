@@ -539,6 +539,20 @@ in primaryNav.ts, so a packaged build carries neither their code nor their style
   stress series' `score` is a stress band). The nap windows sum to the day's
   reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its
   hover note from them.
+  **An MCP failure is one of two things and never one boolean.** Every payload MCP
+  serves carries `mcpState: McpAvailability` — `"ready"`, `"disconnected"` (no COROS MCP
+  server set up here, so connect it) or `"unreachable"` (one that *is* set up and did not
+  answer, so there is nothing to do in Settings). It was `mcpConnected: boolean`, and a
+  failed connection, a server with no sleep tool and a round of calls that all threw were
+  all reported as `false` — which every surface read out as "the COROS MCP server is not
+  connected. Please connect it in Settings → Connections → MCP Servers", sending the athlete
+  to a panel where the server was already there and already authorized.
+  `corosMcpFailureState()` is the only place that tells the two apart, and it asks after an
+  attempt, not instead of one; the copy is
+  built by `mcpNotice`/`mcpShortTextOr`/`mcpTitleOr` (`src/mcp/mcpNotice.ts`) so a surface
+  names its subject and nothing else. `undefined` — nothing has answered yet — must blame
+  nobody. `npm run test:mcp-notice` asserts both sentences for all three subjects and fails
+  wherever the unreachable one starts telling people to connect something.
 - **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
   `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
   the watch's `Music` folder over USB.
@@ -882,6 +896,18 @@ overview). Themes are `dark` | `paper` via `src/theme/`, persisted to localStora
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
+
+**An empty result and an unfinished load are different screens.** An array that has not
+arrived reads exactly like one that came back empty, so a view that branches on `length`
+alone tells the athlete they have no strength sessions, no HRV readings and no training in
+the last 365 days — every launch, for as long as COROS takes to answer. `busy` cannot stand
+in: it is one string for the whole app. Each load says where it stands instead
+(`TrainingHubLoadStatus` for the activity list and the snapshot, `initializing` from
+`useStrengthData`, `loading` on the panels that own a fetch), and the loading copy outranks
+both the empty copy and the MCP copy above it. `initializing` is not `loading`: a flag
+raised when a request starts is `false` for the renders before the effect that starts it,
+which is one of the three ways the Strength screen used to flash "No strength sessions in
+the last 3 months" at an athlete with hundreds.
 
 **There is one way to offer a choice between options, and `npm run test:option-groups`
 closes it.** `OptionGroup` (`src/components/OptionGroup.tsx`) has three modes that share a

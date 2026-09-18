@@ -50,6 +50,12 @@ const LEGACY_FITNESS_METRICS_PREFERENCE =
 interface FitnessTrendPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
+  /**
+   * The activities and the snapshot these read are still arriving. An empty
+   * result says "you have not trained" otherwise, which is a claim about the
+   * athlete made while the app has simply not looked yet.
+   */
+  loading?: boolean;
 }
 
 interface MetricSelectProps {
@@ -85,7 +91,8 @@ function MetricSelect({ selected, onChange }: MetricSelectProps) {
 
 export function FitnessTrendPanel({
   snapshot,
-  activities = []
+  activities = [],
+  loading = false
 }: FitnessTrendPanelProps) {
   const { unitSystem } = useUnitSystem();
   const [barsVisible, setBarsVisible] = useState(false);
@@ -341,7 +348,11 @@ export function FitnessTrendPanel({
           </div>
         </div>
       ) : (
-        <p className="training-empty-state">No weekly activity data yet.</p>
+        <p className="training-empty-state" aria-busy={loading || undefined}>
+          {loading
+            ? "Reading your weeks from COROS…"
+            : "No weekly activity data yet."}
+        </p>
       )}
     </section>
   );

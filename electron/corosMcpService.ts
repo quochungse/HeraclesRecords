@@ -9,7 +9,7 @@ import {
   getMcpServerTools
 } from "./mcpClientManager";
 import { prefixToolName } from "./mcpToolNames";
-import type { CorosMcpStatus, CorosMcpTool } from "./types";
+import type { CorosMcpStatus, CorosMcpTool, McpAvailability } from "./types";
 
 // Back-compat shim: COROS is now the built-in "coros" entry of the generic MCP
 // registry (electron/mcpClientManager.ts). These wrappers keep the original
@@ -34,6 +34,33 @@ export function isCorosMcpUsable(): boolean {
   }
 
   return status.connected || status.authenticated;
+}
+
+/**
+ * Which of the two failures a caller is looking at, once an attempt has come
+ * back empty-handed.
+ *
+ * A server that is enabled and holds credentials was *meant* to work: it did
+ * not answer this time, which is `"unreachable"` and needs no trip to Settings.
+ * Anything else — no entry, disabled, never authorized — is `"disconnected"`,
+ * and connecting it is the whole of the fix. Collapsing the two onto one
+ * boolean sent every failed fetch to the same "please connect it" copy, on a
+ * screen where the server was plainly connected.
+ */
+export function corosMcpFailureState(): Exclude<McpAvailability, "ready"> {
+  const status = getMcpServerStatus(COROS);
+  if (!status?.enabled || !status.authenticated) {
+    return "disconnected";
+  }
+  return "unreachable";
+}
+
+/**
+ * The same question as `isCorosMcpUsable`, answered so that a caller passing it
+ * straight into a payload does not have to re-derive *why* it is unusable.
+ */
+export function corosMcpAvailability(): McpAvailability {
+  return isCorosMcpUsable() ? "ready" : corosMcpFailureState();
 }
 
 export function getCorosMcpStatus(): CorosMcpStatus {

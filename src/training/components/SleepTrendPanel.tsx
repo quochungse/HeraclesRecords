@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
-import { MoonStar } from "lucide-react";
+import { Loader2, MoonStar } from "lucide-react";
 import {
   TRAINING_SHORT_TREND_DAYS,
   TRAINING_TREND_WINDOWS,
@@ -14,7 +14,12 @@ import { useChartColors } from "../useChartColors";
 import type { TrainingTrendPoint } from "../types";
 import { SleepTrendChart } from "../../sleep/components/SleepTrendChart";
 import { EmptyChartNotice, TrendWindowToggle } from "./trendChartParts";
-import { MCP_SLEEP_TREND_NOTICE, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
+import {
+  MCP_SLEEP_TREND_SUBJECT,
+  mcpTextOr,
+  mcpTitleOr,
+  type McpConnectionState
+} from "../../mcp/mcpNotice";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
 
 const SLEEP_WINDOW_PREFERENCE = defineSelectionPreference<TrainingTrendWindow>({
@@ -69,10 +74,13 @@ function SleepTrendLegend() {
  */
 export function SleepTrendPanel({
   points,
-  mcpConnected
+  mcpState,
+  loading = false
 }: {
   points: TrainingTrendPoint[];
-  mcpConnected?: McpConnectionState;
+  mcpState?: McpConnectionState;
+  /** The nights have not arrived yet — which is not the same as having none. */
+  loading?: boolean;
 }) {
   const { metrics } = useChartColors();
   const [trendWindow, setTrendWindow] = useSelectionPreference(
@@ -118,16 +126,25 @@ export function SleepTrendPanel({
         </div>
       ) : (
         <EmptyChartNotice
-          icon={MoonStar}
+          icon={loading ? Loader2 : MoonStar}
           palette={metrics.sleep}
-          title={mcpTextOr(mcpConnected, "Sleep needs MCP", "No sleep trend yet")}
+          busy={loading}
+          title={
+            loading
+              ? "Reading your nights"
+              : mcpTitleOr(mcpState, "Sleep needs MCP", "No sleep trend yet")
+          }
         >
-          {/* No nights to trend: "sync your watch" sends them nowhere. */}
-          {mcpTextOr(
-            mcpConnected,
-            MCP_SLEEP_TREND_NOTICE,
-            "A trend needs more than one night. Sync sleep from COROS and it fills in here."
-          )}
+          {/* No nights to trend: "sync your watch" sends them nowhere. A load
+              still running is neither of those and must outrank both — the MCP
+              state is `undefined` until something answers anyway. */}
+          {loading
+            ? "Nights are still coming back from COROS."
+            : mcpTextOr(
+                mcpState,
+                MCP_SLEEP_TREND_SUBJECT,
+                "A trend needs more than one night. Sync sleep from COROS and it fills in here."
+              )}
         </EmptyChartNotice>
       )}
     </section>

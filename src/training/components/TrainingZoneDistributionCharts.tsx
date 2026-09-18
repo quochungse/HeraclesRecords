@@ -49,6 +49,12 @@ interface TrainingZoneDistributionChartsProps {
   lthrZones: TrainingHubThresholdZone[];
   activities: TrainingHubActivity[];
   analytics: TrainingHubAnalytics | null;
+  /**
+   * The activities and the snapshot these read are still arriving. An empty
+   * result says "you have not trained" otherwise, which is a claim about the
+   * athlete made while the app has simply not looked yet.
+   */
+  loading?: boolean;
 }
 
 interface ZoneDistributionPanelProps {
@@ -657,7 +663,8 @@ export function TrainingZoneDistributionCharts({
   hrZoneModel,
   lthrZones,
   activities,
-  analytics
+  analytics,
+  loading = false
 }: TrainingZoneDistributionChartsProps) {
   const { unitSystem } = useUnitSystem();
   const [heartRateMetric, setHeartRateMetric] = useSelectionPreference(
@@ -712,7 +719,11 @@ export function TrainingZoneDistributionCharts({
         <ZoneDistributionPanel
           title={heartRateTitle}
           subtitle="Training Load"
-          emptyMessage="No heart rate zone distribution data loaded."
+          emptyMessage={
+            loading
+              ? "Reading your activities from COROS…"
+              : "No heart rate zone distribution data loaded."
+          }
           variant="heart"
           heroKicker="Primary zone"
           metricColumnLabel={HEART_RATE_METRIC_LABELS[heartRateMetric]}
@@ -731,7 +742,11 @@ export function TrainingZoneDistributionCharts({
         <ZoneDistributionPanel
           title="Distance Zones"
           subtitle="Distribution"
-          emptyMessage="No activities with a recorded distance in the last four weeks."
+          emptyMessage={
+            loading
+              ? "Reading your activities from COROS…"
+              : "No activities with a recorded distance in the last four weeks."
+          }
           variant="distance"
           heroKicker="Most sessions"
           coverageNote="Sports that record distance — running, cycling, swimming…"

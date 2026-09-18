@@ -2609,10 +2609,23 @@ export interface TrainingHubSleepRecord {
   sleepEndDay?: string;
 }
 
+/**
+ * How the COROS MCP server stood when a payload was built.
+ *
+ * `"ready"` means the server answered, or could have — the payload's emptiness
+ * is about the data, not the server. The other two are the server's fault and
+ * need opposite things doing, which is why they are not one boolean:
+ * `"disconnected"` is no COROS MCP server set up here (connect it), while
+ * `"unreachable"` is one that *is* set up and did not answer (it is offline, or
+ * its authorization has lapsed). Telling someone to connect a server sitting in
+ * their own list is how the boolean read on every failed fetch.
+ */
+export type McpAvailability = "ready" | "disconnected" | "unreachable";
+
 export interface TrainingHubSleepSummary {
   latest?: TrainingHubSleepRecord;
   records: TrainingHubSleepRecord[];
-  mcpConnected: boolean;
+  mcpState: McpAvailability;
 }
 
 /**
@@ -2657,7 +2670,7 @@ export interface SleepNightSeries {
   windowEnd?: number;
   fetchedAt?: number;
   source: "cache" | "network";
-  mcpConnected: boolean;
+  mcpState: McpAvailability;
   error?: string;
 }
 
@@ -2672,7 +2685,7 @@ export interface SleepHistorySnapshot {
   records: TrainingHubSleepRecord[];
   /** Last night, by the rule in `src/training/sleepFreshness.ts`. */
   latest?: TrainingHubSleepRecord;
-  mcpConnected: boolean;
+  mcpState: McpAvailability;
   /** Epoch ms the newest record in this snapshot was fetched from COROS. */
   fetchedAt?: number;
   source: SleepHistorySource;
@@ -2698,7 +2711,7 @@ export interface TrainingHubDailyHealthRecord {
 export interface TrainingHubDailyHealthSummary {
   latest?: TrainingHubDailyHealthRecord;
   records: TrainingHubDailyHealthRecord[];
-  mcpConnected: boolean;
+  mcpState: McpAvailability;
 }
 
 export interface TrainingHubDashboard {

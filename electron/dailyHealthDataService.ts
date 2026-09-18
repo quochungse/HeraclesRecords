@@ -1,5 +1,6 @@
 import {
   callCorosMcpTool,
+  corosMcpFailureState,
   ensureCorosMcpConnected,
   getCorosMcpTools,
   listCorosMcpTools
@@ -556,11 +557,17 @@ function buildDailyHealthToolArgs(
 }
 
 
+/**
+ * `refused` separates "no days in this window" from "every call threw". Both
+ * come back empty, and only the second is the server's fault. See the same
+ * split in `sleepDataService`.
+ */
 async function fetchDailyHealthRecords(
   dailyHealthTool: CorosMcpTool,
   days: number
-): Promise<TrainingHubDailyHealthRecord[]> {
+): Promise<{ records: TrainingHubDailyHealthRecord[]; refused: boolean }> {
   const fallbackDay = recentTrainingHubDateList(1)[0];
+  let answered = false;
 
   // Built from the schema, so the first answer with days in it is the answer;
   // the rest of the list exists for a server that refused it.
@@ -568,9 +575,10 @@ async function fetchDailyHealthRecords(
     try {
       const response = await callCorosMcpTool(dailyHealthTool.name, args);
       const records = parseDailyHealthDataResponse(response, fallbackDay);
+      answered = true;
 
       if (records.length > 0) {
-        return records;
+        return { records, refused: false };
       }
     } catch (error) {
       console.warn(
@@ -580,7 +588,7 @@ async function fetchDailyHealthRecords(
     }
   }
 
-  return [];
+  return { records: [], refused: !answered };
 }
 
 export async function getTrainingDailyHealthData(
@@ -593,7 +601,7 @@ export async function getTrainingDailyHealthData(
   if (!connected) {
     return {
       records: [],
-      mcpConnected: false
+      mcpState: corosMcpFailureState()
     };
   }
 
@@ -605,25 +613,27 @@ export async function getTrainingDailyHealthData(
 
   const dailyHealthTool = resolveDailyHealthTool(getCorosMcpTools());
   if (!dailyHealthTool) {
+    // Connected, and it offers nothing that reads daily health. Connecting it
+    // again is not the fix, so it must not be what the copy asks for.
     return {
       records: [],
-      mcpConnected: true
+      mcpState: "unreachable"
     };
   }
 
   try {
-    const records = await fetchDailyHealthRecords(dailyHealthTool, days);
+    const { records, refused } = await fetchDailyHealthRecords(dailyHealthTool, days);
 
     return {
       latest: pickLatestDailyHealthRecord(records),
       records,
-      mcpConnected: true
+      mcpState: refused ? "unreachable" : "ready"
     };
   } catch (error) {
     console.warn("[dailyHealthDataService] Failed to fetch daily health data:", error);
     return {
       records: [],
-      mcpConnected: true
+      mcpState: "unreachable"
     };
   }
 }

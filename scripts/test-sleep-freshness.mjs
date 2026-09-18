@@ -80,7 +80,7 @@ assert.equal(
 
 assert.equal(pickLastNightSleep(null, { now: NOW }), undefined, "no summary, no night");
 assert.equal(
-  pickLastNightSleep({ records: [], mcpConnected: true }, { now: NOW }),
+  pickLastNightSleep({ records: [], mcpState: "ready" }, { now: NOW }),
   undefined,
   "no records, no night"
 );
@@ -88,7 +88,7 @@ assert.equal(
 // This is the bug: a watch last synced on Sunday still answers, and the panel
 // hung Sunday's score under a heading the athlete reads as this morning's.
 const stale = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: night(-4),
   records: [night(-4), night(-5)]
 };
@@ -101,7 +101,7 @@ assert.equal(
 // A watch that last synced yesterday morning holds the night before last, and
 // that is the reading the athlete saw on the panel dated "Tue, Sep 8".
 const yesterdayOnly = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: night(-1),
   records: [night(-1), night(-2)]
 };
@@ -112,7 +112,7 @@ assert.equal(
 );
 
 const fresh = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: night(0),
   records: [night(0), night(-1), night(-4)]
 };
@@ -126,7 +126,7 @@ assert.equal(
 // qualify — an implausible main sleep can lose the sort — the records are
 // scanned for one that does.
 const staleLatest = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: night(-3),
   records: [night(-3), night(0), night(-2)]
 };
@@ -139,7 +139,7 @@ assert.equal(
 // A single nap is never last night's sleep — it is one piece of a day, folded
 // into the day it belongs to.
 const singleNap = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: undefined,
   records: [{ ...night(0), kind: "nap" }]
 };
@@ -153,7 +153,7 @@ assert.equal(
 // and never will, so holding out for one leaves the panel blank about a day the
 // athlete did sleep on.
 const napOnlyDay = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: undefined,
   records: [
     {
@@ -173,7 +173,7 @@ assert.equal(
 // The panel shows partial nights (it has copy for them); the greeting states
 // totals as fact and must not.
 const partial = {
-  mcpConnected: true,
+  mcpState: "ready",
   latest: night(0, { completeness: "partial", partialReason: "still syncing" }),
   records: []
 };

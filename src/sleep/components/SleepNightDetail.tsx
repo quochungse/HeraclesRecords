@@ -13,7 +13,7 @@ import {
 } from "../sleepStages";
 import { SleepNightCurve } from "./SleepNightCurve";
 import { SleepStageDonut } from "./SleepStageDonut";
-import { MCP_UNAVAILABLE_SHORT, mcpTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
+import { mcpShortTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import {
   isNapOnlyRecord,
   totalSleepMinutes
@@ -34,8 +34,8 @@ interface SleepNightDetailProps {
   /** False when COROS returned no nights at all — a different empty to a
    *  night simply not being picked. */
   hasNights?: boolean;
-  /** `false` explains the "no nights" case. */
-  mcpConnected?: McpConnectionState;
+  /** Explains the "no nights" case when the server is the reason. */
+  mcpState?: McpConnectionState;
 }
 
 /**
@@ -84,14 +84,14 @@ export function SleepNightDetail({
   seriesLoading,
   pending = false,
   hasNights = true,
-  mcpConnected
+  mcpState
 }: SleepNightDetailProps) {
   if (!record) {
     const empty = hasNights
       ? "Pick a night on the left to see how it broke down."
-      : mcpTextOr(
-          mcpConnected,
-          `No nights to show. ${MCP_UNAVAILABLE_SHORT}`,
+      : mcpShortTextOr(
+          mcpState,
+          "No nights to show.",
           "Once a night syncs from your watch it shows up here."
         );
 

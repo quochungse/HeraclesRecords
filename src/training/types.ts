@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type {
+  McpAvailability,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityFileType,
@@ -42,8 +43,8 @@ export interface TrainingSummaryMetrics {
   rhrDelta?: number;
   /** Today's step count, from the MCP daily-health feed. */
   steps?: number;
-  /** Whether MCP served the feed `steps` came from. */
-  mcpConnected?: boolean;
+  /** How the MCP server that serves `steps` stood when this was built. */
+  mcpState?: McpAvailability;
 }
 
 /**
@@ -172,7 +173,16 @@ export type TrainingOverviewProps = Omit<
   | "onExportFile"
   | "onLogout"
   | "onRefresh"
->;
+> & {
+  /**
+   * Whether `snapshot` has arrived. Same reason as `activitiesStatus`: `null`
+   * reads the same while loading, after a failure and for an athlete with no
+   * history, and the trend panels answered all three with "No HRV readings".
+   */
+  snapshotStatus?: TrainingHubLoadStatus;
+  /** Whether `activities` has arrived; the same question, for the other load. */
+  activitiesStatus?: TrainingHubLoadStatus;
+};
 
 /** The Activities screen: the activity list plus its detail pane. */
 export type ActivitiesViewProps = Pick<

@@ -25,7 +25,7 @@ function worthKeeping(happenDay: string, series: SleepNightSeries): boolean {
     return true;
   }
 
-  return series.mcpConnected !== false && !isLastNightHappenDay(happenDay);
+  return series.mcpState === "ready" && !isLastNightHappenDay(happenDay);
 }
 
 export interface SleepNightSeriesState {

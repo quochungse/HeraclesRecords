@@ -80,6 +80,12 @@ interface TrainingHeatmapPanelProps {
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
   rpeBackfill?: { pending: number; running: boolean } | null;
+  /**
+   * The loads behind the grid are still running. A grid with nothing in it
+   * otherwise reports "No training data in the last 365 days", which is a
+   * verdict on the athlete rather than on the request.
+   */
+  loading?: boolean;
 }
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -162,7 +168,8 @@ function formatCellAriaLabel(
 export function TrainingHeatmapPanel({
   snapshot,
   activities = [],
-  rpeBackfill = null
+  rpeBackfill = null,
+  loading = false
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = usePrefersReducedMotion();
@@ -932,14 +939,20 @@ export function TrainingHeatmapPanel({
           </div>
         </>
       ) : (
-        <div className="training-heatmap-empty">
-          <CalendarDays size={22} aria-hidden="true" />
+        <div className="training-heatmap-empty" aria-busy={loading || undefined}>
+          {loading ? (
+            <Loader2 size={22} className="spin" aria-hidden="true" />
+          ) : (
+            <CalendarDays size={22} aria-hidden="true" />
+          )}
           <p>
-            {isRpe
-              ? rpeBackfillActive
-                ? "RPE data is still loading — rate activities in COROS to see it here."
-                : `No rated sessions in the last ${rangeDays} days.`
-              : `No training data in the last ${rangeDays} days.`}
+            {loading
+              ? "Reading your training history from COROS…"
+              : isRpe
+                ? rpeBackfillActive
+                  ? "RPE data is still loading — rate activities in COROS to see it here."
+                  : `No rated sessions in the last ${rangeDays} days.`
+                : `No training data in the last ${rangeDays} days.`}
           </p>
         </div>
       )}

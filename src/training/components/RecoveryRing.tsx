@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { TrainingSummaryTiles } from "./TrainingSummaryTiles";
 import { recoveryTone } from "../parsers";
-import { MCP_DAILY_HEALTH_NOTICE } from "../../mcp/mcpNotice";
+import { MCP_DAILY_HEALTH_SUBJECT, isMcpFailure, mcpNotice } from "../../mcp/mcpNotice";
 import type { TrainingSummaryMetrics } from "../types";
 import type { WeekToDateTotals } from "../weeklyActivity";
 
 interface RecoveryRingProps {
   summary: TrainingSummaryMetrics;
   weekTotals: WeekToDateTotals;
+  /**
+   * The snapshot has not arrived. Without it the ring falls to its neutral
+   * tone, whose line is "Sync your watch to see live recovery guidance here" —
+   * a job for the athlete, handed to them on every launch while the app was
+   * mid-request and about to fill the ring in by itself.
+   */
+  loading?: boolean;
 }
 
 function readinessCopy(
@@ -39,7 +46,11 @@ function readinessCopy(
   }
 }
 
-export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
+export function RecoveryRing({
+  summary,
+  weekTotals,
+  loading = false
+}: RecoveryRingProps) {
   const [isReady, setIsReady] = useState(false);
   const recovery = summary.recoveryPct ?? 0;
   const percent = Math.max(0, Math.min(100, recovery));
@@ -48,11 +59,16 @@ export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
   const circumference = 2 * Math.PI * radius;
   const targetOffset = circumference - (percent / 100) * circumference;
   const tone = hasData ? recoveryTone(percent) : "neutral";
-  const { label, message } = readinessCopy(tone);
+  const waiting = loading && !hasData;
+  const { label, message } = waiting
+    ? { label: "Reading", message: "Reading your recovery from COROS…" }
+    : readinessCopy(tone);
   // A tile's one line can say the step count needs MCP but not where to
   // connect it, so that is said once underneath.
-  const dailyHealthNeedsMcp =
-    summary.mcpConnected === false && weekTotals.steps === undefined;
+  const dailyHealthMcpNotice =
+    isMcpFailure(summary.mcpState) && weekTotals.steps === undefined
+      ? mcpNotice(MCP_DAILY_HEALTH_SUBJECT, summary.mcpState)
+      : null;
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setIsReady(true));
@@ -60,7 +76,10 @@ export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
   }, []);
 
   return (
-    <section className={`panel training-ring-panel tone-${tone}`}>
+    <section
+      className={`panel training-ring-panel tone-${tone}`}
+      aria-busy={waiting || undefined}
+    >
       <div className="training-ring-header">
         <p className="eyebrow">Recovery</p>
       </div>
@@ -94,14 +113,12 @@ export function RecoveryRing({ summary, weekTotals }: RecoveryRingProps) {
 
         <TrainingSummaryTiles
           totals={weekTotals}
-          mcpConnected={summary.mcpConnected}
+          mcpState={summary.mcpState}
           className="training-ring-metrics"
         />
 
-        {dailyHealthNeedsMcp ? (
-          <p className="training-ring-message is-quiet">
-            {MCP_DAILY_HEALTH_NOTICE}
-          </p>
+        {dailyHealthMcpNotice ? (
+          <p className="training-ring-message is-quiet">{dailyHealthMcpNotice}</p>
         ) : null}
       </div>
     </section>

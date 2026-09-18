@@ -105,6 +105,7 @@ export function StrengthView({
     sessions,
     analytics,
     loading,
+    initializing,
     pending,
     error,
     warnings,
@@ -171,6 +172,9 @@ export function StrengthView({
   const activeWindow = activeStrengthWindow(days);
   const summary = analytics.summary;
   const hasSessions = summary.sessions > 0;
+  // An empty history and a history that has not arrived look identical from
+  // here, and only one of them is worth a headline. See `initializing`.
+  const awaitingFirstSessions = !hasSessions && (initializing || loading);
   const coverage = analyticsCoverage(analytics);
   const attributedSetCount = Math.round(coverage.attributed);
   const genericSetCount = Math.round(coverage.generic);
@@ -271,7 +275,9 @@ export function StrengthView({
               ? `You trained ${summary.sessions} ${
                   summary.sessions === 1 ? "time" : "times"
                 } in ${activeWindow.phrase}.`
-              : `Your lifting from ${activeWindow.phrase}, muscle by muscle.`}
+              : awaitingFirstSessions
+                ? `Reading your sessions from ${activeWindow.phrase}…`
+                : `Your lifting from ${activeWindow.phrase}, muscle by muscle.`}
         </p>
       </div>
       <div className="strength-header-controls">
@@ -446,7 +452,18 @@ export function StrengthView({
         <div className="strength-sample-cta">{sampleButton}</div>
       ) : null}
 
-      {!hasSessions ? (
+      {awaitingFirstSessions ? (
+        <section className="panel strength-card strength-blank" aria-busy="true">
+          <h3>
+            <Loader2 className="spin" size={16} aria-hidden="true" />
+            Reading your strength sessions
+          </h3>
+          <p>
+            Your history for {activeWindow.phrase} is being read from{" "}
+            {source === "hevy" ? "Hevy" : source === "coros" ? "COROS" : "COROS and Hevy"}.
+          </p>
+        </section>
+      ) : !hasSessions ? (
         <section className="panel strength-card strength-blank">
           <h3>No strength sessions in {activeWindow.phrase}</h3>
           <p>

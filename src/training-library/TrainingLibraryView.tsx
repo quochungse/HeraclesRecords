@@ -1257,6 +1257,13 @@ function AdherenceSection({
     (match) => match.status === "completed" || match.status === "partial"
   );
   const completion = settled.length ? Math.round((honoured.length / settled.length) * 100) : 0;
+  /*
+   * The match list is built by the refresh this section runs on mount, so an
+   * empty one before that returns says nothing about the athlete's training —
+   * it says the matching has not happened. Both empties below read the same
+   * without this, and the one that shipped was the wrong one.
+   */
+  const matching = loading && matches.length === 0;
 
   /** Weekly planned-versus-completed load, oldest week first. */
   const weeks = useMemo<BulletWeek[]>(() => {
@@ -1369,7 +1376,9 @@ function AdherenceSection({
             <p>
               {settled.length
                 ? `${completion}% of ${settled.length} past sessions were matched to a completed activity.`
-                : "No past planned sessions in this range yet."}
+                : matching
+                  ? "Matching planned sessions against your activities…"
+                  : "No past planned sessions in this range yet."}
             </p>
           </div>
           <button type="button" className="ghost-button" disabled={loading} onClick={() => void refresh()}>
@@ -1421,12 +1430,20 @@ function AdherenceSection({
         </div>
 
         {visible.length === 0 ? (
-          <div className="tl-empty">
-            <h3>{matches.length ? "Nothing in this filter" : "Nothing to compare yet"}</h3>
+          <div className="tl-empty" aria-busy={matching || undefined}>
+            <h3>
+              {matching
+                ? "Matching your sessions"
+                : matches.length
+                  ? "Nothing in this filter"
+                  : "Nothing to compare yet"}
+            </h3>
             <p>
-              {matches.length
-                ? "Choose another filter to see planned sessions."
-                : "Schedule workouts on the calendar, then refresh here after you finish them."}
+              {matching
+                ? "Planned workouts are being compared against what you actually did."
+                : matches.length
+                  ? "Choose another filter to see planned sessions."
+                  : "Schedule workouts on the calendar, then refresh here after you finish them."}
             </p>
           </div>
         ) : (

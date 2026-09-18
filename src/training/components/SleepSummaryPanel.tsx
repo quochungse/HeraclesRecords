@@ -12,7 +12,7 @@ import {
   formatSleepPercent
 } from "../formatters";
 import { pickLastNightSleep } from "../../sleep/sleepFreshness";
-import { MCP_SLEEP_NOTICE, mcpTextOr } from "../../mcp/mcpNotice";
+import { MCP_SLEEP_SUBJECT, mcpTextOr } from "../../mcp/mcpNotice";
 import { sleepScoreLabel, sleepScoreTone } from "../../sleep/sleepScore";
 import { drawableStages } from "../../sleep/sleepStages";
 import {
@@ -304,8 +304,8 @@ export function SleepSummaryPanel({
                 MCP down is the athlete's to fix, a missing night is the
                 watch's. */}
             {mcpTextOr(
-              sleep?.mcpConnected,
-              MCP_SLEEP_NOTICE,
+              sleep?.mcpState,
+              MCP_SLEEP_SUBJECT,
               "No sleep recorded for last night yet. Sync your watch to see it here."
             )}
           </p>

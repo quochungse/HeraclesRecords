@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import type { TrainingHubStatus } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { StrengthHero } from "./StrengthHero";
@@ -18,7 +19,7 @@ export function StrengthDistributionSection({
   api,
   status
 }: StrengthDistributionSectionProps) {
-  const { analytics, days, source, error } = useStrengthData({
+  const { analytics, days, source, error, initializing } = useStrengthData({
     api,
     corosConnected: Boolean(status?.authenticated)
   });
@@ -38,7 +39,17 @@ export function StrengthDistributionSection({
             {error}
           </p>
         ) : null}
-        <StrengthHero analytics={analytics} source={source} />
+        {/* A body map built from an empty history is a body map saying "no
+            sets in this window" — which is a claim, and the wrong one, until
+            the history has actually been read. */}
+        {initializing ? (
+          <p className="strength-notice" role="status">
+            <Loader2 className="spin" size={14} aria-hidden="true" />
+            Reading your strength sessions…
+          </p>
+        ) : (
+          <StrengthHero analytics={analytics} source={source} />
+        )}
       </div>
     </section>
   );

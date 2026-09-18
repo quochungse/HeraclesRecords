@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { HeartPulse } from "lucide-react";
+import { HeartPulse, Loader2 } from "lucide-react";
 import { Area, ComposedChart, Line, ResponsiveContainer } from "recharts";
 import {
   TRAINING_SHORT_TREND_DAYS,
@@ -56,7 +56,19 @@ function HrvChartLegend() {
  * ride on the training snapshot's trend points, which is why the Sleep screen
  * takes them as a prop rather than fetching: sleep records carry no HRV at all.
  */
-export function HrvBaselineChart({ points }: { points: TrainingTrendPoint[] }) {
+export function HrvBaselineChart({
+  points,
+  loading = false
+}: {
+  points: TrainingTrendPoint[];
+  /**
+   * The snapshot these points come from has not arrived. Without it an empty
+   * array reads as "this athlete has no HRV readings", which is a claim about
+   * them rather than about the load, and it is the claim every launch made for
+   * as long as COROS took to answer.
+   */
+  loading?: boolean;
+}) {
   const reducedMotion = usePrefersReducedMotion();
   const { colors, metrics } = useChartColors();
   const [trendWindow, setTrendWindow] = useSelectionPreference(
@@ -136,11 +148,14 @@ export function HrvBaselineChart({ points }: { points: TrainingTrendPoint[] }) {
         </div>
       ) : (
         <EmptyChartNotice
-          icon={HeartPulse}
+          icon={loading ? Loader2 : HeartPulse}
           palette={metrics.hrv}
-          title="No HRV readings"
+          busy={loading}
+          title={loading ? "Reading your HRV" : "No HRV readings"}
         >
-          Wear your device during sleep to capture nightly HRV.
+          {loading
+            ? "Nightly readings are still coming back from COROS."
+            : "Wear your device during sleep to capture nightly HRV."}
         </EmptyChartNotice>
       )}
     </section>

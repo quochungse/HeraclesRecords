@@ -234,7 +234,7 @@ function buildSummary(
         : undefined,
     steps: todayHealth?.steps,
     // Kept, or the step tile is blank with no way to say why.
-    mcpConnected: dailyHealth?.mcpConnected
+    mcpState: dailyHealth?.mcpState
   };
 }
 

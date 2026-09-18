@@ -1,14 +1,19 @@
 import type { ReactNode } from "react";
 import { Flame, Footprints, Route, Timer } from "lucide-react";
-import { MCP_DAILY_HEALTH_TILE_DETAIL } from "../../mcp/mcpNotice";
+import {
+  MCP_DAILY_HEALTH_TILE_DETAIL,
+  MCP_UNREACHABLE_LABEL,
+  isMcpFailure,
+  type McpConnectionState
+} from "../../mcp/mcpNotice";
 import { distanceUnit, metersToDisplayDistance } from "../../units/units";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatDurationTotal, type WeekToDateTotals } from "../weeklyActivity";
 
 interface TrainingSummaryTilesProps {
   totals: WeekToDateTotals;
-  /** Whether MCP served the daily-health feed the step count comes from. */
-  mcpConnected?: boolean;
+  /** How the MCP server that serves the daily-health feed stood. */
+  mcpState?: McpConnectionState;
   className?: string;
 }
 
@@ -64,13 +69,18 @@ function formatWholeNumber(value?: number): string {
  */
 export function TrainingSummaryTiles({
   totals,
-  mcpConnected,
+  mcpState,
   className
 }: TrainingSummaryTilesProps) {
   const { unitSystem } = useUnitSystem();
   // Only where the figure is actually missing: a week that already has step
   // counts in it is not a tile with a problem to report.
-  const stepsNeedMcp = mcpConnected === false && totals.steps === undefined;
+  const stepsNeedMcp = isMcpFailure(mcpState) && totals.steps === undefined;
+  const stepsDetail = !stepsNeedMcp
+    ? "this week"
+    : mcpState === "unreachable"
+      ? MCP_UNREACHABLE_LABEL
+      : MCP_DAILY_HEALTH_TILE_DETAIL;
   const unit = distanceUnit(unitSystem);
   const tilesClassName = ["training-summary-tiles is-stack", className ?? ""]
     .filter(Boolean)
@@ -89,7 +99,7 @@ export function TrainingSummaryTiles({
         icon={<Footprints size={ICON_SIZE} />}
         label="Steps"
         value={formatWholeNumber(totals.steps)}
-        detail={stepsNeedMcp ? MCP_DAILY_HEALTH_TILE_DETAIL : "this week"}
+        detail={stepsDetail}
       />
 
       <StatCard

@@ -85,7 +85,7 @@ assert.equal(formatSleepClockRange(undefined, "05:32"), undefined);
 const trendPoints = mergeSleepIntoTrendPoints(
   buildTrendPoints([{ happenDay: "20260707" }, { happenDay: "20260708" }]),
   {
-    mcpConnected: true,
+    mcpState: "ready",
     records: [
       {
         happenDay: "20260707",

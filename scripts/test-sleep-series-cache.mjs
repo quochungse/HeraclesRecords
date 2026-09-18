@@ -88,7 +88,8 @@ function harness({
   connected = true,
   tools = ["querySleepHrv", "queryStressTimeSeries"],
   failTool = null,
-  mcpUsable = true
+  mcpState = "ready",
+  failureState = "disconnected"
 } = {}) {
   const state = {
     now,
@@ -132,7 +133,8 @@ function harness({
         }
       }
     },
-    mcpUsable: () => mcpUsable
+    mcpState: () => mcpState,
+    failureState: () => failureState
   };
 
   return { state, deps };
@@ -401,7 +403,7 @@ clearSleepSeriesCache();
   const { state, deps } = harness({ nights: [night(-1)], connected: false });
   const series = await getSleepNightSeries({ happenDay: dayKey(-1) }, deps);
   assert.equal(state.calls.length, 0);
-  assert.equal(series.mcpConnected, false);
+  assert.equal(series.mcpState, "disconnected");
   assert.equal(series.source, "cache", "an offline answer is not a network one");
 }
 
@@ -421,15 +423,15 @@ clearSleepSeriesCache();
   const day = dayKey(-1);
   const first = harness({ nights: [night(-1)], hrv: [[day, 60]], stress: [[day, 20]] });
   const fetched = await getSleepNightSeries({ happenDay: day }, first.deps);
-  assert.equal(fetched.mcpConnected, true);
+  assert.equal(fetched.mcpState, "ready");
 
-  const gone = harness({ nights: [night(-1)], mcpUsable: false });
+  const gone = harness({ nights: [night(-1)], mcpState: "unreachable" });
   const cached = await getSleepNightSeries({ happenDay: day }, gone.deps);
   assert.equal(gone.state.calls.length, 0, "the night was settled, so nothing was fetched");
   assert.equal(cached.source, "cache");
   assert.equal(
-    cached.mcpConnected,
-    false,
+    cached.mcpState,
+    "unreachable",
     "a cache hit reports the server as it is now"
   );
 }

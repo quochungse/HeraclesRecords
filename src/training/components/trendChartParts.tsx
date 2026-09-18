@@ -174,20 +174,28 @@ export function EmptyChartNotice({
   icon: Icon,
   palette,
   title,
+  busy = false,
   children
 }: {
   icon: LucideIcon;
   palette: TrainingMetricPalette;
   title: string;
+  /**
+   * The panel is waiting rather than empty. It keeps the same box — a chart
+   * that swaps a notice for a skeleton and back resizes twice on every load —
+   * and turns the icon into a spinner, which is the only part that has to say
+   * "this is not the answer yet".
+   */
+  busy?: boolean;
   children: string;
 }) {
   return (
-    <div className="training-chart-empty">
+    <div className="training-chart-empty" aria-busy={busy || undefined}>
       <span
         className="training-chart-empty-icon"
         style={{ background: palette.soft, color: palette.chip }}
       >
-        <Icon size={18} aria-hidden="true" />
+        <Icon size={18} aria-hidden="true" className={busy ? "spin" : undefined} />
       </span>
       <span className="training-chart-empty-text">
         <strong>{title}</strong>

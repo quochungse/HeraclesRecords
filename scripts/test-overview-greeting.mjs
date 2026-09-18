@@ -132,7 +132,7 @@ assert.deepEqual(
 // --- Sleep -----------------------------------------------------------------
 
 const poorSleep = context({
-  sleep: { records: [], mcpConnected: true, latest: { happenDay: dayKey(0), score: 48 } },
+  sleep: { records: [], mcpState: "ready", latest: { happenDay: dayKey(0), score: 48 } },
   upcomingWorkouts: [{ happenDay: dayKey(0), name: "Easy Run" }]
 });
 assert.equal(
@@ -144,7 +144,7 @@ assert.equal(
 const shortSleep = context({
   sleep: {
     records: [],
-    mcpConnected: true,
+    mcpState: "ready",
     latest: { happenDay: dayKey(0), totalMinutes: 312 }
   }
 });
@@ -156,7 +156,7 @@ assert.equal(
 const napOnly = context({
   sleep: {
     records: [{ happenDay: dayKey(0), kind: "nap", totalMinutes: 40 }],
-    mcpConnected: true,
+    mcpState: "ready",
     latest: { happenDay: dayKey(0), kind: "nap", totalMinutes: 40 }
   }
 });
@@ -165,7 +165,7 @@ assert.deepEqual(ids(napOnly), [], "naps are not last night");
 const partialNight = context({
   sleep: {
     records: [],
-    mcpConnected: true,
+    mcpState: "ready",
     latest: { happenDay: dayKey(0), completeness: "partial", score: 41 }
   }
 });
@@ -176,7 +176,7 @@ assert.deepEqual(
 );
 
 const staleSleep = context({
-  sleep: { records: [], mcpConnected: true, latest: { happenDay: dayKey(-3), score: 41 } }
+  sleep: { records: [], mcpState: "ready", latest: { happenDay: dayKey(-3), score: 41 } }
 });
 assert.deepEqual(ids(staleSleep), [], "sleep from days ago is dropped");
 
@@ -184,7 +184,7 @@ assert.deepEqual(ids(staleSleep), [], "sleep from days ago is dropped");
 // night before last — a watch that has not synced since yesterday morning must
 // not put words about "last night" on the dashboard.
 const nightBeforeLast = context({
-  sleep: { records: [], mcpConnected: true, latest: { happenDay: dayKey(-1), score: 41 } }
+  sleep: { records: [], mcpState: "ready", latest: { happenDay: dayKey(-1), score: 41 } }
 });
 assert.deepEqual(ids(nightBeforeLast), [], "the night before last is dropped");
 
@@ -311,7 +311,7 @@ const many = context({
   summary: { recoveryPct: 76, weekLoadTotal: 318, steps: 12480 },
   sleep: {
     records: [],
-    mcpConnected: true,
+    mcpState: "ready",
     latest: { happenDay: dayKey(0), totalMinutes: 465 }
   },
   watchConnected: true,
