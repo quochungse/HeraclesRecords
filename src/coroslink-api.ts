@@ -271,6 +271,15 @@ export interface CorosLinkApi {
     endDay: string
   ) => Promise<TrainingHubScheduledWorkoutEntry[]>;
   listLibraryWorkouts: () => Promise<TrainingHubLibraryWorkout[]>;
+  /**
+   * Drop the main process's held workout library and movement catalog, so the
+   * next read goes to COROS. Behind the refresh buttons, and nothing else —
+   * the caches age out on their own after an hour.
+   *
+   * A surface calling this must also drop the renderer's own catalog copy
+   * (`refreshWorkoutExerciseCatalogs`), which outlives any single panel.
+   */
+  refreshWorkoutCaches: () => Promise<void>;
   duplicateLibraryWorkout: (
     programId: string,
     name: string,

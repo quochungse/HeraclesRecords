@@ -151,7 +151,7 @@ export function UpcomingWorkoutDetailPanel({
             </header>
 
             <div className="calendar-detail-body">
-              <ScheduledWorkoutDetail entry={entry} sportTypes={sportTypes} />
+              <ScheduledWorkoutDetail entry={entry} sportTypes={sportTypes} api={api} />
             </div>
           </motion.aside>
         </>

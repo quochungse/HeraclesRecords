@@ -49,15 +49,28 @@ export function CalendarGrid({
     week.days.some((day) => day.isToday)
   )?.key;
 
+  /* The visible range, so paging to a month that does not contain today still
+     re-runs this. It used to depend on `todayWeekKey` alone, which is undefined
+     for every other month — so the effect returned early and October opened at
+     whatever offset September's today-row had scrolled to, with its first week
+     above the fold. */
+  const rangeKey = weeks.length > 0 ? `${weeks[0]?.key}-${weeks[weeks.length - 1]?.key}` : "";
+
   useLayoutEffect(() => {
-    if (loading || !todayWeekKey) {
+    if (loading) {
       return;
     }
 
     const frame = window.requestAnimationFrame(() => {
       const body = bodyRef.current;
+      if (!body) {
+        return;
+      }
+
       const todayRow = todayRowRef.current;
-      if (!body || !todayRow) {
+      if (!todayWeekKey || !todayRow) {
+        // No today to centre on: start the range at its first week.
+        body.scrollTo({ top: 0, behavior: "auto" });
         return;
       }
 
@@ -74,7 +87,7 @@ export function CalendarGrid({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [loading, mode, todayWeekKey]);
+  }, [loading, mode, rangeKey, todayWeekKey]);
 
   return (
     <div

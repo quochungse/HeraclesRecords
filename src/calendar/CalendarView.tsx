@@ -24,10 +24,10 @@ import {
   formatDurationSeconds,
   formatHappenDayLabel,
   formatUpcomingWorkoutLoad,
-  formatUpcomingWorkoutVolumeDisplay,
-  getLocalHappenDayKey
+  formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
 import { isSwimSportType } from "../training/sportTypes";
+import { OptionGroup } from "../components/OptionGroup";
 import { AddWorkoutModal } from "./AddWorkoutModal";
 import { CalendarGrid } from "./CalendarGrid";
 import {
@@ -39,6 +39,7 @@ import {
 } from "./calendarTypes";
 import type { CalendarDragPayload } from "./calendarDrag";
 import { DayDetailPanel } from "./DayDetailPanel";
+import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
 import {
   isKeyInMonth,
   monthGridWeeks,
@@ -123,7 +124,8 @@ function scheduledWorkoutRemovalRef(entry: TrainingHubScheduledWorkoutEntry) {
 
 async function removeScheduledWorkoutEntries(
   api: CorosLinkApi,
-  entries: TrainingHubScheduledWorkoutEntry[]
+  entries: TrainingHubScheduledWorkoutEntry[],
+  onProgress: (done: number) => void
 ): Promise<
   Array<{ entry: TrainingHubScheduledWorkoutEntry; cause: unknown }>
 > {
@@ -134,12 +136,15 @@ async function removeScheduledWorkoutEntries(
 
   // Schedule mutations share server-side plan state, so apply them in order
   // instead of racing several updates against the same COROS calendar.
+  let done = 0;
   for (const entry of entries) {
     try {
       await api.removeScheduledWorkout(scheduledWorkoutRemovalRef(entry));
     } catch (cause: unknown) {
       failures.push({ entry, cause });
     }
+    done += 1;
+    onProgress(done);
   }
 
   return failures;
@@ -163,12 +168,29 @@ export function CalendarView({
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [editRef, setEditRef] = useState<WorkoutEditRef | null>(null);
+  /*
+   * A workout opened from this screen, and whether it opens to be read or to
+   * be changed. Only a scheduled occurrence is editable here: a library
+   * workout is a template every future use of it shares, so changing one from
+   * a day cell would rewrite sessions the athlete is not looking at. Training
+   * Library owns that decision.
+   */
+  const [workoutRef, setWorkoutRef] = useState<{
+    ref: WorkoutEditRef;
+    readOnly: boolean;
+  } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedWorkoutKeys, setSelectedWorkoutKeys] = useState<Set<string>>(
     () => new Set()
   );
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  /* Removals go to COROS one at a time, because they share server-side plan
+     state. Twenty of them is twenty round trips behind a single "Removing…",
+     so the button counts them off instead. */
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
 
   const anchorYear = anchor.getFullYear();
   const anchorMonth = anchor.getMonth();
@@ -193,7 +215,8 @@ export function CalendarView({
     loading,
     error,
     reload: reloadCalendarRange,
-    applyOptimisticMove
+    applyOptimisticMove,
+    todayKey
   } = useCalendarData({
     api,
     authenticated,
@@ -212,6 +235,21 @@ export function CalendarView({
     reloadCalendarRange();
     onScheduleChanged();
   }, [onScheduleChanged, reloadCalendarRange]);
+
+  /**
+   * The header's Refresh: everything this screen can reach, not just the range.
+   *
+   * `reload` refetches the schedule, which nothing caches. The workout library
+   * and the movement catalog are held for an hour on both sides of the bridge,
+   * and a button labelled Refresh that left them alone would be telling the
+   * athlete something untrue — the workout they just built on their phone
+   * still would not be in the library panel.
+   */
+  const refreshAll = useCallback(() => {
+    refreshWorkoutExerciseCatalogs();
+    void api?.refreshWorkoutCaches().catch(() => undefined);
+    reload();
+  }, [api, reload]);
 
   const selectableWorkouts = useMemo(() => {
     const entries = new Map<string, TrainingHubScheduledWorkoutEntry>();
@@ -243,6 +281,7 @@ export function CalendarView({
     setSelectionMode(false);
     setSelectedWorkoutKeys(new Set());
     setConfirmBulkDelete(false);
+    setBulkProgress(null);
   }, []);
 
   const toggleSelectionMode = () => {
@@ -301,7 +340,7 @@ export function CalendarView({
       if (mutating || payload.happenDay === targetDay) {
         return;
       }
-      if (targetDay < getLocalHappenDayKey()) {
+      if (targetDay < todayKey) {
         onError("COROS doesn't allow scheduling workouts in the past.");
         return;
       }
@@ -323,7 +362,7 @@ export function CalendarView({
           reload();
         });
     },
-    [api, applyOptimisticMove, mutating, onError, onMessage, reload]
+    [api, applyOptimisticMove, mutating, onError, onMessage, reload, todayKey]
   );
 
   const handleDelete = useCallback(
@@ -364,7 +403,10 @@ export function CalendarView({
     }
 
     setMutating(true);
-    void removeScheduledWorkoutEntries(api, targets)
+    setBulkProgress({ done: 0, total: targets.length });
+    void removeScheduledWorkoutEntries(api, targets, (done) =>
+      setBulkProgress({ done, total: targets.length })
+    )
       .then((failures) => {
         const removedCount = targets.length - failures.length;
 
@@ -396,6 +438,7 @@ export function CalendarView({
       })
       .finally(() => {
         setMutating(false);
+        setBulkProgress(null);
         reload();
       });
   }, [
@@ -556,38 +599,25 @@ export function CalendarView({
           <button
             type="button"
             className="calendar-nav-button calendar-nav-arrow"
-            onClick={reload}
+            onClick={refreshAll}
             title="Refresh"
             aria-label="Refresh calendar"
           >
             <RefreshCw size={14} aria-hidden="true" />
           </button>
-          <div className="calendar-mode-toggle" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "month"}
-              className={mode === "month" ? "is-active" : ""}
-              onClick={() => {
-                exitSelectionMode();
-                setMode("month");
-              }}
-            >
-              Month
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "week"}
-              className={mode === "week" ? "is-active" : ""}
-              onClick={() => {
-                exitSelectionMode();
-                setMode("week");
-              }}
-            >
-              Week
-            </button>
-          </div>
+          <OptionGroup
+            label="Calendar range"
+            className="calendar-mode-toggle"
+            value={mode}
+            options={[
+              { value: "month", label: "Month" },
+              { value: "week", label: "Week" }
+            ]}
+            onChange={(next) => {
+              exitSelectionMode();
+              setMode(next);
+            }}
+          />
         </div>
       </header>
 
@@ -638,11 +668,17 @@ export function CalendarView({
               disabled={mutating || selectedWorkoutKeys.size === 0}
             >
               <Trash2 size={14} aria-hidden="true" />
-              {mutating
-                ? "Removing…"
-                : confirmBulkDelete
-                  ? `Confirm remove ${selectedWorkoutKeys.size}`
-                  : `Remove ${selectedWorkoutKeys.size || ""}`.trim()}
+              {/* `done` counts what has finished, so the one in flight is the
+                  next — except after the last, where there is no next and the
+                  count would read "21 of 20" for the frame before the state
+                  clears. */}
+              {bulkProgress
+                ? `Removing ${Math.min(bulkProgress.done + 1, bulkProgress.total)} of ${bulkProgress.total}…`
+                : mutating
+                  ? "Removing…"
+                  : confirmBulkDelete
+                    ? `Confirm remove ${selectedWorkoutKeys.size}`
+                    : `Remove ${selectedWorkoutKeys.size || ""}`.trim()}
             </button>
           </div>
         </div>
@@ -675,12 +711,15 @@ export function CalendarView({
         onAskCoach={handleAskCoachSelection}
         onEdit={(target) => {
           setSelection(null);
-          setEditRef({
-            kind: "scheduled",
-            happenDay: target.entry.happenDay,
-            planId: target.entry.planId,
-            idInPlan: target.entry.idInPlan,
-            planProgramId: target.entry.planProgramId
+          setWorkoutRef({
+            readOnly: false,
+            ref: {
+              kind: "scheduled",
+              happenDay: target.entry.happenDay,
+              planId: target.entry.planId,
+              idInPlan: target.entry.idInPlan,
+              planProgramId: target.entry.planProgramId
+            }
           });
         }}
         onError={onError}
@@ -698,9 +737,12 @@ export function CalendarView({
             reload();
           }}
           onError={onError}
-          onEditLibrary={(programId) => {
-            setAddTarget(null);
-            setEditRef({ kind: "library", programId });
+          covered={workoutRef !== null}
+          onViewLibrary={(programId) => {
+            setWorkoutRef({
+              readOnly: true,
+              ref: { kind: "library", programId }
+            });
           }}
         />
       ) : null}
@@ -709,9 +751,12 @@ export function CalendarView({
         <WorkoutLibraryModal
           api={api}
           onClose={() => setLibraryOpen(false)}
-          onEdit={(ref) => {
-            setLibraryOpen(false);
-            setEditRef(ref);
+          covered={workoutRef !== null}
+          onView={(programId) => {
+            setWorkoutRef({
+              readOnly: true,
+              ref: { kind: "library", programId }
+            });
           }}
           onScheduled={(message) => {
             onMessage(message);
@@ -722,15 +767,22 @@ export function CalendarView({
         />
       ) : null}
 
-      {editRef ? (
+      {workoutRef ? (
         <WorkoutEditorModal
           api={api}
-          editRef={editRef}
-          onClose={() => setEditRef(null)}
+          editRef={workoutRef.ref}
+          readOnly={workoutRef.readOnly}
+          onClose={() => setWorkoutRef(null)}
           onSaved={(result) => {
-            const scope = editRef.kind === "scheduled" ? "scheduled occurrence" : "library workout";
-            onMessage(result.verified ? `Updated ${scope} in COROS.` : result.warning ?? `Updated ${scope}, but verification is still pending.`);
-            setEditRef(null);
+            // Only a scheduled occurrence can reach this: a library workout
+            // opens read-only from here and has no Save.
+            onMessage(
+              result.verified
+                ? "Updated scheduled occurrence in COROS."
+                : (result.warning ??
+                  "Updated scheduled occurrence, but verification is still pending.")
+            );
+            setWorkoutRef(null);
             reload();
           }}
           onError={onError}

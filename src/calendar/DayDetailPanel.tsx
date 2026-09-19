@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { MessageCircle, Pencil, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   TrainingHubActivityDetail,
   TrainingHubSportType
@@ -8,8 +8,9 @@ import type {
 import type { CorosLinkApi } from "../coroslink-api";
 import { ActivityDetailPanel } from "../training/components/ActivityDetailPanel";
 import { formatHappenDayLabel } from "../training/formatters";
-import type { CalendarSelection } from "./calendarTypes";
+import { scheduledWorkoutKey, type CalendarSelection } from "./calendarTypes";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
+import { scheduledWorkoutSport } from "../training/workoutSport";
 
 interface DayDetailPanelProps {
   api: CorosLinkApi;
@@ -37,10 +38,64 @@ export function DayDetailPanel({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
   const activity = selection?.kind === "activity" ? selection.activity : null;
+
+  /* What is on screen, as one string. `confirmDelete` is an armed destructive
+     action, so it has to be cleared by anything that changes what "Remove"
+     would remove — the detail fetch's own effect keys on the activity id, which
+     does not move when one scheduled workout replaces another. */
+  /* The workout editor writes COROS program sports 1-9 and nothing else, which
+     was spelled as that numeric range twice in the markup. Ask the capability
+     table the editor itself is built from. */
+  const editableSport =
+    selection?.kind === "scheduled"
+      ? scheduledWorkoutSport(selection.entry.sportType)
+      : undefined;
+
+  const selectionKey = selection
+    ? selection.kind === "scheduled"
+      ? `scheduled:${scheduledWorkoutKey(selection.entry)}`
+      : `activity:${selection.activity.activityId}`
+    : "";
 
   useEffect(() => {
     setConfirmDelete(false);
+  }, [selectionKey]);
+
+  /* Escape closes, like every other dialog in the app, and focus goes back to
+     whatever opened the panel — a chip in the grid — instead of being left at
+     the top of a page the athlete cannot see. */
+  useEffect(() => {
+    if (!selection) {
+      return;
+    }
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    const frame = window.requestAnimationFrame(() => panelRef.current?.focus());
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      window.cancelAnimationFrame(frame);
+      returnFocusRef.current?.focus();
+      returnFocusRef.current = null;
+    };
+    // The panel is one surface for the whole time a selection is open; re-running
+    // this per selection would bounce focus on every chip click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(selection)]);
+
+  useEffect(() => {
     setDetail(null);
     if (!activity) {
       return;
@@ -82,7 +137,18 @@ export function DayDetailPanel({
             onClick={onClose}
           />
           <motion.aside
+            ref={panelRef}
             className="calendar-detail-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              selection.kind === "scheduled"
+                ? selection.entry.name
+                : (selection.activity.name ??
+                  selection.activity.sportName ??
+                  "Activity")
+            }
+            tabIndex={-1}
             initial={{ x: "104%" }}
             animate={{ x: 0 }}
             exit={{ x: "104%" }}
@@ -119,9 +185,13 @@ export function DayDetailPanel({
                   <button
                     type="button"
                     className="ghost-button calendar-detail-action"
-                    disabled={!selection.entry.sportType || selection.entry.sportType < 1 || selection.entry.sportType > 9}
+                    disabled={!editableSport}
                     onClick={() => onEdit(selection)}
-                    title={selection.entry.sportType && selection.entry.sportType >= 1 && selection.entry.sportType <= 9 ? "Edit this scheduled occurrence" : "This COROS sport is not supported by the workout editor"}
+                    title={
+                      editableSport
+                        ? "Edit this scheduled occurrence"
+                        : "This COROS sport is not supported by the workout editor"
+                    }
                   >
                     <Pencil size={15} aria-hidden="true" />
                     Edit
@@ -164,6 +234,7 @@ export function DayDetailPanel({
                 <ScheduledWorkoutDetail
                   entry={selection.entry}
                   sportTypes={sportTypes}
+                  api={api}
                 />
               ) : (
                 <ActivityDetailPanel

@@ -379,6 +379,8 @@ const api = {
     ipcRenderer.invoke("trainingHub:listScheduledWorkouts", startDay, endDay),
   listLibraryWorkouts: (): Promise<TrainingHubLibraryWorkout[]> =>
     ipcRenderer.invoke("trainingHub:listLibraryWorkouts"),
+  refreshWorkoutCaches: (): Promise<void> =>
+    ipcRenderer.invoke("trainingHub:refreshWorkoutCaches"),
   duplicateLibraryWorkout: (
     programId: string,
     name: string,

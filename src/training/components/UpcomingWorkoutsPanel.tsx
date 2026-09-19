@@ -12,9 +12,9 @@ import {
   formatUpcomingWorkoutDetailLine,
   formatUpcomingWorkoutRowStats,
   formatUpcomingWorkoutStats,
-  inferUpcomingWorkoutCategory,
   isUpcomingWorkoutToday
 } from "../formatters";
+import { planTag } from "../workoutSport";
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
 
 interface UpcomingWorkoutsPanelProps {
@@ -90,6 +90,7 @@ export function UpcomingWorkoutsPanel({
                 workout.trainingLoad,
                 unitSystem
               );
+              const tag = planTag(workout);
 
               return (
                 <li
@@ -112,9 +113,9 @@ export function UpcomingWorkoutsPanel({
                         <strong className="training-upcoming-title">
                           {workout.name}
                         </strong>
-                        <span className="training-upcoming-tag">
-                          {inferUpcomingWorkoutCategory(workout.name)}
-                        </span>
+                        {tag ? (
+                          <span className="training-upcoming-tag">{tag}</span>
+                        ) : null}
                       </span>
                       {rowStats ? (
                         <span className="training-upcoming-row-stats">
@@ -154,9 +155,9 @@ function TodayWorkoutCard({
   onOpen: () => void;
 }) {
   const { unitSystem } = useUnitSystem();
-  const category = inferUpcomingWorkoutCategory(workout.name);
+  const tag = planTag(workout);
   const detailLine = formatUpcomingWorkoutDetailLine(
-    category,
+    tag,
     workout.volume,
     workout.trainingLoad,
     unitSystem
@@ -174,7 +175,9 @@ function TodayWorkoutCard({
       <span className="training-upcoming-today-copy">
         <span className="training-upcoming-today-heading">
           <span className="training-upcoming-today-pill">Today</span>
-          <span className="training-upcoming-today-tag">{category}</span>
+          {tag ? (
+            <span className="training-upcoming-today-tag">{tag}</span>
+          ) : null}
         </span>
         <span className="training-upcoming-today-title">{workout.name}</span>
         <span className="training-upcoming-today-meta">{detailLine}</span>

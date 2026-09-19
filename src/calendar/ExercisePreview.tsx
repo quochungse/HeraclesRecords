@@ -1,6 +1,6 @@
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { MUSCLE_BY_ID, resolveExerciseTargets } from "../strength/muscles";
 
@@ -10,6 +10,20 @@ interface ExercisePreviewProps {
   name: string;
   /** Show which muscles the movement trains, from the anatomy rule set. */
   showTargets?: boolean;
+  /**
+   * Start the clip as it mounts.
+   *
+   * The default follows the viewer's reduced-motion setting, because the
+   * editor puts this on screen the moment an exercise is chosen rather than
+   * on request. The Calendar's workout view passes `true`: there the clip is
+   * behind a click, so it has already been asked for, and a demonstration the
+   * viewer opened and then has to press play on is a control for nothing.
+   *
+   * Looping is not gated either way — a one-second clip that stops after one
+   * pass shows the movement once and then a frozen figure — and a click on
+   * the plate stops it, which is the escape reduced motion is owed.
+   */
+  autoPlay?: boolean;
   className?: string;
 }
 
@@ -27,11 +41,15 @@ export function ExercisePreview({
   option,
   name,
   showTargets = false,
+  autoPlay,
   className = ""
 }: ExercisePreviewProps) {
   const reducedMotion = useReducedMotion();
+  const startsPlaying = autoPlay ?? !reducedMotion;
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [angleIndex, setAngleIndex] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [paused, setPaused] = useState(true);
 
   const angles = useMemo(
     () => option?.media?.filter((entry) => entry.videoUrl) ?? [],
@@ -64,6 +82,27 @@ export function ExercisePreview({
     setStatus("loading");
   }, [angle?.videoUrl]);
 
+  /**
+   * The clip carries no browser control bar — it is a loop of a movement, not
+   * a film, and the bar sat across the bottom third of the plate with a
+   * scrubber for a one-second clip. The plate itself is the control: click to
+   * play or pause, with the glyph shown only while it is stopped.
+   *
+   * It stays a real button so it can be reached by keyboard, which the control
+   * bar was previously the only way to do.
+   */
+  const togglePlayback = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      // A play() that the browser refuses rejects; nothing here depends on it
+      // succeeding, and the paused state follows the element either way.
+      void video.play().catch(() => undefined);
+    } else {
+      video.pause();
+    }
+  }, []);
+
   if (!angle?.videoUrl) return null;
 
   return (
@@ -87,19 +126,33 @@ export function ExercisePreview({
         ) : null}
         <video
           key={angle.videoUrl}
+          ref={videoRef}
           className={status === "ready" ? "is-ready" : ""}
           src={angle.videoUrl}
           poster={angle.coverUrl ?? option?.thumbnailUrl}
-          controls
-          autoPlay={!reducedMotion}
+          autoPlay={startsPlaying}
           muted
-          loop={!reducedMotion}
+          loop
           playsInline
           preload="metadata"
           onLoadedData={() => setStatus("ready")}
           onError={() => setStatus("error")}
+          onPlay={() => setPaused(false)}
+          onPause={() => setPaused(true)}
           aria-label={`${name || "Exercise"} demonstration, angle ${angleIndex + 1} of ${angles.length}`}
         />
+        {status === "ready" ? (
+          <button
+            type="button"
+            className={`exercise-preview-toggle ${paused ? "is-paused" : ""}`}
+            aria-label={paused ? "Play demonstration" : "Pause demonstration"}
+            onClick={togglePlayback}
+          >
+            <span className="exercise-preview-play" aria-hidden="true">
+              <Play size={20} strokeWidth={2.4} />
+            </span>
+          </button>
+        ) : null}
       </div>
 
       {angles.length > 1 ? (

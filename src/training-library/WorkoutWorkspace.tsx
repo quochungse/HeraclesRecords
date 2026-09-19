@@ -1272,10 +1272,6 @@ export function WorkoutWorkspace({
             void onRefresh();
           }}
           onError={(message) => message && onError(message)}
-          onEditLibrary={(programId) => {
-            setCreating(false);
-            setEditId(programId);
-          }}
         />
       ) : null}
     </div>
