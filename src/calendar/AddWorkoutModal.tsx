@@ -1972,7 +1972,16 @@ export function AddWorkoutModal({
   // Builder
   const [builderSport, setBuilderSport] = useState<WorkoutSport>("run");
   const [builderPoolLength, setBuilderPoolLength] = useState("25");
-  const [builderPoolUnit, setBuilderPoolUnit] = useState<"m" | "yd">("m");
+  /* The pool's unit is a function of the unit system and nothing else —
+     `parseWorkoutEditorContext` derives `defaultPoolLength.unit` from exactly
+     this, and both of the field's own change handlers restated it. Held as
+     state seeded from that context, it was correct only once the context
+     request came back: an athlete reading imperial who reached the swim field
+     first, or whose context request failed (it is caught and dropped), sent
+     COROS a 25 **metre** pool under a field labelled yd. Reading it here
+     removes the load order from the question. The *length* still comes from
+     the context, because that is the athlete's own pool and not a derivation. */
+  const builderPoolUnit: "m" | "yd" = unitSystem === "imperial" ? "yd" : "m";
   const [builderGradeSystem, setBuilderGradeSystem] = useState<keyof typeof CLIMB_SYSTEM_IDS>("yds");
   const [builderExercises, setBuilderExercises] = useState<WorkoutExerciseOption[]>([]);
   const [builderExercisesLoading, setBuilderExercisesLoading] = useState(false);
@@ -2006,8 +2015,9 @@ export function AddWorkoutModal({
     void api.getWorkoutEditorContext(unitSystem)
       .then((context) => {
         setBuilderContext(context);
+        // Only the length: the context derives its unit from the unit system
+        // it was asked with, which `builderPoolUnit` already reads directly.
         setBuilderPoolLength(String(Number(context.defaultPoolLength.value.toFixed(2))));
-        setBuilderPoolUnit(context.defaultPoolLength.unit);
       })
       .catch(() => undefined);
   }, [api, unitSystem]);
@@ -2350,9 +2360,14 @@ export function AddWorkoutModal({
   const activityValid =
     activityTime.trim() !== "" &&
     (Number(activityHours) || 0) * 60 + (Number(activityMinutes) || 0) > 0;
-  const quickDuration = quickPaceValid
-    ? quickWorkoutDuration(quickDistance, quickPace, unitSystem)
-    : null;
+  /* Only a pace target implies a duration, and only this tab's current target
+     counts: `quickPace` survives a change of target and a change of sport, so
+     reading it unconditionally put a run's pace on a ride ("about 3 hr 40 min"
+     for a workout carrying no pace at all) and read a swim's 1500 m as 1500 km. */
+  const quickDuration =
+    quickTargetType === "pace" && quickPaceValid
+      ? quickWorkoutDuration(quickDistance, quickPace, unitSystem)
+      : null;
   const availableTabs: AddTab[] = libraryOnly ? ["builder"] : [
     ...(canSchedule ? (["quick", "library", "builder"] as AddTab[]) : []),
     ...(canLogActivity ? (["activity"] as AddTab[]) : [])
@@ -2548,12 +2563,7 @@ export function AddWorkoutModal({
                           type="number"
                           min="1"
                           value={builderPoolLength}
-                          onChange={(event) => {
-                            setBuilderPoolLength(event.target.value);
-                            setBuilderPoolUnit(
-                              unitSystem === "imperial" ? "yd" : "m"
-                            );
-                          }}
+                          onChange={(event) => setBuilderPoolLength(event.target.value)}
                         />
                         <span aria-hidden="true">{swimDistanceUnit(unitSystem)}</span>
                       </span>
@@ -2842,7 +2852,7 @@ export function AddWorkoutModal({
                       onChange={selectBuilderSport}
                     />
                   </label>
-                  {builderSport === "swim" ? <div className="calendar-field-row"><label className="calendar-field"><span>Pool length ({swimDistanceUnit(unitSystem)})</span><input type="number" min="1" value={builderPoolLength} onChange={(event) => { setBuilderPoolLength(event.target.value); setBuilderPoolUnit(unitSystem === "imperial" ? "yd" : "m"); }} /></label></div> : null}
+                  {builderSport === "swim" ? <div className="calendar-field-row"><label className="calendar-field"><span>Pool length ({swimDistanceUnit(unitSystem)})</span><input type="number" min="1" value={builderPoolLength} onChange={(event) => setBuilderPoolLength(event.target.value)} /></label></div> : null}
                   {(builderSport === "indoorClimb" || builderSport === "bouldering") ? <label className="calendar-field"><span>Grading system</span><SelectDropdown label="Grading system" value={builderGradeSystem} options={(Object.keys(CLIMB_SYSTEM_IDS) as Array<keyof typeof CLIMB_SYSTEM_IDS>).map((system) => ({ value: system, label: formatBuilderToken(system) }))} portal onChange={setBuilderGradeSystem} /></label> : null}
                   <label className="calendar-field">
                     <span className="calendar-field-label">
