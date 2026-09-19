@@ -48,6 +48,10 @@ const { startLocalStoragePublisher } = await import(
 );
 
 store.set("coros-theme", "paper");
+// `derived` tier, so it must NOT travel: the unit is the COROS account's own
+// Measurement field and every machine of one account resolves the same answer
+// from the account itself. Publishing the cache would let a machine that has
+// not refreshed yet write a stale unit over one that has.
 store.set("coroslink.unitSystem", "metric");
 
 const calls = [];
@@ -82,8 +86,8 @@ await tick();
 assert.equal(calls.length, 3, "and the moment sync is on, it hands them over");
 assert.deepEqual(
   calls[2],
-  { "coros-theme": "paper", "coroslink.unitSystem": "metric" },
-  "with every preference in it, none of which had changed"
+  { "coros-theme": "paper" },
+  "with every preference in it, none of which had changed, and no derived key"
 );
 
 // Now that it has been delivered, an unchanged set is silent again.

@@ -165,7 +165,9 @@ const imperialStrength = buildWorkoutPayload(
   undefined,
   imperialContext
 );
-assert.equal(imperialStrength.exercises[0].intensityValue, 10);
+// COROS stores a weight in grams and uses intensityDisplayUnit only to say how
+// to print it, so an imperial athlete's 10 kg step is still 10000 with unit 7.
+assert.equal(imperialStrength.exercises[0].intensityValue, 10_000);
 assert.equal(imperialStrength.exercises[0].intensityDisplayUnit, 7);
 
 const imperialSwim = buildWorkoutPayload(

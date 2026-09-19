@@ -111,6 +111,28 @@ Related enums: `intensityType` (1=weight, 2=heart, 3=pace, 4=speed, 5=stroke,
 (1=min/km, 2=min/mi, 3=s/100m, 4=km/h, 5=mph, 6=kg, 7=lbs),
 `restType` (0=manualEnd, 1=time, 2=heart, 3=noRest, 4=distance).
 
+A **weight** intensity is stored in **grams** (kg x 1000), the same scaling the
+strength activity laps use. A 10 kg kettlebell press comes back as
+`intensityValue: 10000`, `intensityDisplayUnit: 6`, and every weight in that plan
+is a multiple of 1000 between 6000 and 102000. Nothing in the payload marks the
+unit, so the scale is fixed in the codec rather than detected.
+
+`intensityDisplayUnit` 6/7 is taken to mean print-as-kg / print-as-lb, leaving the
+stored figure canonical metric either way -- the rule pace (s/km x1000) and speed
+(km/h x100) already follow regardless of their own display units. **That reading
+is measured for kg and inferred for lb**: no capture to hand came from a pound
+account. Were COROS to store pounds x1000 under displayUnit 7 instead, a pound
+athlete would be off by one factor of 2.2046 each way (a 45 lb step reading as
+99.2 lb, and one written from here landing on the watch as 20.4 lb) while a round
+trip inside the app stayed self-consistent. One capture from a pound account
+settles it: `intensityValue` of 45000 rather than 20412 for a 45 lb step means
+the pound branches drop the 2.2046 conversion and scale by 1000 alone.
+The codec read and wrote it as kilograms until 2026-09-19, so plan weights showed
+1000x too large and a weight this app wrote reached the watch 1000x too small;
+a round trip through the codec could not see it, since both halves were wrong by
+the same factor. `test:workout-intensity-codec` now pins the scale in both
+directions against a verbatim COROS exercise.
+
 Distance-step `targetDisplayUnit` is 2 (meters); an overall metric workout uses
 `distanceDisplayUnit: 1` (kilometers). Pace targets use seconds per kilometer
 multiplied by 1000, `intensityMultiplier: 1000`, and an ordered low/high range.

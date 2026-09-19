@@ -18,7 +18,6 @@ import {
   Mountain,
   Palette,
   RefreshCw,
-  Ruler,
   Server,
   Sun,
   Watch,
@@ -63,7 +62,6 @@ import {
   type SportColorCategory,
 } from "../training/sportColors";
 import appLogo from "../../build/icon.png";
-import { useUnitSystem } from "../units/UnitSystemProvider";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
 
@@ -191,19 +189,6 @@ interface SettingsViewProps {
   onTrainingSignIn: () => void;
 }
 
-const UNIT_SYSTEMS = [
-  {
-    value: "metric" as const,
-    label: "Metric",
-    detail: "Kilometres, metres, min/km, kilograms"
-  },
-  {
-    value: "imperial" as const,
-    label: "Imperial",
-    detail: "Miles, feet, min/mi, pounds, yards"
-  }
-];
-
 const THEME_MODES = [
   { id: "dark" as const, label: "Dark", icon: Moon },
   { id: "paper" as const, label: "Light", icon: Sun }
@@ -242,7 +227,6 @@ export function SettingsView({
   const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
-  const { unitSystem, setUnitSystem } = useUnitSystem();
 
   function updateSportColor(cat: SportColorCategory, value: string) {
     const next = { ...sportColors, [cat]: value };
@@ -586,38 +570,6 @@ export function SettingsView({
       </div>
 
       <SyncPanel api={api} />
-
-      {/* Measurements is a two-way switch, so it is a row, not a card. It had a
-          44px icon, an eyebrow, a 26px heading, two lines of explanation and a
-          pair of 72px radio cards listing the units each system uses — a page
-          of chrome around one binary choice most people make once and never
-          revisit. The unit lists are what the switch names anyway, so they
-          moved to the option's `title`. */}
-      <div className="panel settings-compact-panel">
-        <div className="settings-compact-head">
-          <span className="settings-compact-icon" aria-hidden="true">
-            <Ruler size={18} strokeWidth={1.9} />
-          </span>
-          <div className="settings-compact-copy">
-            <strong>Units</strong>
-            <span>
-              How distance, pace, elevation, swimming and strength values appear
-              throughout Heracles Records.
-            </span>
-          </div>
-          <OptionGroup
-            label="Unit system"
-            size="md"
-            value={unitSystem}
-            options={UNIT_SYSTEMS.map((option) => ({
-              value: option.value,
-              label: option.label,
-              title: option.detail
-            }))}
-            onChange={setUnitSystem}
-          />
-        </div>
-      </div>
 
       <div className="panel settings-appearance-panel">
         {/* Both axes of the theme on one line: the mode switch, the five

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import {
+  POUNDS_PER_KILOGRAM,
   elevationUnit,
   formatDistanceValue,
   formatPaceValue,
@@ -128,6 +129,7 @@ import {
 } from "./corosWorkoutEditor";
 import {
   WORKOUT_SPORT_CAPABILITIES,
+  decodeCorosIntensity,
   resolveWorkoutExerciseName,
   workoutExerciseId,
   workoutExerciseMedia,
@@ -6653,6 +6655,47 @@ export function formatActivitySeriesForChat(
   return ["Time series (downsampled):", header, ...rows].join("\n");
 }
 
+/**
+ * `targetType` as COROS numbers it — the table in docs/coros-plan-write-api.md,
+ * which `decodeCorosIntensity` and the workout builder have always used. This
+ * parser had its own reading of the same field and got two of them wrong: reps
+ * were taken from 1 (Open, which carries no value) instead of 3, so a real
+ * strength plan showed its sets and no reps at all, and 6 — a training load,
+ * a bare 0-999 integer — was read as a weight in kilograms.
+ */
+const COROS_TARGET_TYPE_REPS = 3;
+const COROS_TARGET_TYPE_TIME = 2;
+const COROS_TARGET_TYPE_DISTANCE = 5;
+const COROS_TARGET_TYPE_LOAD = 6;
+
+/**
+ * The prescribed load of a strength exercise, in kilograms.
+ *
+ * It lives in the step's intensity, not in a field of its own: COROS sends no
+ * `weight` or `weightValue` anywhere in a plan payload, so the old reading of
+ * those two names never once produced a number, and the training-load fallback
+ * behind them produced the wrong one. `decodeCorosIntensity` is the one place
+ * that knows the stored figure is grams and that `intensityDisplayUnit` only
+ * says how to print it.
+ */
+function scheduledExerciseWeightKg(
+  exercise: Record<string, unknown>
+): number | undefined {
+  try {
+    const { intensity } = decodeCorosIntensity(exercise);
+    if (intensity.type !== "weight" || intensity.mode !== "weight") {
+      return undefined;
+    }
+    const kilograms =
+      intensity.unit === "lb"
+        ? intensity.value / POUNDS_PER_KILOGRAM
+        : intensity.value;
+    return kilograms > 0 ? kilograms : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseScheduledExercises(
   program: Record<string, unknown> | undefined
 ): TrainingHubScheduledExercise[] {
@@ -6675,11 +6718,10 @@ export function parseScheduledExercises(
     const sets = toOptionalNumber(exercise.sets) ?? 1;
     const reps =
       toOptionalNumber(exercise.reps) ??
-      (targetType === 1 ? toOptionalNumber(exercise.targetValue) : undefined);
-    const weight =
-      toOptionalNumber(exercise.weight) ??
-      toOptionalNumber(exercise.weightValue) ??
-      (targetType === 6 ? toOptionalNumber(exercise.targetValue) : undefined);
+      (targetType === COROS_TARGET_TYPE_REPS
+        ? toOptionalNumber(exercise.targetValue)
+        : undefined);
+    const weight = scheduledExerciseWeightKg(exercise);
     const targetLabel = formatScheduledExerciseTarget(exercise, targetType);
 
     parsed.push({
@@ -6700,20 +6742,20 @@ function formatScheduledExerciseTarget(
   targetType?: number
 ): string | undefined {
   const targetValue = toOptionalNumber(exercise.targetValue);
-  if (targetType === 5 && targetValue) {
+  if (targetType === COROS_TARGET_TYPE_DISTANCE && targetValue) {
     return `${(corosWorkoutDistanceToMeters(targetValue) / 1000).toFixed(2)} km`;
   }
-  if (targetType === 2 && targetValue) {
+  if (targetType === COROS_TARGET_TYPE_TIME && targetValue) {
     const seconds = normalizeActivityDuration(targetValue) ?? targetValue;
     const minutes = Math.floor(seconds / 60);
     const secs = Math.round(seconds % 60);
     return `${minutes}:${String(secs).padStart(2, "0")}`;
   }
-  if (targetType === 1 && targetValue) {
+  if (targetType === COROS_TARGET_TYPE_REPS && targetValue) {
     return `${Math.round(targetValue)} reps`;
   }
-  if (targetType === 6 && targetValue) {
-    return `${Math.round(targetValue)} kg`;
+  if (targetType === COROS_TARGET_TYPE_LOAD && targetValue) {
+    return `${Math.round(targetValue)} load`;
   }
   const intensity = pickString(exercise, ["intensityText", "intensity"]);
   return intensity;
@@ -6737,9 +6779,14 @@ export function formatScheduledExercisesForChat(
       if (exercise.reps) {
         parts.push(`${Math.round(exercise.reps)} reps`);
       }
-      if (exercise.weight) {
-        parts.push(formatWeightValue(exercise.weight, unitSystem, 1));
-      } else if (exercise.targetLabel) {
+      // A load and a target are two different things — a farmer's carry is 24 kg
+      // *for two minutes* — and the weight used to stand in for the target only
+      // because it was never populated. Skip the target when the reps above
+      // already are it.
+      const repsLabel = exercise.reps
+        ? `${Math.round(exercise.reps)} reps`
+        : undefined;
+      if (exercise.targetLabel && exercise.targetLabel !== repsLabel) {
         const distanceMatch = exercise.targetLabel.match(/^([\d.]+)\s*(km|m)$/i);
         if (distanceMatch) {
           const amount = Number(distanceMatch[1]);
@@ -6754,6 +6801,9 @@ export function formatScheduledExercisesForChat(
         } else {
           parts.push(exercise.targetLabel);
         }
+      }
+      if (exercise.weight) {
+        parts.push(formatWeightValue(exercise.weight, unitSystem, 1));
       }
       return parts.join(" · ");
     })

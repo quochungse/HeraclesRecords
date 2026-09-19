@@ -107,6 +107,7 @@
     "test:upcoming-workout-match": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-upcoming-workout-match.mjs",
     "test:weekly-activity": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-weekly-activity.mjs",
     "test:units": "npm run build:electron && node scripts/test-unit-system.mjs",
+    "test:unit-source": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-unit-source.mjs",
     "test:heatmap-summary": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heatmap-summary.mjs",
     "test:heatmap-day-summary": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heatmap-day-summary.mjs",
     "test:exercise-names": "node --experimental-strip-types scripts/test-exercise-names.mjs",

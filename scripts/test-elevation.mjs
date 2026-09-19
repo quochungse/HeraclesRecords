@@ -56,10 +56,17 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
+
+/* Paths are compared against literals written with "/" — the exemption
+   lists, the allowlist keys, every reason string. `relative` hands back
+   backslashes on Windows, so those never matched there and three of these
+   suites reported the whole app as violations. */
+const repoRelative = (file) => relative(ROOT, file).split(sep).join("/");
 const ALLOWLIST_PATH = join(ROOT, "scripts/elevation-allowlist.json");
 
 const SHADOW_TOKENS = new Set(["--shadow-soft", "--shadow-card", "--shadow-elevated", "--shadow-inset"]);
@@ -233,8 +240,8 @@ const bump = (label, bucket, key, site) => {
 
 for (const { file, code } of files) {
   for (const rule of rules(code)) {
-    const key = `${relative(ROOT, file)}|${rule.selector}`;
-    const site = `${relative(ROOT, file)}:${rule.line}`;
+    const key = `${repoRelative(file)}|${rule.selector}`;
+    const site = `${repoRelative(file)}:${rule.line}`;
     const shadows = declarations(rule.body, "box-shadow");
     const borders = declarations(rule.body, "border");
     const isExempt = key in exempt;

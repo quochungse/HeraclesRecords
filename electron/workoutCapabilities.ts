@@ -599,6 +599,39 @@ export function encodeCorosPercent(value: number): number {
   return Math.round(value * 1_000);
 }
 
+/**
+ * COROS stores a weight intensity in **grams**, the same scaling its strength
+ * activity laps use (`electron/strengthDetail.ts`). Nothing in the payload says
+ * so — there is no unit field to branch on, and the scale is fixed here rather
+ * than sniffed. What it was read off is the live API: a 10 kg kettlebell press
+ * arrives as `intensityValue: 10000`, and every weight in that plan is a
+ * multiple of 1000 between 6000 and 102000.
+ *
+ * Taking that number for kilograms put a 10 kg press on the screen as 10,000 kg,
+ * and writing kilograms into it sent COROS 10 grams. A round trip through this
+ * codec cannot catch either — both halves were wrong by the same factor, so the
+ * intensity test round-tripped cleanly for as long as the bug lived. The suite
+ * now asserts the scale against a verbatim COROS exercise in both directions.
+ *
+ * **`intensityDisplayUnit` (6=kg, 7=lb) is read for the label only, and the
+ * pound half of that is inferred rather than measured.** Every sample to hand
+ * was an athlete on metric, so displayUnit 6; none was 7. The inference is the
+ * rule the rest of this struct already follows and that the shipping pace and
+ * speed paths depend on — pace is stored as seconds per kilometre ×1000 and
+ * speed as km/h ×100 whether displayUnit says min/mi or mph, so the field is
+ * presentation and the stored figure is canonical metric. If COROS instead
+ * stores pounds ×1000 under displayUnit 7, this is wrong by one factor of
+ * 2.2046 in each direction for a pound athlete: their 45 lb step would read as
+ * 99.2 lb, and a 45 lb step written from here would reach the watch as 20.4 lb.
+ * A round trip inside this app stays self-consistent either way, so only a
+ * reading taken against the COROS app can settle it. Settling it costs one
+ * capture: prescribe a known weight with the account set to pounds and read
+ * back `intensityValue`. If it comes back 45000 rather than 20412, the pound
+ * branches of `encodeCorosIntensity`/`decodeCorosIntensity` skip the 2.2046
+ * conversion and scale by 1000 alone.
+ */
+const GRAMS_PER_KILOGRAM = 1_000;
+
 function contextZones(
   context: WorkoutEditorContext | undefined,
   key: keyof WorkoutEditorContext["zones"],
@@ -803,12 +836,13 @@ export function encodeCorosIntensity(
       return { ...result, intensityType: 1, intensityCustom: 1 };
     }
     const kg = intensity.unit === "lb" ? intensity.value / 2.2046226218 : intensity.value;
+    const grams = Math.round(kg * GRAMS_PER_KILOGRAM);
     return {
       ...result,
       intensityType: 1,
       intensityCustom: 0,
-      intensityValue: Number(kg.toFixed(2)),
-      intensityValueExtend: Number(kg.toFixed(2)),
+      intensityValue: grams,
+      intensityValueExtend: grams,
       intensityDisplayUnit: intensity.unit === "lb" ? 7 : 6
     };
   }
@@ -854,11 +888,12 @@ export function decodeCorosIntensity(
   if (type === 1) {
     if (custom === 1) return { intensity: { type: "weight", mode: "bodyweight" } };
     const pounds = finiteNumber(exercise.intensityDisplayUnit) === 7;
+    const kg = value / GRAMS_PER_KILOGRAM;
     return {
       intensity: {
         type: "weight",
         mode: "weight",
-        value: Number((pounds ? value * 2.2046226218 : value).toFixed(2)),
+        value: Number((pounds ? kg * 2.2046226218 : kg).toFixed(2)),
         unit: pounds ? "lb" : "kg"
       }
     };

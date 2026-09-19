@@ -1,4 +1,5 @@
 import { COROS_KNOWN_SPORT_TYPES } from "../../../electron/corosSportTypes";
+import { formatDistanceValue, type UnitSystem } from "../../units/units";
 import type {
   AnalysisThresholdMetric,
   AnalysisTrigger,
@@ -38,7 +39,10 @@ const WEEKDAYS = [
  * manual one, and that is what most start as. It answers "Manual" rather than
  * "Manual only" — there is nothing left for it to be *only*.
  */
-export function describeTrigger(trigger: AnalysisTrigger | null): string {
+export function describeTrigger(
+  trigger: AnalysisTrigger | null,
+  unitSystem: UnitSystem = "metric"
+): string {
   if (!trigger) {
     return "Manual";
   }
@@ -62,7 +66,7 @@ export function describeTrigger(trigger: AnalysisTrigger | null): string {
       filters.push(`≥ ${formatMinutes(trigger.minDurationSec)}`);
     }
     if (trigger.minDistanceM) {
-      filters.push(`≥ ${(trigger.minDistanceM / 1000).toFixed(1)} km`);
+      filters.push(`≥ ${formatDistanceValue(trigger.minDistanceM, unitSystem, { digits: 1 })}`);
     }
     const suffix = filters.length ? ` ${filters.join(" · ")}` : "";
     return trigger.multiActivity

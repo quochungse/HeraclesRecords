@@ -4,6 +4,7 @@ export const METERS_PER_MILE = 1609.344;
 export const METERS_PER_YARD = 0.9144;
 export const FEET_PER_METER = 3.280839895;
 export const POUNDS_PER_KILOGRAM = 2.2046226218;
+export const CENTIMETERS_PER_INCH = 2.54;
 
 export function normalizeUnitSystem(value: unknown): UnitSystem {
   return value === "imperial" ? "imperial" : "metric";
@@ -112,6 +113,61 @@ export function swimDistanceUnit(unitSystem: UnitSystem): "m" | "yd" {
 
 export function elevationUnit(unitSystem: UnitSystem): "m" | "ft" {
   return unitSystem === "imperial" ? "ft" : "m";
+}
+
+/**
+ * Body height. COROS stores it in centimetres whatever the athlete's unit is,
+ * and shows inches on imperial — not feet-and-inches, which is two numbers and
+ * cannot go in one number field.
+ */
+export function centimetersToDisplayHeight(
+  centimeters: number,
+  unitSystem: UnitSystem
+): number {
+  return unitSystem === "imperial"
+    ? centimeters / CENTIMETERS_PER_INCH
+    : centimeters;
+}
+
+export function displayHeightToCentimeters(
+  value: number,
+  unitSystem: UnitSystem
+): number {
+  return unitSystem === "imperial" ? value * CENTIMETERS_PER_INCH : value;
+}
+
+export function heightUnit(unitSystem: UnitSystem): "cm" | "in" {
+  return unitSystem === "imperial" ? "in" : "cm";
+}
+
+/**
+ * Temperature is COROS's *other* display setting (`temperatureUnit`: 0 Celsius,
+ * 1 Fahrenheit) and it does not follow `unit` — an athlete can measure in
+ * kilometres and still read Fahrenheit, which is why COROS gives it its own
+ * toggle and why this is not derived from `UnitSystem`.
+ */
+export type TemperatureUnit = "celsius" | "fahrenheit";
+
+export function celsiusToDisplayTemperature(
+  celsius: number,
+  temperatureUnit: TemperatureUnit
+): number {
+  return temperatureUnit === "fahrenheit" ? celsius * 1.8 + 32 : celsius;
+}
+
+export function temperatureUnitLabel(
+  temperatureUnit: TemperatureUnit
+): "°C" | "°F" {
+  return temperatureUnit === "fahrenheit" ? "°F" : "°C";
+}
+
+export function formatTemperatureValue(
+  celsius: number,
+  temperatureUnit: TemperatureUnit
+): string {
+  return `${Math.round(
+    celsiusToDisplayTemperature(celsius, temperatureUnit)
+  )}${temperatureUnitLabel(temperatureUnit)}`;
 }
 
 export function weightUnit(unitSystem: UnitSystem): "kg" | "lb" {

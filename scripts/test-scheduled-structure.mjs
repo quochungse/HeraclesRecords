@@ -176,7 +176,8 @@ const strength = buildScheduledWorkoutView({
         targetType: 3,
         targetValue: 10,
         intensityType: 1,
-        intensityValue: 60,
+        // COROS stores a weight intensity in grams: 60000 is 60 kg.
+        intensityValue: 60_000,
         sets: 3,
         sortNo: 1
       },
@@ -187,7 +188,7 @@ const strength = buildScheduledWorkoutView({
         targetType: 3,
         targetValue: 12,
         intensityType: 1,
-        intensityValue: 24,
+        intensityValue: 24_000,
         sets: 3,
         sortNo: 2
       }
@@ -213,7 +214,7 @@ const imperialStrength = buildScheduledWorkoutView({
       targetType: 3,
       targetValue: 10,
       intensityType: 1,
-      intensityValue: 10,
+      intensityValue: 10_000,
       sets: 3,
       sortNo: 1
     }]

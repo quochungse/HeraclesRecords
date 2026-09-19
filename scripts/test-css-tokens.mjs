@@ -40,10 +40,17 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
+
+/* Paths are compared against literals written with "/" — the exemption
+   lists, the allowlist keys, every reason string. `relative` hands back
+   backslashes on Windows, so those never matched there and three of these
+   suites reported the whole app as violations. */
+const repoRelative = (file) => relative(ROOT, file).split(sep).join("/");
 
 function filesUnder(dir, test) {
   const out = [];
@@ -68,7 +75,7 @@ const read = new Map(); // name -> ["file:line", …]
 const varUses = []; // { name, where, hasFallback }
 
 for (const file of cssFiles) {
-  const where = relative(ROOT, file);
+  const where = repoRelative(file);
   blankComments(readFileSync(file, "utf8"))
     .split("\n")
     .forEach((line, index) => {

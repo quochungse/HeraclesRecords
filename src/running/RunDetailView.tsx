@@ -18,6 +18,7 @@ import {
   formatTrainingTimestamp
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import {
@@ -77,7 +78,7 @@ export function RunDetailView({
   onBack,
   onRetry
 }: RunDetailViewProps) {
-  const { unitSystem } = useUnitSystem();
+  const { unitSystem, temperatureUnit } = useUnitSystem();
   const surface = classifyRunSurface(activity.sportType);
 
   const laps = detail?.laps ?? [];
@@ -234,7 +235,7 @@ export function RunDetailView({
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
         label: "Temperature",
-        value: `${Math.round(detail.weather.temperatureC)}°C`
+        value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {

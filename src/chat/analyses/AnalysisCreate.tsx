@@ -12,6 +12,7 @@ import { TriggerForm, type TriggerDraft } from "./TriggerForm";
 import { COACH_ANALYSIS_PRESETS } from "../../../electron/coachAnalysisPresets";
 import { describeTrigger } from "./analysisLabels";
 import { useAnalysesTitle } from "./analysesTitle";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
 
 /** One the athlete writes themselves, rather than starting from a preset. */
 const BLANK: Omit<CoachAnalysisInput, "sessionId"> = {
@@ -53,6 +54,7 @@ export function AnalysisCreate({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { unitSystem } = useUnitSystem();
 
   const choose = (id: string) => {
     setPresetId(id);
@@ -104,14 +106,14 @@ export function AnalysisCreate({
                 id: preset.id,
                 label: preset.label,
                 description: preset.description,
-                trigger: describeTrigger(preset.suggestedTrigger ?? null)
+                trigger: describeTrigger(preset.suggestedTrigger ?? null, unitSystem)
               })),
               {
                 id: "blank",
                 label: "Write my own",
                 description:
                   "An empty analysis you fill in yourself: what it should look at, and what to say about it.",
-                trigger: describeTrigger(null)
+                trigger: describeTrigger(null, unitSystem)
               }
             ].map((starter) => (
               <button

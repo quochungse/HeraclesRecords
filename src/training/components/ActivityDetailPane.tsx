@@ -33,6 +33,7 @@ import {
 } from "../sportTypes";
 import { isRunSportType } from "../../running/runSurface";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityRouteMap } from "./ActivityRouteMap";
@@ -80,7 +81,7 @@ export function ActivityDetailPane({
   onRetry,
   onOpenSportScreen
 }: ActivityDetailPaneProps) {
-  const { unitSystem } = useUnitSystem();
+  const { unitSystem, temperatureUnit } = useUnitSystem();
   // A detail belonging to some other session is no detail at all — see
   // `detailMatchesActivity` for the window in which that happens.
   const detail = detailMatchesActivity(incomingDetail, listActivity)
@@ -425,11 +426,11 @@ export function ActivityDetailPane({
               <span
                 title={
                   weather.feelsLikeC !== undefined
-                    ? `Felt like ${Math.round(weather.feelsLikeC)}°C`
+                    ? `Felt like ${formatTemperatureValue(weather.feelsLikeC, temperatureUnit)}`
                     : undefined
                 }
               >
-                {Math.round(weather.temperatureC)}°C
+                {formatTemperatureValue(weather.temperatureC, temperatureUnit)}
                 {weather.humidityPct !== undefined
                   ? ` · ${Math.round(weather.humidityPct)}% humidity`
                   : ""}

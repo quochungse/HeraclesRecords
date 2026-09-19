@@ -8,6 +8,12 @@ import {
   SPORT_FILTER_OPTIONS,
   THRESHOLD_METRIC_OPTIONS
 } from "./analysisLabels";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
+import {
+  displayDistanceToMeters,
+  distanceUnit,
+  metersToDisplayDistance
+} from "../../units/units";
 
 /**
  * What an analysis fires on, and how often it is allowed to.
@@ -43,6 +49,7 @@ export function TriggerForm({
       )
     : undefined;
   const quietHours = conditions.quietHours ?? null;
+  const { unitSystem } = useUnitSystem();
 
   const setTrigger = (next: AnalysisTrigger | null) =>
     onChange({
@@ -281,16 +288,30 @@ export function TriggerForm({
               />
             </label>
             <label className="chat-local-field">
-              <span>Minimum distance (km)</span>
+              {/* The summary beside this field goes through `describeTrigger`,
+                  which reads the athlete's unit — so a field fixed to km put
+                  "Minimum distance (km) 5" next to "≥ 3.1 mi", one threshold
+                  printed as two numbers. Stored in metres either way. */}
+              <span>Minimum distance ({distanceUnit(unitSystem)})</span>
               <input
                 type="number"
                 min={0}
                 step={0.5}
-                value={(activityTrigger.minDistanceM ?? 0) / 1000}
+                value={
+                  Math.round(
+                    metersToDisplayDistance(
+                      activityTrigger.minDistanceM ?? 0,
+                      unitSystem
+                    ) * 100
+                  ) / 100
+                }
                 onChange={(event) => {
-                  const km = Number(event.target.value);
+                  const entered = Number(event.target.value);
                   patchActivity({
-                    minDistanceM: km > 0 ? Math.round(km * 1000) : undefined
+                    minDistanceM:
+                      entered > 0
+                        ? Math.round(displayDistanceToMeters(entered, unitSystem))
+                        : undefined
                   });
                 }}
               />

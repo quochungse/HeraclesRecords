@@ -6,7 +6,7 @@ import {
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, elevationUnit, metersToElevation } from "../units/units";
-import { runSurfaceBreakdown } from "./runMetrics";
+import { climbPerDistanceUnit, runSurfaceBreakdown } from "./runMetrics";
 import { RUN_SURFACE_LABELS } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
 
@@ -57,7 +57,9 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
             <th scope="col" className="is-numeric">Distance</th>
             <th scope="col" className="is-numeric">Runs</th>
             <th scope="col" className="is-numeric">Pace</th>
-            <th scope="col" className="is-numeric">Climb/km</th>
+            <th scope="col" className="is-numeric">
+              Climb/{distanceUnit(unitSystem)}
+            </th>
             <th scope="col" className="is-numeric" title="Metres climbed per hour">
               VAM
             </th>
@@ -81,7 +83,7 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
               <td className="is-numeric">
                 {entry.elevationPerKm === undefined
                   ? "—"
-                  : `${Math.round(metersToElevation(entry.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
+                  : `${Math.round(climbPerDistanceUnit(entry.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
               </td>
               <td className="is-numeric">
                 {entry.verticalSpeed === undefined

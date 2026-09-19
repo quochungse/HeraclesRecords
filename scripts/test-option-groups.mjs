@@ -30,10 +30,17 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
+
+/* Paths are compared against literals written with "/" — the exemption
+   lists, the allowlist keys, every reason string. `relative` hands back
+   backslashes on Windows, so those never matched there and three of these
+   suites reported the whole app as violations. */
+const repoRelative = (file) => relative(ROOT, file).split(sep).join("/");
 
 /**
  * Controls that are deliberately not an OptionGroup. Each names the file and a
@@ -156,7 +163,7 @@ function sourceFiles(dir, extensions) {
 
 const tsx = sourceFiles(SRC, [".tsx"]).map((file) => ({
   file,
-  rel: relative(ROOT, file),
+  rel: repoRelative(file),
   text: readFileSync(file, "utf8")
 }));
 
@@ -234,7 +241,7 @@ for (const { rel, text } of [
   ...tsx,
   ...sourceFiles(SRC, [".ts"]).map((file) => ({
     file,
-    rel: relative(ROOT, file),
+    rel: repoRelative(file),
     text: readFileSync(file, "utf8")
   }))
 ]) {

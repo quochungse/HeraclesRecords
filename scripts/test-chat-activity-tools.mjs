@@ -136,19 +136,43 @@ assert.match(imperialSwim, /1 \| 109 yd/);
 const downsampled = downsampleActivitySeries(detail.series ?? [], 3);
 assert.ok(downsampled.length <= 3);
 
+// Shaped like the live API: reps are targetType 3, and the load lives in the
+// step's intensity in grams. Both were read wrongly here — reps from targetType
+// 1 (Open, which carries no value) and the weight from targetType 6, a bare
+// training-load integer — so a real strength plan reached the coach with no
+// reps and an 80000 kg squat.
 const exercises = parseScheduledExercises({
   exercises: [
     {
       name: "Back Squat",
       sets: 4,
-      reps: 8,
-      targetType: 6,
-      targetValue: 80000
+      targetType: 3,
+      targetValue: 8,
+      intensityType: 1,
+      intensityCustom: 0,
+      intensityValue: 80_000,
+      intensityDisplayUnit: 6
+    },
+    {
+      name: "Farmer's Carry",
+      sets: 1,
+      targetType: 2,
+      targetValue: 120,
+      intensityType: 1,
+      intensityCustom: 0,
+      intensityValue: 24_000,
+      intensityDisplayUnit: 6
     }
   ]
 });
-assert.equal(exercises.length, 1);
-assert.match(formatScheduledExercisesForChat(exercises), /Back Squat/);
+assert.equal(exercises.length, 2);
+assert.equal(exercises[0].reps, 8);
+assert.equal(exercises[0].weight, 80);
+assert.equal(exercises[1].weight, 24);
+assert.equal(
+  formatScheduledExercisesForChat(exercises),
+  "Back Squat · 4 sets · 8 reps · 80.0 kg; Farmer's Carry · 2:00 · 24.0 kg"
+);
 
 const visualPreview = buildActivityVisualPreview(detail, "req-1");
 assert.ok(visualPreview);

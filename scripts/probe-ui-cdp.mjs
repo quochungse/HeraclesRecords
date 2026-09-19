@@ -67,8 +67,9 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DEFAULT_SCREENS = ["Overview", "Sleep", "Settings", "Activities", "Running", "Strength", "Coach", "Calendar"];
 const FREEZE_ID = "ui-probe-freeze";
 const COMMAND_TIMEOUT_MS = 30_000;

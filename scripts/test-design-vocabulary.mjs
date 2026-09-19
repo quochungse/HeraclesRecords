@@ -60,10 +60,17 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
+
+/* Paths are compared against literals written with "/" — the exemption
+   lists, the allowlist keys, every reason string. `relative` hands back
+   backslashes on Windows, so those never matched there and three of these
+   suites reported the whole app as violations. */
+const repoRelative = (file) => relative(ROOT, file).split(sep).join("/");
 
 /** The whole vocabulary. Adding an entry is the deliberate act; see the header. */
 const WEIGHTS = new Set([400, 500, 600, 700]);
@@ -170,7 +177,7 @@ const lineAt = (code, index) => code.slice(0, index).split("\n").length;
 
 const violations = [];
 function fail(file, line, prop, value, why) {
-  violations.push(`${relative(ROOT, file)}:${line}  ${prop}: ${value}   — ${why}`);
+  violations.push(`${repoRelative(file)}:${line}  ${prop}: ${value}   — ${why}`);
 }
 
 const isPassthrough = (v) =>
@@ -357,7 +364,7 @@ const CURVE = /^(var\(--[\w-]*ease[\w-]*|cubic-bezier\(|steps\(|linear|ease-in|e
 const designedUnused = new Set(DESIGNED_LENGTHS.map((entry) => entry.join("|")));
 
 for (const { file, code } of stylesheets) {
-  const where = relative(ROOT, file);
+  const where = repoRelative(file);
   for (const m of code.matchAll(/(?<![-\w])(transition|transition-duration|transition-timing-function|animation|animation-timing-function):\s*([^;}]+)/g)) {
     const line = lineAt(code, m.index);
     const [prop, raw] = [m[1], m[2]];

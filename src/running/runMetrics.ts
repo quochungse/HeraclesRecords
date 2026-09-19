@@ -12,6 +12,11 @@ import {
   type RunSurface
 } from "./runSurface";
 import { startOfWeekMs } from "../training/activityWindow";
+import {
+  METERS_PER_MILE,
+  metersToElevation,
+  type UnitSystem
+} from "../units/units";
 
 // The series maths is shared with the main process, which computes the same
 // figures once per run and stores them — see `electron/activityMetrics.ts`.
@@ -104,6 +109,25 @@ export function elevationPerKm(
   }
 
   return activity.elevationGain / (distance / METERS_PER_KM);
+}
+
+/**
+ * `elevationPerKm` restated per the athlete's own distance unit: metres per
+ * kilometre on metric, feet per mile on imperial.
+ *
+ * The ratio carries a unit top and bottom, and converting only the top gives
+ * feet per kilometre — a figure in no system at all, which reads 1.6x low to
+ * anyone taking it for ft/mi. Both tables that show this climb figure call it,
+ * because they sit on the same screen: the run list showing ft/mi over a
+ * surface table showing ft/km is one metric printed as two numbers.
+ */
+export function climbPerDistanceUnit(
+  metersPerKm: number,
+  unitSystem: UnitSystem
+): number {
+  const perDisplayUnit =
+    unitSystem === "imperial" ? metersPerKm * (METERS_PER_MILE / 1000) : metersPerKm;
+  return metersToElevation(perDisplayUnit, unitSystem);
 }
 
 /** Monday-start weeks, matching every other weekly figure in the app. */

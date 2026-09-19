@@ -13,6 +13,7 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   efficiencyIndex,
+  climbPerDistanceUnit,
   elevationPerKm,
   paceSecondsPerKm,
   runSeconds
@@ -22,7 +23,7 @@ import {
   classifyRunSurface,
   type RunSurface
 } from "./runSurface";
-import { elevationUnit, metersToElevation } from "../units/units";
+import { distanceUnit, elevationUnit, type UnitSystem } from "../units/units";
 
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
@@ -78,6 +79,22 @@ interface ColumnDefinition {
   title?: string;
 }
 
+/** The one column whose name carries a unit. */
+function columnLabel(column: ColumnDefinition, unitSystem: UnitSystem): string {
+  return column.key === "elevationPerKm"
+    ? `${column.label}/${distanceUnit(unitSystem)}`
+    : column.label;
+}
+
+function columnTitle(column: ColumnDefinition, unitSystem: UnitSystem): string {
+  if (column.key === "elevationPerKm") {
+    return unitSystem === "imperial"
+      ? "Feet climbed per mile"
+      : "Metres climbed per kilometre";
+  }
+  return column.title ?? `Sort by ${column.label.toLowerCase()}`;
+}
+
 const COLUMNS: readonly ColumnDefinition[] = [
   { key: "when", label: "When", numeric: false },
   { key: "distance", label: "Distance", numeric: true },
@@ -85,9 +102,12 @@ const COLUMNS: readonly ColumnDefinition[] = [
   { key: "pace", label: "Pace", numeric: true },
   {
     key: "elevationPerKm",
-    label: "Climb/km",
-    numeric: true,
-    title: "Metres climbed per kilometre"
+    // Both halves of this ratio are units, and both follow the athlete: metres
+    // per kilometre on metric, feet per mile on imperial. Showing feet per
+    // kilometre — which is what converting only the climb gave — is a figure
+    // in no system at all, and it reads 1.6x low to anyone taking it for ft/mi.
+    label: "Climb",
+    numeric: true
   },
   { key: "avgHr", label: "Avg HR", numeric: true },
   {
@@ -224,9 +244,9 @@ export function RunList({
                 <button
                   type="button"
                   onClick={() => toggleSort(column.key)}
-                  title={column.title ?? `Sort by ${column.label.toLowerCase()}`}
+                  title={columnTitle(column, unitSystem)}
                 >
-                  <span>{column.label}</span>
+                  <span>{columnLabel(column, unitSystem)}</span>
                   {active ? (
                     descending ? (
                       <ArrowDown size={12} aria-hidden="true" />
@@ -265,7 +285,7 @@ export function RunList({
             <td className="is-numeric">
               {row.elevationPerKm === undefined
                 ? "—"
-                : `${Math.round(metersToElevation(row.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
+                : `${Math.round(climbPerDistanceUnit(row.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
             </td>
             <td className="is-numeric">
               {row.avgHr === undefined ? "—" : `${row.avgHr}`}

@@ -46,12 +46,17 @@ export interface ActivityChannelDefinition {
   background?: boolean;
 }
 
+// `unit` is the fixed suffix for a channel whose unit does not follow the
+// athlete. Pace, altitude and every other unit-bearing channel are formatted by
+// `ActivitySeriesChart` from `unitSystem` and never read this field — so the
+// "/km" that used to sit on the two pace rows was a second, frozen answer to a
+// question already answered elsewhere, one edit away from being shown.
 const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
-  { key: "pace", label: "Pace", unit: "/km", decimals: 0, reversed: true },
+  { key: "pace", label: "Pace", unit: "", decimals: 0, reversed: true },
   {
     key: "adjustedPace",
     label: "Grade-adjusted pace",
-    unit: "/km",
+    unit: "",
     decimals: 0,
     reversed: true
   },

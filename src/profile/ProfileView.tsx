@@ -31,6 +31,16 @@ import {
 } from "../training/heartRateZoneModel";
 import type { TrainingHubSnapshot } from "../training/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import {
+  centimetersToDisplayHeight,
+  displayHeightToCentimeters,
+  displayWeightToKilograms,
+  formatWeightValue,
+  heightUnit,
+  kilogramsToDisplayWeight,
+  weightUnit,
+  type UnitSystem
+} from "../units/units";
 import "./profile.css";
 
 interface ProfileViewProps {
@@ -133,7 +143,53 @@ function ageFromBirthday(value?: number): number | undefined {
   return age >= 0 && age < 130 ? age : undefined;
 }
 
-function draftFromProfile(profile: CorosProfile): ProfileDraft {
+/**
+ * The two body fields are edited in the athlete's own unit and stored in
+ * COROS's (centimetres and kilograms), so the draft carries the display value
+ * and `patchFromDraft` converts it back. Both directions round to one decimal,
+ * and `patchFromDraft` rebuilds this same baseline to decide what changed —
+ * so a field nobody touched produces the identical string and no write, rather
+ * than a hair of float drift COROS would store forever.
+ */
+function displayNumber(value: number | undefined, convert: (value: number) => number): string {
+  if (value === undefined) {
+    return "";
+  }
+  const converted = Math.round(convert(value) * 10) / 10;
+  return String(converted);
+}
+
+/**
+ * Metric and Imperial name a system, not a unit, and this is the one switch in
+ * the app that decides what every figure in it is measured in — so the two
+ * units an athlete actually reads ride on the chip itself rather than in a
+ * tooltip. The fuller list stays as the tooltip, which is where the Settings
+ * panel this replaced used to keep it.
+ */
+const MEASUREMENT_OPTIONS = [
+  {
+    value: "0",
+    label: "Metric (km/kg)",
+    title: "Kilometres, metres, min/km, kilograms"
+  },
+  {
+    value: "1",
+    label: "Imperial (mi/lb)",
+    title: "Miles, feet, min/mi, pounds, yards"
+  }
+] as const;
+
+function measurementLabel(unit: number | undefined): string {
+  return (
+    MEASUREMENT_OPTIONS.find((option) => option.value === String(unit ?? 0))
+      ?.label ?? MEASUREMENT_OPTIONS[0].label
+  );
+}
+
+function draftFromProfile(
+  profile: CorosProfile,
+  unitSystem: UnitSystem
+): ProfileDraft {
   const text = (value?: number) =>
     value === undefined ? "" : String(value);
 
@@ -141,8 +197,12 @@ function draftFromProfile(profile: CorosProfile): ProfileDraft {
     nickname: profile.nickname ?? "",
     birthday: birthdayToInput(profile.birthday),
     sex: text(profile.sex),
-    statureCm: text(profile.statureCm),
-    weightKg: text(profile.weightKg),
+    statureCm: displayNumber(profile.statureCm, (value) =>
+      centimetersToDisplayHeight(value, unitSystem)
+    ),
+    weightKg: displayNumber(profile.weightKg, (value) =>
+      kilogramsToDisplayWeight(value, unitSystem)
+    ),
     maxHr: text(profile.thresholds.maxHr),
     restingHr: text(profile.thresholds.restingHr),
     unit: text(profile.unit),
@@ -157,10 +217,11 @@ function draftFromProfile(profile: CorosProfile): ProfileDraft {
  */
 function patchFromDraft(
   draft: ProfileDraft,
-  profile: CorosProfile
+  profile: CorosProfile,
+  unitSystem: UnitSystem
 ): CorosProfilePatch {
   const patch: CorosProfilePatch = {};
-  const baseline = draftFromProfile(profile);
+  const baseline = draftFromProfile(profile, unitSystem);
   const changed = (key: keyof ProfileDraft) =>
     draft[key].trim() !== baseline[key].trim();
   const numeric = (value: string): number | undefined => {
@@ -191,8 +252,15 @@ function patchFromDraft(
   };
 
   assignNumber("sex", (value) => (patch.sex = value));
-  assignNumber("statureCm", (value) => (patch.statureCm = value));
-  assignNumber("weightKg", (value) => (patch.weightKg = value));
+  const round1 = (value: number) => Math.round(value * 10) / 10;
+  assignNumber(
+    "statureCm",
+    (value) => (patch.statureCm = round1(displayHeightToCentimeters(value, unitSystem)))
+  );
+  assignNumber(
+    "weightKg",
+    (value) => (patch.weightKg = round1(displayWeightToKilograms(value, unitSystem)))
+  );
   assignNumber("maxHr", (value) => (patch.maxHr = value));
   assignNumber("restingHr", (value) => (patch.restingHr = value));
   assignNumber("unit", (value) => (patch.unit = value));
@@ -226,7 +294,7 @@ export function ProfileView({
   onMessage,
   onError
 }: ProfileViewProps) {
-  const { unitSystem } = useUnitSystem();
+  const { unitSystem, refreshUnitSystem } = useUnitSystem();
   const [profile, setProfile] = useState<CorosProfile | null>(null);
   // The fitness scores read the same dashboard Overview uses.
   const [dashboard, setDashboard] = useState<TrainingHubDashboard | null>(null);
@@ -333,7 +401,7 @@ export function ProfileView({
       return;
     }
 
-    const patch = patchFromDraft(draft, profile);
+    const patch = patchFromDraft(draft, profile, unitSystem);
     if (Object.keys(patch).length === 0) {
       setDraft(null);
       return;
@@ -345,6 +413,13 @@ export function ProfileView({
       setProfile(updated);
       setCachedAt(new Date().toISOString());
       setDraft(null);
+      // Measurement is the app's only unit switch, so the screens behind this
+      // one have to turn over with it. `refresh` is not optional here: the
+      // profile the provider would otherwise read comes from the main process's
+      // hour-long cache, which still holds the unit as it was a moment ago.
+      if (patch.unit !== undefined) {
+        await refreshUnitSystem({ refresh: true });
+      }
       onMessage("COROS profile updated.");
     } catch (caught) {
       onError(messageFrom(caught));
@@ -479,7 +554,7 @@ export function ProfileView({
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => setDraft(draftFromProfile(profile))}
+                onClick={() => setDraft(draftFromProfile(profile, unitSystem))}
                 disabled={busy !== null}
               >
                 <Pencil size={16} aria-hidden="true" />
@@ -532,11 +607,20 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Height (cm)</span>
+                    <span>Height ({heightUnit(unitSystem)})</span>
                     <input
                       type="number"
-                      min={50}
-                      max={280}
+                      /* COROS stores height as whole centimetres, so 175.5
+                         would be saved as 176 and read back changed. Inches
+                         cannot be whole and stay representable — one inch is
+                         2.54cm — so imperial keeps a decimal and settles on the
+                         nearest centimetre the store can hold. */
+                      step={unitSystem === "imperial" ? "0.1" : "1"}
+                      /* Inward, both ends: the bound is checked in centimetres
+                         after rounding, so an outward-rounded 19in offers a
+                         value the save rejects as out of range. */
+                      min={Math.ceil(centimetersToDisplayHeight(50, unitSystem))}
+                      max={Math.floor(centimetersToDisplayHeight(280, unitSystem))}
                       value={draft.statureCm}
                       onChange={(event) =>
                         updateDraft("statureCm", event.target.value)
@@ -544,12 +628,17 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Weight (kg)</span>
+                    <span>Weight ({weightUnit(unitSystem)})</span>
                     <input
                       type="number"
                       step="0.1"
-                      min={weightRange?.min ?? 10}
-                      max={weightRange?.max ?? 300}
+                      /* Inward, for the reason the height field gives. */
+                      min={Math.ceil(
+                        kilogramsToDisplayWeight(weightRange?.min ?? 10, unitSystem) * 10
+                      ) / 10}
+                      max={Math.floor(
+                        kilogramsToDisplayWeight(weightRange?.max ?? 300, unitSystem) * 10
+                      ) / 10}
                       value={draft.weightKg}
                       onChange={(event) =>
                         updateDraft("weightKg", event.target.value)
@@ -580,7 +669,9 @@ export function ProfileView({
                     <dt>Height</dt>
                     <dd>
                       {profile.statureCm !== undefined
-                        ? `${profile.statureCm} cm`
+                        ? `${Math.round(
+                            centimetersToDisplayHeight(profile.statureCm, unitSystem) * 10
+                          ) / 10} ${heightUnit(unitSystem)}`
                         : "—"}
                     </dd>
                   </div>
@@ -588,7 +679,7 @@ export function ProfileView({
                     <dt>Weight</dt>
                     <dd>
                       {profile.weightKg !== undefined
-                        ? `${profile.weightKg} kg`
+                        ? formatWeightValue(profile.weightKg, unitSystem, 1)
                         : "—"}
                     </dd>
                   </div>
@@ -712,7 +803,7 @@ export function ProfileView({
             <section className="panel profile-card">
               <div className="profile-card-heading">
                 <p className="eyebrow">Display</p>
-                <h3>Units on your watch</h3>
+                <h3>Units</h3>
               </div>
               {editing && draft ? (
                 <div className="profile-fields">
@@ -723,10 +814,7 @@ export function ProfileView({
                       size="md"
                       fill
                       value={draft.unit}
-                      options={[
-                        { value: "0", label: "Metric" },
-                        { value: "1", label: "Imperial" }
-                      ]}
+                      options={MEASUREMENT_OPTIONS}
                       onChange={(next) => updateDraft("unit", next)}
                     />
                   </label>
@@ -745,15 +833,17 @@ export function ProfileView({
                     />
                   </label>
                   <p className="profile-note">
-                    These are COROS account settings — they change what your
-                    watch and the COROS apps show, not this app's units.
+                    Both are your COROS account settings, and both are what
+                    Heracles Records shows too — changing them here turns over
+                    every distance, pace, elevation, weight and temperature in
+                    the app, on your watch and in the COROS apps.
                   </p>
                 </div>
               ) : (
                 <dl className="profile-list">
                   <div>
                     <dt>Measurement</dt>
-                    <dd>{profile.unit === 1 ? "Imperial" : "Metric"}</dd>
+                    <dd>{measurementLabel(profile.unit)}</dd>
                   </div>
                   <div>
                     <dt>Temperature</dt>

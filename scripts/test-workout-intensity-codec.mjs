@@ -123,6 +123,51 @@ const cases = [
   [{ type: "climbGrade", system: "vScale", absoluteGrade: "V6" }, 10]
 ];
 
+// A weight is stored in GRAMS, and a round trip cannot say so: both halves of
+// the codec read kilograms, so every case above passed while a 10 kg press
+// showed as 10,000 kg and a prescribed 10 kg reached COROS as 10 g. This is a
+// verbatim exercise off the live API — a one-arm kettlebell military press at
+// 10 kg, whose whole plan carries weights from 6000 to 102000, every one of
+// them a multiple of 1000. `intensityDisplayUnit` (6=kg, 7=lb) says only how to
+// print it; the stored number is metric either way, as pace and speed are.
+const corosKettlebellPress = {
+  name: "T1179",
+  intensityType: 1,
+  intensityCustom: 0,
+  intensityValue: 10_000,
+  intensityValueExtend: 0,
+  intensityDisplayUnit: 6,
+  intensityMultiplier: 0,
+  isIntensityPercent: false,
+  targetType: 3,
+  targetValue: 12,
+  sets: 3
+};
+assert.deepEqual(codec.decodeCorosIntensity(corosKettlebellPress).intensity, {
+  type: "weight",
+  mode: "weight",
+  value: 10,
+  unit: "kg"
+});
+assert.equal(
+  codec.encodeCorosIntensity({ type: "weight", mode: "weight", value: 10, unit: "kg" }).intensityValue,
+  10_000
+);
+// The pound half is INFERRED, not measured: every sample to hand was a metric
+// athlete (displayUnit 6). It follows the rule pace and speed already use in
+// this same struct — stored canonical metric, displayUnit for presentation only.
+// These two assertions pin that reading so a capture from a pound account either
+// confirms them or fails here first. See GRAMS_PER_KILOGRAM in workoutCapabilities.
+assert.equal(
+  codec.encodeCorosIntensity({ type: "weight", mode: "weight", value: 45, unit: "lb" }).intensityValue,
+  20_412,
+  "a pound weight is assumed to be stored in grams too"
+);
+assert.deepEqual(
+  codec.decodeCorosIntensity({ intensityType: 1, intensityCustom: 0, intensityValue: 20_412, intensityDisplayUnit: 7 }).intensity,
+  { type: "weight", mode: "weight", value: 45, unit: "lb" }
+);
+
 for (const [intensity, intensityType] of cases) {
   const encoded = codec.encodeCorosIntensity(intensity, context);
   assert.equal(encoded.intensityType, intensityType, intensity.type);

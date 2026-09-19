@@ -4,6 +4,7 @@ import type { CorosLinkApi } from "../../coroslink-api";
 import type { CoachAnalysisSummary } from "../../../electron/types";
 import { describeTrigger, formatTimeAgo } from "./analysisLabels";
 import { announceRunNow } from "./runNow";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
 
 /** Section 2.2: the sixth analysis in one conversation is refused. */
 const MAX_PER_SESSION = 5;
@@ -39,6 +40,7 @@ export function ConversationAnalyses({
   /** Opens one analysis's own detail and settings screen. */
   onOpenAnalysis: (analysisId: string) => void;
 }) {
+  const { unitSystem } = useUnitSystem();
   const [summaries, setSummaries] = useState<CoachAnalysisSummary[]>([]);
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -273,7 +275,7 @@ export function ConversationAnalyses({
                         {analysis.name}
                       </span>
                       <span className="chat-coaches-row-meta">
-                        {describeTrigger(analysis.trigger)}
+                        {describeTrigger(analysis.trigger, unitSystem)}
                         {analysis.deviceOnly ? " · this device only" : ""}
                         {lastRun
                           ? ` · last run ${formatTimeAgo(lastRun.startedAt)}`

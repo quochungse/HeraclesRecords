@@ -4804,13 +4804,31 @@ input::placeholder {
  */
 .option-group--fill {
   display: flex;
+  /*
+   * A fill row splits itself equally, so a label too long for its share has
+   * nowhere to go: the group clips it (`overflow: hidden` on the base rule) and
+   * the chip reads "Imperial (mi/l". Measured at the narrowest a
+   * `.profile-card` column gets — 290px, which `repeat(auto-fit, minmax(290px,
+   * 1fr))` reaches on an ordinary narrow window — "Imperial (mi/lb)" needs
+   * 120px of a 101px chip.
+   *
+   * Wrapping gives it somewhere: two full-width rows, still equal. This is safe
+   * on `--fill` in a way it is not on the base rule, whose `nowrap` the
+   * collapsible fallback measures against — no `fill` caller is collapsible,
+   * and a flex line break is resolved in one layout pass rather than by
+   * measuring and re-deciding, which is the oscillation the fallback warns of.
+   */
+  flex-wrap: wrap;
   width: 100%;
 }
 
 .option-group--fill button {
   flex: 1 1 0;
   justify-content: center;
-  min-width: 0;
+  /* Not `min-width: 0`: that is what let a nowrap label spill past its own chip
+     to be clipped by the group. `min-content` is the label's own width, so the
+     line breaks instead of the word. */
+  min-width: min-content;
 }
 
 /*

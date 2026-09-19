@@ -373,7 +373,14 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // Appearance and units — the settings people expect to follow them.
   "coros-theme": "preference",
   "coroslink.accentPalette": "preference",
-  "coroslink.unitSystem": "preference",
+  // Not a preference any more: the switch is the COROS account's own
+  // Measurement field, and this is the last answer it gave, cached so the next
+  // launch's first paint is already in the right unit. Every machine of one
+  // account recomputes the same value from the account itself.
+  "coroslink.unitSystem": "derived",
+  // COROS's other display setting, cached for the same reason and on the same
+  // terms as the one above.
+  "coroslink.temperatureUnit": "derived",
   "coroslink.sportColors": "preference",
   "coroslink.startupView": "preference",
   // Which muscle layers the strength body map draws.
