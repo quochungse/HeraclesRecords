@@ -9295,12 +9295,57 @@ td span {
   min-width: 0;
 }
 
+/*
+ * The timeframe, said once for the four tiles under it.
+ *
+ * Every tile used to carry its own "this week" pill: four readings of one fact,
+ * and the Distance tile's read "km this week", which put the unit a line away
+ * from the figure it belonged to and left `36.7` standing alone. Stating the
+ * week here costs one line instead of four and buys room for what a line can
+ * say that a pill could not — the days the totals actually cover, which stop at
+ * today rather than on Sunday (`formatWeekToDateRange`).
+ */
+.training-summary-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.training-summary-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.training-summary-group__when {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* The dates themselves are the quieter half: the reader is here for the four
+   figures, and the range is what tells them which days those cover. */
+.training-summary-group__range {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .training-stat-card.is-widget {
   display: grid;
   grid-template-areas:
     "icon label"
-    "value value"
-    "detail detail";
+    "value value";
   /* The icon track is a fixed 28px, matching the icon, and deliberately not
      `auto`: the value and detail rows span both columns, so an intrinsic track
      absorbs their min-content width. A wide figure ("20,643", "2h 50m") pulled
@@ -9309,7 +9354,7 @@ td span {
   grid-template-columns: 28px minmax(0, 1fr);
   align-content: start;
   gap: 8px 10px;
-  min-height: 104px;
+  min-height: 84px;
   padding: 14px 15px 12px;
   /* L2 (docs/ui-system-refinement.md §4.3): a wash in a hairline at the inner
      radius, and no shadow. The tile is a figure, not a control, so it does not
@@ -9319,6 +9364,16 @@ td span {
   background: var(--glass-bg);
   box-shadow: none;
   overflow: hidden;
+}
+
+/* The row a notice needs, and only then — `grid-area: detail` against a
+   template that does not name the area would auto-place the pill into the icon
+   column and size that column to it. */
+.training-stat-card.is-widget.has-notice {
+  grid-template-areas:
+    "icon label"
+    "value value"
+    "detail detail";
 }
 
 .training-stat-card.is-widget::before {
@@ -9369,6 +9424,17 @@ td span {
 .training-stat-card.is-widget .training-stat-card__value.is-empty {
   color: var(--text-muted);
   font-weight: 600;
+}
+
+/* `em`, so the suffix follows the figure through its clamp rather than drifting
+   out of proportion at one end of it — the same rule `.training-record-card-unit`
+   states for the same job. `letter-spacing: 0` because the figure's own -0.02em
+   is for display digits and closes the gap after them. */
+.training-stat-card.is-widget .training-stat-card__unit {
+  color: var(--text-secondary);
+  font-size: 0.6em;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .training-stat-card.is-widget .training-stat-card__detail {
@@ -9904,7 +9970,15 @@ td span {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 14px;
-  min-height: clamp(282px, 31vh, 392px);
+  /* A floor, not a share of the window. The `clamp(282px, 31vh, 392px)` that
+     stood here grew the card on a tall window for no reason the card's own
+     content gave, and this panel is the last child of its column — so it sets
+     that column's height, and every pixel it took by viewport arithmetic was a
+     pixel the recovery ring beside it had to stretch across. The figure is what
+     holds the four blocks at their own heights with the stage bar unsqueezed;
+     above it the content decides, and `flex: 1 1 auto` still fills any slack
+     the column has left. */
+  min-height: 260px;
   padding: clamp(16px, 1.55vw, 21px);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: var(--radius-md);
@@ -9933,17 +10007,32 @@ td span {
 
 .sleep-panel-header {
   display: flex;
-  align-items: flex-start;
+  /* Centred, not `flex-start`: the title is one line now and the open button is
+     the taller of the two, so the line reads against the button's middle. */
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
+.sleep-panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The date is the content of this line and the eyebrow is its label, which is
+   why it is the larger of the two while staying well under the score. */
 .sleep-panel-header h2 {
-  margin: 4px 0 0;
-  color: var(--text-primary);
-  font-size: clamp(18px, 1.4vw, 18px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sleep-panel-icon {
@@ -10455,18 +10544,40 @@ td span {
 /* ── Fitness Trend / Weekly Activity card ──────────────────────────── */
 .training-fitness-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  /* Header, then the chart. The sport key had the middle row until it moved up
+     beside the metric chip. */
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: stretch;
   gap: 14px;
-  min-height: clamp(282px, 31vh, 392px);
+  /* A floor, not a share of the window — `clamp(282px, 31vh, 392px)` stood here
+     and was the height this panel actually took on any tall window, so moving a
+     row out of it would have changed nothing on screen. What the panel owes its
+     chart is stated by the chart itself (`.training-fitness-chart` min-height);
+     this only stops the card collapsing while the week is still loading. */
+  min-height: 240px;
   padding: clamp(16px, 1.55vw, 21px);
 }
 
 .training-fitness-header {
   display: flex;
+  /* Wraps only when the title and the two keys cannot share a line: the header
+     is then as tall as the row the key used to have, and no taller. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 10px 12px;
+}
+
+/* The two keys, together at the end of the header: what the colours mean, then
+   what the columns measure. The legend takes the slack so it sits against the
+   chip rather than against the title. */
+.training-fitness-header-keys {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
   gap: 12px;
+  min-width: 0;
 }
 
 .training-fitness-header .eyebrow {
@@ -10674,15 +10785,10 @@ td span {
 
 /* The sport key, wrapped so the panel keeps the three grid rows its template
    declares even when no sport is on the chart yet. */
-.training-fitness-legends {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 16px;
-}
-
 .training-fitness-sport-legend {
+  justify-content: flex-end;
   gap: 5px 14px;
+  min-width: 0;
 }
 
 .training-fitness-legend-item {
@@ -11527,7 +11633,11 @@ td span {
   font-size: 12px;
 }
 
-.training-ring-metrics.training-summary-tiles.is-stack {
+.training-ring-metrics.training-summary-group {
+  width: 100%;
+}
+
+.training-ring-metrics .training-summary-tiles.is-stack {
   display: grid;
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11539,7 +11649,7 @@ td span {
 }
 
 .training-ring-metrics .training-stat-card.is-widget {
-  min-height: 90px;
+  min-height: 72px;
   padding: 12px 13px 10px;
 }
 

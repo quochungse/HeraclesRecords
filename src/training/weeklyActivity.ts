@@ -572,6 +572,60 @@ export function buildWeekToDateTotals(
   };
 }
 
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec"
+] as const;
+
+function describeWeekDay(happenDay: string, weekdayIndex: number, withMonth: boolean): string {
+  const month = MONTH_LABELS[Number(happenDay.slice(4, 6)) - 1];
+  const day = Number(happenDay.slice(6, 8));
+  const weekday = WEEKDAY_LABELS[weekdayIndex];
+
+  return withMonth ? `${weekday} ${month} ${day}` : `${weekday} ${day}`;
+}
+
+/**
+ * The days the week-to-date totals actually add up: Monday through the
+ * reference day, the window `buildWeekToDateTotals` sums. It is said once above
+ * the four tiles, which is what lets each of them drop its own "this week"
+ * line — and it says more than that line did, because "this week" never told
+ * anyone the totals stop at today rather than Sunday.
+ *
+ * The month is named only when the week crosses one, so an ordinary week reads
+ * "Mon 14 – Sat 19" and the last week of August reads "Mon Aug 31 – Wed Sep 2".
+ * Labels are this module's own rather than the platform's: the copy around them
+ * is English either way, and a locale-formatted date would make the test for
+ * this depend on the machine it runs on.
+ */
+export function formatWeekToDateRange(referenceDate = new Date()): string {
+  const monday = getCalendarWeekDateKeys(referenceDate)[0];
+  const today = dateToHappenDay(referenceDate);
+  const todayIndex = (referenceDate.getDay() + 6) % 7;
+
+  if (monday === today) {
+    return describeWeekDay(today, 0, false);
+  }
+
+  const crossesMonths = monday.slice(0, 6) !== today.slice(0, 6);
+
+  return `${describeWeekDay(monday, 0, crossesMonths)} – ${describeWeekDay(
+    today,
+    todayIndex,
+    crossesMonths
+  )}`;
+}
+
 export const WEEKLY_ACTIVITY_METRICS: WeeklyActivityMetric[] = [
   "distance",
   "duration",

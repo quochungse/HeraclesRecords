@@ -151,33 +151,39 @@ export function FitnessTrendPanel({
 
   return (
     <section className="panel training-fitness-panel">
+      {/* The sport key rides in the header beside the metric chip rather than on
+          a row of its own. Both answer the same question — what am I looking at —
+          and a row holding one 12px line cost the panel that line plus a 14px
+          gap, against a chart whose own minimum is what the panel is for. The
+          key is still the only thing here: the week's totals have a home in the
+          summary tiles, where every metric is on screen at once. */}
       <div className="training-fitness-header">
         <p className="eyebrow">Weekly Activity</p>
-        <div className="training-metric-select-wrap">
-          <MetricSelect selected={selectedMetric} onChange={setSelectedMetric} />
+        <div className="training-fitness-header-keys">
+          <ul
+            className="training-chart-sport-legend training-fitness-sport-legend"
+            aria-hidden="true"
+          >
+            {sportLegend.map((entry) => (
+              <li className="training-fitness-legend-item" key={entry.key}>
+                <span
+                  className="training-chart-legend-swatch"
+                  style={
+                    {
+                      "--swatch-color": entry.category
+                        ? `var(--sport-${entry.category})`
+                        : "var(--text-muted)"
+                    } as CSSProperties
+                  }
+                />
+                {entry.label}
+              </li>
+            ))}
+          </ul>
+          <div className="training-metric-select-wrap">
+            <MetricSelect selected={selectedMetric} onChange={setSelectedMetric} />
+          </div>
         </div>
-      </div>
-
-      {/* The sport key, and nothing else: the week's totals already have a home
-          in the summary tiles above, where every metric is on screen at once. */}
-      <div className="training-fitness-legends" aria-hidden="true">
-        <ul className="training-chart-sport-legend training-fitness-sport-legend">
-          {sportLegend.map((entry) => (
-            <li className="training-fitness-legend-item" key={entry.key}>
-              <span
-                className="training-chart-legend-swatch"
-                style={
-                  {
-                    "--swatch-color": entry.category
-                      ? `var(--sport-${entry.category})`
-                      : "var(--text-muted)"
-                  } as CSSProperties
-                }
-              />
-              {entry.label}
-            </li>
-          ))}
-        </ul>
       </div>
 
       {hasData ? (

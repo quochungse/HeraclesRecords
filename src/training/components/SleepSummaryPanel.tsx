@@ -212,7 +212,12 @@ export function SleepSummaryPanel({
       onClick={onOpenDetails}
     >
       <div className="sleep-panel-header">
-        <div>
+        {/* The night's date sits on the eyebrow's own line rather than under it
+            as a heading of its own. It is which night, not what the card is
+            about — the score below says that — and stacked at 18px it cost the
+            card a row it then passed on to the column beside it, where the
+            recovery ring had to stretch to match. */}
+        <div className="sleep-panel-title">
           <p className="eyebrow">Sleep</p>
           <h2>{night ? formatSleepNightLabel(night) : "Last night"}</h2>
         </div>

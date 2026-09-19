@@ -21,6 +21,7 @@ const {
   buildWeekToDateTotals,
   enrichDayListWithActivityTotals,
   formatDurationTotal,
+  formatWeekToDateRange,
   formatWeeklyActivityAxisTick,
   getCalendarWeekDateKeys,
   getWeeklyActivityYAxisUnitLabel,
@@ -329,5 +330,20 @@ assert.equal(formatDurationTotal(21576), "6h");
 assert.equal(formatDurationTotal(21546), "5h 59m");
 assert.equal(formatDurationTotal(3599), "1h");
 assert.equal(formatDurationTotal(3569), "59m");
+
+// The line above the four tiles. It replaced a "this week" pill on each of
+// them, so it has to say what they could not: which days the totals cover.
+// Monday to today, never to Sunday.
+assert.equal(formatWeekToDateRange(new Date(2026, 8, 19)), "Mon 14 – Sat 19");
+assert.equal(formatWeekToDateRange(new Date(2026, 8, 20)), "Mon 14 – Sun 20");
+// Monday itself is one day, not a range back to itself.
+assert.equal(formatWeekToDateRange(new Date(2026, 8, 14)), "Mon 14");
+// A week that crosses a month names both, or "Mon 31 – Wed 2" reads backwards.
+assert.equal(
+  formatWeekToDateRange(new Date(2026, 8, 2)),
+  "Mon Aug 31 – Wed Sep 2"
+);
+// Sunday is the seventh day of this app's week, not the first.
+assert.equal(formatWeekToDateRange(new Date(2026, 0, 4)), "Mon Dec 29 – Sun Jan 4");
 
 console.log("weekly activity tests passed");
