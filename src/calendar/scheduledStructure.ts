@@ -579,23 +579,26 @@ export function buildEditorDraftView(
   draft: Pick<RunWorkoutEditorDraft, "nodes" | "sport">,
   unitSystem: UnitSystem,
   /**
-   * COROS exercise ids to their catalog names. A strength step's own
+   * The COROS exercise catalog, keyed by id. A strength step's own
    * `exerciseName` is a localization key — the live library answers `T1041`
    * for a bench press — so without the catalog every exercise in a session
    * reads as the step kind, which is the same word nine times.
+   *
+   * Typed by the one field it reads, so the caller passes the catalog it
+   * already holds rather than building a second map of names beside it.
    */
-  exerciseNames?: ReadonlyMap<string, string>
+  exercises?: ReadonlyMap<string, { name: string }>
 ): ScheduledStructureView {
   const swim = draft.sport === "swim";
   const nodes: ScheduledNodeView[] = draft.nodes.map((node, index) => {
     if (node.nodeType === "step") {
       return {
         type: "step",
-        step: draftStepView(node, index, unitSystem, swim, exerciseNames)
+        step: draftStepView(node, index, unitSystem, swim, exercises)
       };
     }
     const steps = node.steps.map((step, childIndex) =>
-      draftStepView(step, childIndex, unitSystem, swim, exerciseNames)
+      draftStepView(step, childIndex, unitSystem, swim, exercises)
     );
     return {
       type: "repeat",
@@ -615,7 +618,7 @@ function draftStepView(
   index: number,
   unitSystem: UnitSystem,
   swim: boolean,
-  exerciseNames?: ReadonlyMap<string, string>
+  exercises?: ReadonlyMap<string, { name: string }>
 ): ScheduledStepView {
   const target = draftTargetView(step.target, step.kind, unitSystem, swim);
   const intensity = localizeIntensity(step.intensity, unitSystem);
@@ -623,7 +626,7 @@ function draftStepView(
   // is a COROS key, so the catalog is asked first and `friendlyStepName`
   // turns whatever is left into the kind rather than showing the key.
   const catalogName = step.exerciseId
-    ? exerciseNames?.get(step.exerciseId)
+    ? exercises?.get(step.exerciseId)?.name
     : undefined;
 
   return {

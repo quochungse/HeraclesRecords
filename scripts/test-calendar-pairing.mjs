@@ -309,37 +309,34 @@ const activity = (overrides) => ({
 /* --- 9. the week's planned distance comes from the steps too -------------- */
 
 {
-  const day = (overrides) => ({
+  // Built the way the calendar builds a day, through the pairing — the week's
+  // figures are read off the pairs, so a hand-made day with an empty `pairs`
+  // would be testing a shape the screen never produces.
+  const day = (scheduledEntries, activities) => ({
     dateKey: "20260918",
     inMonth: true,
     isToday: false,
     isPast: true,
-    scheduled: [],
-    activities: [],
-    pairs: [],
+    scheduled: scheduledEntries,
+    activities,
     unplannedActivities: [],
-    ...overrides
+    ...pairPlannedWithActual(scheduledEntries, activities, "metric")
   });
 
-  const stats = computeWeeklyStats(
-    [
-      day({
-        // No `volume` string anywhere: the structure is the only source.
-        scheduled: [
-          scheduled({ sportType: 1, trainingLoad: 80, ...runProgram(12000) })
-        ],
-        activities: [
-          activity({
-            sportType: 100,
-            trainingLoad: 74,
-            distance: 11500,
-            duration: 3600
-          })
-        ]
-      })
-    ],
-    "metric"
-  );
+  const stats = computeWeeklyStats([
+    day(
+      // No `volume` string anywhere: the structure is the only source.
+      [scheduled({ sportType: 1, trainingLoad: 80, ...runProgram(12000) })],
+      [
+        activity({
+          sportType: 100,
+          trainingLoad: 74,
+          distance: 11500,
+          duration: 3600
+        })
+      ]
+    )
+  ]);
   assert.equal(stats.plannedLoad, 80);
   assert.equal(stats.actualLoad, 74);
   assert.equal(

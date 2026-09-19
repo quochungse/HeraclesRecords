@@ -238,7 +238,7 @@ export function useCalendarData({
         key: weekKey,
         days,
         stats: {
-          ...computeWeeklyStats(days, unitSystem),
+          ...computeWeeklyStats(days),
           recommendedLoadMin: Number.isFinite(recommendedMin)
             ? Math.round(recommendedMin)
             : undefined,

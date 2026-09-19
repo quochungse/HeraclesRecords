@@ -856,18 +856,14 @@ function WorkoutReadOnlyBody({
     () => new Map(exerciseOptions.map((option) => [option.id, option])),
     [exerciseOptions]
   );
-  const exerciseNames = useMemo(
-    () => new Map(exerciseOptions.map((option) => [option.id, option.name])),
-    [exerciseOptions]
-  );
   const view = useMemo(
-    () => buildEditorDraftView(draft, unitSystem, exerciseNames),
-    [draft, exerciseNames, unitSystem]
+    () => buildEditorDraftView(draft, unitSystem, exercisesById),
+    [draft, exercisesById, unitSystem]
   );
   const { category, icon: SportIcon } = workoutSportView(draft.sport);
   const isStrength = draft.sport === "strength" || draft.sport === "hyrox";
-  const strength = strengthTotals(draft);
-  const tonnage = strengthTonnage(flatSteps(view));
+  const strength = useMemo(() => strengthTotals(draft), [draft]);
+  const tonnage = useMemo(() => strengthTonnage(flatSteps(view)), [view]);
 
   const poolLength = draft.sport === "swim"
     ? (draft.sportOptions?.poolLength ?? context.defaultPoolLength)

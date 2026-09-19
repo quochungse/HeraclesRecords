@@ -34,7 +34,7 @@ import {
  * surface shows the other.
  */
 
-export const KIND_ICON: Record<ScheduledStepKind, LucideIcon> = {
+const KIND_ICON: Record<ScheduledStepKind, LucideIcon> = {
   warmup: Flame,
   training: Zap,
   rest: Pause,
@@ -42,7 +42,7 @@ export const KIND_ICON: Record<ScheduledStepKind, LucideIcon> = {
   sendOff: Timer
 };
 
-export const KIND_LABEL: Record<ScheduledStepKind, string> = {
+const KIND_LABEL: Record<ScheduledStepKind, string> = {
   warmup: "Warm-up",
   training: "Main",
   rest: "Rest",
@@ -50,7 +50,7 @@ export const KIND_LABEL: Record<ScheduledStepKind, string> = {
   sendOff: "Send-off"
 };
 
-export const KIND_ORDER: ScheduledStepKind[] = [
+const KIND_ORDER: ScheduledStepKind[] = [
   "warmup",
   "training",
   "rest",
@@ -58,7 +58,7 @@ export const KIND_ORDER: ScheduledStepKind[] = [
   "sendOff"
 ];
 
-export function stepMagnitudeLabel(
+function stepMagnitudeLabel(
   step: ScheduledStepView,
   unitSystem: UnitSystem,
   swim: boolean
@@ -174,7 +174,7 @@ function buildBarSegments(
   }));
 }
 
-export function CardioStructure({
+function CardioStructure({
   view,
   unitSystem,
   swim
@@ -329,7 +329,7 @@ export function strengthTonnage(steps: ScheduledStepView[]): number {
   );
 }
 
-export function StrengthStructure({
+function StrengthStructure({
   view,
   unitSystem,
   showSummary = true,

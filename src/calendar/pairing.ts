@@ -176,13 +176,18 @@ export function pairPlannedWithActual(
 
   for (const entry of scheduled) {
     const targets = plannedTargets(entry, unitSystem);
-    const candidates = remaining
-      .filter((activity) => sportsCompatible(entry, activity))
-      .sort(
-        (left, right) =>
-          matchScore(entry, left, targets) - matchScore(entry, right, targets)
-      );
-    const best = candidates[0];
+    let best: TrainingHubActivity | undefined;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const activity of remaining) {
+      if (!sportsCompatible(entry, activity)) {
+        continue;
+      }
+      const score = matchScore(entry, activity, targets);
+      if (score < bestScore) {
+        best = activity;
+        bestScore = score;
+      }
+    }
 
     if (best) {
       remaining.splice(remaining.indexOf(best), 1);
@@ -217,10 +222,17 @@ function lastDefined<T>(
   return undefined;
 }
 
-export function computeWeeklyStats(
-  days: CalendarDay[],
-  unitSystem: UnitSystem
-): WeeklyStats {
+/**
+ * The week's totals, from the day views the calendar already built.
+ *
+ * It used to take the raw scheduled entries and call `plannedTargets` again,
+ * which walks and sorts the whole COROS program — so every workout in the
+ * visible range was parsed twice on each recompute, once for its chip and once
+ * for its week. `PlannedActualPair` carries what that produced, so the second
+ * pass bought nothing, and reading it here is what makes the comment below
+ * true rather than merely intended.
+ */
+export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
   let actualLoad = 0;
   let plannedLoad = 0;
   let activityTimeSeconds = 0;
@@ -235,12 +247,11 @@ export function computeWeeklyStats(
       distanceMeters += activity.distance ?? 0;
       elevationGain += activity.elevationGain ?? 0;
     }
-    for (const entry of day.scheduled) {
-      plannedLoad += entry.trainingLoad ?? 0;
-      // The same source the completion badge reads, so a week's planned column
+    for (const pair of day.pairs) {
+      plannedLoad += pair.scheduled.trainingLoad ?? 0;
+      // The same figures the completion badge reads, so a week's planned column
       // and the chips inside it cannot disagree about what was prescribed.
-      plannedDistanceKm +=
-        (plannedTargets(entry, unitSystem).distanceMeters ?? 0) / 1000;
+      plannedDistanceKm += (pair.targets.distanceMeters ?? 0) / 1000;
     }
   }
 

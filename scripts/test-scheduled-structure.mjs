@@ -355,7 +355,7 @@ const draftStrength = buildEditorDraftView(
     ]
   },
   "metric",
-  new Map([["425831217146019840", "Bench Press"]])
+  new Map([["425831217146019840", { name: "Bench Press" }]])
 );
 assert.equal(draftStrength.nodes[0].step.name, "Bench Press");
 assert.equal(draftStrength.nodes[0].step.sets, 4);

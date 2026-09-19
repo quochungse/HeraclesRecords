@@ -2276,29 +2276,45 @@ export function AddWorkoutModal({
   );
 
   /** The chosen target as one phrase, for the preview and the step line. */
-  const quickTargetSummary =
-    quickTargetType === "none"
-      ? "Open"
-      : quickTargetType === "pace"
-        ? quickPace.trim() && quickPaceValid
-          ? quickPaceLabel
-          : "Not set"
-        : quickTargetType === "swimStroke"
-          ? formatBuilderToken(quickStroke)
-          : Number(quickTargetLow) > 0
-            ? `${builderSummaryRange(quickTargetLow, quickTargetHigh, quickTargetUnitLabel)}`
-            : "Not set";
+  const quickTargetSummary = ((): string => {
+    if (quickTargetType === "none") {
+      return "Open";
+    }
+    if (quickTargetType === "pace") {
+      return quickPace.trim() && quickPaceValid ? quickPaceLabel : "Not set";
+    }
+    if (quickTargetType === "swimStroke") {
+      return formatBuilderToken(quickStroke);
+    }
+    return Number(quickTargetLow) > 0
+      ? builderSummaryRange(quickTargetLow, quickTargetHigh, quickTargetUnitLabel)
+      : "Not set";
+  })();
 
-  /** The first thing standing between this form and COROS, in plain words. */
-  const quickProblem = !quickDistanceValid
-    ? "Enter a distance to enable scheduling."
-    : quickTargetType === "pace" && !quickPace.trim()
-      ? "Enter the pace to hold, or set the target to Open."
-      : quickTargetType === "pace" && !quickPaceValid
-        ? "Correct the pace format to continue."
-        : quickIsRangeTarget && !(Number(quickTargetLow) > 0)
-          ? `Enter the ${QUICK_TARGET_LABEL[quickTargetType].toLocaleLowerCase()} to hold, or set the target to Open.`
-          : builderRowValidationMessage(quickRow, quickSport, [], false, unitSystem);
+  /**
+   * The first thing standing between this form and COROS, in plain words.
+   *
+   * The distance and the target are checked here because they are what this
+   * tab asks for; everything past them is handed to the shared validator, so
+   * Quick cannot accept a step the Structured tab would refuse.
+   */
+  const quickProblem = ((): string | undefined => {
+    if (!quickDistanceValid) {
+      return "Enter a distance to enable scheduling.";
+    }
+    if (quickTargetType === "pace") {
+      if (!quickPace.trim()) {
+        return "Enter the pace to hold, or set the target to Open.";
+      }
+      if (!quickPaceValid) {
+        return "Correct the pace format to continue.";
+      }
+    }
+    if (quickIsRangeTarget && !(Number(quickTargetLow) > 0)) {
+      return `Enter the ${QUICK_TARGET_LABEL[quickTargetType].toLocaleLowerCase()} to hold, or set the target to Open.`;
+    }
+    return builderRowValidationMessage(quickRow, quickSport, [], false, unitSystem);
+  })();
   const quickValid = !quickProblem;
   const builderValid = rows.length > 0 && rows.every((row) =>
     rowIsValid(

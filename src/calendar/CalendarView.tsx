@@ -652,8 +652,12 @@ export function CalendarView({
               disabled={mutating || selectedWorkoutKeys.size === 0}
             >
               <Trash2 size={14} aria-hidden="true" />
+              {/* `done` counts what has finished, so the one in flight is the
+                  next — except after the last, where there is no next and the
+                  count would read "21 of 20" for the frame before the state
+                  clears. */}
               {bulkProgress
-                ? `Removing ${bulkProgress.done + 1} of ${bulkProgress.total}…`
+                ? `Removing ${Math.min(bulkProgress.done + 1, bulkProgress.total)} of ${bulkProgress.total}…`
                 : mutating
                   ? "Removing…"
                   : confirmBulkDelete
