@@ -39,6 +39,7 @@ import {
 } from "./calendarTypes";
 import type { CalendarDragPayload } from "./calendarDrag";
 import { DayDetailPanel } from "./DayDetailPanel";
+import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
 import {
   isKeyInMonth,
   monthGridWeeks,
@@ -234,6 +235,21 @@ export function CalendarView({
     reloadCalendarRange();
     onScheduleChanged();
   }, [onScheduleChanged, reloadCalendarRange]);
+
+  /**
+   * The header's Refresh: everything this screen can reach, not just the range.
+   *
+   * `reload` refetches the schedule, which nothing caches. The workout library
+   * and the movement catalog are held for an hour on both sides of the bridge,
+   * and a button labelled Refresh that left them alone would be telling the
+   * athlete something untrue — the workout they just built on their phone
+   * still would not be in the library panel.
+   */
+  const refreshAll = useCallback(() => {
+    refreshWorkoutExerciseCatalogs();
+    void api?.refreshWorkoutCaches().catch(() => undefined);
+    reload();
+  }, [api, reload]);
 
   const selectableWorkouts = useMemo(() => {
     const entries = new Map<string, TrainingHubScheduledWorkoutEntry>();
@@ -583,7 +599,7 @@ export function CalendarView({
           <button
             type="button"
             className="calendar-nav-button calendar-nav-arrow"
-            onClick={reload}
+            onClick={refreshAll}
             title="Refresh"
             aria-label="Refresh calendar"
           >

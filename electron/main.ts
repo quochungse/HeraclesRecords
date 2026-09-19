@@ -124,6 +124,7 @@ import {
   listTrainingHubActivities,
   listScheduledWorkoutEntries,
   listLibraryWorkouts,
+  refreshWorkoutCaches,
   duplicateLibraryWorkout,
   listWorkoutExercises,
   getWorkoutEditorContext,
@@ -1957,6 +1958,9 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:listLibraryWorkouts", () =>
     listLibraryWorkouts()
+  );
+  ipcMain.handle("trainingHub:refreshWorkoutCaches", () =>
+    refreshWorkoutCaches()
   );
   ipcMain.handle(
     "trainingHub:duplicateLibraryWorkout",

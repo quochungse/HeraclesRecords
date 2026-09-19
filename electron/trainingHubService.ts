@@ -210,6 +210,31 @@ const SETTINGS = {
   baseUrl: "trainingHub.baseUrl"
 };
 
+/**
+ * How long a workout the athlete is not editing may be answered from memory.
+ *
+ * The two things this covers — the workout library and COROS's movement
+ * catalog — are read by a panel the athlete opens and closes over and over,
+ * and neither changes on its own. Every write *this* app makes drops the
+ * cache at the endpoint that made it, so the window only ever covers a change
+ * made somewhere else: a workout built in the COROS app on the phone.
+ *
+ * **An hour, because COROS offers nothing cheaper than refetching.** Probed
+ * against the live API on 2026-09-19: `/training/program/query` answers with
+ * no `ETag`, no `Last-Modified` and no `Cache-Control`, so there is no
+ * conditional request to make; it ignores a filter body (`{updateTimestamp}`
+ * came back byte-identical with every row); and while each program row does
+ * carry its own `version`, reading it costs the same 85 KB call the cache
+ * exists to avoid — it is good for detecting a conflicting edit, which is
+ * what `workoutEditRevision` hashes it for, and useless as a staleness probe.
+ * A shorter window would therefore not be more correct, only more often slow.
+ *
+ * Nothing refetches on a timer or in the background. What closes the gap is
+ * the athlete saying so — `refreshWorkoutCaches`, behind the refresh buttons
+ * on the Calendar header and the Workout Library panel.
+ */
+const WORKOUT_CACHE_MS = 60 * 60_000;
+
 interface TrainingHubAuthState {
   accessToken: string;
   userId: string;
@@ -3403,7 +3428,6 @@ function exerciseCatalogRows(value: unknown): Record<string, unknown>[] {
   ];
 }
 
-const WORKOUT_EXERCISE_CATALOG_CACHE_MS = 5 * 60_000;
 const workoutExerciseCatalogCache = new Map<
   string,
   { expiresAt: number; rows: Record<string, unknown>[] }
@@ -3425,7 +3449,7 @@ async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<s
   });
   const rows = exerciseCatalogRows(raw);
   workoutExerciseCatalogCache.set(cacheKey, {
-    expiresAt: Date.now() + WORKOUT_EXERCISE_CATALOG_CACHE_MS,
+    expiresAt: Date.now() + WORKOUT_CACHE_MS,
     rows
   });
   return rows;
@@ -3727,19 +3751,35 @@ async function trainingHubPostVoid(path: string, body: unknown): Promise<void> {
  * that learns to write cannot forget to. That is what lets `createWorkoutProgram`
  * look its own new workout up by name immediately afterwards. The TTL is for
  * the changes this process is never told about: a workout built in the COROS
- * app on the phone.
+ * app on the phone. See `WORKOUT_CACHE_MS` for why it is an hour and why
+ * nothing shorter would be more correct.
  *
  * It holds the **promise**, not the rows, so two panels opening together share
  * one request instead of racing two. A rejected one is dropped rather than
- * replayed for five minutes: a failed fetch is not an answer.
+ * replayed for an hour: a failed fetch is not an answer.
  */
-const LIBRARY_PROGRAMS_CACHE_MS = 5 * 60_000;
 let libraryProgramsCache:
   | { key: string; expiresAt: number; programs: Promise<Record<string, unknown>[]> }
   | undefined;
 
 function invalidateLibraryWorkoutPrograms(): void {
   libraryProgramsCache = undefined;
+}
+
+/**
+ * Drop everything held about workouts, because the athlete asked.
+ *
+ * The one way past `WORKOUT_CACHE_MS` short of waiting it out. It clears
+ * rather than refetches: the panel that asked is about to read, and a fetch
+ * started here would be a second request racing the one it is about to make.
+ *
+ * The renderer keeps the movement catalog for the life of its window, so a
+ * surface offering this has to drop that copy too — clearing only this side
+ * leaves the exercise names exactly as stale as they were.
+ */
+export function refreshWorkoutCaches(): void {
+  invalidateLibraryWorkoutPrograms();
+  workoutExerciseCatalogCache.clear();
 }
 
 async function listLibraryWorkoutPrograms(): Promise<Record<string, unknown>[]> {
@@ -3755,7 +3795,7 @@ async function listLibraryWorkoutPrograms(): Promise<Record<string, unknown>[]> 
   })();
   const entry = {
     key,
-    expiresAt: Date.now() + LIBRARY_PROGRAMS_CACHE_MS,
+    expiresAt: Date.now() + WORKOUT_CACHE_MS,
     programs
   };
   libraryProgramsCache = entry;
@@ -8008,8 +8048,7 @@ function buildTrainingHubHeaders(
 }
 
 function clearTrainingHubAuth(): void {
-  workoutExerciseCatalogCache.clear();
-  invalidateLibraryWorkoutPrograms();
+  refreshWorkoutCaches();
   invalidateCorosProfileCache();
   deleteSettings([
     SETTINGS.accessToken,

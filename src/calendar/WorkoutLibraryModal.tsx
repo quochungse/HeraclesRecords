@@ -1,10 +1,11 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { CalendarPlus, Eye, Library, LoaderCircle, Search, X } from "lucide-react";
+import { CalendarPlus, Eye, Library, LoaderCircle, RefreshCw, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubLibraryWorkout } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
 import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
+import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
 
 interface WorkoutLibraryModalProps {
   api: CorosLinkApi;
@@ -67,6 +68,23 @@ export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError
     return () => { cancelled = true; };
   }, [api, reloadToken]);
 
+  /**
+   * Go back to COROS for the list, rather than reading the held copy.
+   *
+   * Both sides of the bridge hold one for an hour, and this is the only way
+   * past that window — nothing refetches on a timer. The token is bumped even
+   * when dropping the caches failed, because the list is worth re-reading
+   * either way and a button that does nothing visible reads as broken.
+   */
+  const refresh = () => {
+    setItems(null);
+    refreshWorkoutExerciseCatalogs();
+    void api
+      .refreshWorkoutCaches()
+      .catch(() => undefined)
+      .finally(() => setReloadToken((current) => current + 1));
+  };
+
   useEffect(() => {
     if (covered) {
       return;
@@ -107,7 +125,10 @@ export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError
       <motion.section className="calendar-modal calendar-library-modal" role="dialog" aria-modal="true" aria-labelledby="library-manager-title" initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}>
         <header className="calendar-modal-header">
           <div><p className="eyebrow">COROS Training Hub</p><h2 id="library-manager-title">Workout Library</h2></div>
-          <button type="button" className="icon-button" aria-label="Close workout library" onClick={onClose}><X size={18} aria-hidden="true" /></button>
+          <div className="calendar-modal-header-actions">
+            <button type="button" className="icon-button" title="Refresh from COROS" aria-label="Refresh workout library" onClick={refresh} disabled={items === null}><RefreshCw size={16} className={items === null ? "is-spinning" : undefined} aria-hidden="true" /></button>
+            <button type="button" className="icon-button" aria-label="Close workout library" onClick={onClose}><X size={18} aria-hidden="true" /></button>
+          </div>
         </header>
         <div className="calendar-modal-body">
           <label className="calendar-field calendar-library-search"><span>Search workouts</span><span className="calendar-sport-search-control"><Search size={14} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name" /></span></label>

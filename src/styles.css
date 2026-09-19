@@ -24233,6 +24233,14 @@ tr.data-intervals-row-missing {
   margin-bottom: 16px;
 }
 
+/* Two icon buttons at a modal header's right edge, kept together so the
+   header's space-between still puts the title against the far side. */
+.calendar-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .calendar-modal-header h3 {
   margin: 5px 0 0;
   font-size: 18px;

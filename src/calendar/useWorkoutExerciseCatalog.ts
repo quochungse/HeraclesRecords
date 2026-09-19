@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { WorkoutExerciseOption, WorkoutSport } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 
@@ -14,18 +14,52 @@ import type { CorosLinkApi } from "../coroslink-api";
  * Only strength and hyrox have one; every other sport answers with an empty
  * catalog rather than a request.
  *
- * **Held for the life of the window.** It is COROS's own fixed list of
- * movements, not the athlete's, so it does not change while the app is open;
- * the main process ages its copy out after five minutes, which is what picks
- * up a change on the rare occasion there is one. The promise is cached rather
- * than the rows, so a drawer and an editor opening together share one request
- * instead of racing two — and the day drawer is opened over and over, which is
- * the case this exists for.
+ * **Held for the life of the window**, or until a refresh button says
+ * otherwise. It is COROS's own fixed list of movements, not the athlete's, so
+ * it does not change while the app is open; the main process ages its copy out
+ * after an hour. The promise is cached rather than the rows, so a drawer and an
+ * editor opening together share one request instead of racing two — and the day
+ * drawer is opened over and over, which is the case this exists for.
  */
 const catalogBySport = new Map<
   WorkoutSport,
   Promise<WorkoutExerciseOption[]>
 >();
+
+/**
+ * Bumped when the athlete asks for fresh data, and read by every mounted
+ * hook so they all refetch together.
+ *
+ * Clearing the map alone would do nothing for a drawer already on screen:
+ * its effect has run, and nothing would run it again. The counter is what a
+ * live surface can notice. `useSyncExternalStore` rather than a state in
+ * each hook, so a refresh reaches a hook whose own component is not
+ * re-rendering for any other reason.
+ */
+let catalogEpoch = 0;
+const epochListeners = new Set<() => void>();
+
+function subscribeToEpoch(listener: () => void): () => void {
+  epochListeners.add(listener);
+  return () => {
+    epochListeners.delete(listener);
+  };
+}
+
+/**
+ * Forget every catalog this window holds.
+ *
+ * Pairs with `api.refreshWorkoutCaches()`, which does the same on the other
+ * side of the bridge. Calling one without the other leaves half the staleness
+ * in place: this side would re-ask and the main process would answer from
+ * memory, or the main process would re-fetch and no mounted surface would
+ * ever read the result.
+ */
+export function refreshWorkoutExerciseCatalogs(): void {
+  catalogBySport.clear();
+  catalogEpoch += 1;
+  for (const listener of epochListeners) listener();
+}
 
 export interface WorkoutExerciseCatalog {
   options: WorkoutExerciseOption[];
@@ -41,6 +75,11 @@ export function useWorkoutExerciseCatalog(
   sport: WorkoutSport | undefined
 ): WorkoutExerciseCatalog {
   const wanted = sport === "strength" || sport === "hyrox" ? sport : undefined;
+  const epoch = useSyncExternalStore(
+    subscribeToEpoch,
+    () => catalogEpoch,
+    () => catalogEpoch
+  );
   const [options, setOptions] = useState<WorkoutExerciseOption[]>(EMPTY);
   const [loading, setLoading] = useState(false);
 
@@ -80,7 +119,7 @@ export function useWorkoutExerciseCatalog(
     return () => {
       active = false;
     };
-  }, [api, wanted]);
+  }, [api, wanted, epoch]);
 
   const byId = useMemo(
     () => new Map(options.map((option) => [option.id, option])),
