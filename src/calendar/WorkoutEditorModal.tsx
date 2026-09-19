@@ -58,6 +58,7 @@ import {
   swimDistanceUnit
 } from "../units/units";
 import { ExerciseCombobox } from "./ExerciseCombobox";
+import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import { ExercisePreview } from "./ExercisePreview";
 import {
   buildEditorDraftView,
@@ -313,8 +314,6 @@ export function WorkoutEditorModal({
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [exerciseOptions, setExerciseOptions] = useState<WorkoutExerciseOption[]>([]);
-  const [exerciseOptionsLoading, setExerciseOptionsLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const previewSequence = useRef(0);
   const planMode = Boolean(planEntry);
@@ -372,21 +371,14 @@ export function WorkoutEditorModal({
     return () => { cancelled = true; };
   }, [api, editRef, planEntry, planWorkout, readOnly, unitSystem]);
 
-  useEffect(() => {
-    const sport = draft?.sport;
-    if (sport !== "strength" && sport !== "hyrox") {
-      setExerciseOptions([]);
-      setExerciseOptionsLoading(false);
-      return;
-    }
-    let active = true;
-    setExerciseOptionsLoading(true);
-    void api.listWorkoutExercises(sport)
-      .then((options) => { if (active) setExerciseOptions(options); })
-      .catch(() => { if (active) setExerciseOptions([]); })
-      .finally(() => { if (active) setExerciseOptionsLoading(false); });
-    return () => { active = false; };
-  }, [api, draft?.sport]);
+  /* Shared with the day drawer, which needs the same catalog to name a
+     strength session — and shared means one request between them rather than
+     one each, because the promise is cached per sport. */
+  const {
+    options: exerciseOptions,
+    byId: exercisesById,
+    loading: exerciseOptionsLoading
+  } = useWorkoutExerciseCatalog(api, draft?.sport);
 
   const dirty = Boolean(document && draft && JSON.stringify(document.draft) !== JSON.stringify(draft));
   const validation = useMemo(
@@ -628,7 +620,7 @@ export function WorkoutEditorModal({
                 <WorkoutReadOnlyBody
                   draft={draft}
                   context={document.context}
-                  exerciseOptions={exerciseOptions}
+                  exercisesById={exercisesById}
                 />
               </div>
               <footer className="workout-editor-footer">
@@ -845,17 +837,13 @@ export function WorkoutEditorModal({
 function WorkoutReadOnlyBody({
   draft,
   context,
-  exerciseOptions
+  exercisesById
 }: {
   draft: RunWorkoutEditorDraft;
   context: WorkoutEditorContext;
-  exerciseOptions: WorkoutExerciseOption[];
+  exercisesById: ReadonlyMap<string, WorkoutExerciseOption>;
 }) {
   const { unitSystem } = useUnitSystem();
-  const exercisesById = useMemo(
-    () => new Map(exerciseOptions.map((option) => [option.id, option])),
-    [exerciseOptions]
-  );
   const view = useMemo(
     () => buildEditorDraftView(draft, unitSystem, exercisesById),
     [draft, exercisesById, unitSystem]

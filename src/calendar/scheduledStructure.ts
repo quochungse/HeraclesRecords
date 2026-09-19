@@ -291,7 +291,8 @@ function parseRawStep(
   exercise: Record<string, unknown>,
   index: number,
   unitSystem: UnitSystem,
-  swim: boolean
+  swim: boolean,
+  exercises?: ReadonlyMap<string, { name: string }>
 ): ScheduledStepView {
   const exerciseType = finiteNumber(exercise.exerciseType) ?? 2;
   const kind = EXERCISE_TYPE_TO_KIND[exerciseType] ?? "training";
@@ -307,11 +308,14 @@ function parseRawStep(
   const originId = exercise.originId === undefined || exercise.originId === null
     ? undefined
     : String(exercise.originId);
+  const catalogName = originId && originId !== "0"
+    ? exercises?.get(originId)?.name
+    : undefined;
 
   return {
     id,
     kind,
-    name: friendlyStepName(String(exercise.name ?? ""), kind),
+    name: friendlyStepName(catalogName ?? String(exercise.name ?? ""), kind),
     targetLabel: target.label,
     intensityLabel: intensity.label,
     magnitude: target.magnitude,
@@ -345,7 +349,8 @@ function dominantMagnitude(
 function buildFromRawProgram(
   program: Record<string, unknown>,
   unitSystem: UnitSystem,
-  swim: boolean
+  swim: boolean,
+  catalog?: ReadonlyMap<string, { name: string }>
 ): ScheduledNodeView[] {
   const rawExercises = Array.isArray(program.exercises)
     ? program.exercises
@@ -379,7 +384,7 @@ function buildFromRawProgram(
       );
       children.forEach((child) => consumed.add(child));
       const steps = children.map((child, childIndex) =>
-        parseRawStep(child, childIndex, unitSystem, swim)
+        parseRawStep(child, childIndex, unitSystem, swim, catalog)
       );
       const repeat = Math.max(
         1,
@@ -403,7 +408,7 @@ function buildFromRawProgram(
     }
     nodes.push({
       type: "step",
-      step: parseRawStep(exercise, index, unitSystem, swim)
+      step: parseRawStep(exercise, index, unitSystem, swim, catalog)
     });
     consumed.add(exercise);
   });
@@ -525,7 +530,14 @@ export function buildScheduledWorkoutView(
     TrainingHubScheduledWorkoutEntry,
     "exercises" | "rawProgram" | "sportType"
   >,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /**
+   * The COROS exercise catalog, keyed by id — see `buildEditorDraftView`. A
+   * scheduled strength session carries the same localization keys a library
+   * one does, so without this the day drawer read "Training" once per
+   * exercise while the Calendar's workout view named every one of them.
+   */
+  exercises?: ReadonlyMap<string, { name: string }>
 ): ScheduledStructureView {
   const rawProgram = objectRecord(entry.rawProgram);
   const hasRawExercises =
@@ -535,7 +547,7 @@ export function buildScheduledWorkoutView(
 
   const swim = Number(entry.sportType) === 3;
   const nodes = hasRawExercises
-    ? buildFromRawProgram(rawProgram, unitSystem, swim)
+    ? buildFromRawProgram(rawProgram, unitSystem, swim, exercises)
     : buildFromParsedExercises(entry.exercises ?? [], unitSystem, swim);
 
   return {

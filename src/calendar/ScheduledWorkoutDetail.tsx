@@ -14,7 +14,9 @@ import type {
   TrainingHubSportType,
   UnitSystem
 } from "../../electron/types";
+import type { CorosLinkApi } from "../coroslink-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   workoutSportFromType
@@ -38,6 +40,16 @@ import { WorkoutStructure } from "./WorkoutStructureView";
 interface ScheduledWorkoutDetailProps {
   entry: TrainingHubScheduledWorkoutEntry;
   sportTypes: TrainingHubSportType[];
+  /**
+   * Only so a strength session can be named.
+   *
+   * COROS sends its steps under localization keys — `T1041` for a bench
+   * press — so without the exercise catalog every exercise here read as its
+   * step kind, "Training" nine times down one session, while the same workout
+   * opened from the Calendar's library named all nine. Omit it and the panel
+   * draws exactly as it did before; the clips go with it.
+   */
+  api?: CorosLinkApi;
 }
 
 function formatDetailVolume(volume: string | undefined, unitSystem: UnitSystem): string {
@@ -55,15 +67,17 @@ function formatDetailLoad(load?: number): string {
 
 export function ScheduledWorkoutDetail({
   entry,
-  sportTypes
+  sportTypes,
+  api
 }: ScheduledWorkoutDetailProps) {
   const { unitSystem } = useUnitSystem();
   const reduceMotion = useReducedMotion();
-  const view = useMemo(
-    () => buildScheduledWorkoutView(entry, unitSystem),
-    [entry, unitSystem]
-  );
   const sport = workoutSportFromType(entry.sportType);
+  const { byId: exercises } = useWorkoutExerciseCatalog(api, sport);
+  const view = useMemo(
+    () => buildScheduledWorkoutView(entry, unitSystem, exercises),
+    [entry, exercises, unitSystem]
+  );
   const sportMeta = sport ? workoutSportView(sport) : undefined;
   const category =
     sportMeta?.category ?? sportColorCategory(entry.sportType);
@@ -179,6 +193,7 @@ export function ScheduledWorkoutDetail({
             unitSystem={unitSystem}
             strength={isStrength}
             swim={sport === "swim"}
+            exercises={exercises}
           />
         </motion.div>
       ) : (

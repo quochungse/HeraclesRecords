@@ -479,4 +479,32 @@ assert.equal(draftZeroLoad.nodes[2].step.intensityLabel, "60 kg");
 assert.equal(draftZeroLoad.nodes[2].step.weight, 60);
 assert.equal(liftSchemeLabel(draftZeroLoad.nodes[0].step), "2 × 1:00");
 
+// --- the scheduled path names an exercise from the catalog too ---
+// The day drawer reads this shape. Its steps carry the same localization keys
+// a library workout does, so without the catalog a whole strength session
+// reads "Training" once per exercise.
+const scheduledStrength = {
+  rawProgram: {
+    sportType: 4,
+    exercises: [
+      { id: "1", exerciseType: 2, name: "T1041", originId: "425831217146019840", targetType: 3, targetValue: 8, sets: 3, sortNo: 1 },
+      { id: "2", exerciseType: 2, name: "T9999", originId: "not-in-catalog", targetType: 1, sets: 1, sortNo: 2 }
+    ]
+  }
+};
+const namedByCatalog = buildScheduledWorkoutView(
+  scheduledStrength,
+  "metric",
+  new Map([["425831217146019840", { name: "Bench Press" }]])
+);
+assert.equal(namedByCatalog.nodes[0].step.name, "Bench Press");
+assert.equal(liftSchemeLabel(namedByCatalog.nodes[0].step), "3 × 8 reps");
+// An id the catalog does not hold falls back to the kind, never to the key.
+assert.equal(namedByCatalog.nodes[1].step.name, "Training");
+
+// No catalog at all: the panel draws exactly as it did before.
+const unnamed = buildScheduledWorkoutView(scheduledStrength, "metric");
+assert.equal(unnamed.nodes[0].step.name, "Training");
+assert.equal(unnamed.nodes[0].step.exerciseId, "425831217146019840");
+
 console.log("scheduled-structure tests passed");

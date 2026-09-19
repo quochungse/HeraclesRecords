@@ -2555,6 +2555,8 @@ export async function createWorkoutProgram(
     payload,
     { allowEmptyData: true }
   );
+  // Before the by-name lookup below, which reads the very list this changed.
+  invalidateLibraryWorkoutPrograms();
 
   let programId =
     rawId !== undefined && rawId !== null && String(rawId).trim()
@@ -2680,10 +2682,13 @@ export async function deleteWorkoutProgram(programId: string): Promise<void> {
     throw new Error("A program ID is required to delete a library workout.");
   }
   await trainingHubPostVoid("/training/program/delete", [id]);
+  invalidateLibraryWorkoutPrograms();
 }
 
 export async function listWorkoutPrograms(): Promise<Record<string, unknown>[]> {
-  return listLibraryWorkoutPrograms();
+  // Handed out whole, so it is copied: the list is cached now, and a caller
+  // that edited a row in place would be editing every later read of it.
+  return structuredClone(await listLibraryWorkoutPrograms());
 }
 
 export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]> {
@@ -2884,8 +2889,10 @@ export async function calculateExistingWorkoutProgram(
 function workoutEditEndpointAdapter() {
   return {
     calculate: calculateExistingWorkoutProgram,
-    updateLibrary: (program: Record<string, unknown>) =>
-      trainingHubPostVoid("/training/program/update", program),
+    updateLibrary: async (program: Record<string, unknown>) => {
+      await trainingHubPostVoid("/training/program/update", program);
+      invalidateLibraryWorkoutPrograms();
+    },
     updateScheduled: (request: Record<string, unknown>) =>
       trainingHubPostVoid("/training/schedule/update", request),
     estimateScheduled: async (request: {
@@ -3705,16 +3712,83 @@ async function trainingHubPostVoid(path: string, body: unknown): Promise<void> {
   await trainingHubPost(path, body, { allowEmptyData: true });
 }
 
+/**
+ * The athlete's whole workout library, held between reads.
+ *
+ * `/training/program/query` has no paging and no filter — it answers with
+ * every program the account owns — and four callers each paid a full round
+ * trip for it: the Calendar's Workout Library panel, the Add-to-calendar
+ * library tab, and the by-id and by-name lookups the write paths fall back
+ * on. Opening that panel twice in a minute fetched the same list twice, and
+ * the wait was the first thing the panel showed.
+ *
+ * **Every write this app makes drops it**, at the three endpoints that change
+ * a program — add, update, delete — rather than at each call site, so a path
+ * that learns to write cannot forget to. That is what lets `createWorkoutProgram`
+ * look its own new workout up by name immediately afterwards. The TTL is for
+ * the changes this process is never told about: a workout built in the COROS
+ * app on the phone.
+ *
+ * It holds the **promise**, not the rows, so two panels opening together share
+ * one request instead of racing two. A rejected one is dropped rather than
+ * replayed for five minutes: a failed fetch is not an answer.
+ */
+const LIBRARY_PROGRAMS_CACHE_MS = 5 * 60_000;
+let libraryProgramsCache:
+  | { key: string; expiresAt: number; programs: Promise<Record<string, unknown>[]> }
+  | undefined;
+
+function invalidateLibraryWorkoutPrograms(): void {
+  libraryProgramsCache = undefined;
+}
+
 async function listLibraryWorkoutPrograms(): Promise<Record<string, unknown>[]> {
-  const data = await trainingHubPost<unknown>("/training/program/query", {});
-  return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  const key = getStoredAuth()?.userId ?? "anonymous";
+  const cached = libraryProgramsCache;
+  if (cached && cached.key === key && cached.expiresAt > Date.now()) {
+    return cached.programs;
+  }
+
+  const programs = (async () => {
+    const data = await trainingHubPost<unknown>("/training/program/query", {});
+    return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  })();
+  const entry = {
+    key,
+    expiresAt: Date.now() + LIBRARY_PROGRAMS_CACHE_MS,
+    programs
+  };
+  libraryProgramsCache = entry;
+  void programs.catch(() => {
+    if (libraryProgramsCache === entry) {
+      libraryProgramsCache = undefined;
+    }
+  });
+
+  return programs;
+}
+
+/**
+ * One program row, copied out of the cache.
+ *
+ * `listLibraryWorkouts` builds fresh objects and never touches these, but a
+ * caller handed a row does own it — `scheduleLibraryWorkout` passes one
+ * straight into the payload builder — and a row mutated in place would be the
+ * row every later read gets back.
+ */
+function detachProgram(
+  program: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  return program ? (structuredClone(program) as Record<string, unknown>) : undefined;
 }
 
 async function findLibraryWorkoutById(
   programId: string
 ): Promise<Record<string, unknown> | undefined> {
   const programs = await listLibraryWorkoutPrograms();
-  return programs.find((program) => String(program.id ?? "") === programId);
+  return detachProgram(
+    programs.find((program) => String(program.id ?? "") === programId)
+  );
 }
 
 export async function getWorkoutProgramDetail(
@@ -3739,11 +3813,13 @@ async function findLibraryWorkoutByName(
     return undefined;
   }
 
-  return matches.sort((left, right) => {
-    const leftTs = toOptionalNumber(left.createTimestamp) ?? 0;
-    const rightTs = toOptionalNumber(right.createTimestamp) ?? 0;
-    return rightTs - leftTs;
-  })[0];
+  return detachProgram(
+    matches.sort((left, right) => {
+      const leftTs = toOptionalNumber(left.createTimestamp) ?? 0;
+      const rightTs = toOptionalNumber(right.createTimestamp) ?? 0;
+      return rightTs - leftTs;
+    })[0]
+  );
 }
 
 function upcomingScheduleDateRange(days: number): {
@@ -7933,6 +8009,7 @@ function buildTrainingHubHeaders(
 
 function clearTrainingHubAuth(): void {
   workoutExerciseCatalogCache.clear();
+  invalidateLibraryWorkoutPrograms();
   invalidateCorosProfileCache();
   deleteSettings([
     SETTINGS.accessToken,

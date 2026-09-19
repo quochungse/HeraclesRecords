@@ -234,6 +234,7 @@ export function DayDetailPanel({
                 <ScheduledWorkoutDetail
                   entry={selection.entry}
                   sportTypes={sportTypes}
+                  api={api}
                 />
               ) : (
                 <ActivityDetailPanel
