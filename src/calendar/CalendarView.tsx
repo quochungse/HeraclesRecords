@@ -721,8 +721,8 @@ export function CalendarView({
             reload();
           }}
           onError={onError}
+          covered={workoutRef !== null}
           onViewLibrary={(programId) => {
-            setAddTarget(null);
             setWorkoutRef({
               readOnly: true,
               ref: { kind: "library", programId }
@@ -735,8 +735,8 @@ export function CalendarView({
         <WorkoutLibraryModal
           api={api}
           onClose={() => setLibraryOpen(false)}
+          covered={workoutRef !== null}
           onView={(programId) => {
-            setLibraryOpen(false);
             setWorkoutRef({
               readOnly: true,
               ref: { kind: "library", programId }

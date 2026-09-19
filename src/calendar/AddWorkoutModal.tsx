@@ -471,6 +471,13 @@ interface AddWorkoutModalProps {
    */
   onViewLibrary?: (programId: string) => void;
   libraryOnly?: boolean;
+  /**
+   * Another dialog is open over this one, so it waits rather than closing.
+   * See `WorkoutLibraryModal`: the workout view opens from the library tab
+   * and closes back to it, so both are mounted and only the top one may take
+   * an Escape.
+   */
+  covered?: boolean;
 }
 
 let builderRowId = 0;
@@ -1917,7 +1924,8 @@ export function AddWorkoutModal({
   onScheduled,
   onError,
   onViewLibrary,
-  libraryOnly = false
+  libraryOnly = false,
+  covered = false
 }: AddWorkoutModalProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = useReducedMotion();
@@ -1984,12 +1992,15 @@ export function AddWorkoutModal({
   const [builderReorderMessage, setBuilderReorderMessage] = useState("");
 
   useEffect(() => {
+    if (covered) {
+      return;
+    }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !submitting) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, submitting]);
+  }, [covered, onClose, submitting]);
 
   useEffect(() => {
     void api.getWorkoutEditorContext(unitSystem)
@@ -2387,6 +2398,7 @@ export function AddWorkoutModal({
     <AnimatePresence>
       <motion.div
         className="calendar-modal-backdrop"
+        inert={covered}
         initial={reducedMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={reducedMotion ? { opacity: 1 } : { opacity: 0 }}

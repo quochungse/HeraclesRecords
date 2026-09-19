@@ -18,6 +18,16 @@ interface WorkoutLibraryModalProps {
   onView: (programId: string) => void;
   onScheduled: (message: string) => void;
   onError: (message: string | null) => void;
+  /**
+   * Another dialog is open over this one, so it waits rather than closing.
+   *
+   * The workout view opens from here and closes back to here, which means
+   * both are mounted at once. Escape is listened for on the document by each
+   * of them, so without this one press closed the view and the library under
+   * it in the same breath; `inert` keeps the pointer and the tab ring out of
+   * a panel the reader cannot see.
+   */
+  covered?: boolean;
 }
 
 function keyToInputDate(key: string): string {
@@ -28,7 +38,7 @@ function inputDateToKey(value: string): string {
   return value.replace(/-/g, "");
 }
 
-export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError }: WorkoutLibraryModalProps) {
+export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError, covered = false }: WorkoutLibraryModalProps) {
   const reducedMotion = useReducedMotion();
   const today = getLocalHappenDayKey();
   const [items, setItems] = useState<TrainingHubLibraryWorkout[] | null>(null);
@@ -58,12 +68,15 @@ export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError
   }, [api, reloadToken]);
 
   useEffect(() => {
+    if (covered) {
+      return;
+    }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !scheduling) onClose();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, scheduling]);
+  }, [covered, onClose, scheduling]);
 
   const visible = useMemo(() => {
     const filter = query.trim().toLowerCase();
@@ -90,7 +103,7 @@ export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError
   };
 
   return <AnimatePresence>
-    <motion.div className="calendar-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div className="calendar-modal-backdrop" inert={covered} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <motion.section className="calendar-modal calendar-library-modal" role="dialog" aria-modal="true" aria-labelledby="library-manager-title" initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}>
         <header className="calendar-modal-header">
           <div><p className="eyebrow">COROS Training Hub</p><h2 id="library-manager-title">Workout Library</h2></div>
