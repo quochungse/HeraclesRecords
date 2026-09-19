@@ -95,15 +95,20 @@ function completionTone(pct?: number): string {
  * Actual first, planned second — everywhere. The paired chip used to print
  * `actual / planned` while the missed chip printed `planned / 0`, so the same
  * slash meant opposite things two rows apart.
+ *
+ * The unit is said once and the word "planned" not at all: a day cell is
+ * ~150px wide, so `157 TL / 157 TL planned` wrapped to three lines and pushed
+ * the whole week's row taller. What the second figure is gets said by the
+ * chip's own dashed edge and by its tooltip instead of by a word on every row.
  */
 function loadLine(actual: number | undefined, planned: number | undefined): string | null {
   if (actual === undefined && planned === undefined) {
     return null;
   }
-  const actualLabel = `${Math.round(actual ?? 0)} TL`;
-  return planned === undefined
-    ? actualLabel
-    : `${actualLabel} / ${Math.round(planned)} TL planned`;
+  if (planned === undefined) {
+    return `${Math.round(actual ?? 0)} TL`;
+  }
+  return `${Math.round(actual ?? 0)} / ${Math.round(planned)} TL`;
 }
 
 /**
@@ -218,7 +223,14 @@ function PairChip({
         </span>
         <span className="calendar-chip-meta">{activityStatsLine(activity, unitSystem)}</span>
         {loadLine(actualLoad, plannedLoad) ? (
-          <span className="calendar-chip-meta calendar-chip-load">
+          <span
+            className="calendar-chip-meta calendar-chip-load"
+            title={
+              plannedLoad === undefined
+                ? "Training load"
+                : `${Math.round(actualLoad ?? 0)} TL done of ${Math.round(plannedLoad)} TL planned`
+            }
+          >
             {loadLine(actualLoad, plannedLoad)}
           </span>
         ) : null}
@@ -263,16 +275,20 @@ function PairChip({
       title={
         selectable
           ? `${selected ? "Deselect" : "Select"} ${scheduled.name}`
-          : canDrag
-            ? `${scheduled.name} — drag to another day`
-            : scheduled.name
+          : missed
+            ? `${scheduled.name} — planned, nothing logged`
+            : canDrag
+              ? `${scheduled.name} — planned. Drag to another day.`
+              : `${scheduled.name} — planned`
       }
+      /* The dashed edge is what says "planned" on screen, and a border says
+         nothing to a screen reader, so the word lives here instead. */
       aria-label={
         selectable
-          ? `${selected ? "Deselect" : "Select"} ${scheduled.name}`
+          ? `${selected ? "Deselect" : "Select"} planned workout ${scheduled.name}`
           : canDrag
-          ? `${scheduled.name}. Drag to another day to reschedule.`
-          : scheduled.name
+            ? `Planned: ${scheduled.name}. Drag to another day to reschedule.`
+            : `Planned: ${scheduled.name}`
       }
     >
       {selectable ? (
@@ -292,7 +308,7 @@ function PairChip({
           scheduledWorkoutSport(scheduled.sportType) === "swim"
         )}
         {scheduled.trainingLoad !== undefined && !missed
-          ? ` · ${Math.round(scheduled.trainingLoad)} TL planned`
+          ? ` · ${Math.round(scheduled.trainingLoad)} TL`
           : ""}
       </span>
       {missed && scheduled.trainingLoad !== undefined ? (

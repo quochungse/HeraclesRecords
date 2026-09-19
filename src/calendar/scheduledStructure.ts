@@ -1,7 +1,11 @@
 import type {
+  RunWorkoutEditorDraft,
+  RunWorkoutEditorStep,
+  RunWorkoutEditorTarget,
   TrainingHubScheduledExercise,
   TrainingHubScheduledWorkoutEntry,
-  UnitSystem
+  UnitSystem,
+  WorkoutIntensityInput
 } from "../../electron/types";
 import {
   POUNDS_PER_KILOGRAM,
@@ -41,6 +45,12 @@ export interface ScheduledStepView {
   /** Bar-chart magnitude: meters for distance targets, seconds for time. */
   magnitude?: number;
   magnitudeType?: "distance" | "time";
+  /**
+   * The COROS catalog id this step's exercise came from, where there is one.
+   * A surface that holds the exercise catalog uses it to reach the movement's
+   * demonstration clip; one that does not simply has no media to draw.
+   */
+  exerciseId?: string;
   /** Strength metadata. */
   sets?: number;
   reps?: number;
@@ -202,49 +212,70 @@ function decodeIntensity(
 ): DecodedIntensity {
   try {
     const { intensity } = decodeCorosIntensity(exercise);
-    if (intensity.type === "none") {
-      return {};
-    }
-    if (intensity.type === "pace" || intensity.type === "effortPace") {
-      const formatted = formatWorkoutIntensity({
-        ...intensity,
-        displayUnit: unitSystem === "imperial" ? "mi" : "km"
-      });
-      return { label: formatted === "Not set" ? undefined : formatted };
-    }
-    if (intensity.type === "speed") {
-      const lowKmh = intensity.unit === "mph" ? intensity.low * 1.609344 : intensity.low;
-      const highKmh = intensity.unit === "mph" ? intensity.high * 1.609344 : intensity.high;
-      const formatted = formatWorkoutIntensity({
-        ...intensity,
-        low: kmhToDisplaySpeed(lowKmh, unitSystem),
-        high: kmhToDisplaySpeed(highKmh, unitSystem),
-        unit: speedUnit(unitSystem)
-      });
-      return { label: formatted === "Not set" ? undefined : formatted };
-    }
-    if (intensity.type === "weight" && intensity.mode === "weight") {
-      const weightValue = intensity.unit === "lb"
-        ? intensity.value / POUNDS_PER_KILOGRAM
-        : intensity.value;
-      const displayWeight = kilogramsToDisplayWeight(weightValue, unitSystem);
-      const formatted = formatWorkoutIntensity({
-        ...intensity,
-        value: Number(displayWeight.toFixed(1)),
-        unit: weightUnit(unitSystem)
-      });
-      return {
-        label: formatted === "Not set" ? undefined : formatted,
-        weightValue,
-        weightUnit: "kg"
-      };
-    }
-    const formatted = formatWorkoutIntensity(intensity);
-    const label = formatted === "Not set" ? undefined : formatted;
-    return { label };
+    return localizeIntensity(intensity, unitSystem);
   } catch {
     return {};
   }
+}
+
+/**
+ * One intensity, in the reader's own units.
+ *
+ * Split out of `decodeIntensity` so the editor draft can spend it too: a draft
+ * carries the same `WorkoutIntensityInput` the COROS payload decodes to, and a
+ * second formatter beside this one is how the day drawer and the library view
+ * would start disagreeing about what a pace means.
+ */
+function localizeIntensity(
+  intensity: WorkoutIntensityInput,
+  unitSystem: UnitSystem
+): DecodedIntensity {
+  if (intensity.type === "none") {
+    return {};
+  }
+  if (intensity.type === "pace" || intensity.type === "effortPace") {
+    const formatted = formatWorkoutIntensity({
+      ...intensity,
+      displayUnit: unitSystem === "imperial" ? "mi" : "km"
+    });
+    return { label: formatted === "Not set" ? undefined : formatted };
+  }
+  if (intensity.type === "speed") {
+    const lowKmh = intensity.unit === "mph" ? intensity.low * 1.609344 : intensity.low;
+    const highKmh = intensity.unit === "mph" ? intensity.high * 1.609344 : intensity.high;
+    const formatted = formatWorkoutIntensity({
+      ...intensity,
+      low: kmhToDisplaySpeed(lowKmh, unitSystem),
+      high: kmhToDisplaySpeed(highKmh, unitSystem),
+      unit: speedUnit(unitSystem)
+    });
+    return { label: formatted === "Not set" ? undefined : formatted };
+  }
+  if (intensity.type === "weight" && intensity.mode === "weight") {
+    // COROS writes a weight of 0 for an exercise with no load prescribed —
+    // it has `bodyweight` for the other case — so "0.0 kg" on the row is not
+    // a figure, it is the absence of one.
+    if (!(intensity.value > 0)) {
+      return {};
+    }
+    const weightValue = intensity.unit === "lb"
+      ? intensity.value / POUNDS_PER_KILOGRAM
+      : intensity.value;
+    const displayWeight = kilogramsToDisplayWeight(weightValue, unitSystem);
+    const formatted = formatWorkoutIntensity({
+      ...intensity,
+      value: Number(displayWeight.toFixed(1)),
+      unit: weightUnit(unitSystem)
+    });
+    return {
+      label: formatted === "Not set" ? undefined : formatted,
+      weightValue,
+      weightUnit: "kg"
+    };
+  }
+  const formatted = formatWorkoutIntensity(intensity);
+  const label = formatted === "Not set" ? undefined : formatted;
+  return { label };
 }
 
 function friendlyStepName(rawName: string, kind: ScheduledStepKind): string {
@@ -271,6 +302,12 @@ function parseRawStep(
   const targetType = finiteNumber(exercise.targetType);
   const targetValue = finiteNumber(exercise.targetValue) ?? 0;
 
+  // COROS keeps the catalog id of the movement a step was built from on
+  // `originId`; `id` is the step's own. "0" is its way of saying none.
+  const originId = exercise.originId === undefined || exercise.originId === null
+    ? undefined
+    : String(exercise.originId);
+
   return {
     id,
     kind,
@@ -279,6 +316,7 @@ function parseRawStep(
     intensityLabel: intensity.label,
     magnitude: target.magnitude,
     magnitudeType: target.magnitudeType,
+    ...(originId && originId !== "0" ? { exerciseId: originId } : {}),
     sets: finiteNumber(exercise.sets),
     reps: targetType === 3 && targetValue > 0 ? Math.round(targetValue) : undefined,
     weight: intensity.weightValue,
@@ -505,6 +543,144 @@ export function buildScheduledWorkoutView(
     totals: computeTotals(nodes),
     source: hasRawExercises ? "raw" : "parsed"
   };
+}
+
+/**
+ * What one exercise asks for, in one line: the sets, and what each set holds.
+ *
+ * `targetLabel` already says what a set is — "12 reps", "0:45", "Open" — so
+ * the set count multiplies that rather than the reps alone. Built from `reps`
+ * only, the line was empty for every timed exercise and every open one, and
+ * the set count appeared on neither.
+ */
+export function liftSchemeLabel(step: ScheduledStepView): string | undefined {
+  const sets = Math.max(1, Math.round(step.sets ?? 1));
+  const per = step.targetLabel ?? (step.reps ? `${step.reps} reps` : undefined);
+  if (!per) {
+    return sets > 1 ? `${sets} sets` : undefined;
+  }
+  return sets > 1 ? `${sets} × ${per}` : per;
+}
+
+/**
+ * The same view, built from an editor draft instead of a COROS payload.
+ *
+ * A library workout is only ever read through the editor's document, which
+ * hands back a draft rather than the raw program — so without this the
+ * Calendar had no way to show one except as the edit form with its controls
+ * switched off. The draft carries exactly what the raw path parses out, in
+ * decoded form, so the mapping is a rename rather than a second reading of
+ * COROS: `targetType: 5` has already become `{ type: "distance", meters }`,
+ * and the intensity is already a `WorkoutIntensityInput`.
+ *
+ * Distances are metres here, not the centimetres the schedule payload uses.
+ */
+export function buildEditorDraftView(
+  draft: Pick<RunWorkoutEditorDraft, "nodes" | "sport">,
+  unitSystem: UnitSystem,
+  /**
+   * COROS exercise ids to their catalog names. A strength step's own
+   * `exerciseName` is a localization key — the live library answers `T1041`
+   * for a bench press — so without the catalog every exercise in a session
+   * reads as the step kind, which is the same word nine times.
+   */
+  exerciseNames?: ReadonlyMap<string, string>
+): ScheduledStructureView {
+  const swim = draft.sport === "swim";
+  const nodes: ScheduledNodeView[] = draft.nodes.map((node, index) => {
+    if (node.nodeType === "step") {
+      return {
+        type: "step",
+        step: draftStepView(node, index, unitSystem, swim, exerciseNames)
+      };
+    }
+    const steps = node.steps.map((step, childIndex) =>
+      draftStepView(step, childIndex, unitSystem, swim, exerciseNames)
+    );
+    return {
+      type: "repeat",
+      id: node.id,
+      name: node.name,
+      repeat: Math.max(1, Math.round(node.repeat)),
+      steps,
+      ...dominantMagnitude(steps)
+    };
+  });
+
+  return { nodes, totals: computeTotals(nodes), source: "raw" };
+}
+
+function draftStepView(
+  step: RunWorkoutEditorStep,
+  index: number,
+  unitSystem: UnitSystem,
+  swim: boolean,
+  exerciseNames?: ReadonlyMap<string, string>
+): ScheduledStepView {
+  const target = draftTargetView(step.target, step.kind, unitSystem, swim);
+  const intensity = localizeIntensity(step.intensity, unitSystem);
+  // A strength step's own name is the kind ("Training") and its `exerciseName`
+  // is a COROS key, so the catalog is asked first and `friendlyStepName`
+  // turns whatever is left into the kind rather than showing the key.
+  const catalogName = step.exerciseId
+    ? exerciseNames?.get(step.exerciseId)
+    : undefined;
+
+  return {
+    id: step.id || `step-${index}`,
+    kind: step.kind,
+    name: friendlyStepName(catalogName ?? step.exerciseName ?? step.name, step.kind),
+    targetLabel: target.label,
+    intensityLabel: intensity.label,
+    magnitude: target.magnitude,
+    magnitudeType: target.magnitudeType,
+    ...(step.exerciseId ? { exerciseId: step.exerciseId } : {}),
+    sets: step.sets,
+    reps: step.target.type === "reps" ? step.target.count : undefined,
+    weight: intensity.weightValue,
+    weightUnit: intensity.weightUnit
+  };
+}
+
+function draftTargetView(
+  target: RunWorkoutEditorTarget,
+  kind: ScheduledStepKind,
+  unitSystem: UnitSystem,
+  swim: boolean
+): ParsedTarget {
+  switch (target.type) {
+    case "time":
+      return target.seconds > 0
+        ? {
+            label: formatStepTimeLabel(target.seconds),
+            magnitude: target.seconds,
+            magnitudeType: "time"
+          }
+        : { label: "Open" };
+    case "distance":
+      return target.meters > 0
+        ? {
+            label: formatStepDistanceLabel(target.meters, unitSystem, swim),
+            magnitude: target.meters,
+            magnitudeType: "distance"
+          }
+        : { label: "Open" };
+    case "load":
+      return { label: `${Math.round(target.load)} TL` };
+    case "hrRecovery":
+      return kind === "rest"
+        ? { label: `Until ${Math.round(target.bpm)} bpm` }
+        : { label: `${Math.round(target.bpm)} bpm` };
+    case "reps":
+      return { label: `${Math.round(target.count)} reps` };
+    case "elevationGain":
+      return { label: `${formatElevationValue(target.meters, unitSystem, "0")} gain` };
+    case "routes":
+      return { label: `${Math.round(target.count)} routes` };
+    case "open":
+    default:
+      return { label: "Open" };
+  }
 }
 
 /**

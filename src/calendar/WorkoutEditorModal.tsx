@@ -3,14 +3,22 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Clock,
   Copy,
+  Dumbbell,
   GripVertical,
+  Layers,
+  Gauge,
+  ListChecks,
   LoaderCircle,
   Plus,
+  Repeat,
+  Route,
   Save,
   Trash2,
   Ungroup,
-  X
+  X,
+  type LucideIcon
 } from "lucide-react";
 import { OptionGroup } from "../components/OptionGroup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -52,6 +60,18 @@ import {
 import { ExerciseCombobox } from "./ExerciseCombobox";
 import { ExercisePreview } from "./ExercisePreview";
 import {
+  buildEditorDraftView,
+  formatStepDistanceLabel,
+  formatStepTimeLabel
+} from "./scheduledStructure";
+import {
+  WorkoutStructure,
+  flatSteps,
+  formatTonnage,
+  strengthTonnage
+} from "./WorkoutStructureView";
+import { workoutSportView } from "./workoutSportIcons";
+import {
   CLIMB_GRADES,
   CLIMB_SYSTEM_IDS,
   FTP_PRESETS,
@@ -71,6 +91,18 @@ interface WorkoutEditorModalProps {
   api: CorosLinkApi;
   editRef?: WorkoutEditRef;
   planEntry?: TrainingPlanEntry;
+  /**
+   * Opens the same surface with every control inert and no Save.
+   *
+   * The Calendar shows library workouts this way: a workout in the library is
+   * a reusable template, and changing one there silently rewrites what every
+   * future use of it will be, which is not a decision to offer from a day cell
+   * that only wanted to know what the session is. Training Library owns that.
+   *
+   * It rides on the `canEdit` gate that the unsupported-sport case already
+   * wired through every control, rather than a second disabled path beside it.
+   */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved?: (result: WorkoutEditSaveResult) => void;
   onSavedToPlan?: (workout: PlanWorkoutEntryInput) => void;
@@ -266,6 +298,7 @@ export function WorkoutEditorModal({
   api,
   editRef,
   planEntry,
+  readOnly = false,
   onClose,
   onSaved,
   onSavedToPlan,
@@ -330,14 +363,14 @@ export function WorkoutEditorModal({
     };
     void load().then((loaded) => {
       if (!cancelled) {
-        setDocument(loaded);
+        setDocument(readOnly ? { ...loaded, canEdit: false } : loaded);
         setDraft(structuredClone(loaded.draft));
       }
     }).catch((cause: unknown) => {
       if (!cancelled) setLoadError(cause instanceof Error ? cause.message : String(cause));
     });
     return () => { cancelled = true; };
-  }, [api, editRef, planEntry, planWorkout, unitSystem]);
+  }, [api, editRef, planEntry, planWorkout, readOnly, unitSystem]);
 
   useEffect(() => {
     const sport = draft?.sport;
@@ -553,7 +586,7 @@ export function WorkoutEditorModal({
     <AnimatePresence>
       <motion.div className="workout-editor-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <motion.section
-          className="workout-editor-modal"
+          className={readOnly ? "workout-editor-modal is-view" : "workout-editor-modal"}
           role="dialog"
           aria-modal="true"
           aria-labelledby="workout-editor-title"
@@ -565,9 +598,17 @@ export function WorkoutEditorModal({
           <header className="workout-editor-header">
             <div>
               <p className="eyebrow">{planMode ? "Training plan copy" : editRef?.kind === "scheduled" ? "Scheduled occurrence" : "Workout library"}</p>
-              <h2 id="workout-editor-title">Edit {draft ? formatWorkoutSport(draft.sport) : "workout"}</h2>
+              {/* Reading a workout, its own name is the heading — it was in a
+                  disabled text box two thirds of the way down the form, under
+                  a title that named the sport instead. Editing still says what
+                  is being edited, because the name is a field there. */}
+              <h2 id="workout-editor-title">
+                {readOnly
+                  ? (draft?.name.trim() || (draft ? formatWorkoutSport(draft.sport) : "Workout"))
+                  : `Edit ${draft ? formatWorkoutSport(draft.sport) : "workout"}`}
+              </h2>
             </div>
-            <button type="button" className="icon-button" aria-label="Close workout editor" onClick={requestClose} disabled={saving}>
+            <button type="button" className="icon-button" aria-label={readOnly ? "Close workout" : "Close workout editor"} onClick={requestClose} disabled={saving}>
               <X size={18} aria-hidden="true" />
             </button>
           </header>
@@ -581,7 +622,24 @@ export function WorkoutEditorModal({
             </div>
           ) : null}
 
-          {document && draft ? (
+          {document && draft && readOnly ? (
+            <>
+              <div className="workout-editor-scroll">
+                <WorkoutReadOnlyBody
+                  draft={draft}
+                  context={document.context}
+                  exerciseOptions={exerciseOptions}
+                />
+              </div>
+              <footer className="workout-editor-footer">
+                <div className="workout-editor-footer-actions">
+                  <button type="button" className="primary-button" onClick={onClose}>Close</button>
+                </div>
+              </footer>
+            </>
+          ) : null}
+
+          {document && draft && !readOnly ? (
             <>
               <div className="workout-editor-scroll">
                 {!document.canEdit ? <div className="workout-editor-notice"><AlertTriangle size={16} aria-hidden="true" />{document.unsupportedReason}</div> : null}
@@ -768,6 +826,215 @@ export function WorkoutEditorModal({
   );
 }
 
+/**
+ * A workout, read.
+ *
+ * View mode used to be the edit form with `disabled` on every control, which
+ * says the wrong thing twice over: a greyed-out text box reads as something
+ * broken rather than something settled, and the form's own furniture — the
+ * character counters, the "Add step" buttons, the drag handles, the Sport
+ * picker that has never been changeable in place, the empty Description box —
+ * is all scaffolding for a decision nobody is being offered here. The measured
+ * shape of that was 212 controls, 194 of them dead.
+ *
+ * So this draws the same view the day drawer draws for a scheduled workout,
+ * off the same `ScheduledStructureView` and through the same renderer. Every
+ * figure is computed from the draft rather than asked of COROS: a view that
+ * waits on a round trip to say how long a workout is has no reason to.
+ */
+function WorkoutReadOnlyBody({
+  draft,
+  context,
+  exerciseOptions
+}: {
+  draft: RunWorkoutEditorDraft;
+  context: WorkoutEditorContext;
+  exerciseOptions: WorkoutExerciseOption[];
+}) {
+  const { unitSystem } = useUnitSystem();
+  const exercisesById = useMemo(
+    () => new Map(exerciseOptions.map((option) => [option.id, option])),
+    [exerciseOptions]
+  );
+  const exerciseNames = useMemo(
+    () => new Map(exerciseOptions.map((option) => [option.id, option.name])),
+    [exerciseOptions]
+  );
+  const view = useMemo(
+    () => buildEditorDraftView(draft, unitSystem, exerciseNames),
+    [draft, exerciseNames, unitSystem]
+  );
+  const { category, icon: SportIcon } = workoutSportView(draft.sport);
+  const isStrength = draft.sport === "strength" || draft.sport === "hyrox";
+  const strength = strengthTotals(draft);
+  const tonnage = strengthTonnage(flatSteps(view));
+
+  const poolLength = draft.sport === "swim"
+    ? (draft.sportOptions?.poolLength ?? context.defaultPoolLength)
+    : undefined;
+  const gradingSystem = draft.sport === "indoorClimb" || draft.sport === "bouldering"
+    ? (draft.sportOptions?.gradingSystem ?? context.climbSystems[draft.sport])
+    : undefined;
+
+  // Only figures the draft actually holds. A strength session has no distance
+  // and an open-ended run has no duration; a "--" in a box is not information.
+  const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [];
+  if (isStrength) {
+    stats.push({ icon: Dumbbell, label: "Exercises", value: String(strength.exercises) });
+    if (strength.sets > 0) {
+      stats.push({ icon: Layers, label: "Sets", value: String(strength.sets) });
+    }
+    // One third figure, whichever the session has: what it moves, or what it
+    // spends waiting. A session of single sets has no rest between them.
+    if (tonnage > 0) {
+      stats.push({ icon: Gauge, label: "Lifted", value: formatTonnage(tonnage, unitSystem) });
+    } else if (strength.restSeconds > 0) {
+      stats.push({ icon: Clock, label: "Set rest", value: clockFromSeconds(strength.restSeconds) });
+    }
+  } else {
+    if (view.totals.distanceMeters) {
+      stats.push({
+        icon: Route,
+        label: "Distance",
+        value: formatStepDistanceLabel(
+          view.totals.distanceMeters,
+          unitSystem,
+          draft.sport === "swim"
+        )
+      });
+    }
+    if (view.totals.durationSeconds) {
+      stats.push({
+        icon: Clock,
+        label: view.totals.distanceMeters ? "Timed steps" : "Duration",
+        value: formatStepTimeLabel(view.totals.durationSeconds)
+      });
+    }
+    stats.push({
+      icon: ListChecks,
+      label: view.totals.stepCount === 1 ? "Step" : "Steps",
+      value: String(view.totals.stepCount)
+    });
+  }
+
+  const structureSummary = view.totals.repeatGroups > 0
+    ? `${view.totals.repeatGroups} repeat group${view.totals.repeatGroups === 1 ? "" : "s"}`
+    : undefined;
+  const overview = draft.overview.trim();
+
+  return (
+    <div className={`sched-detail workout-view is-${category}`}>
+      <div className="sched-hero">
+        <div className="sched-hero-top">
+          <span className="sched-hero-icon" aria-hidden="true">
+            <SportIcon size={20} />
+          </span>
+          <div className="sched-hero-title">
+            <div className="sched-hero-heading">
+              <span className="sched-hero-sport">{formatWorkoutSport(draft.sport)}</span>
+              {poolLength ? (
+                <span className="sched-hero-chip">
+                  {poolLength.value} {poolLength.unit} pool
+                </span>
+              ) : null}
+              {gradingSystem ? (
+                <span className="sched-hero-chip">{gradingSystem}</span>
+              ) : null}
+            </div>
+            {structureSummary ? (
+              <span className="sched-hero-context">
+                <Repeat size={12} aria-hidden="true" />
+                {structureSummary}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <dl className={`sched-hero-stats is-${stats.length}`}>
+          {stats.map((stat) => (
+            <div className="sched-stat" key={stat.label}>
+              <dt className="sched-stat-label">
+                <stat.icon size={12} aria-hidden="true" />
+                {stat.label}
+              </dt>
+              <dd className="sched-stat-value">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      {overview ? <p className="workout-view-overview">{overview}</p> : null}
+
+      {view.nodes.length > 0 ? (
+        <div className="sched-structure">
+          <div className="sched-structure-head">
+            <h4>
+              <ListChecks size={14} aria-hidden="true" />
+              {isStrength ? "Session" : "Workout structure"}
+            </h4>
+          </div>
+          <WorkoutStructure
+            view={view}
+            unitSystem={unitSystem}
+            strength={isStrength}
+            swim={draft.sport === "swim"}
+            showSummary={false}
+            exercises={exercisesById}
+          />
+        </div>
+      ) : (
+        <div className="sched-empty">
+          <ListChecks size={18} aria-hidden="true" />
+          <p>No structured steps — this workout runs by feel.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The strength figures the hero shows, counted the same way the editor's own
+ * footer counts them — a repeat group multiplies its children.
+ */
+function strengthTotals(draft: RunWorkoutEditorDraft): {
+  exercises: number;
+  sets: number;
+  restSeconds: number;
+} {
+  let exercises = 0;
+  let sets = 0;
+  let restSeconds = 0;
+  const countStep = (step: RunWorkoutEditorStep, multiplier: number) => {
+    if (step.kind !== "training") return;
+    exercises += 1;
+    const stepSets = Math.max(1, step.sets ?? 1);
+    sets += stepSets * multiplier;
+    restSeconds += Math.max(0, stepSets - 1) * Math.max(0, step.restValue ?? 0) * multiplier;
+  };
+  for (const node of draft.nodes) {
+    if (node.nodeType === "step") countStep(node, 1);
+    else node.steps.forEach((step) => countStep(step, Math.max(1, node.repeat)));
+  }
+  return { exercises, sets, restSeconds };
+}
+
+/**
+ * What to call a strength step's exercise.
+ *
+ * `exerciseName` on a COROS-built workout is a localization key — the live
+ * library answers `T1041` for a bench press — so the catalog is asked first
+ * and the key is only shown when nothing else is known. Display only: the
+ * draft keeps what COROS sent, so a save writes back the same field.
+ */
+function stepExerciseName(
+  step: RunWorkoutEditorStep,
+  options: WorkoutExerciseOption[]
+): string {
+  const catalogName = step.exerciseId
+    ? options.find((option) => option.id === step.exerciseId)?.name
+    : undefined;
+  return (catalogName ?? step.exerciseName ?? "").trim();
+}
+
 function EditorSkeleton() {
   return <div className="workout-editor-skeleton" aria-label="Loading workout"><div /><div /><div /><div /></div>;
 }
@@ -844,7 +1111,7 @@ function StepCard({ step, context, sport, exerciseOptions, exerciseOptionsLoadin
         />
         {strengthExercise ? (
           <div className="workout-strength-step-heading">
-            <strong>{step.exerciseName?.trim() || "Choose an exercise"}</strong>
+            <strong>{stepExerciseName(step, exerciseOptions) || "Choose an exercise"}</strong>
             <span>{strengthStepSummary(step)}</span>
           </div>
         ) : (

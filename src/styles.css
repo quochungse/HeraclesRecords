@@ -23251,6 +23251,20 @@ tr.data-intervals-row-missing {
    `.calendar-chip`. The six `.calendar-cat-*` colours that used to sit here were
    set from an English run-vocabulary regex over the workout's name, and four of
    them were hand-mixed hexes that ignored the paper theme. */
+
+/* Planned, nothing logged against it yet — said with the chip's own edge
+   rather than with the word "planned" on every meta line. A day cell is about
+   150px wide, so that word wrapped `157 TL / 157 TL planned` onto a third line
+   and made the whole week's row taller for nothing.
+
+   The sport bar on the left stays solid: it is the one part of the border that
+   carries data, and dashing it would break the colour into pieces. */
+.calendar-chip-planned {
+  border-style: dashed;
+  border-left-style: solid;
+  border-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
 .calendar-chip-planned.is-missed .calendar-chip-load {
   color: var(--error-text);
 }
@@ -23956,6 +23970,87 @@ tr.data-intervals-row-missing {
   flex-shrink: 0;
 }
 
+/* The movement still, in the slot the dumbbell icon holds otherwise. COROS
+   shoots on a white cyclorama, so the plate is light in both themes — a dark
+   well behind a white-background clip reads as a letterbox. */
+.sched-lift-thumb {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: #f1f2f4;
+  object-fit: cover;
+}
+
+/* A row that can open its clip is a button, so the card stops carrying the
+   padding and the button carries it instead — a hit target the size of the
+   row rather than of the chevron. */
+.sched-lift.has-clip {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sched-lift-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 10px 12px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.sched-lift-toggle:hover {
+  background: var(--glass-bg-hover);
+}
+
+.sched-lift-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.sched-lift-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  color: var(--detail-sport);
+  background: color-mix(in srgb, var(--detail-sport) 13%, transparent);
+}
+
+/* The clip is a demonstration inside a list, not the subject of the screen:
+   the editor plate runs 4/5 and up to 420px, which is most of the sheet this
+   list sits in, and an open one would push the rest of the session off it. */
+.sched-lift-clip {
+  border-top: 1px solid var(--glass-border);
+  padding: 10px 12px 12px;
+}
+
+/* A height, and a row that holds it. The stage is `display: grid` with
+   `place-items: center`, so its single row is auto-sized from the content —
+   the video lays itself out at its own 16/9 and the row follows, which left a
+   302px clip inside a 200px box with the lifter cut off at the shins, and no
+   cap on the box could reach it. Naming the row makes the video resolve its
+   own `height: 100%` against the stage, and `object-fit: contain` letterboxes
+   what is left. */
+.sched-lift-clip .exercise-preview-stage {
+  height: 200px;
+  max-height: none;
+  grid-template-rows: minmax(0, 1fr);
+  aspect-ratio: auto;
+}
+
 .sched-circuit {
   display: flex;
   flex-direction: column;
@@ -24320,6 +24415,24 @@ tr.data-intervals-row-missing {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 14px;
   padding-bottom: 18px;
+}
+
+/* The target's kind and the figure to hold, side by side. The select keeps a
+   fixed share so a long option name cannot squeeze the numbers out. */
+.calendar-quick-target-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-quick-target-row > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.calendar-quick-target-row > .app-select {
+  flex: 0 1 150px;
 }
 
 .calendar-quick-name {
@@ -25870,15 +25983,21 @@ tr.data-intervals-row-missing {
     max-height: none;
   }
 
+  /* Quick grew a sport picker and a target of its own, so the settings column
+     is five field groups rather than three. Measured at 555px of content
+     against 431px of column, which clipped the target inputs halfway. The
+     preview beside it was using none of its own spare height and 633px of
+     width for three figures, so the room comes from there: a taller dialog and
+     a wider settings column, not a scrollbar through the middle of a control. */
   .calendar-modal-workspace.calendar-modal-quick {
     width: min(1120px, calc(100vw - 64px));
-    height: min(760px, calc(100dvh - 48px));
+    height: min(860px, calc(100dvh - 48px));
     max-height: none;
   }
 
   .calendar-modal-workspace.calendar-modal-quick > .calendar-quick-body {
     display: grid;
-    grid-template-columns: minmax(320px, 410px) minmax(0, 1fr);
+    grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
     flex: 1;
     gap: 0 24px;
@@ -25898,7 +26017,7 @@ tr.data-intervals-row-missing {
   }
 
   .calendar-modal-quick .calendar-quick-intro {
-    padding: 0 0 18px;
+    padding: 0 0 12px;
   }
 
   .calendar-modal-quick .calendar-quick-intro h4,
@@ -25908,9 +26027,17 @@ tr.data-intervals-row-missing {
     text-transform: uppercase;
   }
 
+  /* Sport and the workout name are one control tall each and share a row; the
+     distance, the pool and the target each carry a second control under them
+     and take the whole width. Stacking all five was 118px more than the column
+     had, which cut the target inputs in half. */
   .calendar-modal-quick .calendar-quick-fields {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .calendar-modal-quick .calendar-quick-fields > .calendar-quick-wide {
+    grid-column: 1 / -1;
   }
 
   .calendar-modal-quick .calendar-quick-name {
@@ -26398,7 +26525,7 @@ tr.data-intervals-row-missing {
 }
 
 @media (min-width: 1380px) and (min-height: 760px) {
-  .workout-editor-modal {
+  .workout-editor-modal:not(.is-view) {
     width: min(1400px, 100%);
     height: min(1040px, calc(100dvh - 36px));
   }
@@ -26640,6 +26767,55 @@ tr.data-intervals-row-missing {
 
 .exercise-preview-stage video.is-ready {
   opacity: 1;
+}
+
+/* The plate is the control. A browser control bar across a one-second loop is
+   a scrubber for nothing, so the clip runs bare and the whole stage takes the
+   click. It stays a button rather than a handler on the video, because that
+   bar was the only keyboard route to play or pause. */
+.exercise-preview-toggle {
+  z-index: 2;
+  grid-area: 1 / 1;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.exercise-preview-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Shown only while the clip is stopped. The button keeps its whole hit area
+   either way, so a playing clip is still one click from pausing. The colours
+   are literal because the stage behind them is the same white cyclorama in
+   both themes — this badge never sits on a themed surface. */
+.exercise-preview-play {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: rgba(17, 21, 28, 0.55);
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.exercise-preview-toggle.is-paused .exercise-preview-play {
+  opacity: 1;
+}
+
+/* Nudged off centre: the glyph is a triangle, so its optical centre sits
+   right of the box it is drawn in. */
+.exercise-preview-play svg {
+  margin-left: 3px;
 }
 
 .exercise-preview-status {
@@ -27341,6 +27517,34 @@ tr.data-intervals-row-missing {
   gap: 16px;
   border-bottom: 1px solid var(--glass-border);
   padding: 16px 20px 14px;
+}
+
+/* A workout being read is a document, not a workbench. The editor needs the
+   1180px because a step card carries five controls across; the view carries a
+   name, a bar and a list of steps, and at that width the list runs half a
+   metre from its own headings. It also stops at the height of what it holds,
+   so a three-step workout is not a mostly empty sheet. */
+.workout-editor-modal.is-view {
+  width: min(620px, 100%);
+  height: auto;
+  max-height: min(820px, calc(100dvh - 36px));
+}
+
+.workout-editor-modal.is-view .workout-editor-scroll {
+  padding: 18px 20px 20px;
+}
+
+.workout-editor-modal.is-view .workout-editor-footer {
+  min-height: 0;
+  justify-content: flex-end;
+}
+
+.workout-view-overview {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .workout-editor-header h2 {

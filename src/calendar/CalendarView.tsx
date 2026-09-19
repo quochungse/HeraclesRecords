@@ -167,7 +167,17 @@ export function CalendarView({
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [editRef, setEditRef] = useState<WorkoutEditRef | null>(null);
+  /*
+   * A workout opened from this screen, and whether it opens to be read or to
+   * be changed. Only a scheduled occurrence is editable here: a library
+   * workout is a template every future use of it shares, so changing one from
+   * a day cell would rewrite sessions the athlete is not looking at. Training
+   * Library owns that decision.
+   */
+  const [workoutRef, setWorkoutRef] = useState<{
+    ref: WorkoutEditRef;
+    readOnly: boolean;
+  } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedWorkoutKeys, setSelectedWorkoutKeys] = useState<Set<string>>(
     () => new Set()
@@ -681,12 +691,15 @@ export function CalendarView({
         onAskCoach={handleAskCoachSelection}
         onEdit={(target) => {
           setSelection(null);
-          setEditRef({
-            kind: "scheduled",
-            happenDay: target.entry.happenDay,
-            planId: target.entry.planId,
-            idInPlan: target.entry.idInPlan,
-            planProgramId: target.entry.planProgramId
+          setWorkoutRef({
+            readOnly: false,
+            ref: {
+              kind: "scheduled",
+              happenDay: target.entry.happenDay,
+              planId: target.entry.planId,
+              idInPlan: target.entry.idInPlan,
+              planProgramId: target.entry.planProgramId
+            }
           });
         }}
         onError={onError}
@@ -704,9 +717,12 @@ export function CalendarView({
             reload();
           }}
           onError={onError}
-          onEditLibrary={(programId) => {
+          onViewLibrary={(programId) => {
             setAddTarget(null);
-            setEditRef({ kind: "library", programId });
+            setWorkoutRef({
+              readOnly: true,
+              ref: { kind: "library", programId }
+            });
           }}
         />
       ) : null}
@@ -715,9 +731,12 @@ export function CalendarView({
         <WorkoutLibraryModal
           api={api}
           onClose={() => setLibraryOpen(false)}
-          onEdit={(ref) => {
+          onView={(programId) => {
             setLibraryOpen(false);
-            setEditRef(ref);
+            setWorkoutRef({
+              readOnly: true,
+              ref: { kind: "library", programId }
+            });
           }}
           onScheduled={(message) => {
             onMessage(message);
@@ -728,15 +747,22 @@ export function CalendarView({
         />
       ) : null}
 
-      {editRef ? (
+      {workoutRef ? (
         <WorkoutEditorModal
           api={api}
-          editRef={editRef}
-          onClose={() => setEditRef(null)}
+          editRef={workoutRef.ref}
+          readOnly={workoutRef.readOnly}
+          onClose={() => setWorkoutRef(null)}
           onSaved={(result) => {
-            const scope = editRef.kind === "scheduled" ? "scheduled occurrence" : "library workout";
-            onMessage(result.verified ? `Updated ${scope} in COROS.` : result.warning ?? `Updated ${scope}, but verification is still pending.`);
-            setEditRef(null);
+            // Only a scheduled occurrence can reach this: a library workout
+            // opens read-only from here and has no Save.
+            onMessage(
+              result.verified
+                ? "Updated scheduled occurrence in COROS."
+                : (result.warning ??
+                  "Updated scheduled occurrence, but verification is still pending.")
+            );
+            setWorkoutRef(null);
             reload();
           }}
           onError={onError}

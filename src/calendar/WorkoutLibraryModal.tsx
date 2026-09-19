@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { CalendarPlus, Library, LoaderCircle, Pencil, Search, X } from "lucide-react";
+import { CalendarPlus, Eye, Library, LoaderCircle, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { TrainingHubLibraryWorkout, WorkoutEditRef } from "../../electron/types";
+import type { TrainingHubLibraryWorkout } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
 import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
@@ -9,7 +9,13 @@ import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSpo
 interface WorkoutLibraryModalProps {
   api: CorosLinkApi;
   onClose: () => void;
-  onEdit: (ref: WorkoutEditRef) => void;
+  /**
+   * Opens a library workout to be read. The calendar does not offer to change
+   * one: a library workout is a template every future use of it shares, so
+   * editing it from here would rewrite sessions nobody is looking at.
+   * Training Library owns that.
+   */
+  onView: (programId: string) => void;
   onScheduled: (message: string) => void;
   onError: (message: string | null) => void;
 }
@@ -22,7 +28,7 @@ function inputDateToKey(value: string): string {
   return value.replace(/-/g, "");
 }
 
-export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError }: WorkoutLibraryModalProps) {
+export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError }: WorkoutLibraryModalProps) {
   const reducedMotion = useReducedMotion();
   const today = getLocalHappenDayKey();
   const [items, setItems] = useState<TrainingHubLibraryWorkout[] | null>(null);
@@ -105,7 +111,7 @@ export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError
                   <span><strong>{item.name}</strong><small>{[item.volume, item.trainingLoad !== undefined ? `${Math.round(item.trainingLoad)} TL` : null].filter(Boolean).join(" · ") || "No calculated totals"}</small></span>
                   <span className={`workout-library-sport ${supported ? "is-supported" : ""}`}>{sport ? workoutSportLabel(sport) : "View only"}</span>
                 </button>
-                {supported ? <button type="button" className="ghost-button workout-library-edit" onClick={() => onEdit({ kind: "library", programId: item.id })}><Pencil size={14} aria-hidden="true" /> Edit</button> : <span className="workout-library-readonly">Editing is not supported for this sport.</span>}
+                {supported ? <button type="button" className="ghost-button workout-library-edit" onClick={() => onView(item.id)}><Eye size={14} aria-hidden="true" /> View</button> : <span className="workout-library-readonly">No preview for this sport.</span>}
               </article>;
             })}
           </div>

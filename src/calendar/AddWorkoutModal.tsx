@@ -19,7 +19,7 @@ import {
   Hand,
   ListTree,
   Mountain,
-  Pencil,
+  Eye,
   PersonStanding,
   Plus,
   Repeat2,
@@ -49,7 +49,8 @@ import type {
   WorkoutEditorContext,
   WorkoutExerciseOption,
   WorkoutIntensityInput,
-  WorkoutSport
+  WorkoutSport,
+  WorkoutSwimStroke
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { SelectDropdown } from "../components/SelectDropdown";
@@ -96,7 +97,125 @@ const ADD_TAB_ITEMS: Record<AddTab, { label: string; Icon: LucideIcon }> = {
   activity: { label: "Log activity", Icon: Activity }
 };
 
-const QUICK_DISTANCE_PRESETS = [5, 8, 10, 21.1] as const;
+/**
+ * The sports Quick offers.
+ *
+ * All three are a single distance step, which is the whole idea of the tab —
+ * one session, one number, one target. Strength is deliberately absent: COROS
+ * requires an exercise per step and measures it in reps or seconds, never
+ * distance, so a "quick strength workout" is a different form with a different
+ * validator. The Structured tab already is that form.
+ */
+const QUICK_SPORTS = ["run", "bike", "swim"] as const;
+type QuickSport = (typeof QUICK_SPORTS)[number];
+
+/**
+ * What a Quick step can hold itself to.
+ *
+ * **COROS carries one intensity per step, not a set of them** — `intensity` on
+ * a step is a single tagged value — so this is a choice of target rather than
+ * a list to tick. The options differ per sport because COROS says so, not to
+ * keep the form short: a ride has no pace (it has speed), and a pool swim has
+ * no heart-rate, pace or cadence target at all, only a stroke.
+ * `WORKOUT_SPORT_CAPABILITIES[sport].intensities` is the authority; these are
+ * the subset that makes sense without a zone table in front of you, and
+ * `builderRowValidationMessage` still has the final word before anything is
+ * sent.
+ */
+type QuickTargetType =
+  | "none"
+  | "pace"
+  | "heartRate"
+  | "cadence"
+  | "power"
+  | "speed"
+  | "swimStroke";
+
+const QUICK_TARGETS: Readonly<Record<QuickSport, readonly QuickTargetType[]>> = {
+  run: ["none", "pace", "heartRate", "cadence", "power"],
+  bike: ["none", "speed", "heartRate", "cadence", "power"],
+  swim: ["none", "swimStroke"]
+};
+
+const QUICK_TARGET_LABEL: Readonly<Record<QuickTargetType, string>> = {
+  none: "Open",
+  pace: "Pace",
+  heartRate: "Heart rate",
+  cadence: "Cadence",
+  power: "Power",
+  speed: "Speed",
+  swimStroke: "Stroke"
+};
+
+/** A target that is a low-to-high band of plain numbers. */
+const QUICK_RANGE_TARGETS: readonly QuickTargetType[] = [
+  "heartRate",
+  "cadence",
+  "power",
+  "speed"
+];
+
+const QUICK_DISTANCE_PRESETS: Readonly<Record<QuickSport, readonly number[]>> = {
+  run: [5, 8, 10, 21.1],
+  bike: [20, 40, 60, 100],
+  swim: [400, 800, 1500, 2000]
+};
+
+const QUICK_DEFAULT_NAME: Readonly<Record<QuickSport, string>> = {
+  run: "Quick Run",
+  bike: "Quick Ride",
+  swim: "Quick Swim"
+};
+
+/** The builder's own per-sport glyph, so Quick and Structured agree. */
+function BuilderSportIcon({
+  sport,
+  size = 14
+}: {
+  sport: WorkoutSport;
+  size?: number;
+}) {
+  const Icon = BUILDER_SPORT_META[sport].Icon;
+  return <Icon size={size} aria-hidden="true" />;
+}
+
+function quickTargetUnit(
+  target: QuickTargetType,
+  sport: QuickSport,
+  unitSystem: UnitSystem
+): string {
+  switch (target) {
+    case "heartRate":
+      return "bpm";
+    case "cadence":
+      return sport === "bike" ? "rpm" : "spm";
+    case "power":
+      return "W";
+    case "speed":
+      return unitSystem === "imperial" ? "mph" : "km/h";
+    default:
+      return "";
+  }
+}
+
+/**
+ * The pace field as the builder's validator and encoder expect it: a range,
+ * carrying its unit.
+ *
+ * Quick takes a single pace because one number is what "quick" means, and a
+ * held pace is a band of zero width. Widening it here rather than teaching the
+ * shared validator a second shape keeps one spelling of a pace in the app.
+ */
+function quickPaceRange(pace: string, unitSystem: UnitSystem): string {
+  const value = pace.trim();
+  if (!value) {
+    return "";
+  }
+  const unit = value.match(/\/(km|mi)$/i)?.[1]?.toLowerCase() ?? distanceUnit(unitSystem);
+  const bare = value.replace(/\/(km|mi)$/i, "");
+  const [fast, slow] = bare.split("-");
+  return `${fast}-${slow ?? fast}/${unit}`;
+}
 
 interface LogSportOption {
   id: string;
@@ -345,7 +464,12 @@ interface AddWorkoutModalProps {
   onClose: () => void;
   onScheduled: (message: string) => void;
   onError: (message: string | null) => void;
-  onEditLibrary: (programId: string) => void;
+  /**
+   * Opens a library workout to be read. Only the "From library" tab offers
+   * it, and that tab is absent under `libraryOnly`, so a caller that only
+   * creates workouts need not pass it.
+   */
+  onViewLibrary?: (programId: string) => void;
   libraryOnly?: boolean;
 }
 
@@ -1792,7 +1916,7 @@ export function AddWorkoutModal({
   onClose,
   onScheduled,
   onError,
-  onEditLibrary,
+  onViewLibrary,
   libraryOnly = false
 }: AddWorkoutModalProps) {
   const { unitSystem } = useUnitSystem();
@@ -1807,9 +1931,14 @@ export function AddWorkoutModal({
   const [submitting, setSubmitting] = useState(false);
 
   // Quick training
+  const [quickSport, setQuickSport] = useState<QuickSport>("run");
   const [quickName, setQuickName] = useState("");
   const [quickDistanceKm, setQuickDistanceKm] = useState("");
+  const [quickTargetType, setQuickTargetType] = useState<QuickTargetType>("none");
   const [quickPace, setQuickPace] = useState("");
+  const [quickTargetLow, setQuickTargetLow] = useState("");
+  const [quickTargetHigh, setQuickTargetHigh] = useState("");
+  const [quickStroke, setQuickStroke] = useState<WorkoutSwimStroke>("freestyle");
   const [quickSave, setQuickSave] = useState(false);
 
   // Library
@@ -1901,6 +2030,16 @@ export function AddWorkoutModal({
     return () => { active = false; };
   }, [api, builderSport]);
 
+  /* A target belongs to a sport: a ride has no pace and a pool swim has none
+     of pace, heart rate or cadence. Changing sport with an impossible target
+     still selected would send a step COROS refuses, so it falls back to Open
+     rather than silently keeping a value that no longer applies. */
+  useEffect(() => {
+    setQuickTargetType((current) =>
+      QUICK_TARGETS[quickSport].includes(current) ? current : "none"
+    );
+  }, [quickSport]);
+
   useEffect(() => {
     if ((builderSport === "indoorClimb" || builderSport === "bouldering") && builderContext?.climbSystems[builderSport]) {
       setBuilderGradeSystem(builderContext.climbSystems[builderSport]!);
@@ -1989,28 +2128,26 @@ export function AddWorkoutModal({
 
   const submitQuick = () =>
     run(async () => {
-      const name = quickName.trim() || "Quick Run";
-      const distanceMeters = displayDistanceToMeters(
-        Number(quickDistanceKm),
-        unitSystem
-      );
-      const rawPace = quickPace.trim();
-      const pace = normalizeQuickPace(rawPace, unitSystem);
-      const entry: PlanWorkoutEntryInput = rawPace
-        ? {
-            key: "calendar-quick",
-            name,
-            steps: [
-              {
-                kind: "training",
-                target_distance_meters: Math.round(distanceMeters),
-                pace
+      const entry: PlanWorkoutEntryInput = {
+        key: "calendar-quick",
+        name: quickName.trim() || QUICK_DEFAULT_NAME[quickSport],
+        sport: quickSport,
+        // A pool swim is measured in lengths, so COROS needs the pool before
+        // it can turn a distance into a workout.
+        ...(quickSport === "swim"
+          ? {
+              sport_options: {
+                poolLength: {
+                  value: Number(builderPoolLength),
+                  unit: builderPoolUnit
+                }
               }
-            ]
-          }
-        : { key: "calendar-quick", name, distance_km: distanceMeters / 1000 };
+            }
+          : {}),
+        steps: [rowToStep(quickRow, quickSport, unitSystem)]
+      };
       await api.createAndScheduleWorkout(entry, dateKey, unitSystem, quickSave);
-    }, `Scheduled "${quickName.trim() || "Quick Run"}" on ${formatHappenDayLabel(dateKey)}.`);
+    }, `Scheduled "${quickName.trim() || QUICK_DEFAULT_NAME[quickSport]}" on ${formatHappenDayLabel(dateKey)}.`);
 
   const submitLibrary = () =>
     run(async () => {
@@ -2077,10 +2214,92 @@ export function AddWorkoutModal({
   const quickDistance = Number(quickDistanceKm);
   const quickDistanceValid = Number.isFinite(quickDistance) && quickDistance > 0;
   const quickPaceValid = isQuickPaceValid(quickPace);
-  const quickValid = quickDistanceValid && quickPaceValid;
   const quickPaceLabel = quickPace.trim()
     ? normalizeQuickPace(quickPace, unitSystem)
     : "";
+  /* A pool swim is measured in lengths, so its distance is metres or yards
+     while a run and a ride are kilometres or miles. */
+  const quickDistanceUnitLabel =
+    quickSport === "swim" ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem);
+  const quickTargets = QUICK_TARGETS[quickSport];
+  const quickIsRangeTarget = QUICK_RANGE_TARGETS.includes(quickTargetType);
+  const quickTargetUnitLabel = quickTargetUnit(
+    quickTargetType,
+    quickSport,
+    unitSystem
+  );
+
+  /*
+   * Quick builds the same `BuilderRow` the Structured tab does, so the one
+   * encoder (`rowToStep`) and the one validator (`builderRowValidationMessage`)
+   * cover both. A second, simpler encoder beside them is how the two tabs
+   * would start disagreeing about what a pace or a cadence means.
+   */
+  const quickRow = useMemo<BuilderRow>(
+    () => ({
+      id: 0,
+      kind: "training",
+      targetType: "distance",
+      distanceKm: quickDistanceKm,
+      timeMin: "",
+      pace:
+        quickTargetType === "pace" ? quickPaceRange(quickPace, unitSystem) : "",
+      repeats: "1",
+      sets: "1",
+      restSeconds: "0",
+      intensityType: quickTargetType === "none" ? "none" : quickTargetType,
+      intensityLow: quickTargetLow,
+      intensityHigh: quickTargetHigh || quickTargetLow,
+      intensityPreset: quickTargetType === "swimStroke" ? quickStroke : "",
+      intensityBasis: "maxHr",
+      intensityUnit:
+        quickTargetType === "speed"
+          ? unitSystem === "imperial"
+            ? "mph"
+            : "km/h"
+          : quickSport === "bike"
+            ? "rpm"
+            : "spm",
+      exerciseName: "",
+      exerciseId: ""
+    }),
+    [
+      quickDistanceKm,
+      quickPace,
+      quickSport,
+      quickStroke,
+      quickTargetHigh,
+      quickTargetLow,
+      quickTargetType,
+      unitSystem
+    ]
+  );
+
+  /** The chosen target as one phrase, for the preview and the step line. */
+  const quickTargetSummary =
+    quickTargetType === "none"
+      ? "Open"
+      : quickTargetType === "pace"
+        ? quickPace.trim() && quickPaceValid
+          ? quickPaceLabel
+          : "Not set"
+        : quickTargetType === "swimStroke"
+          ? formatBuilderToken(quickStroke)
+          : Number(quickTargetLow) > 0
+            ? `${builderSummaryRange(quickTargetLow, quickTargetHigh, quickTargetUnitLabel)}`
+            : "Not set";
+
+  /** The first thing standing between this form and COROS, in plain words. */
+  const quickProblem = !quickDistanceValid
+    ? "Enter a distance to enable scheduling."
+    : quickTargetType === "pace" && !quickPace.trim()
+      ? "Enter the pace to hold, or set the target to Open."
+      : quickTargetType === "pace" && !quickPaceValid
+        ? "Correct the pace format to continue."
+        : quickIsRangeTarget && !(Number(quickTargetLow) > 0)
+          ? `Enter the ${QUICK_TARGET_LABEL[quickTargetType].toLocaleLowerCase()} to hold, or set the target to Open.`
+          : builderRowValidationMessage(quickRow, quickSport, [], false, unitSystem);
+  const quickValid = !quickProblem;
   const builderValid = rows.length > 0 && rows.every((row) =>
     rowIsValid(
       row,
@@ -2219,11 +2438,31 @@ export function AddWorkoutModal({
               <div className="calendar-quick-settings">
                 <div className="calendar-quick-intro">
                   <h4>Workout settings</h4>
-                  <p>Set the basics for a simple distance workout.</p>
+                  <p>One distance, one target.</p>
                 </div>
 
                 <div className="calendar-quick-fields">
-                  <label className="calendar-field calendar-quick-name">
+                  <div className="calendar-field calendar-quick-wide">
+                    <span className="calendar-field-label">
+                      <span>Sport</span>
+                    </span>
+                    <OptionGroup
+                      label="Workout sport"
+                      fill
+                      size="md"
+                      value={quickSport}
+                      options={QUICK_SPORTS.map((sport) => ({
+                        value: sport,
+                        label: WORKOUT_SPORT_CAPABILITIES[sport].label,
+                        icon: (
+                          <BuilderSportIcon sport={sport} />
+                        )
+                      }))}
+                      onChange={setQuickSport}
+                    />
+                  </div>
+
+                  <label className="calendar-field calendar-quick-name calendar-quick-wide">
                     <span className="calendar-field-label">
                       <span>Workout name</span>
                       <small>Optional</small>
@@ -2232,11 +2471,11 @@ export function AddWorkoutModal({
                       type="text"
                       value={quickName}
                       onChange={(event) => setQuickName(event.target.value)}
-                      placeholder="Easy run"
+                      placeholder={QUICK_DEFAULT_NAME[quickSport]}
                     />
                   </label>
 
-                  <label className="calendar-field">
+                  <label className="calendar-field calendar-quick-wide">
                     <span className="calendar-field-label">
                       <span>Distance</span>
                       <small>Required</small>
@@ -2245,15 +2484,15 @@ export function AddWorkoutModal({
                       <input
                         type="number"
                         min="0"
-                        step="0.1"
+                        step={quickSport === "swim" ? "25" : "0.1"}
                         inputMode="decimal"
                         value={quickDistanceKm}
                         onChange={(event) => setQuickDistanceKm(event.target.value)}
-                        placeholder="8.0"
-                        aria-label={`Distance in ${unitSystem === "imperial" ? "miles" : "kilometres"}`}
+                        placeholder={quickSport === "swim" ? "1500" : "8.0"}
+                        aria-label={`Distance in ${quickDistanceUnitLabel}`}
                         required
                       />
-                      <span aria-hidden="true">{distanceUnit(unitSystem)}</span>
+                      <span aria-hidden="true">{quickDistanceUnitLabel}</span>
                     </span>
                     <OptionGroup
                       label="Common distances"
@@ -2262,50 +2501,138 @@ export function AddWorkoutModal({
                       value={
                         Number.isFinite(quickDistance) ? String(quickDistance) : ""
                       }
-                      options={QUICK_DISTANCE_PRESETS.map((distance) => ({
+                      options={QUICK_DISTANCE_PRESETS[quickSport].map((distance) => ({
                         value: String(distance),
-                        label: `${distance} ${distanceUnit(unitSystem)}`
+                        label: `${distance} ${quickDistanceUnitLabel}`
                       }))}
                       onChange={(next) => setQuickDistanceKm(next)}
                     />
                   </label>
 
-                  <label className="calendar-field">
+                  {quickSport === "swim" ? (
+                    <label className="calendar-field calendar-quick-wide">
+                      <span className="calendar-field-label">
+                        <span>Pool length</span>
+                        <small>From your COROS profile</small>
+                      </span>
+                      <span className="calendar-quick-input">
+                        <input
+                          type="number"
+                          min="1"
+                          value={builderPoolLength}
+                          onChange={(event) => {
+                            setBuilderPoolLength(event.target.value);
+                            setBuilderPoolUnit(
+                              unitSystem === "imperial" ? "yd" : "m"
+                            );
+                          }}
+                        />
+                        <span aria-hidden="true">{swimDistanceUnit(unitSystem)}</span>
+                      </span>
+                    </label>
+                  ) : null}
+
+                  <div className="calendar-field calendar-quick-wide">
                     <span className="calendar-field-label">
-                      <span>Target pace</span>
+                      <span>Target</span>
                       <small>Optional</small>
                     </span>
-                    <span className={`calendar-quick-input ${quickPaceValid ? "" : "has-error"}`}>
-                      <input
-                        type="text"
-                        value={quickPace}
-                        onChange={(event) => setQuickPace(event.target.value)}
-                        placeholder="5:30"
-                        aria-label={`Target pace per ${unitSystem === "imperial" ? "mile" : "kilometre"}`}
-                        aria-invalid={!quickPaceValid}
+                    {/* The kind of target and the figure to hold share a row.
+                        Stacked, the two controls plus their hint came to 133px
+                        in a 431px column and pushed the figure below the fold
+                        of the very form it belongs to. */}
+                    <div className="calendar-quick-target-row">
+                      {/* Portalled like every other dropdown in this modal.
+                          The settings column is a scroll container, and an
+                          absolutely positioned menu still counts towards its
+                          scrollable overflow — so opening the list grew the
+                          column's content, raised a scrollbar, narrowed the
+                          column and reflowed every field in it. The menu
+                          appearing is not a layout change. */}
+                      <SelectDropdown
+                        label="Workout target"
+                        value={quickTargetType}
+                        options={quickTargets.map((target) => ({
+                          value: target,
+                          label: QUICK_TARGET_LABEL[target]
+                        }))}
+                        portal
+                        onChange={(next) => setQuickTargetType(next as QuickTargetType)}
                       />
-                      <span aria-hidden="true">/{distanceUnit(unitSystem)}</span>
-                    </span>
-                    <small className={`calendar-field-help ${quickPaceValid ? "" : "is-error"}`}>
-                      {quickPaceValid
-                        ? "Use minutes and seconds, for example 5:30."
-                        : "Enter pace as minutes:seconds, for example 5:30."}
-                    </small>
-                  </label>
+
+                      {quickTargetType === "pace" ? (
+                        <span className={`calendar-quick-input ${quickPaceValid ? "" : "has-error"}`}>
+                          <input
+                            type="text"
+                            value={quickPace}
+                            onChange={(event) => setQuickPace(event.target.value)}
+                            placeholder="5:30"
+                            aria-label={`Target pace per ${unitSystem === "imperial" ? "mile" : "kilometre"}`}
+                            aria-invalid={!quickPaceValid}
+                          />
+                          <span aria-hidden="true">/{distanceUnit(unitSystem)}</span>
+                        </span>
+                      ) : null}
+
+                      {quickIsRangeTarget ? (
+                        <>
+                          <span className="calendar-quick-input">
+                            <input
+                              type="number"
+                              min="0"
+                              inputMode="decimal"
+                              value={quickTargetLow}
+                              onChange={(event) => setQuickTargetLow(event.target.value)}
+                              placeholder="Low"
+                              aria-label={`${QUICK_TARGET_LABEL[quickTargetType]} low`}
+                            />
+                            <span aria-hidden="true">{quickTargetUnitLabel}</span>
+                          </span>
+                          <span className="calendar-quick-input">
+                            <input
+                              type="number"
+                              min="0"
+                              inputMode="decimal"
+                              value={quickTargetHigh}
+                              onChange={(event) => setQuickTargetHigh(event.target.value)}
+                              placeholder="High"
+                              aria-label={`${QUICK_TARGET_LABEL[quickTargetType]} high`}
+                            />
+                            <span aria-hidden="true">{quickTargetUnitLabel}</span>
+                          </span>
+                        </>
+                      ) : null}
+
+                      {quickTargetType === "swimStroke" ? (
+                        <SelectDropdown
+                          label="Swim stroke"
+                          value={quickStroke}
+                          options={Object.keys(SWIM_STROKE_IDS).map((stroke) => ({
+                            value: stroke,
+                            label: formatBuilderToken(stroke)
+                          }))}
+                          portal
+                          onChange={(next) => setQuickStroke(next as WorkoutSwimStroke)}
+                        />
+                      ) : null}
+                    </div>
+
+                    {quickTargetType === "pace" ? (
+                      <small className={`calendar-field-help ${quickPaceValid ? "" : "is-error"}`}>
+                        {quickPaceValid
+                          ? "One pace to hold, or a range like 5:20-5:40."
+                          : "Enter pace as minutes:seconds, for example 5:30."}
+                      </small>
+                    ) : null}
+
+                    {quickIsRangeTarget ? (
+                      <small className="calendar-field-help">
+                        Leave the high value empty to hold a single figure.
+                      </small>
+                    ) : null}
+                  </div>
                 </div>
 
-                <label className={`calendar-quick-save ${quickSave ? "is-checked" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={quickSave}
-                    onChange={(event) => setQuickSave(event.target.checked)}
-                  />
-                  <BookmarkPlus size={18} aria-hidden="true" />
-                  <span>
-                    <strong>Save to workout library</strong>
-                    <small>Keep a reusable copy after scheduling.</small>
-                  </span>
-                </label>
               </div>
 
               <section className="calendar-quick-preview" aria-labelledby="calendar-quick-preview-title" aria-live="polite">
@@ -2320,9 +2647,9 @@ export function AddWorkoutModal({
                 </header>
 
                 <div className="calendar-quick-preview-title">
-                  <span aria-hidden="true"><RunnerIcon size={20} /></span>
+                  <span aria-hidden="true"><BuilderSportIcon sport={quickSport} size={20} /></span>
                   <div>
-                    <strong>{quickName.trim() || "Quick Run"}</strong>
+                    <strong>{quickName.trim() || QUICK_DEFAULT_NAME[quickSport]}</strong>
                     <small>Distance workout</small>
                   </div>
                 </div>
@@ -2330,11 +2657,16 @@ export function AddWorkoutModal({
                 <dl className="calendar-quick-preview-metrics">
                   <div>
                     <dt>Distance</dt>
-                    <dd>{quickDistanceValid ? `${quickDistance.toLocaleString()} ${distanceUnit(unitSystem)}` : "-"}</dd>
+                    <dd>{quickDistanceValid ? `${quickDistance.toLocaleString()} ${quickDistanceUnitLabel}` : "-"}</dd>
                   </div>
                   <div>
-                    <dt>Target pace</dt>
-                    <dd>{quickPaceLabel && quickPaceValid ? quickPaceLabel : "Open"}</dd>
+                    {/* "Open" is the value, so it cannot also be the label. */}
+                    <dt>
+                      {quickTargetType === "none"
+                        ? "Target"
+                        : QUICK_TARGET_LABEL[quickTargetType]}
+                    </dt>
+                    <dd>{quickTargetSummary}</dd>
                   </div>
                   <div>
                     <dt>Estimated time</dt>
@@ -2342,13 +2674,28 @@ export function AddWorkoutModal({
                   </div>
                 </dl>
 
+                <label className={`calendar-quick-save ${quickSave ? "is-checked" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={quickSave}
+                    onChange={(event) => setQuickSave(event.target.checked)}
+                  />
+                  <BookmarkPlus size={18} aria-hidden="true" />
+                  <span>
+                    <strong>Save to workout library</strong>
+                    <small>Keep a reusable copy after scheduling.</small>
+                  </span>
+                </label>
+
                 <div className="calendar-quick-preview-step">
                   <span aria-hidden="true">1</span>
                   <div>
-                    <strong>Run</strong>
+                    <strong>{WORKOUT_SPORT_CAPABILITIES[quickSport].label}</strong>
                     <small>
-                      {quickDistanceValid ? `${quickDistance.toLocaleString()} ${distanceUnit(unitSystem)}` : "Set a distance"}
-                      {quickPaceLabel && quickPaceValid ? ` at ${quickPaceLabel}` : " at open pace"}
+                      {quickDistanceValid ? `${quickDistance.toLocaleString()} ${quickDistanceUnitLabel}` : "Set a distance"}
+                      {quickTargetType === "none"
+                        ? " at open effort"
+                        : ` at ${quickTargetSummary.toLocaleLowerCase()}`}
                     </small>
                   </div>
                 </div>
@@ -2356,18 +2703,16 @@ export function AddWorkoutModal({
 
               <footer className="calendar-modal-footer">
                 <div className="calendar-quick-summary" aria-live="polite">
-                  {quickDistanceValid && quickPaceValid ? (
+                  {quickValid ? (
                     <>
                       <span>Workout total</span>
                       <strong>
-                        {quickDistance.toLocaleString()} {distanceUnit(unitSystem)}
+                        {quickDistance.toLocaleString()} {quickDistanceUnitLabel}
                         {quickDuration ? `, about ${quickDuration}` : ""}
                       </strong>
                     </>
-                  ) : !quickDistanceValid ? (
-                    <span>Enter a distance to enable scheduling.</span>
                   ) : (
-                    <span>Correct the pace format to continue.</span>
+                    <span>{quickProblem}</span>
                   )}
                 </div>
                 <button
@@ -2413,12 +2758,12 @@ export function AddWorkoutModal({
                             .join(" · ") || "No calculated totals"}
                         </span>
                       </button>
-                      {item.sportType && item.sportType >= 1 && item.sportType <= 9 ? (
-                        <button type="button" className="ghost-button calendar-library-edit" onClick={() => onEditLibrary(item.id)}>
-                          <Pencil size={13} aria-hidden="true" /> Edit
+                      {onViewLibrary && item.sportType && item.sportType >= 1 && item.sportType <= 9 ? (
+                        <button type="button" className="ghost-button calendar-library-edit" onClick={() => onViewLibrary(item.id)}>
+                          <Eye size={13} aria-hidden="true" /> View
                         </button>
                       ) : (
-                        <span className="calendar-library-readonly">View only</span>
+                        <span className="calendar-library-readonly">No preview</span>
                       )}
                     </div>
                   ))
