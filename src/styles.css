@@ -26035,21 +26035,24 @@ tr.data-intervals-row-missing {
     text-transform: uppercase;
   }
 
-  /* Sport and the workout name are one control tall each and share a row; the
-     distance, the pool and the target each carry a second control under them
-     and take the whole width. Stacking all five was 118px more than the column
-     had, which cut the target inputs in half. */
+  /* Every Quick field takes the whole column here: the distance, the pool and
+     the target each carry a second control under them, and the sport is a
+     three-option group that a half column cannot hold. The track stays two
+     columns wide from the rule above so the spans have something to span.
+
+     There is deliberately no `grid-column: auto` exception for the workout
+     name. One stood here, and it never applied: the name field carries
+     `.calendar-quick-wide` too, and `.calendar-modal-quick
+     .calendar-quick-fields > .calendar-quick-wide` is three classes against
+     that rule's two, so the span won wherever both matched. Pairing the sport
+     and the name on one row means dropping the class in the markup, not
+     writing a reset that loses. */
   .calendar-modal-quick .calendar-quick-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
 
   .calendar-modal-quick .calendar-quick-fields > .calendar-quick-wide {
     grid-column: 1 / -1;
-  }
-
-  .calendar-modal-quick .calendar-quick-name {
-    grid-column: auto;
   }
 
   .calendar-quick-preview {
