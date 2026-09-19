@@ -29,7 +29,6 @@ export function ClaudeAuthScopeToggle({
   return (
     <OptionGroup
       label="Claude credentials"
-      className="chat-auth-scope-switch"
       value={appScoped ? "app" : "device"}
       // The labels are short and the full sentence is the title: the long
       // spellings ("Heracles Records-only Claude login") made this the widest

@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFileSync } from "node:fs";
+import { readSource, sourceReader } from "./lib/read-source.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const distUrl = (file) =>
@@ -620,10 +621,7 @@ assert.equal(setCoachAnalysisSchedule("missing", {}, db), null);
 // --- 2.4 is wired to the real delete path, not just exported ---------------
 // applyAnalysisSessionDeleted is only useful if deleting a conversation
 // actually calls it; without this the lifecycle silently never fires.
-const chatServiceSource = readFileSync(
-  path.join(repoRoot, "electron", "chatService.ts"),
-  "utf8"
-);
+const chatServiceSource = readSource(repoRoot, "electron", "chatService.ts");
 assert.match(
   chatServiceSource,
   /export function deleteChatSessionById\([\s\S]*?applyAnalysisSessionDeleted\(id\)/,
@@ -741,7 +739,7 @@ assert.match(
 // about behaviour lives in `test:coach-analysis-renderer`, which mounts these
 // components and drives them — a regex could not say the code ran.
 {
-  const read = (...parts) => readFileSync(path.join(repoRoot, ...parts), "utf8");
+  const read = sourceReader(repoRoot);
 
   const row = read("src", "chat", "ChatSessionRow.tsx");
   assert.match(

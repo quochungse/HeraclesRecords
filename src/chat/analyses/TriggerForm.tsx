@@ -249,7 +249,6 @@ export function TriggerForm({
           <legend>Fires after a new activity</legend>
           <OptionChips
             label="Sports that fire this analysis"
-            className="coach-analysis-sports"
             values={activityTrigger.sportTypes.map(String)}
             options={SPORT_FILTER_OPTIONS.map((sport) => ({
               value: String(sport.value),

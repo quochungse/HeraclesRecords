@@ -437,13 +437,13 @@ async function main() {
     await mountRunning({ activities: RUNS, activitiesStatus: "ready", width: 1000 });
     const pressed = () =>
       win.webContents.executeJavaScript(
-        `[...document.querySelectorAll(".running-controls .training-metric-option[aria-pressed=true]")].map((chip) => chip.textContent.trim())`,
+        `[...document.querySelectorAll(".running-controls .option-group button[aria-checked=true]")].map((chip) => chip.textContent.trim())`,
         true
       );
-    assert.equal(await harness("count", ".running-controls .training-metric-toggle"), 2);
+    assert.equal(await harness("count", ".running-controls .option-group"), 2);
     assert.deepEqual(await pressed(), ["All", "3 months"]);
     await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".running-period .training-metric-option")].find((chip) => chip.textContent.trim() === "1 year").click()`,
+      `[...document.querySelectorAll(".running-period button")].find((chip) => chip.textContent.trim() === "1 year").click()`,
       true
     );
     await settle();
@@ -539,21 +539,21 @@ async function main() {
     );
 
     const pressedAxis = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".activity-chart-axis .training-metric-option[aria-pressed=true]")].map((chip) => chip.textContent.trim())`,
+      `[...document.querySelectorAll(".activity-chart-axis button[aria-checked=true]")].map((chip) => chip.textContent.trim())`,
       true
     );
     assert.deepEqual(pressedAxis, ["Time"]);
-    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 2, "pace and heart rate open");
+    assert.equal(await harness("count", ".activity-chart-chips button[aria-pressed=true]"), 2, "pace and heart rate open");
 
     // "Try again" re-fetches the same run and hands back a new detail object
     // with the same readings. That is not a different run, and the athlete's
     // chip choice survives it — the reset used to key on the object.
     await win.webContents.executeJavaScript(
-      `document.querySelectorAll(".activity-chart-chip.is-active")[1].click()`,
+      `document.querySelectorAll(".activity-chart-chips button[aria-pressed=true]")[1].click()`,
       true
     );
     await settle();
-    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 1, "one channel turned off");
+    assert.equal(await harness("count", ".activity-chart-chips button[aria-pressed=true]"), 1, "one channel turned off");
     await harness("setProps", {
       detail: {
         activityId: target.activityId,
@@ -570,16 +570,16 @@ async function main() {
     });
     await settle();
     assert.equal(
-      await harness("count", ".activity-chart-chip.is-active"),
+      await harness("count", ".activity-chart-chips button[aria-pressed=true]"),
       1,
       "the same run's detail arriving again keeps the channels the athlete chose"
     );
     await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".activity-chart-chip")].find((chip) => !chip.classList.contains("is-active")).click()`,
+      `[...document.querySelectorAll(".activity-chart-chips button[aria-pressed=false]")][0].click()`,
       true
     );
     await settle();
-    assert.equal(await harness("count", ".activity-chart-chip.is-active"), 2);
+    assert.equal(await harness("count", ".activity-chart-chips button[aria-pressed=true]"), 2);
 
     // No panel's content reaches past its own bottom edge — which is what a
     // squeezed grid row looks like, whatever squeezed it. Content inside
@@ -702,15 +702,49 @@ async function main() {
     await settle();
     assert.equal(await harness("exists", ".activity-route-modal"), false, "the backdrop closes it");
 
-    // Only the either/or switches took the heatmap's look; the channel chips
-    // are a pick-any-two set and keep their own, coloured by channel.
-    assert.equal(await harness("count", ".activity-chart-chips .training-metric-option"), 0);
+    // Only the either/or switches are a segmented control; the channel chips
+    // are a pick-any-two set and keep their own look, coloured by channel.
+    // Both go through `OptionGroup.tsx` now, so what separates them is which
+    // export they came from: a radiogroup whose chips answer `aria-checked`,
+    // or a group of toggles that answer `aria-pressed`. The old spelling of
+    // this check counted a class that no longer exists anywhere, which passes
+    // for free and says nothing.
+    assert.equal(
+      await harness("count", ".activity-chart-chips.option-chips"),
+      1,
+      "the channel chips are a multi-select set, not a segmented control"
+    );
+    assert.equal(
+      await harness("count", ".activity-chart-chips.option-group"),
+      0
+    );
+    assert.equal(
+      await harness("count", ".activity-chart-chips button[aria-checked]"),
+      0,
+      "and no channel chip pretends to be one of a set of alternatives"
+    );
+    // The channel's colour arrives as `--option-chip-color` and is spent by
+    // `.option-chips button[aria-pressed="true"]`, so what has to be read is
+    // what the chip paints, not what its `style` attribute spells: an inline
+    // `borderColor` is what the hand-written chips used to set, and reading
+    // that again would pass for as long as the property merely exists.
     const chipColours = await win.webContents.executeJavaScript(
-      `[...document.querySelectorAll(".activity-chart-chip.is-active")].map((chip) => chip.style.borderColor)`,
+      `[...document.querySelectorAll(".activity-chart-chips button[aria-pressed=true]")].map((chip) => ({
+        declared: chip.style.getPropertyValue("--option-chip-color").trim(),
+        painted: getComputedStyle(chip).borderTopColor
+      }))`,
       true
     );
     assert.equal(chipColours.length, 2);
-    assert.ok(chipColours.every(Boolean), "a pressed channel chip wears its channel's colour");
+    assert.ok(
+      chipColours.every((chip) => chip.declared),
+      "a pressed channel chip is handed its channel's colour"
+    );
+    assert.equal(
+      new Set(chipColours.map((chip) => chip.painted)).size,
+      2,
+      "and two channels do not paint the same border"
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -854,7 +888,7 @@ async function main() {
       );
     const pickPeriod = (label) =>
       win.webContents.executeJavaScript(
-        `[...document.querySelectorAll(".running-period .training-metric-option")].find((chip) => chip.textContent.trim() === ${JSON.stringify(label)}).click()`,
+        `[...document.querySelectorAll(".running-period button")].find((chip) => chip.textContent.trim() === ${JSON.stringify(label)}).click()`,
         true
       );
 

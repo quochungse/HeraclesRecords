@@ -1400,6 +1400,9 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   );
 }
 
+// Windows will not unlink a file that is still open, so the handle has to
+// go before the tree does.
+database.closeDatabase();
 await Promise.all(
   tempRoots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );

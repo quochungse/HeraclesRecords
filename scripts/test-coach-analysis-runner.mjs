@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { readSource } from "./lib/read-source.mjs";
 
 const require = createRequire(import.meta.url);
 const Module = require("node:module");
@@ -151,10 +152,7 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
 // source level — the same trick test-ipc-surface.mjs uses for invariants
 // TypeScript cannot see.
 {
-  const chatView = fs.readFileSync(
-    path.join(repoRoot, "src", "chat", "ChatView.tsx"),
-    "utf8"
-  );
+  const chatView = readSource(repoRoot, "src", "chat", "ChatView.tsx");
   assert.match(
     chatView,
     /NOTHING_TO_REPORT\.startsWith\(liveAnalysis\.text\.trim\(\)\)/,
@@ -181,10 +179,7 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
   // The renderer rebuilds entries field by field in both directions. A missing
   // *branch* is a compile error, because the union has one; a missing *field*
   // is not, and would silently drop the timestamp on every reload.
-  const chatTypes = fs.readFileSync(
-    path.join(repoRoot, "src", "chat", "chatTypes.ts"),
-    "utf8"
-  );
+  const chatTypes = readSource(repoRoot, "src", "chat", "chatTypes.ts");
   assert.equal(
     (
       chatTypes.match(

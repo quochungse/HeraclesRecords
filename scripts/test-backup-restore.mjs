@@ -608,6 +608,9 @@ console.log("ok  an old backup restores its data and none of its credentials");
 }
 console.log("ok  an unknown column is dropped rather than failing the restore");
 
+// Windows will not unlink a file that is still open, so the handle has to
+// go before the tree does.
+database.closeDatabase();
 for (const dir of tempRoots) {
   await fsp.rm(dir, { recursive: true, force: true });
 }

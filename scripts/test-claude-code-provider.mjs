@@ -65,9 +65,12 @@ const windowsCandidates = getClaudeExecutableCandidates(undefined, "win32", {
   USERPROFILE: "C:\\Users\\tester",
   LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local"
 });
+// `path.win32`, not `path.join`: the candidates are built for the platform
+// being asked about, so the separator they carry is Windows's whichever host
+// runs this.
 assert.ok(
   windowsCandidates.some((candidate) =>
-    candidate.endsWith(path.join("Programs", "Claude", "claude.exe"))
+    candidate.endsWith(path.win32.join("Programs", "Claude", "claude.exe"))
   )
 );
 

@@ -759,6 +759,30 @@ export function requireDatabase(): Database.Database {
   return db;
 }
 
+/**
+ * Release the handle, so the file can be removed.
+ *
+ * The app never calls this — it owns one database for the life of the process
+ * and the OS closes it at exit. The suites do: each opens a database under a
+ * temp directory and deletes the tree afterwards, and Windows refuses to
+ * unlink a file that is still open (EBUSY on the database, EPERM on the
+ * directory holding it). So every one of them passed its assertions and then
+ * died in teardown, on an error naming a temp path and nothing about the
+ * subject.
+ *
+ * It clears the module's handle as well as closing it, because
+ * `initializeDatabase` returns the existing one when there is any — a test
+ * that closed without clearing would be handed the closed handle back.
+ */
+export function closeDatabase(): void {
+  if (!db) {
+    return;
+  }
+  const open = db;
+  db = undefined;
+  open.close();
+}
+
 function toLocalTrack(row: DownloadRow): LocalTrack {
   return {
     id: row.id,

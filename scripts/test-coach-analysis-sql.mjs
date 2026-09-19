@@ -596,5 +596,8 @@ corruptAnalysis(corruptAnalysisId, {});
   assert.equal(free.outputTokens, 0);
 }
 
+// Windows will not unlink a file that is still open, so the handle has to
+// go before the tree does.
+database.closeDatabase();
 fs.rmSync(tempRoot, { recursive: true, force: true });
 console.log("coach analysis sql tests passed");

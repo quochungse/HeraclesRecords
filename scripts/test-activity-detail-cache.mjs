@@ -33,8 +33,20 @@ const makeTemp = (prefix) => {
   tempDirs.push(dir);
   return dir;
 };
+// Set once the database module has been imported, so the handle can be let go
+// before the tree it lives in is removed: Windows will not unlink an open file,
+// and the suite used to pass every assertion and then die on an EPERM naming a
+// temp path. Declared ahead of the handler and guarded, because this also runs
+// when an assertion threw before anything was ever opened.
+let releaseDatabase;
+
 // On every exit, so a failing assertion does not leave the trees behind.
 process.on("exit", () => {
+  try {
+    releaseDatabase?.();
+  } catch {
+    // Nothing open, or already closed.
+  }
   for (const dir of tempDirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -48,6 +60,7 @@ const metrics = await import(distUrl("activityMetrics.js"));
 const service = await import(distUrl("trainingHubService.js"));
 
 database.initializeDatabase(tempRoot);
+releaseDatabase = database.closeDatabase;
 database.setSetting("trainingHub.userId", "athlete-1");
 cache.initializeActivityDetailCache(tempRoot);
 

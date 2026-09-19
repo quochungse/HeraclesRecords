@@ -108,22 +108,29 @@ export function getClaudeExecutableCandidates(
   const candidates = [customPath?.trim()].filter(
     (value): value is string => Boolean(value)
   );
+  // Joined for the platform being asked about, not for the one asking. Both
+  // extra parameters exist so a suite can ask about the other platform, and
+  // bare `path` is whichever host is running — so a Windows machine answered
+  // the darwin question with `\Users\me\.local\bin\claude`, a path that names
+  // nothing anywhere. At run time `platform` is `process.platform` and the two
+  // are the same module.
+  const join = platform === "win32" ? path.win32.join : path.posix.join;
 
   if (platform === "win32") {
     if (env.LOCALAPPDATA) {
       candidates.push(
-        path.join(env.LOCALAPPDATA, "Programs", "Claude", "claude.exe"),
-        path.join(env.LOCALAPPDATA, "Claude", "claude.exe")
+        join(env.LOCALAPPDATA, "Programs", "Claude", "claude.exe"),
+        join(env.LOCALAPPDATA, "Claude", "claude.exe")
       );
     }
     candidates.push(
-      path.join(home, ".local", "bin", "claude.exe"),
-      path.join(home, ".claude", "local", "claude.exe")
+      join(home, ".local", "bin", "claude.exe"),
+      join(home, ".claude", "local", "claude.exe")
     );
   } else {
     candidates.push(
-      path.join(home, ".local", "bin", "claude"),
-      path.join(home, ".claude", "local", "claude"),
+      join(home, ".local", "bin", "claude"),
+      join(home, ".claude", "local", "claude"),
       "/opt/homebrew/bin/claude",
       "/usr/local/bin/claude",
       "/usr/bin/claude"

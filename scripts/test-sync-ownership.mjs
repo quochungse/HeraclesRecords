@@ -221,6 +221,9 @@ console.log("ok  claiming transfers the vault and forces a republish");
 }
 console.log("ok  a vault from before ownership is adopted, not rejected");
 
+// Windows will not unlink a file that is still open, so the handle has to
+// go before the tree does.
+database.closeDatabase();
 for (const dir of tempRoots) {
   await fsp.rm(dir, { recursive: true, force: true });
 }

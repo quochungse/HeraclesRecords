@@ -2,6 +2,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { readSource } from "./lib/read-source.mjs";
 
 const require = createRequire(import.meta.url);
 const Module = require("node:module");
@@ -456,10 +457,7 @@ assert.deepEqual(persisted[1].automation, marker);
 // that under-reports — so the rule is one function rather than a habit at each
 // throw site, and this asserts the function still carries it.
 {
-  const source = fs.readFileSync(
-    path.join(repoRoot, "electron", "chatService.ts"),
-    "utf8"
-  );
+  const source = readSource(repoRoot, "electron", "chatService.ts");
   assert.match(
     source,
     /const sendStreamError = \(payload: \{[\s\S]{0,240}?\.\.\.\(usage \? \{ usage \} : \{\}\)/,

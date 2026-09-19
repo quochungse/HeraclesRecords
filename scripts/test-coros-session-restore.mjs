@@ -808,6 +808,9 @@ for (const [name, run] of cases) {
   }
 }
 
+// Windows will not unlink a file that is still open, so the handle has to
+// go before the tree does.
+database.closeDatabase();
 fs.rmSync(userData, { recursive: true, force: true });
 Module._load = originalLoad;
 

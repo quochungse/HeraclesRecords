@@ -24,7 +24,12 @@ const { LocalFolderProvider } = await load("localFolderProvider.js");
 const { Lease, isExpired, leasePath, DEFAULT_LEASE_TTL_MS } = await load(
   "lease.js"
 );
-const { attachAutomationLeases, runExclusively } = await load(
+// The file keeps its pre-rename name on purpose; the exports do not.
+// `analysisLeaseName` is imported rather than spelled out because this suite
+// used to build "automation-<id>" by hand beside a `runExclusively` that had
+// been renamed to mint "analysis-<id>" — two names for one lease, so every
+// hand-built Lease here was reading a file the code under test never wrote.
+const { attachAnalysisLeases, analysisLeaseName, runExclusively } = await load(
   "automationLease.js"
 );
 
@@ -180,7 +185,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
 // ===========================================================================
 
 {
-  attachAutomationLeases(null);
+  attachAnalysisLeases(null);
   let ran = 0;
   const outcome = await runExclusively("auto-1", async () => {
     ran += 1;
@@ -195,7 +200,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   const root = tempRoot("automation");
   const skipped = [];
   const attach = (device) =>
-    attachAutomationLeases({
+    attachAnalysisLeases({
       enabled: () => true,
       provider: providerFor(root),
       deviceId: () => device,
@@ -206,7 +211,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
 
   let runs = 0;
   // device-a starts and is still working when device-b comes due.
-  const held = await new Lease("automation-morning", {
+  const held = await new Lease(analysisLeaseName("morning"), {
     provider: providerFor(root),
     deviceId: () => "device-a",
     now: () => Date.now(),
@@ -229,7 +234,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   assert.equal(skipped.length, 1, "the skip is reported, not swallowed");
 
   // Once the first finishes, the next machine may run it.
-  await new Lease("automation-morning", {
+  await new Lease(analysisLeaseName("morning"), {
     provider: providerFor(root),
     deviceId: () => "device-a",
     now: () => Date.now()
@@ -246,7 +251,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
 // Different automations do not block each other.
 {
   const root = tempRoot("parallel");
-  attachAutomationLeases({
+  attachAnalysisLeases({
     enabled: () => true,
     provider: providerFor(root),
     deviceId: () => "device-a",
@@ -275,7 +280,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   const lost = [];
   let fire = null;
 
-  attachAutomationLeases({
+  attachAnalysisLeases({
     enabled: () => true,
     provider: providerFor(root),
     deviceId: () => "device-a",
@@ -292,7 +297,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
     onLeaseLost: (id) => lost.push(id)
   });
 
-  const before = await new Lease("automation-slow", {
+  const before = await new Lease(analysisLeaseName("slow"), {
     provider: providerFor(root),
     deviceId: () => "device-b",
     now: () => Date.now()
@@ -300,7 +305,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   assert.equal(before, null, "nobody holds it to begin with");
 
   const outcome = await runExclusively("slow", async () => {
-    const first = await new Lease("automation-slow", {
+    const first = await new Lease(analysisLeaseName("slow"), {
       provider: providerFor(root),
       deviceId: () => "device-b",
       now: () => Date.now()
@@ -312,7 +317,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
     await new Promise((resolve) => setImmediate(resolve));
     renewals += 1;
 
-    const renewed = await new Lease("automation-slow", {
+    const renewed = await new Lease(analysisLeaseName("slow"), {
       provider: providerFor(root),
       deviceId: () => "device-b",
       now: () => Date.now()
@@ -333,7 +338,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   assert.equal(renewals, 1);
   assert.deepEqual(lost, [], "the holder was never fenced out");
   assert.equal(
-    await new Lease("automation-slow", {
+    await new Lease(analysisLeaseName("slow"), {
       provider: providerFor(root),
       deviceId: () => "device-b",
       now: () => Date.now()
@@ -349,7 +354,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   const lost = [];
   let fire = null;
 
-  attachAutomationLeases({
+  attachAnalysisLeases({
     enabled: () => true,
     provider: providerFor(root),
     deviceId: () => "device-a",
@@ -369,7 +374,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
     // Another device takes it over — as it would after this one suspended past
     // the TTL — which invalidates the revision this holder renews against.
     await new LocalFolderProvider({ root }).put(
-      leasePath("automation-stolen"),
+      leasePath(analysisLeaseName("stolen")),
       Buffer.from(
         JSON.stringify({
           holder: "device-b",
@@ -388,7 +393,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
     ["stolen"],
     "a renewal that loses the race reports it rather than throwing"
   );
-  const after = await new Lease("automation-stolen", {
+  const after = await new Lease(analysisLeaseName("stolen"), {
     provider: providerFor(root),
     deviceId: () => "device-c",
     now: () => Date.now()
@@ -403,7 +408,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
 // The lease is released even when the work throws.
 {
   const root = tempRoot("throwing");
-  attachAutomationLeases({
+  attachAnalysisLeases({
     enabled: () => true,
     provider: providerFor(root),
     deviceId: () => "device-a",
@@ -418,7 +423,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
     /the run blew up/
   );
 
-  const after = await new Lease("automation-fragile", {
+  const after = await new Lease(analysisLeaseName("fragile"), {
     provider: providerFor(root),
     deviceId: () => "device-b",
     now: () => Date.now()
@@ -430,7 +435,7 @@ const providerFor = (root) => () => new LocalFolderProvider({ root });
   );
 }
 
-attachAutomationLeases(null);
+attachAnalysisLeases(null);
 await Promise.all(
   roots.map((root) => fsp.rm(root, { recursive: true, force: true }))
 );
