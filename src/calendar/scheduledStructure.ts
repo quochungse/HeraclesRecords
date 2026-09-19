@@ -713,11 +713,16 @@ function draftTargetView(
  * to total.
  */
 export function formatPlannedVolume(
-  totals: ScheduledStructureTotals,
-  volume: string | undefined,
+  /*
+   * Typed by the two figures it reads rather than by `ScheduledStructureTotals`,
+   * so the calendar can pass the `PlannedTargets` it already computed while
+   * pairing instead of rebuilding the whole structure view for a chip.
+   */
+  totals: Pick<ScheduledStructureTotals, "distanceMeters" | "durationSeconds">,
   unitSystem: UnitSystem,
   swim: boolean,
-  fallback: string
+  /* Lazy: COROS's string is only formatted when the steps had nothing to say. */
+  fallback: () => string
 ): string {
   if (totals.distanceMeters) {
     return formatStepDistanceLabel(totals.distanceMeters, unitSystem, swim);
@@ -725,5 +730,5 @@ export function formatPlannedVolume(
   if (totals.durationSeconds) {
     return formatStepTimeLabel(totals.durationSeconds);
   }
-  return volume ? fallback : "--";
+  return fallback();
 }

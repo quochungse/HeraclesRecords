@@ -72,6 +72,7 @@ import {
   strengthTonnage
 } from "./WorkoutStructureView";
 import { workoutSportView } from "./workoutSportIcons";
+import { isStrengthStyleWorkout } from "../training/workoutSport";
 import {
   CLIMB_GRADES,
   CLIMB_SYSTEM_IDS,
@@ -849,7 +850,7 @@ function WorkoutReadOnlyBody({
     [draft, exercisesById, unitSystem]
   );
   const { category, icon: SportIcon } = workoutSportView(draft.sport);
-  const isStrength = draft.sport === "strength" || draft.sport === "hyrox";
+  const isStrength = isStrengthStyleWorkout(draft.sport);
   const strength = useMemo(() => strengthTotals(draft), [draft]);
   const tonnage = useMemo(() => strengthTonnage(flatSteps(view)), [view]);
 

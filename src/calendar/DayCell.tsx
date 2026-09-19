@@ -19,15 +19,8 @@ import {
   parseCalendarDragPayload,
   type CalendarDragPayload
 } from "./calendarDrag";
-import type {
-  CalendarDay,
-  PlannedActualPair,
-  PlannedTargets
-} from "./calendarTypes";
-import {
-  formatStepDistanceLabel,
-  formatStepTimeLabel
-} from "./scheduledStructure";
+import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
+import { formatPlannedVolume } from "./scheduledStructure";
 import { dayNumber } from "./dateUtils";
 import {
   scheduledSportCategory,
@@ -111,29 +104,6 @@ function loadLine(actual: number | undefined, planned: number | undefined): stri
   return `${Math.round(actual ?? 0)} / ${Math.round(planned)} TL`;
 }
 
-/**
- * What the plan asks for, on a chip.
- *
- * COROS's `volume` string reports a step count whenever a program has more
- * than one step, so a 13 km long run built as warm-up, main and cool-down read
- * "3 set(s)". The steps are asked first and the string is kept for a strength
- * workout, where sets really are the volume.
- */
-function plannedVolumeLine(
-  targets: PlannedTargets,
-  volume: string | undefined,
-  unitSystem: UnitSystem,
-  swim: boolean
-): string {
-  if (targets.distanceMeters) {
-    return formatStepDistanceLabel(targets.distanceMeters, unitSystem, swim);
-  }
-  if (targets.durationSeconds) {
-    return formatStepTimeLabel(targets.durationSeconds);
-  }
-  return formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
-}
-
 function activityStatsLine(
   activity: TrainingHubActivity,
   unitSystem: UnitSystem
@@ -181,6 +151,7 @@ function PairChip({
     // Completed: lead with the actual activity, show planned vs actual load.
     const plannedLoad = scheduled.trainingLoad;
     const actualLoad = activity.trainingLoad;
+    const pairedLoadLine = loadLine(actualLoad, plannedLoad);
     return (
       <button
         type="button"
@@ -222,7 +193,7 @@ function PairChip({
           ) : null}
         </span>
         <span className="calendar-chip-meta">{activityStatsLine(activity, unitSystem)}</span>
-        {loadLine(actualLoad, plannedLoad) ? (
+        {pairedLoadLine ? (
           <span
             className="calendar-chip-meta calendar-chip-load"
             title={
@@ -231,7 +202,7 @@ function PairChip({
                 : `${Math.round(actualLoad ?? 0)} TL done of ${Math.round(plannedLoad)} TL planned`
             }
           >
-            {loadLine(actualLoad, plannedLoad)}
+            {pairedLoadLine}
           </span>
         ) : null}
       </button>
@@ -300,12 +271,18 @@ function PairChip({
         <span className="calendar-chip-name">{scheduled.name}</span>
       </span>
       <span className="calendar-chip-meta">
-        {plannedVolumeLine(
+        {/* The same figures the scheduled detail shows under "Volume", so a
+            chip and the panel it opens cannot disagree about what was asked
+            for. COROS's own `volume` string is the fallback, and only that:
+            it reports a step count whenever a program has more than one step,
+            so a 13 km long run built as warm-up, main and cool-down reads
+            "3 set(s)" — right for a strength session, wrong for that run. */}
+        {formatPlannedVolume(
           pair.targets,
-          scheduled.volume,
           unitSystem,
           // A program sport code, not an activity code: swim is 3 here.
-          scheduledWorkoutSport(scheduled.sportType) === "swim"
+          scheduledWorkoutSport(scheduled.sportType) === "swim",
+          () => formatUpcomingWorkoutVolumeDisplay(scheduled.volume, unitSystem)
         )}
         {scheduled.trainingLoad !== undefined && !missed
           ? ` · ${Math.round(scheduled.trainingLoad)} TL`

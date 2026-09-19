@@ -90,6 +90,7 @@ export function UpcomingWorkoutsPanel({
                 workout.trainingLoad,
                 unitSystem
               );
+              const tag = planTag(workout);
 
               return (
                 <li
@@ -112,10 +113,8 @@ export function UpcomingWorkoutsPanel({
                         <strong className="training-upcoming-title">
                           {workout.name}
                         </strong>
-                        {planTag(workout) ? (
-                          <span className="training-upcoming-tag">
-                            {planTag(workout)}
-                          </span>
+                        {tag ? (
+                          <span className="training-upcoming-tag">{tag}</span>
                         ) : null}
                       </span>
                       {rowStats ? (

@@ -30,6 +30,7 @@ import {
 import { sportColorCategory } from "../training/sportColors";
 import { resolveSportName } from "../training/sportTypes";
 import { workoutSportView } from "./workoutSportIcons";
+import { isStrengthStyleWorkout } from "../training/workoutSport";
 import {
   buildScheduledWorkoutView,
   formatPlannedVolume,
@@ -91,7 +92,7 @@ export function ScheduledWorkoutDetail({
   // badge on swims/rides/strength sessions.
   const showCategoryChip =
     category === "run" || category === "trail" || workoutCategory !== "Run";
-  const isStrength = sport === "strength";
+  const isStrength = isStrengthStyleWorkout(sport);
   const SportIcon = sportMeta?.icon ?? Activity;
 
   const rise = (delay: number) =>
@@ -107,11 +108,7 @@ export function ScheduledWorkoutDetail({
     {
       icon: Route,
       label: "Volume",
-      value: formatPlannedVolume(
-        view.totals,
-        entry.volume,
-        unitSystem,
-        sport === "swim",
+      value: formatPlannedVolume(view.totals, unitSystem, sport === "swim", () =>
         formatDetailVolume(entry.volume, unitSystem)
       )
     },

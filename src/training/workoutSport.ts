@@ -199,3 +199,20 @@ export function planTag(workout: {
   // stands when COROS said the sport really is running.
   return sport ? workoutSportLabel(sport) : undefined;
 }
+
+/**
+ * Whether a sport's steps read as a list of exercises rather than a timeline.
+ *
+ * Both COROS sports whose steps name a movement out of the exercise catalog —
+ * Strength and HYROX — answer yes, which is the same pair
+ * `useWorkoutExerciseCatalog` fetches for. The question was spelled out by hand
+ * in three places and two of them disagreed: the Calendar's read-only view drew
+ * a HYROX session as exercise cards while the day drawer drew the same session
+ * as a magnitude bar, so the two surfaces named the same workout differently
+ * and only one of them could reach the demonstration clips.
+ */
+export function isStrengthStyleWorkout(
+  sport: WorkoutSport | undefined
+): sport is "strength" | "hyrox" {
+  return sport === "strength" || sport === "hyrox";
+}

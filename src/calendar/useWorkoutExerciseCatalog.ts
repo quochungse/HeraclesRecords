@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { WorkoutExerciseOption, WorkoutSport } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import { isStrengthStyleWorkout } from "../training/workoutSport";
 
 /**
  * COROS's movement catalog for a sport, and the map that turns an exercise id
@@ -74,7 +75,7 @@ export function useWorkoutExerciseCatalog(
   api: CorosLinkApi | undefined,
   sport: WorkoutSport | undefined
 ): WorkoutExerciseCatalog {
-  const wanted = sport === "strength" || sport === "hyrox" ? sport : undefined;
+  const wanted = isStrengthStyleWorkout(sport) ? sport : undefined;
   const epoch = useSyncExternalStore(
     subscribeToEpoch,
     () => catalogEpoch,
