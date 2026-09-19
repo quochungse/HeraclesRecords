@@ -4,12 +4,23 @@ import type {
   TrainingHubScheduledWorkoutEntry
 } from "../../electron/types";
 
+/** What the plan asked for, in base units, read from the workout's own steps. */
+export interface PlannedTargets {
+  distanceMeters?: number;
+  durationSeconds?: number;
+}
+
 /** A scheduled workout matched (or not) to the completed activity on the same day. */
 export interface PlannedActualPair {
   scheduled: TrainingHubScheduledWorkoutEntry;
   activity?: TrainingHubActivity;
   /** actual / planned, in percent (load first, then distance, then duration). */
   completionPct?: number;
+  /**
+   * Computed once while pairing and carried so a chip can label its volume
+   * without walking the workout structure again for every day in a month.
+   */
+  targets: PlannedTargets;
 }
 
 export interface CalendarDay {

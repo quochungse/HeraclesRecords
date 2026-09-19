@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubLibraryWorkout, WorkoutEditRef } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
+import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
 
 interface WorkoutLibraryModalProps {
   api: CorosLinkApi;
@@ -24,24 +25,16 @@ function inputDateToKey(value: string): string {
 export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError }: WorkoutLibraryModalProps) {
   const reducedMotion = useReducedMotion();
   const today = getLocalHappenDayKey();
-  const tomorrowDate = new Date();
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = `${tomorrowDate.getFullYear()}${String(tomorrowDate.getMonth() + 1).padStart(2, "0")}${String(tomorrowDate.getDate()).padStart(2, "0")}`;
   const [items, setItems] = useState<TrainingHubLibraryWorkout[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-  const [date, setDate] = useState(keyToInputDate(tomorrow));
+  // Today is schedulable everywhere else on this screen — the day cell's "+"
+  // and a drag both accept it, and COROS only refuses a day already past — so
+  // this panel starts on today rather than inventing a stricter rule of its own.
+  const [date, setDate] = useState(keyToInputDate(today));
   const [scheduling, setScheduling] = useState(false);
-
-  const load = () => {
-    setItems(null);
-    setError(null);
-    void api.listLibraryWorkouts().then(setItems).catch((cause: unknown) => {
-      setItems([]);
-      setError(cause instanceof Error ? cause.message : String(cause));
-    });
-  };
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     setItems(null);
@@ -56,7 +49,15 @@ export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError
       }
     });
     return () => { cancelled = true; };
-  }, [api]);
+  }, [api, reloadToken]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !scheduling) onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, scheduling]);
 
   const visible = useMemo(() => {
     const filter = query.trim().toLowerCase();
@@ -66,8 +67,8 @@ export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError
   const schedule = async () => {
     if (!selected) return;
     const happenDay = inputDateToKey(date);
-    if (happenDay <= today) {
-      onError("Choose a future date.");
+    if (happenDay < today) {
+      onError("COROS doesn't allow scheduling workouts in the past.");
       return;
     }
     setScheduling(true);
@@ -92,12 +93,17 @@ export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError
         <div className="calendar-modal-body">
           <label className="calendar-field calendar-library-search"><span>Search workouts</span><span className="calendar-sport-search-control"><Search size={14} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name" /></span></label>
           <div className="workout-library-manager-list">
-            {items === null ? <div className="workout-library-state"><LoaderCircle className="is-spinning" size={20} aria-hidden="true" /><p>Loading your COROS workout library...</p></div> : error ? <div className="workout-library-state"><p>{error}</p><button type="button" className="ghost-button" onClick={load}>Try again</button></div> : visible.length === 0 ? <div className="workout-library-state"><Library size={24} aria-hidden="true" /><p>{query ? "No workouts match your search." : "Your workout library is empty."}</p></div> : visible.map((item) => {
-              const supported = Boolean(item.sportType && item.sportType >= 1 && item.sportType <= 9);
+            {items === null ? <div className="workout-library-state"><LoaderCircle className="is-spinning" size={20} aria-hidden="true" /><p>Loading your COROS workout library...</p></div> : error ? <div className="workout-library-state"><p>{error}</p><button type="button" className="ghost-button" onClick={() => setReloadToken((current) => current + 1)}>Try again</button></div> : visible.length === 0 ? <div className="workout-library-state"><Library size={24} aria-hidden="true" /><p>{query ? "No workouts match your search." : "Your workout library is empty."}</p></div> : visible.map((item) => {
+              /* The badge used to read "Run" for every editable workout — a
+                 bike, a swim and a strength session all wore it, because the
+                 only thing being tested was whether the sport code was in the
+                 editor's supported range. Name the sport COROS actually sent. */
+              const sport = scheduledWorkoutSport(item.sportType);
+              const supported = Boolean(sport);
               return <article key={item.id} className={`workout-library-row ${selected === item.id ? "is-selected" : ""}`}>
                 <button type="button" className="workout-library-select" aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}>
                   <span><strong>{item.name}</strong><small>{[item.volume, item.trainingLoad !== undefined ? `${Math.round(item.trainingLoad)} TL` : null].filter(Boolean).join(" · ") || "No calculated totals"}</small></span>
-                  <span className={`workout-library-sport ${supported ? "is-run" : ""}`}>{supported ? "Run" : "View only"}</span>
+                  <span className={`workout-library-sport ${supported ? "is-supported" : ""}`}>{sport ? workoutSportLabel(sport) : "View only"}</span>
                 </button>
                 {supported ? <button type="button" className="ghost-button workout-library-edit" onClick={() => onEdit({ kind: "library", programId: item.id })}><Pencil size={14} aria-hidden="true" /> Edit</button> : <span className="workout-library-readonly">Editing is not supported for this sport.</span>}
               </article>;
@@ -105,7 +111,7 @@ export function WorkoutLibraryModal({ api, onClose, onEdit, onScheduled, onError
           </div>
         </div>
         <footer className="calendar-modal-footer workout-library-footer">
-          <label className="calendar-field"><span>Schedule selected workout</span><input type="date" min={keyToInputDate(tomorrow)} value={date} onChange={(event) => setDate(event.target.value)} /></label>
+          <label className="calendar-field"><span>Schedule selected workout</span><input type="date" min={keyToInputDate(today)} value={date} onChange={(event) => setDate(event.target.value)} /></label>
           <button type="button" className="primary-button" disabled={!selected || !date || scheduling} onClick={() => void schedule()}>{scheduling ? <LoaderCircle className="is-spinning" size={15} aria-hidden="true" /> : <CalendarPlus size={15} aria-hidden="true" />}{scheduling ? "Scheduling..." : "Schedule"}</button>
         </footer>
       </motion.section>

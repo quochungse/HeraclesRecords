@@ -9,8 +9,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
-  formatUpcomingWorkoutVolumeDisplay,
-  inferUpcomingWorkoutCategory
+  formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
 import { sportColorCategory } from "../training/sportColors";
 import { isSwimSportType } from "../training/sportTypes";
@@ -20,8 +19,20 @@ import {
   parseCalendarDragPayload,
   type CalendarDragPayload
 } from "./calendarDrag";
-import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
+import type {
+  CalendarDay,
+  PlannedActualPair,
+  PlannedTargets
+} from "./calendarTypes";
+import {
+  formatStepDistanceLabel,
+  formatStepTimeLabel
+} from "./scheduledStructure";
 import { dayNumber } from "./dateUtils";
+import {
+  scheduledSportCategory,
+  scheduledWorkoutSport
+} from "../training/workoutSport";
 
 interface DayCellProps {
   day: CalendarDay;
@@ -36,18 +47,40 @@ interface DayCellProps {
   busy: boolean;
 }
 
-function categoryClass(name: string): string {
-  return `calendar-cat-${inferUpcomingWorkoutCategory(name).toLowerCase()}`;
-}
-
 // Color a completed activity chip by sport, matching the training heatmap.
 function sportClass(activity: TrainingHubActivity): string {
   return `calendar-sport-${sportColorCategory(activity.sportType)}`;
 }
 
+/**
+ * A planned chip is coloured by the sport it prescribes, the same way a
+ * completed one is coloured by the sport that was done — so one colour means
+ * one thing across the grid.
+ *
+ * It used to be coloured by `inferUpcomingWorkoutCategory`, an English
+ * run-vocabulary regex over the workout's *name* that answers "Run" for
+ * everything it does not recognise. A strength session called "Push Day", and
+ * every workout named in any other language, wore the running colour; the
+ * completed chip beside it wore the real one.
+ */
+function scheduledSportClass(
+  entry: TrainingHubScheduledWorkoutEntry
+): string | undefined {
+  const category = scheduledSportCategory(entry.sportType);
+  return category ? `calendar-sport-${category}` : undefined;
+}
+
+/**
+ * Bands for the planned-vs-actual badge. Over-completion gets a band of its
+ * own: three times a prescribed easy run is not "done", and reading it as
+ * complete hid exactly the sessions worth a second look.
+ */
 function completionTone(pct?: number): string {
   if (pct === undefined) {
     return "";
+  }
+  if (pct > 115) {
+    return "is-over";
   }
   if (pct >= 90) {
     return "is-complete";
@@ -56,6 +89,44 @@ function completionTone(pct?: number): string {
     return "is-partial";
   }
   return "is-missed";
+}
+
+/**
+ * Actual first, planned second — everywhere. The paired chip used to print
+ * `actual / planned` while the missed chip printed `planned / 0`, so the same
+ * slash meant opposite things two rows apart.
+ */
+function loadLine(actual: number | undefined, planned: number | undefined): string | null {
+  if (actual === undefined && planned === undefined) {
+    return null;
+  }
+  const actualLabel = `${Math.round(actual ?? 0)} TL`;
+  return planned === undefined
+    ? actualLabel
+    : `${actualLabel} / ${Math.round(planned)} TL planned`;
+}
+
+/**
+ * What the plan asks for, on a chip.
+ *
+ * COROS's `volume` string reports a step count whenever a program has more
+ * than one step, so a 13 km long run built as warm-up, main and cool-down read
+ * "3 set(s)". The steps are asked first and the string is kept for a strength
+ * workout, where sets really are the volume.
+ */
+function plannedVolumeLine(
+  targets: PlannedTargets,
+  volume: string | undefined,
+  unitSystem: UnitSystem,
+  swim: boolean
+): string {
+  if (targets.distanceMeters) {
+    return formatStepDistanceLabel(targets.distanceMeters, unitSystem, swim);
+  }
+  if (targets.durationSeconds) {
+    return formatStepTimeLabel(targets.durationSeconds);
+  }
+  return formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
 }
 
 function activityStatsLine(
@@ -111,7 +182,6 @@ function PairChip({
         className={[
           "calendar-chip",
           "calendar-chip-paired",
-          categoryClass(scheduled.name),
           sportClass(activity),
           selectable && "is-selection-enabled",
           selected && "is-selected",
@@ -140,16 +210,16 @@ function PairChip({
           {pair.completionPct !== undefined ? (
             <span
               className={`calendar-chip-badge ${completionTone(pair.completionPct)}`}
+              title={`${pair.completionPct}% of the planned session`}
             >
-              {Math.min(pair.completionPct, 999)}
+              {Math.min(pair.completionPct, 999)}%
             </span>
           ) : null}
         </span>
         <span className="calendar-chip-meta">{activityStatsLine(activity, unitSystem)}</span>
-        {actualLoad !== undefined || plannedLoad !== undefined ? (
+        {loadLine(actualLoad, plannedLoad) ? (
           <span className="calendar-chip-meta calendar-chip-load">
-            {Math.round(actualLoad ?? 0)} TL
-            {plannedLoad !== undefined ? ` / ${Math.round(plannedLoad)} TL planned` : ""}
+            {loadLine(actualLoad, plannedLoad)}
           </span>
         ) : null}
       </button>
@@ -159,13 +229,15 @@ function PairChip({
   // Planned only. Past days show the COROS-style "0 TL" miss.
   const missed = day.isPast;
   const canDrag = !day.isPast && !busy && !selectionMode;
+
   return (
     <button
       type="button"
       className={[
         "calendar-chip",
         "calendar-chip-planned",
-        categoryClass(scheduled.name),
+        scheduledSportClass(scheduled),
+        missed && "is-missed",
         selectable && "is-selection-enabled",
         selected && "is-selected",
         selectionMode && !selectable && "is-selection-unavailable"
@@ -212,13 +284,22 @@ function PairChip({
         <span className="calendar-chip-name">{scheduled.name}</span>
       </span>
       <span className="calendar-chip-meta">
-        {formatUpcomingWorkoutVolumeDisplay(scheduled.volume, unitSystem)}
-        {scheduled.trainingLoad !== undefined
-          ? missed
-            ? ` · ${Math.round(scheduled.trainingLoad)} TL / 0 TL`
-            : ` · ${Math.round(scheduled.trainingLoad)} TL`
+        {plannedVolumeLine(
+          pair.targets,
+          scheduled.volume,
+          unitSystem,
+          // A program sport code, not an activity code: swim is 3 here.
+          scheduledWorkoutSport(scheduled.sportType) === "swim"
+        )}
+        {scheduled.trainingLoad !== undefined && !missed
+          ? ` · ${Math.round(scheduled.trainingLoad)} TL planned`
           : ""}
       </span>
+      {missed && scheduled.trainingLoad !== undefined ? (
+        <span className="calendar-chip-meta calendar-chip-load">
+          {loadLine(0, scheduled.trainingLoad)}
+        </span>
+      ) : null}
       {canDrag ? (
         <GripVertical
           className="calendar-chip-drag-handle"

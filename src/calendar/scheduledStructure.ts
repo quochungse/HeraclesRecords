@@ -506,3 +506,33 @@ export function buildScheduledWorkoutView(
     source: hasRawExercises ? "raw" : "parsed"
   };
 }
+
+/**
+ * What a planned workout asks for, as one phrase.
+ *
+ * COROS's own `volume` string reports a **step count** whenever a program has
+ * more than one step — `resolveWorkoutSetCount` wins over distance in
+ * `formatUpcomingWorkoutVolume` — so a 13 km long run built as warm-up, main
+ * and cool-down arrived as "3 set(s)". The scheduled detail drew that under
+ * "Volume" and "13.0 km total" two lines below it, in the same panel.
+ *
+ * The steps know better, so they are asked first: their own distance, then
+ * their own duration, and only then COROS's string, which is the right answer
+ * for a strength workout — where sets are the volume and there is no distance
+ * to total.
+ */
+export function formatPlannedVolume(
+  totals: ScheduledStructureTotals,
+  volume: string | undefined,
+  unitSystem: UnitSystem,
+  swim: boolean,
+  fallback: string
+): string {
+  if (totals.distanceMeters) {
+    return formatStepDistanceLabel(totals.distanceMeters, unitSystem, swim);
+  }
+  if (totals.durationSeconds) {
+    return formatStepTimeLabel(totals.durationSeconds);
+  }
+  return volume ? fallback : "--";
+}

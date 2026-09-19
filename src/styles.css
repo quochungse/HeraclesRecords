@@ -22877,28 +22877,10 @@ tr.data-intervals-row-missing {
   gap: 6px;
 }
 
+/* The Month/Week switch is an `OptionGroup`, which draws its own track and
+   mark — this is only the gap between it and the buttons beside it. */
 .calendar-mode-toggle {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-}
-
-.calendar-mode-toggle button {
-  padding: 6px 16px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.calendar-mode-toggle button.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-weight: 600;
+  flex: 0 0 auto;
 }
 
 /* --- multi-select toolbar --- */
@@ -22960,16 +22942,19 @@ tr.data-intervals-row-missing {
   gap: 7px;
 }
 
+/* Removing a workout is the destructive action on this screen, so it reads the
+   app's error tokens. It was three hand-mixed reds that ignored the theme and
+   sat on paper's white page at dark-theme brightness. */
 .calendar-view .calendar-selection-delete {
-  border-color: rgba(239, 93, 93, 0.35);
-  color: #ef7c7c;
+  border-color: var(--error-border);
+  color: var(--error-text);
 }
 
 .calendar-view .calendar-selection-delete:hover:not(:disabled),
 .calendar-view .calendar-selection-delete.is-armed {
-  border-color: rgba(239, 93, 93, 0.6);
-  background: rgba(239, 93, 93, 0.12);
-  color: #ff9696;
+  border-color: color-mix(in srgb, var(--error-text) 55%, transparent);
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 /* --- grid --- */
@@ -22988,9 +22973,22 @@ tr.data-intervals-row-missing {
   overflow: hidden;
 }
 
+/* The header sits outside the scroller, so the two boxes only line up while
+   they are the same width -- and the body loses a scrollbar's width the moment
+   a month is tall enough to scroll, which slid all eight columns left under a
+   header that had not moved. Measured at 16px in the running app, and most
+   visible on the stats column, the one whose rule is drawn.
+
+   A stable scrollbar gutter reserves that width whether or not a scrollbar is
+   showing, so the columns stay put between a short month and a tall one. The
+   header needs an overflow of its own for the gutter to apply to it at all --
+   the property is only honoured on a scroll container -- and "hidden" is one
+   that can never paint a bar. */
 .calendar-grid-header {
   flex-shrink: 0;
   border-bottom: 1px solid var(--glass-border);
+  overflow: hidden;
+  scrollbar-gutter: stable;
 }
 
 .calendar-grid-body {
@@ -22998,6 +22996,7 @@ tr.data-intervals-row-missing {
   min-height: 0;
   overflow-x: clip;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .calendar-grid-header,
@@ -23056,6 +23055,13 @@ tr.data-intervals-row-missing {
   background: var(--accent-soft);
 }
 
+/* `isPast` drove behaviour — no drag, no add, no remove — and drew nothing, so
+   the line the athlete keeps hitting was invisible. A wash, not an opacity: the
+   chips in a past day are the record and must stay legible. */
+.calendar-day.is-past:not(.is-today):not(:hover) {
+  background: color-mix(in srgb, var(--bg-base) 45%, transparent);
+}
+
 .calendar-day.is-drop-target {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 2px var(--accent);
@@ -23094,8 +23100,18 @@ tr.data-intervals-row-missing {
   transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
+/* A control that exists only under the pointer cannot be tabbed to, and on a
+   touch screen it cannot be reached at all — the same trap the sidebar's
+   collapse toggle was in. Focus reveals it too, in its own rule so neither
+   selector can take the other down. */
 .calendar-day:hover .calendar-day-add {
   opacity: 1;
+}
+
+.calendar-day-add:focus-visible {
+  opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-day-add:hover {
@@ -23231,12 +23247,13 @@ tr.data-intervals-row-missing {
   border-left-color: var(--sport-other);
 }
 
-.calendar-cat-easy { border-left-color: #5eb9f0; }
-.calendar-cat-long { border-left-color: #a78bfa; }
-.calendar-cat-intervals { border-left-color: #f0785e; }
-.calendar-cat-speed { border-left-color: var(--accent-gold); }
-.calendar-cat-race { border-left-color: #ef5da8; }
-.calendar-cat-run { border-left-color: var(--accent); }
+/* A planned chip that COROS sent no sport code for keeps the neutral edge from
+   `.calendar-chip`. The six `.calendar-cat-*` colours that used to sit here were
+   set from an English run-vocabulary regex over the workout's name, and four of
+   them were hand-mixed hexes that ignored the paper theme. */
+.calendar-chip-planned.is-missed .calendar-chip-load {
+  color: var(--error-text);
+}
 
 .calendar-chip-title {
   display: flex;
@@ -23270,8 +23287,8 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-chip-badge.is-complete {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .calendar-chip-badge.is-partial {
@@ -23280,8 +23297,15 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-chip-badge.is-missed {
-  background: rgba(239, 93, 93, 0.16);
-  color: #ef7c7c;
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+/* Well over what was prescribed. Not a failure and not "done" either, so it
+   takes the accent rather than one of the three signal colours. */
+.calendar-chip-badge.is-over {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 /* --- weekly stats column --- */
@@ -23314,9 +23338,19 @@ tr.data-intervals-row-missing {
   white-space: nowrap;
 }
 
-.calendar-weekstats-value.tone-accent { color: var(--accent-strong); }
-.calendar-weekstats-value.tone-gold { color: var(--accent-gold); }
+.calendar-weekstats-value.tone-ok { color: var(--success-text); }
 .calendar-weekstats-value.tone-warn { color: var(--warning-text); }
+.calendar-weekstats-value.tone-danger { color: var(--error-text); }
+
+.calendar-weekstats.is-empty {
+  justify-content: center;
+}
+
+.calendar-weekstats-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
 
 .calendar-weekstats-coach {
   display: inline-flex;
@@ -23428,9 +23462,10 @@ tr.data-intervals-row-missing {
   font-size: 12px;
 }
 
-.calendar-detail-delete.is-armed {
-  color: #ef7c7c;
-  border-color: rgba(239, 93, 93, 0.5);
+.calendar-detail-panel .calendar-detail-delete.is-armed {
+  border-color: color-mix(in srgb, var(--error-text) 55%, transparent);
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 .calendar-detail-body {
@@ -27230,9 +27265,12 @@ tr.data-intervals-row-missing {
   letter-spacing: 0.06em;
 }
 
-.workout-library-sport.is-run {
-  border-color: color-mix(in srgb, #35c76f 45%, transparent);
-  color: #6ddd98;
+/* "Supported" means the workout editor can open it, which is true of all nine
+   COROS program sports — the badge names the sport itself, so the marker is the
+   app's own affirmative rather than a green mixed by hand that ignores paper. */
+.workout-library-sport.is-supported {
+  border-color: var(--success-border);
+  color: var(--success-text);
 }
 
 .workout-library-edit { margin-right: 6px; }

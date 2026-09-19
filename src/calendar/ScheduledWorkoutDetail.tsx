@@ -1,20 +1,17 @@
 import { motion, useReducedMotion } from "motion/react";
 import {
   Activity,
-  Bike,
   Clock,
   Dumbbell,
   Flame,
   Gauge,
   Layers,
   ListChecks,
-  Mountain,
   Pause,
   Repeat,
   Route,
   Snowflake,
   Timer,
-  Waves,
   Zap,
   type LucideIcon
 } from "lucide-react";
@@ -22,11 +19,9 @@ import { useMemo } from "react";
 import type {
   TrainingHubScheduledWorkoutEntry,
   TrainingHubSportType,
-  UnitSystem,
-  WorkoutSport
+  UnitSystem
 } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { RunnerIcon } from "../running/runnerIcon";
 import {
   POUNDS_PER_KILOGRAM,
   formatWeightValue
@@ -41,13 +36,12 @@ import {
   formatUpcomingWorkoutVolumeDisplay,
   inferUpcomingWorkoutCategory
 } from "../training/formatters";
-import {
-  sportColorCategory,
-  type SportColorCategory
-} from "../training/sportColors";
+import { sportColorCategory } from "../training/sportColors";
 import { resolveSportName } from "../training/sportTypes";
+import { workoutSportView } from "./workoutSportIcons";
 import {
   buildScheduledWorkoutView,
+  formatPlannedVolume,
   formatStepDistanceLabel,
   formatStepTimeLabel,
   type ScheduledNodeView,
@@ -84,26 +78,6 @@ const KIND_ORDER: ScheduledStepKind[] = [
   "cooldown",
   "sendOff"
 ];
-
-/**
- * Scheduled workouts carry COROS *program* sport codes (1–9), not activity
- * codes — resolve them via the shared workout capabilities so icons/colors
- * stay in sync with the workout editor.
- */
-const SPORT_VIEW: Record<
-  WorkoutSport,
-  { category: SportColorCategory; icon: LucideIcon }
-> = {
-  run: { category: "run", icon: RunnerIcon },
-  trailRun: { category: "trail", icon: Mountain },
-  bike: { category: "bike", icon: Bike },
-  swim: { category: "other", icon: Waves },
-  strength: { category: "strength", icon: Dumbbell },
-  hyrox: { category: "other", icon: Activity },
-  indoorClimb: { category: "other", icon: Mountain },
-  bouldering: { category: "other", icon: Mountain },
-  xcSki: { category: "other", icon: Snowflake }
-};
 
 function stepMagnitudeLabel(
   step: ScheduledStepView,
@@ -154,7 +128,7 @@ export function ScheduledWorkoutDetail({
     [entry, unitSystem]
   );
   const sport = workoutSportFromType(entry.sportType);
-  const sportMeta = sport ? SPORT_VIEW[sport] : undefined;
+  const sportMeta = sport ? workoutSportView(sport) : undefined;
   const category =
     sportMeta?.category ?? sportColorCategory(entry.sportType);
   const sportName = sport
@@ -183,7 +157,13 @@ export function ScheduledWorkoutDetail({
     {
       icon: Route,
       label: "Volume",
-      value: formatDetailVolume(entry.volume, unitSystem)
+      value: formatPlannedVolume(
+        view.totals,
+        entry.volume,
+        unitSystem,
+        sport === "swim",
+        formatDetailVolume(entry.volume, unitSystem)
+      )
     },
     {
       icon: Gauge,

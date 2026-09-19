@@ -537,14 +537,16 @@ export function formatUpcomingWorkoutStats(
 }
 
 export function formatUpcomingWorkoutDetailLine(
-  category: string,
+  category: string | undefined,
   volume: string | undefined,
   trainingLoad: number | undefined,
   unitSystem: UnitSystem
 ): string {
   const volumeLabel = formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
   const loadLabel = formatUpcomingWorkoutLoad(trainingLoad);
-  return `${category} · ${volumeLabel} · ${loadLabel}`;
+  // A workout whose sport COROS did not state and whose name says nothing has
+  // no honest tag; the line is its figures alone rather than a leading dot.
+  return [category, volumeLabel, loadLabel].filter(Boolean).join(" · ");
 }
 
 export function formatUpcomingWorkoutRowStats(

@@ -18,6 +18,7 @@ import {
 import { pickLastNightSleep } from "./sleep/sleepFreshness";
 import { isNapOnlyRecord, totalSleepMinutes } from "../electron/sleepMetrics";
 import { resolveSportName } from "./training/sportTypes";
+import { scheduledWorkoutSport } from "./training/workoutSport";
 import type { TrainingSummaryMetrics } from "./training/types";
 
 /**
@@ -127,8 +128,14 @@ const TODAY_WORKOUT_COPY: Record<string, string> = {
 };
 
 function todayWorkoutText(workout: TrainingHubUpcomingWorkout): string {
+  // Every line in the table above is written about a run, and the classifier
+  // that picks one reads the workout's *name*. A strength session called
+  // "Full Body - Long" matched the Long rule and was greeted with "Long run on
+  // the plan today", so the sport is asked first and a non-run keeps its name.
+  const sport = scheduledWorkoutSport(workout.sportType);
+  const runFlavoured = !sport || sport === "run" || sport === "trailRun";
   const category = inferUpcomingWorkoutCategory(workout.name ?? "");
-  const copy = TODAY_WORKOUT_COPY[category];
+  const copy = runFlavoured ? TODAY_WORKOUT_COPY[category] : undefined;
 
   if (copy) {
     return copy;
