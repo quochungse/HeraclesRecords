@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   net,
   powerMonitor,
   safeStorage,
@@ -554,6 +555,27 @@ const ALLOWED_PERMISSIONS = new Set([
   "clipboard-sanitized-write"
 ]);
 
+/**
+ * The app has no menu of its own, and Electron builds a default one — File,
+ * Edit, View, Window, Help — whenever none is set. On Windows and Linux that
+ * strip lives *inside* the window, above the app's own chrome, and everything
+ * on it is either a browser control the app does not want exposed (Reload,
+ * Toggle Developer Tools) or a duplicate of something the UI already offers.
+ *
+ * macOS keeps the default. There the menu is the system menu bar rather than a
+ * strip in the window, so it costs the layout nothing, and clearing it takes
+ * the Edit roles with it — which is where Cmd+C/V/X in a text field come from
+ * on that platform. Windows and Linux get those from Chromium directly, so
+ * removing the menu there loses no editing shortcut.
+ */
+function hideDefaultApplicationMenu(): void {
+  if (process.platform === "darwin") {
+    return;
+  }
+
+  Menu.setApplicationMenu(null);
+}
+
 function configureAppPermissions(): void {
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback) => {
@@ -704,6 +726,7 @@ app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
+  hideDefaultApplicationMenu();
   configureAppPermissions();
   configureYouTubeBrowserSession();
   registerYouTubeBrowserHandlers();
