@@ -23555,6 +23555,59 @@ tr.data-intervals-row-missing {
   font-size: 13px;
 }
 
+/*
+ * What answered a planned session, and the two ways to say the pairing got it
+ * wrong. A well rather than a card: it sits inside the detail pane and belongs
+ * to the session above it, so it recesses instead of lifting.
+ */
+.calendar-plan-status {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 15px;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+}
+
+.calendar-plan-status > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+
+.calendar-plan-status-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  background: var(--accent-soft);
+  place-items: center;
+}
+
+.calendar-plan-status header strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-plan-status header small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.calendar-plan-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* --- scheduled workout detail (sport-aware) --- */
 
 .sched-detail {

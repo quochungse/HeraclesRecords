@@ -174,6 +174,7 @@ import {
   getNativeTrainingPlan,
   getTrainingLibrarySnapshot,
   libraryWorkoutAsPlanSession,
+  listActivityMatches,
   previewPlanOnCalendar,
   putPlanOnCalendar,
   listTrainingLibraryWorkouts,
@@ -2045,6 +2046,7 @@ function registerIpcHandlers(): void {
     (_event, startDay: string, endDay: string) =>
       refreshTrainingActivityMatches(startDay, endDay)
   );
+  ipcMain.handle("trainingLibrary:listMatches", () => listActivityMatches());
   ipcMain.handle("trainingLibrary:saveManualMatch", (_event, match) =>
     saveManualActivityMatch(match)
   );

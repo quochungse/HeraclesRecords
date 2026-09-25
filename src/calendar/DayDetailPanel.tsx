@@ -9,6 +9,7 @@ import type { CorosLinkApi } from "../coroslink-api";
 import { ActivityDetailPanel } from "../training/components/ActivityDetailPanel";
 import { formatHappenDayLabel } from "../training/formatters";
 import { scheduledWorkoutKey, type CalendarSelection } from "./calendarTypes";
+import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 
@@ -21,6 +22,8 @@ interface DayDetailPanelProps {
   onDelete: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => void;
   onAskCoach: (selection: CalendarSelection) => void;
   onEdit: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => void;
+  /** Re-reads the range after a manual plan-status change. */
+  onReload: () => void;
   onError: (message: string | null) => void;
 }
 export function DayDetailPanel({
@@ -32,6 +35,7 @@ export function DayDetailPanel({
   onDelete,
   onAskCoach,
   onEdit,
+  onReload,
   onError
 }: DayDetailPanelProps) {
   const [detail, setDetail] = useState<TrainingHubActivityDetail | null>(null);
@@ -53,6 +57,15 @@ export function DayDetailPanel({
   const editableSport =
     selection?.kind === "scheduled"
       ? scheduledWorkoutSport(selection.entry.sportType)
+      : undefined;
+
+  /* The pairing this day already computed, for the entry on screen. */
+  const planPair =
+    selection?.kind === "scheduled"
+      ? selection.day.pairs.find(
+          (pair) =>
+            scheduledWorkoutKey(pair.scheduled) === scheduledWorkoutKey(selection.entry)
+        )
       : undefined;
 
   const selectionKey = selection
@@ -231,11 +244,22 @@ export function DayDetailPanel({
 
             <div className="calendar-detail-body">
               {selection.kind === "scheduled" ? (
-                <ScheduledWorkoutDetail
-                  entry={selection.entry}
-                  sportTypes={sportTypes}
-                  api={api}
-                />
+                <>
+                  {planPair ? (
+                    <PlanStatusBlock
+                      api={api}
+                      day={selection.day}
+                      pair={planPair}
+                      onChanged={onReload}
+                      onError={onError}
+                    />
+                  ) : null}
+                  <ScheduledWorkoutDetail
+                    entry={selection.entry}
+                    sportTypes={sportTypes}
+                    api={api}
+                  />
+                </>
               ) : (
                 <ActivityDetailPanel
                   embedded

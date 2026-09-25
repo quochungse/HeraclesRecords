@@ -464,6 +464,18 @@ for (const table of ["training_plans", "training_plan_workout_links", "training_
   assert.equal(tableNames.has(table), false, `${table} is retired and not created`);
 }
 
+// A statement about a session lands on the matcher's own row for it — the
+// table holds one per session — and `manual: false` hands the session back.
+const auto = { ...matches[0], id: "auto-id" };
+databaseModule.saveTrainingActivityMatch(auto);
+const said = library.saveManualActivityMatch({ ...auto, id: "schedule:one", activityId: undefined, status: "skipped", manual: true });
+assert.equal(said.id, "auto-id", "the stored row is replaced, not collided with");
+assert.equal(databaseModule.listTrainingActivityMatches().length, 1);
+assert.equal(databaseModule.listTrainingActivityMatches()[0].status, "skipped");
+assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, true);
+library.saveManualActivityMatch({ ...said, status: "missed", manual: false });
+assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, false, "Match automatically lets the matcher decide again");
+
 // Drafts: kept, listed, replaced in place, discarded.
 const kept = library.savePlanDraft({ baseRemoteId: "remote-1", baseVersion: 7, plan: nativeDocument });
 assert.match(kept.id, /^draft:/);

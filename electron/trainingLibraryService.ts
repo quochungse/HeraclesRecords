@@ -1100,8 +1100,27 @@ export function listActivityMatches(): TrainingActivityMatch[] {
   return listTrainingActivityMatches();
 }
 
+/**
+ * What the athlete said about one calendar session: this activity was it, none
+ * was, it was skipped — or, with `manual: false`, "match it again", which the
+ * next rebuild does.
+ *
+ * Keyed by the session, not by the caller's id. The matcher already holds a row
+ * for the session under an id of its own, and the table takes one row per
+ * session, so a statement carrying a fresh id would collide with it rather than
+ * replace it.
+ */
 export function saveManualActivityMatch(match: TrainingActivityMatch): TrainingActivityMatch {
-  const next = { ...match, manual: true, updatedAt: new Date().toISOString() };
+  const held = listTrainingActivityMatches().find(
+    (item) =>
+      item.schedulePlanId === match.schedulePlanId && item.scheduleIdInPlan === match.scheduleIdInPlan
+  );
+  const next = {
+    ...match,
+    id: held?.id ?? match.id,
+    manual: match.manual !== false,
+    updatedAt: new Date().toISOString()
+  };
   saveTrainingActivityMatch(next);
   return next;
 }

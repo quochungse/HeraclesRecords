@@ -708,6 +708,7 @@ export function CalendarView({
         deleting={mutating}
         onClose={() => setSelection(null)}
         onDelete={handleDelete}
+        onReload={reload}
         onAskCoach={handleAskCoachSelection}
         onEdit={(target) => {
           setSelection(null);

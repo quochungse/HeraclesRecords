@@ -373,4 +373,37 @@ const activity = (overrides) => ({
   assert.equal(pairs[0].targets.durationSeconds, undefined);
 }
 
+/* --- 6. what the athlete said outranks the greedy pass --------------------- */
+
+{
+  const key = (entry) => JSON.stringify([entry.planId, entry.idInPlan]);
+  const easy = scheduled({ idInPlan: "easy", sportType: 1, trainingLoad: 50 });
+  const onPlan = activity({ activityId: "on-plan", sportType: 100, trainingLoad: 49 });
+  const other = activity({ activityId: "other", sportType: 100, trainingLoad: 20 });
+
+  const linked = pairPlannedWithActual(
+    [easy],
+    [onPlan, other],
+    "metric",
+    new Map([[key(easy), { kind: "activity", activityId: "other" }]])
+  );
+  assert.equal(linked.pairs[0].activity.activityId, "other", "the activity linked by hand, not the closer guess");
+  assert.deepEqual(linked.unplanned.map((entry) => entry.activityId), ["on-plan"]);
+
+  for (const kind of ["skipped", "none"]) {
+    const { pairs, unplanned } = pairPlannedWithActual(
+      [easy],
+      [onPlan],
+      "metric",
+      new Map([[key(easy), { kind }]])
+    );
+    assert.equal(pairs[0].activity, undefined, `${kind}: nothing is paired to the session`);
+    assert.deepEqual(
+      unplanned.map((entry) => entry.activityId),
+      ["on-plan"],
+      `${kind}: what was done that day stays unplanned rather than being claimed`
+    );
+  }
+}
+
 console.log("calendar pairing tests passed");

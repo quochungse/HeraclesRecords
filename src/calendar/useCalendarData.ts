@@ -12,11 +12,23 @@ import {
   type CalendarDragPayload
 } from "./calendarDrag";
 import type { CalendarDay, CalendarWeek } from "./calendarTypes";
-import { computeWeeklyStats, pairPlannedWithActual } from "./pairing";
+import {
+  computeWeeklyStats,
+  pairPlannedWithActual,
+  type PairingOverride
+} from "./pairing";
+import { scheduledWorkoutKey } from "./calendarTypes";
 
 interface CalendarRangeData {
   scheduled: TrainingHubScheduledWorkoutEntry[];
   activities: TrainingHubActivity[];
+  /**
+   * What the athlete said by hand about a planned session — this one was
+   * really that activity, or it was skipped. Stored locally, so reading them
+   * costs no COROS request; without them the calendar's own greedy pairing
+   * would silently overrule an override made on the day panel.
+   */
+  overrides: Map<string, PairingOverride>;
   metrics: TrainingHubDailyMetric[];
   /** Raw week aggregates from /analyse/dayDetail (recommended TL band per week). */
   weekAggregates: Record<string, unknown>[];
@@ -115,15 +127,33 @@ export function useCalendarData({
     void Promise.all([
       api.listScheduledWorkouts(rangeStart, rangeEnd),
       api.listTrainingHubActivities(1, 200, rangeStart, rangeEnd),
-      api.getDailyMetrics(keysForRange)
+      api.getDailyMetrics(keysForRange),
+      // Local read, so it adds no round trip and cannot fail the range.
+      api.listTrainingActivityMatches().catch(() => [])
     ])
-      .then(([scheduled, activities, dailyMetrics]) => {
+      .then(([scheduled, activities, dailyMetrics, matches]) => {
         if (cancelled || rangeKeyRef.current !== rangeKey) {
           return;
+        }
+        const overrides = new Map<string, PairingOverride>();
+        for (const match of matches) {
+          if (!match.manual) continue;
+          const key = scheduledWorkoutKey({
+            planId: match.schedulePlanId,
+            idInPlan: match.scheduleIdInPlan
+          });
+          if (match.status === "skipped") {
+            overrides.set(key, { kind: "skipped" });
+          } else if (match.activityId) {
+            overrides.set(key, { kind: "activity", activityId: match.activityId });
+          } else {
+            overrides.set(key, { kind: "none" });
+          }
         }
         const next: CalendarRangeData = {
           scheduled,
           activities,
+          overrides,
           metrics: dailyMetrics.dayList ?? [],
           weekAggregates: dailyMetrics.weekList ?? []
         };
@@ -223,7 +253,8 @@ export function useCalendarData({
         const { pairs, unplanned } = pairPlannedWithActual(
           scheduled,
           activities,
-          unitSystem
+          unitSystem,
+          data?.overrides
         );
         return {
           dateKey,

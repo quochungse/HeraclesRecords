@@ -446,6 +446,8 @@ const api = {
     endDay: string
   ): Promise<TrainingActivityMatch[]> =>
     ipcRenderer.invoke("trainingLibrary:refreshMatches", startDay, endDay),
+  listTrainingActivityMatches: (): Promise<TrainingActivityMatch[]> =>
+    ipcRenderer.invoke("trainingLibrary:listMatches"),
   saveManualActivityMatch: (
     match: TrainingActivityMatch
   ): Promise<TrainingActivityMatch> =>

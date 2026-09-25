@@ -329,6 +329,7 @@ export interface CorosLinkApi {
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ) => Promise<string[]>;
+  listTrainingActivityMatches: () => Promise<TrainingActivityMatch[]>;
   refreshTrainingActivityMatches: (
     startDay: string,
     endDay: string
