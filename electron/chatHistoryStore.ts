@@ -595,6 +595,7 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
   return {
     previewId: value.previewId,
     activityId: value.activityId,
+    sportType: typeof value.sportType === "number" ? value.sportType : undefined,
     name: typeof value.name === "string" ? value.name : undefined,
     startTime: typeof value.startTime === "string" ? value.startTime : undefined,
     avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,

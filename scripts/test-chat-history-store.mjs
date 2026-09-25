@@ -1044,6 +1044,9 @@ assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
   { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
 ]);
 assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
+// The card reads the sport to draw a ride as speed and a swim in pool units;
+// dropped here, every reopened ride charted its speed as a running pace.
+assert.equal(restoredVisual[0].preview.sportType, 100);
 
 // Removing a creation is a mark on the draft that survives a round trip, and
 // a save that keeps the array's length so `foreignTail` has no tail to put
