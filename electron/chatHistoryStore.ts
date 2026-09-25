@@ -114,6 +114,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Keys a newer build wrote that this one has no parser for, put back on what
+ * this one rebuilt. Every object below is reconstructed field by field, which
+ * validates the fields it names — and used to drop every other one in silence,
+ * so a save here could strip what a newer build on another machine stored.
+ *
+ * `handled` is what the parser reads, valid or not: a known field it rejected
+ * must stay rejected rather than come back from the raw value. Unknown keys go
+ * after the rebuilt ones, so an entry without any serializes exactly as before
+ * and an unchanged save still leaves the row untouched.
+ */
+function keepUnknownKeys<T extends object>(
+  parsed: T,
+  raw: Record<string, unknown>,
+  handled: readonly string[]
+): T {
+  let unknown: Record<string, unknown> | undefined;
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === undefined || handled.includes(key)) continue;
+    (unknown ??= {})[key] = value;
+  }
+  return unknown ? { ...parsed, ...unknown } : parsed;
+}
+
 function parseSource(value: unknown): PersistedChatSource | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -138,7 +162,13 @@ function parseSource(value: unknown): PersistedChatSource | undefined {
   if (typeof value.mcpError === "string" && value.mcpError.trim()) {
     source.mcpError = value.mcpError;
   }
-  return source;
+  return keepUnknownKeys(source, value, [
+    "snapshotIncluded",
+    "mcpEnabled",
+    "mcpUsed",
+    "mcpTools",
+    "mcpError"
+  ]);
 }
 
 function parseCoachInputPrompt(value: unknown): CoachInputPrompt | null {
@@ -162,14 +192,18 @@ function parseCoachInputPrompt(value: unknown): CoachInputPrompt | null {
       ) {
         return null;
       }
-      return {
-        id: choice.id,
-        label: choice.label,
-        response: choice.response,
-        ...(typeof choice.description === "string"
-          ? { description: choice.description }
-          : {})
-      };
+      return keepUnknownKeys(
+        {
+          id: choice.id,
+          label: choice.label,
+          response: choice.response,
+          ...(typeof choice.description === "string"
+            ? { description: choice.description }
+            : {})
+        },
+        choice,
+        ["id", "label", "response", "description"]
+      );
     })
     .filter((choice): choice is CoachInputChoice => choice !== null);
 
@@ -177,19 +211,23 @@ function parseCoachInputPrompt(value: unknown): CoachInputPrompt | null {
     return null;
   }
 
-  return {
-    promptId: value.promptId,
-    question: value.question,
-    choices,
-    allowCustom: value.allowCustom,
-    ...(typeof value.answer === "string" ? { answer: value.answer } : {}),
-    ...(typeof value.selectedChoiceId === "string"
-      ? { selectedChoiceId: value.selectedChoiceId }
-      : {}),
-    ...(typeof value.answeredAt === "number"
-      ? { answeredAt: value.answeredAt }
-      : {})
-  };
+  return keepUnknownKeys(
+    {
+      promptId: value.promptId,
+      question: value.question,
+      choices,
+      allowCustom: value.allowCustom,
+      ...(typeof value.answer === "string" ? { answer: value.answer } : {}),
+      ...(typeof value.selectedChoiceId === "string"
+        ? { selectedChoiceId: value.selectedChoiceId }
+        : {}),
+      ...(typeof value.answeredAt === "number"
+        ? { answeredAt: value.answeredAt }
+        : {})
+    },
+    value,
+    ["promptId", "question", "choices", "allowCustom", "answer", "selectedChoiceId", "answeredAt"]
+  );
 }
 
 const PERSISTED_WORKOUT_SPORTS = new Set([
@@ -250,32 +288,47 @@ function parsePlanWorkoutSource(
       ? value.sport as PlanWorkoutEntryInput["sport"]
       : undefined;
 
-  return {
-    key: value.key,
-    name: value.name,
-    ...(typeof value.description === "string"
-      ? { description: value.description }
-      : {}),
-    ...(sport ? { sport } : {}),
-    ...(isRecord(value.sport_options)
-      ? {
-          sport_options: {
-            ...value.sport_options
-          } as PlanWorkoutEntryInput["sport_options"]
-        }
-      : {}),
-    ...(steps ? { steps } : {}),
-    ...(typeof value.distance_km === "number"
-      ? { distance_km: value.distance_km }
-      : {}),
-    ...(typeof value.schedule_date === "string"
-      ? { schedule_date: value.schedule_date }
-      : {}),
-    ...(typeof value.sort_no === "number" ? { sort_no: value.sort_no } : {}),
-    ...(typeof value.save_to_library === "boolean"
-      ? { save_to_library: value.save_to_library }
-      : {})
-  };
+  return keepUnknownKeys(
+    {
+      key: value.key,
+      name: value.name,
+      ...(typeof value.description === "string"
+        ? { description: value.description }
+        : {}),
+      ...(sport ? { sport } : {}),
+      ...(isRecord(value.sport_options)
+        ? {
+            sport_options: {
+              ...value.sport_options
+            } as PlanWorkoutEntryInput["sport_options"]
+          }
+        : {}),
+      ...(steps ? { steps } : {}),
+      ...(typeof value.distance_km === "number"
+        ? { distance_km: value.distance_km }
+        : {}),
+      ...(typeof value.schedule_date === "string"
+        ? { schedule_date: value.schedule_date }
+        : {}),
+      ...(typeof value.sort_no === "number" ? { sort_no: value.sort_no } : {}),
+      ...(typeof value.save_to_library === "boolean"
+        ? { save_to_library: value.save_to_library }
+        : {})
+    },
+    value,
+    [
+      "key",
+      "name",
+      "description",
+      "sport",
+      "sport_options",
+      "steps",
+      "distance_km",
+      "schedule_date",
+      "sort_no",
+      "save_to_library"
+    ]
+  );
 }
 
 function parsePlanDraftEntry(value: unknown): PlanDraftPreviewEntry | null {
@@ -293,21 +346,35 @@ function parsePlanDraftEntry(value: unknown): PlanDraftPreviewEntry | null {
   }
 
   const source = parsePlanWorkoutSource(value.source);
-  return {
-    key: value.key,
-    name: value.name,
-    sport: typeof value.sport === "string"
-      ? value.sport as PlanDraftPreviewEntry["sport"]
-      : undefined,
-    scheduleDate:
-      typeof value.scheduleDate === "string" ? value.scheduleDate : undefined,
-    volume: typeof value.volume === "string" ? value.volume : undefined,
-    saveToLibrary: value.saveToLibrary,
-    workoutType: value.workoutType,
-    stepsSummary:
-      typeof value.stepsSummary === "string" ? value.stepsSummary : undefined,
-    ...(source ? { source } : {})
-  };
+  return keepUnknownKeys(
+    {
+      key: value.key,
+      name: value.name,
+      sport: typeof value.sport === "string"
+        ? value.sport as PlanDraftPreviewEntry["sport"]
+        : undefined,
+      scheduleDate:
+        typeof value.scheduleDate === "string" ? value.scheduleDate : undefined,
+      volume: typeof value.volume === "string" ? value.volume : undefined,
+      saveToLibrary: value.saveToLibrary,
+      workoutType: value.workoutType,
+      stepsSummary:
+        typeof value.stepsSummary === "string" ? value.stepsSummary : undefined,
+      ...(source ? { source } : {})
+    },
+    value,
+    [
+      "key",
+      "name",
+      "sport",
+      "scheduleDate",
+      "volume",
+      "saveToLibrary",
+      "workoutType",
+      "stepsSummary",
+      "source"
+    ]
+  );
 }
 
 function parsePlanDraft(value: unknown): PlanDraftPreview | null {
@@ -340,48 +407,65 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
     return null;
   }
 
-  return {
-    draftId: value.draftId,
-    artifactType: value.artifactType === "workout" ? "workout" : "plan",
-    name: value.name,
-    summary: value.summary,
-    entries,
-    conflicts: value.conflicts,
-    warnings: value.warnings,
-    uploadedAt:
-      typeof value.uploadedAt === "number" ? value.uploadedAt : undefined,
-    // Rebuilt field by field like the rest, so an unlisted key is dropped —
-    // and dropping this one would bring a removed creation back on the next
-    // save.
-    removedAt:
-      typeof value.removedAt === "number" ? value.removedAt : undefined,
-    // The same, for an edit: dropped, the coach would stop seeing the version
-    // the athlete made.
-    editedAt:
-      typeof value.editedAt === "number" ? value.editedAt : undefined,
-    uploadResult:
-      isRecord(value.uploadResult) &&
-      typeof value.uploadResult.workoutsScheduled === "number" &&
-      typeof value.uploadResult.workoutsCreated === "number"
-        ? {
-            workoutsScheduled: value.uploadResult.workoutsScheduled,
-            workoutsCreated: value.uploadResult.workoutsCreated,
-            destination:
-              value.uploadResult.destination === "workoutLibrary" ||
-              value.uploadResult.destination === "calendar" ||
-              value.uploadResult.destination === "localPlan" ||
-              value.uploadResult.destination === "nativePlan" ||
-              value.uploadResult.destination === "localTemplate" ||
-              value.uploadResult.destination === "nativePlanAndCalendar"
-                ? value.uploadResult.destination
-                : undefined,
-            planId:
-              typeof value.uploadResult.planId === "string"
-                ? value.uploadResult.planId
-                : undefined
-          }
-        : undefined
-  };
+  return keepUnknownKeys<PlanDraftPreview>(
+    {
+      draftId: value.draftId,
+      artifactType: value.artifactType === "workout" ? "workout" : "plan",
+      name: value.name,
+      summary: value.summary,
+      entries,
+      conflicts: value.conflicts,
+      warnings: value.warnings,
+      uploadedAt:
+        typeof value.uploadedAt === "number" ? value.uploadedAt : undefined,
+      // Both are read as timestamps (a removed card is hidden, an edited one is
+      // restated to the coach), so they are typed here, not passed through.
+      removedAt:
+        typeof value.removedAt === "number" ? value.removedAt : undefined,
+      editedAt:
+        typeof value.editedAt === "number" ? value.editedAt : undefined,
+      uploadResult:
+        isRecord(value.uploadResult) &&
+        typeof value.uploadResult.workoutsScheduled === "number" &&
+        typeof value.uploadResult.workoutsCreated === "number"
+          ? keepUnknownKeys<NonNullable<PlanDraftPreview["uploadResult"]>>(
+              {
+                workoutsScheduled: value.uploadResult.workoutsScheduled,
+                workoutsCreated: value.uploadResult.workoutsCreated,
+                destination:
+                  value.uploadResult.destination === "workoutLibrary" ||
+                  value.uploadResult.destination === "calendar" ||
+                  value.uploadResult.destination === "localPlan" ||
+                  value.uploadResult.destination === "nativePlan" ||
+                  value.uploadResult.destination === "localTemplate" ||
+                  value.uploadResult.destination === "nativePlanAndCalendar"
+                    ? value.uploadResult.destination
+                    : undefined,
+                planId:
+                  typeof value.uploadResult.planId === "string"
+                    ? value.uploadResult.planId
+                    : undefined
+              },
+              value.uploadResult,
+              ["workoutsScheduled", "workoutsCreated", "destination", "planId"]
+            )
+          : undefined
+    },
+    value,
+    [
+      "draftId",
+      "artifactType",
+      "name",
+      "summary",
+      "entries",
+      "conflicts",
+      "warnings",
+      "uploadedAt",
+      "removedAt",
+      "editedAt",
+      "uploadResult"
+    ]
+  );
 }
 
 function parseWorkoutDeletePreview(value: unknown): WorkoutDeletePreview | null {
@@ -399,16 +483,20 @@ function parseWorkoutDeletePreview(value: unknown): WorkoutDeletePreview | null 
     return null;
   }
 
-  return {
-    requestId: value.requestId,
-    target: value.target,
-    workoutName:
-      typeof value.workoutName === "string" ? value.workoutName : undefined,
-    scheduleDate:
-      typeof value.scheduleDate === "string" ? value.scheduleDate : undefined,
-    programId: typeof value.programId === "string" ? value.programId : undefined,
-    summary: value.summary
-  };
+  return keepUnknownKeys<WorkoutDeletePreview>(
+    {
+      requestId: value.requestId,
+      target: value.target,
+      workoutName:
+        typeof value.workoutName === "string" ? value.workoutName : undefined,
+      scheduleDate:
+        typeof value.scheduleDate === "string" ? value.scheduleDate : undefined,
+      programId: typeof value.programId === "string" ? value.programId : undefined,
+      summary: value.summary
+    },
+    value,
+    ["requestId", "target", "workoutName", "scheduleDate", "programId", "summary"]
+  );
 }
 
 function parseSeriesPoint(value: unknown): TrainingHubActivitySeriesPoint | null {
@@ -427,7 +515,9 @@ function parseSeriesPoint(value: unknown): TrainingHubActivitySeriesPoint | null
     }
   }
 
-  return Object.keys(point).length > 0 ? point : null;
+  return Object.keys(point).length > 0
+    ? keepUnknownKeys(point, value, SERIES_POINT_CHANNELS)
+    : null;
 }
 
 const SERIES_POINT_CHANNELS = [
@@ -454,7 +544,9 @@ function parseTrackPoint(value: unknown): TrainingHubTrackPoint | null {
   if (typeof value.lon === "number") point.lon = value.lon;
   if (typeof value.elevation === "number") point.elevation = value.elevation;
   if (typeof value.distance === "number") point.distance = value.distance;
-  return Object.keys(point).length > 0 ? point : null;
+  return Object.keys(point).length > 0
+    ? keepUnknownKeys(point, value, ["lat", "lon", "elevation", "distance"])
+    : null;
 }
 
 function parseVisualLapPoint(value: unknown): ActivityVisualLapPoint | null {
@@ -462,15 +554,19 @@ function parseVisualLapPoint(value: unknown): ActivityVisualLapPoint | null {
     return null;
   }
 
-  return {
-    index: value.index,
-    avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,
-    maxHr: typeof value.maxHr === "number" ? value.maxHr : undefined,
-    distance: typeof value.distance === "number" ? value.distance : undefined,
-    duration: typeof value.duration === "number" ? value.duration : undefined,
-    pace: typeof value.pace === "number" ? value.pace : undefined,
-    avgCadence: typeof value.avgCadence === "number" ? value.avgCadence : undefined
-  };
+  return keepUnknownKeys(
+    {
+      index: value.index,
+      avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,
+      maxHr: typeof value.maxHr === "number" ? value.maxHr : undefined,
+      distance: typeof value.distance === "number" ? value.distance : undefined,
+      duration: typeof value.duration === "number" ? value.duration : undefined,
+      pace: typeof value.pace === "number" ? value.pace : undefined,
+      avgCadence: typeof value.avgCadence === "number" ? value.avgCadence : undefined
+    },
+    value,
+    ["index", "avgHr", "maxHr", "distance", "duration", "pace", "avgCadence"]
+  );
 }
 
 function parseChannelSection(value: unknown): ActivityVisualChannelSection | null {
@@ -503,11 +599,15 @@ function parseChannelSection(value: unknown): ActivityVisualChannelSection | nul
     laps = parsed.length > 0 ? parsed : undefined;
   }
 
-  return {
-    chartKind: value.chartKind,
-    series,
-    laps
-  };
+  return keepUnknownKeys<ActivityVisualChannelSection>(
+    {
+      chartKind: value.chartKind,
+      series,
+      laps
+    },
+    value,
+    ["chartKind", "series", "laps"]
+  );
 }
 
 function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | null {
@@ -550,7 +650,7 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     if (series.length !== value.sections.pace.series.length) {
       return null;
     }
-    sections.pace = { series };
+    sections.pace = keepUnknownKeys({ series }, value.sections.pace, ["series"]);
   }
 
   if (value.sections.power !== undefined) {
@@ -563,7 +663,7 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     if (series.length !== value.sections.power.series.length) {
       return null;
     }
-    sections.power = { series };
+    sections.power = keepUnknownKeys({ series }, value.sections.power, ["series"]);
   }
 
   if (value.sections.elevation !== undefined) {
@@ -579,7 +679,7 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     if (points.length !== value.sections.elevation.points.length) {
       return null;
     }
-    sections.elevation = { points };
+    sections.elevation = keepUnknownKeys({ points }, value.sections.elevation, ["points"]);
   }
 
   if (Array.isArray(value.sections.laps)) {
@@ -592,16 +692,27 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     sections.laps = laps;
   }
 
-  return {
-    previewId: value.previewId,
-    activityId: value.activityId,
-    sportType: typeof value.sportType === "number" ? value.sportType : undefined,
-    name: typeof value.name === "string" ? value.name : undefined,
-    startTime: typeof value.startTime === "string" ? value.startTime : undefined,
-    avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,
-    maxHr: typeof value.maxHr === "number" ? value.maxHr : undefined,
-    sections
-  };
+  return keepUnknownKeys(
+    {
+      previewId: value.previewId,
+      activityId: value.activityId,
+      sportType: typeof value.sportType === "number" ? value.sportType : undefined,
+      name: typeof value.name === "string" ? value.name : undefined,
+      startTime: typeof value.startTime === "string" ? value.startTime : undefined,
+      avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,
+      maxHr: typeof value.maxHr === "number" ? value.maxHr : undefined,
+      sections: keepUnknownKeys(sections, value.sections, [
+        "hr",
+        "cadence",
+        "pace",
+        "power",
+        "elevation",
+        "laps"
+      ])
+    },
+    value,
+    ["previewId", "activityId", "sportType", "name", "startTime", "avgHr", "maxHr", "sections"]
+  );
 }
 
 function parseHrTrendLapPoint(value: unknown): ActivityVisualLapPoint | null {
@@ -661,17 +772,21 @@ function parseTrendPoint(value: unknown): TrainingTrendPoint | null {
     return null;
   }
 
-  return {
-    date: value.date,
-    label: value.label,
-    trainingLoad:
-      typeof value.trainingLoad === "number" ? value.trainingLoad : undefined,
-    avgSleepHrv:
-      typeof value.avgSleepHrv === "number" ? value.avgSleepHrv : undefined,
-    sleepHrvBase:
-      typeof value.sleepHrvBase === "number" ? value.sleepHrvBase : undefined,
-    rhr: typeof value.rhr === "number" ? value.rhr : undefined
-  };
+  return keepUnknownKeys(
+    {
+      date: value.date,
+      label: value.label,
+      trainingLoad:
+        typeof value.trainingLoad === "number" ? value.trainingLoad : undefined,
+      avgSleepHrv:
+        typeof value.avgSleepHrv === "number" ? value.avgSleepHrv : undefined,
+      sleepHrvBase:
+        typeof value.sleepHrvBase === "number" ? value.sleepHrvBase : undefined,
+      rhr: typeof value.rhr === "number" ? value.rhr : undefined
+    },
+    value,
+    ["date", "label", "trainingLoad", "avgSleepHrv", "sleepHrvBase", "rhr"]
+  );
 }
 
 function parseFitnessTrendPreview(value: unknown): FitnessTrendPreview | null {
@@ -689,7 +804,10 @@ function parseFitnessTrendPreview(value: unknown): FitnessTrendPreview | null {
     return null;
   }
 
-  return { previewId: value.previewId, trendPoints };
+  return keepUnknownKeys({ previewId: value.previewId, trendPoints }, value, [
+    "previewId",
+    "trendPoints"
+  ]);
 }
 
 function parseThresholdZone(value: unknown): TrainingHubThresholdZone | null {
@@ -697,12 +815,16 @@ function parseThresholdZone(value: unknown): TrainingHubThresholdZone | null {
     return null;
   }
 
-  return {
-    index: value.index,
-    hr: typeof value.hr === "number" ? value.hr : undefined,
-    pace: typeof value.pace === "number" ? value.pace : undefined,
-    ratio: typeof value.ratio === "number" ? value.ratio : undefined
-  };
+  return keepUnknownKeys(
+    {
+      index: value.index,
+      hr: typeof value.hr === "number" ? value.hr : undefined,
+      pace: typeof value.pace === "number" ? value.pace : undefined,
+      ratio: typeof value.ratio === "number" ? value.ratio : undefined
+    },
+    value,
+    ["index", "hr", "pace", "ratio"]
+  );
 }
 
 function parseHrZoneEntry(value: unknown): HrZoneEntry | null {
@@ -718,12 +840,16 @@ function parseHrZoneEntry(value: unknown): HrZoneEntry | null {
     return null;
   }
 
-  return {
-    index: value.index,
-    label: value.label,
-    percent: value.percent,
-    value: value.value
-  };
+  return keepUnknownKeys(
+    {
+      index: value.index,
+      label: value.label,
+      percent: value.percent,
+      value: value.value
+    },
+    value,
+    ["index", "label", "percent", "value"]
+  );
 }
 
 function parseHrZonePreview(value: unknown): HrZonePreview | null {
@@ -751,12 +877,16 @@ function parseHrZonePreview(value: unknown): HrZonePreview | null {
     return null;
   }
 
-  return {
-    previewId: value.previewId,
-    metric: value.metric,
-    zones,
-    lthrZones
-  };
+  return keepUnknownKeys<HrZonePreview>(
+    {
+      previewId: value.previewId,
+      metric: value.metric,
+      zones,
+      lthrZones
+    },
+    value,
+    ["previewId", "metric", "zones", "lthrZones"]
+  );
 }
 
 /**
@@ -798,7 +928,7 @@ function parseAnalysisMarker(
     }
     marker[field] = entry;
   }
-  return marker as unknown as ChatEntryAnalysisMarker;
+  return keepUnknownKeys(marker, value, fields) as unknown as ChatEntryAnalysisMarker;
 }
 
 /**
@@ -825,7 +955,7 @@ function parseTokenUsage(value: unknown): ChatTokenUsage | undefined {
   const outputTokens = count("outputTokens");
   return inputTokens === null || outputTokens === null
     ? undefined
-    : { inputTokens, outputTokens };
+    : keepUnknownKeys({ inputTokens, outputTokens }, value, ["inputTokens", "outputTokens"]);
 }
 
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
@@ -850,16 +980,55 @@ function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {
     typeof value.model === "string" && value.model.trim()
       ? value.model.trim()
       : undefined;
-  return {
-    kind: "message",
-    role,
-    content: value.content,
-    ...(source ? { source } : {}),
-    ...(reasoningSummary ? { reasoningSummary } : {}),
-    ...(usage ? { usage } : {}),
-    ...(model ? { model } : {}),
-    ...(automation ? { automation } : {})
-  };
+  return keepUnknownKeys<PersistedChatMessageEntry>(
+    {
+      kind: "message",
+      role,
+      content: value.content,
+      ...(source ? { source } : {}),
+      ...(reasoningSummary ? { reasoningSummary } : {}),
+      ...(usage ? { usage } : {}),
+      ...(model ? { model } : {}),
+      ...(automation ? { automation } : {})
+    },
+    value,
+    [...ENTRY_META_KEYS, "role", "content", "source", "reasoningSummary", "usage", "model", "automation"]
+  );
+}
+
+/** On every entry; `mid`/`mrev` are carried by `withMergeMeta`, not passed through. */
+const ENTRY_META_KEYS = ["kind", "mid", "mrev"] as const;
+
+/** Every kind this build parses. Anything else is a newer build's, kept verbatim. */
+const KNOWN_ENTRY_KINDS = new Set([
+  "message",
+  "planDraft",
+  "coachPrompt",
+  "workoutDelete",
+  "activityVisual",
+  "activityHrTrend",
+  "fitnessTrend",
+  "hrZoneSummary",
+  "automationSilent"
+]);
+
+function opaqueEntry(
+  raw: Record<string, unknown>,
+  meta: Record<string, unknown>
+): PersistedChatEntry {
+  const { mid: _mid, mrev: _mrev, ...rest } = raw;
+  return withMergeMeta({ kind: "opaque", raw: rest }, meta);
+}
+
+/** What the row stores for an entry: an opaque one is its raw object again. */
+function toStoredEntry(entry: PersistedChatEntry): unknown {
+  if (entry.kind !== "opaque") return entry;
+  const { raw, mid, mrev } = entry;
+  return { ...raw, ...(mid ? { mid } : {}), ...(mrev ? { mrev } : {}) };
+}
+
+function serializeEntries(entries: PersistedChatEntry[]): string {
+  return JSON.stringify(entries.map(toStoredEntry));
 }
 
 /**
@@ -885,30 +1054,46 @@ function parseEntry(value: unknown): PersistedChatEntry | null {
   if (!isRecord(value)) {
     return null;
   }
+  // The wrapper coming back from the renderer, which holds it as it was sent.
+  if (value.kind === "opaque") {
+    return isRecord(value.raw) ? opaqueEntry(value.raw, value) : null;
+  }
+  if (typeof value.kind === "string" && !KNOWN_ENTRY_KINDS.has(value.kind)) {
+    return opaqueEntry(value, value);
+  }
   const parsed = parseEntryShape(value);
   return parsed ? withMergeMeta(parsed, value) : null;
+}
+
+/** A card kind whose payload sits under one key. */
+function cardEntry<T extends PersistedChatEntry>(
+  entry: T,
+  value: Record<string, unknown>,
+  payloadKey: string
+): T {
+  return keepUnknownKeys(entry, value, [...ENTRY_META_KEYS, payloadKey]);
 }
 
 function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | null {
 
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
-    return draft ? { kind: "planDraft", draft } : null;
+    return draft ? cardEntry({ kind: "planDraft", draft }, value, "draft") : null;
   }
 
   if (value.kind === "coachPrompt") {
     const prompt = parseCoachInputPrompt(value.prompt);
-    return prompt ? { kind: "coachPrompt", prompt } : null;
+    return prompt ? cardEntry({ kind: "coachPrompt", prompt }, value, "prompt") : null;
   }
 
   if (value.kind === "workoutDelete") {
     const preview = parseWorkoutDeletePreview(value.preview);
-    return preview ? { kind: "workoutDelete", preview } : null;
+    return preview ? cardEntry({ kind: "workoutDelete", preview }, value, "preview") : null;
   }
 
   if (value.kind === "activityVisual") {
     const preview = parseActivityVisualPreview(value.preview);
-    return preview ? { kind: "activityVisual", preview } : null;
+    return preview ? cardEntry({ kind: "activityVisual", preview }, value, "preview") : null;
   }
 
   if (value.kind === "activityHrTrend") {
@@ -920,12 +1105,12 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
 
   if (value.kind === "fitnessTrend") {
     const preview = parseFitnessTrendPreview(value.preview);
-    return preview ? { kind: "fitnessTrend", preview } : null;
+    return preview ? cardEntry({ kind: "fitnessTrend", preview }, value, "preview") : null;
   }
 
   if (value.kind === "hrZoneSummary") {
     const preview = parseHrZonePreview(value.preview);
-    return preview ? { kind: "hrZoneSummary", preview } : null;
+    return preview ? cardEntry({ kind: "hrZoneSummary", preview }, value, "preview") : null;
   }
 
   if (value.kind === "automationSilent") {
@@ -939,7 +1124,11 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
         ? value.at
         : null;
     return automation && at !== null
-      ? { kind: "automationSilent", automation, at }
+      ? keepUnknownKeys({ kind: "automationSilent" as const, automation, at }, value, [
+          ...ENTRY_META_KEYS,
+          "automation",
+          "at"
+        ])
       : null;
   }
 
@@ -1433,7 +1622,7 @@ export function saveChatSession(
     row.title === DEFAULT_SESSION_TITLE
       ? deriveSessionTitleFromEntries(normalizedEntries)
       : row.title;
-  const messagesJson = JSON.stringify(normalizedEntries);
+  const messagesJson = serializeEntries(normalizedEntries);
 
   // Opening a conversation replays its transcript back through this path, so
   // without this guard simply reading a chat would give it a fresh updatedAt
@@ -1539,7 +1728,7 @@ export function migrateLegacyTranscriptRow(
     id,
     normalizeProvider(provider),
     title,
-    JSON.stringify(entries),
+    serializeEntries(entries),
     updatedAt,
     updatedAt
   );

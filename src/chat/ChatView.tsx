@@ -2716,7 +2716,7 @@ export function ChatView({
         const next = prev.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
         persistHistory(activeSessionIdRef.current, next, true);
@@ -3502,7 +3502,7 @@ export function ChatView({
     const answeredTimeline = timeline.map((entry, index): ChatEntry =>
       index === answeredPromptIndex && entry.kind === "coachPrompt"
         ? {
-            kind: "coachPrompt",
+            ...entry,
             prompt: {
               ...entry.prompt,
               answer: trimmed,
@@ -3567,7 +3567,7 @@ export function ChatView({
         const restoredEntries = timeline.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
         setTimeline(restoredEntries);
@@ -3638,7 +3638,7 @@ export function ChatView({
         const next = prev.map((entry) =>
           entry.kind === "planDraft" && entry.draft.draftId === draftId
             ? {
-                kind: "planDraft" as const,
+                ...entry,
                 draft: {
                   ...entry.draft,
                   uploadedAt: Date.now(),
@@ -3702,10 +3702,7 @@ export function ChatView({
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === draftId
-          ? {
-              kind: "planDraft",
-              draft: { ...entry.draft, removedAt: Date.now() }
-            }
+          ? { ...entry, draft: { ...entry.draft, removedAt: Date.now() } }
           : entry
       );
       persistHistory(activeSessionIdRef.current, next, true);
@@ -3725,7 +3722,7 @@ export function ChatView({
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-          ? { kind: "planDraft", draft: { ...entry.draft, ...preview } }
+          ? { ...entry, draft: { ...entry.draft, ...preview } }
           : entry
       );
       persistHistory(activeSessionIdRef.current, next, true);
@@ -4683,6 +4680,10 @@ function AnalysisSilentChip({
                   highlighted={highlightedChatEntryIndex === index}
                 />
               );
+            }
+
+            if (entry.kind === "opaque") {
+              return null;
             }
 
             // 5.6: the synthetic user turn an analysis sends is stored with

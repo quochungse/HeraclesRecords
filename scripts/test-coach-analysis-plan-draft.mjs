@@ -124,12 +124,12 @@ const rendererSource = require("node:fs").readFileSync(
 );
 assert.match(
   rendererSource,
-  /if \(entry\.kind === "planDraft"\) \{\s*result\.push\(\{ kind: "planDraft", draft: entry\.draft \}\);/,
+  /function fromPersistedEntry\([\s\S]*?if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
   "fromPersistedEntries no longer passes planDraft through unchanged"
 );
 assert.match(
   rendererSource,
-  /if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
+  /function persistKnownEntry\([\s\S]*?if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
   "toPersistedEntries no longer passes planDraft through unchanged"
 );
 

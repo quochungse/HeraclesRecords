@@ -93,21 +93,30 @@ thấy cùng một diff. Plan đã lưu vẫn nối với cuộc chat đã sinh 
 
 ## 4. Tương thích giữa hai build (D7)
 
-Hai máy sync chung dữ liệu có thể chạy hai build khác nhau. Các sự thật dưới đây được **suy
-ra từ việc đọc code**; P0.1 bắt đầu bằng test ghi lại đúng các hành vi này trước khi phần còn
-lại của kế hoạch dựa vào chúng.
+Hai máy sync chung dữ liệu có thể chạy hai build khác nhau. H1–H4 đã được kiểm bằng
+`test:chat-transcript-compat` (P0.1), chạy parser và merger thật trên đúng những gì một build
+cũ gửi đi; H5–H7 đọc từ code.
 
 - **H1. Transcript là một cột, merge là union theo `mid`** (`mergeTranscripts`,
   `sync/rowMergers.ts`). Một entry chỉ bên này có vẫn được giữ trong kết quả merge.
 - **H2. Build hiện tại dựng lại entry từng field một** (`parseEntryShape` → `parsePlanDraft`…
   trong `chatHistoryStore.ts`, và `toPersistedEntries`/`fromPersistedEntries` ở renderer).
   Kind lạ thì bỏ cả entry; field lạ thì bỏ field đó.
-- **H3. Khi lưu, identity được khôi phục theo nội dung, rồi theo id của card**
-  (`stampEntries`, `logicalKey`). Một `planDraft` bị build cũ bỏ mất field mới sẽ không khớp
-  nội dung, nhưng khớp `planDraft:<draftId>`, nên **giữ `mid` và được tăng `mrev`**. Bản đã
-  mất field vì thế **thắng** last-writer-wins theo entry, và lan sang mọi máy.
-- **H4. Một `message` bị build cũ bỏ mất field thì bị nhân đôi**: message không có
-  `logicalKey`, nên bản thiếu field được cấp `mid` mới, và union giữ cả hai bản.
+- **H3. Build cũ làm mất field mới của một kind đã có, theo hai đường** (`stampEntries`,
+  `logicalKey`, `mergeTranscripts`):
+  - **H3a, lưu lại mà không sửa**: build cũ parse bản đang lưu và bản nó gửi đi theo cùng một
+    cách, nên hai bản khớp nội dung; entry giữ nguyên `mid` **và** `mrev`. Khi merge, hai bản
+    cùng revision được phân xử bằng cách so chuỗi JSON, nên field mất hay còn là do cách hai
+    bản serialize, không do ý ai.
+  - **H3b, build cũ sửa entry đó** (trả lời câu hỏi, sửa plan, remove card): nội dung đổi, id
+    của card (`planDraft:<draftId>`) vẫn khớp, nên entry giữ `mid` và được tăng `mrev`. Bản
+    mất field **luôn thắng** trên mọi máy.
+- **H4. Một `message` không bị nhân đôi** khi build cũ bỏ field của nó: build cũ bỏ field ở cả
+  hai phía nên message vẫn khớp nội dung, giữ `mid` và `mrev`. Nó chịu cùng rủi ro như H3a
+  (build cũ không sửa message, nên không có H3b).
+
+  (Bản 2 của tài liệu này viết H3 là "luôn tăng `mrev`" và H4 là "nhân đôi". Cả hai sai, và
+  `test:chat-transcript-compat` là chỗ đã bắt được điều đó.)
 - **H5. Row của bảng thường thì an toàn khi thêm cột**: `upsertRow` ghi đúng những cột có
   trong payload, nên payload thiếu cột (từ build cũ) nghĩa là *không đổi*; payload thừa cột
   được báo qua `takeIncomplete` và không bị stamp (CLAUDE.md, mục Sync).
@@ -121,8 +130,9 @@ lại của kế hoạch dựa vào chúng.
 Từ đó, năm quy tắc:
 
 - **Q1. Không thêm field vào kind đã có** (`message`, `planDraft`, `coachPrompt`,
-  `workoutDelete`, các kind biểu đồ), kể cả field tuỳ chọn (H3, H4). Field đã tồn tại thì
-  được dùng (`editedAt`, `removedAt`, `uploadResult`…).
+  `workoutDelete`, các kind biểu đồ), kể cả field tuỳ chọn: một máy chạy build cũ có thể làm
+  mất nó ở mọi máy (H3, H4). Field đã tồn tại thì được dùng (`editedAt`, `removedAt`,
+  `uploadResult`…).
 - **Q2. Dữ liệu mới nằm trong bảng.** Version, brief, outline, chip, cài đặt của cuộc chat:
   trong cột mới của `chat_plan_drafts` (qua `ensureColumn`) và bảng mới (§7). An toàn nhờ H5.
 - **Q3. Kind mới chỉ làm neo.** Thứ gì cần *hiện* ở một vị trí trong luồng chat (brief,
@@ -153,9 +163,8 @@ Không kind mới, không bảng mới. P0.1 nên ở một bản phát hành c�
 
 **P0.1 Parser giữ nguyên kind và field lạ (Q4)** · M
 - **Trước tiên**, suite mới `test:chat-transcript-compat` ghi lại hành vi *hiện tại* bằng
-  parser và merger thật: H3 (field bị bỏ → bản mất field thắng), H4 (message bị bỏ field → nhân
-  đôi), H1 (kind lạ bị bỏ ở một bên vẫn sống qua union). Nếu test nào không ra như §4 viết thì
-  dừng lại và sửa §4 trước khi làm tiếp.
+  parser và merger thật: H3a/H3b, H4 và H1. Nếu test nào không ra như §4 viết thì dừng lại và
+  sửa §4 trước khi làm tiếp. (Đã xảy ra: H3 và H4 được viết lại theo kết quả test.)
 - Main (`chatHistoryStore.ts`): kind không nhận ra thì giữ nguyên object, không trả `null`.
   Kind nhận ra thì mỗi `parse*` giữ lại các key **không** có trong danh sách key đã biết của nó,
   còn key đã biết luôn lấy từ bản đã parse (key đã biết mà không hợp lệ thì bị bỏ, không được
