@@ -1191,6 +1191,58 @@ test("a coach's one-off workout is edited in place, keeping the day it was sugge
   );
 });
 
+test("a programme is placed by week and day, and the draft's answer is short", async () => {
+  fakeCoros();
+  assert.equal(
+    chatWorkoutTools.CHAT_WORKOUT_TOOL_NAMES.includes("upload_training_plan"),
+    false,
+    "the tool that never wrote anything is gone"
+  );
+  const draftTool = (args) =>
+    chatWorkoutTools.handleChatWorkoutTool("draft_training_plan", args, { allowUpcomingWorkouts: false });
+
+  const answer = JSON.parse(
+    await draftTool({
+      name: "Programme",
+      workouts: [
+        coachRun("Tue easy", 2400, { week: 1, day: "tue" }),
+        coachRun("Sat long", 4800, { week: 1, day: "sat" }),
+        coachRun("Wed tempo", 3000, { week: 2, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(answer.ok, true, JSON.stringify(answer));
+  assert.ok(
+    answer.preview.entries.every((entry) => entry.source === undefined),
+    "the steps the model just wrote are not echoed back to it"
+  );
+  assert.match(answer.message, /do not list every session/);
+  assert.match(answer.preview.summary, /^2 weeks · 1–2 sessions a week · Run$/);
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(answer.draft_id).entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
+    [["Tue easy", 0, 1], ["Sat long", 0, 5], ["Wed tempo", 1, 2]],
+    "each session sits on its week and day, where a list used to go one a day"
+  );
+
+  const mixed = JSON.parse(
+    await draftTool({
+      name: "Mixed",
+      workouts: [
+        coachRun("Dated", 1800, { schedule_date: "20990803" }),
+        coachRun("Placed", 1800, { week: 1, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(mixed.ok, false, "dates and weeks in one plan have no single reading");
+  assert.match(mixed.errors.join(" "), /not a mix/);
+
+  const half = JSON.parse(
+    await draftTool({ name: "Half", workouts: [coachRun("Only a week", 1800, { week: 2 })] })
+  );
+  assert.equal(half.ok, false);
+  assert.match(half.errors.join(" "), /needs both week/);
+});
+
 test("deleting a conversation's drafts lets them go", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

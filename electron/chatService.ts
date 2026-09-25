@@ -2497,8 +2497,8 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
 
 /**
  * Section 6, decision 3: an auto run may draft and propose, never write.
- * `upload_training_plan` and `delete_workout` are the write surface today; any
- * future write tool must be added here as well.
+ * `delete_workout` is the write surface today (a plan or workout is only ever
+ * written from the card); any future write tool must be added here as well.
  */
 /**
  * Section 6's read-only set, as an **allowlist**.
@@ -2599,7 +2599,6 @@ export function getClaudeCodeTools(
   const sleepTools = permissions.sleepData ? getChatSleepTools() : [];
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
-      tool.name === "upload_training_plan" ||
       tool.name === "list_scheduled_workouts" ||
       tool.name === "delete_workout"
     ) {
@@ -2974,9 +2973,13 @@ function withLiveToolInstructions(
         "(no value, run-until-lap) for by-feel warmups/cooldowns or fartlek surges. Put every " +
         "prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE, or grade in " +
         "the typed intensity field; do not leave it only in workout prose or the name. " +
-        "For draft_training_plan entries intended for calendar placement, include schedule_date " +
-        "(YYYYMMDD). A multi-workout draft is saved to COROS as one plan by default (give it a description and, for a periodised block, week_stages); the athlete may instead choose individual COROS workouts or Calendar, and may edit the plan before saving. " +
-        "The athlete must confirm the destination and any one-off workout date before saving. " +
+        "Place draft_training_plan sessions one way for the whole plan: sessions for this week " +
+        "or the next few days get a schedule_date (YYYYMMDD) each; a programme the athlete " +
+        "will start later gets a week (from 1) and a day (mon…sun) for each session instead. " +
+        "A dated plan within two weeks is offered first as sessions on the calendar; any other " +
+        "plan is offered first as one COROS plan (give it a description and, for a periodised " +
+        "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
+        "or schedules it from there — nothing you call writes to COROS. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
       "",

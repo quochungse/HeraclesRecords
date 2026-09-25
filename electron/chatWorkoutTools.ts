@@ -172,7 +172,6 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "search_coros_exercises",
   "draft_workout",
   "draft_training_plan",
-  "upload_training_plan",
   "list_scheduled_workouts",
   "delete_workout"
 ] as const;
@@ -262,25 +261,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
         "Strength and Hybrid Fitness exercise names are checked against the COROS catalog; use search_coros_exercises first " +
         "and pass its exact IDs and names. If candidates are returned, revise the affected steps and call this tool again. " +
-        "Always call this before upload. Returns a draftId and human-readable preview.",
+        "Nothing is saved to COROS by this or any tool: the athlete saves from the card. Returns a draftId and a short preview.",
       inputSchema: buildDraftTrainingPlanInputSchema()
-    },
-    {
-      name: "upload_training_plan",
-      description:
-        "Compatibility guard for plan uploads. Plan writes can only be initiated by the athlete " +
-        "from the confirmation card; this tool never performs a remote write.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          draft_id: { type: "string", description: "draftId from a workout or plan draft tool" },
-          confirmed: {
-            type: "boolean",
-            description: "Must be true only after explicit athlete confirmation"
-          }
-        },
-        required: ["draft_id"]
-      }
     },
     {
       name: "list_scheduled_workouts",
@@ -378,9 +360,6 @@ export async function handleChatWorkoutTool(
   }
   if (name === "search_coros_exercises") {
     return handleSearchCorosExercises(args);
-  }
-  if (name === "upload_training_plan") {
-    return handleUploadTrainingPlan(args, options?.unitSystem ?? "metric");
   }
   if (name === "list_scheduled_workouts") {
     return handleListScheduledWorkouts(args, options?.unitSystem ?? "metric");
@@ -486,6 +465,62 @@ async function handleSearchCorosExercises(
   });
 }
 
+const PLAN_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+interface RawPlacement {
+  key: string;
+  name: string;
+  dated: boolean;
+  week?: number;
+  day?: number;
+  /** A week or a day was given, valid or not. */
+  placed: boolean;
+}
+
+function rawPlacements(args: Record<string, unknown>): RawPlacement[] {
+  const rawWorkouts = Array.isArray(args.workouts) ? args.workouts : [];
+  return rawWorkouts.map((item, index) => {
+    const entry = (item ?? {}) as Record<string, unknown>;
+    const week = Number(entry.week);
+    const day = PLAN_DAYS.indexOf(String(entry.day ?? "").toLowerCase() as (typeof PLAN_DAYS)[number]);
+    return {
+      key: String(entry.key ?? `workout-${index + 1}`).trim(),
+      name: String(entry.name ?? `Workout ${index + 1}`).trim(),
+      dated: Boolean(entry.schedule_date),
+      placed: entry.week !== undefined || entry.day !== undefined,
+      ...(Number.isInteger(week) && week >= 1 && week <= 52 ? { week: week - 1 } : {}),
+      ...(day >= 0 ? { day } : {})
+    };
+  });
+}
+
+/**
+ * A plan's sessions are placed one way: every one dated (sessions to use now),
+ * or every one given a week and a day (a programme to start later). A mix has
+ * no reading — dates count from the first date's Monday, weeks from a start not
+ * yet chosen — so it is handed back rather than guessed at. Undated sessions
+ * with no week and day at all are still accepted, as before.
+ */
+export function planPlacementErrors(args: Record<string, unknown>): string[] {
+  const placements = rawPlacements(args);
+  const errors: string[] = [];
+  for (const item of placements) {
+    if (item.dated && item.placed) {
+      errors.push(`"${item.name}" has both a schedule_date and a week/day; give one.`);
+    } else if (item.placed && (item.week === undefined || item.day === undefined)) {
+      errors.push(`"${item.name}" needs both week (1–52) and day (mon…sun).`);
+    }
+  }
+  const dated = placements.filter((item) => item.dated).length;
+  const placed = placements.filter((item) => item.placed).length;
+  if (dated > 0 && placed > 0 && !errors.length) {
+    errors.push(
+      "Give every session a schedule_date, or every session a week and day — not a mix."
+    );
+  }
+  return errors;
+}
+
 function toPlanDraft(args: Record<string, unknown>): CorosTrainingPlanDraft {
   const name = String(args.name ?? "").trim();
   const rawWorkouts = Array.isArray(args.workouts) ? args.workouts : [];
@@ -515,11 +550,20 @@ function toPlanDraft(args: Record<string, unknown>): CorosTrainingPlanDraft {
       ? [{ weekIndex: week - 1, stage: stage.value as TrainingPlanWeekStage }]
       : [];
   });
+  /* Week and day ride in `layout`, which the plan document already reads for
+     an undated plan — without them it laid the list out one session a day. */
+  const layout: NonNullable<CorosTrainingPlanDraft["layout"]> = {};
+  for (const item of rawPlacements(args)) {
+    if (!item.dated && item.week !== undefined && item.day !== undefined) {
+      layout[item.key] = { weekIndex: item.week, dayIndex: item.day };
+    }
+  }
   return {
     name,
     workouts,
     ...(description ? { description } : {}),
-    ...(weekStages.length ? { weekStages } : {})
+    ...(weekStages.length ? { weekStages } : {}),
+    ...(Object.keys(layout).length ? { layout } : {})
   };
 }
 
@@ -669,6 +713,10 @@ async function handleDraftTrainingPlan(
   artifactType: "plan" | "workout" = "plan",
   planRequest?: TrainingPlanGenerationRequest
 ): Promise<string> {
+  const placementErrors = planPlacementErrors(args);
+  if (placementErrors.length > 0) {
+    return JSON.stringify({ ok: false, errors: placementErrors });
+  }
   const draft = toPlanDraft(args);
   const validation = validatePlanDraft(draft, {
     todayDay: formatScheduleDay(new Date())
@@ -739,7 +787,7 @@ async function handleDraftTrainingPlan(
     return JSON.stringify({
       ok: true,
       draft_id: draftId,
-      message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app opens it in the athlete's plan editor."
+      message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app shows it to the athlete week by week, to save, schedule or edit."
     });
   }
   draftStore.set(draftId, stored);
@@ -753,47 +801,16 @@ async function handleDraftTrainingPlan(
     preview: {
       name: preview.name,
       summary: preview.summary,
-      entries: preview.entries,
+      // Without each session's `source`: the steps are what the model just
+      // wrote, and echoing them back cost ~10k tokens a plan on every later
+      // round of the turn.
+      entries: preview.entries.map(({ source: _source, ...entry }) => entry),
       conflicts: preview.conflicts,
       warnings: preview.warnings
     },
     message: artifactType === "workout"
-      ? "Workout draft saved. Tell the athlete to review it, choose Workout Library or Calendar, and confirm. The workout is not a training plan."
-      : "Draft saved. Tell the athlete to review the plan card: they can edit it first, save it to COROS as a plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
-  });
-}
-
-async function handleUploadTrainingPlan(
-  args: Record<string, unknown>,
-  _unitSystem: UnitSystem
-): Promise<string> {
-  const draftId = String(args.draft_id ?? args.draftId ?? "").trim();
-  if (!draftId) {
-    return JSON.stringify({ ok: false, error: "draft_id is required." });
-  }
-
-  const stored = loadStoredPlanDraft(draftId);
-  if (!stored) {
-    return JSON.stringify({
-      ok: false,
-      error:
-        "Draft not found or expired. Ask the athlete to ask you to regenerate this training plan."
-    });
-  }
-
-  if (stored.uploadedAt) {
-    return JSON.stringify({
-      ok: false,
-      error: "This draft was already uploaded.",
-      uploaded_at: stored.uploadedAt
-    });
-  }
-
-  return JSON.stringify({
-    ok: false,
-    confirmation_required: true,
-    error:
-      "Plan writes cannot run from an AI tool call. Ask the athlete to choose a destination and confirm the plan card."
+      ? "The workout card is shown under your reply; the athlete saves it from there. Say why this session, briefly; do not repeat its steps."
+      : "The plan card is shown under your reply; the athlete saves it from there. Explain the plan's logic and its key weeks; do not list every session."
   });
 }
 

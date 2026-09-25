@@ -168,7 +168,8 @@ assert.equal(
     ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
     ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
   ];
-  assert.ok(localToolNames.length >= 12, "the tool-name scrape has drifted");
+  // Eleven since `upload_training_plan`, which never wrote anything, was removed.
+  assert.ok(localToolNames.length >= 11, "the tool-name scrape has drifted");
 
   // 6's own lists: nine reads plus `request_coach_input`, which is reachable
   // and answers "no athlete is available"; the two writes are refused.
@@ -184,7 +185,7 @@ assert.equal(
     "draft_training_plan",
     "request_coach_input"
   ]);
-  const expectedBlocked = new Set(["upload_training_plan", "delete_workout"]);
+  const expectedBlocked = new Set(["delete_workout"]);
 
   for (const name of localToolNames) {
     const decided = expectedAllowed.has(name) || expectedBlocked.has(name);
