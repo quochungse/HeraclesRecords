@@ -2966,8 +2966,11 @@ export type WorkoutSport =
 export type WorkoutHeartRateBasis = "maxHr" | "reserve" | "lthr";
 export type WorkoutHeartRatePreset =
   | "recovery"
+  // The Max HR family keeps COROS's older consumer wording; every other
+  // family uses the training wording below it.
   | "warmUp"
   | "fatBurn"
+  | "aerobic"
   | "aerobicEndurance"
   | "aerobicPower"
   | "threshold"
@@ -2989,12 +2992,6 @@ export type WorkoutFtpPreset =
   | "anaerobicEndurance"
   | "anaerobicPower"
   | "sprint";
-export type WorkoutRunningPowerPreset =
-  | "easy"
-  | "moderate"
-  | "threshold"
-  | "interval"
-  | "repetition";
 export type WorkoutSwimStroke =
   | "freestyle"
   | "breaststroke"
@@ -3039,20 +3036,16 @@ export type WorkoutIntensityInput =
       WorkoutPercentPresetOrRange<WorkoutPacePreset>)
   | ({ type: "ftpPercent"; zoneId?: number } &
       WorkoutPercentPresetOrRange<WorkoutFtpPreset>)
-  | {
-      type: "power";
-      lowWatts: number;
-      highWatts: number;
-      preset?: never;
-      zoneId?: never;
-    }
-  | {
-      type: "power";
-      preset: WorkoutRunningPowerPreset;
-      zoneId?: number;
-      lowWatts?: never;
-      highWatts?: never;
-    }
+  /*
+   * Watts, stated outright.
+   *
+   * There is deliberately no zone preset here. COROS publishes five zone
+   * families and none of them is running power — its Settings offers Heart
+   * Rate, Pace and Cycling Power and nothing else — so the preset this used
+   * to carry (Easy / Moderate / Threshold / Interval / Repetition, 65-200%)
+   * named bands that exist nowhere but in this file.
+   */
+  | { type: "power"; lowWatts: number; highWatts: number }
   | { type: "speed"; low: number; high: number; unit: "km/h" | "mph" }
   | { type: "cadence"; low: number; high: number; unit: "spm" | "rpm" }
   | { type: "swimStroke"; stroke: WorkoutSwimStroke }
@@ -3316,6 +3309,13 @@ export interface WorkoutZone {
   highPercent: number;
   lowBpm?: number;
   highBpm?: number;
+  /**
+   * The end of the family that has no bound, as COROS writes it: the first
+   * zone is "under X" and the last is "over Y". COROS stores the last zone's
+   * ceiling as a sentinel — 404 bpm, 900 W, a 2:44/km pace — so a zone that
+   * printed it would be printing a number nobody can reach.
+   */
+  openEnd?: "low" | "high";
 }
 
 /** @deprecated Use WorkoutZone. */
@@ -3324,6 +3324,16 @@ export type WorkoutLthrZone = WorkoutZone;
 export interface WorkoutEditorContext {
   distanceUnit: "metric" | "imperial";
   paceUnit: "km" | "mi";
+  /**
+   * Which heart-rate model the account is scored against — COROS's own
+   * `hrZoneType`, chosen on its Heart Rate Zone screen.
+   *
+   * It is a property of the athlete, not of a step, which is why the builder
+   * does not ask: COROS scores every activity against this one model, so a
+   * workout prescribed in another family would be read back in a family the
+   * watch does not use.
+   */
+  heartRateBasis: WorkoutHeartRateBasis;
   lthrBpm?: number;
   maxHr?: number;
   restingHr?: number;
@@ -3331,7 +3341,7 @@ export interface WorkoutEditorContext {
   ftp?: number;
   criticalPower?: number;
   zones: Partial<Record<
-    "maxHr" | "reserve" | "lthr" | "thresholdPace" | "ftp" | "runningPower",
+    "maxHr" | "reserve" | "lthr" | "thresholdPace" | "ftp",
     WorkoutZone[]
   >>;
   lthrZones: WorkoutLthrZone[];

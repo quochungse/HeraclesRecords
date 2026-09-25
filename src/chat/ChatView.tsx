@@ -546,7 +546,7 @@ function formatPlanIntensity(
   if (intensity.type === "heartRate") {
     return `${intensity.lowBpm}–${intensity.highBpm} bpm`;
   }
-  if (intensity.type === "power" && !intensity.preset) {
+  if (intensity.type === "power") {
     return `${intensity.lowWatts}–${intensity.highWatts} W`;
   }
   if (intensity.type === "cadence") {

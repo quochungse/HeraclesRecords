@@ -170,8 +170,12 @@ const metricContext = parseWorkoutEditorContext({
 assert.equal(metricContext.distanceUnit, "metric");
 assert.equal(metricContext.paceUnit, "km");
 assert.equal(metricContext.lthrBpm, 175);
-assert.equal(metricContext.lthrZones[2]?.lowPercent, 91);
-assert.equal(metricContext.lthrZones[2]?.lowBpm, 159);
+// An entry is the zone's ceiling, so zone 3 runs from one above zone 2's
+// entry (0.85) up to its own (0.91).
+assert.equal(metricContext.lthrZones[2]?.lowPercent, 86);
+assert.equal(metricContext.lthrZones[2]?.highPercent, 91);
+assert.equal(metricContext.lthrZones[2]?.lowBpm, 150);
+assert.equal(metricContext.lthrZones[2]?.highBpm, 159);
 
 const imperialContext = parseWorkoutEditorContext({
   unit: 1,

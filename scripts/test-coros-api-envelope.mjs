@@ -238,6 +238,103 @@ test("a region is not ruled out on one unhappy endpoint", async () => {
   );
 });
 
+// The bare form is not simply refused — it is *partly* answered, which is why
+// this went unseen for so long. Identity and the heart-rate zone tables come
+// back; `ltspZone` and `cyclePowerZone` do not. So Personal drew three of its
+// five zone tabs and hid the rest, and the workout builder read every pace
+// target off a hardcoded fallback table instead of the athlete's own zones.
+const ACCOUNT_WITH_ID = {
+  apiCode: "420BE2BB",
+  data: {
+    userId: USER_ID,
+    unit: 0,
+    hrZoneType: 2,
+    maxHr: 190,
+    rhr: 52,
+    zoneData: {
+      maxHr: 190,
+      rhr: 52,
+      lthr: 168,
+      ltsp: 322,
+      ftp: 180,
+      maxHrZone: [{ index: 0, hr: 95, ratio: 50 }],
+      rhrZone: [{ index: 0, hr: 133, ratio: 59 }],
+      lthrZone: [{ index: 0, hr: 134, ratio: 80 }],
+      ltspZone: [{ index: 0, pace: 467, ratio: 69 }],
+      cyclePowerZone: [{ index: 0, power: 101, ratio: 56 }]
+    }
+  }
+};
+
+const ACCOUNT_BARE = {
+  apiCode: "420BE2BB",
+  data: {
+    userId: USER_ID,
+    unit: 0,
+    hrZoneType: 2,
+    maxHr: 190,
+    rhr: 52,
+    zoneData: {
+      maxHr: 190,
+      rhr: 52,
+      lthr: 168,
+      maxHrZone: [{ index: 0, hr: 95, ratio: 50 }],
+      rhrZone: [{ index: 0, hr: 133, ratio: 59 }],
+      lthrZone: [{ index: 0, hr: 134, ratio: 80 }]
+    }
+  }
+};
+
+const accountRoutes = {
+  "/account/login": loginOk,
+  "/activity/query": { result: "0000", data: { dataList: [] } },
+  "/account/query": (target) =>
+    target.includes("accountid=") ? ACCOUNT_WITH_ID : ACCOUNT_BARE
+};
+
+async function signedIn(coros) {
+  await trainingHub.loginTrainingHub("runner@example.com", "pw");
+  trainingHub.invalidateCorosProfileCache();
+  coros.calls.length = 0;
+}
+
+test("the profile read asks with the account id", async () => {
+  const coros = stubCoros(accountRoutes);
+  await signedIn(coros);
+
+  const profile = await trainingHub.getCorosProfile();
+
+  assert.deepEqual(
+    coros.calls.filter(
+      (target) => target.includes("/account/query") && !target.includes("accountid=")
+    ),
+    [],
+    "the bare form is answered without the pace and power zones, so it must not be sent"
+  );
+  assert.equal(profile.thresholds.zones.thresholdPace.length, 1);
+  assert.equal(profile.thresholds.zones.cyclePower.length, 1);
+  assert.equal(profile.thresholds.thresholdPaceSecondsPerKm, 322);
+  assert.equal(profile.thresholds.ftp, 180);
+});
+
+test("the workout editor context asks with the account id", async () => {
+  const coros = stubCoros(accountRoutes);
+  await signedIn(coros);
+
+  const context = await trainingHub.getWorkoutEditorContext("metric");
+
+  assert.deepEqual(
+    coros.calls.filter(
+      (target) => target.includes("/account/query") && !target.includes("accountid=")
+    ),
+    [],
+    "a builder that asks bare draws every pace zone from a hardcoded table"
+  );
+  // `loadWorkoutEditorAccount` swallows its own errors, so a context that came
+  // back empty is what a failed read looks like from here.
+  assert.equal(context.maxHr, 190, "the account read reached the editor context");
+});
+
 let failed = 0;
 for (const [name, run] of cases) {
   try {

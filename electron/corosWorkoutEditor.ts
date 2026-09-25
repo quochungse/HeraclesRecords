@@ -9,6 +9,7 @@ import type {
   RunWorkoutEditorTarget,
   UnitSystem,
   WorkoutEditRef,
+  WorkoutHeartRateBasis,
   WorkoutEditorContext,
   WorkoutLthrZone,
   WorkoutSport,
@@ -19,7 +20,6 @@ import {
   FTP_PRESETS,
   HEART_RATE_PRESETS,
   PACE_PRESETS,
-  RUNNING_POWER_PRESETS,
   WORKOUT_SPORT_CAPABILITIES,
   decodeCorosIntensity,
   encodeCorosIntensity,
@@ -792,9 +792,10 @@ export function parseWorkoutEditorContext(
     return undefined;
   };
   const maxHr = firstNumber(zoneData.maxHr, zoneData.maxHeartRate, account.maxHr, account.maxHeartRate);
-  const restingHr = firstNumber(zoneData.restingHr, zoneData.restHr, account.restingHr, account.restHr);
+  const restingHr = firstNumber(zoneData.rhr, account.rhr, zoneData.restingHr, zoneData.restHr, account.restingHr, account.restHr);
   const lthrBpm = firstNumber(zoneData.lthr, zoneData.thresholdHr, account.lthr, account.thresholdHr);
   const rawThresholdPace = firstNumber(
+    zoneData.ltsp,
     zoneData.thresholdPace,
     zoneData.thresholdPaceSeconds,
     account.thresholdPace,
@@ -804,6 +805,16 @@ export function parseWorkoutEditorContext(
     ? rawThresholdPace / 1_000
     : rawThresholdPace;
   const ftp = firstNumber(zoneData.ftp, zoneData.cycleFtp, account.ftp, account.cycleFtp);
+  /*
+   * `hrZoneType` is on the account itself, not inside `zoneData` — probed, and
+   * `normalizeCorosProfile` reads it the same way. 1 is Max HR, 2 is Heart
+   * Rate Reserve, 3 is Lactate Threshold, and COROS scores every activity
+   * against whichever one is chosen.
+   */
+  const heartRateBasis: WorkoutHeartRateBasis =
+    numberValue(account.hrZoneType) === 2
+      ? "reserve"
+      : numberValue(account.hrZoneType) === 3 ? "lthr" : "maxHr";
   const criticalPower = firstNumber(
     zoneData.criticalPower,
     zoneData.runCriticalPower,
@@ -845,57 +856,99 @@ export function parseWorkoutEditorContext(
           label: zone.label,
           lowPercent: zone.low,
           highPercent: zone.high,
-          ...absolute
+          ...absolute,
+          // COROS writes the ends of every family open, and so does the table
+          // these defaults come from.
+          ...(index === 0 ? { openEnd: "low" as const } : {}),
+          ...(index === defaults.length - 1 ? { openEnd: "high" as const } : {})
         };
       });
     }
+    /*
+     * A COROS zone entry states the zone's **ceiling**, not its floor.
+     *
+     * Verified against the account screens on 2026-09-22 for all five
+     * families. HR reserve arrives as ceilings 133 / 154 / 168 / 173 / 183 and
+     * COROS draws "<133", "133-154", "155-168", "169-173", "174-183", ">183".
+     * So zone 1 runs up to the first entry, zone 2 spans the first two, and
+     * every zone after that starts one above the entry below it.
+     *
+     * Reading `ratio` as the floor — which is what this did — shifted every
+     * zone down one and put the wrong percentages on every preset in the
+     * workout builder. The heart-rate tables happened to look close because
+     * their ceilings are evenly spaced; the pace table did not.
+     *
+     * The top entry is a sentinel (404 bpm, 900 W, a 2:44/km pace), so the
+     * last zone is open-ended and must never print it.
+     */
     const parsed = raw.map((item, arrayIndex) => {
       const zone = objectValue(item) ?? {};
-      const fallback = defaults[arrayIndex] ?? defaults[defaults.length - 1]!;
-      const ratio = numberValue(zone.ratio ?? zone.lowRatio ?? zone.percent ?? zone.lowPercent);
-      const directHigh = numberValue(zone.highRatio ?? zone.highPercent);
-      const absolute = numberValue(zone.hr ?? zone.value ?? zone.low);
-      const lowPercent = ratio !== undefined
-        ? Math.round(ratio <= 2 ? ratio * 100 : ratio)
-        : reference && absolute !== undefined
-          ? Math.round(
-              reserveRest !== undefined
-                ? ((absolute - reserveRest) / (reference - reserveRest)) * 100
-                : (absolute / reference) * 100
-            )
-          : fallback.low;
+      const ratio = numberValue(zone.ratio ?? zone.percent);
+      const absolute = numberValue(zone.hr ?? zone.power ?? zone.value);
       return {
-        index: Math.round(numberValue(zone.index) ?? arrayIndex + 1),
-        id: Math.round(numberValue(zone.type ?? zone.zoneType ?? zone.id) ?? fallback.id),
-        key: String(zone.key ?? fallback.preset ?? fallback.id),
-        label: String(zone.label ?? fallback.label),
-        lowPercent,
-        directHigh: directHigh !== undefined ? Math.round(directHigh <= 2 ? directHigh * 100 : directHigh) : undefined,
-        absolute
+        index: Math.round(numberValue(zone.index) ?? arrayIndex),
+        ceilingPercent: ratio !== undefined
+          ? Math.round(ratio <= 2 ? ratio * 100 : ratio)
+          : reference && absolute !== undefined
+            ? Math.round(
+                reserveRest !== undefined
+                  ? ((absolute - reserveRest) / (reference - reserveRest)) * 100
+                  : (absolute / reference) * 100
+              )
+            : undefined,
+        ceilingAbsolute: absolute
       };
     }).sort((left, right) => left.index - right.index);
-    return parsed.map((zone, index) => {
-      const next = parsed[index + 1];
-      const highPercent = zone.directHigh ?? (next ? Math.max(zone.lowPercent, next.lowPercent - 1) : defaults[index]?.high ?? zone.lowPercent);
-      const lowBpm = zone.absolute ?? (reference
-        ? Math.round(reserveRest !== undefined
-          ? reserveRest + (reference - reserveRest) * zone.lowPercent / 100
-          : reference * zone.lowPercent / 100)
-        : undefined);
-      const highBpm = reference
-        ? Math.round(reserveRest !== undefined
-          ? reserveRest + (reference - reserveRest) * highPercent / 100
-          : reference * highPercent / 100)
-        : undefined;
+
+    const percentAt = (position: number): number | undefined => {
+      const entry = parsed[position];
+      if (!entry) return undefined;
+      if (entry.ceilingPercent !== undefined) return entry.ceilingPercent;
+      return defaults[position]?.high;
+    };
+    const bpmAt = (position: number): number | undefined => {
+      const entry = parsed[position];
+      if (entry?.ceilingAbsolute !== undefined) return entry.ceilingAbsolute;
+      const percent = percentAt(position);
+      if (percent === undefined || !reference) return undefined;
+      return Math.round(reserveRest !== undefined
+        ? reserveRest + (reference - reserveRest) * percent / 100
+        : reference * percent / 100);
+    };
+
+    return parsed.map((_entry, position) => {
+      const fallback = defaults[position] ?? defaults[defaults.length - 1]!;
+      const isFirst = position === 0;
+      const isLast = position === parsed.length - 1;
+      // Zone 2 starts exactly at zone 1's ceiling, because zone 1 is written
+      // "under X" and so stops below it. Every zone after that starts one
+      // above the zone below.
+      const floorPercent = isFirst
+        ? 0
+        : position === 1
+          ? percentAt(0) ?? fallback.low
+          : (percentAt(position - 1) ?? fallback.low - 1) + 1;
+      const ceilingPercent = percentAt(position) ?? fallback.high;
+      const floorBpm = isFirst
+        ? undefined
+        : position === 1
+          ? bpmAt(0)
+          : (() => {
+            const below = bpmAt(position - 1);
+            return below === undefined ? undefined : below + 1;
+          })();
+      const ceilingBpm = isLast ? undefined : bpmAt(position);
       return {
-        index: zone.index,
-        id: zone.id,
-        key: zone.key,
-        label: zone.label,
-        lowPercent: zone.lowPercent,
-        highPercent,
-        ...(lowBpm !== undefined ? { lowBpm: Math.round(lowBpm) } : {}),
-        ...(highBpm !== undefined ? { highBpm } : {})
+        index: position + 1,
+        id: fallback.id,
+        key: fallback.preset ?? String(fallback.id),
+        label: fallback.label,
+        lowPercent: floorPercent,
+        highPercent: isLast ? Math.max(floorPercent, fallback.high) : ceilingPercent,
+        ...(floorBpm !== undefined ? { lowBpm: floorBpm } : {}),
+        ...(ceilingBpm !== undefined ? { highBpm: ceilingBpm } : {}),
+        ...(isFirst ? { openEnd: "low" as const } : {}),
+        ...(isLast ? { openEnd: "high" as const } : {})
       };
     });
   };
@@ -904,14 +957,25 @@ export function parseWorkoutEditorContext(
     HEART_RATE_PRESETS[basis].map((zone) => ({ ...zone, preset: zone.preset }));
   const paceDefinitions = PACE_PRESETS.map((zone) => ({ ...zone, preset: zone.preset }));
   const ftpDefinitions = FTP_PRESETS.map((zone) => ({ ...zone, preset: zone.preset }));
-  const powerDefinitions = RUNNING_POWER_PRESETS.map((zone) => ({ ...zone, preset: zone.preset }));
+  /*
+   * COROS's own names come first in each list.
+   *
+   * `ltspZone` and `cyclePowerZone` are what `/account/query` sends — the same
+   * names `normalizeCorosProfileThresholds` reads them under. This asked for
+   * `thresholdPaceZone` and `paceZone`, which COROS has never sent, so the
+   * pace family was empty on every account and the builder drew its fallback
+   * table instead of the athlete's zones. The remaining spellings are kept in
+   * case an older account shape still answers to them; they cost one lookup.
+   *
+   * There is no running-power family. COROS publishes five, and its Settings
+   * offers Heart Rate, Pace and Cycling Power.
+   */
   const zones: WorkoutEditorContext["zones"] = {
     maxHr: configuredZones(zoneArray("maxHrZone", "maxHrZones", "heartRateZone"), hrDefinitions("maxHr"), maxHr),
     reserve: configuredZones(zoneArray("rhrZone", "hrrZone", "reserveZone"), hrDefinitions("reserve"), maxHr, restingHr),
     lthr: configuredZones(zoneArray("lthrZone", "lthrZones", "thresholdHrZone"), hrDefinitions("lthr"), lthrBpm),
-    thresholdPace: configuredZones(zoneArray("thresholdPaceZone", "paceZone"), paceDefinitions),
-    ftp: configuredZones(zoneArray("ftpZone", "cyclePowerZone"), ftpDefinitions),
-    runningPower: configuredZones(zoneArray("criticalPowerZone", "runPowerZone"), powerDefinitions)
+    thresholdPace: configuredZones(zoneArray("ltspZone", "thresholdPaceZone", "paceZone"), paceDefinitions),
+    ftp: configuredZones(zoneArray("cyclePowerZone", "ftpZone"), ftpDefinitions)
   };
   const lthrZones: WorkoutLthrZone[] = zones.lthr ?? [];
   const selectedUnitSystem = normalizeUnitSystem(unitSystem);
@@ -940,6 +1004,7 @@ export function parseWorkoutEditorContext(
   return {
     distanceUnit: imperial ? "imperial" : "metric",
     paceUnit: imperial ? "mi" : "km",
+    heartRateBasis,
     ...(lthrBpm ? { lthrBpm: Math.round(lthrBpm) } : {}),
     ...(maxHr ? { maxHr: Math.round(maxHr) } : {}),
     ...(restingHr ? { restingHr: Math.round(restingHr) } : {}),

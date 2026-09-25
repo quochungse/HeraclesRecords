@@ -1289,9 +1289,29 @@ export function buildCorosProfileUpdateFields(
  * COROS trains from and the zone tables it derives from them.
  */
 export async function getCorosProfile(): Promise<CorosProfile> {
-  return normalizeCorosProfile(
-    await trainingHubGet<Record<string, unknown>>("/account/query")
-  );
+  return normalizeCorosProfile(await readCorosAccount());
+}
+
+/**
+ * The signed-in account, asked for the only way `/account/query` answers.
+ *
+ * **It takes the account's own id.** The bare form is not a "whoever this
+ * token belongs to" endpoint — `test:coros-api-envelope` has held that down
+ * on the login path since the region probe was found silently dead from it —
+ * but these two reads were never covered and kept asking bare. What came back
+ * was enough to look right (identity and the heart-rate zone tables) and
+ * short of `ltspZone` and `cyclePowerZone`, so Personal quietly hid its Pace
+ * and Power tabs and the workout builder fell back to a hardcoded zone table
+ * for every pace target it has ever drawn.
+ */
+async function readCorosAccount(): Promise<Record<string, unknown>> {
+  const auth = getStoredAuth();
+  if (!auth) {
+    throw new Error("Log in to COROS Training Hub first.");
+  }
+  return trainingHubGet<Record<string, unknown>>("/account/query", {
+    accountid: auth.userId
+  });
 }
 
 // A profile changes when the user edits it — which goes through this service —
@@ -2832,7 +2852,7 @@ async function resolveWorkoutEditSource(ref: WorkoutEditRef): Promise<WorkoutEdi
 
 async function loadWorkoutEditorAccount(): Promise<Record<string, unknown>> {
   try {
-    return await trainingHubGet<Record<string, unknown>>("/account/query");
+    return await readCorosAccount();
   } catch {
     return {};
   }

@@ -74,7 +74,7 @@ import {
   FTP_PRESETS,
   HEART_RATE_PRESETS,
   PACE_PRESETS,
-  RUNNING_POWER_PRESETS,
+  zoneOptionLabel,
   SWIM_STROKE_IDS,
   WORKOUT_SPORT_CAPABILITIES,
   WORKOUT_SPORTS,
@@ -586,7 +586,6 @@ function paceSeconds(value: string, fallbackUnit: "km" | "mi" = "km"): number {
 
 function rowIntensity(
   row: BuilderRow,
-  sport: WorkoutSport,
   unitSystem: UnitSystem
 ): WorkoutIntensityInput {
   const low = Number(row.intensityLow);
@@ -608,7 +607,7 @@ function rowIntensity(
     case "thresholdPacePercent":
     case "effortPacePercent": return preset ? { type: row.intensityType, preset: preset as never } as WorkoutIntensityInput : { type: row.intensityType, lowPercent: low, highPercent: high } as WorkoutIntensityInput;
     case "ftpPercent": return preset ? { type: "ftpPercent", preset: preset as never } : { type: "ftpPercent", lowPercent: low, highPercent: high };
-    case "power": return preset && sport !== "bike" ? { type: "power", preset: preset as never } : { type: "power", lowWatts: low, highWatts: high };
+    case "power": return { type: "power", lowWatts: low, highWatts: high };
     case "speed": return { type: "speed", low, high, unit: row.intensityUnit === "mph" ? "mph" : "km/h" };
     case "cadence": return { type: "cadence", low, high, unit: row.intensityUnit === "spm" ? "spm" : "rpm" };
     case "swimStroke": return { type: "swimStroke", stroke: (preset || "freestyle") as keyof typeof SWIM_STROKE_IDS };
@@ -686,7 +685,7 @@ function builderRowValidationMessage(
   }
   const intensityError = validateWorkoutIntensity(
     sport,
-    rowIntensity(row, sport, unitSystem),
+    rowIntensity(row, unitSystem),
     stepKind,
     row.exerciseKind
   );
@@ -720,7 +719,7 @@ function rowToStep(
             : row.targetType === "elevationGain" ? { target_type: "elevationGain" as const, target_elevation_gain_meters: elevationToMeters(rawValue, unitSystem) }
               : row.targetType === "routes" ? { target_type: "routes" as const, target_routes: Math.round(rawValue) }
                 : { target_type: "open" as const };
-  const intensity = { intensity: rowIntensity(row, sport, unitSystem) };
+  const intensity = { intensity: rowIntensity(row, unitSystem) };
   const exercise = row.exerciseName.trim()
     ? {
         exercise_name: row.exerciseName.trim(),
@@ -826,7 +825,7 @@ function builderSummaryRange(low: string, high: string, unit: string): string {
   return `${end && end !== start ? `${start}-${end}` : start}${unit ? ` ${unit}` : ""}`;
 }
 
-function builderIntensitySummary(row: BuilderRow, sport: WorkoutSport): string {
+function builderIntensitySummary(row: BuilderRow): string {
   switch (row.intensityType) {
     case "none": return "Open";
     case "heartRate": return builderSummaryRange(row.intensityLow, row.intensityHigh, "bpm");
@@ -845,12 +844,8 @@ function builderIntensitySummary(row: BuilderRow, sport: WorkoutSport): string {
       const preset = FTP_PRESETS.find((zone) => zone.preset === row.intensityPreset);
       return preset?.label ?? builderSummaryRange(row.intensityLow, row.intensityHigh, "% FTP");
     }
-    case "power": {
-      const preset = sport !== "bike"
-        ? RUNNING_POWER_PRESETS.find((zone) => zone.preset === row.intensityPreset)
-        : undefined;
-      return preset?.label ?? builderSummaryRange(row.intensityLow, row.intensityHigh, "W");
-    }
+    case "power":
+      return builderSummaryRange(row.intensityLow, row.intensityHigh, "W");
     case "speed": return builderSummaryRange(row.intensityLow, row.intensityHigh, row.intensityUnit === "mph" ? "mph" : "km/h");
     case "cadence": return builderSummaryRange(row.intensityLow, row.intensityHigh, row.intensityUnit === "spm" ? "spm" : "rpm");
     case "swimStroke": return formatBuilderToken(row.intensityPreset || "freestyle");
@@ -905,7 +900,7 @@ function builderRowSummary(
                 : rawTarget ? `${rawTarget} routes` : "Not set";
   const details: BuilderRowSummaryItem[] = [
     { label: builderTargetTypeLabel(row.targetType), value: target },
-    { label: "Intensity", value: builderIntensitySummary(row, sport) }
+    { label: "Intensity", value: builderIntensitySummary(row) }
   ];
   if (row.exerciseName.trim()) {
     details.splice(1, 0, { label: "Exercise", value: row.exerciseName.trim() });
@@ -1012,12 +1007,12 @@ function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercise
     ? HEART_RATE_PRESETS[row.intensityBasis]
     : row.intensityType === "ftpPercent" ? FTP_PRESETS
       : row.intensityType === "thresholdPacePercent" || row.intensityType === "effortPacePercent" ? PACE_PRESETS
-        : row.intensityType === "power" && sport !== "bike" ? RUNNING_POWER_PRESETS : [];
+        : [];
   const presetZoneKey: keyof WorkoutEditorContext["zones"] | undefined = row.intensityType === "heartRatePercent"
     ? row.intensityBasis
     : row.intensityType === "ftpPercent" ? "ftp"
       : row.intensityType === "thresholdPacePercent" || row.intensityType === "effortPacePercent" ? "thresholdPace"
-        : row.intensityType === "power" ? "runningPower" : undefined;
+        : undefined;
   const climbParts = row.intensityPreset.split(":");
   const rawClimbSystem = row.intensityPreset.startsWith("relative:") ? climbParts[1] : climbParts[0];
   const climbSystem = (rawClimbSystem || (sport === "bouldering" ? "vScale" : "yds")) as keyof typeof CLIMB_SYSTEM_IDS;
@@ -1103,13 +1098,16 @@ function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercise
         value={row.intensityPreset || "custom"}
         options={[
           { value: "custom", label: "Custom range" },
-          ...presets.map((zone) => {
+          ...presets.map((zone, index) => {
+            // Prefer the athlete's own zone over the shipped default, by
+            // position: COROS sends no label and no id on a zone entry, so
+            // position is the only thing the two lists agree on.
             const configured = presetZoneKey
-              ? context?.zones[presetZoneKey]?.find((candidate) => candidate.id === zone.id || candidate.key === zone.preset)
+              ? context?.zones[presetZoneKey]?.[index]
               : undefined;
             return {
               value: zone.preset,
-              label: `${configured?.label ?? zone.label}${configured ? ` · ${configured.lowPercent}-${configured.highPercent}%` : ""}`
+              label: zoneOptionLabel(zone, index, presets.length, configured)
             };
           })
         ]}
@@ -1140,7 +1138,7 @@ function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercise
       {row.intensityPreset.startsWith("relative:") ? <label className="calendar-builder-control"><span>Relative level</span><input type="number" min="-8" max="4" value={row.intensityLow || "0"} onChange={(event) => onChange({ intensityLow: event.target.value })} /></label> : <label className="calendar-builder-control"><span>Grade</span><SelectDropdown label="Climbing grade" value={row.intensityPreset.split(":")[1] ?? CLIMB_GRADES[climbSystem][0]} options={CLIMB_GRADES[climbSystem].map((grade) => ({ value: grade, label: grade }))} portal onChange={(grade) => onChange({ intensityPreset: `${climbSystem}:${grade}` })} /></label>}
     </> : null}
 
-    {context ? <div className="calendar-builder-derived"><BuilderDerivedIntensityPreview intensity={rowIntensity(row, sport, unitSystem)} context={context} /></div> : null}
+    {context ? <div className="calendar-builder-derived"><BuilderDerivedIntensityPreview intensity={rowIntensity(row, unitSystem)} context={context} /></div> : null}
   </>;
   const exerciseStatus = exercisesLoading
     ? "Loading COROS exercises..."
@@ -1902,15 +1900,6 @@ function BuilderDerivedIntensityPreview({ intensity, context }: { intensity: Wor
     const high = intensity.highPercent ?? zone?.highPercent ?? fallback?.high;
     if (low !== undefined && high !== undefined && context.ftp) {
       return <span className="workout-control-hint">Derived: {Math.round(context.ftp * low / 100)}-{Math.round(context.ftp * high / 100)} W</span>;
-    }
-  }
-  if (intensity.type === "power" && intensity.preset && context.criticalPower) {
-    const fallback = RUNNING_POWER_PRESETS.find((zone) => zone.preset === intensity.preset);
-    const zone = configuredZone("runningPower", intensity.preset, intensity.zoneId ?? fallback?.id);
-    const low = zone?.lowPercent ?? fallback?.low;
-    const high = zone?.highPercent ?? fallback?.high;
-    if (low !== undefined && high !== undefined) {
-      return <span className="workout-control-hint">Derived: {Math.round(context.criticalPower * low / 100)}-{Math.round(context.criticalPower * high / 100)} W</span>;
     }
   }
   return null;

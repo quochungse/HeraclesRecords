@@ -323,6 +323,39 @@ Overview, Media, Data, and Settings are in the main bundle.
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **Training zones** (`workoutCapabilities.ts` tables, `corosWorkoutEditor.ts` parser) —
+  what a zone preset in the workout builder means. Three things about COROS's own model,
+  all read off its Settings screens on 2026-09-22 and all previously wrong here:
+  **a zone entry states the zone's *ceiling*, not its floor.** HR Reserve arrives as
+  133 / 154 / 168 / 173 / 183 and COROS draws `<133`, `133-154`, `155-168`, `169-173`,
+  `174-183`, `>183` — so zone 1 runs up to the first entry, zone 2 spans the first two,
+  and every zone after starts one above the entry below it. Reading `ratio` as a floor
+  shifted every band down one. The top entry is a **sentinel** (404 bpm, 900 W, a
+  2:44/km pace), so the last zone is open-ended and must never print it; `openEnd` on a
+  `WorkoutZone` and `zoneOptionLabel` carry that.
+  **COROS names its zones twice.** Max HR is `Recovery / Warm Up / Fat Burn / Aerobic /
+  Threshold / Anaerobic`; HR Reserve, LTHR, Pace and Cycling Power are
+  `Recovery / Aerobic Endurance / Aerobic Power / Threshold / Anaerobic Endurance /
+  Anaerobic Power`, with `Sprint` a seventh on power alone. Using the first set
+  everywhere labelled the band COROS calls **Threshold** as "Aerobic Endurance", two
+  bands easier — a threshold session prescribed as an easy one.
+  **There is no running-power family.** COROS publishes five (`maxHrZone`, `rhrZone`,
+  `lthrZone`, `ltspZone`, `cyclePowerZone`) and its Settings offers Heart Rate, Pace and
+  Cycling Power. `RUNNING_POWER_PRESETS` named bands that existed nowhere else; running
+  power is stated in watts now.
+  **And `/account/query` without `accountid` answers *partly*.** Identity and the three
+  heart-rate families come back; `ltspZone` and `cyclePowerZone` do not. That is what hid
+  Personal's Pace and Power tabs (`ZONE_TABS` filters on a family having entries) and,
+  because `loadWorkoutEditorAccount` swallows its own errors, what made the builder read
+  every pace target off the fallback table. Every account read goes through
+  `readCorosAccount`; `test:coros-api-envelope` now covers the profile and the editor
+  context, not just the login path.
+  The shipped tables are a fallback for an account that has none of its own — an athlete
+  edits these on COROS, so the parsed zones always outrank them. `intensityCustom`, the
+  zone id that travels to COROS, is deliberately untouched: nothing here establishes where
+  its numbering came from. `npm run test:coros-zone-presets` holds all five families
+  against the screens.
+
 - **Coach** (`chatService.ts` + four providers: `claudeCodeProvider`, `anthropicChatProvider`,
   `openRouterProvider`, `localChatProvider`) — streaming chat with COROS-data tools
   (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,

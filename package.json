@@ -129,6 +129,7 @@
     "verify:coach-workout-api": "npm run build:electron && node scripts/verify-coach-workout-api.mjs",
     "test:training-hub-write": "npm run build:electron && node scripts/test-training-hub-write.mjs",
     "test:coros-login": "npm run build:electron && node scripts/test-coros-login.mjs",
+    "test:coros-zone-presets": "npm run build:electron && node scripts/test-coros-zone-presets.mjs",
     "test:coros-api-envelope": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-coros-api-envelope.mjs",
     "test:coros-session-restore": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-coros-session-restore.mjs",
     "test:coros-profile": "npm run build:electron && node scripts/test-coros-profile.mjs",

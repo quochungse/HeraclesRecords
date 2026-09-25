@@ -50,18 +50,36 @@ const climbContext = editor.parseWorkoutEditorContext({
   ]
 });
 assert.deepEqual(climbContext.climbSystems, { indoorClimb: "french", bouldering: "font" });
+// An account that has moved its own zone bounds. The shape is COROS's: one
+// entry per zone, each stating that zone's **ceiling** as a percentage, with a
+// sentinel on top. (This fixture used to be `[{ type, label, lowPercent,
+// highPercent }]`, a shape COROS has never sent — so it asserted the parser
+// against an invention rather than against the API, which is exactly how the
+// floor/ceiling mix-up survived.)
 const customZoneContext = editor.parseWorkoutEditorContext({
   maxHr: 190,
-  maxHrZone: [{ type: 2, label: "My Endurance", lowPercent: 65, highPercent: 72 }]
+  zoneData: {
+    maxHr: 190,
+    maxHrZone: [
+      { index: 0, ratio: 52 },
+      { index: 1, ratio: 62 },
+      { index: 2, ratio: 72 },
+      { index: 3, ratio: 82 },
+      { index: 4, ratio: 92 },
+      { index: 5, ratio: 255 }
+    ]
+  }
 });
 const customZone = codec.encodeCorosIntensity(
   { type: "heartRatePercent", basis: "maxHr", preset: "fatBurn" },
   customZoneContext
 );
+// Fat Burn is the third zone, so it runs from one above the second zone's
+// ceiling up to its own: 63-72%, not the shipped 61-70%.
 assert.equal(customZone.intensityCustom, 2);
-assert.equal(customZone.intensityPercent, 65_000);
+assert.equal(customZone.intensityPercent, 63_000);
 assert.equal(customZone.intensityPercentExtend, 72_000);
-assert.equal(customZone.intensityValue, 124);
+assert.equal(customZone.intensityValue, 120);
 assert.equal(customZone.intensityValueExtend, 137);
 const missingReference = codec.encodeCorosIntensity(
   { type: "ftpPercent", lowPercent: 90, highPercent: 100 },
@@ -197,7 +215,10 @@ assert.equal(builder.buildWorkoutPayload("ftp", [{ kind: "training", target_type
 assert.equal(builder.buildWorkoutPayload("send off", [{ kind: "sendOff", target_type: "distance", target_distance_meters: 100, send_off_seconds: 120, intensity: { type: "swimStroke", stroke: "drills" } }], "swim").pbVersion, 8);
 
 assert.deepEqual(
-  ["recovery", "warmUp", "fatBurn", "aerobicEndurance", "threshold", "anaerobic"].map(
+  // The Max HR family's own zone names. COROS gives the other families a
+  // different set (Aerobic Endurance / Aerobic Power / ...), which is why this
+  // list is not shared with them.
+  ["recovery", "warmUp", "fatBurn", "aerobic", "threshold", "anaerobic"].map(
     (preset) => codec.encodeCorosIntensity({ type: "heartRatePercent", basis: "maxHr", preset }, context).intensityCustom
   ),
   [6, 1, 2, 3, 4, 5]

@@ -79,7 +79,7 @@ import {
   FTP_PRESETS,
   HEART_RATE_PRESETS,
   PACE_PRESETS,
-  RUNNING_POWER_PRESETS,
+  zoneOptionLabel,
   SWIM_STROKE_IDS,
   WORKOUT_SPORT_CAPABILITIES,
   formatIntensityType,
@@ -1448,28 +1448,27 @@ function IntensityFields({ step, context, sport, disabled, onChange }: { step: R
     {intensity.type === "heartRate" ? numberRange(intensity.lowBpm, intensity.highBpm, "Low bpm", "High bpm", (lowBpm, highBpm) => ({ type: "heartRate", lowBpm, highBpm }), 30, 250) : null}
 
     {intensity.type === "heartRatePercent" ? <>
-      <label><span>Basis</span><SelectDropdown<WorkoutHeartRateBasis> label="Heart-rate basis" value={intensity.basis} options={[{ value: "maxHr", label: "% Max Heart Rate" }, { value: "reserve", label: "% Heart Rate Reserve" }, { value: "lthr", label: "% Lactate Threshold HR" }]} disabled={disabled} portal onChange={(basis) => setIntensity({ type: "heartRatePercent", basis, preset: "aerobicEndurance" })} /></label>
-      <label><span>Zone or custom</span><SelectDropdown label="Heart-rate zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...HEART_RATE_PRESETS[intensity.basis].map((zone) => { const configured = profileZone(context, intensity.basis, zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = HEART_RATE_PRESETS[intensity.basis].find((zone) => zone.preset === preset); const configured = profileZone(context, intensity.basis, preset, definition?.id); setIntensity(preset === "custom" ? { type: "heartRatePercent", basis: intensity.basis, lowPercent: 80, highPercent: 90 } : { type: "heartRatePercent", basis: intensity.basis, preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
+      <label><span>Basis</span><SelectDropdown<WorkoutHeartRateBasis> label="Heart-rate basis" value={intensity.basis} options={[{ value: "maxHr", label: "% Max Heart Rate" }, { value: "reserve", label: "% Heart Rate Reserve" }, { value: "lthr", label: "% Lactate Threshold HR" }]} disabled={disabled} portal onChange={(basis) => setIntensity({ type: "heartRatePercent", basis, preset: HEART_RATE_PRESETS[basis][1]!.preset })} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Heart-rate zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...HEART_RATE_PRESETS[intensity.basis].map((zone, zoneIndex, list) => { const configured = profileZone(context, intensity.basis, zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = HEART_RATE_PRESETS[intensity.basis].find((zone) => zone.preset === preset); const configured = profileZone(context, intensity.basis, preset, definition?.id); setIntensity(preset === "custom" ? { type: "heartRatePercent", basis: intensity.basis, lowPercent: 80, highPercent: 90 } : { type: "heartRatePercent", basis: intensity.basis, preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: "heartRatePercent", basis: intensity.basis, lowPercent, highPercent })) : null}
       <HeartRatePreview intensity={intensity} context={context} />
     </> : null}
 
     {(intensity.type === "thresholdPacePercent" || intensity.type === "effortPacePercent") ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Pace zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...PACE_PRESETS.map((zone) => { const configured = profileZone(context, "thresholdPace", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = PACE_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "thresholdPace", preset, definition?.id); setIntensity((preset === "custom" ? { type: intensity.type, lowPercent: 90, highPercent: 100 } : { type: intensity.type, preset, ...(configured ? { zoneId: configured.id } : {}) }) as WorkoutIntensityInput); }} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Pace zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...PACE_PRESETS.map((zone, zoneIndex, list) => { const configured = profileZone(context, "thresholdPace", zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = PACE_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "thresholdPace", preset, definition?.id); setIntensity((preset === "custom" ? { type: intensity.type, lowPercent: 90, highPercent: 100 } : { type: intensity.type, preset, ...(configured ? { zoneId: configured.id } : {}) }) as WorkoutIntensityInput); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: intensity.type, lowPercent, highPercent })) : null}
       <PacePercentPreview intensity={intensity} context={context} />
     </> : null}
 
     {intensity.type === "ftpPercent" ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Cycling power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...FTP_PRESETS.map((zone) => { const configured = profileZone(context, "ftp", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = FTP_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "ftp", preset, definition?.id); setIntensity(preset === "custom" ? { type: "ftpPercent", lowPercent: 90, highPercent: 100 } : { type: "ftpPercent", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Cycling power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...FTP_PRESETS.map((zone, zoneIndex, list) => { const configured = profileZone(context, "ftp", zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = FTP_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "ftp", preset, definition?.id); setIntensity(preset === "custom" ? { type: "ftpPercent", lowPercent: 90, highPercent: 100 } : { type: "ftpPercent", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: "ftpPercent", lowPercent, highPercent })) : null}
       <PowerPercentPreview intensity={intensity} context={context} reference={context.ftp} zoneKey="ftp" />
     </> : null}
 
-    {intensity.type === "power" ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Running power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom watts" }, ...RUNNING_POWER_PRESETS.map((zone) => { const configured = profileZone(context, "runningPower", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = RUNNING_POWER_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "runningPower", preset, definition?.id); setIntensity(preset === "custom" ? { type: "power", lowWatts: 180, highWatts: 220 } : { type: "power", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
-      {!intensity.preset ? numberRange(intensity.lowWatts, intensity.highWatts, "Low W", "High W", (lowWatts, highWatts) => ({ type: "power", lowWatts, highWatts }), 0, 3000) : <PowerPercentPreview intensity={intensity} context={context} reference={context.criticalPower} zoneKey="runningPower" />}
-    </> : null}
+    {intensity.type === "power"
+      ? numberRange(intensity.lowWatts, intensity.highWatts, "Low W", "High W", (lowWatts, highWatts) => ({ type: "power", lowWatts, highWatts }), 0, 3000)
+      : null}
 
     {intensity.type === "speed" ? numberRange(intensity.low, intensity.high, `Low ${intensity.unit}`, `High ${intensity.unit}`, (low, high) => ({ ...intensity, low, high }), 0, 200) : null}
     {intensity.type === "cadence" ? numberRange(intensity.low, intensity.high, `Low ${intensity.unit}`, `High ${intensity.unit}`, (low, high) => ({ ...intensity, low, high }), 0, 300) : null}
@@ -1516,12 +1515,11 @@ function PacePercentPreview({ intensity, context }: { intensity: Extract<Workout
   return <p className="workout-control-hint">Derived preview: {derivedPaceLabel(context.thresholdPaceSecondsPerKm * 100 / high, context)}–{derivedPaceLabel(context.thresholdPaceSecondsPerKm * 100 / low, context)}.</p>;
 }
 
-function PowerPercentPreview({ intensity, context, reference, zoneKey }: { intensity: Extract<WorkoutIntensityInput, { type: "ftpPercent" }> | Extract<WorkoutIntensityInput, { type: "power" }> & { preset: string }; context: WorkoutEditorContext; reference?: number; zoneKey: "ftp" | "runningPower" }) {
-  const definitions = zoneKey === "ftp" ? FTP_PRESETS : RUNNING_POWER_PRESETS;
-  const definition = definitions.find((zone) => zone.preset === intensity.preset);
+function PowerPercentPreview({ intensity, context, reference, zoneKey }: { intensity: Extract<WorkoutIntensityInput, { type: "ftpPercent" }>; context: WorkoutEditorContext; reference?: number; zoneKey: "ftp" }) {
+  const definition = FTP_PRESETS.find((zone) => zone.preset === intensity.preset);
   const configured = profileZone(context, zoneKey, intensity.preset, intensity.zoneId ?? definition?.id);
-  const low = "lowPercent" in intensity && intensity.lowPercent !== undefined ? intensity.lowPercent : configured?.lowPercent ?? definition?.low;
-  const high = "highPercent" in intensity && intensity.highPercent !== undefined ? intensity.highPercent : configured?.highPercent ?? definition?.high;
+  const low = intensity.lowPercent ?? configured?.lowPercent ?? definition?.low;
+  const high = intensity.highPercent ?? configured?.highPercent ?? definition?.high;
   if (!reference || low === undefined || high === undefined) {
     return <p className="workout-control-hint">Profile reference is unavailable; the percentage zone will still be saved.</p>;
   }

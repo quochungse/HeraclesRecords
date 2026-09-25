@@ -236,7 +236,9 @@ const mixedDraft = {
           kind: "training",
           target_type: "time",
           target_duration_seconds: 2_400,
-          intensity: { type: "heartRatePercent", basis: "maxHr", preset: "aerobicEndurance" }
+          // COROS calls this band "Aerobic" on the Max HR family; only the
+          // other families call it "Aerobic Endurance".
+          intensity: { type: "heartRatePercent", basis: "maxHr", preset: "aerobic" }
         }
       ]
     },
