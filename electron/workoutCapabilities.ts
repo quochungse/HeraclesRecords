@@ -876,7 +876,7 @@ function reverseKey<T extends string>(mapping: Readonly<Record<T, number>>, valu
 
 export function decodeCorosIntensity(
   exercise: Record<string, unknown>,
-  context?: WorkoutEditorContext
+  _context?: WorkoutEditorContext
 ): { intensity: WorkoutIntensityInput; reason?: string } {
   const type = finiteNumber(exercise.intensityType) ?? 0;
   const value = finiteNumber(exercise.intensityValue) ?? 0;

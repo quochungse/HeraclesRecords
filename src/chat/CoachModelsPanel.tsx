@@ -15,7 +15,6 @@ import {
 import { OptionGroup } from "../components/OptionGroup";
 import type {
   AnthropicApiConnectionTest,
-  AnthropicEffort,
   ChatAuthStatus,
   ChatProvider,
   ChatSettings,

@@ -8,6 +8,15 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
+    /* Two gates, on because the Training Library review found what their
+       absence costs: a "New plan" button deleted as collateral left `onCreate`
+       destructured and never rendered, and the `Plus`/`Sparkles` imports
+       standing beside it — all three typechecked, and the screen lost every
+       way to create a plan for a day before anyone noticed. `tsc` is this
+       repo's only static gate; these make it catch that class. An argument a
+       signature must keep but a body does not use takes a leading underscore. */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",

@@ -216,7 +216,7 @@ const VisitHeatLayer = L.Layer.extend({
 }) as new (points: GlobePoint[], lightBasemap: boolean) => HeatLayerInstance;
 
 function addGlowingRoute(
-  map: L.Map,
+  _map: L.Map,
   latLngs: [number, number][],
   lightBasemap: boolean,
   group: L.LayerGroup,

@@ -50,7 +50,6 @@ import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
 import { ANALYSIS_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
-  AnthropicEffort,
   AnalysisRuntime,
   ClaudeCodeConnectionState,
   AnalysisTriggerKind,

@@ -163,7 +163,6 @@ interface LoginResult {
 }
 
 const GLOBAL_BASE_URL = "https://teamapi.coros.com";
-const LOGIN_URL = `${GLOBAL_BASE_URL}/account/login`;
 const RESULT_SUCCESS = "0000";
 // Every code COROS answers a request with when the access token it carries is
 // not the live one for that account. `1019` is what a token that has been
@@ -3911,8 +3910,6 @@ export function parseUpcomingWorkouts(
       return;
     }
 
-    const idInPlan = String(entity.idInPlan ?? "");
-    const planProgramId = String(entity.planProgramId ?? "");
     const program = resolveScheduledProgram(
       entity,
       index,
@@ -5383,7 +5380,7 @@ function resolveLongestRunDuration(
 }
 
 function resolveLongestRunAvgPace(
-  raw: Record<string, unknown>,
+  _raw: Record<string, unknown>,
   rawRecord?: number,
   rawAvgPace?: number,
   distanceMeters?: number,
@@ -7580,15 +7577,6 @@ function toOptionalNumber(value: unknown): number | undefined {
   }
 
   return undefined;
-}
-
-function normalizeCalories(value: unknown): number | undefined {
-  const numeric = toOptionalNumber(value);
-  if (numeric === undefined) {
-    return undefined;
-  }
-
-  return numeric > 1000 ? Math.round(numeric / 1000) : Math.round(numeric);
 }
 
 function formatRaceDistanceLabel(

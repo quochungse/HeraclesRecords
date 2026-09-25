@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Footprints, Heart } from "lucide-react";
 import { OptionGroup } from "../../components/OptionGroup";
 import {

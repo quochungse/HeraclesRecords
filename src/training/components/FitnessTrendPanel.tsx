@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { OptionGroup } from "../../components/OptionGroup";
 import type { TrainingHubActivity } from "../../../electron/types";
 import { formatHappenDayLabel } from "../formatters";

@@ -41,16 +41,7 @@ import {
 
 const TOP_LEVEL_SORT_INTERVAL = 16_777_216;
 const GROUP_CHILD_SORT_INTERVAL = 65_536;
-const PACE_MULTIPLIER = 1_000;
 const MILES_PER_KILOMETER = 0.621371192;
-const LTHR_ZONE_LABELS = [
-  "Recovery",
-  "Aerobic Endurance",
-  "Aerobic Power",
-  "Threshold",
-  "Anaerobic Endurance",
-  "Anaerobic Power"
-];
 
 const EXERCISE_TYPE_TO_KIND: Record<number, RunWorkoutEditorStepKind> = {
   1: "warmup",

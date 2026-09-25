@@ -56,7 +56,6 @@ export const STALE_SLOT_MS = 24 * 60 * 60_000;
 export const THRESHOLD_RETRY_INTERVAL_MS = 15 * 60_000;
 
 type ScheduleTrigger = Extract<AnalysisTrigger, { kind: "schedule" }>;
-type ThresholdTrigger = Extract<AnalysisTrigger, { kind: "threshold" }>;
 
 export interface CoachAnalysisSchedulerDeps {
   now(): Date;

@@ -40,7 +40,6 @@ import {
   Terminal,
   Trash2,
   TriangleAlert,
-  Upload,
   User,
   Zap
 } from "lucide-react";
@@ -61,7 +60,6 @@ import {
   type UnitSystem
 } from "../units/units";
 import type {
-  AnthropicApiConnectionTest,
   AnthropicEffort,
   ChatAuthStatus,
   ChatContextCompaction,
@@ -76,9 +74,6 @@ import type {
   CoachAnalysisSessionAttention,
   CoachInputChoice,
   CoachInputPrompt,
-  LocalChatConnectionTest,
-  LocalChatDiscovery,
-  OpenRouterConnectionTest,
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
