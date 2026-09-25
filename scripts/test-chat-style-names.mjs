@@ -68,10 +68,25 @@ function walk(dir) {
   return out;
 }
 
+const classesDefinedIn = (text) =>
+  new Set([...text.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((match) => match[1]));
 const css = readFileSync(path.join(repoRoot, "src", "styles.css"), "utf8");
-const defined = new Set(
-  [...css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((match) => match[1])
-);
+const defined = classesDefinedIn(css);
+
+/**
+ * A Coach file may also bring a stylesheet of its own — the plan editor the
+ * chat opens is the Training Library's, and imports that screen's rules with
+ * it. Its classes count as defined for that file and nowhere else, so a chat
+ * class cannot lean on a rule that only loads when the editor does.
+ */
+function importedClasses(file, source) {
+  const found = new Set();
+  for (const match of source.matchAll(/^import\s+"([^"]+\.css)";/gm)) {
+    const sheet = readFileSync(path.resolve(path.dirname(file), match[1]), "utf8");
+    for (const name of classesDefinedIn(sheet)) found.add(name);
+  }
+  return found;
+}
 
 /**
  * Only literal class strings. A class assembled from a template is a decision
@@ -104,8 +119,10 @@ assert.ok(files.length > 5, "expected the Coach renderer to be where it was");
 const missing = [];
 for (const file of files) {
   const relative = path.relative(repoRoot, file);
-  for (const name of classesIn(readFileSync(file, "utf8"))) {
-    if (defined.has(name) || KNOWN_UNSTYLED.has(name)) continue;
+  const source = readFileSync(file, "utf8");
+  const own = importedClasses(file, source);
+  for (const name of classesIn(source)) {
+    if (defined.has(name) || own.has(name) || KNOWN_UNSTYLED.has(name)) continue;
     missing.push(`${name}  (${relative})`);
   }
 }

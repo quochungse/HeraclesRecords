@@ -16,15 +16,18 @@ import {
   uploadTrainingPlan
 } from "./trainingHubService";
 import {
+  deleteChatPlanDraft,
   getChatPlanDraft,
   listChatPlanDrafts,
   markChatPlanDraftUploaded,
-  pruneChatPlanDrafts,
   saveChatPlanDraft
 } from "./database";
 import { savePlanToCoros } from "./trainingLibraryService";
 import {
   COROS_WEEK_STAGES,
+  formatPlanDay,
+  mondayOf,
+  parsePlanDay,
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import type {
@@ -699,7 +702,7 @@ async function handleDraftTrainingPlan(
     },
     message: artifactType === "workout"
       ? "Workout draft saved. Tell the athlete to review it, choose Workout Library or Calendar, and confirm. The workout is not a training plan."
-      : "Draft saved. Tell the athlete to review the plan card: they can save it to COROS as a plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
+      : "Draft saved. Tell the athlete to review the plan card: they can edit it first, save it to COROS as a plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
   });
 }
 
@@ -1076,6 +1079,17 @@ function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void
   markChatPlanDraftUploaded(stored.draftId, stored.uploadedAt);
 }
 
+function requirePlanDraft(draftId: string): StoredPlanDraft {
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) {
+    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+  }
+  if (stored.preview.artifactType === "workout") {
+    throw new Error("This is a single workout, not a plan.");
+  }
+  return stored;
+}
+
 /** The coach's plan as the plan editor and a COROS save read it. */
 function coachDraftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
   return trainingPlanFromCoachDraftPreview(stored.preview, {
@@ -1117,15 +1131,107 @@ async function savePlanDraftAsCorosPlan(
   return result;
 }
 
-/** Remove drafts older than 24 hours */
-export function prunePlanDraftStore(): void {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  for (const [id, draft] of draftStore) {
-    if (draft.createdAt < cutoff && !draft.uploadedAt) {
-      draftStore.delete(id);
+/** The plan behind a Coach card, for the editor "Edit plan first" opens. */
+export function planDraftDocument(draftId: string): TrainingPlanDocument {
+  return coachDraftDocument(requirePlanDraft(draftId));
+}
+
+/**
+ * The athlete's edit of a coach plan, written back into the coach's own draft
+ * — not a plan draft of the library's, and not a new card. The draft keeps
+ * its id, so the card, the coach's tools and a later save all read the edited
+ * version, and `editedAt` is what puts that version in front of the coach on
+ * its next turn.
+ *
+ * Dates are kept where the coach gave them: a session is dated from the
+ * Monday the coach's first dated session fell in, at the week and day the
+ * athlete left it on. A plan the coach wrote undated stays undated, with the
+ * arrangement kept beside it as `layout`.
+ */
+export async function savePlanDraftEdit(
+  draftId: string,
+  plan: TrainingPlanDocument,
+  unitSystem: UnitSystem = "metric"
+): Promise<PlanDraftPreview> {
+  const stored = requirePlanDraft(draftId);
+  if (stored.uploadedAt) {
+    throw new Error("This plan has already been saved, so the Coach card can no longer be edited.");
+  }
+  const dates = stored.plan.workouts
+    .map((workout) => parsePlanDay(workout.schedule_date))
+    .filter((date): date is Date => Boolean(date))
+    .sort((left, right) => left.valueOf() - right.valueOf());
+  const anchor = dates[0] ? mondayOf(dates[0]) : undefined;
+  const originals = new Map(stored.plan.workouts.map((workout) => [workout.key, workout]));
+  const keys = new Set<string>();
+  const layout: NonNullable<CorosTrainingPlanDraft["layout"]> = {};
+
+  const workouts = [...plan.entries]
+    .sort(
+      (left, right) =>
+        left.weekIndex - right.weekIndex ||
+        left.dayIndex - right.dayIndex ||
+        left.sortOrder - right.sortOrder
+    )
+    .map((entry, index): PlanWorkoutEntry => {
+      let key = (entry.workout.key || entry.id).trim();
+      while (keys.has(key)) key = `${key}-${index + 1}`;
+      keys.add(key);
+      const day = anchor ? new Date(anchor) : undefined;
+      day?.setDate(day.getDate() + entry.weekIndex * 7 + entry.dayIndex);
+      if (!day) layout[key] = { weekIndex: entry.weekIndex, dayIndex: entry.dayIndex };
+      const { schedule_date: _date, sort_no: _sort, save_to_library: _library, ...workout } = structuredClone(entry.workout);
+      const original = originals.get(key);
+      return {
+        ...workout,
+        key,
+        name: entry.title.trim() || workout.name,
+        sort_no: index + 1,
+        ...(day ? { schedule_date: formatPlanDay(day, false) } : {}),
+        ...(original?.save_to_library !== undefined ? { save_to_library: original.save_to_library } : {})
+      } as PlanWorkoutEntry;
+    });
+
+  const next: CorosTrainingPlanDraft = {
+    name: plan.name.trim(),
+    workouts,
+    ...(plan.description.trim() ? { description: plan.description.trim() } : {}),
+    ...(plan.weekStages.length ? { weekStages: plan.weekStages.map((stage) => ({ ...stage })) } : {}),
+    ...(anchor ? {} : { layout })
+  };
+  const validation = validatePlanDraft(next, { todayDay: "00000000" });
+  if (!validation.ok) throw new Error(validation.errors.join(" "));
+
+  let conflicts: string[] = [];
+  if (anchor) {
+    try {
+      conflicts = await detectScheduleConflicts(next);
+    } catch {
+      /* The calendar is only consulted to warn; offline, the card says nothing. */
     }
   }
-  pruneChatPlanDrafts(cutoff);
+  const preview = buildPlanPreview(draftId, next, {
+    scheduleConflicts: conflicts,
+    unitSystem,
+    artifactType: "plan"
+  });
+  preview.editedAt = Date.now();
+  stored.plan = next;
+  stored.preview = preview;
+  persistPlanDraft(stored);
+  return preview;
+}
+
+/**
+ * A conversation's drafts go with it. They used to be pruned a day after they
+ * were written, which left a card in the transcript whose Save could only
+ * answer "draft not found"; now a draft lives exactly as long as the card.
+ */
+export function deletePlanDraftsOf(draftIds: readonly string[]): void {
+  for (const draftId of draftIds) {
+    draftStore.delete(draftId);
+    deleteChatPlanDraft(draftId);
+  }
 }
 
 /** Remove delete requests older than 24 hours */

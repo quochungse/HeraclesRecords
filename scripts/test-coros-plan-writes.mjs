@@ -1067,6 +1067,74 @@ test("a coach plan is saved to COROS as one plan, with its overview and stages",
     /already uploaded/,
     "saved once"
   );
+  await assert.rejects(
+    chatWorkoutTools.savePlanDraftEdit(preview.draftId, chatWorkoutTools.planDraftDocument(preview.draftId)),
+    /already been saved/,
+    "and a saved card is no longer edited"
+  );
+});
+
+test("an edit in Coach rewrites the coach's draft, and the card keeps its id", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  const opened = chatWorkoutTools.planDraftDocument(preview.draftId);
+  assert.equal(opened.origin, "coach");
+  assert.equal(opened.description, "Two easy weeks.");
+  assert.deepEqual(opened.weekStages, [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 3 }]);
+  assert.deepEqual(opened.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 0], [1, 6]]);
+
+  // Easy moves to Wednesday, Long is renamed, and a third session arrives on week 2's Tuesday.
+  const edited = structuredClone(opened);
+  edited.entries[0].dayIndex = 2;
+  edited.entries[1].title = "Longer Sunday";
+  edited.entries.push({ ...structuredClone(edited.entries[0]), id: "added", weekIndex: 1, dayIndex: 1, sortOrder: 9 });
+  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  assert.equal(next.draftId, preview.draftId, "the same card, not a new one");
+  assert.ok(next.editedAt, "marked edited, which is what shows it to the coach");
+  assert.deepEqual(
+    next.entries.map((entry) => [entry.name, entry.scheduleDate]),
+    [
+      ["Easy Monday", "2099-08-05"],
+      ["Easy Monday", "2099-08-11"],
+      ["Longer Sunday", "2099-08-16"]
+    ],
+    "dated from the Monday the coach started on, at the day the athlete left each session"
+  );
+  assert.equal(new Set(next.entries.map((entry) => entry.key)).size, 3, "a copied session gets a key of its own");
+
+  const reopened = chatWorkoutTools.planDraftDocument(preview.draftId);
+  assert.deepEqual(
+    reopened.entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
+    [["Easy Monday", 0, 2], ["Easy Monday", 1, 1], ["Longer Sunday", 1, 6]],
+    "opening it again shows the edit"
+  );
+});
+
+test("an undated coach plan keeps the weeks and days the athlete gave it", async () => {
+  fakeCoros();
+  const preview = await coachDraft({
+    name: "Undated",
+    workouts: [coachRun("One", 1200), coachRun("Two", 1200), coachRun("Three", 1200)]
+  });
+  const opened = chatWorkoutTools.planDraftDocument(preview.draftId);
+  assert.deepEqual(opened.entries.map((entry) => entry.dayIndex), [0, 1, 2], "a list, one a day");
+  const edited = structuredClone(opened);
+  edited.entries[2].weekIndex = 1;
+  edited.entries[2].dayIndex = 5;
+  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  assert.ok(next.entries.every((entry) => !entry.scheduleDate), "no date is invented");
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(preview.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+    [[0, 0], [0, 1], [1, 5]],
+    "and the arrangement survives, where the list would have put Three back on Wednesday"
+  );
+});
+
+test("deleting a conversation's drafts lets them go", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  chatWorkoutTools.deletePlanDraftsOf([preview.draftId]);
+  assert.throws(() => chatWorkoutTools.planDraftDocument(preview.draftId), /not found/);
 });
 
 let failed = 0;

@@ -206,7 +206,11 @@ A plan the coach writes stays in the conversation until it is saved: it is a
 chat plan draft (`chat_plan_drafts`), not a library draft, and the Plans screen
 does not list it. The card's **Training Plan** destination saves it to COROS as
 one plan (`origin: "coach"`), its description as the overview and its week
-stages as COROS's.
+stages as COROS's. **Edit plan first** opens the plan editor over the
+conversation (`CoachPlanEditor`) and saves back into the coach's own draft — the
+same card, marked `editedAt` — and the coach is shown that version in front of
+the athlete's next question (`withPlanEdits`). A conversation's drafts are
+deleted with it.
 
 ## Verified COROS surface
 

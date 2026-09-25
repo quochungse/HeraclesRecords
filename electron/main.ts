@@ -335,6 +335,8 @@ import {
   testLocalChatConnection,
   testOpenRouterConnection,
   uploadTrainingPlanDraft,
+  editPlanDraft,
+  getPlanDraftDocument,
   confirmWorkoutDelete
 } from "./chatService";
 import {
@@ -348,8 +350,7 @@ import {
 } from "./openRouterProvider";
 import {
   hydratePlanDraftStoreFromDatabase,
-  pruneDeleteRequestStore,
-  prunePlanDraftStore
+  pruneDeleteRequestStore
 } from "./chatWorkoutTools";
 import {
   connectCorosMcp,
@@ -782,7 +783,6 @@ app.whenReady().then(() => {
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
   hydratePlanDraftStoreFromDatabase();
-  prunePlanDraftStore();
   pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
@@ -1844,6 +1844,12 @@ function registerIpcHandlers(): void {
     await disconnectMcpServer(id, { clearAuthorization: false });
   });
 
+  ipcMain.handle("chat:planDraftDocument", (_event, draftId: string) => getPlanDraftDocument(draftId));
+  ipcMain.handle(
+    "chat:editPlanDraft",
+    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem) =>
+      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem))
+  );
   ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string) =>
     uploadTrainingPlanDraft(
       draftId,

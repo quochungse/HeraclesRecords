@@ -27,6 +27,9 @@ import {
   isChatWorkoutTool,
   uploadPlanDraftById,
   confirmWorkoutDeleteById,
+  deletePlanDraftsOf,
+  planDraftDocument,
+  savePlanDraftEdit,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -141,6 +144,7 @@ import type {
   TrainingHubUpcomingWorkout,
   UploadPlanResult,
   PlanDraftPreview,
+  TrainingPlanDocument,
   DeleteWorkoutResult,
   UnitSystem,
   WorkoutDeletePreview
@@ -469,7 +473,13 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
 }
 
 export function deleteChatSessionById(id: string): void {
+  // Read before the row goes: the transcript is the only record of which
+  // drafts were this conversation's.
+  const draftIds = getChatSession(id).flatMap((entry) =>
+    entry.kind === "planDraft" ? [entry.draft.draftId] : []
+  );
   deleteChatSession(id);
+  deletePlanDraftsOf(draftIds);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1998,6 +2008,18 @@ export async function uploadTrainingPlanDraft(
   );
 }
 
+export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
+  return planDraftDocument(draftId);
+}
+
+export async function editPlanDraft(
+  draftId: string,
+  plan: TrainingPlanDocument,
+  unitSystem: UnitSystem = "metric"
+): Promise<PlanDraftPreview> {
+  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem));
+}
+
 export async function confirmWorkoutDelete(
   requestId: string
 ): Promise<DeleteWorkoutResult> {
@@ -2549,7 +2571,7 @@ function withLiveToolInstructions(
         "prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE, or grade in " +
         "the typed intensity field; do not leave it only in workout prose or the name. " +
         "For draft_training_plan entries intended for calendar placement, include schedule_date " +
-        "(YYYYMMDD). A multi-workout draft is saved to COROS as one plan by default (give it a description and, for a periodised block, week_stages); the athlete may instead choose individual COROS workouts or Calendar. " +
+        "(YYYYMMDD). A multi-workout draft is saved to COROS as one plan by default (give it a description and, for a periodised block, week_stages); the athlete may instead choose individual COROS workouts or Calendar, and may edit the plan before saving. " +
         "The athlete must confirm the destination and any one-off workout date before saving. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",

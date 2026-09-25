@@ -2870,28 +2870,6 @@ export function markChatPlanDraftUploaded(
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [draftId]);
 }
 
-export function pruneChatPlanDrafts(cutoffMs: number): number {
-  const database = requireDatabase();
-  // Ids first: a tombstone needs them, and after the delete there is nothing
-  // left to read them from.
-  const doomed = (
-    database
-      .prepare(
-        "SELECT draft_id FROM chat_plan_drafts " +
-          "WHERE created_at < ? AND uploaded_at IS NULL"
-      )
-      .all(cutoffMs) as Array<{ draft_id: string }>
-  ).map((row) => row.draft_id);
-
-  const result = database
-    .prepare("DELETE FROM chat_plan_drafts WHERE created_at < ? AND uploaded_at IS NULL")
-    .run(cutoffMs);
-  for (const draftId of doomed) {
-    notifySyncedDelete("chat_plan_drafts", draftId);
-  }
-  return result.changes;
-}
-
 export function deleteChatPlanDraft(draftId: string): void {
   requireDatabase()
     .prepare("DELETE FROM chat_plan_drafts WHERE draft_id = ?")

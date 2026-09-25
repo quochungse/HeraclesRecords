@@ -1,5 +1,7 @@
 import {
+  Suspense,
   forwardRef,
+  lazy,
   memo,
   useCallback,
   useEffect,
@@ -80,7 +82,6 @@ import type {
   PlanDraftPreview,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
-  TrainingPlanDocument,
   TrainingPlanDestination,
   TrainingHubExportResult,
   UploadPlanResult,
@@ -90,7 +91,6 @@ import type {
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
-import { trainingPlanFromCoachDraftPreview } from "../../electron/trainingPlanDomain";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -105,7 +105,8 @@ import { CoachCreationModal } from "./CoachCreationModal";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
-  toWireMessages
+  toWireMessages,
+  withPlanEdits
 } from "../../electron/chatContextCompaction";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
@@ -133,6 +134,10 @@ import {
   groupChatToolsBySource,
   type ChatToolSource
 } from "../../electron/chatToolSources";
+
+/* "Edit plan first": the plan editor and the library's stylesheet, loaded
+   only when a coach plan is opened in it. */
+const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -292,7 +297,6 @@ interface ChatViewProps {
   api: CorosLinkApi | undefined;
   onError: (message: string | null) => void;
   onPlanUploaded?: () => void;
-  onReviewPlan?: (plan: TrainingPlanDocument) => void;
   /** Fires when a coach request is in progress (streaming or exporting). */
   onActivityChange?: (active: boolean) => void;
   /** Text preloaded into the composer (e.g. "Ask Coach" from the calendar). */
@@ -1415,7 +1419,7 @@ function PlanPreviewCard({
               className="chat-plan-review"
               onClick={onReview}
               disabled={uploading}
-              title="Open this plan in the Training Library editor"
+              title="Change the plan before saving it"
             >
               <BookOpen size={14} aria-hidden="true" />
               Edit plan first
@@ -1858,7 +1862,6 @@ export function ChatView({
   api,
   onError,
   onPlanUploaded,
-  onReviewPlan,
   onActivityChange,
   pendingPrompt,
   onPendingPromptConsumed,
@@ -1940,6 +1943,8 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /* The coach's plan open in the editor, by draft id — "Edit plan first". */
+  const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
@@ -3545,10 +3550,13 @@ export function ChatView({
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
-    const wireMessages = [
-      ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
-      ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
-    ];
+    const wireMessages = withPlanEdits(
+      [
+        ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
+        ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
+      ],
+      persisted
+    );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem);
     } catch (caught) {
@@ -3705,14 +3713,25 @@ export function ChatView({
     });
   };
 
-  const handleReviewPlanDraft = (draft: PlanDraftPreview) => {
-    if (!onReviewPlan) return;
-    try {
-      onError(null);
-      onReviewPlan(trainingPlanFromCoachDraftPreview(draft));
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "The Coach plan could not be opened in the Training Library.");
-    }
+  /*
+   * The edit replaces the card in place: same draft id, same position in the
+   * transcript, so the array the window saves is the length the row holds and
+   * the card's identity for sync is kept (`...entry.draft` first). `editedAt`
+   * is what shows the coach this version on the next turn.
+   */
+  const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
+    setEditingPlanDraftId(null);
+    setOpenCreationId(preview.draftId);
+    setTimeline((prev) => {
+      const next = prev.map((entry): ChatEntry =>
+        entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
+          ? { kind: "planDraft", draft: { ...entry.draft, ...preview } }
+          : entry
+      );
+      persistHistory(activeSessionIdRef.current, next, true);
+      return next;
+    });
+    showToast("Plan updated. The coach will see your version on its next reply.");
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -4968,13 +4987,34 @@ function AnalysisSilentChip({
               )
             }
             onReview={
-              onReviewPlan
-                ? () => handleReviewPlanDraft(openCreation)
+              api && openCreation.artifactType !== "workout"
+                ? () => {
+                    /* The card's modal steps aside for the editor — both
+                       close on Escape, and the card sits above the editor's
+                       layer — and comes back when the editor closes. */
+                    onError(null);
+                    setOpenCreationId(null);
+                    setEditingPlanDraftId(openCreation.draftId);
+                  }
                 : undefined
             }
           />
         ) : null}
       </CoachCreationModal>
+      {api && editingPlanDraftId ? (
+        <Suspense fallback={null}>
+          <CoachPlanEditor
+            api={api}
+            draftId={editingPlanDraftId}
+            onSaved={handlePlanDraftEdited}
+            onClose={() => {
+              setOpenCreationId(editingPlanDraftId);
+              setEditingPlanDraftId(null);
+            }}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
       <AnalysesModal
         api={api}
         target={analysisTarget}

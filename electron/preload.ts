@@ -65,6 +65,7 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
+  PlanDraftPreview,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -959,6 +960,14 @@ const api = {
       destination,
       scheduleDate
     ),
+  getPlanDraftDocument: (draftId: string): Promise<TrainingPlanDocument> =>
+    ipcRenderer.invoke("chat:planDraftDocument", draftId),
+  editPlanDraft: (
+    draftId: string,
+    plan: TrainingPlanDocument,
+    unitSystem?: UnitSystem
+  ): Promise<PlanDraftPreview> =>
+    ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem),
   confirmWorkoutDelete: (requestId: string): Promise<DeleteWorkoutResult> =>
     ipcRenderer.invoke("chat:confirmWorkoutDelete", requestId),
   // ----- Sync -----

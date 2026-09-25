@@ -478,7 +478,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   **A Coach plan stays in the conversation until it is saved** — a chat plan draft
   (`chat_plan_drafts`), not a library draft, and not listed on the Plans tab. The card's Training
   Plan destination saves it to COROS as one plan (`origin: "coach"`, the coach's `description` as
-  the overview, its `week_stages` as COROS's).
+  the overview, its `week_stages` as COROS's). **Edit plan first opens the plan editor over the
+  conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and saves back into the
+  coach's own draft through `chat:editPlanDraft` — same draft id, same card, dates kept from the
+  coach's first Monday, an undated plan's arrangement kept as `layout`. The edited card carries
+  `editedAt`, and `withPlanEdits` states that version to the coach in front of the athlete's next
+  question (in the chat and in analysis runs), because the coach otherwise advises about the
+  version it wrote. Drafts are deleted with their conversation; the 24-hour prune is gone.
   **A plan saved from COROS's official catalogue is written in localization keys** —
   `name: "P10035"`, sessions `P10281`, descriptions `P11058`, steps `T1120` — which the
   Training Hub web app resolves against a string table on its CDN

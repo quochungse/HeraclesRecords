@@ -2992,6 +2992,12 @@ export interface PlanDraftPreview {
     /** The COROS plan it became, for a plan saved whole. */
     planId?: string;
   };
+  /**
+   * Set when the athlete changed the plan in the editor after the coach wrote
+   * it. The coach is shown the current version on its next turn, since the
+   * card is the only place the change was made.
+   */
+  editedAt?: number;
 }
 
 export interface PlanWorkoutEntryInput {

@@ -62,6 +62,7 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
+  PlanDraftPreview,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -641,6 +642,10 @@ export interface CorosLinkApi {
     destination?: TrainingPlanDestination,
     scheduleDate?: string
   ) => Promise<UploadPlanResult>;
+  /** The plan behind a Coach card, for the editor "Edit plan first" opens. */
+  getPlanDraftDocument: (draftId: string) => Promise<TrainingPlanDocument>;
+  /** Writes the athlete's edit back into the coach's own draft; answers the card. */
+  editPlanDraft: (draftId: string, plan: TrainingPlanDocument, unitSystem?: UnitSystem) => Promise<PlanDraftPreview>;
   confirmWorkoutDelete: (requestId: string) => Promise<DeleteWorkoutResult>;
   // ----- Sync -----
   chooseSyncFolder: () => Promise<string | null>;
