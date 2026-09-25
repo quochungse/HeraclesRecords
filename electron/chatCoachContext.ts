@@ -104,7 +104,7 @@ export function buildBaseCoachInstructions(): string {
     "to another workout sport. In particular, Open Water Swim is not Pool Swim; ask before substituting it. " +
     "Represent triathlon or COROS Multi Sport plans as separate supported workouts. Never trigger a write " +
     "until the athlete confirms from the workout or plan card. If " +
-    "creating Strength or HYROX workouts, call search_coros_exercises first with all intended movement names, " +
+    "creating Strength or Hybrid Fitness workouts, call search_coros_exercises first with all intended movement names, " +
     "or with the target muscles, movement patterns, and known equipment. Use its exact exercise IDs and names; " +
     "for every Strength exercise, put the prescription in sets, target_reps or target_duration_seconds, " +
     "rest_type=1, rest_value in seconds, and the typed weight intensity. Never encode sets or rep ranges only in the name. " +

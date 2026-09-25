@@ -675,7 +675,7 @@ function builderRowValidationMessage(
   }
   if (sport === "hyrox" && row.exerciseName.trim() && !row.exerciseId) {
     return exerciseOptions.length === 0
-      ? "Reconnect COROS to load the HYROX exercise catalog."
+      ? "Reconnect COROS to load the Hybrid Fitness exercise catalog."
       : "Choose an exact exercise from the COROS suggestions.";
   }
   if ((row.intensityType === "pace" || row.intensityType === "effortPace") && !/^\d+:[0-5]\d(?:\/(?:km|mi))?-\d+:[0-5]\d(?:\/(?:km|mi))?$/i.test(row.pace.trim())) {
@@ -1157,8 +1157,8 @@ function BuilderIntensityFields({ row, sport, context, exerciseOptions, exercise
         value={row.exerciseName}
         selectedId={row.exerciseId}
         options={exerciseOptions}
-        placeholder={sport === "strength" ? "Search and select a COROS exercise" : "Search HYROX exercises"}
-        label={sport === "strength" ? "Exercise" : "HYROX exercise"}
+        placeholder={sport === "strength" ? "Search and select a COROS exercise" : "Search Hybrid Fitness exercises"}
+        label={sport === "strength" ? "Exercise" : "Hybrid Fitness exercise"}
         loading={exercisesLoading}
         details={<div className="calendar-builder-exercise-details">
           <div className={`calendar-builder-exercise-status ${row.exerciseId ? "is-selected" : ""}`}>

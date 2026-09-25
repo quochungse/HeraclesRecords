@@ -3110,7 +3110,7 @@ export interface RunWorkoutCreateStep {
   send_off_seconds?: number;
   /** Typed intensity is authoritative. Legacy raw fields remain read-compatible. */
   intensity?: WorkoutIntensityInput;
-  /** COROS strength/HYROX exercise identity or uniquely resolvable name. */
+  /** COROS strength/Hybrid Fitness exercise identity or uniquely resolvable name. */
   exercise_id?: string;
   exercise_name?: string;
   exercise_kind?: number;

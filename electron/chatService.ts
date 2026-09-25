@@ -2534,7 +2534,7 @@ function withLiveToolInstructions(
       `Authoring tools: ${planTools.map((tool) => tool.name).join(", ")}. ` +
         "Use draft_workout for exactly one standalone workout. Its card lets the athlete choose Workout Library or Calendar; set calendar_date only when the athlete names a date. " +
         "Use draft_training_plan only for multi-day or multi-week schedules. Never wrap a one-off workout in a plan. " +
-        "Before drafting Strength or HYROX workouts, call search_coros_exercises once with all intended " +
+        "Before drafting Strength or Hybrid Fitness workouts, call search_coros_exercises once with all intended " +
         "exercise queries, or with target muscles, movement patterns, and known equipment; then use the " +
         "returned exact exercise IDs and names. A COROS naming mismatch alone never requires an athlete question. " +
         "For Strength exercises, set sets explicitly, use target_reps or target_duration_seconds per set, " +

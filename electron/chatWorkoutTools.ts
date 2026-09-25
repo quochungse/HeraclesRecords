@@ -169,8 +169,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
     {
       name: "search_coros_exercises",
       description:
-        "Search the athlete's live COROS Strength/HYROX exercise catalog and return exact exercise IDs and names. " +
-        "Call this before drafting strength or HYROX workouts whenever exact COROS exercise IDs are not already known. " +
+        "Search the athlete's live COROS Strength/Hybrid Fitness exercise catalog and return exact exercise IDs and names. " +
+        "Call this before drafting strength or Hybrid Fitness workouts whenever exact COROS exercise IDs are not already known. " +
         "Search several intended movements in one call with queries, or discover exercises by target muscles, movement patterns, and available equipment. " +
         "Use returned exercise_id and exercise_name values in whichever draft tool matches the request. Catalog naming differences are not a reason to ask the athlete.",
       inputSchema: {
@@ -179,7 +179,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
           sport: {
             type: "string",
             enum: ["strength", "hyrox"],
-            description: "Catalog context. HYROX functional stations use the COROS Strength catalog. Default strength."
+            description: "Catalog context. Hybrid Fitness functional stations use the COROS Strength catalog. Default strength."
           },
           query: {
             type: "string",
@@ -226,7 +226,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Use this for one-off requests such as today's run, a single gym session, or one workout to reuse later; " +
         "do not wrap a one-off workout in draft_training_plan. Set calendar_date only when the athlete names a date. " +
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "For Strength and HYROX, call search_coros_exercises first and pass its exact exercise IDs and names. " +
+        "For Strength and Hybrid Fitness, call search_coros_exercises first and pass its exact exercise IDs and names. " +
         "Returns a workout card where the athlete can choose Workout Library or Calendar and confirm.",
       inputSchema: buildDraftWorkoutInputSchema()
     },
@@ -236,7 +236,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Validate and store a multi-day or multi-week sport-aware training plan draft for athlete review. " +
         "Use draft_workout instead when the athlete asks for only one standalone workout. " +
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "Strength and HYROX exercise names are checked against the COROS catalog; use search_coros_exercises first " +
+        "Strength and Hybrid Fitness exercise names are checked against the COROS catalog; use search_coros_exercises first " +
         "and pass its exact IDs and names. If candidates are returned, revise the affected steps and call this tool again. " +
         "Always call this before upload. Returns a draftId and human-readable preview.",
       inputSchema: buildDraftTrainingPlanInputSchema()

@@ -191,7 +191,7 @@ export const WORKOUT_SPORT_CAPABILITIES: Readonly<Record<WorkoutSport, SportCapa
   hyrox: {
     sport: "hyrox",
     sportType: 9,
-    label: "HYROX",
+    label: "Hybrid Fitness",
     pbVersion: 9,
     referExercise: { intensityType: 0, hrType: 0, valueType: 0 },
     stepKinds: STANDARD_KINDS,
