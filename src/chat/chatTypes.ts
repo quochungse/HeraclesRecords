@@ -127,6 +127,24 @@ export function isChatVisualEntry(
   );
 }
 
+/**
+ * A finished turn's answer, put where the turn began.
+ *
+ * The cards a turn produces (a plan, a chart) arrive while it runs and are
+ * appended as they come; the answer arrives last. Appended too, it read below
+ * the plan it introduces. `turnStart` is the timeline's length when the turn
+ * was sent, so everything from there on is this turn's, and `closing` goes in
+ * front of it. Clamped, so a timeline replaced mid-turn cannot throw.
+ */
+export function settleTurnEntries(
+  timeline: ChatEntry[],
+  turnStart: number,
+  closing: ChatEntry[]
+): ChatEntry[] {
+  const at = Math.min(Math.max(0, Math.floor(turnStart)), timeline.length);
+  return [...timeline.slice(0, at), ...closing, ...timeline.slice(at)];
+}
+
 /** A replacement keeps what a newer build stored beside the entry it replaces. */
 function keepExtra(entry: ChatEntry): { extra?: Record<string, unknown> } {
   return entry.extra ? { extra: entry.extra } : {};

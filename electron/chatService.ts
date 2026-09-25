@@ -1106,6 +1106,8 @@ export function createCollectorSink(
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
   let tokenModel: string | undefined;
+  /** Where the running turn's entries begin; its answer goes in front of its cards. */
+  let turnStart = 0;
 
   const reset = () => {
     pendingCoachPrompts = [];
@@ -1280,7 +1282,9 @@ export function createCollectorSink(
     const turnSource = source ?? undefined;
 
     if (fullText) {
-      entries.push({
+      // Before the cards this turn produced, as ChatView settles an
+      // interactive turn (`settleTurnEntries`): the answer introduces them.
+      entries.splice(Math.min(turnStart, entries.length), 0, {
         kind: "message",
         role: "assistant",
         content: fullText,
@@ -1313,6 +1317,7 @@ export function createCollectorSink(
       const record = (payload ?? {}) as Record<string, unknown>;
       if (channel === "chat:streamStart") {
         reset();
+        turnStart = entries.length;
         return;
       }
       if (channel === "chat:streamToken") {

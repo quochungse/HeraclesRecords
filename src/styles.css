@@ -19784,6 +19784,190 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* A coach's creation under the answer that proposed it: read-only, with the
+   way to save it and a way into the full view. */
+.chat-creation-card {
+  position: relative;
+}
+
+.chat-creation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-creation-head h4 {
+  margin: 2px 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-creation-kicker {
+  color: var(--chat-signal-strong);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.chat-creation-head-aside {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-creation-status {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  color: var(--chat-signal-strong);
+  background: var(--chat-signal-soft);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.chat-creation-status[data-saved="true"] {
+  color: var(--success-text);
+  background: color-mix(in srgb, var(--success-text) 12%, transparent);
+}
+
+.chat-creation-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.chat-creation-figures > div {
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-creation-figures dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.chat-creation-figures dd {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-creation-week {
+  display: grid;
+  gap: 5px;
+}
+
+.chat-creation-week-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-creation-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-creation-days > li {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-creation-days b {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-creation-days span {
+  padding-left: 5px;
+  border-left: 3px solid var(--tl-sport, var(--chat-signal));
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-creation-days > li.is-rest span {
+  padding-left: 0;
+  border-left: 0;
+  color: var(--text-muted);
+}
+
+.chat-creation-steps {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-creation-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-creation-open:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+.chat-creation-open:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .chat-creation-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-creation-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .chat-plan-sports {
   display: inline-flex;
   flex: none;
@@ -31591,3 +31775,194 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   opacity: 0.55;
   cursor: default;
 }
+
+/* ============================================== Plan pieces shared with Coach
+ * The week ridge and the stage hues are drawn by the Training Library and by a
+ * coach's plan card in the conversation, which does not load the library's
+ * stylesheet. */
+
+/* ------------------------------------------------------ Stages, as colour */
+
+/*
+ * A week's stage is data — COROS's own six, Preparation to Transition — so it
+ * may take a hue, the same one on the ridge's band and down the edge of the
+ * week. The semantic inks are borrowed rather than a palette invented, so a
+ * stage follows the theme with everything else.
+ */
+[data-stage] {
+  --tl-stage: var(--text-muted);
+}
+
+[data-stage="preparation"] {
+  --tl-stage: var(--text-secondary);
+}
+
+[data-stage="base"] {
+  --tl-stage: var(--success-text);
+}
+
+[data-stage="build"] {
+  --tl-stage: var(--warning-text);
+}
+
+[data-stage="peak"] {
+  --tl-stage: var(--error-text);
+}
+
+[data-stage="race"] {
+  --tl-stage: var(--accent-strong);
+}
+
+[data-stage="transition"] {
+  --tl-stage: var(--text-muted);
+}
+
+/* ------------------------------------------------------- The week ridge */
+
+.plan-ridge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-ridge-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.plan-ridge-caption b {
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.plan-ridge-caption small {
+  font-size: 10px;
+}
+
+.plan-ridge-bars,
+.plan-ridge-stages {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(var(--plan-ridge-weeks), minmax(0, 1fr));
+}
+
+/* A week: its bar, and under it its number. The whole column is the target. */
+.plan-ridge-week {
+  display: flex;
+  height: 100px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover {
+  background: var(--glass-bg);
+}
+
+/* A stack of the week's sports, bottom up in one fixed order, each in the hue
+   its sessions wear below. The hover and this week lift the whole stack. */
+.plan-ridge-bar {
+  display: flex;
+  height: var(--plan-bar-height);
+  flex-direction: column-reverse;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+}
+
+.plan-ridge-seg {
+  min-height: 2px;
+  flex-basis: 0;
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 62%, transparent);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-empty .plan-ridge-bar {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+.plan-ridge-week small {
+  height: 10px;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* This week: the stack at full strength and its number in the accent's ink. */
+.plan-ridge-week.is-current .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-current small {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.plan-ridge-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.plan-ridge-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.plan-ridge-legend > span::before {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--tl-sport, var(--text-muted));
+  content: "";
+}
+
+.plan-ridge-stage {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-ridge-stage[data-stage] {
+  color: var(--tl-stage);
+  background: color-mix(in srgb, var(--tl-stage) 16%, transparent);
+}
+

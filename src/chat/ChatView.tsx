@@ -82,6 +82,7 @@ import type {
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
+  TrainingPlanDocument,
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutIntensityInput,
@@ -102,6 +103,7 @@ import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationModal } from "./CoachCreationModal";
 import { CreationActions } from "./CreationActions";
+import { CoachCreationCard } from "./CoachCreationCard";
 import { creationStatus } from "./creationChoices";
 import {
   DEFAULT_COMPACT_CONTEXT,
@@ -127,6 +129,7 @@ import {
   upsertPlanDraftEntry,
   upsertWorkoutDeleteEntry,
   isChatVisualEntry,
+  settleTurnEntries,
   type ChatEntry,
   type SourceInfo
 } from "./chatTypes";
@@ -646,8 +649,17 @@ interface PlanWeekGroup {
   entries: PlanDraftPreviewEntry[];
 }
 
-function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup[] {
+/**
+ * `weekOf` places an undated session in its week of the plan — read off the
+ * document the draft becomes — so an undated plan reads as weeks rather than
+ * as one "Unscheduled" pile.
+ */
+function groupPlanEntriesByWeek(
+  entries: PlanDraftPreviewEntry[],
+  weekOf?: ReadonlyMap<string, number>
+): PlanWeekGroup[] {
   const groups = new Map<string, { start: Date; entries: PlanDraftPreviewEntry[] }>();
+  const planWeeks = new Map<string, PlanDraftPreviewEntry[]>();
   const unscheduled: PlanDraftPreviewEntry[] = [];
   const sortedEntries = [...entries].sort((left, right) => {
     const leftDate = planEntryScheduleDate(left) ?? "9999-99-99";
@@ -659,7 +671,15 @@ function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup
     const scheduleDate = planEntryScheduleDate(entry);
     const date = scheduleDate ? planDateFromSchedule(scheduleDate) : undefined;
     if (!date) {
-      unscheduled.push(entry);
+      const week = weekOf?.get(entry.key);
+      if (week === undefined) {
+        unscheduled.push(entry);
+        continue;
+      }
+      const id = `week-${String(week).padStart(3, "0")}`;
+      const existing = planWeeks.get(id);
+      if (existing) existing.push(entry);
+      else planWeeks.set(id, [entry]);
       continue;
     }
     const start = planWeekStart(date);
@@ -680,6 +700,16 @@ function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup
       dateRange: formatPlanWeekRange(group.start),
       entries: group.entries
     }));
+  for (const [id, grouped] of [...planWeeks.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
+    weeks.push({
+      id,
+      label: `Week ${Number(id.slice(5)) + 1}`,
+      dateRange: "Dated when it goes on the calendar",
+      entries: grouped
+    });
+  }
   if (unscheduled.length > 0) {
     weeks.push({
       id: "unscheduled",
@@ -827,12 +857,14 @@ function WorkoutPreviewCard({
 
 function PlanPreviewCard({
   draft,
+  document,
   uploading,
   uploaded,
   onUpload,
   onReview
 }: {
   draft: PlanDraftPreview;
+  document?: TrainingPlanDocument;
   uploading: boolean;
   uploaded?: UploadPlanResult;
   onUpload: (destination: TrainingPlanDestination) => void;
@@ -854,7 +886,16 @@ function PlanPreviewCard({
   const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
   const savedTo: TrainingPlanDestination =
     uploadedResult?.destination ?? draft.uploadResult?.destination ?? "nativePlan";
-  const planWeeks = groupPlanEntriesByWeek(draft.entries);
+  const entryPrefix = `entry:${draft.draftId}:`;
+  const weekOf = document
+    ? new Map(
+        document.entries.map((entry) => [
+          entry.id.startsWith(entryPrefix) ? entry.id.slice(entryPrefix.length) : entry.id,
+          entry.weekIndex
+        ])
+      )
+    : undefined;
+  const planWeeks = groupPlanEntriesByWeek(draft.entries, weekOf);
   const scheduledWeekCount = planWeeks.filter(
     (week) => week.id !== "unscheduled"
   ).length;
@@ -1170,7 +1211,8 @@ function CoachDraftPreviewCard({
   uploading,
   uploaded,
   onUpload,
-  onReview
+  onReview,
+  document
 }: {
   draft: PlanDraftPreview;
   uploading: boolean;
@@ -1180,6 +1222,7 @@ function CoachDraftPreviewCard({
     scheduleDate?: string
   ) => void;
   onReview?: () => void;
+  document?: TrainingPlanDocument;
 }) {
   if (draft.artifactType === "workout") {
     return (
@@ -1195,6 +1238,7 @@ function CoachDraftPreviewCard({
   return (
     <PlanPreviewCard
       draft={draft}
+      document={document}
       uploading={uploading}
       uploaded={uploaded}
       onUpload={onUpload}
@@ -1656,6 +1700,41 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /**
+   * Each plan card's document, by draft and edit: the weeks and days the card
+   * draws come from what the draft becomes, not from its dates. `null` is a
+   * read that failed, kept so it is not retried on every render.
+   */
+  const [planDocuments, setPlanDocuments] = useState<
+    Record<string, TrainingPlanDocument | null>
+  >({});
+  /** Whether the plan editor was opened from the popup, which it then reopens. */
+  const reopenCreationAfterEditRef = useRef(false);
+  const planDocumentKeys = timeline.flatMap((entry) =>
+    entry.kind === "planDraft" &&
+    entry.draft.artifactType !== "workout" &&
+    !entry.draft.removedAt
+      ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}`]
+      : []
+  );
+  const missingPlanDocuments = planDocumentKeys
+    .filter((key) => !(key in planDocuments))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingPlanDocuments) return;
+    // Marked before the read lands, so the next render does not ask again; the
+    // answer replaces the mark whenever it arrives.
+    for (const key of missingPlanDocuments.split(",")) {
+      const draftId = key.slice(0, key.lastIndexOf(":"));
+      setPlanDocuments((current) => (key in current ? current : { ...current, [key]: null }));
+      void api
+        .getPlanDraftDocument(draftId)
+        .then((document) => {
+          setPlanDocuments((current) => ({ ...current, [key]: document ?? null }));
+        })
+        .catch(() => undefined);
+    }
+  }, [api, missingPlanDocuments]);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
@@ -1683,6 +1762,8 @@ export function ChatView({
   // Ref so the push-event handlers filter on the current request without
   // being recreated (and re-subscribed) on every keystroke.
   const activeRequestIdRef = useRef<string | null>(null);
+  /** The timeline's length when the running turn was sent: what comes after is the turn's. */
+  const turnStartRef = useRef(0);
   const activeSessionIdRef = useRef<string | null>(null);
   /**
    * A turn of the athlete's own is in the air, so the timeline on screen is
@@ -2463,12 +2544,12 @@ export function ChatView({
       resumedCoachPromptRef.current = null;
       if (finalText || coachPrompts.length > 0) {
         setTimeline((prev) => {
-          let next: ChatEntry[] = [...prev];
+          const closing: ChatEntry[] = [];
           if (source?.mcpError) {
-            next.push({ kind: "toolNotice", message: source.mcpError });
+            closing.push({ kind: "toolNotice", message: source.mcpError });
           }
           if (finalText) {
-            next.push({
+            closing.push({
               kind: "message",
               role: "assistant",
               content: finalText,
@@ -2482,6 +2563,7 @@ export function ChatView({
               ...(model ? { model } : {})
             });
           }
+          let next = settleTurnEntries(prev, turnStartRef.current, closing);
           for (const prompt of coachPrompts) {
             next = upsertCoachPromptEntry(next, prompt);
           }
@@ -2638,18 +2720,23 @@ export function ChatView({
           // for a finished one.
           resumedCoachPromptRef.current = null;
           setTimeline((prev) => {
-            let next: ChatEntry[] = [...prev];
-            if (partialText) {
-              next.push({
-                kind: "message",
-                role: "assistant",
-                content: partialText,
-                source,
-                reasoningSummary,
-                ...(payload.usage ? { usage: payload.usage } : {}),
-                ...(payload.model ? { model: payload.model } : {})
-              });
-            }
+            let next = settleTurnEntries(
+              prev,
+              turnStartRef.current,
+              partialText
+                ? [
+                    {
+                      kind: "message",
+                      role: "assistant",
+                      content: partialText,
+                      source,
+                      reasoningSummary,
+                      ...(payload.usage ? { usage: payload.usage } : {}),
+                      ...(payload.model ? { model: payload.model } : {})
+                    }
+                  ]
+                : []
+            );
             for (const prompt of coachPrompts) {
               next = upsertCoachPromptEntry(next, prompt);
             }
@@ -3237,6 +3324,7 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
     setCurrentSource(null);
@@ -3431,7 +3519,7 @@ export function ChatView({
    */
   const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
     setEditingPlanDraftId(null);
-    setOpenCreationId(preview.draftId);
+    if (reopenCreationAfterEditRef.current) setOpenCreationId(preview.draftId);
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
@@ -3450,22 +3538,8 @@ export function ChatView({
     );
     if (planIndex < 0) return;
 
-    let targetIndex = timeline.findIndex(
-      (entry, index) =>
-        index > planIndex &&
-        entry.kind === "message" &&
-        entry.role === "assistant"
-    );
-    if (targetIndex < 0) {
-      for (let index = planIndex - 1; index >= 0; index -= 1) {
-        const entry = timeline[index];
-        if (entry.kind === "message" && entry.role === "assistant") {
-          targetIndex = index;
-          break;
-        }
-      }
-    }
-    if (targetIndex < 0) return;
+    // The card itself: it is drawn in the conversation, under its answer.
+    const targetIndex = planIndex;
 
     const transcript = scrollRef.current;
     const target = transcript?.querySelector<HTMLElement>(
@@ -4134,6 +4208,50 @@ function AnalysisSilentChip({
   );
 }
 
+  /* The running turn's bubble sits where the turn began, above the cards it
+     produces as it runs, so its answer reads before them — as it will once
+     settled (`settleTurnEntries`). One array with keys, so nothing remounts. */
+  const streamingRow = streaming ? (
+    <div key="streaming-turn" className="chat-row chat-row-assistant">
+      <div className="chat-avatar chat-avatar-assistant">
+        <Sparkles size={16} aria-hidden="true" />
+      </div>
+      <div className="chat-bubble chat-bubble-streaming">
+        {streamingText ? (
+          <>
+            {thinkingText ? (
+              <ThinkingDisclosure content={thinkingText} live />
+            ) : null}
+            <AssistantMarkdown content={streamingText} streaming />
+          </>
+        ) : (
+          <div className="chat-stream-pending">
+            {activeTool || !thinkingText ? (
+              <span className="chat-stream-status">
+                {compacting
+                  ? "Compacting the conversation…"
+                  : activeTool
+                    ? `Using ${activeTool.replace(/_/g, " ")}…`
+                    : resumedCoachPromptRef.current
+                      ? "Resuming plan…"
+                      : "Working on it…"}
+              </span>
+            ) : null}
+            {thinkingText ? (
+              <ThinkingDisclosure content={thinkingText} live />
+            ) : null}
+          </div>
+        )}
+        {currentSource ? <SourceBadge source={currentSource} /> : null}
+      </div>
+    </div>
+  ) : null;
+  const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
+    if (!streamingRow) return rows;
+    const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
+    return [...rows.slice(0, at), streamingRow, ...rows.slice(at)];
+  };
+
   return (
     <div className="chat-view">
       <div className="chat-header">
@@ -4234,7 +4352,7 @@ function AnalysisSilentChip({
             </div>
           ) : null}
 
-          {timeline.map((entry, index) => {
+          {withStreamingRow(timeline.map((entry, index) => {
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
@@ -4289,13 +4407,46 @@ function AnalysisSilentChip({
               if (entry.draft.removedAt) {
                 return null;
               }
-              // Creations are read from the panel and the popup it opens, at
-              // every window width. There used to be a second copy of the card
-              // inline here for windows too narrow to hold the panel, and the
-              // width test that chose between them also decided whether the
-              // header's Creations button existed — so narrowing the window
-              // took the button away and left the panel with no way back.
-              return null;
+              const draft = entry.draft;
+              const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
+              // One copy at every window width, and nothing measured: the
+              // copy that used to live here was chosen by a width test, and
+              // that test also decided whether the Creations button existed.
+              return (
+                <div
+                  key={`${draft.draftId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachCreationCard
+                      draft={draft}
+                      document={planDocuments[documentKey] ?? undefined}
+                      uploading={uploadingDraftId === draft.draftId}
+                      uploaded={uploadedPlans[draft.draftId]}
+                      onUpload={(destination, scheduleDate) =>
+                        void handleUploadPlanDraft(draft.draftId, destination, scheduleDate)
+                      }
+                      onEdit={
+                        api && draft.artifactType !== "workout"
+                          ? () => {
+                              onError(null);
+                              reopenCreationAfterEditRef.current = false;
+                              setEditingPlanDraftId(draft.draftId);
+                            }
+                          : undefined
+                      }
+                      onOpen={() => {
+                        setSelectedPlanDraftId(draft.draftId);
+                        setOpenCreationId(draft.draftId);
+                      }}
+                    />
+                  </div>
+                </div>
+              );
             }
 
             if (entry.kind === "workoutDelete") {
@@ -4449,43 +4600,7 @@ function AnalysisSilentChip({
                 </div>
               </ChatRow>
             );
-          })}
-
-          {streaming ? (
-            <div className="chat-row chat-row-assistant">
-              <div className="chat-avatar chat-avatar-assistant">
-                <Sparkles size={16} aria-hidden="true" />
-              </div>
-              <div className="chat-bubble chat-bubble-streaming">
-                {streamingText ? (
-                  <>
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                    <AssistantMarkdown content={streamingText} streaming />
-                  </>
-                ) : (
-                  <div className="chat-stream-pending">
-                    {activeTool || !thinkingText ? (
-                      <span className="chat-stream-status">
-                        {compacting
-                          ? "Compacting the conversation…"
-                          : activeTool
-                            ? `Using ${activeTool.replace(/_/g, " ")}…`
-                            : resumedCoachPromptRef.current
-                              ? "Resuming plan…"
-                              : "Working on it…"}
-                      </span>
-                    ) : null}
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                  </div>
-                )}
-                {currentSource ? <SourceBadge source={currentSource} /> : null}
-              </div>
-            </div>
-          ) : null}
+          }))}
 
           {/* Same avatar and bubble as the persisted answer this becomes, so
               the reload at the end of the run does not make the row jump. */}
@@ -4660,6 +4775,10 @@ function AnalysisSilentChip({
           <CoachDraftPreviewCard
             key={openCreation.draftId}
             draft={openCreation}
+            document={
+              planDocuments[`${openCreation.draftId}:${openCreation.editedAt ?? 0}`] ??
+              undefined
+            }
             uploading={uploadingDraftId === openCreation.draftId}
             uploaded={uploadedPlans[openCreation.draftId]}
             onUpload={(destination, scheduleDate) =>
@@ -4677,6 +4796,7 @@ function AnalysisSilentChip({
                        layer — and comes back when the editor closes. */
                     onError(null);
                     setOpenCreationId(null);
+                    reopenCreationAfterEditRef.current = true;
                     setEditingPlanDraftId(openCreation.draftId);
                   }
                 : undefined
@@ -4691,7 +4811,9 @@ function AnalysisSilentChip({
             draftId={editingPlanDraftId}
             onSaved={handlePlanDraftEdited}
             onClose={() => {
-              setOpenCreationId(editingPlanDraftId);
+              if (reopenCreationAfterEditRef.current) {
+                setOpenCreationId(editingPlanDraftId);
+              }
               setEditingPlanDraftId(null);
             }}
             onError={onError}
