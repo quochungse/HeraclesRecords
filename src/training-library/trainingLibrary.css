@@ -30,9 +30,13 @@
  * to <body> to clear the shell's stacking context and so outside the view
  * entirely. An undeclared `--tl-*` deletes the declaration that reads it, so
  * an editor without these came out with no dashed day wells and no rules.
+ * `.tl-dialog-backdrop` carries them too: ConfirmDialog is also drawn by the
+ * Calendar, portalled to <body>, where its scrim read `--tl-scrim` from nothing
+ * and the question sat over an undimmed screen.
  */
 .training-library-view,
-.tl-plan-modal-backdrop {
+.tl-plan-modal-backdrop,
+.tl-dialog-backdrop {
   /*
    * Hairlines derive from the text colour rather than --glass-border, which is
    * a 0.1-alpha dark on the paper theme and disappears against a white panel.
@@ -104,7 +108,7 @@
  * sits in, so the editor came out with no dashed day wells, no tile ground and
  * no rules at all.
  */
-:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop) {
+:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
   color-scheme: dark;
 
   --tl-ground: #16171b;
@@ -148,7 +152,7 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop) {
+:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
   color-scheme: light;
 
   --tl-ground: #e6eaf1;

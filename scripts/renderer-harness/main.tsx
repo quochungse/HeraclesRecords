@@ -40,6 +40,7 @@ import { TrainingLibraryView } from "../../src/training-library/TrainingLibraryV
 import { TrainingPlanGenerator } from "../../src/training-library/TrainingPlanGenerator";
 import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
+import { CalendarView } from "../../src/calendar/CalendarView";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -477,6 +478,24 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         danger={(options.danger as boolean | undefined) ?? false}
         onConfirm={spy("onConfirm")}
         onCancel={spy("onCancel")}
+      />
+    );
+  },
+  /** The whole screen, signed in. Its removal questions portal to
+      `document.body`, so the driver finds them there. */
+  CalendarView: () => {
+    loadLibraryStyles();
+    return (
+      <CalendarView
+        api={api}
+        status={{ authenticated: true } as never}
+        sportTypes={[]}
+        refreshToken={0}
+        onMessage={spy("onMessage")}
+        onError={spy("onError")}
+        onOpenTraining={spy("onOpenTraining")}
+        onOpenCoach={spy("onOpenCoach")}
+        onScheduleChanged={spy("onScheduleChanged")}
       />
     );
   },

@@ -42,6 +42,7 @@
     "test:selection-preferences": "node --experimental-strip-types scripts/test-selection-preferences.mjs",
     "test:calendar-drag": "node --experimental-strip-types scripts/test-calendar-drag.mjs",
     "test:calendar-pairing": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-calendar-pairing.mjs",
+    "test:calendar-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-calendar-renderer.mjs",
     "test:scheduled-structure": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-scheduled-structure.mjs",
     "test:rpe-load": "node --experimental-strip-types scripts/test-rpe-load.mjs",
     "test:mcp-oauth-compatibility": "node --experimental-strip-types scripts/test-mcp-oauth-compatibility.mjs",

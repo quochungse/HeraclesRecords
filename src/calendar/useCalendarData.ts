@@ -20,6 +20,12 @@ import {
 import { scheduledWorkoutKey } from "./calendarTypes";
 
 interface CalendarRangeData {
+  /**
+   * The range this was read for. Paging to a range with nothing cached keeps
+   * the previous range's data on screen until the new one lands, so "is there
+   * data" is not the same question as "has the range on screen been read".
+   */
+  rangeKey: string;
   scheduled: TrainingHubScheduledWorkoutEntry[];
   activities: TrainingHubActivity[];
   /**
@@ -151,6 +157,7 @@ export function useCalendarData({
           }
         }
         const next: CalendarRangeData = {
+          rangeKey,
           scheduled,
           activities,
           overrides,
@@ -292,5 +299,14 @@ export function useCalendarData({
     });
   }, [data, weekKeys, isInMonth, todayKey, unitSystem]);
 
-  return { weeks, loading, error, reload, applyOptimisticMove, todayKey };
+  /*
+   * Whether the range on screen has been read at least once. `loading` cannot
+   * answer that: it is false for the renders before the effect that raises it,
+   * and it goes up again on every reload of a range already on screen. An
+   * empty week may only say so once this is true — before that, "nothing
+   * planned" is a statement about a request that has not come back.
+   */
+  const rangeLoaded = data?.rangeKey === rangeKey;
+
+  return { weeks, loading, rangeLoaded, error, reload, applyOptimisticMove, todayKey };
 }

@@ -23008,8 +23008,7 @@ tr.data-intervals-row-missing {
   color: var(--error-text);
 }
 
-.calendar-view .calendar-selection-delete:hover:not(:disabled),
-.calendar-view .calendar-selection-delete.is-armed {
+.calendar-view .calendar-selection-delete:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--error-text) 55%, transparent);
   background: var(--error-bg);
   color: var(--error-text);
@@ -23017,9 +23016,11 @@ tr.data-intervals-row-missing {
 
 /* --- grid --- */
 
+/* As tall as its weeks, shrinking (and scrolling its body) only when they do
+   not fit — `flex: 1` stretched the panel past the last row. */
 .calendar-grid {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   flex-direction: column;
   min-height: 0;
   border: 1px solid var(--surface-line, var(--glass-border));
@@ -23535,12 +23536,6 @@ tr.data-intervals-row-missing {
   gap: 6px;
   color: var(--text-muted);
   font-size: 12px;
-}
-
-.calendar-detail-panel .calendar-detail-delete.is-armed {
-  border-color: color-mix(in srgb, var(--error-text) 55%, transparent);
-  background: var(--error-bg);
-  color: var(--error-text);
 }
 
 .calendar-detail-body {

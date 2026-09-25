@@ -18,6 +18,8 @@ interface CalendarGridProps {
   weeks: CalendarWeek[];
   mode: CalendarMode;
   loading: boolean;
+  /** Whether the range on screen has been read at least once. */
+  rangeLoaded: boolean;
   busy: boolean;
   selectionMode: boolean;
   selectedWorkoutKeys: ReadonlySet<string>;
@@ -33,6 +35,7 @@ export function CalendarGrid({
   weeks,
   mode,
   loading,
+  rangeLoaded,
   busy,
   selectionMode,
   selectedWorkoutKeys,
@@ -133,6 +136,7 @@ export function CalendarGrid({
               ))}
               <WeekStatsCell
                 stats={week.stats}
+                loaded={rangeLoaded}
                 onAskCoach={() => onAskCoachWeek(week)}
               />
             </div>
