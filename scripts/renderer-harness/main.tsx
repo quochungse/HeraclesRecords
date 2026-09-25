@@ -29,6 +29,8 @@ import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { RunningView } from "../../src/running/RunningView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
+import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
+import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -225,12 +227,38 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       </main>
     );
   },
-  /*
-   * The summary strip on its own, inside the class that scopes its tokens.
-   * Everything asserted about it is geometry — a tooltip that must not leave
-   * the bar, a bar that must not move what is under it — so it is mounted at a
-   * stated width rather than the window's.
-   */
+  /** The whole Create-workout dialog, portal and all. Mounted for the narrow
+      layout, which is a single scrolling column and has twice grown an overlap
+      the wide one cannot have. */
+  AddWorkoutModal: (options) => {
+    loadAppStyles();
+    return (
+      <AddWorkoutModal
+        api={api}
+        dateKey={(options.dateKey as string | undefined) ?? "20991231"}
+        sportTypes={(options.sportTypes as never) ?? []}
+        libraryOnly={(options.libraryOnly as boolean | undefined) ?? true}
+        onClose={spy("onClose")}
+        onScheduled={spy("onScheduled")}
+        onError={spy("onError")}
+      />
+    );
+  },
+  /** The exercise library screen. It portals to `document.body`, so nothing
+      here wraps it — the driver measures it where it lands. */
+  ExercisePickerDialog: (options) => {
+    loadAppStyles();
+    return (
+      <ExercisePickerDialog
+        title={(options.title as string | undefined) ?? "Exercise"}
+        options={(options.options as never) ?? []}
+        selectedId={options.selectedId as string | undefined}
+        loading={(options.loading as boolean | undefined) ?? false}
+        onPick={spy("onPick")}
+        onClose={spy("onClose")}
+      />
+    );
+  },
   ActivitiesSummary: (options) => {
     loadActivitiesStyles();
     return (

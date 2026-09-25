@@ -116,6 +116,11 @@ const EXEMPT = [
     why: "A table's sort header: pressed means 'sorted by this column', which is not a choice between options."
   },
   {
+    file: "src/calendar/ExercisePickerDialog.tsx",
+    marker: "exercise-picker-facet",
+    why: "The exercise library's value column: a scrolling column of up to sixteen muscles, each a picture of where it sits on the body, its anatomical name and how many movements are filed under it. A chip row holds none of that, and the picture is the point — it is what makes the column readable without knowing the words."
+  },
+  {
     file: "src/training-library/WorkoutWorkspace.tsx",
     marker: "tl-sortable",
     why: "Same control as above, on the workout table."

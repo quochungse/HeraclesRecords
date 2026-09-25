@@ -23442,7 +23442,8 @@ tr.data-intervals-row-missing {
 
 .calendar-view .ghost-button,
 .calendar-detail-panel .ghost-button,
-.calendar-modal .ghost-button {
+.calendar-modal .ghost-button,
+.workout-editor-modal .ghost-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -23458,14 +23459,16 @@ tr.data-intervals-row-missing {
 
 .calendar-view .ghost-button:hover:not(:disabled),
 .calendar-detail-panel .ghost-button:hover:not(:disabled),
-.calendar-modal .ghost-button:hover:not(:disabled) {
+.calendar-modal .ghost-button:hover:not(:disabled),
+.workout-editor-modal .ghost-button:hover:not(:disabled) {
   color: var(--text-primary);
   background: var(--glass-bg-hover);
 }
 
 .calendar-view .ghost-button:disabled,
 .calendar-detail-panel .ghost-button:disabled,
-.calendar-modal .ghost-button:disabled {
+.calendar-modal .ghost-button:disabled,
+.workout-editor-modal .ghost-button:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -23583,6 +23586,42 @@ tr.data-intervals-row-missing {
   box-shadow: var(--shadow-inset);
 }
 
+/*
+ * The workout's own name, where a surface has no title bar to carry it. The
+ * sport steps down to the context line beneath, which is the order a reader
+ * wants when the pane is the whole answer rather than the body of a dialog
+ * that has already said what it is showing.
+ */
+.sched-hero-name {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.sched-hero-context b {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/*
+ * The hero's top-right corner. It is the corner rather than the title's own
+ * line because what goes here acts on the whole workout — a favourite toggle —
+ * and a control tucked in beside the name both read as part of the title and
+ * took the width the name needed to wrap in.
+ */
+.sched-hero-aside {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .sched-hero-top {
   display: flex;
   align-items: center;
@@ -23637,6 +23676,10 @@ tr.data-intervals-row-missing {
 
 .sched-hero-context {
   display: inline-flex;
+  min-width: 0;
+  /* A caller can hang its own things off this line — the library reader puts
+     the workout's tags here — so it wraps rather than overflowing the hero. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
   color: var(--text-muted);
@@ -24216,7 +24259,6 @@ tr.data-intervals-row-missing {
 .calendar-builder-settings,
 .calendar-builder-canvas {
   display: flex;
-  min-height: 0;
   flex-direction: column;
 }
 
@@ -24224,6 +24266,45 @@ tr.data-intervals-row-missing {
 .calendar-builder-settings,
 .calendar-builder-canvas {
   gap: 14px;
+}
+
+/* On a narrow window the builder is one scrolling column, and nothing in it
+   may be shorter than what it holds.
+   `min-height: 0` used to sit on all three of these at the base level, for the
+   wide layout — where each of them owns a scroller and has to be allowed to be
+   shorter than its content. Down here nothing scrolls but the body itself, so
+   the same declaration let the settings column be given a share of the height
+   rather than its own: the Description textarea kept its `min-height`, its
+   column did not, and the workout steps drew over the overflow. Stating the
+   flex here as well as the min-height is belt and braces — a flex item's
+   automatic minimum is what stops the shrink, and an `auto` basis is what makes
+   it the right size to begin with. */
+.calendar-builder-workspace > *,
+.calendar-builder-canvas > * {
+  min-height: auto;
+  flex: 0 0 auto;
+}
+
+/* The footer is the one thing under the scroller that keeps its own height —
+   it is `position: sticky`, so a squeezed one takes the save button with it.
+   Stated at the same weight the wide layout states it, so its `min-height`
+   there is not reached over. */
+.calendar-builder-footer {
+  flex: 0 0 auto;
+}
+
+/* A settings field keeps its own height.
+   `.calendar-field` is `flex: 1`, which is right in a row — every field takes
+   an equal share of the width. Stacked in the settings column it means
+   `flex-basis: 0` down the *block* axis, so each field is given an equal share
+   of whatever height is left and shrinks below its content. On a narrow window
+   that is exactly what happened to Description: the textarea keeps its
+   `min-height`, its label box does not, and the overflow drew over the workout
+   steps below it. The wide layout had this rule inside its own media query;
+   the narrow one is where it was needed. */
+.calendar-builder-settings > .calendar-field,
+.calendar-builder-settings > .calendar-field-row {
+  flex: 0 0 auto;
 }
 
 .calendar-builder-settings-copy h4,
@@ -24297,6 +24378,12 @@ tr.data-intervals-row-missing {
   font-size: 18px;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+}
+
+/* Alone in the header, with no date line above it to sit under. */
+.calendar-modal-header h3.is-library {
+  margin-top: 0;
+  color: var(--accent-strong);
 }
 
 .calendar-modal-date {
@@ -24931,13 +25018,71 @@ tr.data-intervals-row-missing {
   background: linear-gradient(to bottom, transparent, var(--bg-base) 18px);
 }
 
+/* The builder's footer is sticky on a narrow window — it is inside the body's
+   own scroller — so it keeps `.calendar-modal-footer`'s ground. It said
+   `background: none`, which is right in the wide layout, where the footer is
+   static and separated by a rule: here it made the totals and the save button
+   transparent, with the step rows scrolling visibly through them. */
 .calendar-builder-footer {
   justify-content: space-between;
-  background: none;
 }
 
 .calendar-builder-footer .calendar-check {
   margin-right: auto;
+}
+
+/* ---- the builder in its own dialog (`WorkoutBuilderModal`) ----
+   The same frame as Create workout; what follows is only what that frame
+   never had to draw: sitting over the plan editor, a sport that is stated
+   rather than offered, a step kept as COROS has it, and a load. */
+
+/* The plan editor shares the calendar modal's band (70), and this opens
+   over it. */
+.calendar-modal-backdrop.is-stacked {
+  z-index: 80;
+}
+
+/* Why Save is off, where the "Also save to library" check sits in Create. */
+.calendar-builder-footer .workout-builder-problem {
+  margin: 0 auto 0 0;
+}
+
+/* The chosen sport, where the picker would be: the value itself, in ink. */
+.calendar-builder-sport-value {
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.workout-builder-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.workout-builder-state.is-error {
+  color: var(--error-text);
+}
+
+.workout-builder-state strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* A step the builder cannot represent: drawn, moved and deletable, never
+   opened. Its toggle is disabled, so it stops reading as a button. */
+.calendar-builder-row.is-locked,
+.calendar-builder-repeat-child.is-locked {
+  border-style: dashed;
+}
+
+.calendar-builder-row-toggle:disabled,
+.calendar-builder-repeat-child-toggle:disabled {
+  cursor: default;
 }
 
 .calendar-library-list {
@@ -25373,6 +25518,35 @@ tr.data-intervals-row-missing {
   grid-column: 1 / -1;
 }
 
+/* A pace band is two clock fields and the dash between them. They keep their
+   own width — a pace is four or five characters and never more — rather than
+   filling the row, which would make two small numbers look like two text
+   fields. */
+/* Beside the intensity picker, not under it. A pace band is two small
+   figures; giving it a row of its own left the row holding the picker
+   half empty and pushed the band away from the control that chose it. */
+.pace-range-control {
+  grid-column: span 2;
+}
+
+.pace-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-builder-control .pace-range .clock-field {
+  width: 5.2em;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.pace-range-separator {
+  color: var(--text-muted);
+  user-select: none;
+}
+
 .calendar-builder-control > span:first-child {
   min-height: 15px;
   color: var(--text-secondary);
@@ -25430,14 +25604,27 @@ tr.data-intervals-row-missing {
   grid-column: 1 / -1;
 }
 
-.calendar-builder-derived:empty {
-  display: none;
+/* The derived line keeps its box whether or not it has anything to say.
+   It used to be `display: none` while empty, so the box appeared the moment
+   COROS answered with the athlete's thresholds — a round trip after the form
+   is already on screen — and everything below it dropped 34px. The height is
+   held by a non-breaking space rather than a measured number, so it stays
+   right if the hint's type ever changes. */
+.calendar-builder-derived {
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.calendar-builder-derived:empty::before {
+  content: "\00a0";
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .calendar-builder-derived:not(:empty) {
-  padding: 8px 11px;
-  border: 1px solid color-mix(in srgb, var(--builder-sport, var(--accent)) 26%, transparent);
-  border-radius: var(--radius-sm);
+  border-color: color-mix(in srgb, var(--builder-sport, var(--accent)) 26%, transparent);
   background: color-mix(in srgb, var(--builder-sport, var(--accent)) 7%, transparent);
 }
 
@@ -25706,6 +25893,7 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-repeat-child-summary {
+  margin-left: auto;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 11px;
@@ -25713,8 +25901,8 @@ tr.data-intervals-row-missing {
   white-space: nowrap;
 }
 
+/* The chevron follows the name; the summary is what takes the free space. */
 .calendar-builder-repeat-child-toggle > svg {
-  margin-left: auto;
   flex: 0 0 auto;
   color: var(--text-muted);
   transition: transform var(--dur-base) var(--ease), color var(--dur-fast) var(--ease);
@@ -25946,12 +26134,16 @@ tr.data-intervals-row-missing {
 
 /* --- quick-add step bar --- */
 
+/* The add bar is two centred lines: what the control does, then the block
+   kinds it offers. Side by side the label read as a prefix to the first chip
+   and the row drifted left of the steps it appends to. */
 .calendar-builder-add-bar {
   display: flex;
+  flex-direction: column;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 10px;
-  padding: 9px 10px;
+  gap: 10px;
+  padding: 13px 12px;
   border: 1px dashed color-mix(in srgb, var(--glass-border) 95%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass-bg) 45%, transparent);
@@ -25967,10 +26159,11 @@ tr.data-intervals-row-missing {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 6px;
   padding: 0 2px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -25978,23 +26171,24 @@ tr.data-intervals-row-missing {
 
 .calendar-builder-add-chips {
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
 }
 
 .calendar-builder-add-chip {
   --chip: var(--builder-sport, var(--accent));
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 5px 11px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 14px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -26308,6 +26502,14 @@ tr.data-intervals-row-missing {
     overflow: hidden;
   }
 
+  /* Two columns that each own a scroller, so each has to be allowed to be
+     shorter than what it holds. The narrow layout above is the opposite. */
+  .calendar-builder-workspace,
+  .calendar-builder-settings,
+  .calendar-builder-canvas {
+    min-height: 0;
+  }
+
   .calendar-modal-builder {
     background:
       radial-gradient(circle at 86% -6%, color-mix(in srgb, var(--builder-sport, var(--accent)) 15%, transparent), transparent 36%),
@@ -26337,9 +26539,6 @@ tr.data-intervals-row-missing {
     overflow-y: auto;
     gap: 16px;
     padding: 4px 22px 8px 0;
-  }
-  .calendar-builder-settings .calendar-field {
-    flex: 0 0 auto;
   }
 
   .calendar-builder-settings .calendar-field > span:first-child {
@@ -26609,179 +26808,540 @@ tr.data-intervals-row-missing {
   min-width: 0;
 }
 
-.exercise-combobox-input {
+/* The field is a button and is drawn as one.
+   Its first version kept the old shell — a magnifier, a caret and a divider
+   down the right edge — which is the vocabulary of a box you type into and a
+   menu that drops out of it, so it read as a search field that had stopped
+   taking text. What is left is a plate, a name and the word for what pressing
+   it does. */
+.exercise-choice {
   display: flex;
-  align-items: center;
-  min-height: 40px;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-muted);
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-}
-
-.exercise-combobox-input:hover {
-  border-color: color-mix(in srgb, var(--text-primary) 22%, var(--glass-border));
-  background: var(--glass-bg-hover);
-}
-
-.exercise-combobox-input.is-open,
-.exercise-combobox-input:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 72%, var(--glass-border));
-  background: var(--glass-bg-hover);
-}
-
-.calendar-builder-row .exercise-combobox-input > svg,
-.workout-step-card .exercise-combobox-input > svg {
-  flex: 0 0 auto;
-  margin-left: 11px;
-}
-
-.exercise-combobox-input-thumbnail {
-  width: 34px;
-  height: 22px;
-  flex: 0 0 34px;
-  margin-left: 7px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xs);
-  background: rgba(255, 255, 255, 0.04);
-  object-fit: cover;
-}
-
-.calendar-builder-row .exercise-combobox-input input,
-.workout-step-card .exercise-combobox-input input {
   width: 100%;
-  min-height: 38px;
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.exercise-combobox-input > button {
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  flex: 0 0 40px;
-  border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--glass-border) 70%, transparent);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.exercise-combobox-input > button:hover:not(:disabled) {
-  background: var(--glass-bg-hover);
+  align-items: center;
+  gap: 11px;
+  min-height: 52px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass-bg) 74%, transparent);
+  padding: 7px 11px 7px 8px;
   color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
-.exercise-combobox-input > button:disabled {
+/* Nothing chosen yet is an invitation, so the edge is drawn rather than filled. */
+.exercise-choice.is-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.exercise-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--glass-border));
+  background: var(--glass-bg-hover);
+}
+
+.exercise-choice:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.exercise-combobox-input > button svg {
-  transition: transform var(--dur-base) var(--ease);
-}
-
-.exercise-combobox-input > button svg.is-open {
-  transform: rotate(180deg);
-}
-
-.exercise-combobox-menu {
-  position: fixed;
-  z-index: 120;
-  display: grid;
-  gap: 2px;
-  padding: 6px;
-  overflow-y: auto;
-  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.15));
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, rgba(29, 32, 37, 0.98), rgba(15, 17, 21, 0.98));
-  box-shadow:
-    var(--glass-inset), var(--shadow-elevated);
-  scrollbar-color: var(--glass-border) transparent;
-}
-
-.exercise-combobox-menu [role="listbox"] {
-  display: grid;
-  gap: 2px;
-}
-
-.exercise-combobox-menu [role="listbox"] > button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  min-height: 42px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  padding: 8px 10px;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-.exercise-combobox-menu [role="listbox"] > button:hover,
-.exercise-combobox-menu [role="listbox"] > button.is-active {
-  background: rgba(255, 255, 255, 0.075);
-  outline: none;
-}
-
-.exercise-combobox-menu [role="listbox"] > button:focus-visible {
-  background: rgba(255, 255, 255, 0.075);
+.exercise-choice:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
-.exercise-combobox-menu [role="listbox"] > button.is-selected {
-  background: rgba(255, 255, 255, 0.095);
-  color: var(--text-primary);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 72%, transparent);
-}
-
-.exercise-combobox-menu [role="listbox"] > button > svg {
-  flex: 0 0 auto;
-  color: var(--accent);
-}
-
-.exercise-combobox-option-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.exercise-combobox-option-main > img {
-  width: 48px;
-  height: 27px;
-  flex: 0 0 48px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-xs);
-  background: rgba(255, 255, 255, 0.035);
-  object-fit: cover;
-}
-
-.exercise-combobox-option-main > span {
+/* COROS films on a white cyclorama, so the still meets its own ground. */
+.exercise-choice-art {
+  display: grid;
+  width: 56px;
+  height: 36px;
+  flex: 0 0 56px;
+  place-items: center;
   overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #ffffff 80%, var(--bg-base));
+  color: color-mix(in srgb, var(--text-primary) 45%, var(--bg-base));
+}
+
+.exercise-choice.is-empty .exercise-choice-art {
+  background: var(--glass-bg-hover);
+  color: var(--text-muted);
+}
+
+.exercise-choice-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.exercise-choice-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.exercise-combobox-state {
+.exercise-choice.is-empty .exercise-choice-name {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.exercise-choice-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  padding: 4px 8px 4px 10px;
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.exercise-choice:hover:not(:disabled) .exercise-choice-action {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+/* --- the exercise library screen --- */
+
+.exercise-picker-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.52);
+  padding: 24px;
+}
+
+.exercise-picker {
+  display: flex;
+  width: min(1080px, 100%);
+  height: min(720px, calc(100dvh - 48px));
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  background: var(--bg-base);
+}
+
+.exercise-picker-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px 20px 14px;
+}
+
+.exercise-picker-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.exercise-picker-heading p {
   margin: 0;
-  padding: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.exercise-picker-heading h3 {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.exercise-picker-search {
+  display: flex;
+  width: min(320px, 100%);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  padding: 0 11px;
+  color: var(--text-muted);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.exercise-picker-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--glass-border));
+  background: var(--glass-bg-hover);
+}
+
+.exercise-picker-search input {
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+/* The close button is a plain square of its own rather than a `ghost-button`,
+   which is sized for a word and left an icon floating in a wide pill. */
+.exercise-picker-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.exercise-picker-close:hover {
+  border-color: color-mix(in srgb, var(--error-text) 42%, var(--glass-border));
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+  color: var(--error-text);
+}
+
+.exercise-picker-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.exercise-picker-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 20px 14px;
+}
+
+.exercise-picker-count {
+  margin-left: auto;
   color: var(--text-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.exercise-picker-body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 232px minmax(0, 1fr);
+  border-top: 1px solid var(--glass-border);
+}
+
+/* All has nothing to narrow by, so the column is not drawn empty. */
+.exercise-picker-body.is-unfiltered {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.exercise-picker-facets {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  border-right: 1px solid var(--glass-border);
+  padding: 12px;
+  scrollbar-width: thin;
+}
+
+.exercise-picker-facet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 6px 9px;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.exercise-picker-facet:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.exercise-picker-facet[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.exercise-picker-facet:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The figure is half as wide as it is tall, so the slot is a portrait one.
+   It is 60px rather than the 44 it started at because a bicep on a 44px body
+   is two pixels: measured against the rendered figure, 44 lost the arms and
+   the neck entirely while the trunk muscles still read. */
+.exercise-picker-facet-art {
+  display: grid;
+  width: 32px;
+  height: 60px;
+  flex: 0 0 32px;
+  place-items: center;
+}
+
+.exercise-picker-facet-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: inherit;
+}
+
+/* The silhouette, with the chosen muscles lit on top of it. */
+.exercise-body-glyph-figure {
+  fill: color-mix(in srgb, var(--text-primary) 15%, transparent);
+}
+
+.exercise-body-glyph-lit {
+  fill: var(--accent);
+}
+
+.exercise-picker-facet[aria-pressed="true"] .exercise-body-glyph-figure {
+  fill: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.exercise-picker-facet-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.exercise-picker-facet-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exercise-picker-facet-copy small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exercise-picker-facet-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.exercise-picker-facet[aria-pressed="true"] .exercise-picker-facet-count {
+  color: var(--accent-strong);
+}
+
+.exercise-picker-results {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  scrollbar-width: thin;
+}
+
+.exercise-picker-grid {
+  display: grid;
+  margin: 0;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  padding: 0;
+  list-style: none;
+}
+
+.exercise-picker-card {
+  position: relative;
+  min-width: 0;
+}
+
+.exercise-picker-card-pick {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+  padding: 8px;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
+}
+
+.exercise-picker-card-pick:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--glass-border));
+  background: var(--glass-bg-hover);
+  transform: translateY(-1px);
+}
+
+.exercise-picker-card-pick[aria-current="true"] {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--glass-border));
+  background: var(--accent-soft);
+}
+
+.exercise-picker-card-pick:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* COROS films the clips on a white cyclorama, so the plate is light in both
+   themes — the still meets its own background rather than a letterbox. */
+.exercise-picker-card-media {
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #ffffff 82%, var(--bg-base));
+}
+
+.exercise-picker-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.exercise-picker-card-name {
+  overflow: hidden;
+  padding: 0 2px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.exercise-picker-card-play {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 18, 22, 0.66);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
+}
+
+.exercise-picker-card-play:hover {
+  background: var(--accent);
+  transform: scale(1.06);
+}
+
+.exercise-picker-card-play:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.exercise-picker-empty {
+  margin: 0;
+  padding: 16px 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.exercise-picker-clip-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 24px;
+}
+
+.exercise-picker-clip {
+  display: flex;
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+.exercise-picker-clip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exercise-picker-clip-header h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.exercise-picker-clip-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .exercise-picker-body {
+    grid-template-columns: 158px minmax(0, 1fr);
+  }
+
+  .exercise-picker-facet-copy small {
+    display: none;
+  }
+
+  .exercise-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
 }
 
 .exercise-combobox.has-inline-video {
@@ -27061,20 +27621,6 @@ tr.data-intervals-row-missing {
     grid-row: 4;
   }
 
-  .calendar-builder-row .exercise-combobox.has-inline-video .exercise-combobox-input {
-    min-height: 46px;
-  }
-
-  .calendar-builder-row .exercise-combobox.has-inline-video .exercise-combobox-input input {
-    min-height: 44px;
-  }
-
-  .calendar-builder-row .exercise-combobox.has-inline-video .exercise-combobox-input-thumbnail {
-    width: 48px;
-    height: 30px;
-    flex-basis: 48px;
-  }
-
   .calendar-builder-row .exercise-combobox.has-inline-video .exercise-preview {
     align-self: start;
   }
@@ -27084,22 +27630,11 @@ tr.data-intervals-row-missing {
   }
 }
 
-:root[data-theme="paper"] .exercise-combobox-menu {
-  border-color: var(--glass-border);
+/* Paper's page is grey and its surfaces are white, so the library sheet takes
+   the raised surface rather than the page colour the dark theme is happy with. */
+:root[data-theme="paper"] .exercise-picker,
+:root[data-theme="paper"] .exercise-picker-clip {
   background: var(--glass-bg-elevated);
-  box-shadow: var(--shadow-elevated), var(--glass-inset);
-}
-
-:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:hover,
-:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-active,
-:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button.is-selected {
-  background: rgba(19, 26, 40, 0.08);
-}
-
-:root[data-theme="paper"] .exercise-combobox-menu [role="listbox"] > button:focus-visible {
-  background: rgba(19, 26, 40, 0.08);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -27182,11 +27717,6 @@ tr.data-intervals-row-missing {
   justify-content: center;
   gap: 3px;
   padding: 10px 15px 12px;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.set-line-cell:focus-within {
-  background: color-mix(in srgb, var(--step-color, var(--accent)) 10%, transparent);
 }
 
 .set-line-cell > span:first-child {
@@ -27227,14 +27757,26 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
 }
 
+/* A figure the athlete can type carries a box; one they cannot does not.
+   These were bare numerals on the strip's own ground, which read as a
+   readout — the set count and the weight are the two things on this line
+   that are actually editable. */
 .calendar-builder-row .set-line input {
-  padding: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
   font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   line-height: 1.2;
   appearance: textfield;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.calendar-builder-row .set-line input:hover {
+  background: var(--glass-bg-hover);
 }
 
 .calendar-builder-row .set-line input::-webkit-inner-spin-button,
@@ -27260,11 +27802,11 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-row .set-line-cell > input {
-  width: 2.6em;
+  width: 3.1em;
 }
 
 .calendar-builder-row .set-line-compound > input {
-  width: 3.2em;
+  width: 3.7em;
 }
 
 /* The unit and load pickers stay legible as controls: a hairline pill inside
@@ -27327,7 +27869,7 @@ tr.data-intervals-row-missing {
 }
 
 .calendar-builder-row .set-line-weight input {
-  width: 3.4em;
+  width: 3.9em;
   font-size: 22px;
 }
 
@@ -27601,13 +28143,71 @@ tr.data-intervals-row-missing {
   justify-content: flex-end;
 }
 
+/*
+ * The description, framed, with its name set into the frame. A `fieldset`
+ * because its `legend` is drawn *on* the border by the browser, which cuts the
+ * line behind the word whatever surface the box sits on — a label painted
+ * over the line would need that surface's colour, and this view sits on three.
+ */
 .workout-view-overview {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 14px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+}
+
+.workout-view-overview legend {
+  padding: 0 6px;
+  margin-left: -6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.workout-view-overview p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
 }
+
+/* The line above the title: the sport, as a tag in its own colour, then
+   where the workout sits. The sport was a locked one-option field in the form. */
+.workout-editor-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.workout-editor-sport {
+  --workout-sport: var(--sport-other);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--workout-sport) 34%, transparent);
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--workout-sport) 82%, var(--text-primary));
+  background: color-mix(in srgb, var(--workout-sport) 10%, transparent);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workout-editor-sport svg {
+  flex: none;
+  color: var(--workout-sport);
+}
+
+.workout-editor-sport.is-run { --workout-sport: var(--sport-run); }
+.workout-editor-sport.is-trail { --workout-sport: var(--sport-trail); }
+.workout-editor-sport.is-bike { --workout-sport: var(--sport-bike); }
+.workout-editor-sport.is-strength { --workout-sport: var(--sport-strength); }
 
 .workout-editor-header h2 {
   margin: 3px 0 0;
@@ -28266,7 +28866,24 @@ tr.data-intervals-row-missing {
 
 .workout-editor-confirm strong { color: var(--text-primary); font-size: 12px; }
 .workout-editor-confirm span { color: var(--text-muted); font-size: 11px; }
-.workout-editor-confirm .danger-button { padding: 7px 12px; }
+/* Discard is the delete confirmation's recipe at the size of the Keep editing
+   beside it. It was a bare `.danger-button` — a colour modifier with no size,
+   padding or radius of its own — so it drew as the platform's button. */
+.workout-editor-confirm .primary-button.danger {
+  min-height: 0;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--shadow-soft);
+}
+
+.workout-editor-confirm .primary-button.danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), var(--shadow-card);
+}
 
 .workout-editor-skeleton {
   display: grid;
@@ -28439,6 +29056,7 @@ tr.data-intervals-row-missing {
   }
 
   .calendar-builder-control.is-wide,
+  .pace-range-control,
   .calendar-builder-derived {
     grid-column: auto;
   }

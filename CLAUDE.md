@@ -82,6 +82,7 @@ npm install
 npm run rebuild          # electron-builder install-app-deps — rebuilds better-sqlite3 against Electron's ABI. Required after install.
 npm run binaries:prepare # downloads pinned yt-dlp + copies ffmpeg-static into bin/<platform>-<arch>/
 npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
+npm run body-shapes:fetch # regenerates src/calendar/bodyShapes.ts from react-native-body-highlighter (MIT). Same rule as fonts: the output is committed, the package is not a dependency, and a build never runs this.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs binaries:prepare and build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm start                # build, then run the packaged-style app
@@ -354,6 +355,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   of `resolveRunTarget` throws on a missing figure, so that is a loosening; a step that
   *names* a `target_type` and omits its figure is still half-written. A step of a repeat
   group takes the in-repeat default (one rep, and the rest between reps), whatever its kind.
+  One consequence worth knowing: `BuilderRow` holds **one** `targetValue`, not a
+  `distanceKm` and a `timeMin`. It had two fields for eight target types, so reps lived
+  in `distanceKm` and a step's repetitions read as kilometres everywhere they were
+  written.
 
 - **Training zones** (`workoutCapabilities.ts` tables, `corosWorkoutEditor.ts` parser) —
   what a zone preset in the workout builder means. Three things about COROS's own model,

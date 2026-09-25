@@ -174,16 +174,19 @@ function buildBarSegments(
   }));
 }
 
-function CardioStructure({
+/**
+ * The structure bar and its legend, shared by both halves of the split so a
+ * strength session and a run draw their shape the same way. Nothing to draw
+ * draws nothing — an empty track says less than no track.
+ */
+function StructureBar({
   view,
-  unitSystem,
-  swim
+  segments
 }: {
   view: ScheduledStructureView;
-  unitSystem: UnitSystem;
-  swim: boolean;
+  segments: BarSegment[];
 }) {
-  const segments = buildBarSegments(view, unitSystem, swim);
+  if (segments.length === 0) return null;
   const kindsPresent = KIND_ORDER.filter((kind) =>
     view.nodes.some((node) =>
       node.type === "step"
@@ -220,6 +223,22 @@ function CardioStructure({
           ))}
         </div>
       ) : null}
+    </>
+  );
+}
+
+function CardioStructure({
+  view,
+  unitSystem,
+  swim
+}: {
+  view: ScheduledStructureView;
+  unitSystem: UnitSystem;
+  swim: boolean;
+}) {
+  return (
+    <>
+      <StructureBar view={view} segments={buildBarSegments(view, unitSystem, swim)} />
       <ol className="sched-steps">
         {view.nodes.map((node) =>
           node.type === "step" ? (
@@ -329,6 +348,49 @@ export function strengthTonnage(steps: ScheduledStepView[]): number {
   );
 }
 
+/**
+ * A strength session's bar: one segment per step, sized by the work in it.
+ *
+ * A lift's target is reps or time, and most carry no distance or duration at
+ * all, so `magnitude` alone leaves the bar with nothing to size by. Each step
+ * weighs its sets times what one set asks — its seconds when it is timed, four
+ * seconds a rep otherwise, two minutes when it states neither — which is the
+ * weighting the library's list rows draw their line with, so the two agree.
+ */
+function buildStrengthBarSegments(view: ScheduledStructureView): BarSegment[] {
+  const segments: BarSegment[] = [];
+  const push = (step: ScheduledStepView, key: string, repeat?: number) => {
+    const sets = Math.max(1, step.sets ?? 1);
+    const perSet =
+      step.magnitudeType === "time" && step.magnitude
+        ? step.magnitude
+        : step.reps
+          ? step.reps * 4
+          : 120;
+    const scheme = liftSchemeLabel(step);
+    const label = [step.name, repeat && repeat > 1 ? `×${repeat}` : null, scheme]
+      .filter(Boolean)
+      .join(" · ");
+    segments.push({ key, kind: step.kind, grow: sets * perSet, label });
+  };
+
+  for (const node of view.nodes) {
+    if (node.type === "step") {
+      push(node.step, node.step.id);
+    } else {
+      for (let round = 0; round < node.repeat; round += 1) {
+        for (const step of node.steps) {
+          push(step, `${node.id}-${round}-${step.id}`, node.repeat);
+        }
+      }
+    }
+  }
+
+  const max = Math.max(0, ...segments.map((segment) => segment.grow));
+  const floor = max * 0.035;
+  return segments.map((segment) => ({ ...segment, grow: Math.max(segment.grow, floor) }));
+}
+
 function StrengthStructure({
   view,
   unitSystem,
@@ -359,6 +421,7 @@ function StrengthStructure({
           ) : null}
         </div>
       ) : null}
+      <StructureBar view={view} segments={buildStrengthBarSegments(view)} />
       <div className="sched-strength-list">
         {view.nodes.map((node) =>
           node.type === "step" ? (
