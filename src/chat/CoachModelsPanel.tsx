@@ -74,6 +74,24 @@ export interface CoachModelsSummary {
 }
 
 /**
+ * Whether each provider is usable, by the rule `summarizeCoachModels` states
+ * below. A status not read yet (`null`) counts as not ready.
+ */
+export function coachProviderReadiness(
+  chatSettings: ChatSettings,
+  authStatus: ChatAuthStatus | null,
+  claudeStatus: ClaudeCodeStatus | null
+): Record<ChatProvider, boolean> {
+  return {
+    chatgpt: authStatus?.signedIn === true,
+    "claude-code": claudeStatus?.state === "connected",
+    "claude-api": chatSettings.anthropic.hasApiKey === true,
+    openrouter: chatSettings.openRouter.hasApiKey === true,
+    local: chatSettings.local.model.trim().length > 0
+  };
+}
+
+/**
  * Which providers are actually usable, for the Connections row that opens this
  * panel. "Connected" means the credential each provider needs is in place — a
  * signed-in account, a stored key, or a chosen local model — not that a request
@@ -84,13 +102,7 @@ export function summarizeCoachModels(
   authStatus: ChatAuthStatus | null,
   claudeStatus: ClaudeCodeStatus | null
 ): CoachModelsSummary {
-  const ready: Record<ChatProvider, boolean> = {
-    chatgpt: authStatus?.signedIn === true,
-    "claude-code": claudeStatus?.state === "connected",
-    "claude-api": chatSettings.anthropic.hasApiKey === true,
-    openrouter: chatSettings.openRouter.hasApiKey === true,
-    local: chatSettings.local.model.trim().length > 0
-  };
+  const ready = coachProviderReadiness(chatSettings, authStatus, claudeStatus);
   const providers = Object.keys(ready) as ChatProvider[];
 
   return {

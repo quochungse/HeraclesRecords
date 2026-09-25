@@ -28,10 +28,30 @@ import {
   uploadPlanDraftById,
   confirmWorkoutDeleteById,
   deletePlanDraftsOf,
+  forgetGeneratedPlanDrafts,
+  generatedPlanDraft,
   planDraftDocument,
   savePlanDraftEdit,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
+import {
+  PLAN_OUTLINE_TOOL,
+  PLAN_OUTLINE_TOOL_DEFINITION,
+  generationRequestProblems,
+  parsePlanOutline,
+  planOutlineProblems,
+  trainingPlanFromDraftPreview,
+  trainingPlanGenerationPrompt,
+  toolReadsWithheldSource,
+  trainingPlanOutlinePrompt
+} from "./trainingPlanGeneration";
+import {
+  simulatePlanAi,
+  simulatedDraftArgs,
+  simulatedOutlineArgs,
+  simulatedThinking,
+  withExerciseCandidates
+} from "./trainingPlanSimulation";
 import {
   formatActivityListLine,
   formatActivitySpan,
@@ -145,6 +165,11 @@ import type {
   UploadPlanResult,
   PlanDraftPreview,
   TrainingPlanDocument,
+  TrainingPlanGenerationRequest,
+  TrainingPlanGenerationResult,
+  TrainingPlanOutline,
+  TrainingPlanOutlineResult,
+  TrainingPlanOutlineRevision,
   DeleteWorkoutResult,
   UnitSystem,
   WorkoutDeletePreview
@@ -1435,15 +1460,16 @@ export async function streamChat(
       }
 
       await ensureAllMcpConnected();
-      const chatTools = getClaudeCodeTools(
-        settings.claudeCode.permissions,
-        toolPolicy
+      const chatTools = toolsForRun(
+        requestId,
+        getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
       const { text: instructions, hasData } = await buildTrainingContext(
         settings.claudeCode.permissions,
         unitSystem,
         settings.customInstructions,
-        roleInstructions
+        roleInstructions,
+        runTools.get(requestId)?.context
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -1542,11 +1568,12 @@ export async function streamChat(
         undefined,
         unitSystem,
         settings.customInstructions,
-        roleInstructions
+        roleInstructions,
+        runTools.get(requestId)?.context
       );
 
       await ensureAllMcpConnected();
-      const chatTools = applyChatToolPolicy(getAllChatTools(), toolPolicy);
+      const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
         chatTools
@@ -1628,12 +1655,13 @@ export async function streamChat(
       }
 
       await ensureAllMcpConnected();
-      const chatTools = applyChatToolPolicy(getAllChatTools(), toolPolicy);
+      const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const { text: instructions, hasData } = await buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
-        roleInstructions
+        roleInstructions,
+        runTools.get(requestId)?.context
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -1704,7 +1732,8 @@ export async function streamChat(
         undefined,
         unitSystem,
         settings.customInstructions,
-        roleInstructions
+        roleInstructions,
+        runTools.get(requestId)?.context
       );
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
@@ -1714,11 +1743,14 @@ export async function streamChat(
       if (runtimeConfig.toolsEnabled) {
         await ensureAllMcpConnected();
       }
-      const chatTools = applyChatToolPolicy(
-        runtimeConfig.toolsEnabled
-          ? getAllChatTools()
-          : [...getChatWorkoutTools(), ...getChatInteractionTools()],
-        toolPolicy
+      const chatTools = toolsForRun(
+        requestId,
+        applyChatToolPolicy(
+          runtimeConfig.toolsEnabled
+            ? getAllChatTools()
+            : [...getChatWorkoutTools(), ...getChatInteractionTools()],
+          toolPolicy
+        )
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -1797,19 +1829,20 @@ export async function streamChat(
       undefined,
       unitSystem,
       settings.customInstructions,
-      roleInstructions
+      roleInstructions,
+      runTools.get(requestId)?.context
     );
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
     await ensureAllMcpConnected();
-    const tools = buildChatFunctionTools();
+    const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
 
     // When live tools are available, steer the model to use them rather than
     // leaning on the brief snapshot in `instructions`.
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
-      applyChatToolPolicy(getAllChatTools(), toolPolicy)
+      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy))
     );
 
     send("chat:streamStart", { requestId });
@@ -1986,6 +2019,345 @@ export async function streamChat(
   } finally {
     releaseAbort?.();
     activeStreams.delete(requestId);
+  }
+}
+
+/**
+ * What one run adds to the tools every run is offered, and what it withholds,
+ * by request id — the plan generator's outline tool, offered to the outline
+ * turn alone, and the writing tools an outline turn has no use for. Consulted
+ * where each provider's tool list is built and again in `executeChatTool`, so
+ * a withheld tool is neither offered nor answered.
+ */
+interface RunTools {
+  extra: CorosMcpTool[];
+  allow: (name: string) => boolean;
+  handle?: (name: string, args: Record<string, unknown>) => Promise<string>;
+  /** What the snapshot the turn starts from may carry; absent is everything. */
+  context?: TrainingContextScope;
+}
+const runTools = new Map<string, RunTools>();
+
+function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
+  const run = runTools.get(requestId);
+  return run ? [...tools.filter((tool) => run.allow(tool.name)), ...run.extra] : tools;
+}
+
+/**
+ * How a stream ended, as a sink hears it: `streamChat` reports an end through
+ * events and never by throwing, so a caller that needs the outcome listens.
+ */
+function watchStreamEnd(sink: ChatStreamSink): {
+  sink: ChatStreamSink;
+  heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } };
+} {
+  const heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } } = {};
+  return {
+    heard,
+    sink: {
+      emit(channel, payload) {
+        const event = payload as { finishReason?: string; fullText?: string; message?: string };
+        if (channel === "chat:streamDone") {
+          heard.end = { kind: "done", cancelled: event.finishReason === "cancelled", text: event.fullText ?? "" };
+        } else if (channel === "chat:streamError") {
+          heard.end = { kind: "error", message: event.message ?? "Training Coach stopped before it finished." };
+        }
+        sink.emit(channel, payload);
+      },
+      ...(sink.bindAbort ? { bindAbort: (controller: AbortController) => sink.bindAbort!(controller) } : {})
+    }
+  };
+}
+
+/** Tools a generation never needs: an outline turn writes nothing, and no turn writes a single workout. */
+const OUTLINE_WITHHELD_TOOLS = new Set(["draft_training_plan", "draft_workout"]);
+const SESSIONS_WITHHELD_TOOLS = new Set(["draft_workout"]);
+
+/**
+ * A generation's reach, from the tools a phase never needs and the sources
+ * the athlete withheld: a withheld source is behind no tool the turn is
+ * offered, and in no part of the snapshot it starts from.
+ */
+function generationReach(request: TrainingPlanGenerationRequest, withheldTools: ReadonlySet<string>): Pick<RunTools, "allow" | "context"> {
+  const sources = request.sources;
+  return {
+    allow: (name) => !withheldTools.has(name) && !toolReadsWithheldSource(name, sources),
+    ...(sources ? { context: { activities: sources.activities, zones: sources.zones } } : {})
+  };
+}
+
+/** What the simulated turn reads before it thinks, by the source each tool belongs to. */
+const SIMULATED_READS: readonly [tool: string, source: keyof import("./types").TrainingPlanDataSources][] = [
+  ["list_recent_activities", "activities"],
+  ["get_activity_detail", "activities"],
+  ["get_sleep_summary", "sleep"],
+  ["get_training_zones", "zones"]
+];
+
+/**
+ * A generator turn with a script in the model's place (`trainingPlanSimulation`),
+ * for `HERACLES_SIMULATE_PLAN_AI=1`. It streams as a provider does — start,
+ * thinking, the reads it announces, the text, done — and hands its arguments
+ * to the real tools through `executeChatTool`, so everything after the model
+ * runs for real. It reads nothing: the reads are announced, not made, and the
+ * first line of its thinking says the run is simulated. Cancelled through
+ * `chat:cancel` like any stream.
+ */
+async function simulatedPlanTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  kind: "outline" | "plan",
+  request: TrainingPlanGenerationRequest,
+  unitSystem: UnitSystem,
+  revision?: TrainingPlanOutlineRevision
+): Promise<void> {
+  const controller = new AbortController();
+  activeStreams.set(requestId, controller);
+  const releaseAbort = sink.bindAbort?.(controller);
+  const send = (channel: string, payload: unknown) => sink.emit(channel, payload);
+  const pause = (ms: number) =>
+    new Promise<void>((resolve, reject) => {
+      if (controller.signal.aborted) return reject(new Error("cancelled"));
+      const timer = setTimeout(resolve, ms);
+      controller.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new Error("cancelled"));
+      }, { once: true });
+    });
+  /* In small pieces, as a provider streams, so the screen's live words move. */
+  const think = async (text: string) => {
+    for (let at = 0; at < text.length; at += 14) {
+      send("chat:streamInfo", { requestId, kind: "thinking", delta: text.slice(at, at + 14) });
+      await pause(35);
+    }
+  };
+  const callTool = async (name: string, args: Record<string, unknown>) => {
+    send("chat:streamInfo", { requestId, kind: "mcp", tool: name, status: "call" });
+    await pause(600);
+    return JSON.parse(await executeChatTool(name, args, send, requestId, unitSystem, undefined, "read-only")) as {
+      ok: boolean;
+      error_code?: string;
+      errors?: string[];
+      issues?: { workout_key: string; exercise_name: string; candidates: string[] }[];
+    };
+  };
+
+  let fullText = "";
+  try {
+    send("chat:streamStart", { requestId });
+    await pause(300);
+    const [opening, ...thoughts] = simulatedThinking(kind, request);
+    await think(opening);
+    for (const [tool, source] of SIMULATED_READS) {
+      if (request.sources && !request.sources[source]) continue;
+      send("chat:streamInfo", { requestId, kind: "mcp", tool, status: "call" });
+      await pause(450);
+    }
+    for (const thought of thoughts) {
+      await think(thought);
+      await pause(250);
+    }
+
+    if (kind === "outline") {
+      const answer = await callTool(PLAN_OUTLINE_TOOL, simulatedOutlineArgs(request, revision?.note));
+      if (!answer.ok) throw new Error(`Simulated run: the outline check refused the scripted outline — ${(answer.errors ?? []).join(" ")}`);
+      fullText = "Simulated outline drawn.";
+    } else {
+      /* The first draft is a session short, so the check's hand-back shows. */
+      let args = simulatedDraftArgs(request, { flawed: true });
+      let answer = await callTool("draft_training_plan", args);
+      for (let round = 0; !answer.ok && round < 3; round += 1) {
+        if (answer.error_code === "exercise_resolution_required" && answer.issues) {
+          await think("**Matching exercises to the COROS library**\n\nSwapping each name COROS could not place for its first match.\n\n");
+          args = withExerciseCandidates(args, answer.issues);
+        } else if (answer.error_code === "plan_breaks_request" && round === 0) {
+          await think(`**Fixing what the check found**\n\n${answer.errors?.[0] ?? "A week is off."}\n\n`);
+          args = simulatedDraftArgs(request);
+        } else {
+          break;
+        }
+        answer = await callTool("draft_training_plan", args);
+      }
+      if (!answer.ok) {
+        throw new Error(
+          `Simulated run: the check refused the scripted plan — ${(answer.errors ?? answer.issues?.map((issue) => `${issue.exercise_name}: no match`) ?? []).join(" ")}`
+        );
+      }
+      fullText = "Simulated plan written to the outline.";
+    }
+    for (const word of fullText.split(/(?<= )/)) {
+      send("chat:streamToken", { requestId, delta: word });
+      await pause(30);
+    }
+    send("chat:streamDone", { requestId, fullText, finishReason: "stop" });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      send("chat:streamDone", { requestId, fullText, finishReason: "cancelled" });
+    } else {
+      send("chat:streamError", { requestId, message: error instanceof Error ? error.message : String(error) });
+    }
+  } finally {
+    releaseAbort?.();
+    activeStreams.delete(requestId);
+  }
+}
+
+/**
+ * Plan generations in flight, by request id: what the athlete asked for, which
+ * the draft tool checks every draft against, and the drafts it accepted.
+ */
+const planGenerations = new Map<
+  string,
+  { request: TrainingPlanGenerationRequest; drafts: PlanDraftPreview[] }
+>();
+
+/**
+ * The AI plan generator's one turn.
+ *
+ * It streams like a chat turn — the generator draws its progress from the
+ * same `chat:stream*` events — but it is not one, in three ways that used to
+ * rest on a sentence in the prompt:
+ *
+ * - **It runs read-only.** `chat:send` offers every tool, so a generation could
+ *   reach `upload_training_plan`, `delete_workout` and every MCP server the
+ *   athlete connected, with "never call upload_training_plan" as the only
+ *   guard. Read-only also answers `request_coach_input` with "assume and
+ *   continue"; offered interactively, it ended the turn to wait for an answer
+ *   the generator has nowhere to show, and the run failed with no plan.
+ * - **A draft that breaks the request is refused inside the turn**, with the
+ *   reasons, so the model fixes it and calls the tool again — the checks used
+ *   to run only after the turn ended, throwing away the whole plan over one
+ *   week with three sessions instead of four.
+ * - **Its drafts never reach `chat_plan_drafts`**, and are let go when it ends.
+ *
+ * Cancelled through `chat:cancel`, like any stream.
+ */
+export async function generateTrainingPlan(
+  sink: ChatStreamSink,
+  requestId: string,
+  request: TrainingPlanGenerationRequest,
+  options: { unitSystem?: UnitSystem } = {}
+): Promise<TrainingPlanGenerationResult> {
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
+
+  const run = { request, drafts: [] as PlanDraftPreview[] };
+  planGenerations.set(requestId, run);
+  runTools.set(requestId, { extra: [], ...generationReach(request, SESSIONS_WITHHELD_TOOLS) });
+  const { sink: watching, heard } = watchStreamEnd(sink);
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(watching, requestId, "plan", request, normalizeUnitSystem(options.unitSystem));
+    } else {
+      await streamChat(
+        watching,
+        requestId,
+        [{ role: "user", content: trainingPlanGenerationPrompt(request) }],
+        {
+          unitSystem: normalizeUnitSystem(options.unitSystem),
+          toolPolicy: "read-only",
+          ...(request.runtime ? { runtime: request.runtime } : {})
+        }
+      );
+    }
+    const outcome = heard.end;
+    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
+    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
+    const accepted = run.drafts.at(-1);
+    const draft = accepted ? generatedPlanDraft(accepted.draftId) : undefined;
+    if (!draft) {
+      return {
+        ok: false,
+        reason: "no-plan",
+        message: outcome.text.trim()
+          ? "Training Coach answered but never handed over a plan that fits what you asked for."
+          : "Training Coach finished without writing a plan."
+      };
+    }
+    const plan = trainingPlanFromDraftPreview(draft.preview, request, {
+      description: draft.plan.description,
+      weekStages: draft.plan.weekStages
+    });
+    return { ok: true, plan };
+  } catch (cause) {
+    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
+  } finally {
+    planGenerations.delete(requestId);
+    runTools.delete(requestId);
+    forgetGeneratedPlanDrafts(run.drafts.map((preview) => preview.draftId));
+  }
+}
+
+/**
+ * The generator's outline turn: the plan's shape, week by week, before any
+ * session is written.
+ *
+ * Its tool, `propose_plan_outline`, is offered to this turn alone, and the
+ * writing tools are withheld from it. Like the draft tool in the sessions
+ * turn, it refuses an outline that breaks the request and hands the reasons
+ * back, so the model fixes it in the same turn. A redraw carries the outline
+ * already proposed and the athlete's words about what to change.
+ */
+export async function outlineTrainingPlan(
+  sink: ChatStreamSink,
+  requestId: string,
+  request: TrainingPlanGenerationRequest,
+  options: { unitSystem?: UnitSystem; revision?: TrainingPlanOutlineRevision } = {}
+): Promise<TrainingPlanOutlineResult> {
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
+  let accepted: TrainingPlanOutline | undefined;
+  runTools.set(requestId, {
+    extra: [PLAN_OUTLINE_TOOL_DEFINITION],
+    ...generationReach(request, OUTLINE_WITHHELD_TOOLS),
+    handle: async (_name, args) => {
+      const parsed = parsePlanOutline(args);
+      const problems = parsed.outline ? planOutlineProblems(parsed.outline, request) : parsed.errors;
+      if (!parsed.outline || problems.length) {
+        return JSON.stringify({
+          ok: false,
+          error_code: parsed.outline ? "outline_breaks_request" : "outline_incomplete",
+          errors: problems.slice(0, 20),
+          action: `Fix every problem listed and call ${PLAN_OUTLINE_TOOL} again with the whole outline. Do not ask the athlete.`
+        });
+      }
+      accepted = parsed.outline;
+      return JSON.stringify({ ok: true, message: "Outline accepted. Reply with one sentence and nothing else; the athlete reads the outline in the app." });
+    }
+  });
+  const { sink: watching, heard } = watchStreamEnd(sink);
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(watching, requestId, "outline", request, normalizeUnitSystem(options.unitSystem), options.revision);
+    } else {
+      await streamChat(
+        watching,
+        requestId,
+        [{ role: "user", content: trainingPlanOutlinePrompt(request, options.revision) }],
+        {
+          unitSystem: normalizeUnitSystem(options.unitSystem),
+          toolPolicy: "read-only",
+          ...(request.runtime ? { runtime: request.runtime } : {})
+        }
+      );
+    }
+    const outcome = heard.end;
+    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
+    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
+    if (!accepted) {
+      return {
+        ok: false,
+        reason: "no-outline",
+        message: outcome.text.trim()
+          ? "Training Coach answered but never handed over an outline that fits what you asked for."
+          : "Training Coach finished without drawing an outline."
+      };
+    }
+    return { ok: true, outline: accepted };
+  } catch (cause) {
+    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
+  } finally {
+    runTools.delete(requestId);
   }
 }
 
@@ -2245,6 +2617,15 @@ async function executeChatTool(
   claudePermissions?: ClaudeCodePermissions,
   toolPolicy: ChatToolPolicy = "interactive"
 ): Promise<string> {
+  // A run's own tools, and the ones it withholds, are settled before the
+  // policy: an extra tool is the run's to answer, not the policy's to allow.
+  const run = runTools.get(requestId);
+  if (run && !run.allow(name)) {
+    throw new Error(`${name} is not available to this run.`);
+  }
+  if (run?.handle && run.extra.some((tool) => tool.name === name)) {
+    return run.handle(name, args);
+  }
   // Every provider branch converges here, so this is the one place the
   // read-only boundary cannot be routed around by a model that names a tool it
   // was never offered.
@@ -2269,14 +2650,17 @@ async function executeChatTool(
     );
   }
   if (isChatWorkoutTool(name)) {
+    const generation = planGenerations.get(requestId);
     return handleChatWorkoutTool(name as ChatWorkoutToolName, args, {
       onPlanDraft: (preview: PlanDraftPreview) => {
+        generation?.drafts.push(preview);
         send("chat:streamInfo", {
           requestId,
           kind: "planDraft",
           draft: preview
         });
       },
+      planRequest: generation?.request,
       onWorkoutDelete: (preview) => {
         send("chat:streamInfo", {
           requestId,
@@ -2351,7 +2735,10 @@ async function executeChatTool(
 }
 
 function findChatTool(name: string): CorosMcpTool | undefined {
-  return getAllChatTools().find((tool) => tool.name === name);
+  return (
+    getAllChatTools().find((tool) => tool.name === name) ??
+    [...runTools.values()].flatMap((run) => run.extra).find((tool) => tool.name === name)
+  );
 }
 
 // ----- Provider request/response shape (isolated) -----
@@ -2465,8 +2852,8 @@ function toInputMessageItem(message: ChatMessage): Record<string, unknown> {
 }
 
 /** Exposes connected MCP and local workout tools to the model as functions. */
-function buildChatFunctionTools(): Record<string, unknown>[] {
-  return getAllChatTools().map((tool) => ({
+function buildChatFunctionTools(tools: CorosMcpTool[] = getAllChatTools()): Record<string, unknown>[] {
+  return tools.map((tool) => ({
     type: "function",
     name: tool.name,
     description: tool.description ?? "",
@@ -2633,11 +3020,24 @@ function extractSseData(frame: string): string | null {
 
 // ----- Training-data context assembly -----
 
+/**
+ * What a run's snapshot may carry beyond the athlete's privacy settings: a
+ * plan generation that was not given the athlete's training history or
+ * thresholds starts from a snapshot without them.
+ */
+interface TrainingContextScope {
+  /** Recent activities, and the fitness, records and predictions COROS derives from them. */
+  activities: boolean;
+  /** The threshold anchors in the athlete profile. */
+  zones: boolean;
+}
+
 async function buildTrainingContext(
   permissions?: ClaudeCodePermissions,
   unitSystem: UnitSystem = "metric",
   customInstructions?: string,
-  roleInstructions?: string
+  roleInstructions?: string,
+  scope?: TrainingContextScope
 ): Promise<{ text: string; hasData: boolean }> {
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
@@ -2664,14 +3064,15 @@ async function buildTrainingContext(
     };
   }
 
-  const includeActivities = permissions?.recentActivities !== false;
+  const includeActivities = permissions?.recentActivities !== false && scope?.activities !== false;
   const includeMetrics = permissions?.trainingMetrics !== false;
+  const includeDashboard = includeMetrics && scope?.activities !== false;
   const includeUpcoming = permissions?.upcomingWorkouts !== false;
   const [activities, dashboard, upcoming, profile] = await Promise.allSettled([
     includeActivities
       ? listTrainingHubActivities(1, 25)
       : Promise.resolve([] as TrainingHubActivity[]),
-    includeMetrics
+    includeDashboard
       ? getTrainingDashboard()
       : Promise.resolve(null as TrainingHubDashboard | null),
     includeUpcoming
@@ -2705,7 +3106,12 @@ async function buildTrainingContext(
     hasData = true;
   }
   if (profile.status === "fulfilled" && profile.value) {
-    const athlete = formatAthleteProfile(profile.value, unitSystem);
+    const athlete = formatAthleteProfile(
+      scope?.zones === false
+        ? { ...profile.value, thresholds: { zones: profile.value.thresholds.zones, ranges: {} } }
+        : profile.value,
+      unitSystem
+    );
     if (athlete) {
       sections.push("## Athlete profile");
       sections.push(athlete);

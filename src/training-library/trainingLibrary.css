@@ -3987,6 +3987,12 @@
   width: min(680px, 100%);
 }
 
+/* A run takes the form's place, and the two are not the same height: sized by
+   its content, the dialog shrank 124px on Generate and grew back on Stop. */
+.plan-generator {
+  height: min(840px, calc(100dvh - 40px));
+}
+
 .plan-generator > header,
 .plan-calendar-dialog > header {
   display: flex;
@@ -4010,6 +4016,72 @@
   letter-spacing: -0.02em;
 }
 
+/* The generator's head is one line: what it is, the steps, the close. */
+.plan-generator > header {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.plan-generator > header > .icon-button { margin-left: auto; }
+
+.plan-generator > header h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.plan-generator-heading { flex: none; }
+
+.plan-generator-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 auto;
+}
+
+.plan-generator-steps button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px 0 6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-steps button > span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--tl-rule);
+  border-radius: 50%;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  place-items: center;
+}
+
+.plan-generator-steps button:hover:not(:disabled) { color: var(--text-primary); background: var(--glass-bg); }
+.plan-generator-steps button:disabled { cursor: default; }
+.plan-generator-steps button.is-done { color: var(--text-secondary); }
+.plan-generator-steps button.is-done > span { border-color: transparent; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.plan-generator-steps button.is-current { color: var(--text-primary); font-weight: 600; background: var(--glass-bg); }
+.plan-generator-steps button.is-current > span { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+
+.plan-generator-steps button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .plan-generator-title-icon {
   display: grid;
   width: 30px;
@@ -4022,7 +4094,6 @@
   place-items: center;
 }
 
-.plan-generator > header p:last-child,
 .plan-calendar-dialog > header p:last-child {
   max-width: 680px;
   margin: 7px 0 0;
@@ -4035,9 +4106,16 @@
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) 286px;
+  /* The plan's settings on the left, the step being answered beside them. */
+  grid-template-columns: 286px minmax(0, 1fr);
   overflow: hidden;
 }
+
+.plan-generator-body.is-done { grid-template-columns: minmax(0, 1fr); }
+
+/* Under the editor that Edit plan opens: kept, with everything in it, and
+   out of sight — the attribute alone loses to the backdrop's `display`. */
+.plan-generator-backdrop[hidden] { display: none; }
 
 .plan-generator-form {
   min-width: 0;
@@ -4045,7 +4123,8 @@
   overflow-y: auto;
 }
 
-.plan-generator-form label {
+.plan-generator-form label,
+.plan-generator-field {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -4056,6 +4135,7 @@
 }
 
 .plan-generator-form label > span:first-child,
+.plan-generator-field > span:first-child,
 .plan-generator-form legend {
   color: var(--text-secondary);
   letter-spacing: 0.06em;
@@ -4077,10 +4157,21 @@
   resize: vertical;
 }
 
-.plan-generator-goal input {
-  min-height: 43px;
-  font-size: 14px;
+/* The fields had `outline: none` and nothing in its place, so tabbing through
+   the form showed no focus at all. */
+.plan-generator-form textarea:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
+
+.plan-generator-form :is(input, textarea)[aria-invalid="true"],
+.plan-generator-stepper.is-invalid,
+.plan-generator-racepop-trigger.is-invalid,
+.plan-generator-week.is-invalid .plan-generator-day {
+  border-color: var(--error-border);
+}
+
+.plan-generator-form fieldset.is-invalid legend { color: var(--error-text); }
 
 .plan-generator-form fieldset {
   margin: 20px 0 0;
@@ -4096,55 +4187,18 @@
 
 .plan-generator-form button:disabled { cursor: default; opacity: 0.5; }
 
-.plan-generator-segmented button:focus-visible,
-.plan-generator-stepper button:focus-visible,
-.plan-generator-examples button:focus-visible {
+.plan-generator-cards button:focus-visible,
+.plan-generator-stepper button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
 .plan-generator-inline-error {
   margin: 7px 0 0;
-  color: var(--warning-text);
+  color: var(--error-text);
   font-size: 11px;
-}
-
-.plan-generator-grid {
-  display: grid;
-  margin-top: 20px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.plan-generator-grid.is-bottom {
-  grid-template-columns: 180px minmax(0, 1fr);
-}
-
-.plan-generator-date,
-.plan-generator-duration {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.plan-generator-date {
-  padding-left: 9px;
-}
-
-.plan-generator-date input,
-.plan-generator-duration input {
-  border: 0;
-  background: transparent;
-}
-
-.plan-generator-duration em {
-  padding-right: 9px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .plan-generator-form small {
@@ -4153,46 +4207,16 @@
   font-weight: 400;
 }
 
-.plan-generator-examples {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.plan-generator-examples > span {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.plan-generator-examples button {
-  padding: 4px 10px;
-  border: 1px dashed var(--tl-rule);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-}
-
-.plan-generator-examples button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-
-.plan-generator-segmented {
+/* Cards that need a sentence: the kind of goal, and the level. */
+.plan-generator-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
-.plan-generator-segmented button {
+.plan-generator-goal-kinds { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+.plan-generator-cards button {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -4208,22 +4232,464 @@
   transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-.plan-generator-segmented button strong { color: inherit; font-size: 11px; font-weight: 600; }
-.plan-generator-segmented button small { font-size: 10px; color: var(--text-muted); line-height: 1.3; }
+.plan-generator-cards button strong { color: inherit; font-size: 11px; font-weight: 600; }
+.plan-generator-cards button small { font-size: 10px; color: var(--text-muted); line-height: 1.3; }
 
-.plan-generator-segmented button:hover:not(:disabled):not(.is-selected) {
+.plan-generator-cards button:hover:not(:disabled):not(.is-selected) {
   border-color: var(--glass-border);
   color: var(--text-primary);
   background: var(--glass-bg-hover);
 }
 
-.plan-generator-segmented button.is-selected {
+.plan-generator-cards button.is-selected {
   border-color: color-mix(in srgb, var(--accent) 46%, transparent);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.plan-generator-segmented button.is-selected small { color: color-mix(in srgb, var(--accent) 68%, var(--text-muted)); }
+.plan-generator-cards button.is-selected small { color: color-mix(in srgb, var(--accent) 68%, var(--text-muted)); }
+
+/* One step of the form: its fields in a column, each group spaced alike. */
+.plan-generator-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.plan-generator-step > .plan-generator-inline-error { margin-top: -12px; }
+.plan-generator-form .plan-generator-step fieldset { margin: 0; }
+
+.plan-generator-step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.plan-generator-step-head > div { flex: 1 1 280px; }
+
+.plan-generator-step-head h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.3; }
+
+.plan-generator-week-mode { margin: 8px 0 2px; }
+
+.plan-generator-step-head p,
+.plan-generator-note,
+.plan-generator-span {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.plan-generator-span { margin-top: -10px; color: var(--text-muted); }
+.plan-generator-note { margin: 0; }
+
+.plan-generator-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.plan-generator-row > .plan-generator-field { flex: none; }
+
+/* Race day: a button that opens a month under it. */
+.plan-generator-racepop { position: relative; }
+
+.plan-generator-racepop-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--glass-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-racepop-trigger:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--glass-border)); }
+.plan-generator-racepop-trigger svg { color: var(--accent); }
+
+.plan-generator-racepop-trigger:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.plan-generator-racepop-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  padding: 11px;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-sm);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* The usual week: seven columns, a card a day. */
+.plan-generator-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* A day is one card: the kind it cycles through on top, the most time it has
+   under it, inside the same edge. The card wears the kind — accent for a
+   training day, stronger for the long day, dashed for one Coach may use. */
+.plan-generator-day {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-day:has(.plan-generator-day-kind:hover) { border-color: color-mix(in srgb, var(--accent) 35%, var(--tl-rule)); }
+
+.plan-generator-day-kind {
+  display: flex;
+  min-height: 58px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 9px 10px 6px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-generator-day-kind > span { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+.plan-generator-day-kind > strong { max-width: 100%; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+.plan-generator-day-kind:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.plan-generator-day[data-kind="train"] {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.plan-generator-day[data-kind="long"] {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.plan-generator-day[data-kind="flex"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-secondary);
+}
+
+/* The time: a menu at the foot of the card, across its width. */
+.plan-generator-day-time { margin: 0 6px 6px; }
+
+.plan-generator-day-time .app-select-trigger {
+  width: 100%;
+  min-height: 26px;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-generator-day-time.is-empty {
+  display: grid;
+  height: 26px;
+  color: var(--text-muted);
+  font-size: 11px;
+  place-items: center;
+}
+
+.plan-generator-coach-week {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--tl-rule));
+  border-radius: var(--radius-sm);
+}
+
+.plan-generator-week-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--tl-rule);
+}
+
+.plan-generator-week-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-left: 1px solid var(--tl-rule-soft);
+}
+
+.plan-generator-week-summary > div:first-child { border-left: 0; padding-left: 0; }
+.plan-generator-week-summary dt { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+.plan-generator-week-summary dd { margin: 0; overflow: hidden; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The outline: a bar a week, as tall as its hours and in its stage's hue,
+   and the week picked out below. A lighter week is the same hue, fainter. */
+.plan-generator-outline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-generator-outline-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.plan-generator-outline-legend li::before {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-xs);
+  background: var(--tl-stage);
+  content: "";
+}
+
+.plan-generator-outline-bars {
+  display: flex;
+  height: 168px;
+  align-items: stretch;
+  gap: 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--tl-rule);
+}
+
+.plan-generator-outline-bar {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-outline-bar > small { font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-generator-outline-bar > em { font-size: 11px; font-style: normal; font-weight: 500; }
+
+.plan-generator-outline-bar > span {
+  width: 70%;
+  max-width: 34px;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: var(--tl-stage);
+  opacity: 0.8;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.plan-generator-outline-bar.is-lighter > span { opacity: 0.45; }
+.plan-generator-outline-bar:hover { background: var(--glass-bg); }
+.plan-generator-outline-bar.is-selected { color: var(--text-primary); background: var(--glass-bg); }
+.plan-generator-outline-bar.is-selected > span { opacity: 1; }
+.plan-generator-outline-bar.is-selected > em { font-weight: 600; }
+
+.plan-generator-outline-bar:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.plan-generator-outline-week {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: inset 3px 0 0 var(--tl-stage);
+}
+
+.plan-generator-outline-week > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.plan-generator-outline-week > header > span { color: var(--text-muted); font-size: 11px; }
+.plan-generator-outline-week > header > strong { color: var(--tl-stage); font-size: 13px; font-weight: 600; }
+.plan-generator-outline-week > header > small { margin-left: auto; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.plan-generator-outline-week > p { margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.45; }
+
+.plan-generator-outline-week ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-generator-outline-week li {
+  display: grid;
+  grid-template-columns: 34px 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.plan-generator-outline-week li > span { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.plan-generator-outline-week li > i { width: 8px; height: 8px; border-radius: 50%; background: var(--sport-accent, var(--accent)); }
+.plan-generator-outline-week li > strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.plan-generator-outline-week li > small { color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.plan-generator-note > strong { color: var(--text-primary); font-weight: 600; }
+
+.plan-generator-redraw {
+  display: flex;
+  gap: 8px;
+}
+
+.plan-generator-redraw input { flex: 1; min-width: 0; }
+
+.plan-generator-redraw input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* What the check has sent back so far: the run is working, not stuck. */
+.plan-generator-run-checks {
+  margin: 6px 0 0;
+  color: var(--warning-text);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Writing to an outline: its weeks, in the state the whole draft is in. */
+.plan-generator-run.has-weeks { max-width: 640px; }
+
+.plan-generator-run-weeks {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.plan-generator-run-weeks li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: inset 3px 0 0 var(--tl-stage);
+}
+
+.plan-generator-run-weeks li > span { font-size: 12px; font-weight: 600; }
+.plan-generator-run-weeks li > small { grid-column: 1 / -1; color: var(--text-secondary); font-size: 11px; }
+.plan-generator-run-weeks li > em { color: var(--text-muted); font-size: 10px; font-style: normal; font-weight: 600; }
+.plan-generator-run-weeks li[data-state="Writing…"] > em { color: var(--warning-text); }
+.plan-generator-run-weeks li[data-state="Checked"] > em { color: var(--success-text); }
+.plan-generator-run-weeks li[data-state="Queued"] { opacity: 0.6; }
+
+/* The plan, kept: its name, where it is, its figures and its shape. */
+.plan-generator-done {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-generator-done-weeks-title { margin: 12px 0 0; }
+.plan-generator-done-weeks { margin: 0; }
+
+.plan-generator-done-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.plan-generator-done-mark {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  flex: none;
+  border: 1px solid var(--success-border);
+  border-radius: 50%;
+  color: var(--success-text);
+  background: var(--success-bg);
+  place-items: center;
+}
+
+/* Still being kept or saved: not a success yet, so not in its ink. */
+.plan-generator-done-mark.is-busy {
+  border-color: var(--tl-rule);
+  color: var(--text-secondary);
+  background: var(--glass-bg);
+}
+
+.plan-generator-done-title {
+  margin: 0;
+  color: var(--success-text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.plan-generator-done-name { display: block; margin-top: 4px; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.plan-generator-done-kept,
+.plan-generator-done-overview { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.plan-generator-done-overview { color: var(--text-primary); font-size: 13px; }
+
+.plan-generator-done-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--warning-bg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.plan-generator-done-warning svg { flex: none; margin-top: 2px; color: var(--warning-text); }
+
+.plan-generator-done-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 4px 0 0;
+  border-block: 1px solid var(--tl-rule);
+}
+
+.plan-generator-done-figures > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.plan-generator-done-figures dt { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+.plan-generator-done-figures dd { margin: 0; font-family: var(--font-display); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
 
 .plan-generator-stepper {
   display: flex;
@@ -4260,7 +4726,10 @@
 
 .plan-generator-stepper strong {
   display: grid;
+  min-width: 0;
   flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
@@ -4271,7 +4740,7 @@
 
 .plan-generator-status {
   padding: 22px;
-  border-left: 1px solid var(--tl-rule);
+  border-right: 1px solid var(--tl-rule);
   background: color-mix(in srgb, var(--surface) 68%, transparent);
   overflow-y: auto;
 }
@@ -4288,17 +4757,244 @@
   background: var(--glass-bg);
 }
 
-.plan-generator-provider-icon {
-  display: grid;
-  width: 28px;
-  height: 28px;
+/* The provider card opens "AI for this plan", so it is a button that reads
+   as the card it was: the whole row is the target, "Change" says so. */
+button.plan-generator-provider {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+button.plan-generator-provider:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--tl-rule));
+}
+
+button.plan-generator-provider:disabled { cursor: default; opacity: 0.6; }
+
+button.plan-generator-provider:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.plan-generator-provider .plan-generator-provider-change {
   flex: none;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, currentColor 13%, transparent);
-  place-items: center;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .plan-generator-aside-eyebrow { margin-top: 20px; }
+
+/* What Coach reads: a switch a source, its sentence saying what it covers —
+   or that it is not shared. */
+.plan-generator-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-generator-sources li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plan-generator-sources li > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.plan-generator-sources strong { font-size: 12px; font-weight: 600; }
+.plan-generator-sources small { color: var(--text-secondary); font-size: 10px; line-height: 1.3; }
+
+.plan-generator-source {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-border);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-source > span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.plan-generator-source[aria-checked="true"] { background: var(--accent); }
+.plan-generator-source[aria-checked="true"] > span { transform: translateX(14px); }
+.plan-generator-source:disabled { cursor: default; opacity: 0.5; }
+
+.plan-generator-source:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* "AI for this plan" sits over the generator, inside its frame. */
+.plan-generator { position: relative; }
+
+.plan-generator-sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+}
+
+.plan-generator-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: var(--tl-scrim);
+  cursor: default;
+  animation: tl-fade-in var(--dur-fast) var(--ease) both;
+}
+
+.plan-generator-sheet {
+  position: relative;
+  display: flex;
+  width: min(520px, 100%);
+  max-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--tl-reader-bg, var(--bg-base));
+  box-shadow: var(--shadow-elevated);
+  animation: tl-dialog-in var(--dur-base) var(--tl-ease-out) both;
+}
+
+.plan-generator-sheet > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--tl-rule-soft);
+}
+
+.plan-generator-sheet > header > div { flex: 1; }
+.plan-generator-sheet h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.plan-generator-sheet > header p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+
+.plan-generator-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px 18px;
+  overflow-y: auto;
+}
+
+.plan-generator-sheet-body > .tl-eyebrow:not(:first-child) { margin-top: 10px; }
+
+.plan-generator-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-generator-provider-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--glass-bg);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-provider-option:hover:not(.is-selected) {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--tl-rule));
+}
+
+.plan-generator-provider-option.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-weight: 600;
+}
+
+.plan-generator-provider-option:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.plan-generator-provider-option-name { display: flex; align-items: baseline; gap: 6px; }
+.plan-generator-provider-option-name small { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+
+.plan-generator-provider-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.plan-generator-provider-tag.is-ready { color: var(--success-text); }
+.plan-generator-provider-tag.is-blocked { color: var(--warning-text); }
+
+.plan-generator-sheet-warning {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  color: var(--warning-text);
+  background: var(--warning-bg);
+}
+
+.plan-generator-sheet-warning p { margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.45; }
+
+.plan-generator-sheet-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.plan-generator-sheet-models { flex-wrap: wrap; }
+
+.plan-generator-sheet > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--tl-rule-soft);
+}
+
+.plan-generator-sheet-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
 
 .plan-generator-snapshot {
   display: flex;
@@ -4309,61 +5005,94 @@
   border: 1px solid var(--tl-rule);
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
-  list-style: none;
 }
 
-.plan-generator-snapshot li {
+.plan-generator-snapshot > div {
   display: flex;
   min-height: 18px;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 10px;
 }
 
-.plan-generator-snapshot li > span:first-child { flex: none; color: var(--text-muted); font-size: 10px; }
+.plan-generator-snapshot dt { flex: none; color: var(--text-muted); font-size: 10px; }
 
-.plan-generator-snapshot strong {
+.plan-generator-snapshot dd {
+  margin: 0;
   overflow: hidden;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   text-align: right;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.plan-generator-snapshot-sports { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-
-.plan-generator-snapshot-sport {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  color: var(--sport-accent, var(--accent));
-  background: color-mix(in srgb, var(--sport-accent, var(--accent)) 13%, transparent);
-  place-items: center;
-}
-
-.plan-generator-provider.is-ready { color: var(--accent); }
-.plan-generator-provider.is-blocked { color: var(--warning-text); }
-.plan-generator-provider span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+/* The card carries no status mark: the line under the name says what the
+   provider needs when it is not set up, in the warning ink. */
+.plan-generator-provider-text { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
 .plan-generator-provider strong { color: var(--text-primary); font-size: 12px; }
 .plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.45; }
-.plan-generator-status > .ghost-button { width: 100%; margin-top: 9px; }
-
-.plan-generator-progress,
-.plan-generator-failure,
-.plan-generator-privacy {
-  margin-top: 22px;
-  padding-top: 20px;
-  border-top: 1px solid var(--tl-rule);
-}
-
-.plan-generator-progress {
+.plan-generator-provider.is-blocked small { color: var(--warning-text); }
+/* A run takes the form's place rather than a corner of the side column: on a
+   narrow window that column stacks with the form, and a run drawn in it was
+   off screen from wherever the athlete had scrolled to. */
+/* Top-aligned, not centred: the trail grows under the title, and a centred
+   column moved everything above it up the screen with every line. */
+.plan-generator-run {
   display: flex;
+  min-height: 100%;
   align-items: center;
   flex-direction: column;
+  justify-content: flex-start;
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 24px 0;
   text-align: center;
 }
+
+.plan-generator-run > strong { font-size: 14px; }
+
+.plan-generator-run-activity {
+  min-height: 1.45em;
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.plan-generator-run-time {
+  margin: 16px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.plan-generator-elapsed {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.plan-generator-failure {
+  display: grid;
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+}
+
+.plan-generator-failure > svg { margin-top: 1px; color: var(--warning-text); }
+.plan-generator-failure-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; grid-column: 2; }
 
 .plan-generator-pulse {
   display: grid;
@@ -4428,15 +5157,69 @@
   50% { opacity: 0.35; }
 }
 
-.plan-generator-progress strong,
-.plan-generator-failure strong,
-.plan-generator-privacy strong { font-size: 12px; }
-.plan-generator-progress p,
-.plan-generator-failure p,
-.plan-generator-privacy p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
-.plan-generator-progress .ghost-button { margin-top: 12px; }
-.plan-generator-failure > svg { color: var(--warning-text); }
-.plan-generator-failure > div { display: flex; flex-direction: column; gap: 7px; margin-top: 11px; }
+/* What Coach has done so far and the words it is on: the wait reads as work. */
+.plan-generator-trail {
+  width: 100%;
+  margin: 14px 0 0;
+  padding: 13px 2px 0;
+  border-top: 1px solid var(--tl-rule-soft);
+  text-align: left;
+}
+
+.plan-generator-trail .tl-eyebrow { margin: 0 0 8px; }
+
+.plan-generator-trail ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-generator-trail li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.plan-generator-trail li.is-latest { color: var(--text-primary); font-weight: 600; }
+.plan-generator-trail li small { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+
+.plan-generator-trail-mark {
+  display: grid;
+  width: 15px;
+  height: 16px;
+  flex: none;
+  color: var(--accent);
+  place-items: center;
+}
+
+.plan-generator-trail li[data-kind="check"] .plan-generator-trail-mark { color: var(--warning-text); }
+.plan-generator-trail li[data-kind="passed"] .plan-generator-trail-mark { color: var(--success-text); }
+
+.plan-generator-trail-earlier {
+  margin: 0 0 6px 23px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.plan-generator-trail-thought {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--tl-rule-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.plan-generator-failure strong { font-size: 12px; }
+.plan-generator-failure p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 
 .plan-generator > footer,
 .plan-calendar-dialog > footer {
@@ -4459,7 +5242,6 @@
   font-size: 11px;
 }
 
-.plan-generator-footer-hint svg { flex: none; color: var(--accent); }
 
 .plan-calendar-loading,
 .plan-calendar-error {
@@ -4563,8 +5345,10 @@
 @media (max-width: 840px) {
   .plan-generator-body { display: block; overflow-y: auto; }
   .plan-generator-form { overflow: visible; }
-  .plan-generator-status { border-top: 1px solid var(--tl-rule); border-left: 0; overflow: visible; }
-  .plan-generator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-generator-status { border-right: 0; border-bottom: 1px solid var(--tl-rule); overflow: visible; }
+  .plan-generator-goal-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plan-generator > header { flex-wrap: wrap; }
+  .plan-generator-steps { order: 3; width: 100%; justify-content: flex-start; }
   .plan-calendar-body { display: block; overflow-y: auto; }
   .plan-calendar-pick { border-right: 0; border-bottom: 1px solid var(--tl-rule); overflow: visible; }
   .plan-calendar-preview { overflow: visible; }
@@ -4575,9 +5359,14 @@
   .plan-calendar-backdrop { padding: 0; }
   .plan-generator,
   .plan-calendar-dialog { width: 100%; max-height: 100dvh; border-radius: 0; }
-  .plan-generator-grid,
-  .plan-generator-grid.is-bottom { grid-template-columns: 1fr; }
-  .plan-generator-segmented { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-generator { height: 100dvh; }
+  .plan-generator-cards,
+  .plan-generator-goal-kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-generator-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .plan-generator-row { flex-direction: column; align-items: stretch; }
+  /* A row of choices the width cannot hold wraps rather than running off the
+     sheet; the track loses its pill so the rows read as one group. */
+  .plan-generator-step .option-group--expanded { flex-wrap: wrap; border-radius: var(--radius-md); }
   .plan-calendar-summary { grid-template-columns: 1fr; }
   .plan-calendar-summary > span { border-top: 1px solid var(--tl-rule); border-left: 0; }
   .plan-calendar-summary > span:first-child { border-top: 0; }
@@ -4932,11 +5721,6 @@
 .plan-entry-figures.is-nil {
   color: var(--text-muted);
   font-style: italic;
-}
-
-.plan-entry-steps {
-  color: var(--text-muted);
-  font-size: 11px;
 }
 
 /*

@@ -634,20 +634,26 @@ function FoldedWeek({ week, onUnfold }: { week: PlanReaderWeek; onUnfold: () => 
   );
 }
 
-function WeekCard({
+/**
+ * One week of a plan, a column a day. Exported for the generator's last step,
+ * which previews the plan it wrote with the reader's own cards rather than a
+ * second drawing of a week — there it is read only: no day is today, nothing
+ * folds and a session does not open.
+ */
+export function WeekCard({
   week,
-  current,
-  todayKey,
-  foldable,
+  current = false,
+  todayKey = "",
+  foldable = false,
   onFold,
   onOpen
 }: {
   week: PlanReaderWeek;
-  current: boolean;
-  todayKey: string;
-  foldable: boolean;
-  onFold: () => void;
-  onOpen: (entryId: string) => void;
+  current?: boolean;
+  todayKey?: string;
+  foldable?: boolean;
+  onFold?: () => void;
+  onOpen?: (entryId: string) => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const hasAny = week.days.some((day) => day.entries.length);

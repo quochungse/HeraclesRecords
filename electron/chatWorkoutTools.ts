@@ -30,6 +30,7 @@ import {
   parsePlanDay,
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
+import { generatedPlanProblems } from "./trainingPlanGeneration";
 import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
@@ -38,6 +39,7 @@ import type {
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
   TrainingPlanDocument,
+  TrainingPlanGenerationRequest,
   TrainingPlanWeekStage,
   UploadPlanResult,
   WorkoutDeletePreview,
@@ -85,6 +87,24 @@ interface DeleteWorkoutParams {
 }
 
 const draftStore = new Map<string, StoredPlanDraft>();
+/**
+ * Drafts written during a plan generation. Never persisted: `chat_plan_drafts`
+ * is `personal` tier and a draft there lives as long as the conversation card
+ * that holds it — a generation has no conversation, so every one it wrote used
+ * to stay in that table for good and travel to every machine on the vault.
+ */
+const generatedDrafts = new Map<string, StoredPlanDraft>();
+
+/** A draft the plan generator's run accepted, for it to build the plan from. */
+export function generatedPlanDraft(draftId: string): { plan: CorosTrainingPlanDraft; preview: PlanDraftPreview } | undefined {
+  const stored = generatedDrafts.get(draftId);
+  return stored ? { plan: stored.plan, preview: stored.preview } : undefined;
+}
+
+/** Lets go of a finished generation's drafts. */
+export function forgetGeneratedPlanDrafts(draftIds: readonly string[]): void {
+  for (const draftId of draftIds) generatedDrafts.delete(draftId);
+}
 const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
@@ -329,6 +349,13 @@ export async function handleChatWorkoutTool(
     onWorkoutDelete?: (preview: WorkoutDeletePreview) => void;
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
+    /**
+     * Set while the plan generator runs: a draft is checked against what the
+     * athlete asked for and handed back to the model when it departs from it,
+     * and one that passes is kept in memory for the generator to collect
+     * rather than written to `chat_plan_drafts` (see `generatedPlanDraft`).
+     */
+    planRequest?: TrainingPlanGenerationRequest;
   }
 ): Promise<string> {
   if (name === "draft_training_plan") {
@@ -336,7 +363,9 @@ export async function handleChatWorkoutTool(
       args,
       options?.onPlanDraft,
       options?.allowUpcomingWorkouts !== false,
-      options?.unitSystem ?? "metric"
+      options?.unitSystem ?? "metric",
+      "plan",
+      options?.planRequest
     );
   }
   if (name === "draft_workout") {
@@ -635,7 +664,8 @@ async function handleDraftTrainingPlan(
   onPlanDraft?: (preview: PlanDraftPreview) => void,
   allowUpcomingWorkouts = true,
   unitSystem: UnitSystem = "metric",
-  artifactType: "plan" | "workout" = "plan"
+  artifactType: "plan" | "workout" = "plan",
+  planRequest?: TrainingPlanGenerationRequest
 ): Promise<string> {
   const draft = toPlanDraft(args);
   const validation = validatePlanDraft(draft, {
@@ -643,6 +673,19 @@ async function handleDraftTrainingPlan(
   });
   if (!validation.ok) {
     return JSON.stringify({ ok: false, errors: validation.errors });
+  }
+  /* Before the exercises are resolved: that can cost COROS requests, and a
+     draft with the wrong number of sessions is going to be rewritten anyway. */
+  if (planRequest) {
+    const problems = generatedPlanProblems(draft.workouts, planRequest);
+    if (problems.length > 0) {
+      return JSON.stringify({
+        ok: false,
+        error_code: "plan_breaks_request",
+        errors: problems.slice(0, 20),
+        action: "Fix every problem listed and call draft_training_plan again with the whole plan. Do not ask the athlete."
+      });
+    }
   }
 
   const exerciseResolution = await resolveTrainingPlanExercises(draft);
@@ -669,7 +712,9 @@ async function handleDraftTrainingPlan(
   }
   const resolvedDraft = exerciseResolution.draft;
 
-  const conflicts = allowUpcomingWorkouts
+  /* A generated plan is not scheduled — it opens in the plan editor — so the
+     calendar has nothing to say about it and is not asked. */
+  const conflicts = allowUpcomingWorkouts && !planRequest
     ? await detectScheduleConflicts(resolvedDraft)
     : [];
   const draftId = crypto.randomUUID();
@@ -680,13 +725,23 @@ async function handleDraftTrainingPlan(
   });
   preview.conflicts = conflicts;
 
-  draftStore.set(draftId, {
+  const stored: StoredPlanDraft = {
     draftId,
     plan: resolvedDraft,
     preview,
     createdAt: Date.now()
-  });
-  persistPlanDraft(draftStore.get(draftId)!);
+  };
+  if (planRequest) {
+    generatedDrafts.set(draftId, stored);
+    onPlanDraft?.(preview);
+    return JSON.stringify({
+      ok: true,
+      draft_id: draftId,
+      message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app opens it in the athlete's plan editor."
+    });
+  }
+  draftStore.set(draftId, stored);
+  persistPlanDraft(stored);
 
   onPlanDraft?.(preview);
 

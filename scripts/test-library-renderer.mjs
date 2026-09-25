@@ -565,16 +565,14 @@ async function main() {
     const days = await textOf(".plan-reader-day:not(.is-empty) .plan-reader-day-label");
     assert.ok(days[0].startsWith("Tue "), `a plan on the calendar names the date on the day: ${days[0]}`);
 
-    // The target, and the step count behind it.
+    // The target, and nothing else: a step count sat in a day column that
+    // could not hold it and broke the row.
     const figures = await textOf(".plan-entry-figures");
     assert.ok(
       figures[0].includes("47m") && figures[0].includes("90 load"),
       `the session states what it asks for: ${figures[0]}`
     );
-    assert.ok(
-      (await textOf(".plan-entry-steps")).includes("2 steps"),
-      "a structured session says how many steps it holds"
-    );
+    assert.equal(await count(".plan-entry-steps"), 0, "a session does not count its steps in the row");
     assert.ok(
       figures.some((value) => value.includes("2:00") && value.includes("120 load")),
       "a session with no structure still states the target it declares"

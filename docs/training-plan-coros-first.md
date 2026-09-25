@@ -174,8 +174,15 @@ hay item nào khác. Chỉ khi được save nó mới thành một plan COROS.
   khi xoá row, rồi gọi `deletePlanDraftsOf`).
 - Xoá hai đích lưu local (`localPlan`, `localTemplate`). Mở lại `nativePlan` qua luồng trên.
   Workout Library và Calendar giữ nguyên.
-- `TrainingPlanGenerator` (tạo plan bằng coach ngay trong Library) mở kết quả trong editor,
-  chưa lưu; ở đây Save draft được phép vì người dùng đang đứng ở màn hình Plans.
+- `TrainingPlanGenerator` (tạo plan bằng coach ngay trong Library) đi qua bốn bước — Goal,
+  Your week, Outline, Sessions — và **giữ kết quả thành một library draft** (`training_plan_drafts`)
+  ngay khi plan về, trước khi người dùng quyết gì, nên đóng dialog ở bước cuối không mất gì.
+  Outline là một lượt riêng (`trainingLibrary:outlinePlan`, tool `propose_plan_outline` chỉ lượt
+  đó có); lượt viết session (`trainingLibrary:generatePlan`) bị buộc theo outline đã chấp nhận —
+  số tuần, số buổi từng tuần, giờ, stage. Cả hai read-only, tuần tính từ Thứ Hai, tool kiểm tra
+  theo request ngay trong lượt, draft của lượt generate không bao giờ vào `chat_plan_drafts`;
+  nguồn dữ liệu người dùng tắt bị giữ lại khỏi cả tool lẫn snapshot — quy tắc ở
+  `electron/trainingPlanGeneration.ts`.
 
 ## 8. Migration (chạy một lần khi mở DB)
 

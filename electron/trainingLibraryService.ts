@@ -5,6 +5,7 @@ import {
   deleteTrainingPlanMetadata,
   findCachedRunningCorosPlan,
   getCorosPlanCache,
+  getTrainingPlanDraft,
   getTrainingPlanMetadata,
   listCachedTrainingLibraryWorkouts,
   listCorosPlanCache,
@@ -807,14 +808,18 @@ export async function deletePlanFromCoros(
  * Monday and Tuesday of week 1, and a Sunday start the whole week. Nothing on
  * COROS checks the calendar either: a day that already holds a workout gets
  * the plan's as well. Both are said here, before anything is written.
+ *
+ * `planId` may also name a library draft (`draft:<uuid>`, the record's id),
+ * read from this machine: a generated plan is asked for its day before it is
+ * saved, so the day is picked first and the save and the calendar follow as
+ * one answer. Nothing about a draft's own calendar can block it.
  */
 export async function previewPlanOnCalendar(
   planId: string,
   startDay: string
 ): Promise<TrainingPlanCalendarPreview> {
   if (!/^\d{8}$/.test(startDay)) throw new Error("Choose a start day.");
-  const remoteId = remoteIdOf(planId);
-  const plan = await getNativeTrainingPlan(remoteId);
+  const plan = planId.startsWith("draft:") ? draftPlan(planId) : await getNativeTrainingPlan(remoteIdOf(planId));
   const start = parsePlanDay(startDay)!;
   const anchor = mondayOf(start);
   const lastDay = new Date(anchor);
@@ -855,6 +860,12 @@ export async function previewPlanOnCalendar(
     blockers.push("Starting on that day leaves none of the plan's sessions on the calendar.");
   }
   return { planId, startDay, anchorDay: dateKey(anchor), entries, blockers };
+}
+
+function draftPlan(draftId: string): TrainingPlanDocument {
+  const draft = getTrainingPlanDraft(draftId);
+  if (!draft) throw new Error("That draft is no longer in your library.");
+  return draft.plan;
 }
 
 /** `executeSubPlan`: the plan goes on the calendar as COROS's running copy of it, answered read in full. */

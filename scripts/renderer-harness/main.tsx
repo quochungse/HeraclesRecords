@@ -37,6 +37,7 @@ import { startDraft } from "../../src/training-library/planDraft";
 import { ConfirmDialog } from "../../src/training-library/ConfirmDialog";
 import { WorkoutWorkspace } from "../../src/training-library/WorkoutWorkspace";
 import { TrainingLibraryView } from "../../src/training-library/TrainingLibraryView";
+import { TrainingPlanGenerator } from "../../src/training-library/TrainingPlanGenerator";
 import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import type { CorosLinkApi } from "../../src/coroslink-api";
@@ -353,6 +354,25 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
    * size rather than fixed over the window, so the width the weeks get is the
    * test's to choose. The draft is held here, as the view holds it.
    */
+  /* The AI plan generator on its own: the library opens it over the index,
+     and nothing it does depends on the library under it. */
+  TrainingPlanGenerator: (options) => {
+    loadLibraryStyles();
+    return (
+      <TrainingPlanGenerator
+        api={api}
+        covered={(options.covered as boolean | undefined) ?? false}
+        editedDraft={(options.editedDraft as never) ?? null}
+        onClose={spy("onClose")}
+        onKept={spy("onKept") as () => void}
+        onOpenPlan={spy("onOpenPlan") as () => void}
+        onSaved={spy("onSaved") as () => void}
+        onScheduled={spy("onScheduled") as () => void}
+        onReadPlan={spy("onReadPlan") as () => void}
+        onOpenCoach={spy("onOpenCoach")}
+      />
+    );
+  },
   PlanEditor: (options) => {
     loadLibraryStyles();
     return <PlanEditorHarness options={options} />;

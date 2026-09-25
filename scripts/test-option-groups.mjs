@@ -76,9 +76,24 @@ const EXEMPT = [
     why: "Same control as above — the cards themselves."
   },
   {
-    file: "src/training-library/TrainingPlanGenerator.tsx",
+    file: "src/training-library/GeneratorGoalStep.tsx",
     marker: "plan-generator-segmented",
     why: "A difficulty card is two lines: the name and what it means for the plan."
+  },
+  {
+    file: "src/training-library/GeneratorGoalStep.tsx",
+    marker: "plan-generator-goal-kind",
+    why: "A kind of goal is two lines: its name and what the plan does about it (\"Plan ends on race day\")."
+  },
+  {
+    file: "src/training-library/GeneratorProviderPanel.tsx",
+    marker: "plan-generator-provider-option",
+    why: "Each provider row carries whether it is connected here, and one that is not stays pickable so the panel can say what it needs — a chip holds neither the status nor the reason."
+  },
+  {
+    file: "src/training-library/GeneratorOutlineStep.tsx",
+    marker: "plan-generator-outline-bar",
+    why: "A chart of the outline's weeks, each bar as tall as its hours and in its stage's hue: picking one shows that week. The arrangement is the control, as a month of days is."
   },
   {
     file: "src/chat/analyses/AnalysisCreate.tsx",

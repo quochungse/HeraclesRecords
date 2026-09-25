@@ -67,9 +67,6 @@ export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
            and nothing else. Saying so beats four dashes pretending to be data. */
         <span className="plan-entry-figures is-nil">No target set</span>
       )}
-      {entry.stepCount ? (
-        <span className="plan-entry-steps">{entry.stepCount} steps</span>
-      ) : null}
       {label && tone ? (
         <em className="plan-entry-status" data-tone={tone}>
           {label}

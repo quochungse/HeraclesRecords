@@ -62,6 +62,10 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
+  TrainingPlanGenerationRequest,
+  TrainingPlanOutlineResult,
+  TrainingPlanOutlineRevision,
+  TrainingPlanGenerationResult,
   PlanDraftPreview,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
@@ -298,6 +302,27 @@ export interface CorosLinkApi {
   ) => Promise<TrainingPlanMetadata>;
   /** Writes a plan to COROS and reads it back; a plan changed there since the edit began is a conflict. */
   saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest) => Promise<TrainingPlanSaveResult>;
+  /**
+   * The AI plan generator's turn, read-only: progress arrives on the
+   * `onChatStream*` events under `requestId`, and `cancelChat(requestId)`
+   * stops it. Resolves with the plan, or with why there is none.
+   */
+  generateTrainingPlan: (
+    requestId: string,
+    request: TrainingPlanGenerationRequest,
+    unitSystem: UnitSystem
+  ) => Promise<TrainingPlanGenerationResult>;
+  /**
+   * The plan's shape, week by week, before its sessions — or, given a
+   * revision, that shape redrawn as the athlete asked. Streams like
+   * `generateTrainingPlan` and is stopped the same way.
+   */
+  outlineTrainingPlan: (
+    requestId: string,
+    request: TrainingPlanGenerationRequest,
+    unitSystem: UnitSystem,
+    revision?: TrainingPlanOutlineRevision
+  ) => Promise<TrainingPlanOutlineResult>;
   /** A COROS copy of the plan, named "… Copy". */
   duplicateTrainingPlan: (planId: string) => Promise<TrainingPlanDocument>;
   /** `takeOffCalendar`: a plan on the calendar is taken off it first; without it, one is refused. */

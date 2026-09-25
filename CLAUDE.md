@@ -485,6 +485,53 @@ Overview, Media, Data, and Settings are in the main bundle.
   `editedAt`, and `withPlanEdits` states that version to the coach in front of the athlete's next
   question (in the chat and in analysis runs), because the coach otherwise advises about the
   version it wrote. Drafts are deleted with their conversation; the 24-hour prune is gone.
+  **The AI plan generator (`TrainingPlanGenerator`) is two turns of its own, not a chat message.**
+  Four steps: Goal (a race — its day decides the length and ends the plan — a base, a comeback,
+  hybrid, or "Something else" in the athlete's words; a length Coach may choose), Your week (days
+  cycling Rest / Train / Long day / "Coach picks", each with the most time it has (an hour, two for the long day, or Free: no limit), or "Let Coach decide"
+  where every answer may be "Not sure"), **Outline**, Sessions. `trainingLibrary:outlinePlan` →
+  `outlineTrainingPlan` proposes the plan's shape through `propose_plan_outline`, a tool offered
+  to that turn alone; the athlete reads it a bar a week and may have it redrawn in their own words.
+  `trainingLibrary:generatePlan` → `generateTrainingPlan` then writes the sessions **to the
+  accepted outline** (`request.outline`): its length, each week's exact count, its hours within a
+  fifth and its stages, which become the plan's. Both stream on `chat:stream*`, resolve with a
+  result, stop with `chat:cancel`, and run **read-only** — `chat:send` offered `upload_training_plan`,
+  `delete_workout` and every MCP server with one line of prompt as the guard, and its
+  `request_coach_input` ended the turn waiting for an answer the dialog cannot show. **A run's own
+  tools are `runTools` in `chatService.ts`**: a run adds tools and withholds others by request id,
+  consulted where every provider builds its list and again in `executeChatTool`, *before* the
+  policy. The rules live in `electron/trainingPlanGeneration.ts` (no `node:` imports; the form
+  reads them too): **a generated plan starts on a Monday and counts Monday-to-Sunday weeks**; a
+  usual week is a **band** of sessions (flex days may be used or not); race day holds the race
+  whatever the day usually is. Both tools check what they are handed *inside* the turn and hand
+  the reasons back (`planOutlineProblems`, `generatedPlanProblems`), where the checks used to run
+  after the turn and throw away the whole plan over one short week. **What the athlete does not
+  share is withheld twice** (`request.sources`): from every tool that reads it — local, and COROS
+  MCP's by what its name says (`toolReadsWithheldSource`) — and from the snapshot the turn starts
+  from (`buildTrainingContext`'s scope); a switch that only edited the prompt would be a lie. Switching one under a drawn outline asks first and, on
+  yes, draws the outline again — it was drawn from what Coach could read.
+  "From my data" needs the activities. **The AI is the athlete's choice per plan**
+  (`request.runtime`, the override an analysis uses): only what differs from Coach's settings
+  travels, and a "Default model" travels as no model, since the Messages API reads `""` as an id.
+  **A generation's drafts never reach `chat_plan_drafts`**; the plan's overview is the coach's
+  `description`. The finished plan is **kept as a library draft the moment it arrives** — before
+  the athlete decides anything — so closing the last step loses nothing. That step offers **Save to COROS** (letting the draft go) and **Add to calendar**, which asks for the day first:
+  `previewPlanOnCalendar` reads a `draft:` id from this machine, so the preview comes before the
+  plan is on COROS, and the dialog's `saveFirst` saves and schedules it as one answer. **Edit
+  plan** opens the editor over the generator, which waits hidden (`covered`) and comes back
+  showing what Save draft kept (`editedDraft`); a save to COROS or a discard from the editor
+  closes it, since the plan left with them. A run
+  shows what Coach is doing as it happens (`runTrail.ts`): a line per read, per heading of the
+  thinking summary and per draft the check sends back — only what the stream said.
+  **`npm run dev:simulate-plan-ai` runs both turns without a provider** (`HERACLES_SIMULATE_PLAN_AI=1`,
+  `trainingPlanSimulation.ts`): a script in the model's place streams thinking and announced reads,
+  then hands its outline and plan to the *real* tools, so the checks, the draft, the library save
+  and COROS all run as they do for a real turn. Its first draft is a session short on purpose, to
+  show the check's hand-back. It reads nothing and says so, in its thinking and in the plan's
+  name. `test:training-plan-simulation` holds that the script passes the checks for every shape
+  of request — a script the checks refuse is a bug in one of the two. The form's arithmetic is
+  `planGeneratorModel.ts` and `planGeneratorRuntime.ts`. `test:training-plan-generation`,
+  `test:plan-generator-model`, `test:plan-generator-renderer`.
   **A plan saved from COROS's official catalogue is written in localization keys** —
   `name: "P10035"`, sessions `P10281`, descriptions `P11058`, steps `T1120` — which the
   Training Hub web app resolves against a string table on its CDN

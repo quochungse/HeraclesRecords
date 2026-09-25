@@ -193,6 +193,9 @@ export function TrainingLibraryView({
   /* What an answered save question is doing now; the question stays up until it is done. */
   const [saveBusy, setSaveBusy] = useState<{ target: "confirm" | "alternative"; label: string } | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  /* The editor was opened from the generator's last step, which waits under it. */
+  const editingFromGenerator = useRef(false);
+  const [generatorEdit, setGeneratorEdit] = useState<{ draftId: string; plan: TrainingPlanDocument } | null>(null);
   const [deepening, setDeepening] = useState<string | null>(null);
   /* The plan being copied on COROS — two requests and a read, and the
      reader says so rather than sitting still. */
@@ -334,6 +337,7 @@ export function TrainingLibraryView({
         baseVersion: editing.baseVersion ?? plan.remoteVersion,
         plan
       });
+      if (editingFromGenerator.current) setGeneratorEdit({ draftId: record.id, plan: record.plan });
       closeEditor();
       onMessage(
         record.baseRemoteId
@@ -344,6 +348,49 @@ export function TrainingLibraryView({
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
     }
+  };
+
+  /*
+   * A generated plan is kept as a draft before the editor opens on it.
+   *
+   * It used to open as an unsaved new plan, whose base was the plan itself —
+   * so the editor saw nothing to protect, and one press of Close or Escape
+   * threw away minutes of generation and the tokens that paid for it. As a
+   * draft it is a tile marked Draft until it is saved or discarded, like any
+   * plan written by hand and kept for later.
+   */
+  /* The generator keeps a finished plan as a library draft itself, before
+     the athlete decides anything, so closing it on its last step loses
+     nothing. The library lists the draft and, on "Open in editor", opens it. */
+  const generatedPlanKept = (plan: TrainingPlanDocument, draftId?: string) => {
+    if (draftId) {
+      onMessage(`Coach wrote "${plan.name}". It is kept as a draft until you save it to COROS.`);
+      void load();
+    }
+  };
+
+  /* Edit plan: the editor opens over the generator, which comes back when
+     the editor closes — unless the plan left with it, saved or discarded. */
+  const openGeneratedPlan = (plan: TrainingPlanDocument, draftId?: string) => {
+    editingFromGenerator.current = true;
+    openEditor(draftId ? { plan, draftId } : { plan });
+  };
+
+  /* Saved or scheduled from the generator's last step, which stays open on it. */
+  const generatedPlanSaved = (plan: TrainingPlanDocument) => {
+    onMessage(`Saved "${plan.name}" to COROS.`);
+    void load();
+  };
+
+  const generatedPlanScheduled = (plan: TrainingPlanDocument) => {
+    onMessage(`Saved "${plan.name}" to COROS and added it to the calendar.`);
+    onScheduleChanged();
+    void load();
+  };
+
+  const readGeneratedPlan = (plan: TrainingPlanDocument) => {
+    setGeneratorOpen(false);
+    setReadingPlan(plan);
   };
 
   /*
@@ -375,6 +422,9 @@ export function TrainingLibraryView({
       const updateCalendar = updateCalendarOnSave.current && result.plan.id === plan.id;
       updateCalendarOnSave.current = false;
       setSaveConflict(null);
+      /* Saved from the editor Edit plan opened: the generator's plan is on
+         COROS now, and the reader shows it. */
+      if (editingFromGenerator.current) setGeneratorOpen(false);
       closeEditor();
       setReadingPlan(result.plan);
       if (updateCalendar) {
@@ -541,6 +591,7 @@ export function TrainingLibraryView({
   };
 
   const closeEditor = () => {
+    editingFromGenerator.current = false;
     setEditing(null);
     setDraft(null);
   };
@@ -564,8 +615,12 @@ export function TrainingLibraryView({
           : `Discarded the draft "${plan.name}".`
       );
       setPendingDraftDiscard(null);
-      /* Discarded from inside the editor, the editor goes with it. */
-      if (editing?.draftId === id) closeEditor();
+      /* Discarded from inside the editor, the editor goes with it — and so
+         does the generator it was opened from, whose plan this was. */
+      if (editing?.draftId === id) {
+        if (editingFromGenerator.current) setGeneratorOpen(false);
+        closeEditor();
+      }
       await load();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
@@ -735,7 +790,10 @@ export function TrainingLibraryView({
           onResumeDraft={resumePlanDraft}
           inert={planScreen !== null}
           onCreate={createPlan}
-          onGenerate={() => setGeneratorOpen(true)}
+          onGenerate={() => {
+            setGeneratorEdit(null);
+            setGeneratorOpen(true);
+          }}
           offline={current.offline}
           onOpen={openPlan}
           matches={current.matches}
@@ -860,10 +918,13 @@ export function TrainingLibraryView({
           api={api}
           onClose={() => setGeneratorOpen(false)}
           onOpenCoach={onOpenCoach}
-          onGenerated={(plan) => {
-            setGeneratorOpen(false);
-            openEditor({ plan });
-          }}
+          onKept={generatedPlanKept}
+          onOpenPlan={openGeneratedPlan}
+          covered={Boolean(editing)}
+          editedDraft={generatorEdit}
+          onSaved={generatedPlanSaved}
+          onScheduled={generatedPlanScheduled}
+          onReadPlan={readGeneratedPlan}
         />
       ) : null}
 

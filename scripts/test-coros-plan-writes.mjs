@@ -758,6 +758,25 @@ test("a preview dates the plan from the Monday of the start day's week, and says
   assert.deepEqual(shared.entries[2].existing, ["Club run"], "and one already holding a workout, which COROS never checks");
 });
 
+test("a draft is previewed from this machine, before it is on COROS", async () => {
+  const coros = fakeCoros();
+  const entries = [libraryEntry, { ...writtenEntry, id: "w2", weekIndex: 1, dayIndex: 1 }];
+  const draft = library.savePlanDraft({ plan: { ...draftDocument(entries), weekCount: 2 } });
+  // Wednesday 13 January 2027.
+  const preview = await library.previewPlanOnCalendar(draft.id, "20270113");
+  assert.equal(preview.anchorDay, "20270111");
+  assert.deepEqual(
+    preview.entries.map((entry) => [entry.happenDay, entry.dropped]),
+    [["20270111", true], ["20270119", false]],
+    "a generated plan is asked for its day before it is saved"
+  );
+  assert.deepEqual(preview.blockers, []);
+  assert.equal(coros.to("/training/plan/detail").length, 0, "and COROS is asked only for the calendar");
+  assert.equal(coros.to("/training/schedule/query").length, 1);
+  library.discardPlanDraft(draft.id);
+  await assert.rejects(library.previewPlanOnCalendar(draft.id, "20270113"), /no longer in your library/);
+});
+
 test("a preview refuses what COROS would accept and get wrong", async () => {
   const running = { ...weeklyTemplate(), id: "run-1", executeStatus: 1, sourcePlanId: template.id, startDay: 20270111 };
   const listed = fakeCoros([weeklyTemplate(), running]);

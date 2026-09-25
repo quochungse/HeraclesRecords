@@ -11,6 +11,13 @@ interface TrainingPlanCalendarDialogProps {
   onClose: () => void;
   /** Answers the running copy COROS made of the plan. */
   onAdded: (instance: TrainingPlanDocument) => void;
+  /**
+   * A plan not on COROS yet — a library draft, `plan.id` its record's id — is
+   * saved by this before it is added, once the day is picked. It answers the
+   * saved plan, and must answer the same one if asked again after the add
+   * failed, so Try again adds rather than saving a second copy.
+   */
+  saveFirst?: () => Promise<TrainingPlanDocument>;
 }
 
 /**
@@ -42,13 +49,14 @@ function userFacingError(cause: unknown): string {
  * without a word from COROS, so the preview is read again on every day
  * picked and says both before anything is written.
  */
-export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded }: TrainingPlanCalendarDialogProps) {
+export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded, saveFirst }: TrainingPlanCalendarDialogProps) {
   const [startDay, setStartDay] = useState(() => nextMondayKey());
   const [preview, setPreview] = useState<TrainingPlanCalendarPreview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
+  /* What an add is doing now: saving the plan first, or putting it on the calendar. */
+  const [adding, setAdding] = useState<"saving" | "adding" | null>(null);
   /* Which step failed decides what the error is called and what Try again does. */
-  const [error, setError] = useState<{ during: "preview" | "add"; message: string } | null>(null);
+  const [error, setError] = useState<{ during: "preview" | "save" | "add"; message: string } | null>(null);
   /* A preview answering an earlier pick must not land over a later one. */
   const request = useRef(0);
 
@@ -88,13 +96,24 @@ export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded }: Trai
 
   const add = async () => {
     if (!preview || preview.blockers.length) return;
-    setAdding(true);
     setError(null);
+    let planId = plan.id;
+    if (saveFirst) {
+      setAdding("saving");
+      try {
+        planId = (await saveFirst()).id;
+      } catch (cause) {
+        setError({ during: "save", message: userFacingError(cause) });
+        setAdding(null);
+        return;
+      }
+    }
+    setAdding("adding");
     try {
-      onAdded(await api.addTrainingPlanToCalendar(plan.id, startDay));
+      onAdded(await api.addTrainingPlanToCalendar(planId, startDay));
     } catch (cause) {
       setError({ during: "add", message: userFacingError(cause) });
-      setAdding(false);
+      setAdding(null);
     }
   };
 
@@ -120,7 +139,7 @@ export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded }: Trai
             </h2>
             <p>{plan.name}</p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" disabled={adding} onClick={onClose}>
+          <button type="button" className="icon-button" aria-label="Close" disabled={Boolean(adding)} onClick={onClose}>
             <X size={17} />
           </button>
         </header>
@@ -140,15 +159,19 @@ export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded }: Trai
                 <AlertTriangle size={17} />
                 <div>
                   <strong>
-                    {error.during === "add" ? "COROS didn’t add the plan" : "Couldn’t read the COROS calendar"}
+                    {error.during === "save"
+                      ? "The plan wasn’t saved to COROS"
+                      : error.during === "add"
+                        ? saveFirst ? "Saved to COROS, but not added to the calendar" : "COROS didn’t add the plan"
+                        : "Couldn’t read the COROS calendar"}
                   </strong>
                   <p>{error.message}</p>
                 </div>
                 <button
                   type="button"
                   className="ghost-button"
-                  disabled={loading || adding}
-                  onClick={() => void (error.during === "add" ? add() : loadPreview(startDay))}
+                  disabled={loading || Boolean(adding)}
+                  onClick={() => void (error.during === "preview" ? loadPreview(startDay) : add())}
                 >
                   <RefreshCw size={14} /> Try again
                 </button>
@@ -225,17 +248,21 @@ export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded }: Trai
         </div>
 
         <footer>
-          <button type="button" className="ghost-button" disabled={adding} onClick={onClose}>
+          <button type="button" className="ghost-button" disabled={Boolean(adding)} onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
             className="primary-button"
-            disabled={adding || loading || !current || current.blockers.length > 0}
+            disabled={Boolean(adding) || loading || !current || current.blockers.length > 0}
             onClick={() => void add()}
           >
             {adding ? <LoaderCircle className="is-spinning" size={15} /> : <CalendarPlus size={15} />}
-            {adding ? "Adding…" : sharedDays ? "Add alongside them" : "Add to calendar"}
+            {adding === "saving"
+              ? "Saving to COROS…"
+              : adding
+                ? "Adding…"
+                : `${saveFirst ? "Save & add" : "Add"}${sharedDays ? " alongside them" : " to calendar"}`}
           </button>
         </footer>
       </section>

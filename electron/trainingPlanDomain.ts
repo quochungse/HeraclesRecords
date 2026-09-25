@@ -6,7 +6,6 @@ import type {
   RunWorkoutStepInput,
   TrainingPlanDocument,
   TrainingPlanEntry,
-  TrainingPlanGenerationRequest,
   TrainingPlanWeekStage,
   WorkoutSport
 } from "./types";
@@ -139,7 +138,7 @@ export function createTrainingPlan(name = "New plan"): TrainingPlanDocument {
  * the anchor COROS itself uses when a plan goes on the calendar, so a coach
  * session dated Wednesday is a Wednesday session in the plan.
  */
-function placeDatedWorkouts(
+export function placeDatedWorkouts(
   workouts: ReadonlyArray<{ key: string; name: string; source: PlanWorkoutEntryInput; date?: string }>,
   idPrefix: string,
   anchor?: Date,
@@ -175,79 +174,6 @@ function placeDatedWorkouts(
       }
     };
   });
-}
-
-export function trainingPlanFromDraftPreview(
-  preview: PlanDraftPreview,
-  request: TrainingPlanGenerationRequest
-): TrainingPlanDocument {
-  if (!request.goal.trim()) throw new Error("Add a training goal before generating a plan.");
-  if (request.weeks < 1 || request.weeks > 24) throw new Error("Generated plans must contain 1 to 24 weeks.");
-  if (request.sessionsPerWeek < 1 || request.sessionsPerWeek > 7) throw new Error("Sessions per week must be between 1 and 7.");
-  if (request.sports.length === 0) throw new Error("Choose at least one sport.");
-  if (request.availableDayIndexes.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("Available days must be Monday through Sunday.");
-  if (request.availableDayIndexes.length < request.sessionsPerWeek) throw new Error("Choose at least as many available days as weekly sessions.");
-  if (request.maxSessionMinutes !== undefined && request.maxSessionMinutes <= 0) throw new Error("The session-duration limit must be greater than zero.");
-  const start = parsePlanDay(request.startDate);
-  if (!start) throw new Error("Choose a valid plan start date.");
-  if (!preview.name.trim()) throw new Error("Training Coach returned a plan without a name.");
-
-  const lastDay = new Date(start);
-  lastDay.setDate(lastDay.getDate() + request.weeks * 7);
-  /* Counted in the weeks the athlete asked for, from their start day — not in
-     calendar weeks, which a mid-week start splits in two. */
-  const perRequestedWeek = new Map<number, number>();
-  for (const entry of preview.entries) {
-    if (!entry.source) throw new Error(`Generated workout "${entry.name}" is missing its structured definition.`);
-    const date = parsePlanDay(entry.source.schedule_date ?? entry.scheduleDate);
-    if (!date) throw new Error(`Generated workout "${entry.name}" is missing a schedule date.`);
-    if (date < start || date >= lastDay) {
-      throw new Error(`Generated workout "${entry.name}" falls outside the requested plan dates.`);
-    }
-    if (!request.availableDayIndexes.includes((date.getDay() + 6) % 7)) {
-      throw new Error(`Generated workout "${entry.name}" was placed on an unavailable day.`);
-    }
-    if (!request.sports.includes(entry.source.sport ?? "run")) {
-      throw new Error(`Generated workout "${entry.name}" uses a sport that was not requested.`);
-    }
-    const week = Math.floor(daysBetween(start, date) / 7);
-    perRequestedWeek.set(week, (perRequestedWeek.get(week) ?? 0) + 1);
-  }
-  for (let week = 0; week < request.weeks; week += 1) {
-    const count = perRequestedWeek.get(week) ?? 0;
-    if (count !== request.sessionsPerWeek) {
-      throw new Error(`Generated week ${week + 1} has ${count} workouts instead of ${request.sessionsPerWeek}.`);
-    }
-  }
-
-  const document = createTrainingPlan(preview.name);
-  document.description = [
-    request.goal.trim(),
-    preview.summary.trim() || "Generated with Training Coach from your current training context.",
-    request.constraints?.trim(),
-    ...preview.warnings
-  ].filter(Boolean).join("\n\n");
-  document.origin = "coach";
-  document.coach = { draftId: preview.draftId };
-  document.entries = placeDatedWorkouts(
-    preview.entries.map((entry) => ({
-      key: entry.key,
-      name: entry.name,
-      source: entry.source!,
-      date: entry.source!.schedule_date ?? entry.scheduleDate
-    })),
-    preview.draftId,
-    mondayOf(start)
-  );
-  document.weekCount = Math.max(1, ...document.entries.map((entry) => entry.weekIndex + 1));
-  if (request.maxSessionMinutes) {
-    const overLimit = document.entries.find((entry) => workoutMetrics(entry.workout).durationSeconds > request.maxSessionMinutes! * 60);
-    if (overLimit) {
-      throw new Error(`Generated workout "${overLimit.title}" exceeds the session-duration limit.`);
-    }
-  }
-  document.sportMix = sportMixOf(document.entries);
-  return document;
 }
 
 /** A Coach plan card as a plan document, for the editor and for a save to COROS. */
@@ -382,6 +308,11 @@ function workoutMetrics(workout?: PlanWorkoutEntryInput): {
     }
   }
   return { durationSeconds, distanceMeters, trainingLoad, strengthSets };
+}
+
+/** A session's length, where its steps state one: a step given as a distance or reps adds nothing. */
+export function workoutDurationSeconds(workout?: PlanWorkoutEntryInput): number {
+  return workoutMetrics(workout).durationSeconds;
 }
 
 /**

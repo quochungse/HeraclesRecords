@@ -2548,19 +2548,141 @@ export type LibraryPlanSession = Pick<
   | "plannedStrengthSets"
 >;
 
-export interface TrainingPlanGenerationRequest {
-  goal: string;
-  sports: WorkoutSport[];
-  difficulty: TrainingPlanDifficulty;
-  weeks: number;
-  sessionsPerWeek: number;
-  /** ISO date for Day 1 of Week 1. */
-  startDate: string;
-  /** Monday = 0 through Sunday = 6. */
-  availableDayIndexes: number[];
-  maxSessionMinutes?: number;
-  constraints?: string;
+/**
+ * What a generated plan is for. The four named kinds each carry a brief the
+ * prompt states for the athlete; `other` is the athlete's own words and
+ * nothing else, for a goal none of the four fits.
+ */
+export type TrainingPlanGoalKind = "race" | "base" | "return" | "hybrid" | "other";
+
+/**
+ * One weekday of the athlete's usual week. `flex` is a day Coach may use or
+ * leave free, so a week with flex days asks for a range of sessions rather
+ * than a count.
+ */
+export type TrainingPlanDayKind = "rest" | "train" | "long" | "flex";
+
+export interface TrainingPlanGenerationDay {
+  kind: TrainingPlanDayKind;
+  /** The time the athlete has that day, whole minutes. Absent on a rest day. */
+  minutes?: number;
 }
+
+/**
+ * The athlete's usual week, stated one of two ways: day by day (`days`, seven
+ * of them, Monday first), or left to Coach (`coach`) with whatever the athlete
+ * is sure of — every field of which may be left out, "not sure" being an
+ * answer the form offers everywhere.
+ */
+export type TrainingPlanGenerationWeek =
+  | { mode: "days"; days: TrainingPlanGenerationDay[] }
+  | {
+      mode: "coach";
+      /** Hours a week, a band; `max` absent means "or more". */
+      hours?: { min: number; max?: number };
+      sessionsPerWeek?: number;
+      /** Days the athlete cannot train, Monday = 0 through Sunday = 6. */
+      blockedDayIndexes: number[];
+    };
+
+export interface TrainingPlanGenerationRequest {
+  goalKind: TrainingPlanGoalKind;
+  /** The athlete's own words. Required for `other`; a detail for the rest. */
+  goal: string;
+  /** A race plan ends on race day, which decides its length. */
+  race?: { date: string; distance?: string };
+  sports: WorkoutSport[];
+  /** `custom` means Coach judges the level from the athlete's own training. */
+  difficulty: TrainingPlanDifficulty;
+  /** The Monday week 1 starts on, `YYYY-MM-DD`: COROS counts a plan's weeks from a Monday. */
+  startDate: string;
+  /**
+   * Whole weeks. Absent means Coach decides — never on a race plan, whose
+   * length is the distance to race day.
+   */
+  weeks?: number;
+  week: TrainingPlanGenerationWeek;
+  constraints?: string;
+  /**
+   * The provider, model and effort for this plan only, as an analysis states
+   * its own. Absent fields fall back to Coach's settings.
+   */
+  runtime?: AnalysisRuntime;
+  /**
+   * What Coach may read for this plan. Absent means everything; a source
+   * switched off is neither in the snapshot the turn starts from nor behind
+   * any tool the turn is offered.
+   */
+  sources?: TrainingPlanDataSources;
+  /**
+   * The outline the athlete accepted, when the sessions are written from one:
+   * its length, stages and weekly sessions become rules the draft tool checks.
+   */
+  outline?: TrainingPlanOutline;
+}
+
+/** The athlete's data a generation may read, each on or off. */
+export interface TrainingPlanDataSources {
+  /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
+  activities: boolean;
+  /** Nights, naps and overnight HRV. */
+  sleep: boolean;
+  /** The athlete's COROS thresholds and zone tables. */
+  zones: boolean;
+}
+
+/** One of an outline's key sessions: what the week is built around. */
+export interface TrainingPlanOutlineSession {
+  /** Monday = 0 through Sunday = 6. */
+  dayIndex: number;
+  name: string;
+  sport: WorkoutSport;
+  minutes?: number;
+}
+
+export interface TrainingPlanOutlineWeek {
+  /** COROS's stage, 1 Preparation … 6 Transition. */
+  stage: TrainingPlanWeekStage;
+  /** A lighter week inside its block, to absorb the ones before it. */
+  lighter: boolean;
+  hours: number;
+  sessions: number;
+  /** One sentence: what the week is for. */
+  focus: string;
+  keySessions: TrainingPlanOutlineSession[];
+}
+
+/**
+ * A plan's shape before its sessions: Coach proposes it, the athlete reads
+ * it and may ask for changes, and the sessions are then written to it.
+ */
+export interface TrainingPlanOutline {
+  summary: string;
+  /** What Coach read of the athlete's training, in a sentence or two. */
+  basis: string;
+  weeks: TrainingPlanOutlineWeek[];
+}
+
+/** What to change in an outline already proposed: the athlete's words. */
+export interface TrainingPlanOutlineRevision {
+  outline: TrainingPlanOutline;
+  note: string;
+}
+
+export type TrainingPlanOutlineResult =
+  | { ok: true; outline: TrainingPlanOutline }
+  | { ok: false; reason: "cancelled" }
+  | { ok: false; reason: "invalid" | "failed" | "no-outline"; message: string };
+
+/**
+ * How a generation ended. The stream carries its progress; this carries its
+ * outcome, so the generator does not have to rebuild it from stream events.
+ * `plan` is a new plan document, not yet saved anywhere.
+ */
+export type TrainingPlanGenerationResult =
+  | { ok: true; plan: TrainingPlanDocument }
+  | { ok: false; reason: "cancelled" }
+  | { ok: false; reason: "invalid" | "failed" | "no-plan"; message: string };
 
 /**
  * What a plan is doing on the COROS calendar. A plan put there becomes an
