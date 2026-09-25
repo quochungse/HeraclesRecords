@@ -786,6 +786,7 @@ export function TrainingPlanGenerator({
           api={api}
           plan={finished.saved ?? { ...finished.plan, id: finished.draftId ?? finished.plan.id }}
           saveFirst={finished.saved ? undefined : saveToCoros}
+          defaultStartDay={request.startDate.replace(/-/g, "")}
           onClose={() => setCalendarOpen(false)}
           onAdded={() => {
             setCalendarOpen(false);
