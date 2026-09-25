@@ -18,7 +18,7 @@
  * so this costs no new dependency — and because the bugs being chased are the
  * kind a real browser has: effects, event order, and a console nobody read.
  */
-import { StrictMode, type ReactElement } from "react";
+import { StrictMode, useState, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
 import { ThemeProvider } from "../../src/theme/ThemeProvider";
@@ -29,6 +29,18 @@ import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { RunningView } from "../../src/running/RunningView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
+import { PromptDialog } from "../../src/training-library/PromptDialog";
+import { clampTagInput } from "../../src/training-library/tagInput";
+import { PlanReader } from "../../src/training-library/PlanReader";
+import { PlanEditor } from "../../src/training-library/PlanEditor";
+import { startDraft } from "../../src/training-library/planDraft";
+import { ConfirmDialog } from "../../src/training-library/ConfirmDialog";
+import { WorkoutWorkspace } from "../../src/training-library/WorkoutWorkspace";
+import { TrainingLibraryView } from "../../src/training-library/TrainingLibraryView";
+import { TrainingPlanGenerator } from "../../src/training-library/TrainingPlanGenerator";
+import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
+import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
+import { CalendarView } from "../../src/calendar/CalendarView";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -182,6 +194,17 @@ function loadAppStyles() {
  * passing. Kept apart from `loadAppStyles` so the suites that predate it go on
  * standing on exactly the ground they were written against.
  */
+/** The same, plus the Training Library's own stylesheet. */
+function loadLibraryStyles() {
+  if (appStylesReady) return;
+  void Promise.all([
+    import("../../src/styles.css"),
+    import("../../src/training-library/trainingLibrary.css")
+  ]).then(() => {
+    appStylesReady = true;
+  });
+}
+
 function loadActivitiesStyles() {
   if (appStylesReady) return;
   void Promise.all([
@@ -190,6 +213,39 @@ function loadActivitiesStyles() {
   ]).then(() => {
     appStylesReady = true;
   });
+}
+
+function PlanEditorHarness({ options }: { options: Record<string, unknown> }) {
+  const [draft, setDraft] = useState(() => startDraft(options.plan as never));
+  return (
+    <div
+      className="tl-plan-modal-backdrop"
+      style={{
+        position: "relative",
+        inset: "auto",
+        padding: 0,
+        width: `${(options.width as number | undefined) ?? 1180}px`,
+        height: `${(options.height as number | undefined) ?? 800}px`
+      }}
+    >
+      <div className="tl-plan-modal">
+        <PlanEditor
+          api={api}
+          draft={draft}
+          onDraftChange={setDraft}
+          workouts={(options.workouts as never) ?? []}
+          isNew={(options.isNew as boolean | undefined) ?? false}
+          onSave={async (plan) => {
+            spy("onSave")(plan);
+          }}
+          onSaveDraft={async (plan) => {
+            spy("onSaveDraft")(plan);
+          }}
+          onClose={spy("onClose")}
+        />
+      </div>
+    </div>
+  );
 }
 
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
@@ -231,6 +287,218 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
    * the bar, a bar that must not move what is under it — so it is mounted at a
    * stated width rather than the window's.
    */
+  /*
+   * The Training Library's replacement for `window.prompt`, which Electron does
+   * not implement. Mounted with the library stylesheet because what is asserted
+   * about it is behaviour a hidden window still has — focus, Escape, submit,
+   * and which mousedown dismisses it.
+   */
+  PromptDialog: (options) => {
+    loadLibraryStyles();
+    return (
+      <PromptDialog
+        title={(options.title as string | undefined) ?? "Tag this workout"}
+        description={options.description as string | undefined}
+        label={(options.label as string | undefined) ?? "Tags, separated by commas"}
+        initialValue={(options.initialValue as string | undefined) ?? ""}
+        type={(options.type as "text" | "date" | undefined) ?? "text"}
+        min={options.min as string | undefined}
+        /* The tag dialogs' own sanitizer, named rather than passed: a function
+           cannot cross the harness's JSON mount options. */
+        sanitize={options.sanitize === "tags" ? clampTagInput : undefined}
+        confirmLabel={(options.confirmLabel as string | undefined) ?? "Save"}
+        onConfirm={spy("onConfirm")}
+        onCancel={spy("onCancel")}
+      />
+    );
+  },
+  /*
+   * The plan reader in a column that cannot grow, which is the only place its
+   * layout is interesting: it scrolls itself, and a day row is a two-column
+   * grid whose label gutter has to hold at every width.
+   */
+  PlanReader: (options) => {
+    loadLibraryStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          display: "flex",
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <PlanReader
+          plan={options.plan as never}
+          matches={(options.matches as never) ?? []}
+          offline={(options.offline as boolean | undefined) ?? false}
+          loadingFull={(options.loadingFull as boolean | undefined) ?? false}
+          duplicating={(options.duplicating as boolean | undefined) ?? false}
+          /* A date cannot cross the mount options, so the clock travels as a string. */
+          today={typeof options.today === "string" ? new Date(options.today) : undefined}
+          onBack={spy("onBack")}
+          onEdit={spy("onEdit")}
+          onDuplicate={spy("onDuplicate")}
+          onCalendar={spy("onCalendar")}
+          onFavorite={spy("onFavorite")}
+          onArchive={spy("onArchive")}
+          onDelete={spy("onDelete")}
+          onOpenActivity={spy("onOpenActivity")}
+        />
+      </main>
+    );
+  },
+  /*
+   * The plan editor inside the backdrop it is portalled into in the app,
+   * because that is where half of its bugs lived: the library's button rules
+   * were scoped to the view, and the backdrop is outside it. Pinned to a stated
+   * size rather than fixed over the window, so the width the weeks get is the
+   * test's to choose. The draft is held here, as the view holds it.
+   */
+  /* The AI plan generator on its own: the library opens it over the index,
+     and nothing it does depends on the library under it. */
+  TrainingPlanGenerator: (options) => {
+    loadLibraryStyles();
+    return (
+      <TrainingPlanGenerator
+        api={api}
+        covered={(options.covered as boolean | undefined) ?? false}
+        editedDraft={(options.editedDraft as never) ?? null}
+        onClose={spy("onClose")}
+        onKept={spy("onKept") as () => void}
+        onOpenPlan={spy("onOpenPlan") as () => void}
+        onSaved={spy("onSaved") as () => void}
+        onScheduled={spy("onScheduled") as () => void}
+        onReadPlan={spy("onReadPlan") as () => void}
+        onOpenCoach={spy("onOpenCoach")}
+      />
+    );
+  },
+  PlanEditor: (options) => {
+    loadLibraryStyles();
+    return <PlanEditorHarness options={options} />;
+  },
+  /*
+   * The whole library screen, snapshot scripted through
+   * `getTrainingLibrarySnapshot`. The reader and the session view are layers
+   * over the index, so their geometry is only honest with the scrim, the sheet
+   * and the index underneath actually there.
+   */
+  TrainingLibraryView: (options) => {
+    loadLibraryStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          display: "flex",
+          height: `${(options.height as number | undefined) ?? 900}px`
+        }}
+      >
+        <TrainingLibraryView
+          api={api}
+          status={{ authenticated: true } as never}
+          onOpenTraining={spy("onOpenTraining")}
+          onOpenCoach={spy("onOpenCoach")}
+          onMessage={spy("onMessage")}
+          onError={spy("onError")}
+          onScheduleChanged={spy("onScheduleChanged")}
+          onOpenActivity={spy("onOpenActivity")}
+        />
+      </main>
+    );
+  },
+  /*
+   * The Workouts tab in a column that cannot grow, which is where its layout
+   * is interesting: the list and the detail pane split the width, and the
+   * detail pane draws the Calendar's own workout view.
+   */
+  WorkoutWorkspace: (options) => {
+    loadLibraryStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          display: "flex",
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <section className="training-library-view">
+          <WorkoutWorkspace
+            api={api}
+            workouts={(options.workouts as never) ?? []}
+            onRefresh={async () => undefined}
+            onMessage={spy("onMessage")}
+            onError={spy("onError")}
+          />
+        </section>
+      </main>
+    );
+  },
+  /** The whole Create-workout dialog, portal and all. Mounted for the narrow
+      layout, which is a single scrolling column and has twice grown an overlap
+      the wide one cannot have. */
+  AddWorkoutModal: (options) => {
+    loadAppStyles();
+    return (
+      <AddWorkoutModal
+        api={api}
+        dateKey={(options.dateKey as string | undefined) ?? "20991231"}
+        sportTypes={(options.sportTypes as never) ?? []}
+        libraryOnly={(options.libraryOnly as boolean | undefined) ?? true}
+        onClose={spy("onClose")}
+        onScheduled={spy("onScheduled")}
+        onError={spy("onError")}
+      />
+    );
+  },
+  /** The exercise library screen. It portals to `document.body`, so nothing
+      here wraps it — the driver measures it where it lands. */
+  ExercisePickerDialog: (options) => {
+    loadAppStyles();
+    return (
+      <ExercisePickerDialog
+        title={(options.title as string | undefined) ?? "Exercise"}
+        options={(options.options as never) ?? []}
+        selectedId={options.selectedId as string | undefined}
+        loading={(options.loading as boolean | undefined) ?? false}
+        onPick={spy("onPick")}
+        onClose={spy("onClose")}
+      />
+    );
+  },
+  ConfirmDialog: (options) => {
+    loadLibraryStyles();
+    return (
+      <ConfirmDialog
+        title={(options.title as string | undefined) ?? "Discard unsaved changes?"}
+        description={options.description as string | undefined}
+        confirmLabel={(options.confirmLabel as string | undefined) ?? "Discard changes"}
+        cancelLabel={options.cancelLabel as string | undefined}
+        danger={(options.danger as boolean | undefined) ?? false}
+        onConfirm={spy("onConfirm")}
+        onCancel={spy("onCancel")}
+      />
+    );
+  },
+  /** The whole screen, signed in. Its removal questions portal to
+      `document.body`, so the driver finds them there. */
+  CalendarView: () => {
+    loadLibraryStyles();
+    return (
+      <CalendarView
+        api={api}
+        status={{ authenticated: true } as never}
+        sportTypes={[]}
+        refreshToken={0}
+        onMessage={spy("onMessage")}
+        onError={spy("onError")}
+        onOpenTraining={spy("onOpenTraining")}
+        onOpenCoach={spy("onOpenCoach")}
+        onScheduleChanged={spy("onScheduleChanged")}
+      />
+    );
+  },
   ActivitiesSummary: (options) => {
     loadActivitiesStyles();
     return (

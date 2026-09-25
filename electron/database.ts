@@ -15,16 +15,16 @@ import type {
   ActivityDetailSummary,
   CoachAnalysisRunQuery,
   LocalTrack,
-  NativeCorosPlanDetail,
   SpotifySyncTrack,
   SpotifySyncTrackStatus,
   StrengthDetail,
   StrengthSession,
   TrainingActivityMatch,
-  TrainingCollection,
   TrainingHubActivity,
   TrainingHubLibraryWorkout,
   TrainingPlanDocument,
+  TrainingPlanDraftRecord,
+  TrainingPlanMetadata,
   TrainingWorkoutMetadata,
   YouTubeHistoryEntry,
   YouTubeHistoryEntryType
@@ -237,30 +237,37 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_chat_plan_drafts_created
       ON chat_plan_drafts(created_at DESC);
 
-    CREATE TABLE IF NOT EXISTS training_plans (
-      id TEXT PRIMARY KEY,
-      remote_id TEXT UNIQUE,
-      source TEXT NOT NULL,
-      name TEXT NOT NULL,
-      document_json TEXT NOT NULL,
-      raw_remote_json TEXT,
-      remote_version INTEGER,
-      remote_updated_at INTEGER,
-      sync_state TEXT NOT NULL DEFAULT 'local',
-      last_synced_at TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      archived_at TEXT
+    -- App-side facts about a COROS plan that COROS has no field for.
+    CREATE TABLE IF NOT EXISTS training_plan_metadata (
+      plan_id TEXT PRIMARY KEY,
+      favorite INTEGER NOT NULL DEFAULT 0,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      archived INTEGER NOT NULL DEFAULT 0,
+      origin TEXT,
+      coach_json TEXT,
+      updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_training_plans_source_updated
-      ON training_plans(source, updated_at DESC);
+    -- A plan being edited, not yet saved to COROS.
+    CREATE TABLE IF NOT EXISTS training_plan_drafts (
+      id TEXT PRIMARY KEY,
+      base_remote_id TEXT,
+      base_version INTEGER,
+      plan_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+
+    -- The last COROS answer for each plan, so the library draws offline.
+    CREATE TABLE IF NOT EXISTS coros_plan_cache (
+      remote_id TEXT PRIMARY KEY,
+      document_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL
+    );
 
     CREATE TABLE IF NOT EXISTS training_workout_metadata (
       program_id TEXT PRIMARY KEY,
       favorite INTEGER NOT NULL DEFAULT 0,
       tags_json TEXT NOT NULL DEFAULT '[]',
-      collection_id TEXT,
       source TEXT NOT NULL DEFAULT 'coros',
       sync_state TEXT NOT NULL DEFAULT 'synced',
       last_used_at TEXT,
@@ -268,27 +275,6 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       cached_version TEXT,
       cached_payload_json TEXT
     );
-
-    CREATE TABLE IF NOT EXISTS training_collections (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      color TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS training_plan_workout_links (
-      plan_id TEXT NOT NULL,
-      entry_id TEXT NOT NULL,
-      program_id TEXT,
-      happen_day TEXT,
-      remote_plan_program_id TEXT,
-      PRIMARY KEY (plan_id, entry_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_training_plan_workout_program
-      ON training_plan_workout_links(program_id);
 
     CREATE TABLE IF NOT EXISTS training_activity_matches (
       id TEXT PRIMARY KEY,
@@ -512,6 +498,8 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // rather than grown, so every column it has is in the CREATE block above.
   dropLegacyAutomationTables(db);
   dropRetiredMapTables(db);
+  dropRetiredCollectionTable(db);
+  dropLocalTrainingPlans(db);
   migrateChatTranscriptsToSessions(db);
 
   // Seed the built-in COROS MCP server so existing users get a registry entry
@@ -678,6 +666,85 @@ function dropLegacyAutomationTables(database: Database.Database): void {
     "idx_automation_runs_started"
   ]) {
     database.exec(`DROP INDEX IF EXISTS ${index}`);
+  }
+}
+
+/**
+ * Retires the local plan store: a plan is a COROS plan now, and a local one
+ * has nowhere to go (docs/training-plan-coros-first.md §8).
+ *
+ * `training_plans` held two kinds of row. A `coros:` row was a cache of a plan
+ * COROS still holds, and the only thing in it COROS does not have is what the
+ * athlete set here — favourite, tags, archived — so that moves to
+ * `training_plan_metadata` and the rest is dropped; the next snapshot reads the
+ * plan fresh. A `local` or `coach` row is dropped outright, by decision: the
+ * sessions such a plan once wrote to the calendar are ordinary COROS workouts
+ * and stay exactly where they are, because nothing here asks COROS anything.
+ *
+ * No tombstones, the same as `dropRetiredCollectionTable`: every machine drops
+ * its own tables on the upgrade, and `syncPolicy` no longer classifies them,
+ * so a row published by a machine still on the old build has no table to land
+ * in and is skipped by the merge.
+ */
+function dropLocalTrainingPlans(database: Database.Database): void {
+  if (tableExists(database, "training_plans")) {
+    const rows = database
+      .prepare("SELECT id, document_json, updated_at FROM training_plans WHERE source = 'coros'")
+      .all() as Array<{ id: string; document_json: string; updated_at: string }>;
+    const keep = database.prepare(
+      `INSERT OR IGNORE INTO training_plan_metadata
+         (plan_id, favorite, tags_json, archived, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
+    );
+    let kept = 0;
+    database.transaction(() => {
+      for (const row of rows) {
+        const plan = parseStoredJson<Record<string, unknown> | undefined>(row.document_json, undefined);
+        const tags = Array.isArray(plan?.tags) ? plan.tags.filter((tag) => typeof tag === "string") : [];
+        const favorite = plan?.favorite === true;
+        const archived = plan?.archived === true;
+        if (!favorite && !archived && tags.length === 0) continue;
+        keep.run(row.id, favorite ? 1 : 0, JSON.stringify(tags), archived ? 1 : 0, row.updated_at);
+        kept += 1;
+      }
+    })();
+    console.log(`[db] retiring local training plans; kept metadata for ${kept} COROS plan(s)`);
+    database.exec("DROP TABLE training_plans");
+  }
+  if (tableExists(database, "training_plan_workout_links")) {
+    database.exec("DROP TABLE training_plan_workout_links");
+  }
+}
+
+/**
+ * Drops the local "collection" grouping, with its column.
+ *
+ * COROS serves four training endpoints — program, plan, schedule and exercise —
+ * and not one of them knows about a collection. It was invented upstream, and
+ * in this fork it was write-only: two bulk bars set `collection_id` and the one
+ * place that read it was a count. There is nothing to migrate, because there
+ * was never anywhere for the grouping to go.
+ *
+ * No tombstones, the same as `dropLegacyAutomationTables`: each machine drops
+ * this for itself on the upgrade, and `syncPolicy` no longer classifies the
+ * table, so a row republished by a machine still on the old build is skipped by
+ * the merge rather than recreating anything.
+ */
+function dropRetiredCollectionTable(database: Database.Database): void {
+  if (tableExists(database, "training_collections")) {
+    console.log("[db] dropping retired table: training_collections");
+    database.exec("DROP TABLE training_collections");
+  }
+  // The column goes with it. `SqliteSyncTarget.upsertRow` drops columns this
+  // build does not have and reports the entry through `takeIncomplete`, so a
+  // machine still on the old build publishing `collection_id` lands its row
+  // without that column rather than aborting the merge.
+  const columns = database
+    .prepare("PRAGMA table_info(training_workout_metadata)")
+    .all() as Array<{ name: string }>;
+  if (columns.some((column) => column.name === "collection_id")) {
+    console.log("[db] dropping retired column: training_workout_metadata.collection_id");
+    database.exec("ALTER TABLE training_workout_metadata DROP COLUMN collection_id");
   }
 }
 
@@ -2803,28 +2870,6 @@ export function markChatPlanDraftUploaded(
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [draftId]);
 }
 
-export function pruneChatPlanDrafts(cutoffMs: number): number {
-  const database = requireDatabase();
-  // Ids first: a tombstone needs them, and after the delete there is nothing
-  // left to read them from.
-  const doomed = (
-    database
-      .prepare(
-        "SELECT draft_id FROM chat_plan_drafts " +
-          "WHERE created_at < ? AND uploaded_at IS NULL"
-      )
-      .all(cutoffMs) as Array<{ draft_id: string }>
-  ).map((row) => row.draft_id);
-
-  const result = database
-    .prepare("DELETE FROM chat_plan_drafts WHERE created_at < ? AND uploaded_at IS NULL")
-    .run(cutoffMs);
-  for (const draftId of doomed) {
-    notifySyncedDelete("chat_plan_drafts", draftId);
-  }
-  return result.changes;
-}
-
 export function deleteChatPlanDraft(draftId: string): void {
   requireDatabase()
     .prepare("DELETE FROM chat_plan_drafts WHERE draft_id = ?")
@@ -2832,31 +2877,15 @@ export function deleteChatPlanDraft(draftId: string): void {
   notifySyncedDelete("chat_plan_drafts", draftId);
 }
 
-interface TrainingPlanRow {
-  id: string;
-  document_json: string;
-  raw_remote_json: string | null;
-}
-
 interface TrainingWorkoutMetadataRow {
   program_id: string;
   favorite: number;
   tags_json: string;
-  collection_id: string | null;
   source: TrainingWorkoutMetadata["source"];
   sync_state: TrainingWorkoutMetadata["syncState"];
   last_used_at: string | null;
   last_synced_at: string | null;
   cached_version: string | null;
-}
-
-interface TrainingCollectionRow {
-  id: string;
-  name: string;
-  description: string | null;
-  color: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 interface TrainingActivityMatchRow {
@@ -2887,181 +2916,247 @@ function parseStoredJson<T>(value: string, fallback: T): T {
   }
 }
 
-export function saveTrainingPlanDocument(
-  document: TrainingPlanDocument,
-  rawRemote?: Record<string, unknown>
-): void {
-  const seenEntryIds = new Set<string>();
-  const duplicateEntryIds = new Set<string>();
-  for (const entry of document.entries) {
-    if (seenEntryIds.has(entry.id)) duplicateEntryIds.add(entry.id);
-    seenEntryIds.add(entry.id);
-  }
-  if (duplicateEntryIds.size > 0) {
-    throw new Error(
-      `Training plan "${document.name}" contains duplicate entry IDs: ${
-        [...duplicateEntryIds].join(", ")
-      }`
-    );
-  }
-  const database = requireDatabase();
-  // The links this plan had before the save. Read first, because the write
-  // below deletes them all and rebuilds from `document.entries` — so after it
-  // there is nothing left to say which entries the person removed, and a
-  // removal with no tombstone is a session that comes back on their other
-  // machine.
-  const previousEntryIds = (
-    database
-      .prepare("SELECT entry_id FROM training_plan_workout_links WHERE plan_id = ?")
-      .all(document.id) as Array<{ entry_id: string }>
-  ).map((row) => row.entry_id);
-
-  database.transaction(() => {
-    database
-      .prepare(
-        `INSERT INTO training_plans (
-           id, remote_id, source, name, document_json, raw_remote_json,
-           remote_version, remote_updated_at, sync_state, last_synced_at,
-           created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           remote_id = excluded.remote_id,
-           source = excluded.source,
-           name = excluded.name,
-           document_json = excluded.document_json,
-           raw_remote_json = COALESCE(excluded.raw_remote_json, training_plans.raw_remote_json),
-           remote_version = excluded.remote_version,
-           remote_updated_at = excluded.remote_updated_at,
-           sync_state = excluded.sync_state,
-           last_synced_at = excluded.last_synced_at,
-           updated_at = excluded.updated_at,
-           archived_at = excluded.archived_at`
-      )
-      .run(
-        document.id,
-        document.remoteId ?? null,
-        document.source,
-        document.name,
-        JSON.stringify(document),
-        rawRemote ? JSON.stringify(rawRemote) : null,
-        document.remoteVersion ?? null,
-        document.remoteUpdatedAt ?? null,
-        document.syncState,
-        document.lastSyncedAt ?? null,
-        document.createdAt,
-        document.updatedAt,
-        document.archived ? document.updatedAt : null
-      );
-
-    database
-      .prepare("DELETE FROM training_plan_workout_links WHERE plan_id = ?")
-      .run(document.id);
-    const insertLink = database.prepare(
-      `INSERT INTO training_plan_workout_links
-       (plan_id, entry_id, program_id, happen_day, remote_plan_program_id)
-       VALUES (?, ?, ?, ?, ?)`
-    );
-    for (const entry of document.entries) {
-      insertLink.run(
-        document.id,
-        entry.id,
-        entry.programId ?? null,
-        entry.workout?.schedule_date ?? null,
-        entry.remotePlanProgramId ?? null
-      );
-    }
-  })();
-
-  // The plan and every link it owns. Links are rewritten wholesale on each
-  // save, so the surviving ones are announced the same way rather than diffed.
-  notifySyncedRow("training_plans", ["id"], [document.id]);
-  const keptEntryIds = new Set<string>();
-  for (const entry of document.entries) {
-    keptEntryIds.add(entry.id);
-    notifySyncedRow(
-      "training_plan_workout_links",
-      ["plan_id", "entry_id"],
-      [document.id, entry.id]
-    );
-  }
-
-  // Removals do have to be diffed. A `set` for what remains says nothing about
-  // what went: the other machine holds the old link and, with no tombstone to
-  // outrank it, keeps the session this save deleted.
-  for (const entryId of previousEntryIds) {
-    if (keptEntryIds.has(entryId)) continue;
-    notifySyncedDelete("training_plan_workout_links", document.id, entryId);
-  }
+/**
+ * A plan document read back off disk, or nothing.
+ *
+ * Drafts sync between machines and the cache outlives builds, so a document can
+ * arrive in a shape this build did not write. Anything missing the fields the
+ * library cannot draw without is dropped rather than drawn wrong.
+ */
+function parsePlanDocument(json: string): TrainingPlanDocument | undefined {
+  const plan = parseStoredJson<TrainingPlanDocument | undefined>(json, undefined);
+  if (!plan || typeof plan.id !== "string" || !Array.isArray(plan.entries)) return undefined;
+  return {
+    ...plan,
+    weekStages: Array.isArray(plan.weekStages) ? plan.weekStages : [],
+    tags: Array.isArray(plan.tags) ? plan.tags : [],
+    calendar: plan.calendar ?? "unscheduled"
+  };
 }
 
-export function listTrainingPlanDocuments(): TrainingPlanDocument[] {
+interface CorosPlanCacheRow {
+  remote_id: string;
+  document_json: string;
+}
+
+export function listCorosPlanCache(): TrainingPlanDocument[] {
   const rows = requireDatabase()
-    .prepare(
-      `SELECT id, document_json, raw_remote_json
-       FROM training_plans
-       ORDER BY updated_at DESC`
-    )
-    .all() as TrainingPlanRow[];
+    .prepare("SELECT remote_id, document_json FROM coros_plan_cache")
+    .all() as CorosPlanCacheRow[];
   return rows
-    .map((row) => parseStoredJson<TrainingPlanDocument | undefined>(row.document_json, undefined))
+    .map((row) => parsePlanDocument(row.document_json))
     .filter((plan): plan is TrainingPlanDocument => Boolean(plan));
 }
 
-export function getTrainingPlanDocument(
-  id: string
-): TrainingPlanDocument | undefined {
+export function getCorosPlanCache(remoteId: string): TrainingPlanDocument | undefined {
   const row = requireDatabase()
-    .prepare(
-      `SELECT id, document_json, raw_remote_json
-       FROM training_plans
-       WHERE id = ? OR remote_id = ?`
-    )
-    .get(id, id) as TrainingPlanRow | undefined;
-  return row
-    ? parseStoredJson<TrainingPlanDocument | undefined>(row.document_json, undefined)
-    : undefined;
+    .prepare("SELECT remote_id, document_json FROM coros_plan_cache WHERE remote_id = ?")
+    .get(remoteId) as CorosPlanCacheRow | undefined;
+  return row ? parsePlanDocument(row.document_json) : undefined;
 }
 
-export function getNativePlanRawPayload(
-  id: string
-): NativeCorosPlanDetail["rawPayload"] | undefined {
+/**
+ * The running copy of a plan as the last snapshot cached it — the join
+ * `linkRunningInstances` makes over the whole list, asked for one plan
+ * without parsing every document in the cache.
+ */
+export function findCachedRunningCorosPlan(sourceRemoteId: string): string | undefined {
   const row = requireDatabase()
     .prepare(
-      `SELECT id, document_json, raw_remote_json
-       FROM training_plans
-       WHERE id = ? OR remote_id = ?`
+      `SELECT remote_id FROM coros_plan_cache
+        WHERE json_extract(document_json, '$.calendar') = 'running'
+          AND json_extract(document_json, '$.sourcePlanId') = ?
+        LIMIT 1`
     )
-    .get(id, id) as TrainingPlanRow | undefined;
-  return row?.raw_remote_json
-    ? parseStoredJson<Record<string, unknown> | undefined>(row.raw_remote_json, undefined)
-    : undefined;
+    .get(sourceRemoteId) as { remote_id: string } | undefined;
+  return row?.remote_id;
 }
 
-export function deleteTrainingPlanDocument(id: string): void {
+/**
+ * One plan as COROS last answered for it, as the library draws it. `device`
+ * tier: never synced. Only the document is kept — every write reads the plan
+ * from COROS again first, so COROS's own payload would be a copy nothing reads.
+ */
+export function saveCorosPlanCache(document: TrainingPlanDocument): void {
+  if (!document.remoteId) throw new Error("Only a plan on COROS is cached.");
+  requireDatabase()
+    .prepare(
+      `INSERT INTO coros_plan_cache (remote_id, document_json, fetched_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(remote_id) DO UPDATE SET
+         document_json = excluded.document_json,
+         fetched_at = excluded.fetched_at`
+    )
+    .run(document.remoteId, JSON.stringify(document), new Date().toISOString());
+}
+
+/** The whole cache becomes this list: a plan COROS no longer lists is gone. */
+export function replaceCorosPlanCache(plans: readonly TrainingPlanDocument[]): void {
   const database = requireDatabase();
-  // Link ids before the delete: a tombstone needs them, and afterwards there is
-  // nothing left to read them from.
-  const linkEntryIds = (
-    database
-      .prepare("SELECT entry_id FROM training_plan_workout_links WHERE plan_id = ?")
-      .all(id) as Array<{ entry_id: string }>
-  ).map((row) => row.entry_id);
-
   database.transaction(() => {
-    database.prepare("DELETE FROM training_plan_workout_links WHERE plan_id = ?").run(id);
-    database.prepare("DELETE FROM training_plans WHERE id = ?").run(id);
+    const keep = new Set(plans.map((plan) => plan.remoteId));
+    const present = database.prepare("SELECT remote_id FROM coros_plan_cache").all() as Array<{ remote_id: string }>;
+    const drop = database.prepare("DELETE FROM coros_plan_cache WHERE remote_id = ?");
+    for (const row of present) if (!keep.has(row.remote_id)) drop.run(row.remote_id);
+    for (const plan of plans) saveCorosPlanCache(plan);
   })();
+}
 
-  for (const entryId of linkEntryIds) {
-    notifySyncedDelete("training_plan_workout_links", id, entryId);
-  }
-  notifySyncedDelete("training_plans", id);
+export function deleteCorosPlanCache(remoteId: string): void {
+  requireDatabase().prepare("DELETE FROM coros_plan_cache WHERE remote_id = ?").run(remoteId);
+}
+
+interface TrainingPlanMetadataRow {
+  plan_id: string;
+  favorite: number;
+  tags_json: string;
+  archived: number;
+  origin: string | null;
+  coach_json: string | null;
+  updated_at: string;
+}
+
+function planMetadataFromRow(row: TrainingPlanMetadataRow): TrainingPlanMetadata {
+  return {
+    planId: row.plan_id,
+    favorite: row.favorite === 1,
+    tags: parseStoredJson<string[]>(row.tags_json, []),
+    archived: row.archived === 1,
+    origin: row.origin === "coach" || row.origin === "user" ? row.origin : undefined,
+    coach: row.coach_json ? parseStoredJson(row.coach_json, undefined) : undefined,
+    updatedAt: row.updated_at
+  };
+}
+
+export function listTrainingPlanMetadata(): TrainingPlanMetadata[] {
+  return (
+    requireDatabase()
+      .prepare(
+        `SELECT plan_id, favorite, tags_json, archived, origin, coach_json, updated_at
+         FROM training_plan_metadata`
+      )
+      .all() as TrainingPlanMetadataRow[]
+  ).map(planMetadataFromRow);
+}
+
+export function getTrainingPlanMetadata(planId: string): TrainingPlanMetadata | undefined {
+  const row = requireDatabase()
+    .prepare(
+      `SELECT plan_id, favorite, tags_json, archived, origin, coach_json, updated_at
+       FROM training_plan_metadata WHERE plan_id = ?`
+    )
+    .get(planId) as TrainingPlanMetadataRow | undefined;
+  return row ? planMetadataFromRow(row) : undefined;
+}
+
+export function saveTrainingPlanMetadata(metadata: TrainingPlanMetadata): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO training_plan_metadata
+         (plan_id, favorite, tags_json, archived, origin, coach_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(plan_id) DO UPDATE SET
+         favorite = excluded.favorite,
+         tags_json = excluded.tags_json,
+         archived = excluded.archived,
+         origin = excluded.origin,
+         coach_json = excluded.coach_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(
+      metadata.planId,
+      metadata.favorite ? 1 : 0,
+      JSON.stringify(metadata.tags),
+      metadata.archived ? 1 : 0,
+      metadata.origin ?? null,
+      metadata.coach ? JSON.stringify(metadata.coach) : null,
+      metadata.updatedAt
+    );
+  notifySyncedRow("training_plan_metadata", ["plan_id"], [metadata.planId]);
+}
+
+export function deleteTrainingPlanMetadata(planId: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM training_plan_metadata WHERE plan_id = ?")
+    .run(planId);
+  if (result.changes) notifySyncedDelete("training_plan_metadata", planId);
+}
+
+interface TrainingPlanDraftRow {
+  id: string;
+  base_remote_id: string | null;
+  base_version: number | null;
+  plan_json: string;
+  saved_at: string;
+}
+
+function planDraftFromRow(row: TrainingPlanDraftRow): TrainingPlanDraftRecord | undefined {
+  const plan = parsePlanDocument(row.plan_json);
+  if (!plan) return undefined;
+  return {
+    id: row.id,
+    baseRemoteId: row.base_remote_id ?? undefined,
+    baseVersion: row.base_version ?? undefined,
+    plan,
+    savedAt: row.saved_at
+  };
+}
+
+export function listTrainingPlanDrafts(): TrainingPlanDraftRecord[] {
+  return (
+    requireDatabase()
+      .prepare(
+        `SELECT id, base_remote_id, base_version, plan_json, saved_at
+         FROM training_plan_drafts ORDER BY saved_at DESC`
+      )
+      .all() as TrainingPlanDraftRow[]
+  )
+    .map(planDraftFromRow)
+    .filter((draft): draft is TrainingPlanDraftRecord => Boolean(draft));
+}
+
+export function getTrainingPlanDraft(id: string): TrainingPlanDraftRecord | undefined {
+  const row = requireDatabase()
+    .prepare(
+      `SELECT id, base_remote_id, base_version, plan_json, saved_at
+       FROM training_plan_drafts WHERE id = ?`
+    )
+    .get(id) as TrainingPlanDraftRow | undefined;
+  return row ? planDraftFromRow(row) : undefined;
+}
+
+export function saveTrainingPlanDraft(draft: TrainingPlanDraftRecord): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO training_plan_drafts (id, base_remote_id, base_version, plan_json, saved_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         base_remote_id = excluded.base_remote_id,
+         base_version = excluded.base_version,
+         plan_json = excluded.plan_json,
+         saved_at = excluded.saved_at`
+    )
+    .run(
+      draft.id,
+      draft.baseRemoteId ?? null,
+      draft.baseVersion ?? null,
+      JSON.stringify(draft.plan),
+      draft.savedAt
+    );
+  notifySyncedRow("training_plan_drafts", ["id"], [draft.id]);
+}
+
+export function deleteTrainingPlanDraft(id: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM training_plan_drafts WHERE id = ?")
+    .run(id);
+  if (result.changes) notifySyncedDelete("training_plan_drafts", id);
 }
 
 export function listTrainingWorkoutMetadata(): TrainingWorkoutMetadata[] {
   const rows = requireDatabase()
     .prepare(
-      `SELECT program_id, favorite, tags_json, collection_id, source, sync_state,
+      `SELECT program_id, favorite, tags_json, source, sync_state,
               last_used_at, last_synced_at, cached_version
        FROM training_workout_metadata`
     )
@@ -3070,7 +3165,6 @@ export function listTrainingWorkoutMetadata(): TrainingWorkoutMetadata[] {
     programId: row.program_id,
     favorite: Boolean(row.favorite),
     tags: parseStoredJson<string[]>(row.tags_json, []),
-    collectionId: row.collection_id ?? undefined,
     source: row.source,
     syncState: row.sync_state,
     lastUsedAt: row.last_used_at ?? undefined,
@@ -3104,13 +3198,12 @@ export function saveTrainingWorkoutMetadata(
   requireDatabase()
     .prepare(
       `INSERT INTO training_workout_metadata (
-         program_id, favorite, tags_json, collection_id, source, sync_state,
+         program_id, favorite, tags_json, source, sync_state,
          last_used_at, last_synced_at, cached_version, cached_payload_json
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(program_id) DO UPDATE SET
          favorite = excluded.favorite,
          tags_json = excluded.tags_json,
-         collection_id = excluded.collection_id,
          source = excluded.source,
          sync_state = excluded.sync_state,
          last_used_at = excluded.last_used_at,
@@ -3122,7 +3215,6 @@ export function saveTrainingWorkoutMetadata(
       metadata.programId,
       metadata.favorite ? 1 : 0,
       JSON.stringify(metadata.tags),
-      metadata.collectionId ?? null,
       metadata.source,
       metadata.syncState,
       metadata.lastUsedAt ?? null,
@@ -3135,72 +3227,6 @@ export function saveTrainingWorkoutMetadata(
     ["program_id"],
     [metadata.programId]
   );
-}
-
-export function listTrainingCollections(): TrainingCollection[] {
-  const rows = requireDatabase()
-    .prepare(
-      `SELECT id, name, description, color, created_at, updated_at
-       FROM training_collections
-       ORDER BY name COLLATE NOCASE`
-    )
-    .all() as TrainingCollectionRow[];
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description ?? undefined,
-    color: row.color ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  }));
-}
-
-export function saveTrainingCollection(collection: TrainingCollection): void {
-  requireDatabase()
-    .prepare(
-      `INSERT INTO training_collections
-       (id, name, description, color, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name,
-         description = excluded.description,
-         color = excluded.color,
-         updated_at = excluded.updated_at`
-    )
-    .run(
-      collection.id,
-      collection.name,
-      collection.description ?? null,
-      collection.color ?? null,
-      collection.createdAt,
-      collection.updatedAt
-    );
-  notifySyncedRow("training_collections", ["id"], [collection.id]);
-}
-
-export function deleteTrainingCollection(id: string): void {
-  const database = requireDatabase();
-  // The workouts that lose their collection change too, and another machine has
-  // to be told about both halves or it keeps them in a collection that is gone.
-  const orphaned = (
-    database
-      .prepare(
-        "SELECT program_id FROM training_workout_metadata WHERE collection_id = ?"
-      )
-      .all(id) as Array<{ program_id: string }>
-  ).map((row) => row.program_id);
-
-  database.transaction(() => {
-    database
-      .prepare("UPDATE training_workout_metadata SET collection_id = NULL WHERE collection_id = ?")
-      .run(id);
-    database.prepare("DELETE FROM training_collections WHERE id = ?").run(id);
-  })();
-
-  for (const programId of orphaned) {
-    notifySyncedRow("training_workout_metadata", ["program_id"], [programId]);
-  }
-  notifySyncedDelete("training_collections", id);
 }
 
 function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivityMatch {

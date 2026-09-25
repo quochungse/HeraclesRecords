@@ -19,6 +19,7 @@ import {
 import type { CSSProperties } from "react";
 import type { TrainingPlanDocument, WorkoutSport } from "../../electron/types";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
+import { planOriginLabel } from "./planFilters";
 import { RunnerIcon } from "../running/runnerIcon";
 
 export interface SportTheme {
@@ -139,24 +140,29 @@ export function SportMixDots({ sports, counts }: SportMixDotsProps) {
   );
 }
 
-type PlanSource = TrainingPlanDocument["source"];
+/* The label itself lives in planFilters, beside the chip that spends it: a
+   filter chip and a badge naming the same origin differently is a drift with
+   nothing to catch it, and only planFilters is reachable from a test. */
 
-const PLAN_SOURCE_LABELS: Record<PlanSource, string> = {
-  coros: "COROS",
-  local: "Local",
-  template: "Template",
-  coach: "Coach"
-};
-
-export function planSourceLabel(source: PlanSource): string {
-  return PLAN_SOURCE_LABELS[source] ?? "Local";
-}
-
-/** Colour-coded provenance — where a plan came from, not what it contains. */
-export function PlanSourceBadge({ source }: { source: PlanSource }) {
+/**
+ * Where a plan came from, when that is worth saying — every plan is a COROS
+ * plan, so the badge only speaks for one the coach wrote.
+ */
+export function PlanOriginBadge({
+  plan,
+  className
+}: {
+  plan: Pick<TrainingPlanDocument, "origin">;
+  className?: string;
+}) {
+  const label = planOriginLabel(plan);
+  if (!label) return null;
   return (
-    <em className="tl-source" data-source={source}>
-      {planSourceLabel(source)}
+    <em
+      className={className ? `tl-source ${className}` : "tl-source"}
+      data-source={plan.origin}
+    >
+      {label}
     </em>
   );
 }

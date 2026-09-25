@@ -64,7 +64,7 @@ function seedDatabase() {
     "chat_sessions",
     "training_activities",
     "downloads",
-    "training_collections"
+    "training_workout_metadata"
   ]) {
     db.prepare(`DELETE FROM ${table}`).run();
   }
@@ -82,10 +82,13 @@ function seedDatabase() {
     "2026-09-01T00:00:00Z"
   );
 
+  // A `personal` row of the athlete's own: a favourite and two tags COROS
+  // cannot rebuild. (This was `training_collections` until that grouping was
+  // removed — COROS has no endpoint for one.)
   db.prepare(
-    "INSERT INTO training_collections (id, name, description, color, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?)"
-  ).run("c1", "Base building", null, null, "2026-08-01", "2026-08-01");
+    "INSERT INTO training_workout_metadata (program_id, favorite, tags_json, source, sync_state) " +
+      "VALUES (?, ?, ?, ?, ?)"
+  ).run("program-1", 1, '["tempo","threshold"]', "coros", "synced");
 
   // derived — must never be copied
   db.prepare(
@@ -141,7 +144,7 @@ seedDatabase();
   );
   assert.equal(document.tables.downloads, undefined, "nor a device one");
   // Two of the person's own, plus the built-in MCP server every install has.
-  assert.equal(rowCount, 3, "one conversation, one collection, one built-in");
+  assert.equal(rowCount, 3, "one conversation, one workout's metadata, one built-in");
 
   assert.equal(document.settings["chat.provider"], "claude-code");
   assert.equal(document.settings["chat.customInstructions"], "Be terse.");
@@ -577,14 +580,13 @@ console.log("ok  an old backup restores its data and none of its credentials");
       createdAt: "2026-12-01T00:00:00.000Z",
       deviceId: "a-newer-machine",
       tables: {
-        training_collections: [
+        training_workout_metadata: [
           {
-            id: "c-future",
-            name: "From the future",
-            description: null,
-            color: null,
-            created_at: "2026-12-01",
-            updated_at: "2026-12-01",
+            program_id: "program-future",
+            favorite: 1,
+            tags_json: '["from-the-future"]',
+            source: "coros",
+            sync_state: "synced",
             // A column this schema has never heard of.
             mood_rating: 9
           }
@@ -599,10 +601,10 @@ console.log("ok  an old backup restores its data and none of its credentials");
   const result = await restoreBackupFile(futurePath, "merge");
   assert.equal(result.rowsWritten, 1, "the row lands");
   assert.equal(
-    db.prepare("SELECT name FROM training_collections WHERE id = ?").get(
-      "c-future"
-    ).name,
-    "From the future",
+    db.prepare(
+      "SELECT tags_json FROM training_workout_metadata WHERE program_id = ?"
+    ).get("program-future").tags_json,
+    '["from-the-future"]',
     "with the columns this schema does have"
   );
 }

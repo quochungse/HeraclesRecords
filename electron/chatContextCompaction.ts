@@ -153,6 +153,50 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
   });
 }
 
+/**
+ * What the athlete changed on a plan the coach drafted.
+ *
+ * The plan card is dropped from the wire like every other card, on the theory
+ * that the coach already narrated it — which stops being true the moment the
+ * athlete edits the plan in the editor: the version on the card is then one
+ * the coach has never seen, and it would go on advising about its own. So an
+ * edited draft is stated, whole, on every turn after the edit; each edit
+ * rewrites the draft in place, so there is only ever one version to state.
+ */
+export function planEditNote(entries: PersistedChatEntry[]): string | null {
+  const edited = entries.flatMap((entry) =>
+    entry.kind === "planDraft" && entry.draft.editedAt && !entry.draft.removedAt ? [entry.draft] : []
+  );
+  if (!edited.length) return null;
+  const plans = edited.map((draft) => {
+    const sessions = draft.entries.map((item, index) => {
+      const when = item.scheduleDate ?? `session ${index + 1}`;
+      const facts = [item.volume, item.stepsSummary].filter(Boolean).join(" · ");
+      return `- ${when}: ${item.name}${facts ? ` — ${facts}` : ""}`;
+    });
+    const state = draft.uploadedAt ? "saved" : "not saved yet";
+    return [`Plan "${draft.name}" (draft_id ${draft.draftId}, ${state}):`, ...sessions].join("\n");
+  });
+  return [
+    "[The athlete edited a plan you drafted, in the plan editor. The card now holds this version; build on it rather than on the one you wrote.]",
+    ...plans
+  ].join("\n\n");
+}
+
+/** The wire with `planEditNote` put in front of the latest user message. */
+export function withPlanEdits(messages: ChatMessage[], entries: PersistedChatEntry[]): ChatMessage[] {
+  const note = planEditNote(entries);
+  if (!note) return messages;
+  let last = -1;
+  messages.forEach((message, index) => {
+    if (message.role === "user") last = index;
+  });
+  if (last < 0) return [...messages, { role: "user", content: note }];
+  return messages.map((message, index) =>
+    index === last ? { ...message, content: `${note}\n\n${message.content}` } : message
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Planning
 // ---------------------------------------------------------------------------

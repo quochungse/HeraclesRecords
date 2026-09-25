@@ -99,11 +99,20 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   sleep_night_series: "derived",
 
   // --- Training library: user intent, worth carrying between machines ------
-  training_plans: "personal",
-  training_plan_workout_links: "personal",
-  training_collections: "personal",
-  // `favorite`, `tags_json` and `collection_id` are pure user intent and cannot
-  // be rebuilt; the `cached_*` columns ride along as dead weight.
+  // A plan is a COROS plan (docs/training-plan-coros-first.md), so what the
+  // app keeps is what COROS has no field for: favourite, tags, archived and
+  // where the plan came from — and the drafts being edited, which a second
+  // machine can pick up. `training_plans` and `training_plan_workout_links`
+  // held local plans and are dropped by `dropLocalTrainingPlans`; left
+  // unclassified, a row from a machine still on the old build syncs nowhere.
+  training_plan_metadata: "personal",
+  training_plan_drafts: "personal",
+  // `favorite` and `tags_json` are pure user intent and cannot be rebuilt; the
+  // `cached_*` columns ride along as dead weight. `training_collections` used
+  // to sit here — COROS has no collection endpoint, it was an upstream
+  // invention, and `dropRetiredCollectionTable` removes it. Leaving the name
+  // classified would let a row from a machine still on the old build recreate
+  // the table on the merge path.
   training_workout_metadata: "personal",
   // Server config only. The bearer tokens and OAuth client info live in
   // app_settings under `mcp.<id>.*`, and stay on the machine that authorised
@@ -127,6 +136,10 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // machine — a row-level rule for those belongs in the sync engine, not in a
   // table-level registry. Filed conservatively until then.
   training_activity_matches: "derived",
+
+  // The last COROS answer for each plan, for drawing the library offline.
+  // COROS is the source; another machine asks it rather than receiving this.
+  coros_plan_cache: "device",
 
   // --- Bound to this machine's filesystem ----------------------------------
   // Both carry absolute paths to downloaded audio that exists nowhere else.

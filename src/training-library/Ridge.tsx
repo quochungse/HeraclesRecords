@@ -1,10 +1,13 @@
 /**
- * The Training Library draws exactly one kind of picture: a ridge of weekly
- * training load. `Ridge` puts it on an index row so a plan can be recognised by
- * its silhouette; `BulletRidge` puts the same axis at reading size so planned
- * load can be compared against what was actually completed.
+ * A plan's tile draws one small picture: a ridge of its weeks, so a plan can
+ * be recognised by its silhouette. It measures what `ridgeMeasure` picks, as
+ * the reader's own ridge does.
  *
- * Both keep to a single hue. Height carries the number; nothing else is encoded.
+ * `BulletRidge` stood beside it — planned load against completed — and went
+ * with the Adherence tab it was drawn for. Compliance is a figure on a plan's
+ * row now (`planCompliance.ts`), not a chart of its own.
+ *
+ * It keeps to a single hue. Height carries the number; nothing else is encoded.
  */
 
 /** Bars below this share of the peak still get a visible stub. */
@@ -61,40 +64,5 @@ export function Ridge({ values, peakWeek, unit, variant, label }: RidgeProps) {
         );
       })}
     </span>
-  );
-}
-
-export interface BulletWeek {
-  weekLabel: string;
-  planned: number;
-  completed: number;
-}
-
-interface BulletRidgeProps {
-  weeks: BulletWeek[];
-  label: string;
-}
-
-/**
- * Planned load is the pale full-width bar; completed load is the solid bar
- * inside it. A solid bar taller than its pale bar means the week ran over plan.
- */
-export function BulletRidge({ weeks, label }: BulletRidgeProps) {
-  const peak = Math.max(1, ...weeks.map((week) => Math.max(week.planned, week.completed)));
-
-  return (
-    <div className="tl-bullets" role="img" aria-label={label}>
-      {weeks.map((week, index) => (
-        <span
-          className="tl-bullet"
-          key={week.weekLabel}
-          title={`${week.weekLabel} — planned ${Math.round(week.planned)}, done ${Math.round(week.completed)}`}
-          style={{ "--tl-bar-index": index < STAGGER_LIMIT ? index : STAGGER_LIMIT } as React.CSSProperties}
-        >
-          <b style={{ "--tl-bar-height": `${(week.planned / peak) * 100}%` } as React.CSSProperties} />
-          <i style={{ "--tl-bar-height": `${(week.completed / peak) * 100}%` } as React.CSSProperties} />
-        </span>
-      ))}
-    </div>
   );
 }

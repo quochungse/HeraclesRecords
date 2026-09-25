@@ -16,12 +16,21 @@ import {
   uploadTrainingPlan
 } from "./trainingHubService";
 import {
+  deleteChatPlanDraft,
   getChatPlanDraft,
   listChatPlanDrafts,
   markChatPlanDraftUploaded,
-  pruneChatPlanDrafts,
   saveChatPlanDraft
 } from "./database";
+import { savePlanToCoros } from "./trainingLibraryService";
+import {
+  COROS_WEEK_STAGES,
+  formatPlanDay,
+  mondayOf,
+  parsePlanDay,
+  trainingPlanFromCoachDraftPreview
+} from "./trainingPlanDomain";
+import { generatedPlanProblems } from "./trainingPlanGeneration";
 import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
@@ -30,6 +39,8 @@ import type {
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
   TrainingPlanDocument,
+  TrainingPlanGenerationRequest,
+  TrainingPlanWeekStage,
   UploadPlanResult,
   WorkoutDeletePreview,
   UnitSystem
@@ -39,11 +50,6 @@ import {
   buildDraftWorkoutInputSchema
 } from "./workoutCapabilities";
 import { formatDistanceValue } from "./unitSystem.js";
-import {
-  createTrainingPlan,
-  trainingPlanFromCoachDraftPreview
-} from "./trainingPlanDomain";
-import { saveLocalTrainingPlan } from "./trainingLibraryService";
 import {
   EXERCISE_SEARCH_EQUIPMENT,
   EXERCISE_SEARCH_MOVEMENTS,
@@ -81,6 +87,24 @@ interface DeleteWorkoutParams {
 }
 
 const draftStore = new Map<string, StoredPlanDraft>();
+/**
+ * Drafts written during a plan generation. Never persisted: `chat_plan_drafts`
+ * is `personal` tier and a draft there lives as long as the conversation card
+ * that holds it — a generation has no conversation, so every one it wrote used
+ * to stay in that table for good and travel to every machine on the vault.
+ */
+const generatedDrafts = new Map<string, StoredPlanDraft>();
+
+/** A draft the plan generator's run accepted, for it to build the plan from. */
+export function generatedPlanDraft(draftId: string): { plan: CorosTrainingPlanDraft; preview: PlanDraftPreview } | undefined {
+  const stored = generatedDrafts.get(draftId);
+  return stored ? { plan: stored.plan, preview: stored.preview } : undefined;
+}
+
+/** Lets go of a finished generation's drafts. */
+export function forgetGeneratedPlanDrafts(draftIds: readonly string[]): void {
+  for (const draftId of draftIds) generatedDrafts.delete(draftId);
+}
 const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
@@ -169,8 +193,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
     {
       name: "search_coros_exercises",
       description:
-        "Search the athlete's live COROS Strength/HYROX exercise catalog and return exact exercise IDs and names. " +
-        "Call this before drafting strength or HYROX workouts whenever exact COROS exercise IDs are not already known. " +
+        "Search the athlete's live COROS Strength/Hybrid Fitness exercise catalog and return exact exercise IDs and names. " +
+        "Call this before drafting strength or Hybrid Fitness workouts whenever exact COROS exercise IDs are not already known. " +
         "Search several intended movements in one call with queries, or discover exercises by target muscles, movement patterns, and available equipment. " +
         "Use returned exercise_id and exercise_name values in whichever draft tool matches the request. Catalog naming differences are not a reason to ask the athlete.",
       inputSchema: {
@@ -179,7 +203,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
           sport: {
             type: "string",
             enum: ["strength", "hyrox"],
-            description: "Catalog context. HYROX functional stations use the COROS Strength catalog. Default strength."
+            description: "Catalog context. Hybrid Fitness functional stations use the COROS Strength catalog. Default strength."
           },
           query: {
             type: "string",
@@ -226,7 +250,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Use this for one-off requests such as today's run, a single gym session, or one workout to reuse later; " +
         "do not wrap a one-off workout in draft_training_plan. Set calendar_date only when the athlete names a date. " +
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "For Strength and HYROX, call search_coros_exercises first and pass its exact exercise IDs and names. " +
+        "For Strength and Hybrid Fitness, call search_coros_exercises first and pass its exact exercise IDs and names. " +
         "Returns a workout card where the athlete can choose Workout Library or Calendar and confirm.",
       inputSchema: buildDraftWorkoutInputSchema()
     },
@@ -236,7 +260,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Validate and store a multi-day or multi-week sport-aware training plan draft for athlete review. " +
         "Use draft_workout instead when the athlete asks for only one standalone workout. " +
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
-        "Strength and HYROX exercise names are checked against the COROS catalog; use search_coros_exercises first " +
+        "Strength and Hybrid Fitness exercise names are checked against the COROS catalog; use search_coros_exercises first " +
         "and pass its exact IDs and names. If candidates are returned, revise the affected steps and call this tool again. " +
         "Always call this before upload. Returns a draftId and human-readable preview.",
       inputSchema: buildDraftTrainingPlanInputSchema()
@@ -317,14 +341,6 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
   ];
 }
 
-export function getStoredPlanDraft(draftId: string): StoredPlanDraft | undefined {
-  return draftStore.get(draftId);
-}
-
-export function listStoredPlanDrafts(): PlanDraftPreview[] {
-  return [...draftStore.values()].map((entry) => entry.preview);
-}
-
 export async function handleChatWorkoutTool(
   name: ChatWorkoutToolName,
   args: Record<string, unknown>,
@@ -333,6 +349,13 @@ export async function handleChatWorkoutTool(
     onWorkoutDelete?: (preview: WorkoutDeletePreview) => void;
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
+    /**
+     * Set while the plan generator runs: a draft is checked against what the
+     * athlete asked for and handed back to the model when it departs from it,
+     * and one that passes is kept in memory for the generator to collect
+     * rather than written to `chat_plan_drafts` (see `generatedPlanDraft`).
+     */
+    planRequest?: TrainingPlanGenerationRequest;
   }
 ): Promise<string> {
   if (name === "draft_training_plan") {
@@ -340,7 +363,9 @@ export async function handleChatWorkoutTool(
       args,
       options?.onPlanDraft,
       options?.allowUpcomingWorkouts !== false,
-      options?.unitSystem ?? "metric"
+      options?.unitSystem ?? "metric",
+      "plan",
+      options?.planRequest
     );
   }
   if (name === "draft_workout") {
@@ -481,7 +506,21 @@ function toPlanDraft(args: Record<string, unknown>): CorosTrainingPlanDraft {
       save_to_library: entry.save_to_library
     };
   });
-  return { name, workouts };
+  const description = typeof args.description === "string" ? args.description.trim() : "";
+  const weekStages = (Array.isArray(args.week_stages) ? args.week_stages : []).flatMap((item) => {
+    const record = (item ?? {}) as Record<string, unknown>;
+    const week = Number(record.week);
+    const stage = COROS_WEEK_STAGES.find((candidate) => candidate.slug === record.stage);
+    return Number.isInteger(week) && week >= 1 && stage && stage.value > 0
+      ? [{ weekIndex: week - 1, stage: stage.value as TrainingPlanWeekStage }]
+      : [];
+  });
+  return {
+    name,
+    workouts,
+    ...(description ? { description } : {}),
+    ...(weekStages.length ? { weekStages } : {})
+  };
 }
 
 function handleDraftWorkout(
@@ -537,68 +576,6 @@ export function buildTrainingPlanUploadInput(
       save_to_library: entry.save_to_library
     }))
   };
-}
-
-function normalizePlanDate(value?: string): string | undefined {
-  if (!value) return undefined;
-  const digits = value.replace(/-/g, "");
-  if (!/^\d{8}$/.test(digits)) return undefined;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-}
-
-function dateDayOffset(start: string, current: string): number {
-  const startDate = new Date(`${start}T12:00:00`);
-  const currentDate = new Date(`${current}T12:00:00`);
-  return Math.max(0, Math.round((currentDate.valueOf() - startDate.valueOf()) / 86_400_000));
-}
-
-function saveDraftAsLocalTemplate(
-  draftId: string,
-  plan: CorosTrainingPlanDraft
-): TrainingPlanDocument {
-  const scheduledDates = plan.workouts
-    .map((entry) => normalizePlanDate(entry.schedule_date))
-    .filter((date): date is string => Boolean(date))
-    .sort();
-  const startDate = scheduledDates[0];
-  const document = createTrainingPlan(plan.name, "template");
-  document.id = `template:coach:${draftId}`;
-  document.description = "Generated in Coach and saved locally for reuse.";
-  document.startDate = startDate;
-  document.entries = plan.workouts.map((workout, index) => {
-    const scheduledDate = normalizePlanDate(workout.schedule_date);
-    const offset = startDate && scheduledDate
-      ? dateDayOffset(startDate, scheduledDate)
-      : undefined;
-    return {
-      id: `entry:${draftId}:${workout.key || index}`,
-      kind: "workout" as const,
-      weekIndex: offset === undefined ? Math.floor(index / 7) : Math.floor(offset / 7),
-      dayIndex: offset === undefined ? undefined : offset % 7,
-      sortOrder: workout.sort_no ?? index,
-      title: workout.name,
-      workout: {
-        key: workout.key,
-        name: workout.name,
-        description: workout.description,
-        sport: workout.sport ?? "run",
-        sport_options: workout.sport_options,
-        steps: workout.steps,
-        distance_km: workout.distance_km,
-        schedule_date: workout.schedule_date,
-        sort_no: workout.sort_no,
-        save_to_library: workout.save_to_library
-      }
-    };
-  });
-  document.weekCount = Math.max(
-    1,
-    ...document.entries.map((entry) => entry.weekIndex + 1)
-  );
-  document.sportMix = [
-    ...new Set(plan.workouts.map((entry) => entry.sport ?? "run"))
-  ];
-  return saveLocalTrainingPlan(document);
 }
 
 export function buildTrainingPlanDestinationInput(
@@ -687,7 +664,8 @@ async function handleDraftTrainingPlan(
   onPlanDraft?: (preview: PlanDraftPreview) => void,
   allowUpcomingWorkouts = true,
   unitSystem: UnitSystem = "metric",
-  artifactType: "plan" | "workout" = "plan"
+  artifactType: "plan" | "workout" = "plan",
+  planRequest?: TrainingPlanGenerationRequest
 ): Promise<string> {
   const draft = toPlanDraft(args);
   const validation = validatePlanDraft(draft, {
@@ -695,6 +673,19 @@ async function handleDraftTrainingPlan(
   });
   if (!validation.ok) {
     return JSON.stringify({ ok: false, errors: validation.errors });
+  }
+  /* Before the exercises are resolved: that can cost COROS requests, and a
+     draft with the wrong number of sessions is going to be rewritten anyway. */
+  if (planRequest) {
+    const problems = generatedPlanProblems(draft.workouts, planRequest);
+    if (problems.length > 0) {
+      return JSON.stringify({
+        ok: false,
+        error_code: "plan_breaks_request",
+        errors: problems.slice(0, 20),
+        action: "Fix every problem listed and call draft_training_plan again with the whole plan. Do not ask the athlete."
+      });
+    }
   }
 
   const exerciseResolution = await resolveTrainingPlanExercises(draft);
@@ -721,7 +712,9 @@ async function handleDraftTrainingPlan(
   }
   const resolvedDraft = exerciseResolution.draft;
 
-  const conflicts = allowUpcomingWorkouts
+  /* A generated plan is not scheduled — it opens in the plan editor — so the
+     calendar has nothing to say about it and is not asked. */
+  const conflicts = allowUpcomingWorkouts && !planRequest
     ? await detectScheduleConflicts(resolvedDraft)
     : [];
   const draftId = crypto.randomUUID();
@@ -732,13 +725,23 @@ async function handleDraftTrainingPlan(
   });
   preview.conflicts = conflicts;
 
-  draftStore.set(draftId, {
+  const stored: StoredPlanDraft = {
     draftId,
     plan: resolvedDraft,
     preview,
     createdAt: Date.now()
-  });
-  persistPlanDraft(draftStore.get(draftId)!);
+  };
+  if (planRequest) {
+    generatedDrafts.set(draftId, stored);
+    onPlanDraft?.(preview);
+    return JSON.stringify({
+      ok: true,
+      draft_id: draftId,
+      message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app opens it in the athlete's plan editor."
+    });
+  }
+  draftStore.set(draftId, stored);
+  persistPlanDraft(stored);
 
   onPlanDraft?.(preview);
 
@@ -754,7 +757,7 @@ async function handleDraftTrainingPlan(
     },
     message: artifactType === "workout"
       ? "Workout draft saved. Tell the athlete to review it, choose Workout Library or Calendar, and confirm. The workout is not a training plan."
-      : "Draft saved. Tell the athlete to review the plan preview and save it as a grouped Training Plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
+      : "Draft saved. Tell the athlete to review the plan card: they can edit it first, save it to COROS as a plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
   });
 }
 
@@ -1091,90 +1094,199 @@ export async function uploadPlanDraftById(
     throw new Error("This training plan was already uploaded.");
   }
 
-  if (destination === "nativePlan" || destination === "nativePlanAndCalendar") {
-    throw new Error(
-      "Native COROS plan writes are unavailable because the create/update payload has not been live-verified safely. Choose Workout Library, Calendar, or Local template."
-    );
+  if (destination === "nativePlan") {
+    return savePlanDraftAsCorosPlan(stored, unitSystem);
+  }
+  if (destination !== "workoutLibrary" && destination !== "calendar") {
+    throw new Error("Save the plan to COROS as a plan, as individual workouts, or on the calendar.");
   }
 
-  let result: UploadPlanResult;
-  if (destination === "localPlan") {
-    const saved = saveLocalTrainingPlan(
-      trainingPlanFromCoachDraftPreview(stored.preview)
-    );
-    result = {
-      planName: saved.name,
-      workoutsCreated: 0,
-      workoutsScheduled: 0,
-      entries: [],
-      destination,
-      localPlanId: saved.id,
-      groupedPlanCreated: true,
-      remoteWrites: []
-    };
-  } else if (destination === "localTemplate") {
-    const saved = saveDraftAsLocalTemplate(draftId, stored.plan);
-    result = {
-      planName: saved.name,
-      workoutsCreated: 0,
-      workoutsScheduled: 0,
-      entries: [],
-      destination,
-      localPlanId: saved.id,
-      groupedPlanCreated: false,
-      remoteWrites: []
-    };
-  } else {
-    if (scheduleDate && stored.preview.artifactType !== "workout") {
-      throw new Error("A calendar date can only override a one-off workout draft.");
-    }
-    const input = buildTrainingPlanDestinationInput(
-      stored.plan,
-      destination,
-      scheduleDate
-    );
-    const uploaded = await uploadTrainingPlan(input, unitSystem);
-    result = {
-      ...uploaded,
-      destination,
-      groupedPlanCreated: false,
-      remoteWrites: destination === "calendar"
-        ? input.workouts.map((workout) => `Schedule ${workout.name} on ${workout.schedule_date}`)
-        : input.workouts.map((workout) => `Create workout ${workout.name}`)
-    };
+  if (scheduleDate && stored.preview.artifactType !== "workout") {
+    throw new Error("A calendar date can only override a one-off workout draft.");
   }
+  const input = buildTrainingPlanDestinationInput(
+    stored.plan,
+    destination,
+    scheduleDate
+  );
+  const uploaded = await uploadTrainingPlan(input, unitSystem);
+  const result: UploadPlanResult = {
+    ...uploaded,
+    destination,
+    remoteWrites: destination === "calendar"
+      ? input.workouts.map((workout) => `Schedule ${workout.name} on ${workout.schedule_date}`)
+      : input.workouts.map((workout) => `Create workout ${workout.name}`)
+  };
+  markDraftSaved(stored, result);
+  return result;
+}
+
+function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void {
   stored.uploadedAt = Date.now();
   stored.preview.uploadedAt = stored.uploadedAt;
   stored.preview.uploadResult = {
     workoutsScheduled: result.workoutsScheduled,
     workoutsCreated: result.workoutsCreated,
-    destination,
-    localPlanId: result.localPlanId,
-    groupedPlanCreated: result.groupedPlanCreated
+    destination: result.destination,
+    ...(result.planId ? { planId: result.planId } : {})
   };
   persistPlanDraft(stored);
-  markChatPlanDraftUploaded(draftId, stored.uploadedAt);
+  markChatPlanDraftUploaded(stored.draftId, stored.uploadedAt);
+}
+
+function requirePlanDraft(draftId: string): StoredPlanDraft {
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) {
+    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+  }
+  if (stored.preview.artifactType === "workout") {
+    throw new Error("This is a single workout, not a plan.");
+  }
+  return stored;
+}
+
+/** The coach's plan as the plan editor and a COROS save read it. */
+function coachDraftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
+  return trainingPlanFromCoachDraftPreview(stored.preview, {
+    description: stored.plan.description,
+    weekStages: stored.plan.weekStages,
+    layout: stored.plan.layout
+  });
+}
+
+/**
+ * A plan the coach wrote, saved to COROS whole. It is a COROS plan from here
+ * on — listed with the athlete's other plans, marked as the coach's — and the
+ * card says where it went.
+ */
+async function savePlanDraftAsCorosPlan(
+  stored: StoredPlanDraft,
+  unitSystem: UnitSystem
+): Promise<UploadPlanResult> {
+  if (stored.preview.artifactType === "workout") {
+    throw new Error("A single workout is saved to the library or the calendar, not as a plan.");
+  }
+  const saved = await savePlanToCoros({
+    plan: coachDraftDocument(stored),
+    unitSystem,
+    origin: "coach",
+    coach: { draftId: stored.draftId }
+  });
+  if (!saved.ok) throw new Error("COROS did not take the plan. Try again.");
+  const result: UploadPlanResult = {
+    planName: saved.plan.name,
+    workoutsCreated: saved.plan.entries.length,
+    workoutsScheduled: 0,
+    entries: [],
+    destination: "nativePlan",
+    planId: saved.plan.id,
+    remoteWrites: [`Create plan ${saved.plan.name}`]
+  };
+  markDraftSaved(stored, result);
   return result;
 }
 
-function summarizeUploadResult(result: UploadPlanResult): Record<string, unknown> {
-  return {
-    plan_name: result.planName,
-    workouts_created: result.workoutsCreated,
-    workouts_scheduled: result.workoutsScheduled,
-    entries: result.entries
-  };
+/** The plan behind a Coach card, for the editor "Edit plan first" opens. */
+export function planDraftDocument(draftId: string): TrainingPlanDocument {
+  return coachDraftDocument(requirePlanDraft(draftId));
 }
 
-/** Remove drafts older than 24 hours */
-export function prunePlanDraftStore(): void {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  for (const [id, draft] of draftStore) {
-    if (draft.createdAt < cutoff && !draft.uploadedAt) {
-      draftStore.delete(id);
+/**
+ * The athlete's edit of a coach plan, written back into the coach's own draft
+ * — not a plan draft of the library's, and not a new card. The draft keeps
+ * its id, so the card, the coach's tools and a later save all read the edited
+ * version, and `editedAt` is what puts that version in front of the coach on
+ * its next turn.
+ *
+ * Dates are kept where the coach gave them: a session is dated from the
+ * Monday the coach's first dated session fell in, at the week and day the
+ * athlete left it on. A plan the coach wrote undated stays undated, with the
+ * arrangement kept beside it as `layout`.
+ */
+export async function savePlanDraftEdit(
+  draftId: string,
+  plan: TrainingPlanDocument,
+  unitSystem: UnitSystem = "metric"
+): Promise<PlanDraftPreview> {
+  const stored = requirePlanDraft(draftId);
+  if (stored.uploadedAt) {
+    throw new Error("This plan has already been saved, so the Coach card can no longer be edited.");
+  }
+  const dates = stored.plan.workouts
+    .map((workout) => parsePlanDay(workout.schedule_date))
+    .filter((date): date is Date => Boolean(date))
+    .sort((left, right) => left.valueOf() - right.valueOf());
+  const anchor = dates[0] ? mondayOf(dates[0]) : undefined;
+  const originals = new Map(stored.plan.workouts.map((workout) => [workout.key, workout]));
+  const keys = new Set<string>();
+  const layout: NonNullable<CorosTrainingPlanDraft["layout"]> = {};
+
+  const workouts = [...plan.entries]
+    .sort(
+      (left, right) =>
+        left.weekIndex - right.weekIndex ||
+        left.dayIndex - right.dayIndex ||
+        left.sortOrder - right.sortOrder
+    )
+    .map((entry, index): PlanWorkoutEntry => {
+      let key = (entry.workout.key || entry.id).trim();
+      while (keys.has(key)) key = `${key}-${index + 1}`;
+      keys.add(key);
+      const day = anchor ? new Date(anchor) : undefined;
+      day?.setDate(day.getDate() + entry.weekIndex * 7 + entry.dayIndex);
+      if (!day) layout[key] = { weekIndex: entry.weekIndex, dayIndex: entry.dayIndex };
+      const { schedule_date: _date, sort_no: _sort, save_to_library: _library, ...workout } = structuredClone(entry.workout);
+      const original = originals.get(key);
+      return {
+        ...workout,
+        key,
+        name: entry.title.trim() || workout.name,
+        sort_no: index + 1,
+        ...(day ? { schedule_date: formatPlanDay(day, false) } : {}),
+        ...(original?.save_to_library !== undefined ? { save_to_library: original.save_to_library } : {})
+      } as PlanWorkoutEntry;
+    });
+
+  const next: CorosTrainingPlanDraft = {
+    name: plan.name.trim(),
+    workouts,
+    ...(plan.description.trim() ? { description: plan.description.trim() } : {}),
+    ...(plan.weekStages.length ? { weekStages: plan.weekStages.map((stage) => ({ ...stage })) } : {}),
+    ...(anchor ? {} : { layout })
+  };
+  const validation = validatePlanDraft(next, { todayDay: "00000000" });
+  if (!validation.ok) throw new Error(validation.errors.join(" "));
+
+  let conflicts: string[] = [];
+  if (anchor) {
+    try {
+      conflicts = await detectScheduleConflicts(next);
+    } catch {
+      /* The calendar is only consulted to warn; offline, the card says nothing. */
     }
   }
-  pruneChatPlanDrafts(cutoff);
+  const preview = buildPlanPreview(draftId, next, {
+    scheduleConflicts: conflicts,
+    unitSystem,
+    artifactType: "plan"
+  });
+  preview.editedAt = Date.now();
+  stored.plan = next;
+  stored.preview = preview;
+  persistPlanDraft(stored);
+  return preview;
+}
+
+/**
+ * A conversation's drafts go with it. They used to be pruned a day after they
+ * were written, which left a card in the transcript whose Save could only
+ * answer "draft not found"; now a draft lives exactly as long as the card.
+ */
+export function deletePlanDraftsOf(draftIds: readonly string[]): void {
+  for (const draftId of draftIds) {
+    draftStore.delete(draftId);
+    deleteChatPlanDraft(draftId);
+  }
 }
 
 /** Remove delete requests older than 24 hours */

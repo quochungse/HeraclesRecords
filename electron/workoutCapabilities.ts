@@ -11,7 +11,6 @@ import type {
   WorkoutIntensityInput,
   WorkoutExerciseMedia,
   WorkoutPacePreset,
-  WorkoutRunningPowerPreset,
   WorkoutSport,
   WorkoutSwimStroke,
   WorkoutZone
@@ -192,7 +191,7 @@ export const WORKOUT_SPORT_CAPABILITIES: Readonly<Record<WorkoutSport, SportCapa
   hyrox: {
     sport: "hyrox",
     sportType: 9,
-    label: "HYROX",
+    label: "Hybrid Fitness",
     pbVersion: 9,
     referExercise: { intensityType: 0, hrType: 0, valueType: 0 },
     stepKinds: STANDARD_KINDS,
@@ -205,6 +204,40 @@ export const WORKOUT_SPORT_CAPABILITIES: Readonly<Record<WorkoutSport, SportCapa
 };
 
 export const WORKOUT_SPORTS = Object.keys(WORKOUT_SPORT_CAPABILITIES) as WorkoutSport[];
+
+/**
+ * A zone's percentage band, written the way COROS writes it.
+ *
+ * The first zone of a family is "under X" and the last is "over Y" — COROS
+ * stores the last one's ceiling as a sentinel (404 bpm, 900 W, a 2:44/km
+ * pace), so a zone that printed both bounds would be printing a number nobody
+ * can reach.
+ */
+export function zoneOptionLabel(
+  definition: { label: string; low: number; high: number },
+  index: number,
+  total: number,
+  configured?: WorkoutZone
+): string {
+  const openEnd = configured?.openEnd
+    ?? (index === 0 ? "low" : index === total - 1 ? "high" : undefined);
+  const band = zonePercentLabel({
+    index: index + 1,
+    id: 0,
+    key: "",
+    label: definition.label,
+    lowPercent: configured?.lowPercent ?? definition.low,
+    highPercent: configured?.highPercent ?? definition.high,
+    ...(openEnd ? { openEnd } : {})
+  });
+  return `${definition.label} · ${band}`;
+}
+
+export function zonePercentLabel(zone: WorkoutZone): string {
+  if (zone.openEnd === "low") return `<${zone.highPercent}%`;
+  if (zone.openEnd === "high") return `>${Math.max(0, zone.lowPercent - 1)}%`;
+  return `${zone.lowPercent}-${zone.highPercent}%`;
+}
 
 export interface WorkoutExerciseResolution {
   match?: Record<string, unknown>;
@@ -461,36 +494,73 @@ export function requiredWorkoutPbVersion(
   return version;
 }
 
+/*
+ * The zone tables COROS ships, used when an account has none of its own.
+ *
+ * Read off the COROS app's own Settings screens on 2026-09-22 (Max HR 190,
+ * resting 52, LTHR 168, threshold pace 5'22", FTP 180) and checked back
+ * against the `/account/query` payload each screen is drawn from.
+ *
+ * Two things to keep straight.
+ *
+ * **COROS names its zones twice.** The Max HR family is the old consumer
+ * wording — Warm Up, Fat Burn, Aerobic — and every other family uses the
+ * training wording — Aerobic Endurance, Aerobic Power, Threshold, Anaerobic
+ * Endurance, Anaerobic Power. This file used the first set for all three
+ * heart-rate families, so on Heart Rate Reserve and LTHR five of the six
+ * zones carried a name COROS gives to a different zone: what COROS calls
+ * Threshold was labelled "Aerobic Endurance", two bands below. A threshold
+ * session prescribed as an easy one is the worst way for this to be wrong.
+ *
+ * **The first zone is open below and the last is open above.** COROS writes
+ * them "<50%" and ">90%", so the low bound of the first and the high bound of
+ * the last are presentation only; `openEnd` on a `WorkoutZone` carries that.
+ *
+ * `id` is what travels to COROS as `intensityCustom`. It is deliberately left
+ * as it was: nothing in this repo establishes where the numbering came from,
+ * and renaming a zone does not touch it, while guessing at it would send a
+ * workout to the watch in the wrong band.
+ */
 export const HEART_RATE_PRESETS: Readonly<Record<
   WorkoutHeartRateBasis,
   readonly { preset: WorkoutHeartRatePreset; id: number; label: string; low: number; high: number }[]
 >> = {
   maxHr: [
     { preset: "recovery", id: 6, label: "Recovery", low: 0, high: 50 },
-    { preset: "warmUp", id: 1, label: "Warm Up", low: 51, high: 60 },
+    { preset: "warmUp", id: 1, label: "Warm Up", low: 50, high: 60 },
     { preset: "fatBurn", id: 2, label: "Fat Burn", low: 61, high: 70 },
-    { preset: "aerobicEndurance", id: 3, label: "Aerobic Endurance", low: 71, high: 80 },
+    { preset: "aerobic", id: 3, label: "Aerobic", low: 71, high: 80 },
     { preset: "threshold", id: 4, label: "Threshold", low: 81, high: 90 },
     { preset: "anaerobic", id: 5, label: "Anaerobic", low: 91, high: 100 }
   ],
   reserve: [
     { preset: "recovery", id: 6, label: "Recovery", low: 0, high: 59 },
-    { preset: "warmUp", id: 1, label: "Warm Up", low: 60, high: 74 },
-    { preset: "fatBurn", id: 2, label: "Fat Burn", low: 75, high: 84 },
-    { preset: "aerobicEndurance", id: 3, label: "Aerobic Endurance", low: 85, high: 88 },
-    { preset: "threshold", id: 4, label: "Threshold", low: 89, high: 95 },
-    { preset: "anaerobic", id: 5, label: "Anaerobic", low: 96, high: 100 }
+    { preset: "aerobicEndurance", id: 1, label: "Aerobic Endurance", low: 59, high: 74 },
+    { preset: "aerobicPower", id: 2, label: "Aerobic Power", low: 75, high: 84 },
+    { preset: "threshold", id: 3, label: "Threshold", low: 85, high: 88 },
+    { preset: "anaerobicEndurance", id: 4, label: "Anaerobic Endurance", low: 89, high: 95 },
+    { preset: "anaerobicPower", id: 5, label: "Anaerobic Power", low: 96, high: 100 }
   ],
   lthr: [
     { preset: "recovery", id: 6, label: "Recovery", low: 0, high: 80 },
-    { preset: "warmUp", id: 1, label: "Warm Up", low: 81, high: 90 },
-    { preset: "fatBurn", id: 2, label: "Fat Burn", low: 91, high: 95 },
-    { preset: "aerobicEndurance", id: 3, label: "Aerobic Endurance", low: 96, high: 102 },
-    { preset: "threshold", id: 4, label: "Threshold", low: 103, high: 106 },
-    { preset: "anaerobic", id: 5, label: "Anaerobic", low: 107, high: 120 }
+    { preset: "aerobicEndurance", id: 1, label: "Aerobic Endurance", low: 80, high: 90 },
+    { preset: "aerobicPower", id: 2, label: "Aerobic Power", low: 91, high: 95 },
+    { preset: "threshold", id: 3, label: "Threshold", low: 96, high: 102 },
+    { preset: "anaerobicEndurance", id: 4, label: "Anaerobic Endurance", low: 103, high: 106 },
+    { preset: "anaerobicPower", id: 5, label: "Anaerobic Power", low: 107, high: 120 }
   ]
 };
 
+/**
+ * Running pace zones, as percentages of threshold **speed** — so a higher
+ * percentage is a faster pace, and the band COROS puts the threshold itself
+ * in ends at 102%.
+ *
+ * Every row of this table was wrong (0-77 / 78-87 / 88-94 / 95-108 / 109-118 /
+ * 119-200), and because `parseWorkoutEditorContext` asked for `ltspZone` under
+ * two names COROS does not use, this table — not the athlete's zones — is what
+ * the workout builder drew for every pace target it has ever shown.
+ */
 export const PACE_PRESETS: readonly {
   preset: WorkoutPacePreset;
   id: number;
@@ -498,14 +568,15 @@ export const PACE_PRESETS: readonly {
   low: number;
   high: number;
 }[] = [
-  { preset: "recovery", id: 7, label: "Recovery", low: 0, high: 77 },
-  { preset: "aerobicEndurance", id: 1, label: "Aerobic Endurance", low: 78, high: 87 },
-  { preset: "aerobicPower", id: 2, label: "Aerobic Power", low: 88, high: 94 },
-  { preset: "threshold", id: 3, label: "Threshold", low: 95, high: 108 },
-  { preset: "anaerobicEndurance", id: 5, label: "Anaerobic Endurance", low: 109, high: 118 },
-  { preset: "anaerobicPower", id: 6, label: "Anaerobic Power", low: 119, high: 200 }
+  { preset: "recovery", id: 7, label: "Recovery", low: 0, high: 69 },
+  { preset: "aerobicEndurance", id: 1, label: "Aerobic Endurance", low: 69, high: 82 },
+  { preset: "aerobicPower", id: 2, label: "Aerobic Power", low: 83, high: 91 },
+  { preset: "threshold", id: 3, label: "Threshold", low: 92, high: 102 },
+  { preset: "anaerobicEndurance", id: 5, label: "Anaerobic Endurance", low: 103, high: 113 },
+  { preset: "anaerobicPower", id: 6, label: "Anaerobic Power", low: 114, high: 200 }
 ];
 
+/** Cycling power zones. The only family COROS gives seven of, Sprint being the seventh. */
 export const FTP_PRESETS: readonly {
   preset: WorkoutFtpPreset;
   id: number;
@@ -513,27 +584,13 @@ export const FTP_PRESETS: readonly {
   low: number;
   high: number;
 }[] = [
-  { preset: "recovery", id: 1, label: "Recovery", low: 0, high: 55 },
+  { preset: "recovery", id: 1, label: "Recovery", low: 0, high: 56 },
   { preset: "aerobicEndurance", id: 2, label: "Aerobic Endurance", low: 56, high: 75 },
   { preset: "aerobicPower", id: 3, label: "Aerobic Power", low: 76, high: 90 },
   { preset: "threshold", id: 4, label: "Threshold", low: 91, high: 105 },
   { preset: "anaerobicEndurance", id: 5, label: "Anaerobic Endurance", low: 106, high: 120 },
   { preset: "anaerobicPower", id: 6, label: "Anaerobic Power", low: 121, high: 150 },
   { preset: "sprint", id: 7, label: "Sprint", low: 151, high: 300 }
-];
-
-export const RUNNING_POWER_PRESETS: readonly {
-  preset: WorkoutRunningPowerPreset;
-  id: number;
-  label: string;
-  low: number;
-  high: number;
-}[] = [
-  { preset: "easy", id: 1, label: "Easy", low: 65, high: 80 },
-  { preset: "moderate", id: 2, label: "Moderate", low: 81, high: 90 },
-  { preset: "threshold", id: 3, label: "Threshold", low: 91, high: 100 },
-  { preset: "interval", id: 4, label: "Interval", low: 101, high: 115 },
-  { preset: "repetition", id: 5, label: "Repetition", low: 116, high: 200 }
 ];
 
 export const SWIM_STROKE_IDS: Readonly<Record<WorkoutSwimStroke, number>> = {
@@ -786,21 +843,13 @@ export function encodeCorosIntensity(
   }
 
   if (intensity.type === "power") {
-    result.intensityType = 6;
-    if (intensity.preset) {
-      const definition = RUNNING_POWER_PRESETS.find((entry) => entry.preset === intensity.preset);
-      const zones = contextZones(context, "runningPower", RUNNING_POWER_PRESETS);
-      const selected = findZone(zones, intensity.zoneId ?? definition?.id, intensity.preset);
-      result.intensityCustom = selected?.id ?? definition?.id ?? intensity.zoneId ?? 0;
-      const low = selected?.lowPercent ?? definition?.low ?? 0;
-      const high = selected?.highPercent ?? definition?.high ?? low;
-      setPercentFields(result, low, high, context?.criticalPower);
-    } else {
-      const [low, high] = range(intensity.lowWatts, intensity.highWatts);
-      result.intensityValue = Math.round(low);
-      result.intensityValueExtend = Math.round(high);
-    }
-    return result;
+    const [low, high] = range(intensity.lowWatts, intensity.highWatts);
+    return {
+      ...result,
+      intensityType: 6,
+      intensityValue: Math.round(low),
+      intensityValueExtend: Math.round(high)
+    };
   }
 
   if (intensity.type === "speed") {
@@ -876,7 +925,7 @@ function reverseKey<T extends string>(mapping: Readonly<Record<T, number>>, valu
 
 export function decodeCorosIntensity(
   exercise: Record<string, unknown>,
-  context?: WorkoutEditorContext
+  _context?: WorkoutEditorContext
 ): { intensity: WorkoutIntensityInput; reason?: string } {
   const type = finiteNumber(exercise.intensityType) ?? 0;
   const value = finiteNumber(exercise.intensityValue) ?? 0;
@@ -944,10 +993,6 @@ export function decodeCorosIntensity(
       : { intensity: { type: "none" }, reason: `Unknown COROS swim stroke ${value} is preserved but locked.` };
   }
   if (type === 6) {
-    const definition = RUNNING_POWER_PRESETS.find((entry) => entry.id === custom);
-    if (custom && definition) {
-      return { intensity: { type: "power", preset: definition.preset, zoneId: custom } };
-    }
     const [lowWatts, highWatts] = range(value, valueExtend);
     return { intensity: { type: "power", lowWatts, highWatts } };
   }
@@ -1020,11 +1065,8 @@ export function validateWorkoutIntensity(
   if ((intensity.type === "pace" || intensity.type === "effortPace") && !validRange(intensity.lowSecondsPerKm, intensity.highSecondsPerKm, 1, 3_600)) {
     return "Pace must be a valid range.";
   }
-  if (intensity.type === "power" && !intensity.preset && !validRange(intensity.lowWatts, intensity.highWatts, 0, 3_000)) {
+  if (intensity.type === "power" && !validRange(intensity.lowWatts, intensity.highWatts, 0, 3_000)) {
     return "Power must be a range from 0 to 3000 watts.";
-  }
-  if (intensity.type === "power" && intensity.preset && !RUNNING_POWER_PRESETS.some((entry) => entry.preset === intensity.preset)) {
-    return "Unsupported running-power preset.";
   }
   if ((intensity.type === "speed" || intensity.type === "cadence") && !validRange(intensity.low, intensity.high, 0, intensity.type === "speed" ? 200 : 300)) {
     return `${formatIntensityType(intensity.type)} is outside the supported range.`;
@@ -1213,7 +1255,7 @@ export function formatWorkoutIntensity(intensity: WorkoutIntensityInput): string
   if (intensity.type === "lthrPercent") return `${intensity.lowPercent}–${intensity.highPercent}% LTHR`;
   if (intensity.type === "pace" || intensity.type === "effortPace") return `${formatPace(intensity.lowSecondsPerKm, intensity.displayUnit)}–${formatPace(intensity.highSecondsPerKm, intensity.displayUnit)}/${intensity.displayUnit}`;
   if (intensity.type === "thresholdPacePercent" || intensity.type === "effortPacePercent" || intensity.type === "ftpPercent") return intensity.preset ? intensity.preset : `${intensity.lowPercent}–${intensity.highPercent}%`;
-  if (intensity.type === "power") return intensity.preset ? intensity.preset : `${intensity.lowWatts}–${intensity.highWatts} W`;
+  if (intensity.type === "power") return `${intensity.lowWatts}–${intensity.highWatts} W`;
   if (intensity.type === "speed" || intensity.type === "cadence") return `${intensity.low}–${intensity.high} ${intensity.unit}`;
   if (intensity.type === "swimStroke") return intensity.stroke;
   if (intensity.type === "weight") return intensity.mode === "bodyweight" ? "Bodyweight" : `${intensity.value} ${intensity.unit}`;
@@ -1299,8 +1341,7 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
       percent("ftpPercent", FTP_PRESETS.map((entry) => entry.preset)),
       {
         oneOf: [
-          { type: "object", properties: { type: { const: "power" }, lowWatts: { type: "number" }, highWatts: { type: "number" } }, required: ["type", "lowWatts", "highWatts"] },
-          { type: "object", properties: { type: { const: "power" }, preset: { type: "string", enum: RUNNING_POWER_PRESETS.map((entry) => entry.preset) } }, required: ["type", "preset"] }
+          { type: "object", properties: { type: { const: "power" }, lowWatts: { type: "number" }, highWatts: { type: "number" } }, required: ["type", "lowWatts", "highWatts"] }
         ]
       },
       { type: "object", properties: { type: { const: "speed" }, low: { type: "number" }, high: { type: "number" }, unit: { type: "string", enum: ["km/h", "mph"] } }, required: ["type", "low", "high", "unit"] },
@@ -1423,6 +1464,22 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       name: { type: "string", description: "Plan name" },
+      description: {
+        type: "string",
+        description: "What the plan is for and how it is built; becomes the plan's overview on COROS."
+      },
+      week_stages: {
+        type: "array",
+        description: "COROS's stage for each week that has one, week 1 being the week of the first session.",
+        items: {
+          type: "object",
+          properties: {
+            week: { type: "integer", minimum: 1 },
+            stage: { type: "string", enum: ["preparation", "base", "build", "peak", "race", "transition"] }
+          },
+          required: ["week", "stage"]
+        }
+      },
       workouts: { type: "array", minItems: 1, items: workout }
     },
     required: ["name", "workouts"]

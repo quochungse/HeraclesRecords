@@ -7,9 +7,11 @@
 //
 // Usage:
 //   npm run build:electron && node scripts/verify-coach-workout-api.mjs
+//   HERACLES_USER_DATA=/path/to/userData node scripts/verify-coach-workout-api.mjs
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,10 +33,17 @@ const {
   workoutDraftsMatch
 } = await import(`${distUrl("corosWorkoutEditor.js")}?cacheBust=${Date.now()}`);
 
-const dbPath = path.join(
-  os.homedir(),
-  "Library/Application Support/coroslink/coroslink.sqlite"
-);
+/* userData is named after package.json's top-level `name` — see CLAUDE.md.
+   It was a hard-coded macOS path to the pre-rename `coroslink` folder, which
+   the app no longer reads. */
+function userDataDir() {
+  if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
+  const name = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).name;
+  if (process.platform === "darwin") return path.join(os.homedir(), "Library/Application Support", name);
+  if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
+  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
+}
+const dbPath = path.join(userDataDir(), "coroslink.sqlite");
 const setting = (key) =>
   execFileSync(
     "sqlite3",
@@ -48,7 +57,7 @@ const auth = {
 };
 
 if (!auth.accessToken || !auth.userId || !auth.baseUrl) {
-  console.error("No saved COROS session found. Log in through CorosLink first.");
+  console.error("No saved COROS session found. Log in through Heracles Records first.");
   process.exit(1);
 }
 

@@ -12,6 +12,7 @@ import {
   applyTranscriptContext,
   summaryContextMessage,
   toWireMessages,
+  withPlanEdits,
   type ContextWindow,
   type StoredTranscriptSummary
 } from "./chatContextCompaction";
@@ -50,7 +51,6 @@ import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
 import { ANALYSIS_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
-  AnthropicEffort,
   AnalysisRuntime,
   ClaudeCodeConnectionState,
   AnalysisTriggerKind,
@@ -1453,11 +1453,16 @@ async function runOneBinding(
     const streaming = resolved.streamChat(
       sink,
       run.id,
-      [
-        ...(summary ? [summaryContextMessage(summary)] : []),
-        ...toWireMessages(tail),
-        { role: "user", content: playbook }
-      ],
+      withPlanEdits(
+        [
+          ...(summary ? [summaryContextMessage(summary)] : []),
+          ...toWireMessages(tail),
+          { role: "user", content: playbook }
+        ],
+        /* The whole transcript, as the chat passes it: an edited plan's card
+           can sit in the part the summary folded away. */
+        session.entries
+      ),
       {
         runtime,
         toolPolicy: "read-only",

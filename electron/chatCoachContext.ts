@@ -104,7 +104,7 @@ export function buildBaseCoachInstructions(): string {
     "to another workout sport. In particular, Open Water Swim is not Pool Swim; ask before substituting it. " +
     "Represent triathlon or COROS Multi Sport plans as separate supported workouts. Never trigger a write " +
     "until the athlete confirms from the workout or plan card. If " +
-    "creating Strength or HYROX workouts, call search_coros_exercises first with all intended movement names, " +
+    "creating Strength or Hybrid Fitness workouts, call search_coros_exercises first with all intended movement names, " +
     "or with the target muscles, movement patterns, and known equipment. Use its exact exercise IDs and names; " +
     "for every Strength exercise, put the prescription in sets, target_reps or target_duration_seconds, " +
     "rest_type=1, rest_value in seconds, and the typed weight intensity. Never encode sets or rep ranges only in the name. " +
@@ -153,6 +153,32 @@ export function buildCoachSportCapabilityGuide(): string {
       (options.length > 0 ? `; ${options.join("; ")}` : "")
     );
   }).join("\n");
+}
+
+/**
+ * That a step need not carry a target at all.
+ *
+ * Every field the coach writes is paid for twice — once in the arguments it
+ * generates and once in the schema that described them — so a warm-up it can
+ * write as `{"kind": "warmup"}` is cheaper than one that has to carry ten
+ * minutes in seconds. `withDefaultTarget` fills it from the same table the
+ * builder seeds its rows from (`workoutDefaults.ts`), so a workout drafted
+ * here and one built by hand start from the same figures.
+ *
+ * Deliberately short on specifics: listing every sport's figures would cost
+ * more per turn than the omission saves, and the coach does not need to know
+ * them to leave a field out.
+ */
+export function buildCoachWorkoutDefaultsGuide(): string {
+  return [
+    "A step that states no target takes its sport's default for that kind —",
+    "warm-ups and cool-downs are an easy ten minutes, a rest is a rest, an",
+    "interval is one rep, a Strength step follows the movement it names (a",
+    "deadlift is heavy and low-rep, a plank is held), and a Hybrid Fitness",
+    "station is its competition distance. Omit the target when the default is",
+    "what you meant; state it when it is not. A step that names a target_type",
+    "must still carry that target's figure."
+  ].join(" ");
 }
 
 interface ActivitySportGroup {

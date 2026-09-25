@@ -5,11 +5,12 @@ import type {
   UnitSystem
 } from "../../electron/types";
 import { parseUpcomingWorkoutDistanceKm } from "../training/formatters";
-import type {
-  CalendarDay,
-  PlannedActualPair,
-  PlannedTargets,
-  WeeklyStats
+import {
+  scheduledWorkoutKey,
+  type CalendarDay,
+  type PlannedActualPair,
+  type PlannedTargets,
+  type WeeklyStats
 } from "./calendarTypes";
 import { buildScheduledWorkoutView } from "./scheduledStructure";
 import {
@@ -163,19 +164,74 @@ function matchScore(
 }
 
 /**
+ * What the athlete said, for a scheduled entry this greedy pass would
+ * otherwise guess about. Keyed by `scheduledWorkoutKey`.
+ *
+ * `skipped` is not the absence of an activity — it is the statement that the
+ * session was deliberately not done, so no activity may be paired to it and
+ * whatever *was* done that day stays unplanned rather than being claimed.
+ * `none` pairs the same way and says less: none of the day's activities was
+ * this session.
+ */
+export type PairingOverride =
+  | { kind: "activity"; activityId: string }
+  | { kind: "skipped" }
+  | { kind: "none" };
+
+/**
  * Greedy per-day matching of scheduled workouts to completed activities.
  * Each activity is consumed by at most one scheduled workout.
+ *
+ * Overrides are applied *before* the greedy pass, not after, and in their own
+ * loop: a hand-linked activity has to be taken out of the pool before any
+ * scoring happens, or the entry standing next to it can be given the activity
+ * the athlete already assigned and the override quietly loses.
  */
 export function pairPlannedWithActual(
   scheduled: TrainingHubScheduledWorkoutEntry[],
   activities: TrainingHubActivity[],
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  overrides?: ReadonlyMap<string, PairingOverride>
 ): { pairs: PlannedActualPair[]; unplanned: TrainingHubActivity[] } {
   const remaining = [...activities];
   const pairs: PlannedActualPair[] = [];
+  const decided = new Map<string, TrainingHubActivity | null>();
+
+  if (overrides?.size) {
+    for (const entry of scheduled) {
+      const override = overrides.get(scheduledWorkoutKey(entry));
+      if (!override) continue;
+      if (override.kind !== "activity") {
+        decided.set(scheduledWorkoutKey(entry), null);
+        continue;
+      }
+      const index = remaining.findIndex(
+        (activity) => activity.activityId === override.activityId
+      );
+      // An override naming an activity outside this range is not an error and
+      // not a skip: it simply cannot be shown here, so the entry falls through
+      // to the greedy pass rather than being drawn as deliberately undone.
+      if (index < 0) continue;
+      decided.set(scheduledWorkoutKey(entry), remaining[index]!);
+      remaining.splice(index, 1);
+    }
+  }
 
   for (const entry of scheduled) {
     const targets = plannedTargets(entry, unitSystem);
+    const key = scheduledWorkoutKey(entry);
+
+    if (decided.has(key)) {
+      const chosen = decided.get(key) ?? undefined;
+      pairs.push({
+        scheduled: entry,
+        activity: chosen,
+        completionPct: chosen ? completionPct(entry, chosen, targets) : undefined,
+        targets
+      });
+      continue;
+    }
+
     let best: TrainingHubActivity | undefined;
     let bestScore = Number.POSITIVE_INFINITY;
     for (const activity of remaining) {

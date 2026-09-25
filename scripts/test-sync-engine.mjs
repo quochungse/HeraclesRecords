@@ -846,28 +846,16 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
     "delete removes the row"
   );
 
-  // Composite primary keys.
-  const linkId = ["plan-1", "entry-1"].join(RECORD_ID_SEPARATOR);
-  target.upsertRow("training_plan_workout_links", linkId, {
-    plan_id: "plan-1",
-    entry_id: "entry-1",
-    program_id: "prog-1"
-  });
+  // A record id is split on the separator into one part per primary-key
+  // column. No synced table has a composite key since the local plan store
+  // (and `training_plan_workout_links` with it) was retired, so the general
+  // path is held here by its arity check on a single-key table: an id with the
+  // wrong number of parts must not reach a DELETE.
   assert.equal(
-    target.recordIdFor("training_plan_workout_links", {
-      plan_id: "plan-1",
-      entry_id: "entry-1"
-    }),
-    linkId,
+    target.recordIdFor("chat_sessions", { id: "s1" }),
+    "s1",
     "recordIdFor must produce what deleteRow consumes"
   );
-  target.deleteRow("training_plan_workout_links", linkId);
-  assert.equal(
-    db.prepare("SELECT COUNT(*) AS n FROM training_plan_workout_links").get().n,
-    0,
-    "a composite key deletes the right row"
-  );
-
   // Settings.
   target.setSetting("chat.provider", "openrouter");
   assert.equal(database.getSetting("chat.provider"), "openrouter");
@@ -914,8 +902,8 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
     /missing primary key/
   );
   assert.throws(
-    () => target.deleteRow("training_plan_workout_links", "only-one-part"),
-    /expected 2/,
+    () => target.deleteRow("chat_sessions", ["two", "parts"].join(RECORD_ID_SEPARATOR)),
+    /expected 1/,
     "a record id with the wrong arity must not delete an unintended row"
   );
 

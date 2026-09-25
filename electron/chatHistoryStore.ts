@@ -355,6 +355,10 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
     // save.
     removedAt:
       typeof value.removedAt === "number" ? value.removedAt : undefined,
+    // The same, for an edit: dropped, the coach would stop seeing the version
+    // the athlete made.
+    editedAt:
+      typeof value.editedAt === "number" ? value.editedAt : undefined,
     uploadResult:
       isRecord(value.uploadResult) &&
       typeof value.uploadResult.workoutsScheduled === "number" &&
@@ -371,13 +375,9 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
               value.uploadResult.destination === "nativePlanAndCalendar"
                 ? value.uploadResult.destination
                 : undefined,
-            localPlanId:
-              typeof value.uploadResult.localPlanId === "string"
-                ? value.uploadResult.localPlanId
-                : undefined,
-            groupedPlanCreated:
-              typeof value.uploadResult.groupedPlanCreated === "boolean"
-                ? value.uploadResult.groupedPlanCreated
+            planId:
+              typeof value.uploadResult.planId === "string"
+                ? value.uploadResult.planId
                 : undefined
           }
         : undefined

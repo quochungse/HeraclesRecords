@@ -12,11 +12,29 @@ import {
   type CalendarDragPayload
 } from "./calendarDrag";
 import type { CalendarDay, CalendarWeek } from "./calendarTypes";
-import { computeWeeklyStats, pairPlannedWithActual } from "./pairing";
+import {
+  computeWeeklyStats,
+  pairPlannedWithActual,
+  type PairingOverride
+} from "./pairing";
+import { scheduledWorkoutKey } from "./calendarTypes";
 
 interface CalendarRangeData {
+  /**
+   * The range this was read for. Paging to a range with nothing cached keeps
+   * the previous range's data on screen until the new one lands, so "is there
+   * data" is not the same question as "has the range on screen been read".
+   */
+  rangeKey: string;
   scheduled: TrainingHubScheduledWorkoutEntry[];
   activities: TrainingHubActivity[];
+  /**
+   * What the athlete said by hand about a planned session — this one was
+   * really that activity, or it was skipped. Stored locally, so reading them
+   * costs no COROS request; without them the calendar's own greedy pairing
+   * would silently overrule an override made on the day panel.
+   */
+  overrides: Map<string, PairingOverride>;
   metrics: TrainingHubDailyMetric[];
   /** Raw week aggregates from /analyse/dayDetail (recommended TL band per week). */
   weekAggregates: Record<string, unknown>[];
@@ -115,15 +133,34 @@ export function useCalendarData({
     void Promise.all([
       api.listScheduledWorkouts(rangeStart, rangeEnd),
       api.listTrainingHubActivities(1, 200, rangeStart, rangeEnd),
-      api.getDailyMetrics(keysForRange)
+      api.getDailyMetrics(keysForRange),
+      // Local read, so it adds no round trip and cannot fail the range.
+      api.listTrainingActivityMatches().catch(() => [])
     ])
-      .then(([scheduled, activities, dailyMetrics]) => {
+      .then(([scheduled, activities, dailyMetrics, matches]) => {
         if (cancelled || rangeKeyRef.current !== rangeKey) {
           return;
         }
+        const overrides = new Map<string, PairingOverride>();
+        for (const match of matches) {
+          if (!match.manual) continue;
+          const key = scheduledWorkoutKey({
+            planId: match.schedulePlanId,
+            idInPlan: match.scheduleIdInPlan
+          });
+          if (match.status === "skipped") {
+            overrides.set(key, { kind: "skipped" });
+          } else if (match.activityId) {
+            overrides.set(key, { kind: "activity", activityId: match.activityId });
+          } else {
+            overrides.set(key, { kind: "none" });
+          }
+        }
         const next: CalendarRangeData = {
+          rangeKey,
           scheduled,
           activities,
+          overrides,
           metrics: dailyMetrics.dayList ?? [],
           weekAggregates: dailyMetrics.weekList ?? []
         };
@@ -223,7 +260,8 @@ export function useCalendarData({
         const { pairs, unplanned } = pairPlannedWithActual(
           scheduled,
           activities,
-          unitSystem
+          unitSystem,
+          data?.overrides
         );
         return {
           dateKey,
@@ -261,5 +299,14 @@ export function useCalendarData({
     });
   }, [data, weekKeys, isInMonth, todayKey, unitSystem]);
 
-  return { weeks, loading, error, reload, applyOptimisticMove, todayKey };
+  /*
+   * Whether the range on screen has been read at least once. `loading` cannot
+   * answer that: it is false for the renders before the effect that raises it,
+   * and it goes up again on every reload of a range already on screen. An
+   * empty week may only say so once this is true — before that, "nothing
+   * planned" is a statement about a request that has not come back.
+   */
+  const rangeLoaded = data?.rangeKey === rangeKey;
+
+  return { weeks, loading, rangeLoaded, error, reload, applyOptimisticMove, todayKey };
 }

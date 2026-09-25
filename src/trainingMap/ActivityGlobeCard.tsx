@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Clock3,
   Flame,
   Gauge,
   Hand,
@@ -232,57 +231,6 @@ function mergeRouteBatch(
     }
   }
   return changed ? Array.from(routesById.values()) : base;
-}
-
-interface GlobeProfile {
-  label: string;
-  unit: string;
-  values: number[];
-}
-
-function isFiniteNumber(value: number | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function downsampleValues(values: number[], target: number): number[] {
-  if (values.length <= target) {
-    return values;
-  }
-
-  const step = values.length / target;
-  return Array.from(
-    { length: target },
-    (_, index) => values[Math.floor(index * step)]!,
-  );
-}
-
-function extractProfile(
-  detail: TrainingHubActivityDetail | null,
-): GlobeProfile | null {
-  const heartRate = (detail?.series ?? [])
-    .map((point) => point.hr)
-    .filter(isFiniteNumber)
-    .filter((value) => value > 0);
-  if (heartRate.length >= 8) {
-    return {
-      label: "Heart rate",
-      unit: "bpm",
-      values: downsampleValues(heartRate, 72),
-    };
-  }
-
-  const elevation = (detail?.track?.points ?? [])
-    .map((point) => point.elevation)
-    .filter(isFiniteNumber);
-  if (elevation.length >= 8) {
-    return {
-      label: "Elevation",
-      unit: "m",
-      values: downsampleValues(elevation, 72),
-    };
-  }
-
-  return null;
 }
 
 export function ActivityGlobeCard({

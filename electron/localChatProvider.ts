@@ -380,7 +380,6 @@ export async function streamOpenAiCompatibleChatCompletion(
   let tools = options.toolsEnabled
     ? buildLocalFunctionTools(options.tools)
     : [];
-  let toolsDisabled = false;
 
   for (let round = 0; round < options.maxToolRounds; round++) {
     const opened = await openLocalChatStream(
@@ -394,7 +393,6 @@ export async function streamOpenAiCompatibleChatCompletion(
 
     if ("toolsUnsupported" in opened) {
       tools = [];
-      toolsDisabled = true;
       input = buildLocalInputMessages(
         options.fallbackInstructions ?? options.instructions,
         options.messages

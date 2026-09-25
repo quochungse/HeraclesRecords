@@ -163,7 +163,6 @@ interface LoginResult {
 }
 
 const GLOBAL_BASE_URL = "https://teamapi.coros.com";
-const LOGIN_URL = `${GLOBAL_BASE_URL}/account/login`;
 const RESULT_SUCCESS = "0000";
 // Every code COROS answers a request with when the access token it carries is
 // not the live one for that account. `1019` is what a token that has been
@@ -1290,9 +1289,29 @@ export function buildCorosProfileUpdateFields(
  * COROS trains from and the zone tables it derives from them.
  */
 export async function getCorosProfile(): Promise<CorosProfile> {
-  return normalizeCorosProfile(
-    await trainingHubGet<Record<string, unknown>>("/account/query")
-  );
+  return normalizeCorosProfile(await readCorosAccount());
+}
+
+/**
+ * The signed-in account, asked for the only way `/account/query` answers.
+ *
+ * **It takes the account's own id.** The bare form is not a "whoever this
+ * token belongs to" endpoint — `test:coros-api-envelope` has held that down
+ * on the login path since the region probe was found silently dead from it —
+ * but these two reads were never covered and kept asking bare. What came back
+ * was enough to look right (identity and the heart-rate zone tables) and
+ * short of `ltspZone` and `cyclePowerZone`, so Personal quietly hid its Pace
+ * and Power tabs and the workout builder fell back to a hardcoded zone table
+ * for every pace target it has ever drawn.
+ */
+async function readCorosAccount(): Promise<Record<string, unknown>> {
+  const auth = getStoredAuth();
+  if (!auth) {
+    throw new Error("Log in to COROS Training Hub first.");
+  }
+  return trainingHubGet<Record<string, unknown>>("/account/query", {
+    accountid: auth.userId
+  });
 }
 
 // A profile changes when the user edits it — which goes through this service —
@@ -2726,6 +2745,9 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
       sportType: toOptionalNumber(program.sportType),
       volume: formatUpcomingWorkoutVolume(program, {}),
       trainingLoad: resolveUpcomingWorkoutLoad(program, {}),
+      durationSeconds: previewFromProgram(program).durationSeconds,
+      exerciseCount: toProgramFigure(program.exerciseNum),
+      setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
       createTimestamp: toOptionalNumber(program.createTimestamp)
     }))
     .sort((left, right) => (right.createTimestamp ?? 0) - (left.createTimestamp ?? 0));
@@ -2775,6 +2797,11 @@ export async function duplicateLibraryWorkout(
     sportType: toOptionalNumber(created.program.sportType),
     volume: formatUpcomingWorkoutVolume(created.program, {}),
     trainingLoad: resolveUpcomingWorkoutLoad(created.program, {}),
+    durationSeconds: previewFromProgram(created.program).durationSeconds,
+    exerciseCount: toProgramFigure(created.program.exerciseNum),
+    setCount:
+      toProgramFigure(created.program.totalSets) ??
+      toProgramFigure(created.program.sets),
     createTimestamp: Date.now()
   };
 }
@@ -2833,7 +2860,7 @@ async function resolveWorkoutEditSource(ref: WorkoutEditRef): Promise<WorkoutEdi
 
 async function loadWorkoutEditorAccount(): Promise<Record<string, unknown>> {
   try {
-    return await trainingHubGet<Record<string, unknown>>("/account/query");
+    return await readCorosAccount();
   } catch {
     return {};
   }
@@ -2936,19 +2963,36 @@ function workoutEditEndpointAdapter() {
   };
 }
 
+/**
+ * A COROS program total, where **zero means the field is not filled in**.
+ *
+ * Every one of these figures — duration, distance, training load, set count —
+ * is a quantity a real workout has some of, and COROS writes `0` into the ones
+ * it has not computed. `/training/program/query` returns a trimmed row where
+ * they are all `0`, so a plain `??` chain stops at the first field it finds
+ * rather than at the first field that says anything: an hour's easy run read
+ * back as a training load of nothing, and the fallbacks behind it were never
+ * reached. `resolveWorkoutDistanceMeters` has always read these with `> 0`;
+ * this is the same rule, named, for the fields that were not.
+ */
+function toProgramFigure(value: unknown): number | undefined {
+  const parsed = toOptionalNumber(value);
+  return parsed !== undefined && parsed > 0 ? parsed : undefined;
+}
+
 function previewFromProgram(program: Record<string, unknown>): WorkoutEditPreview {
   const durationSeconds =
-    toOptionalNumber(program.planDuration) ??
-    toOptionalNumber(program.duration) ??
-    toOptionalNumber(program.estimatedTime);
+    toProgramFigure(program.planDuration) ??
+    toProgramFigure(program.duration) ??
+    toProgramFigure(program.estimatedTime);
   const distanceRaw =
-    toOptionalNumber(program.planDistance) ??
-    toOptionalNumber(program.distance) ??
-    toOptionalNumber(program.estimatedDistance);
+    toProgramFigure(program.planDistance) ??
+    toProgramFigure(program.distance) ??
+    toProgramFigure(program.estimatedDistance);
   const trainingLoad =
-    toOptionalNumber(program.planTrainingLoad) ??
-    toOptionalNumber(program.trainingLoad) ??
-    toOptionalNumber(program.essence);
+    toProgramFigure(program.planTrainingLoad) ??
+    toProgramFigure(program.trainingLoad) ??
+    toProgramFigure(program.essence);
   return {
     ...(durationSeconds !== undefined ? { durationSeconds } : {}),
     ...(distanceRaw !== undefined ? { distanceMeters: distanceRaw / 100 } : {}),
@@ -3122,6 +3166,42 @@ export async function scheduleLibraryWorkout(
     throw new Error("Library workout not found.");
   }
   await scheduleWorkoutOnDate(program, happenDay);
+}
+
+/**
+ * One plan session as the full COROS program a plan write carries.
+ *
+ * `/training/plan/add` and `update` take each session as a complete program —
+ * what `/training/program/detail` answers, or what `calculate` answers for one
+ * built here — and COROS gives it an id of its own inside the plan. So this is
+ * the schedule path's own payload, calculated and not written anywhere, and an
+ * unresolved exercise refuses it as a schedule write does: it would put the
+ * wrong movement on the watch.
+ *
+ * A plan save builds its sessions one after another, so it reads the editor
+ * context once (`getWorkoutEditorContext`) and hands it to each; without it
+ * every session read the account again.
+ */
+export async function buildCalculatedPlanProgram(
+  entryInput: PlanWorkoutEntryInput,
+  unitSystem: UnitSystem = "metric",
+  context?: WorkoutEditorContext
+): Promise<Record<string, unknown>> {
+  const entry = toPlanWorkoutEntry(entryInput);
+  const exerciseResolution = await resolveTrainingPlanExercises({
+    name: entry.name,
+    workouts: [entry]
+  });
+  if (exerciseResolution.issues.length > 0) {
+    throw new Error(exerciseResolution.issues.map((issue) => issue.message).join(" "));
+  }
+  const resolvedEntry = exerciseResolution.draft.workouts[0]!;
+  return calculateWorkoutProgram(
+    buildWorkoutPayloadFromEntry(
+      resolvedEntry,
+      context ?? (await getWorkoutEditorContext(unitSystem))
+    )
+  );
 }
 
 export async function createAndScheduleWorkout(
@@ -3911,8 +3991,6 @@ export function parseUpcomingWorkouts(
       return;
     }
 
-    const idInPlan = String(entity.idInPlan ?? "");
-    const planProgramId = String(entity.planProgramId ?? "");
     const program = resolveScheduledProgram(
       entity,
       index,
@@ -4026,11 +4104,14 @@ function resolveUpcomingWorkoutLoad(
 ): number | undefined {
   const sportData = pickObject(entity, ["sportData"]);
 
+  // `toProgramFigure`, not `toOptionalNumber`: a `trainingLoad` of 0 is COROS
+  // saying it has not computed one, and reading it as a figure stopped this
+  // chain before it reached either fallback. See that function's header.
   return (
-    (sportData ? toOptionalNumber(sportData.trainingLoad) : undefined) ??
-    (program ? toOptionalNumber(program.trainingLoad) : undefined) ??
-    (program ? toOptionalNumber(program.essence) : undefined) ??
-    (program ? toOptionalNumber(program.estimatedValue) : undefined)
+    (sportData ? toProgramFigure(sportData.trainingLoad) : undefined) ??
+    (program ? toProgramFigure(program.trainingLoad) : undefined) ??
+    (program ? toProgramFigure(program.essence) : undefined) ??
+    (program ? toProgramFigure(program.estimatedValue) : undefined)
   );
 }
 
@@ -5383,7 +5464,7 @@ function resolveLongestRunDuration(
 }
 
 function resolveLongestRunAvgPace(
-  raw: Record<string, unknown>,
+  _raw: Record<string, unknown>,
   rawRecord?: number,
   rawAvgPace?: number,
   distanceMeters?: number,
@@ -7582,15 +7663,6 @@ function toOptionalNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function normalizeCalories(value: unknown): number | undefined {
-  const numeric = toOptionalNumber(value);
-  if (numeric === undefined) {
-    return undefined;
-  }
-
-  return numeric > 1000 ? Math.round(numeric / 1000) : Math.round(numeric);
-}
-
 function formatRaceDistanceLabel(
   distance?: number,
   raceName?: string,
@@ -7656,6 +7728,53 @@ export async function readNativeTrainingPlanEndpoint<T>(
     return trainingHubGet<T>(path, options.params);
   }
   throw new Error("Unsupported native training-plan read operation.");
+}
+
+/**
+ * The native training-plan writes, and nothing else — the read bridge's
+ * allowlist carried over to the write side, for the same reason.
+ *
+ * Every path here was probed live on 2026-09-24 through its whole lifecycle,
+ * with payloads taken from the Training Hub web app's own bundle
+ * (`docs/coros-plan-write-api.md`). The ones that are a status and nothing
+ * else — `update`, `delete`, `executeSubPlan`, `quitSubPlan` — answer
+ * `0000` with no `data` at all, so an absent body is success here.
+ */
+export type NativeTrainingPlanWritePath =
+  | "/training/plan/add"
+  | "/training/plan/update"
+  | "/training/plan/copy"
+  | "/training/plan/delete"
+  | "/training/schedule/executeSubPlan"
+  | "/training/schedule/quitSubPlan";
+
+const NATIVE_TRAINING_PLAN_WRITE_PATHS: ReadonlySet<string> = new Set<NativeTrainingPlanWritePath>([
+  "/training/plan/add",
+  "/training/plan/update",
+  "/training/plan/copy",
+  "/training/plan/delete",
+  "/training/schedule/executeSubPlan",
+  "/training/schedule/quitSubPlan"
+]);
+
+export async function writeNativeTrainingPlanEndpoint<T>(
+  path: NativeTrainingPlanWritePath,
+  options: { params?: Record<string, string | number>; body?: unknown } = {}
+): Promise<T | undefined> {
+  if (!NATIVE_TRAINING_PLAN_WRITE_PATHS.has(path)) {
+    throw new Error("Unsupported native training-plan write operation.");
+  }
+  return trainingHubRequest<T>(path, {
+    method: "POST",
+    params: options.params,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    allowEmptyData: true
+  });
+}
+
+/** The region the session is on — `plan/add` carries it and `plan/copy` asks for it. */
+export function currentTrainingHubRegionId(): string | undefined {
+  return getStoredAuth()?.regionId;
 }
 
 interface TrainingHubRequestOptions extends RequestInit {

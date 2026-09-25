@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { OptionGroup } from "../components/OptionGroup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, ReactElement } from "react";
+import type { DragEvent, ReactElement, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type {
   RunWorkoutEditorDraft,
@@ -32,8 +32,6 @@ import type {
   RunWorkoutEditorStep,
   RunWorkoutEditorStepKind,
   RunWorkoutEditorTarget,
-  PlanWorkoutEntryInput,
-  TrainingPlanEntry,
   WorkoutEditPreview,
   WorkoutEditRef,
   WorkoutEditSaveResult,
@@ -46,10 +44,6 @@ import type {
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { SelectDropdown } from "../components/SelectDropdown";
-import {
-  editorDraftToPlanWorkoutInput,
-  planWorkoutInputToEditorDraft
-} from "../../electron/planWorkoutEditor";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   elevationToMeters,
@@ -79,7 +73,7 @@ import {
   FTP_PRESETS,
   HEART_RATE_PRESETS,
   PACE_PRESETS,
-  RUNNING_POWER_PRESETS,
+  zoneOptionLabel,
   SWIM_STROKE_IDS,
   WORKOUT_SPORT_CAPABILITIES,
   formatIntensityType,
@@ -89,10 +83,19 @@ import {
   workoutTargetsForStep
 } from "../../electron/workoutCapabilities";
 
+/**
+ * The Calendar's editor for a scheduled occurrence, and its read-only view of
+ * a library workout.
+ *
+ * Every other workout — a plan session, new or edited, and Edit workout in the
+ * Training Library — is written in the workout builder (`WorkoutBuilderModal`),
+ * which is Create workout's own form. This modal's plan mode went with that
+ * move, along with the heading and discard question that only the plan editor
+ * passed.
+ */
 interface WorkoutEditorModalProps {
   api: CorosLinkApi;
-  editRef?: WorkoutEditRef;
-  planEntry?: TrainingPlanEntry;
+  editRef: WorkoutEditRef;
   /**
    * Opens the same surface with every control inert and no Save.
    *
@@ -107,7 +110,6 @@ interface WorkoutEditorModalProps {
   readOnly?: boolean;
   onClose: () => void;
   onSaved?: (result: WorkoutEditSaveResult) => void;
-  onSavedToPlan?: (workout: PlanWorkoutEntryInput) => void;
   onError: (message: string | null) => void;
 }
 
@@ -298,16 +300,23 @@ function moveItem<T>(items: T[], from: number, to: number): T[] {
 
 export function WorkoutEditorModal({
   api,
-  editRef,
-  planEntry,
+  editRef: editRefProp,
   readOnly = false,
   onClose,
   onSaved,
-  onSavedToPlan,
   onError
 }: WorkoutEditorModalProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = useReducedMotion();
+  /*
+   * The ref by what it names, not by identity. The load below is keyed on it,
+   * and a caller that writes the ref as a literal hands over a new object on
+   * every render of its own — each of which reset the document and fetched it
+   * again, so the editor flashed back to its skeleton a few seconds after
+   * opening and dropped whatever had been typed.
+   */
+  const editRefKey = JSON.stringify(editRefProp);
+  const editRef = useMemo(() => editRefProp, [editRefKey]);
   const [document, setDocument] = useState<WorkoutEditorDocument | null>(null);
   const [draft, setDraft] = useState<RunWorkoutEditorDraft | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -317,51 +326,13 @@ export function WorkoutEditorModal({
   const [saving, setSaving] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const previewSequence = useRef(0);
-  const planMode = Boolean(planEntry);
-  const planWorkout = useMemo<PlanWorkoutEntryInput | undefined>(() => {
-    if (!planEntry) return undefined;
-    return planEntry.workout ?? {
-      key: `plan:${planEntry.id}`,
-      name: planEntry.title ?? "Workout",
-      sport: "run",
-      save_to_library: false
-    };
-  }, [planEntry]);
 
   useEffect(() => {
     let cancelled = false;
     setDocument(null);
     setDraft(null);
     setLoadError(null);
-    const load = async (): Promise<WorkoutEditorDocument> => {
-      if (!planEntry) {
-        if (!editRef) throw new Error("No workout was selected.");
-        return api.getWorkoutForEdit(editRef, unitSystem);
-      }
-      if (planEntry.programId) {
-        const linked = await api.getWorkoutForEdit(
-          { kind: "library", programId: planEntry.programId },
-          unitSystem
-        );
-        return {
-          ...linked,
-          ref: { kind: "library", programId: planEntry.programId },
-          revision: `plan:${planEntry.id}`,
-          canEdit: true,
-          unsupportedReason: undefined
-        };
-      }
-      if (!planWorkout) throw new Error("This plan entry has no editable workout definition.");
-      const context = await api.getWorkoutEditorContext(unitSystem);
-      return {
-        ref: { kind: "library", programId: `plan:${planEntry.id}` },
-        revision: `plan:${planEntry.id}`,
-        draft: planWorkoutInputToEditorDraft(planWorkout),
-        context,
-        canEdit: true
-      };
-    };
-    void load().then((loaded) => {
+    void api.getWorkoutForEdit(editRef, unitSystem).then((loaded) => {
       if (!cancelled) {
         setDocument(readOnly ? { ...loaded, canEdit: false } : loaded);
         setDraft(structuredClone(loaded.draft));
@@ -370,7 +341,7 @@ export function WorkoutEditorModal({
       if (!cancelled) setLoadError(cause instanceof Error ? cause.message : String(cause));
     });
     return () => { cancelled = true; };
-  }, [api, editRef, planEntry, planWorkout, readOnly, unitSystem]);
+  }, [api, editRef, readOnly, unitSystem]);
 
   /* Shared with the day drawer, which needs the same catalog to name a
      strength session — and shared means one request between them rather than
@@ -389,7 +360,7 @@ export function WorkoutEditorModal({
 
   useEffect(() => {
     const sequence = ++previewSequence.current;
-    if (!document || !draft || !document.canEdit || !validation.valid || planMode || !editRef) {
+    if (!document || !draft || !document.canEdit || !validation.valid) {
       setPreview(null);
       setPreviewing(false);
       return;
@@ -416,7 +387,7 @@ export function WorkoutEditorModal({
         });
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [api, document, draft, editRef, planMode, unitSystem, validation.valid]);
+  }, [api, document, draft, editRef, unitSystem, validation.valid]);
 
   const requestClose = useCallback(() => {
     if (dirty && !saving) setConfirmClose(true);
@@ -555,12 +526,7 @@ export function WorkoutEditorModal({
     if (!document || !draft || !validation.valid) return;
     setSaving(true);
     try {
-      if (planMode) {
-        if (!planWorkout || !onSavedToPlan) throw new Error("The plan workout cannot be updated.");
-        onSavedToPlan(editorDraftToPlanWorkoutInput(draft, planWorkout));
-        return;
-      }
-      if (!editRef || !onSaved) throw new Error("The workout editor is missing its save target.");
+      if (!onSaved) throw new Error("The workout editor is missing its save target.");
       const result = await api.saveWorkoutEdit(
         editRef,
         document.revision,
@@ -576,6 +542,7 @@ export function WorkoutEditorModal({
   };
 
   return createPortal(
+    <>
     <AnimatePresence>
       <motion.div className="workout-editor-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <motion.section
@@ -590,7 +557,15 @@ export function WorkoutEditorModal({
         >
           <header className="workout-editor-header">
             <div>
-              <p className="eyebrow">{planMode ? "Training plan copy" : editRef?.kind === "scheduled" ? "Scheduled occurrence" : "Workout library"}</p>
+              {/* The sport leads the line above the title. It used to be a Sport
+                  field in the form, which no workout here can change — a new
+                  plan session has its sport chosen before this opens, and an
+                  existing COROS workout cannot change sport in place — so it
+                  was a locked dropdown with one option. */}
+              <p className="eyebrow workout-editor-eyebrow">
+                {draft ? <WorkoutSportTag sport={draft.sport} /> : null}
+                <span>{editRef.kind === "scheduled" ? "Scheduled occurrence" : "Workout library"}</span>
+              </p>
               {/* Reading a workout, its own name is the heading — it was in a
                   disabled text box two thirds of the way down the form, under
                   a title that named the sport instead. Editing still says what
@@ -637,17 +612,6 @@ export function WorkoutEditorModal({
               <div className="workout-editor-scroll">
                 {!document.canEdit ? <div className="workout-editor-notice"><AlertTriangle size={16} aria-hidden="true" />{document.unsupportedReason}</div> : null}
                 <div className="workout-editor-basics">
-                  <label className="calendar-field">
-                    <span>Sport</span>
-                    <SelectDropdown
-                      label="Sport"
-                      value={draft.sport}
-                      options={[{ value: draft.sport, label: formatWorkoutSport(draft.sport) }]}
-                      disabled
-                      title="An existing COROS workout cannot change sport in place."
-                      onChange={() => undefined}
-                    />
-                  </label>
                   {draft.sport === "swim" ? (
                     <label className="calendar-field">
                       <span>Pool length ({document.context.defaultPoolLength.unit})</span>
@@ -798,7 +762,7 @@ export function WorkoutEditorModal({
                   <button type="button" className="ghost-button" onClick={requestClose} disabled={saving}>Cancel</button>
                   <button type="button" className="primary-button" disabled={!document.canEdit || !dirty || !validation.valid || saving} onClick={() => void save()}>
                     {saving ? <LoaderCircle className="is-spinning" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
-                    {saving ? (planMode ? "Applying..." : "Saving and verifying...") : (planMode ? "Apply to plan" : "Save")}
+                    {saving ? "Saving and verifying..." : "Save"}
                   </button>
                 </div>
               </footer>
@@ -807,14 +771,15 @@ export function WorkoutEditorModal({
 
           {confirmClose ? (
             <div className="workout-editor-confirm" role="alertdialog" aria-label="Discard workout changes">
-              <div><strong>Discard unsaved changes?</strong><span>{planMode ? "Your edits have not been applied to the plan." : "Your edits have not been sent to COROS."}</span></div>
+              <div><strong>Discard unsaved changes?</strong><span>Your edits have not been sent to COROS.</span></div>
               <button type="button" className="ghost-button" onClick={() => setConfirmClose(false)}>Keep editing</button>
-              <button type="button" className="danger-button" onClick={onClose}>Discard</button>
+              <button type="button" className="primary-button danger" onClick={onClose}>Discard</button>
             </div>
           ) : null}
         </motion.section>
       </motion.div>
-    </AnimatePresence>,
+    </AnimatePresence>
+    </>,
     window.document.body
   );
 }
@@ -834,15 +799,49 @@ export function WorkoutEditorModal({
  * off the same `ScheduledStructureView` and through the same renderer. Every
  * figure is computed from the draft rather than asked of COROS: a view that
  * waits on a round trip to say how long a workout is has no reason to.
+ *
+ * **Exported, because the Training Library reads workouts too.** Its detail
+ * pane drew its own hero, its own metric list and its own step list off the
+ * same `WorkoutEditorDocument` — a second renderer for the same payload,
+ * which is exactly the drift `WorkoutStructure` exists to prevent one level
+ * down. Neither surface shows the other, so nothing would have caught them
+ * disagreeing.
  */
-function WorkoutReadOnlyBody({
+export function WorkoutReadOnlyBody({
   draft,
   context,
-  exercisesById
+  exercisesById,
+  title,
+  heroAside,
+  subtitleAside,
+  heroFooter
 }: {
   draft: RunWorkoutEditorDraft;
   context: WorkoutEditorContext;
   exercisesById: ReadonlyMap<string, WorkoutExerciseOption>;
+  /**
+   * The workout's name, for a surface that has no title bar of its own. Given
+   * one, the hero leads with it and the sport steps down to the line beneath —
+   * which is the order a reader wants when the pane is the whole answer rather
+   * than the body of a dialog that already says what it is showing.
+   *
+   * The Calendar passes none: its modal header carries the name, and a second
+   * copy a few pixels below it is the same word twice.
+   */
+  title?: string;
+  /**
+   * The hero's top-right corner — a favourite toggle, say. Three slots rather
+   * than one because a surface that owns the whole pane has things to say about
+   * the workout that the hero is the place for, and each belongs at a
+   * different height: something you act on sits in the corner, something that
+   * qualifies the sport rides on its line, and something about the workout's
+   * place in the rest of the library is a last line under the figures.
+   */
+  heroAside?: ReactNode;
+  /** Follows the sport on the subtitle line — its tags, say. */
+  subtitleAside?: ReactNode;
+  /** A closing line inside the hero, under its figures. */
+  heroFooter?: ReactNode;
 }) {
   const { unitSystem } = useUnitSystem();
   const view = useMemo(
@@ -916,7 +915,11 @@ function WorkoutReadOnlyBody({
           </span>
           <div className="sched-hero-title">
             <div className="sched-hero-heading">
-              <span className="sched-hero-sport">{formatWorkoutSport(draft.sport)}</span>
+              {title ? (
+                <h2 className="sched-hero-name">{title}</h2>
+              ) : (
+                <span className="sched-hero-sport">{formatWorkoutSport(draft.sport)}</span>
+              )}
               {poolLength ? (
                 <span className="sched-hero-chip">
                   {poolLength.value} {poolLength.unit} pool
@@ -926,13 +929,27 @@ function WorkoutReadOnlyBody({
                 <span className="sched-hero-chip">{gradingSystem}</span>
               ) : null}
             </div>
-            {structureSummary ? (
+            {title || structureSummary || subtitleAside ? (
               <span className="sched-hero-context">
-                <Repeat size={12} aria-hidden="true" />
-                {structureSummary}
+                {/* With a name above it the sport is the subtitle; without
+                    one it is the heading and this line is only the shape. */}
+                {title ? <b>{formatWorkoutSport(draft.sport)}</b> : null}
+                {structureSummary ? (
+                  <>
+                    <Repeat size={12} aria-hidden="true" />
+                    {structureSummary}
+                  </>
+                ) : null}
+                {subtitleAside}
               </span>
             ) : null}
           </div>
+          {/* The corner, not the name's line: a control that acts on the whole
+              workout reads as the hero's own rather than as part of its title,
+              and the title keeps the width to wrap in. */}
+          {heroAside ? (
+            <div className="sched-hero-aside">{heroAside}</div>
+          ) : null}
         </div>
         <dl className={`sched-hero-stats is-${stats.length}`}>
           {stats.map((stat) => (
@@ -945,16 +962,25 @@ function WorkoutReadOnlyBody({
             </div>
           ))}
         </dl>
+        {heroFooter}
       </div>
 
-      {overview ? <p className="workout-view-overview">{overview}</p> : null}
+      {/* Framed, with its name on the frame: bare under the hero it read as
+          one more line of the hero's own copy. A workout with none draws
+          nothing here rather than an empty box. */}
+      {overview ? (
+        <fieldset className="workout-view-overview">
+          <legend>Description</legend>
+          <p>{overview}</p>
+        </fieldset>
+      ) : null}
 
       {view.nodes.length > 0 ? (
         <div className="sched-structure">
           <div className="sched-structure-head">
             <h4>
               <ListChecks size={14} aria-hidden="true" />
-              {isStrength ? "Session" : "Workout structure"}
+              Workout structure
             </h4>
           </div>
           <WorkoutStructure
@@ -1126,7 +1152,7 @@ function StepCard({ step, context, sport, exerciseOptions, exerciseOptionsLoadin
           <TargetFields step={step} context={context} sport={sport} disabled={locked} onChange={onChange} />
           <IntensityFields step={step} context={context} sport={sport} disabled={locked} onChange={onChange} />
           {step.kind === "sendOff" ? <label className="workout-control-group"><span>Send-off interval</span><ClockInput label="Send-off interval" seconds={step.sendOffSeconds ?? 120} disabled={locked} onChange={(seconds) => onChange({ ...step, sendOffSeconds: seconds })} /></label> : null}
-          {capability.requiresExercise && step.kind === "training" ? <div className="workout-control-group workout-exercise-control"><span>Exercise</span><ExerciseCombobox value={step.exerciseName ?? ""} selectedId={step.exerciseId} options={exerciseOptions} placeholder="Search by COROS exercise name" label="Exercise" loading={exerciseOptionsLoading} disabled={locked} onChange={(selection) => onChange({ ...step, exerciseName: selection.name, exerciseId: selection.id, exerciseKind: selection.exerciseKind })} />{step.exerciseId ? <small>COROS exercise selected</small> : <small>Select one exact COROS exercise before saving.</small>}</div> : null}
+          {capability.requiresExercise && step.kind === "training" ? <div className="workout-control-group workout-exercise-control"><span>Exercise</span><ExerciseCombobox value={step.exerciseName ?? ""} selectedId={step.exerciseId} options={exerciseOptions} placeholder="Choose an exercise" label="Exercise" loading={exerciseOptionsLoading} disabled={locked} onChange={(selection) => onChange({ ...step, exerciseName: selection.name, exerciseId: selection.id, exerciseKind: selection.exerciseKind })} />{step.exerciseId ? <small>COROS exercise selected</small> : <small>Select one exact COROS exercise before saving.</small>}</div> : null}
         </div>
       )}
       {error ? <p className="workout-field-error">{error}</p> : null}
@@ -1196,7 +1222,7 @@ function StrengthStepFields({
             value={step.exerciseName ?? ""}
             selectedId={step.exerciseId}
             options={exerciseOptions}
-            placeholder="Search the COROS exercise library"
+            placeholder="Choose a movement"
             label="Exercise"
             loading={exerciseOptionsLoading}
             disabled={disabled}
@@ -1448,28 +1474,27 @@ function IntensityFields({ step, context, sport, disabled, onChange }: { step: R
     {intensity.type === "heartRate" ? numberRange(intensity.lowBpm, intensity.highBpm, "Low bpm", "High bpm", (lowBpm, highBpm) => ({ type: "heartRate", lowBpm, highBpm }), 30, 250) : null}
 
     {intensity.type === "heartRatePercent" ? <>
-      <label><span>Basis</span><SelectDropdown<WorkoutHeartRateBasis> label="Heart-rate basis" value={intensity.basis} options={[{ value: "maxHr", label: "% Max Heart Rate" }, { value: "reserve", label: "% Heart Rate Reserve" }, { value: "lthr", label: "% Lactate Threshold HR" }]} disabled={disabled} portal onChange={(basis) => setIntensity({ type: "heartRatePercent", basis, preset: "aerobicEndurance" })} /></label>
-      <label><span>Zone or custom</span><SelectDropdown label="Heart-rate zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...HEART_RATE_PRESETS[intensity.basis].map((zone) => { const configured = profileZone(context, intensity.basis, zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = HEART_RATE_PRESETS[intensity.basis].find((zone) => zone.preset === preset); const configured = profileZone(context, intensity.basis, preset, definition?.id); setIntensity(preset === "custom" ? { type: "heartRatePercent", basis: intensity.basis, lowPercent: 80, highPercent: 90 } : { type: "heartRatePercent", basis: intensity.basis, preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
+      <label><span>Basis</span><SelectDropdown<WorkoutHeartRateBasis> label="Heart-rate basis" value={intensity.basis} options={[{ value: "maxHr", label: "% Max Heart Rate" }, { value: "reserve", label: "% Heart Rate Reserve" }, { value: "lthr", label: "% Lactate Threshold HR" }]} disabled={disabled} portal onChange={(basis) => setIntensity({ type: "heartRatePercent", basis, preset: HEART_RATE_PRESETS[basis][1]!.preset })} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Heart-rate zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...HEART_RATE_PRESETS[intensity.basis].map((zone, zoneIndex, list) => { const configured = profileZone(context, intensity.basis, zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = HEART_RATE_PRESETS[intensity.basis].find((zone) => zone.preset === preset); const configured = profileZone(context, intensity.basis, preset, definition?.id); setIntensity(preset === "custom" ? { type: "heartRatePercent", basis: intensity.basis, lowPercent: 80, highPercent: 90 } : { type: "heartRatePercent", basis: intensity.basis, preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: "heartRatePercent", basis: intensity.basis, lowPercent, highPercent })) : null}
       <HeartRatePreview intensity={intensity} context={context} />
     </> : null}
 
     {(intensity.type === "thresholdPacePercent" || intensity.type === "effortPacePercent") ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Pace zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...PACE_PRESETS.map((zone) => { const configured = profileZone(context, "thresholdPace", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = PACE_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "thresholdPace", preset, definition?.id); setIntensity((preset === "custom" ? { type: intensity.type, lowPercent: 90, highPercent: 100 } : { type: intensity.type, preset, ...(configured ? { zoneId: configured.id } : {}) }) as WorkoutIntensityInput); }} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Pace zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...PACE_PRESETS.map((zone, zoneIndex, list) => { const configured = profileZone(context, "thresholdPace", zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = PACE_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "thresholdPace", preset, definition?.id); setIntensity((preset === "custom" ? { type: intensity.type, lowPercent: 90, highPercent: 100 } : { type: intensity.type, preset, ...(configured ? { zoneId: configured.id } : {}) }) as WorkoutIntensityInput); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: intensity.type, lowPercent, highPercent })) : null}
       <PacePercentPreview intensity={intensity} context={context} />
     </> : null}
 
     {intensity.type === "ftpPercent" ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Cycling power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...FTP_PRESETS.map((zone) => { const configured = profileZone(context, "ftp", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = FTP_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "ftp", preset, definition?.id); setIntensity(preset === "custom" ? { type: "ftpPercent", lowPercent: 90, highPercent: 100 } : { type: "ftpPercent", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
+      <label><span>Zone or custom</span><SelectDropdown label="Cycling power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom range" }, ...FTP_PRESETS.map((zone, zoneIndex, list) => { const configured = profileZone(context, "ftp", zone.preset, zone.id); return { value: zone.preset, label: zoneOptionLabel(zone, zoneIndex, list.length, configured) }; })]} disabled={disabled} portal onChange={(preset) => { const definition = FTP_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "ftp", preset, definition?.id); setIntensity(preset === "custom" ? { type: "ftpPercent", lowPercent: 90, highPercent: 100 } : { type: "ftpPercent", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
       {!intensity.preset ? percentRange(intensity, (lowPercent, highPercent) => ({ type: "ftpPercent", lowPercent, highPercent })) : null}
       <PowerPercentPreview intensity={intensity} context={context} reference={context.ftp} zoneKey="ftp" />
     </> : null}
 
-    {intensity.type === "power" ? <>
-      <label><span>Zone or custom</span><SelectDropdown label="Running power zone" value={intensity.preset ?? "custom"} options={[{ value: "custom", label: "Custom watts" }, ...RUNNING_POWER_PRESETS.map((zone) => { const configured = profileZone(context, "runningPower", zone.preset, zone.id); return { value: zone.preset, label: `${configured?.label ?? zone.label} · ${configured?.lowPercent ?? zone.low}-${configured?.highPercent ?? zone.high}%` }; })]} disabled={disabled} portal onChange={(preset) => { const definition = RUNNING_POWER_PRESETS.find((zone) => zone.preset === preset); const configured = profileZone(context, "runningPower", preset, definition?.id); setIntensity(preset === "custom" ? { type: "power", lowWatts: 180, highWatts: 220 } : { type: "power", preset: preset as never, ...(configured ? { zoneId: configured.id } : {}) }); }} /></label>
-      {!intensity.preset ? numberRange(intensity.lowWatts, intensity.highWatts, "Low W", "High W", (lowWatts, highWatts) => ({ type: "power", lowWatts, highWatts }), 0, 3000) : <PowerPercentPreview intensity={intensity} context={context} reference={context.criticalPower} zoneKey="runningPower" />}
-    </> : null}
+    {intensity.type === "power"
+      ? numberRange(intensity.lowWatts, intensity.highWatts, "Low W", "High W", (lowWatts, highWatts) => ({ type: "power", lowWatts, highWatts }), 0, 3000)
+      : null}
 
     {intensity.type === "speed" ? numberRange(intensity.low, intensity.high, `Low ${intensity.unit}`, `High ${intensity.unit}`, (low, high) => ({ ...intensity, low, high }), 0, 200) : null}
     {intensity.type === "cadence" ? numberRange(intensity.low, intensity.high, `Low ${intensity.unit}`, `High ${intensity.unit}`, (low, high) => ({ ...intensity, low, high }), 0, 300) : null}
@@ -1516,12 +1541,11 @@ function PacePercentPreview({ intensity, context }: { intensity: Extract<Workout
   return <p className="workout-control-hint">Derived preview: {derivedPaceLabel(context.thresholdPaceSecondsPerKm * 100 / high, context)}–{derivedPaceLabel(context.thresholdPaceSecondsPerKm * 100 / low, context)}.</p>;
 }
 
-function PowerPercentPreview({ intensity, context, reference, zoneKey }: { intensity: Extract<WorkoutIntensityInput, { type: "ftpPercent" }> | Extract<WorkoutIntensityInput, { type: "power" }> & { preset: string }; context: WorkoutEditorContext; reference?: number; zoneKey: "ftp" | "runningPower" }) {
-  const definitions = zoneKey === "ftp" ? FTP_PRESETS : RUNNING_POWER_PRESETS;
-  const definition = definitions.find((zone) => zone.preset === intensity.preset);
+function PowerPercentPreview({ intensity, context, reference, zoneKey }: { intensity: Extract<WorkoutIntensityInput, { type: "ftpPercent" }>; context: WorkoutEditorContext; reference?: number; zoneKey: "ftp" }) {
+  const definition = FTP_PRESETS.find((zone) => zone.preset === intensity.preset);
   const configured = profileZone(context, zoneKey, intensity.preset, intensity.zoneId ?? definition?.id);
-  const low = "lowPercent" in intensity && intensity.lowPercent !== undefined ? intensity.lowPercent : configured?.lowPercent ?? definition?.low;
-  const high = "highPercent" in intensity && intensity.highPercent !== undefined ? intensity.highPercent : configured?.highPercent ?? definition?.high;
+  const low = intensity.lowPercent ?? configured?.lowPercent ?? definition?.low;
+  const high = intensity.highPercent ?? configured?.highPercent ?? definition?.high;
   if (!reference || low === undefined || high === undefined) {
     return <p className="workout-control-hint">Profile reference is unavailable; the percentage zone will still be saved.</p>;
   }
@@ -1584,5 +1608,16 @@ function StrengthEstimateFooter({ draft }: { draft: RunWorkoutEditorDraft }) {
       <span><small>Reps</small><strong>{reps || "--"}</strong></span>
       <span><small>Set rest</small><strong>{restSeconds ? clockFromSeconds(restSeconds) : "--"}</strong></span>
     </div>
+  );
+}
+
+/** The workout's sport, in its own colour and icon, as the eyebrow's lead. */
+function WorkoutSportTag({ sport }: { sport: WorkoutSport }) {
+  const { category, icon: Icon } = workoutSportView(sport);
+  return (
+    <span className={`workout-editor-sport is-${category}`}>
+      <Icon size={12} strokeWidth={2.2} aria-hidden="true" />
+      {formatWorkoutSport(sport)}
+    </span>
   );
 }

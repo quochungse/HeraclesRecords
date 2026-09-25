@@ -2474,11 +2474,14 @@ export type TrainingLibrarySyncState =
   | "failed"
   | "stale";
 
-export type TrainingPlanSource =
-  | "coros"
-  | "local"
-  | "template"
-  | "coach";
+/**
+ * A week's stage, as COROS stores it: an index into its own list, not a name.
+ * 0 Not Set, 1 Preparation, 2 Base, 3 Build, 4 Peak, 5 Race, 6 Transition —
+ * `COROS_WEEK_STAGES` in `trainingPlanDomain.ts` carries the labels.
+ * There is no Taper and no naming a stage, which is why the free-text phases
+ * this replaced are gone rather than mapped.
+ */
+export type TrainingPlanWeekStage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TrainingPlanDifficulty =
   | "beginner"
@@ -2486,168 +2489,332 @@ export type TrainingPlanDifficulty =
   | "advanced"
   | "custom";
 
+/**
+ * Where a Coach plan card can be saved. `localPlan`, `localTemplate` and
+ * `nativePlanAndCalendar` are retired — a plan is a COROS plan now
+ * (docs/training-plan-coros-first.md) — and stay in the union only so a
+ * transcript that recorded one still reads.
+ */
 export type TrainingPlanDestination =
   | "workoutLibrary"
   | "calendar"
-  | "localPlan"
   | "nativePlan"
-  | "localTemplate"
-  | "nativePlanAndCalendar";
+  | "localPlan"
+  | "nativePlanAndCalendar"
+  | "localTemplate";
 
-export type TrainingPlanEntryKind = "workout" | "rest" | "note";
-
-export interface TrainingPlanPhase {
-  id: string;
-  name: string;
-  startWeek: number;
-  endWeek: number;
-  kind?: "base" | "build" | "peak" | "taper" | "recovery" | "custom";
-}
-
+/**
+ * One session in a plan.
+ *
+ * Every entry is a workout on a day: COROS stores a plan as sessions and
+ * nothing else, so the rest days, notes and day-less "holding area" entries
+ * this used to carry are gone with the local plans that held them.
+ */
 export interface TrainingPlanEntry {
   id: string;
-  kind: TrainingPlanEntryKind;
   weekIndex: number;
-  /** Zero-based day within the plan week; undefined places the entry in the holding area. */
-  dayIndex?: number;
+  /** Monday = 0 through Sunday = 6. */
+  dayIndex: number;
+  /** Order within the day. */
   sortOrder: number;
-  title?: string;
-  workout?: PlanWorkoutEntryInput;
-  programId?: string;
-  remotePlanProgramId?: string;
+  title: string;
+  workout: PlanWorkoutEntryInput;
+  /**
+   * The session's COROS program exactly as the plan holds it. Written back
+   * untouched while the session is not edited, so a round trip through the
+   * editor loses none of the fields the workout codec does not model; an edit
+   * drops it, and the save rebuilds the program from `workout`.
+   */
+  corosProgram?: Record<string, unknown>;
+  /** The session's id inside its COROS plan; absent for a session not saved yet. */
+  idInPlan?: string;
+  /** On a plan that is on the calendar: the day COROS put this session on (yyyyMMdd). */
+  happenDay?: string;
   plannedDurationSeconds?: number;
   plannedDistanceMeters?: number;
   plannedTrainingLoad?: number;
   plannedStrengthSets?: number;
-  notes?: string;
 }
+
+/** A library workout copied in full, as a session ready to place on a plan day. */
+export type LibraryPlanSession = Pick<
+  TrainingPlanEntry,
+  | "title"
+  | "workout"
+  | "corosProgram"
+  | "plannedDurationSeconds"
+  | "plannedDistanceMeters"
+  | "plannedTrainingLoad"
+  | "plannedStrengthSets"
+>;
+
+/**
+ * What a generated plan is for. The four named kinds each carry a brief the
+ * prompt states for the athlete; `other` is the athlete's own words and
+ * nothing else, for a goal none of the four fits.
+ */
+export type TrainingPlanGoalKind = "race" | "base" | "return" | "hybrid" | "other";
+
+/**
+ * One weekday of the athlete's usual week. `flex` is a day Coach may use or
+ * leave free, so a week with flex days asks for a range of sessions rather
+ * than a count.
+ */
+export type TrainingPlanDayKind = "rest" | "train" | "long" | "flex";
+
+export interface TrainingPlanGenerationDay {
+  kind: TrainingPlanDayKind;
+  /** The time the athlete has that day, whole minutes. Absent on a rest day. */
+  minutes?: number;
+}
+
+/**
+ * The athlete's usual week, stated one of two ways: day by day (`days`, seven
+ * of them, Monday first), or left to Coach (`coach`) with whatever the athlete
+ * is sure of — every field of which may be left out, "not sure" being an
+ * answer the form offers everywhere.
+ */
+export type TrainingPlanGenerationWeek =
+  | { mode: "days"; days: TrainingPlanGenerationDay[] }
+  | {
+      mode: "coach";
+      /** Hours a week, a band; `max` absent means "or more". */
+      hours?: { min: number; max?: number };
+      sessionsPerWeek?: number;
+      /** Days the athlete cannot train, Monday = 0 through Sunday = 6. */
+      blockedDayIndexes: number[];
+    };
 
 export interface TrainingPlanGenerationRequest {
+  goalKind: TrainingPlanGoalKind;
+  /** The athlete's own words. Required for `other`; a detail for the rest. */
   goal: string;
+  /** A race plan ends on race day, which decides its length. */
+  race?: { date: string; distance?: string };
   sports: WorkoutSport[];
+  /** `custom` means Coach judges the level from the athlete's own training. */
   difficulty: TrainingPlanDifficulty;
-  weeks: number;
-  sessionsPerWeek: number;
-  /** ISO date for Day 1 of Week 1. */
+  /** The Monday week 1 starts on, `YYYY-MM-DD`: COROS counts a plan's weeks from a Monday. */
   startDate: string;
-  /** Monday = 0 through Sunday = 6. */
-  availableDayIndexes: number[];
-  maxSessionMinutes?: number;
+  /**
+   * Whole weeks. Absent means Coach decides — never on a race plan, whose
+   * length is the distance to race day.
+   */
+  weeks?: number;
+  week: TrainingPlanGenerationWeek;
   constraints?: string;
+  /**
+   * The provider, model and effort for this plan only, as an analysis states
+   * its own. Absent fields fall back to Coach's settings.
+   */
+  runtime?: AnalysisRuntime;
+  /**
+   * What Coach may read for this plan. Absent means everything; a source
+   * switched off is neither in the snapshot the turn starts from nor behind
+   * any tool the turn is offered.
+   */
+  sources?: TrainingPlanDataSources;
+  /**
+   * The outline the athlete accepted, when the sessions are written from one:
+   * its length, stages and weekly sessions become rules the draft tool checks.
+   */
+  outline?: TrainingPlanOutline;
 }
 
-export interface TrainingPlanCalendarOccurrence {
-  planEntryId: string;
-  happenDay: string;
-  schedulePlanId: string;
-  scheduleIdInPlan: string;
-  planProgramId: string;
-  pbVersion?: number;
-  createdAt: string;
-  removedAt?: string;
+/** The athlete's data a generation may read, each on or off. */
+export interface TrainingPlanDataSources {
+  /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
+  activities: boolean;
+  /** Nights, naps and overnight HRV. */
+  sleep: boolean;
+  /** The athlete's COROS thresholds and zone tables. */
+  zones: boolean;
 }
 
-export interface TrainingPlanCalendarFailure {
-  planEntryId: string;
-  happenDay: string;
-  message: string;
-  /** True when COROS may have accepted the write but its identity could not be verified. */
-  writeMayHaveSucceeded?: boolean;
+/** One of an outline's key sessions: what the week is built around. */
+export interface TrainingPlanOutlineSession {
+  /** Monday = 0 through Sunday = 6. */
+  dayIndex: number;
+  name: string;
+  sport: WorkoutSport;
+  minutes?: number;
 }
 
-export interface TrainingPlanCalendarInstall {
-  id: string;
-  startDate: string;
-  planRevision: string;
-  state: "active" | "partial" | "removed";
-  lastOperation?: "install" | "remove";
-  occurrences: TrainingPlanCalendarOccurrence[];
-  failures: TrainingPlanCalendarFailure[];
-  createdAt: string;
+export interface TrainingPlanOutlineWeek {
+  /** COROS's stage, 1 Preparation … 6 Transition. */
+  stage: TrainingPlanWeekStage;
+  /** A lighter week inside its block, to absorb the ones before it. */
+  lighter: boolean;
+  hours: number;
+  sessions: number;
+  /** One sentence: what the week is for. */
+  focus: string;
+  keySessions: TrainingPlanOutlineSession[];
+}
+
+/**
+ * A plan's shape before its sessions: Coach proposes it, the athlete reads
+ * it and may ask for changes, and the sessions are then written to it.
+ */
+export interface TrainingPlanOutline {
+  summary: string;
+  /** What Coach read of the athlete's training, in a sentence or two. */
+  basis: string;
+  weeks: TrainingPlanOutlineWeek[];
+}
+
+/** What to change in an outline already proposed: the athlete's words. */
+export interface TrainingPlanOutlineRevision {
+  outline: TrainingPlanOutline;
+  note: string;
+}
+
+export type TrainingPlanOutlineResult =
+  | { ok: true; outline: TrainingPlanOutline }
+  | { ok: false; reason: "cancelled" }
+  | { ok: false; reason: "invalid" | "failed" | "no-outline"; message: string };
+
+/**
+ * How a generation ended. The stream carries its progress; this carries its
+ * outcome, so the generator does not have to rebuild it from stream events.
+ * `plan` is a new plan document, not yet saved anywhere.
+ */
+export type TrainingPlanGenerationResult =
+  | { ok: true; plan: TrainingPlanDocument }
+  | { ok: false; reason: "cancelled" }
+  | { ok: false; reason: "invalid" | "failed" | "no-plan"; message: string };
+
+/**
+ * What a plan is doing on the COROS calendar. A plan put there becomes an
+ * *instance* — a copy COROS makes, dated from the Monday of its start week —
+ * so this is read off COROS and never written by the app.
+ *
+ * `finished` and `stopped` are both COROS's `executeStatus 2`, and differ by
+ * whether the run reached its last day: "Remove from calendar" (`quitSubPlan`)
+ * sets the same status and moves `endDay` to the day it was removed — before
+ * `startDay`, for a run taken off before it began. A stopped run cannot go
+ * back on the calendar: COROS refuses `executeSubPlan` on it with 1031.
+ */
+export type TrainingPlanCalendarState = "unscheduled" | "running" | "finished" | "stopped";
+
+/** Why a Coach plan exists, carried in plan metadata so it outlives the save. */
+export interface TrainingPlanCoachContext {
+  /** The chat plan draft it was saved from. */
+  draftId?: string;
+}
+
+/** App-side facts about a COROS plan, which COROS has no field for. */
+export interface TrainingPlanMetadata {
+  /** `coros:<remoteId>`. */
+  planId: string;
+  favorite: boolean;
+  tags: string[];
+  archived: boolean;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
   updatedAt: string;
 }
 
+/**
+ * A plan, as the library reads and writes it: a COROS plan, or a draft of one.
+ *
+ * The shape is cut to what COROS stores (docs/training-plan-coros-first.md §2),
+ * so saving a draft loses nothing. Goal, free-text phases, a start date on the
+ * plan itself, and the calendar bookkeeping of local installs are all gone.
+ */
 export interface TrainingPlanDocument {
+  /** `coros:<remoteId>` for a plan on COROS, `draft:<uuid>` for a new one not saved yet. */
   id: string;
   remoteId?: string;
+  /** COROS's `version`, which every update bumps. */
+  remoteVersion?: number;
   name: string;
   description: string;
-  goal: string;
-  difficulty: TrainingPlanDifficulty;
-  notes: string;
-  source: TrainingPlanSource;
-  sportMix: WorkoutSport[];
   weekCount: number;
-  startDate?: string;
-  phases: TrainingPlanPhase[];
+  /** Only weeks with a stage set; a week not listed is Not Set. */
+  weekStages: Array<{ weekIndex: number; stage: TrainingPlanWeekStage }>;
   entries: TrainingPlanEntry[];
-  calendarInstalls?: TrainingPlanCalendarInstall[];
+  sportMix: WorkoutSport[];
+  calendar: TrainingPlanCalendarState;
+  /**
+   * For an instance: the Monday its week 1 falls on (YYYY-MM-DD), which is
+   * where COROS counts `dayNo` from. Absent on a plan that is not on the
+   * calendar — a plan has no start date of its own.
+   */
+  startDate?: string;
+  /** For an instance: the plan it was made from. */
+  sourcePlanId?: string;
+  /** For a plan with an instance running from it: that instance's id. */
+  runningInstanceId?: string;
   tags: string[];
-  collectionId?: string;
   favorite: boolean;
   archived: boolean;
-  syncState: TrainingLibrarySyncState;
-  remoteVersion?: number;
-  remoteUpdatedAt?: number;
-  lastSyncedAt?: string;
-  createdAt: string;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
   updatedAt: string;
 }
+
+/**
+ * An edit in progress, kept on this machine and synced with the others
+ * (`personal`). A draft is not a plan: it cannot be scheduled or copied, and
+ * becomes one only when it is saved to COROS. The Plans tab draws a new
+ * plan's draft as a tile and marks a plan whose edits are held here.
+ */
+export interface TrainingPlanDraftRecord {
+  id: string;
+  /** The COROS plan being edited; absent for a plan that does not exist yet. */
+  baseRemoteId?: string;
+  /** The version that plan had when the edit began. */
+  baseVersion?: number;
+  plan: TrainingPlanDocument;
+  savedAt: string;
+}
+
+export interface TrainingPlanSaveRequest {
+  plan: TrainingPlanDocument;
+  unitSystem: UnitSystem;
+  /** The draft this save finishes, deleted once the plan is on COROS. */
+  draftId?: string;
+  /** The version the edit began from; a plan changed since is refused unless `overwrite`. */
+  expectedVersion?: number;
+  overwrite?: boolean;
+  /** Save as a new COROS plan even though `plan.remoteId` names one. */
+  asNew?: boolean;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
+}
+
+export type TrainingPlanSaveResult =
+  | { ok: true; plan: TrainingPlanDocument }
+  | { ok: false; conflict: { currentVersion?: number; expectedVersion: number } };
 
 export interface TrainingPlanCalendarPreviewEntry {
-  planEntryId: string;
+  entryId: string;
   name: string;
-  happenDay: string;
   sport?: WorkoutSport;
-  schedulePlanId?: string;
-  scheduleIdInPlan?: string;
-  planProgramId?: string;
-  pbVersion?: number;
-}
-
-export interface TrainingPlanCalendarConflict {
+  /** yyyyMMdd. */
   happenDay: string;
-  existing: Array<{
-    name: string;
-    schedulePlanId: string;
-    scheduleIdInPlan: string;
-  }>;
+  /** Before the start day, so COROS will leave it off the calendar. */
+  dropped: boolean;
+  /** What the calendar already holds that day. */
+  existing: string[];
 }
 
+/** What putting a plan on the calendar from a given day would do. */
 export interface TrainingPlanCalendarPreview {
-  previewId: string;
-  operation: "install" | "remove";
   planId: string;
-  planName: string;
-  planRevision: string;
-  startDate: string;
+  /** yyyyMMdd, as chosen. */
+  startDay: string;
+  /** yyyyMMdd: the Monday COROS counts the plan's days from. */
+  anchorDay: string;
   entries: TrainingPlanCalendarPreviewEntry[];
-  conflicts: TrainingPlanCalendarConflict[];
   blockers: string[];
-  expiresAt: string;
-}
-
-export interface TrainingPlanCalendarMutationResult {
-  plan: TrainingPlanDocument;
-  scheduledCount: number;
-  removedCount: number;
-  failures: TrainingPlanCalendarFailure[];
-}
-
-export interface TrainingCollection {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface TrainingWorkoutMetadata {
   programId: string;
   favorite: boolean;
   tags: string[];
-  collectionId?: string;
   source: "coros" | "local" | "activity" | "coach";
   syncState: TrainingLibrarySyncState;
   lastUsedAt?: string;
@@ -2655,16 +2822,35 @@ export interface TrainingWorkoutMetadata {
   cachedVersion?: string;
 }
 
+/*
+ * **Three fields that used to be here are gone: `usedByPlanIds`,
+ * `scheduledCount` and `lastUsedAt`.**
+ *
+ * The first two matched a library workout's COROS program id against plan
+ * entries and scheduled days, and neither match can land. Nothing in the app
+ * ever writes a plan entry's `programId` from a library workout — the plan
+ * editor builds its sessions inline, and the only non-null ones come from an
+ * imported COROS plan, whose sessions are plan-internal programs with ids of
+ * their own (checked against this account's store: not one library id appears
+ * in any plan). And COROS stores a scheduled workout as its own copy under its
+ * own id. So both counts were zero on every workout in every library, which
+ * made the screen say "Unused" about all of them and gave the `Most used` sort
+ * one constant to order by. `lastUsedAt` was the fallback that survived them
+ * and had one writer and one reader, both on the screen that has stopped
+ * asking; the `last_used_at` column and `TrainingWorkoutMetadata.lastUsedAt`
+ * are left alone, because that table syncs and nulling a column on every save
+ * would rewrite the value on every machine.
+ *
+ * Tying a library workout to the plan or the day that used it needs a link
+ * written at the moment of use. That is a change to what is stored, and
+ * reintroducing any of these has to start there rather than here.
+ */
 export interface TrainingLibraryWorkout extends TrainingHubLibraryWorkout {
   favorite: boolean;
   tags: string[];
-  collectionId?: string;
   source: TrainingWorkoutMetadata["source"];
   syncState: TrainingLibrarySyncState;
-  lastUsedAt?: string;
   lastSyncedAt?: string;
-  usedByPlanIds: string[];
-  scheduledCount: number;
 }
 
 export interface NativeCorosPlanSummary {
@@ -2677,6 +2863,9 @@ export interface NativeCorosPlanSummary {
   startDay?: string;
   endDay?: string;
   executeStatus?: number;
+  /** On an instance — the copy `executeSubPlan` puts on the calendar — the
+      plan it was made from. Absent on a plan nobody has scheduled. */
+  sourcePlanId?: string;
   inSchedule?: boolean;
   workoutCount: number;
   sportTypes: number[];
@@ -2709,9 +2898,12 @@ export interface NativeCorosPlanProgram {
   name: string;
   overview?: string;
   sportType?: number;
+  /** Centimetres, as COROS sends every program distance. */
   planDistance?: number;
   planDuration?: number;
   planTrainingLoad?: number;
+  /** COROS's `totalSets`, which counts steps for every sport; only a strength
+      session's is a count of sets. */
   planSets?: number;
   exercises?: TrainingHubScheduledExercise[];
 }
@@ -2728,17 +2920,6 @@ export interface NativeCorosPlanDetail extends NativeCorosPlanSummary {
   }>;
   /** Lossless payload retained only at the remote adapter boundary. */
   rawPayload: Record<string, unknown>;
-}
-
-export interface TrainingPlanWriteCapabilities {
-  create: boolean;
-  update: boolean;
-  duplicate: boolean;
-  delete: boolean;
-  activate: boolean;
-  removeActive: boolean;
-  reason?: string;
-  verifiedAt?: string;
 }
 
 export interface TrainingActivityMatch {
@@ -2769,21 +2950,19 @@ export interface TrainingActivityMatch {
 
 export interface TrainingLibrarySnapshot {
   workouts: TrainingLibraryWorkout[];
+  /** Every plan COROS holds for the account, templates and instances alike. */
   plans: TrainingPlanDocument[];
-  nativePlans: NativeCorosPlanSummary[];
-  collections: TrainingCollection[];
+  drafts: TrainingPlanDraftRecord[];
   matches: TrainingActivityMatch[];
   cachedAt: string;
   stale: boolean;
   offline: boolean;
   partialFailures: string[];
-  nativePlanWrites: TrainingPlanWriteCapabilities;
 }
 
 export interface WorkoutMetadataPatch {
   favorite?: boolean;
   tags?: string[];
-  collectionId?: string | null;
   source?: TrainingWorkoutMetadata["source"];
   lastUsedAt?: string;
 }
@@ -2791,7 +2970,6 @@ export interface WorkoutMetadataPatch {
 export interface TrainingPlanMetadataPatch {
   favorite?: boolean;
   tags?: string[];
-  collectionId?: string | null;
   archived?: boolean;
 }
 
@@ -2933,9 +3111,15 @@ export interface PlanDraftPreview {
     workoutsScheduled: number;
     workoutsCreated: number;
     destination?: TrainingPlanDestination;
-    localPlanId?: string;
-    groupedPlanCreated?: boolean;
+    /** The COROS plan it became, for a plan saved whole. */
+    planId?: string;
   };
+  /**
+   * Set when the athlete changed the plan in the editor after the coach wrote
+   * it. The coach is shown the current version on its next turn, since the
+   * card is the only place the change was made.
+   */
+  editedAt?: number;
 }
 
 export interface PlanWorkoutEntryInput {
@@ -2966,8 +3150,11 @@ export type WorkoutSport =
 export type WorkoutHeartRateBasis = "maxHr" | "reserve" | "lthr";
 export type WorkoutHeartRatePreset =
   | "recovery"
+  // The Max HR family keeps COROS's older consumer wording; every other
+  // family uses the training wording below it.
   | "warmUp"
   | "fatBurn"
+  | "aerobic"
   | "aerobicEndurance"
   | "aerobicPower"
   | "threshold"
@@ -2989,12 +3176,6 @@ export type WorkoutFtpPreset =
   | "anaerobicEndurance"
   | "anaerobicPower"
   | "sprint";
-export type WorkoutRunningPowerPreset =
-  | "easy"
-  | "moderate"
-  | "threshold"
-  | "interval"
-  | "repetition";
 export type WorkoutSwimStroke =
   | "freestyle"
   | "breaststroke"
@@ -3039,20 +3220,16 @@ export type WorkoutIntensityInput =
       WorkoutPercentPresetOrRange<WorkoutPacePreset>)
   | ({ type: "ftpPercent"; zoneId?: number } &
       WorkoutPercentPresetOrRange<WorkoutFtpPreset>)
-  | {
-      type: "power";
-      lowWatts: number;
-      highWatts: number;
-      preset?: never;
-      zoneId?: never;
-    }
-  | {
-      type: "power";
-      preset: WorkoutRunningPowerPreset;
-      zoneId?: number;
-      lowWatts?: never;
-      highWatts?: never;
-    }
+  /*
+   * Watts, stated outright.
+   *
+   * There is deliberately no zone preset here. COROS publishes five zone
+   * families and none of them is running power — its Settings offers Heart
+   * Rate, Pace and Cycling Power and nothing else — so the preset this used
+   * to carry (Easy / Moderate / Threshold / Interval / Repetition, 65-200%)
+   * named bands that exist nowhere but in this file.
+   */
+  | { type: "power"; lowWatts: number; highWatts: number }
   | { type: "speed"; low: number; high: number; unit: "km/h" | "mph" }
   | { type: "cadence"; low: number; high: number; unit: "spm" | "rpm" }
   | { type: "swimStroke"; stroke: WorkoutSwimStroke }
@@ -3117,7 +3294,7 @@ export interface RunWorkoutCreateStep {
   send_off_seconds?: number;
   /** Typed intensity is authoritative. Legacy raw fields remain read-compatible. */
   intensity?: WorkoutIntensityInput;
-  /** COROS strength/HYROX exercise identity or uniquely resolvable name. */
+  /** COROS strength/Hybrid Fitness exercise identity or uniquely resolvable name. */
   exercise_id?: string;
   exercise_name?: string;
   exercise_kind?: number;
@@ -3179,8 +3356,8 @@ export interface UploadPlanResult {
   workoutsScheduled: number;
   entries: UploadPlanResultEntry[];
   destination?: TrainingPlanDestination;
-  localPlanId?: string;
-  groupedPlanCreated?: boolean;
+  /** The COROS plan it became, for a plan saved whole. */
+  planId?: string;
   remoteWrites?: string[];
 }
 
@@ -3206,6 +3383,28 @@ export interface TrainingHubLibraryWorkout {
   sportType?: number;
   volume?: string;
   trainingLoad?: number;
+  /**
+   * How long COROS expects the session to take.
+   *
+   * On the list row this is `estimatedTime`, which the program-query payload
+   * does carry — unlike `duration`, `distance` and `trainingLoad`, which it
+   * writes as `0` — and which matches the detail's `duration` exactly (probed
+   * live 2026-09-22: 690, 360, 1618 and 1096 seconds against the same four
+   * details). So it is the one figure a library row can state without asking
+   * COROS a second question, and it is the figure every workout has.
+   */
+  durationSeconds?: number;
+  /**
+   * How many movements the session holds and how many sets they add up to.
+   *
+   * `exerciseNum` and `totalSets`, and both are **real on the list row** —
+   * probed live: 9 and 9 for one strength session, 11 and 21 for another. They
+   * are the only figures besides `estimatedTime` that `/training/program/query`
+   * fills in, which is what makes them the two a row can state without asking
+   * COROS a second question.
+   */
+  exerciseCount?: number;
+  setCount?: number;
   createTimestamp?: number;
 }
 
@@ -3316,6 +3515,13 @@ export interface WorkoutZone {
   highPercent: number;
   lowBpm?: number;
   highBpm?: number;
+  /**
+   * The end of the family that has no bound, as COROS writes it: the first
+   * zone is "under X" and the last is "over Y". COROS stores the last zone's
+   * ceiling as a sentinel — 404 bpm, 900 W, a 2:44/km pace — so a zone that
+   * printed it would be printing a number nobody can reach.
+   */
+  openEnd?: "low" | "high";
 }
 
 /** @deprecated Use WorkoutZone. */
@@ -3324,6 +3530,16 @@ export type WorkoutLthrZone = WorkoutZone;
 export interface WorkoutEditorContext {
   distanceUnit: "metric" | "imperial";
   paceUnit: "km" | "mi";
+  /**
+   * Which heart-rate model the account is scored against — COROS's own
+   * `hrZoneType`, chosen on its Heart Rate Zone screen.
+   *
+   * It is a property of the athlete, not of a step, which is why the builder
+   * does not ask: COROS scores every activity against this one model, so a
+   * workout prescribed in another family would be read back in a family the
+   * watch does not use.
+   */
+  heartRateBasis: WorkoutHeartRateBasis;
   lthrBpm?: number;
   maxHr?: number;
   restingHr?: number;
@@ -3331,7 +3547,7 @@ export interface WorkoutEditorContext {
   ftp?: number;
   criticalPower?: number;
   zones: Partial<Record<
-    "maxHr" | "reserve" | "lthr" | "thresholdPace" | "ftp" | "runningPower",
+    "maxHr" | "reserve" | "lthr" | "thresholdPace" | "ftp",
     WorkoutZone[]
   >>;
   lthrZones: WorkoutLthrZone[];

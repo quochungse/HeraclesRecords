@@ -281,7 +281,7 @@ assert.match(activityMix, /Run \(plan sport=run\): 1 activity/);
 assert.match(activityMix, /Pool Swim \(plan sport=swim\): 1 activity/);
 assert.match(activityMix, /Open Water Swim \(not directly plan-authorable\)/);
 assert.equal(formatUpcomingWorkoutSport(2), "Bike");
-assert.equal(formatUpcomingWorkoutSport(9), "HYROX");
+assert.equal(formatUpcomingWorkoutSport(9), "Hybrid Fitness");
 assert.equal(formatUpcomingWorkoutSport(undefined), undefined);
 
 const dashboardSummary = formatCoachDashboard({

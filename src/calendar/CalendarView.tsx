@@ -8,7 +8,8 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   TrainingHubActivity,
   TrainingHubScheduledWorkoutEntry,
@@ -28,6 +29,11 @@ import {
 } from "../training/formatters";
 import { isSwimSportType } from "../training/sportTypes";
 import { OptionGroup } from "../components/OptionGroup";
+import { ConfirmDialog } from "../training-library/ConfirmDialog";
+/* For ConfirmDialog, which is drawn in the library's `tl-dialog` chrome. The
+   Coach's plan editor pulls the stylesheet in the same way; this screen is
+   lazy-loaded, so it costs the main bundle nothing. */
+import "../training-library/trainingLibrary.css";
 import { AddWorkoutModal } from "./AddWorkoutModal";
 import { CalendarGrid } from "./CalendarGrid";
 import {
@@ -183,7 +189,9 @@ export function CalendarView({
   const [selectedWorkoutKeys, setSelectedWorkoutKeys] = useState<Set<string>>(
     () => new Set()
   );
+  /* Whether the bulk removal question is open. */
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const bulkRemoveButtonRef = useRef<HTMLButtonElement>(null);
   /* Removals go to COROS one at a time, because they share server-side plan
      state. Twenty of them is twenty round trips behind a single "Removing…",
      so the button counts them off instead. */
@@ -213,6 +221,7 @@ export function CalendarView({
   const {
     weeks,
     loading,
+    rangeLoaded,
     error,
     reload: reloadCalendarRange,
     applyOptimisticMove,
@@ -292,13 +301,11 @@ export function CalendarView({
     setSelection(null);
     setSelectionMode(true);
     setSelectedWorkoutKeys(new Set());
-    setConfirmBulkDelete(false);
   };
 
   const toggleScheduledSelection = useCallback(
     (entry: TrainingHubScheduledWorkoutEntry) => {
       const key = scheduledWorkoutKey(entry);
-      setConfirmBulkDelete(false);
       setSelectedWorkoutKeys((current) => {
         const next = new Set(current);
         if (next.has(key)) {
@@ -313,7 +320,6 @@ export function CalendarView({
   );
 
   const toggleSelectAll = () => {
-    setConfirmBulkDelete(false);
     setSelectedWorkoutKeys(
       allSelectableSelected
         ? new Set()
@@ -368,7 +374,7 @@ export function CalendarView({
   const handleDelete = useCallback(
     (target: Extract<CalendarSelection, { kind: "scheduled" }>) => {
       setMutating(true);
-      void api
+      return api
         .removeScheduledWorkout(scheduledWorkoutRemovalRef(target.entry))
         .then(() => {
           onMessage(`Removed "${target.entry.name}" from the calendar.`);
@@ -387,10 +393,6 @@ export function CalendarView({
 
   const handleDeleteSelected = useCallback(() => {
     if (mutating || selectedWorkoutKeys.size === 0) {
-      return;
-    }
-    if (!confirmBulkDelete) {
-      setConfirmBulkDelete(true);
       return;
     }
 
@@ -443,7 +445,6 @@ export function CalendarView({
       });
   }, [
     api,
-    confirmBulkDelete,
     exitSelectionMode,
     mutating,
     onError,
@@ -509,6 +510,14 @@ export function CalendarView({
     },
     [onOpenCoach, unitSystem]
   );
+
+  /* `done` counts what has finished, so the one in flight is the next — except
+     after the last, where there is no next and the count would read "21 of 20"
+     for the frame before the state clears. */
+  const bulkProgressLabel = bulkProgress
+    ? `Removing ${Math.min(bulkProgress.done + 1, bulkProgress.total)} of ${bulkProgress.total}…`
+    : null;
+  const bulkCount = selectedWorkoutKeys.size;
 
   if (!authenticated) {
     return (
@@ -652,33 +661,24 @@ export function CalendarView({
               <button
                 type="button"
                 className="ghost-button"
-                onClick={() => {
-                  setSelectedWorkoutKeys(new Set());
-                  setConfirmBulkDelete(false);
-                }}
+                onClick={() => setSelectedWorkoutKeys(new Set())}
                 disabled={mutating}
               >
                 Clear
               </button>
             ) : null}
             <button
+              ref={bulkRemoveButtonRef}
               type="button"
-              className={`ghost-button calendar-selection-delete ${confirmBulkDelete ? "is-armed" : ""}`}
-              onClick={handleDeleteSelected}
+              className="ghost-button calendar-selection-delete"
+              onClick={() => setConfirmBulkDelete(true)}
               disabled={mutating || selectedWorkoutKeys.size === 0}
             >
               <Trash2 size={14} aria-hidden="true" />
-              {/* `done` counts what has finished, so the one in flight is the
-                  next — except after the last, where there is no next and the
-                  count would read "21 of 20" for the frame before the state
-                  clears. */}
-              {bulkProgress
-                ? `Removing ${Math.min(bulkProgress.done + 1, bulkProgress.total)} of ${bulkProgress.total}…`
-                : mutating
+              {bulkProgressLabel ??
+                (mutating
                   ? "Removing…"
-                  : confirmBulkDelete
-                    ? `Confirm remove ${selectedWorkoutKeys.size}`
-                    : `Remove ${selectedWorkoutKeys.size || ""}`.trim()}
+                  : `Remove ${selectedWorkoutKeys.size || ""}`.trim())}
             </button>
           </div>
         </div>
@@ -688,6 +688,7 @@ export function CalendarView({
         weeks={weeks}
         mode={mode}
         loading={loading}
+        rangeLoaded={rangeLoaded}
         busy={mutating}
         selectionMode={selectionMode}
         selectedWorkoutKeys={selectedWorkoutKeys}
@@ -701,6 +702,35 @@ export function CalendarView({
         onAskCoachWeek={handleAskCoachWeek}
       />
 
+      {/* Portalled to <body> to clear the shell's stacking context, as the plan
+          editor is. It stays up while the removals run, counting them off,
+          and the removal closes it whichever way it ends. */}
+      {confirmBulkDelete
+        ? createPortal(
+            <ConfirmDialog
+              title={`Remove ${bulkCount} workout${bulkCount === 1 ? "" : "s"} from the calendar?`}
+              description={
+                bulkCount === 1
+                  ? "It comes off your COROS calendar. A workout in your library stays as it is — the calendar holds a copy of its own."
+                  : "They come off your COROS calendar one at a time. Workouts in your library stay as they are — the calendar holds copies of its own."
+              }
+              confirmLabel={`Remove ${bulkCount} workout${bulkCount === 1 ? "" : "s"}`}
+              danger
+              busy={
+                mutating
+                  ? { target: "confirm", label: bulkProgressLabel ?? "Removing…" }
+                  : undefined
+              }
+              onConfirm={handleDeleteSelected}
+              onCancel={() => {
+                setConfirmBulkDelete(false);
+                bulkRemoveButtonRef.current?.focus();
+              }}
+            />,
+            document.body
+          )
+        : null}
+
       <DayDetailPanel
         api={api}
         selection={selection}
@@ -708,6 +738,7 @@ export function CalendarView({
         deleting={mutating}
         onClose={() => setSelection(null)}
         onDelete={handleDelete}
+        onReload={reload}
         onAskCoach={handleAskCoachSelection}
         onEdit={(target) => {
           setSelection(null);

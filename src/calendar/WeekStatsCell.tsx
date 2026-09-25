@@ -14,6 +14,8 @@ import {
 
 interface WeekStatsCellProps {
   stats: WeeklyStats;
+  /** Whether the range on screen has been read, so an empty week is known to be empty. */
+  loaded: boolean;
   onAskCoach: () => void;
 }
 
@@ -84,7 +86,7 @@ function loadBandTone(
   return { tone: "ok", title: `Inside the ${min}–${max} TL COROS recommends for this week.` };
 }
 
-export function WeekStatsCell({ stats, onAskCoach }: WeekStatsCellProps) {
+export function WeekStatsCell({ stats, loaded, onAskCoach }: WeekStatsCellProps) {
   const { unitSystem } = useUnitSystem();
   const hasAny =
     stats.actualLoad > 0 ||
@@ -96,6 +98,13 @@ export function WeekStatsCell({ stats, onAskCoach }: WeekStatsCellProps) {
      advance. Seven rows of "--" beside it said nothing and made the grid read
      as broken; one line says the same thing and leaves the eye on the days. */
   if (!hasAny) {
+    /* Until the range has been read, an empty week is only a week nobody has
+       asked COROS about yet. Saying "nothing planned" there told every athlete
+       on every launch that their month was empty, then took it back. The cell
+       stays, so the grid keeps its column, and says nothing. */
+    if (!loaded) {
+      return <div className="calendar-weekstats" aria-hidden="true" />;
+    }
     return (
       <div className="calendar-weekstats is-empty">
         <p className="calendar-weekstats-empty">Nothing planned or logged</p>

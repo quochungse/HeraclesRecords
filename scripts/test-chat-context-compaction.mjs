@@ -26,8 +26,10 @@ const {
   contextMessages,
   normalizeContextWindow,
   planTranscriptContext,
+  planEditNote,
   summaryContextMessage,
-  toWireMessages
+  toWireMessages,
+  withPlanEdits
 } = await import(
   `${distUrl("chatContextCompaction.js")}?cacheBust=${Date.now()}`
 );
@@ -754,5 +756,54 @@ assert.deepEqual(
   ["enabled", "loadEntries", "stored", "window"],
   "the inspector must have no way to roll or to write"
 );
+
+// ---------------------------------------------------------------------------
+// A plan the athlete edited is stated to the coach; one it did not, is not
+// ---------------------------------------------------------------------------
+{
+  const planCard = (overrides = {}) => ({
+    kind: "planDraft",
+    draft: {
+      draftId: "d1",
+      artifactType: "plan",
+      name: "Base block",
+      summary: "2 workouts",
+      entries: [
+        { key: "a", name: "Easy", scheduleDate: "2099-08-03", volume: "45 min", saveToLibrary: true, workoutType: "Easy", stepsSummary: "Z2" },
+        { key: "b", name: "Long", scheduleDate: "2099-08-09", volume: "90 min", saveToLibrary: true, workoutType: "Long" }
+      ],
+      conflicts: [],
+      warnings: [],
+      ...overrides
+    }
+  });
+  const conversation = [
+    { kind: "message", role: "user", content: "Write me a block" },
+    planCard(),
+    { kind: "message", role: "assistant", content: "Here it is" },
+    { kind: "message", role: "user", content: "Is Sunday too long?" }
+  ];
+
+  assert.equal(planEditNote(conversation), null, "the coach wrote this version; there is nothing to tell it");
+  const untouched = toWireMessages(conversation);
+  assert.equal(withPlanEdits(untouched, conversation), untouched, "and the wire is left as it is");
+  assert.equal(untouched.length, 3, "the card itself never goes on the wire");
+
+  const edited = conversation.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5 }) : entry));
+  const note = planEditNote(edited);
+  assert.match(note, /edited a plan you drafted/);
+  assert.match(note, /Plan "Base block" \(draft_id d1, not saved yet\)/);
+  assert.match(note, /- 2099-08-03: Easy — 45 min · Z2/, "each session with its date and what it asks for");
+  const wire = withPlanEdits(toWireMessages(edited), edited);
+  assert.equal(wire.length, 3, "no message of its own, so roles still alternate");
+  assert.ok(wire[2].content.startsWith(note), "it rides in front of the latest question");
+  assert.ok(wire[2].content.endsWith("Is Sunday too long?"), "which is kept whole");
+  assert.equal(wire[0].content, "Write me a block", "earlier turns are untouched");
+
+  const removed = edited.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5, removedAt: 6 }) : entry));
+  assert.equal(planEditNote(removed), null, "a card taken out of the conversation is not stated");
+  const saved = edited.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5, uploadedAt: 7 }) : entry));
+  assert.match(planEditNote(saved), /draft_id d1, saved\)/, "a saved one still is — it is what went to COROS");
+}
 
 console.log("chat context compaction tests passed");

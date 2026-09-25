@@ -486,7 +486,7 @@ export async function startClaudeCodeLogin(options: {
         );
       }, LOGIN_POLL_INTERVAL_MS);
 
-      child.once("exit", (exitCode) => {
+      child.once("exit", (_exitCode) => {
         void (async () => {
           if (cancelled) {
             finish(() => resolve("cancelled"));

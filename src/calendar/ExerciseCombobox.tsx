@@ -1,17 +1,34 @@
-import { Check, ChevronDown, Search } from "lucide-react";
-import {
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState
-} from "react";
-import { createPortal } from "react-dom";
+/**
+ * The exercise field: what has been chosen, and the way into the library.
+ *
+ * **It is a button, and it is drawn as one.** It used to be a text box with a
+ * dropdown of names under it, which asked the athlete to already know what a
+ * movement is called and could show one 48px still at a time — for a catalog
+ * of several hundred movements that each ship a demonstration clip. Choosing
+ * happens in `ExercisePickerDialog` now, which has room for the filters and
+ * the pictures.
+ *
+ * The first pass kept the old shell: a magnifier, a caret and a divider down
+ * the right edge. Every one of those is the vocabulary of a field you type
+ * into and a menu that drops from it, so the control still read as a search
+ * box that had stopped taking text. What it says now is what it does — the
+ * movement, or an invitation to pick one, and `Change` / `Browse` at the end.
+ *
+ * The props are unchanged, so every surface that draws this field — the two in
+ * the calendar's builder and the two in the workout editor — got the picker
+ * without being touched. `placeholder` is now the button's empty-state label
+ * rather than a search hint.
+ *
+ * `onChange` therefore fires only on a pick, and a pick always carries a COROS
+ * id. Free text used to reach it on every keystroke, which is what let a
+ * strength step be saved with a name COROS has never heard of.
+ */
+import { ChevronRight, Dumbbell } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { ExercisePreview } from "./ExercisePreview";
+import { ExercisePickerDialog, type LabeledExerciseOption } from "./ExercisePickerDialog";
 
 export interface ExerciseComboboxSelection {
   name: string;
@@ -23,6 +40,7 @@ interface ExerciseComboboxProps {
   value: string;
   selectedId?: string;
   options: WorkoutExerciseOption[];
+  /** What the button says while nothing is chosen — "Choose an exercise". */
   placeholder: string;
   label: string;
   loading?: boolean;
@@ -31,22 +49,6 @@ interface ExerciseComboboxProps {
   /** Suppress the built-in demonstration plate when the host renders its own. */
   hidePreview?: boolean;
   onChange: (selection: ExerciseComboboxSelection) => void;
-}
-
-interface LabeledExerciseOption extends WorkoutExerciseOption {
-  label: string;
-}
-
-interface ExerciseMenuPosition {
-  left: number;
-  width: number;
-  top?: number;
-  bottom?: number;
-  maxHeight: number;
-}
-
-function normalizeSearch(value: string): string {
-  return value.trim().toLocaleLowerCase();
 }
 
 function exerciseLabel(option: WorkoutExerciseOption): string {
@@ -65,16 +67,7 @@ export function ExerciseCombobox({
   hidePreview = false,
   onChange
 }: ExerciseComboboxProps) {
-  const id = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inputShellRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState(value);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [menuPosition, setMenuPosition] = useState<ExerciseMenuPosition>();
-  const listboxId = `${id}-listbox`;
 
   const labeledOptions = useMemo<LabeledExerciseOption[]>(() => options
     .map((option) => ({ ...option, label: exerciseLabel(option) }))
@@ -85,227 +78,36 @@ export function ExerciseCombobox({
   );
   const hasPreview = !hidePreview
     && Boolean(selectedOption?.media?.some((entry) => entry.videoUrl));
-
-  const filteredOptions = useMemo(() => {
-    const term = normalizeSearch(query);
-    const selectedLabel = labeledOptions.find((option) => option.id === selectedId)?.label;
-    const showAll = !term || Boolean(
-      selectedId && selectedLabel && normalizeSearch(selectedLabel) === term
-    );
-    return showAll
-      ? labeledOptions
-      : labeledOptions.filter((option) => normalizeSearch(option.label).includes(term));
-  }, [labeledOptions, query, selectedId]);
-
-  useEffect(() => {
-    if (!isOpen) setQuery(value);
-  }, [isOpen, value]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const selectedIndex = filteredOptions.findIndex((option) => option.id === selectedId);
-    setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [filteredOptions, isOpen, selectedId]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setMenuPosition(undefined);
-      return;
-    }
-    const updateMenuPosition = () => {
-      const rect = inputShellRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const gap = 6;
-      const viewportPadding = 12;
-      const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
-      const spaceAbove = rect.top - viewportPadding;
-      const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-      setMenuPosition({
-        left: Math.max(viewportPadding, Math.min(rect.left, window.innerWidth - rect.width - viewportPadding)),
-        width: Math.min(rect.width, window.innerWidth - viewportPadding * 2),
-        maxHeight: Math.max(140, Math.min(300, (placeAbove ? spaceAbove : spaceBelow) - gap)),
-        ...(placeAbove
-          ? { bottom: window.innerHeight - rect.top + gap }
-          : { top: rect.bottom + gap })
-      });
-    };
-    updateMenuPosition();
-    window.addEventListener("resize", updateMenuPosition);
-    window.addEventListener("scroll", updateMenuPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateMenuPosition);
-      window.removeEventListener("scroll", updateMenuPosition, true);
-    };
-  }, [isOpen]);
-
-  const selectOption = (option: LabeledExerciseOption) => {
-    setQuery(option.label);
-    setIsOpen(false);
-    onChange({
-      name: option.label,
-      id: option.id,
-      exerciseKind: option.exerciseKind
-    });
-  };
-
-  const open = () => {
-    if (!disabled) {
-      setIsOpen(true);
-    }
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      if (!isOpen) {
-        open();
-        return;
-      }
-      const direction = event.key === "ArrowDown" ? 1 : -1;
-      setHighlightedIndex((current) => {
-        if (filteredOptions.length === 0) return 0;
-        return (current + direction + filteredOptions.length) % filteredOptions.length;
-      });
-      return;
-    }
-    if (event.key === "Enter" && isOpen) {
-      const option = filteredOptions[highlightedIndex];
-      if (option) {
-        event.preventDefault();
-        selectOption(option);
-      }
-      return;
-    }
-    if (event.key === "Escape" && isOpen) {
-      event.preventDefault();
-      event.stopPropagation();
-      setIsOpen(false);
-      setQuery(value);
-      return;
-    }
-    if (event.key === "Tab") setIsOpen(false);
-  };
-
-  const activeOption = isOpen ? filteredOptions[highlightedIndex] : undefined;
+  const still = selectedOption?.media?.find((entry) => entry.coverUrl)?.coverUrl
+    ?? selectedOption?.thumbnailUrl;
 
   return (
-    <div
-      className={`exercise-combobox ${hasPreview ? "has-inline-video" : ""}`}
-      ref={rootRef}
-    >
+    <div className={`exercise-combobox ${hasPreview ? "has-inline-video" : ""}`}>
       <div className="exercise-combobox-picker">
-        <div ref={inputShellRef} className={`exercise-combobox-input ${isOpen ? "is-open" : ""}`}>
-          {selectedOption?.thumbnailUrl ? (
-            <img
-              className="exercise-combobox-input-thumbnail"
-              src={selectedOption.thumbnailUrl}
-              alt=""
-              decoding="async"
-              onError={(event) => { event.currentTarget.hidden = true; }}
-            />
-          ) : <Search size={15} aria-hidden="true" />}
-          <input
-            ref={inputRef}
-            type="search"
-            role="combobox"
-            aria-label={label}
-            aria-autocomplete="list"
-            aria-controls={listboxId}
-            aria-expanded={isOpen}
-            aria-activedescendant={activeOption ? `${id}-option-${activeOption.id}` : undefined}
-            value={query}
-            placeholder={placeholder}
-            disabled={disabled}
-            autoComplete="off"
-            onFocus={open}
-            onClick={open}
-            onKeyDown={handleKeyDown}
-            onChange={(event) => {
-              const name = event.target.value;
-              setQuery(name);
-              setHighlightedIndex(0);
-              setIsOpen(true);
-              onChange({ name });
-            }}
-          />
-          <button
-            className="exercise-combobox-toggle"
-            type="button"
-            aria-label={isOpen ? "Close exercise suggestions" : "Show exercise suggestions"}
-            aria-expanded={isOpen}
-            disabled={disabled}
-            onClick={() => {
-              if (isOpen) {
-                setIsOpen(false);
-              } else {
-                setQuery(value);
-                setIsOpen(true);
-                inputRef.current?.focus();
-              }
-            }}
-          >
-            <ChevronDown className={isOpen ? "is-open" : ""} size={16} aria-hidden="true" />
-          </button>
-        </div>
-
-        {isOpen && menuPosition ? createPortal(
-          <div
-            ref={menuRef}
-            className="exercise-combobox-menu is-portal"
-            style={menuPosition}
-          >
-            <div id={listboxId} role="listbox" aria-label={`${label} suggestions`}>
-              {loading ? (
-                <p className="exercise-combobox-state" role="status">Loading COROS exercises...</p>
-              ) : filteredOptions.length === 0 ? (
-                <p className="exercise-combobox-state">No matching exercises.</p>
-              ) : filteredOptions.map((option, index) => {
-                const isSelected = option.id === selectedId;
-                const isActive = index === highlightedIndex;
-                return (
-                  <button
-                    type="button"
-                    id={`${id}-option-${option.id}`}
-                    key={option.id}
-                    role="option"
-                    aria-selected={isSelected}
-                    className={`${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""}`.trim()}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    onClick={() => selectOption(option)}
-                  >
-                    <span className="exercise-combobox-option-main">
-                      {option.thumbnailUrl ? (
-                        <img
-                          src={option.thumbnailUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          onError={(event) => { event.currentTarget.hidden = true; }}
-                        />
-                      ) : null}
-                      <span>{option.label}</span>
-                    </span>
-                    {isSelected ? <Check size={15} aria-hidden="true" /> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>,
-          document.body
-        ) : null}
+        <button
+          type="button"
+          className={`exercise-choice ${value ? "is-chosen" : "is-empty"}`}
+          aria-haspopup="dialog"
+          aria-label={value ? `${label}: ${value}. Choose another` : `Choose ${label.toLocaleLowerCase()}`}
+          disabled={disabled}
+          onClick={() => setIsOpen(true)}
+        >
+          <span className="exercise-choice-art" aria-hidden="true">
+            {still ? (
+              <img
+                src={still}
+                alt=""
+                decoding="async"
+                onError={(event) => { event.currentTarget.hidden = true; }}
+              />
+            ) : <Dumbbell size={18} />}
+          </span>
+          <span className="exercise-choice-name">{value || placeholder}</span>
+          <span className="exercise-choice-action" aria-hidden="true">
+            {value ? "Change" : "Browse"}
+            <ChevronRight size={14} />
+          </span>
+        </button>
 
         {details ? <div className="exercise-combobox-details">{details}</div> : null}
       </div>
@@ -314,6 +116,24 @@ export function ExerciseCombobox({
         <ExercisePreview
           option={selectedOption}
           name={selectedOption?.label ?? ""}
+        />
+      ) : null}
+
+      {isOpen ? (
+        <ExercisePickerDialog
+          title={label}
+          options={labeledOptions}
+          selectedId={selectedId}
+          loading={loading}
+          onPick={(option) => {
+            setIsOpen(false);
+            onChange({
+              name: option.label,
+              id: option.id,
+              exerciseKind: option.exerciseKind
+            });
+          }}
+          onClose={() => setIsOpen(false)}
         />
       ) : null}
     </div>

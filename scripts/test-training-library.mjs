@@ -1,3 +1,7 @@
+// The plan model the library reads and writes: a COROS plan, or a draft of
+// one (docs/training-plan-coros-first.md). Sessions on days, a stage per week,
+// and nothing COROS cannot store — no rest days, notes, phases, start dates or
+// calendar bookkeeping of local installs.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -15,6 +19,7 @@ const databaseModule = await import(distUrl("database.js"));
 const library = await import(distUrl("trainingLibraryService.js"));
 const planWorkoutEditor = await import(distUrl("planWorkoutEditor.js"));
 const chatWorkoutTools = await import(distUrl("chatWorkoutTools.js"));
+const generation = await import(distUrl("trainingPlanGeneration.js"));
 
 const makeWorkout = (name, load, seconds = 1_800) => ({
   key: name.toLowerCase().replaceAll(" ", "-"),
@@ -31,62 +36,89 @@ const makeWorkout = (name, load, seconds = 1_800) => ({
   ]
 });
 
-const first = domain.createTrainingPlan("Build", "local");
+// --- a new plan is a draft ---------------------------------------------------
+
+const first = domain.createTrainingPlan("Build");
+assert.match(first.id, /^draft:/, "a plan that is not on COROS yet is a draft");
+assert.equal(first.calendar, "unscheduled");
+assert.deepEqual(first.weekStages, []);
 first.weekCount = 2;
-first.startDate = "2026-08-03";
-first.phases = [{ id: "base", name: "Base", kind: "base", startWeek: 1, endWeek: 2 }];
+first.weekStages = [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 3 }];
 first.entries = [
   domain.planEntryFromWorkout(makeWorkout("Easy", 40), 0, 0),
   domain.planEntryFromWorkout(makeWorkout("Threshold", 80, 2_700), 1, 2),
   domain.planEntryFromWorkout(makeWorkout("Double", 20), 1, 2)
 ];
 
-const shifted = domain.shiftTrainingPlan(first, "2026-08-10");
-assert.equal(shifted.startDate, "2026-08-10");
-assert.equal(shifted.entries[0].workout.schedule_date, "2026-08-10");
-assert.equal(shifted.entries[1].workout.schedule_date, "2026-08-19");
+// --- week operations carry the stages -----------------------------------------
 
 const duplicated = domain.duplicateTrainingPlanWeek(first, 0);
 assert.equal(duplicated.weekCount, 3);
 assert.equal(duplicated.entries.filter((entry) => entry.weekIndex === 1).length, 1);
 assert.notEqual(duplicated.entries[0].id, duplicated.entries.at(-1).id);
-
-const recovery = domain.insertRecoveryWeek(first, 0);
-assert.equal(recovery.weekCount, 3);
-assert.equal(recovery.entries.filter((entry) => entry.weekIndex === 1).length, 0);
-assert.equal(recovery.phases.some((phase) => phase.kind === "recovery"), true);
+assert.deepEqual(
+  duplicated.weekStages.map((stage) => [stage.weekIndex, stage.stage]).sort(),
+  [[0, 2], [1, 2], [2, 3]],
+  "the copy takes the week's stage and later weeks keep theirs, one down"
+);
 
 const reordered = domain.reorderTrainingPlanWeek(first, 0, 1);
 assert.equal(reordered.entries[0].weekIndex, 1);
-assert.equal(reordered.phases.length, 1, "week reordering preserves phase metadata");
+assert.deepEqual(
+  reordered.weekStages.map((stage) => [stage.weekIndex, stage.stage]).sort(),
+  [[0, 3], [1, 2]],
+  "a moved week takes its stage with it"
+);
+
+const copied = domain.copiedEntry({ ...first.entries[0], idInPlan: "7", happenDay: "20990803", corosProgram: { id: "p" } });
+assert.equal(copied.idInPlan, undefined, "a copy is a new session to COROS");
+assert.equal(copied.happenDay, undefined);
+assert.equal(copied.corosProgram.id, "p", "and keeps the program: the steps are the same");
+assert.notEqual(copied.id, first.entries[0].id);
+
+// --- the summary and what stops a save --------------------------------------
 
 const summary = domain.summarizeTrainingPlan(first);
 assert.equal(summary.workouts, 3);
 assert.equal(summary.trainingLoad, 140);
-assert.equal(summary.conflictCount, 1);
+assert.equal(summary.peakWeek, 2);
+assert.deepEqual(summary.sportDistribution, { run: 3 });
+
+const issues = (plan) => domain.validateTrainingPlan(plan);
+assert.deepEqual(issues(first), [], "a finished plan has nothing to say");
+assert.equal(issues({ ...first, name: "" }).some((issue) => issue.path === "name"), true);
 assert.equal(
-  domain.validateTrainingPlan({ ...first, name: "" }).some((issue) => issue.path === "name"),
-  true
+  issues({ ...first, entries: [] }).some((issue) => issue.path === "entries" && issue.severity === "error"),
+  true,
+  "COROS keeps no empty plan"
 );
+const crowded = {
+  ...first,
+  entries: Array.from({ length: 11 }, () => domain.planEntryFromWorkout(makeWorkout("Stack", 1), 0, 3))
+};
+assert.match(
+  issues(crowded).find((issue) => issue.severity === "error")?.message ?? "",
+  /at most 10 sessions/,
+  "the web app's per-day limit is stated before COROS refuses it"
+);
+const trailing = issues({ ...first, weekCount: 4 });
+assert.equal(trailing.every((issue) => issue.severity === "warning"), true);
+assert.match(trailing[0].message, /2 empty weeks at the end are not kept/, "COROS ends a plan at its last session");
 
-const second = structuredClone(first);
-second.id = "plan:second";
-second.name = "Lower load";
-second.entries = [domain.planEntryFromWorkout(makeWorkout("Easy", 20), 0, 0)];
-const comparison = domain.compareTrainingPlans([first, second]);
-assert.deepEqual(comparison.sharedWorkoutNames, ["Easy"]);
-assert.equal(comparison.summaries.length, 2);
-assert.equal(comparison.insights.some((insight) => insight.includes("more estimated training load")), true);
+// --- the coach's plans ------------------------------------------------------
 
+const usualWeek = (...trainingDays) => ({
+  mode: "days",
+  days: Array.from({ length: 7 }, (_, day) => (trainingDays.includes(day) ? { kind: "train", minutes: 90 } : { kind: "rest" }))
+});
 const generationRequest = {
+  goalKind: "other",
   goal: "Build durable mountain endurance",
   sports: ["run", "strength", "swim"],
   difficulty: "advanced",
   weeks: 2,
-  sessionsPerWeek: 2,
   startDate: "2026-08-03",
-  availableDayIndexes: [0, 2],
-  maxSessionMinutes: 90,
+  week: usualWeek(0, 2),
   constraints: "Keep Wednesday joint-friendly."
 };
 const generatedDraft = {
@@ -136,48 +168,75 @@ const generatedDraft = {
     }
   ]
 };
-const generated = domain.trainingPlanFromDraftPreview(generatedDraft, generationRequest);
-assert.equal(generated.source, "coach");
+const generated = generation.trainingPlanFromDraftPreview(generatedDraft, generationRequest);
+assert.equal(generated.origin, "coach");
+assert.equal(generated.coach, undefined, "a generation's draft is discarded, so nothing links back to it");
+assert.equal(generated.startDate, undefined, "a plan has no start date of its own");
 assert.equal(generated.weekCount, 2);
 assert.equal(generated.entries.length, 4);
 assert.equal(generated.entries[0].workout.steps[0].repeat, 4);
 assert.deepEqual(generated.entries[1].workout.steps[0].intensity, { type: "weight", mode: "weight", value: 24, unit: "kg" });
 assert.deepEqual(generated.entries[3].workout.sport_options, { poolLength: { value: 25, unit: "m" } });
-assert.match(generated.notes, /Review loads/);
+assert.equal(generated.description, "Build durable mountain endurance", "without the coach's own overview, the goal stands in");
+assert.doesNotMatch(generated.description, /Review loads|Two focused weeks|joint-friendly/, "the card's summary, its warnings and the constraints stay off COROS");
+assert.deepEqual(generated.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 0], [0, 2], [1, 0], [1, 2]]);
+
+/* Weeks run Monday to Sunday from the Monday asked for, which is where COROS
+   counts a plan's days from — so a Tuesday session is a Tuesday. */
 const tuesdayDraft = structuredClone(generatedDraft);
-tuesdayDraft.draftId = "tuesday-start";
+tuesdayDraft.draftId = "tuesday-sessions";
 const tuesdayDates = ["20260804", "20260806", "20260811", "20260813"];
 tuesdayDraft.entries.forEach((entry, index) => {
   entry.scheduleDate = tuesdayDates[index];
   entry.source.schedule_date = tuesdayDates[index];
 });
-const tuesdayPlan = domain.trainingPlanFromDraftPreview(tuesdayDraft, {
+const tuesdayPlan = generation.trainingPlanFromDraftPreview(tuesdayDraft, {
   ...generationRequest,
-  startDate: "2026-08-04",
-  availableDayIndexes: [1, 3]
+  week: usualWeek(1, 3)
 });
-assert.deepEqual(tuesdayPlan.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 0], [0, 2], [1, 0], [1, 2]]);
+assert.deepEqual(tuesdayPlan.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 1], [0, 3], [1, 1], [1, 3]]);
 assert.throws(
-  () => domain.trainingPlanFromDraftPreview(tuesdayDraft, { ...generationRequest, startDate: "2026-08-04" }),
-  /unavailable day/i
+  () => generation.trainingPlanFromDraftPreview(tuesdayDraft, generationRequest),
+  /which is a rest day/i
 );
+/* A mid-week start used to be counted in seven-day blocks from that day, so
+   its weeks and COROS's disagreed; a generated plan starts on a Monday. */
+assert.throws(
+  () => generation.trainingPlanFromDraftPreview(tuesdayDraft, { ...generationRequest, startDate: "2026-08-05", week: usualWeek(1, 3) }),
+  /starts on a Monday/i
+);
+assert.throws(
+  () => generation.trainingPlanFromDraftPreview({ ...generatedDraft, entries: generatedDraft.entries.slice(0, 3) }, generationRequest),
+  /week 2 \(from 2026-08-10\) has 1 session; it needs exactly 2/i
+);
+
 const coachLibraryPlan = domain.trainingPlanFromCoachDraftPreview(generatedDraft);
-assert.equal(coachLibraryPlan.source, "coach");
-assert.equal(coachLibraryPlan.startDate, "2026-08-03");
+assert.equal(coachLibraryPlan.origin, "coach");
+assert.equal(coachLibraryPlan.startDate, undefined);
 assert.equal(coachLibraryPlan.entries[3].weekIndex, 1);
 assert.deepEqual(coachLibraryPlan.entries[0].workout.steps, generatedDraft.entries[0].source.steps);
 const undatedCoachPlan = domain.trainingPlanFromCoachDraftPreview({
   ...generatedDraft,
   draftId: "undated-coach",
-  entries: [{ key: "holding", name: "Decide later", sport: "run", saveToLibrary: false, workoutType: "run", conflicts: [], warnings: [] }]
+  entries: [
+    { key: "later-1", name: "Decide later", sport: "run", saveToLibrary: false, workoutType: "run" },
+    { key: "later-2", name: "And this", sport: "run", saveToLibrary: false, workoutType: "run" }
+  ]
 });
-assert.equal(undatedCoachPlan.startDate, undefined);
-assert.equal(undatedCoachPlan.entries[0].dayIndex, undefined);
-assert.equal(undatedCoachPlan.entries[0].workout.name, "Decide later");
-assert.throws(
-  () => domain.trainingPlanFromDraftPreview({ ...generatedDraft, entries: generatedDraft.entries.slice(0, 3) }, generationRequest),
-  /week 2 has 1 workouts/i
+assert.deepEqual(
+  undatedCoachPlan.entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+  [[0, 0], [0, 1]],
+  "a plan has no day-less sessions: undated ones are placed a day apart"
 );
+assert.equal(undatedCoachPlan.entries[0].workout.name, "Decide later");
+const stagedCoachPlan = domain.trainingPlanFromCoachDraftPreview(generatedDraft, {
+  description: "Edited by the athlete.",
+  weekStages: [{ weekIndex: 1, stage: 4 }, { weekIndex: 9, stage: 5 }]
+});
+assert.equal(stagedCoachPlan.description, "Edited by the athlete.");
+assert.deepEqual(stagedCoachPlan.weekStages, [{ weekIndex: 1, stage: 4 }], "a stage past the plan's weeks is dropped");
+
+// --- a session's workout, round-tripped through the editor --------------------
 
 const intensityFamilies = [
   { type: "none" },
@@ -229,17 +288,24 @@ assert.deepEqual(roundTripped.sport_options, roundTripSource.sport_options);
 assert.deepEqual(roundTripped.steps, roundTripSource.steps);
 assert.equal(roundTripped.schedule_date, "20260803");
 assert.equal(roundTripped.save_to_library, false);
-const linkedEntry = { ...domain.planEntryFromWorkout({ key: "linked", name: "Linked source", sport: "strength" }, 0, 0, "remote-program"), plannedTrainingLoad: 80 };
-const detachedEntry = planWorkoutEditor.replaceTrainingPlanEntryWorkout(linkedEntry, {
-  key: "linked",
+const coroEntry = {
+  ...domain.planEntryFromWorkout({ key: "coros", name: "Read from COROS", sport: "strength" }, 0, 0),
+  corosProgram: { id: "program-in-plan", exercises: [] },
+  idInPlan: "3",
+  plannedTrainingLoad: 80
+};
+const editedEntry = planWorkoutEditor.replaceTrainingPlanEntryWorkout(coroEntry, {
+  key: "coros",
   name: "Edited plan copy",
   sport: "strength",
   steps: [{ kind: "training", name: "Deadlift", target_type: "reps", target_reps: 5, exercise_id: "deadlift-1", exercise_name: "Deadlift", exercise_kind: 4, intensity: { type: "weight", mode: "weight", value: 100, unit: "kg" } }]
 });
-assert.equal(detachedEntry.programId, undefined, "editing a linked workout detaches only the plan copy");
-assert.equal(detachedEntry.plannedTrainingLoad, undefined);
-assert.equal(linkedEntry.programId, "remote-program", "the linked source entry remains unchanged");
-assert.equal(detachedEntry.workout.steps[0].exercise_id, "deadlift-1");
+assert.equal(editedEntry.corosProgram, undefined, "an edit drops the program it was read with, so the save rebuilds it from the steps");
+assert.equal(editedEntry.plannedTrainingLoad, undefined, "and the old program's figures with it");
+assert.equal(editedEntry.idInPlan, "3", "the session keeps its identity inside the COROS plan");
+assert.equal(editedEntry.title, "Edited plan copy");
+assert.equal(coroEntry.corosProgram.id, "program-in-plan", "the entry edited is not mutated");
+assert.equal(editedEntry.workout.steps[0].exercise_id, "deadlift-1");
 for (const specialistInput of [
   { key: "pool", name: "Pool", sport: "swim", sport_options: { poolLength: { value: 50, unit: "m" } }, steps: [{ kind: "sendOff", name: "100s", target_type: "distance", target_distance_meters: 100, send_off_seconds: 105, intensity: { type: "swimStroke", stroke: "butterfly" } }] },
   { key: "climb", name: "Boulders", sport: "bouldering", sport_options: { gradingSystem: "font" }, steps: [{ kind: "training", name: "Limit route", target_type: "routes", target_routes: 4, intensity: { type: "climbGrade", system: "font", absoluteGrade: "7B" } }] },
@@ -250,24 +316,8 @@ for (const specialistInput of [
   assert.deepEqual(planWorkoutEditor.editorDraftToPlanWorkoutInput(specialistDraft, specialistInput).sport_options, specialistInput.sport_options);
 }
 
-const calendarPlan = structuredClone(generated);
-calendarPlan.startDate = "2099-08-03";
-calendarPlan.entries = calendarPlan.entries.slice(0, 2).map((entry, index) => ({ ...entry, weekIndex: 0, dayIndex: index * 2 }));
-const projection = library.buildTrainingPlanCalendarProjection(calendarPlan, "2099-08-03", [
-  { planId: "other", idInPlan: "existing", planProgramId: "other-program", happenDay: "20990803", name: "Existing run" }
-], "20990101");
-assert.equal(projection.entries.length, 2);
-assert.equal(projection.entries[1].happenDay, "20990805");
-assert.equal(projection.conflicts[0].existing[0].name, "Existing run");
-const holdingPlan = structuredClone(calendarPlan);
-holdingPlan.entries[0].dayIndex = undefined;
-assert.match(library.buildTrainingPlanCalendarProjection(holdingPlan, "2099-08-03", [], "20990101").blockers[0], /holding area/i);
-const anyDayProjection = library.buildTrainingPlanCalendarProjection(calendarPlan, "2099-08-04", [], "20990101");
-assert.equal(anyDayProjection.startDate, "2099-08-04");
-assert.deepEqual(anyDayProjection.entries.map((entry) => entry.happenDay), ["20990804", "20990806"]);
-const revisionBefore = domain.trainingPlanCalendarRevision(calendarPlan);
-calendarPlan.entries[0].title = "Edited after install";
-assert.notEqual(domain.trainingPlanCalendarRevision(calendarPlan), revisionBefore);
+
+// --- a COROS plan as the library reads it -------------------------------------
 
 const rawNative = {
   id: "remote-1",
@@ -277,51 +327,92 @@ const rawNative = {
   version: 7,
   unknownFutureField: { keep: true },
   entities: [
-    { id: "native-entity-1", idInPlan: "entry-1", planProgramId: "pp-1", dayNo: 0, happenDay: "20260803" }
+    { id: "native-entity-1", idInPlan: "1", planProgramId: "1", dayNo: 9 }
   ],
   programs: [
     {
       id: "program-1",
-      idInPlan: "entry-1",
-      planProgramId: "pp-1",
+      idInPlan: "1",
       name: "Native Run",
       sportType: 1,
       duration: 2_400,
-      distance: 6_000,
+      distance: 600_000,
       trainingLoad: 55,
       totalSets: 3,
-      opaqueProgramField: "round-trip"
+      opaqueProgramField: "round-trip",
+      exercises: []
     }
   ],
-  weekStages: [{ weekNo: 1, stage: "Base", planTrainingLoad: 55 }]
+  weekStages: [{ weekNo: 1, stage: 0 }, { weekNo: 2, stage: 3 }]
 };
 const native = adapter.parseNativeCorosPlan(rawNative, "2026-07-29T00:00:00.000Z");
 assert.equal(native.remoteId, "remote-1");
 assert.equal(native.programs[0].planTrainingLoad, 55);
 assert.equal(native.programs[0].planDuration, 2_400);
-assert.equal(native.programs[0].planDistance, 6_000);
 assert.equal(native.programs[0].planSets, 3);
 assert.equal(native.rawPayload.unknownFutureField.keep, true);
 assert.equal(native.sportTypes[0], 1);
 assert.equal(native.entities[0].id, "native-entity-1");
 
+const nativeDocument = library.nativePlanToDocument(native, {
+  planId: "coros:remote-1",
+  favorite: true,
+  tags: ["base"],
+  archived: false,
+  origin: "coach",
+  updatedAt: "2026-07-29T00:00:00.000Z"
+});
+assert.equal(nativeDocument.id, "coros:remote-1");
+assert.equal(nativeDocument.remoteVersion, 7);
+assert.equal(nativeDocument.calendar, "unscheduled");
+assert.equal(nativeDocument.startDate, undefined);
+assert.equal(nativeDocument.weekCount, 2);
+assert.deepEqual(nativeDocument.weekStages, [{ weekIndex: 1, stage: 3 }], "only a stage COROS set; stage 0 is Not Set");
+const nativeEntry = nativeDocument.entries[0];
+assert.deepEqual([nativeEntry.weekIndex, nativeEntry.dayIndex], [1, 2], "dayNo 9 is week 2, Wednesday");
+assert.equal(nativeEntry.idInPlan, "1", "the session keeps the id an update names it by");
+assert.equal(nativeEntry.corosProgram.opaqueProgramField, "round-trip", "and the program as COROS sent it, unknown fields included");
+assert.equal(nativeEntry.plannedDistanceMeters, 6_000, "program distance is centimetres");
+assert.equal(nativeEntry.plannedStrengthSets, undefined, "totalSets counts steps on a run");
+assert.equal(nativeDocument.favorite, true, "the app's own settings are laid over it");
+assert.equal(nativeDocument.origin, "coach");
+
+/* An instance is dated from the Monday of its start day's week: COROS counts
+   dayNo from there and drops what falls before the start. */
+const instance = library.nativePlanToDocument(adapter.parseNativeCorosPlan({
+  ...rawNative,
+  id: "instance-1",
+  executeStatus: 1,
+  sourcePlanId: "remote-1",
+  startDay: 20270303,
+  entities: [{ id: "e", idInPlan: "1", planProgramId: "1", dayNo: 9, happenDay: 20270310 }]
+}));
+assert.equal(instance.calendar, "running");
+assert.equal(instance.sourcePlanId, "remote-1");
+assert.equal(instance.startDate, "2027-03-01", "the Monday of a Wednesday start");
+assert.equal(instance.entries[0].happenDay, "20270310");
+const finished = library.nativePlanToDocument(adapter.parseNativeCorosPlan({ ...rawNative, id: "old", executeStatus: 2, startDay: 20260105 }));
+assert.equal(finished.calendar, "finished");
+
 const duplicateNative = adapter.parseNativeCorosPlan({
   id: "remote-duplicates",
-  name: "Native duplicate identities",
+  name: "Native duplicate rows",
   totalDay: 7,
   entities: [
-    { id: "occurrence-a", idInPlan: "shared", planProgramId: "pp-shared", dayNo: 0, happenDay: "20260803" },
-    { id: "occurrence-b", idInPlan: "shared", planProgramId: "pp-shared", dayNo: 1, happenDay: "20260804" },
-    { id: "occurrence-b", idInPlan: "shared", planProgramId: "pp-shared", dayNo: 1, happenDay: "20260804" },
-    { idInPlan: "shared", planProgramId: "pp-shared", dayNo: 2, happenDay: "20260805" },
-    { id: "raw-unique", idInPlan: "unique", planProgramId: "pp-unique", dayNo: 3, happenDay: "20260806" }
+    { id: "occurrence-a", idInPlan: "1", planProgramId: "1", dayNo: 0 },
+    { id: "occurrence-a", idInPlan: "1", planProgramId: "1", dayNo: 0 },
+    { id: "occurrence-b", idInPlan: "2", planProgramId: "2", dayNo: 3, status: 3 }
   ],
-  programs: [
-    { id: "program-shared", idInPlan: "shared", planProgramId: "pp-shared", name: "Repeated run", sportType: 1 },
-    { id: "program-unique", idInPlan: "unique", planProgramId: "pp-unique", name: "Unique run", sportType: 1 }
-  ]
+  programs: [{ id: "program-1", idInPlan: "1", name: "Run", sportType: 1 }]
 });
-assert.equal(duplicateNative.entities.length, 5, "the lossless adapter retains exact duplicate source rows");
+assert.equal(duplicateNative.entities.length, 3, "the adapter keeps every row it was sent");
+assert.deepEqual(
+  library.nativePlanToDocument(duplicateNative).entries.map((entry) => entry.idInPlan),
+  ["1"],
+  "a repeated row is one session, and a deleted one (status 3) is none"
+);
+
+// --- plan-versus-done ---------------------------------------------------------
 
 const day = new Date(2099, 11, 1, 12, 0, 0).valueOf();
 const scheduled = [
@@ -344,7 +435,10 @@ const manual = library.buildTrainingActivityMatches(
 );
 assert.equal(manual[1].status, "skipped");
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-training-library-"));
+
+// --- storage ------------------------------------------------------------------
+
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-training-library-"));
 const legacyPath = path.join(tempRoot, "coros-desktop.sqlite");
 const legacy = new Database(legacyPath);
 legacy.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
@@ -354,18 +448,54 @@ legacy.close();
 const db = databaseModule.initializeDatabase(tempRoot);
 assert.equal(fs.existsSync(path.join(tempRoot, "coroslink.sqlite")), true);
 assert.equal(db.prepare("SELECT value FROM app_settings WHERE key = ?").get("preserved").value, "yes");
-const expectedTables = [
-  "training_plans",
-  "training_workout_metadata",
-  "training_collections",
-  "training_plan_workout_links",
-  "training_activity_matches"
-];
 const tableNames = new Set(
   db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name)
 );
-for (const table of expectedTables) assert.equal(tableNames.has(table), true, `${table} was migrated`);
+for (const table of ["training_plan_metadata", "training_plan_drafts", "coros_plan_cache", "training_workout_metadata", "training_activity_matches"]) {
+  assert.equal(tableNames.has(table), true, `${table} exists`);
+}
+for (const table of ["training_plans", "training_plan_workout_links", "training_collections"]) {
+  assert.equal(tableNames.has(table), false, `${table} is retired and not created`);
+}
 
+// A statement about a session lands on the matcher's own row for it — the
+// table holds one per session — and `manual: false` hands the session back.
+const auto = { ...matches[0], id: "auto-id" };
+databaseModule.saveTrainingActivityMatch(auto);
+const said = library.saveManualActivityMatch({ ...auto, id: "schedule:one", activityId: undefined, status: "skipped", manual: true });
+assert.equal(said.id, "auto-id", "the stored row is replaced, not collided with");
+assert.equal(databaseModule.listTrainingActivityMatches().length, 1);
+assert.equal(databaseModule.listTrainingActivityMatches()[0].status, "skipped");
+assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, true);
+library.saveManualActivityMatch({ ...said, status: "missed", manual: false });
+assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, false, "Match automatically lets the matcher decide again");
+
+// Drafts: kept, listed, replaced in place, discarded.
+const kept = library.savePlanDraft({ baseRemoteId: "remote-1", baseVersion: 7, plan: nativeDocument });
+assert.match(kept.id, /^draft:/);
+assert.equal(databaseModule.listTrainingPlanDrafts().length, 1);
+const rekept = library.savePlanDraft({ id: kept.id, baseRemoteId: "remote-1", baseVersion: 7, plan: { ...nativeDocument, name: "Renamed" } });
+assert.equal(rekept.id, kept.id, "saving a draft again replaces it");
+assert.equal(databaseModule.listTrainingPlanDrafts().length, 1);
+assert.equal(databaseModule.getTrainingPlanDraft(kept.id).plan.name, "Renamed");
+assert.equal(databaseModule.getTrainingPlanDraft(kept.id).baseVersion, 7);
+library.discardPlanDraft(kept.id);
+assert.equal(databaseModule.listTrainingPlanDrafts().length, 0);
+
+// Metadata: the app's own settings on a COROS plan.
+const settings = library.updateTrainingPlanMetadata("coros:remote-1", { favorite: true });
+assert.equal(settings.favorite, true);
+assert.equal(library.updateTrainingPlanMetadata("coros:remote-1", { archived: true }).favorite, true, "a patch keeps what it does not name");
+assert.throws(() => library.updateTrainingPlanMetadata("draft:x", { favorite: true }), /saved to COROS/);
+
+// The cache: a list replaces it whole.
+databaseModule.replaceCorosPlanCache([nativeDocument, instance]);
+assert.equal(databaseModule.listCorosPlanCache().length, 2);
+databaseModule.replaceCorosPlanCache([nativeDocument]);
+assert.deepEqual(databaseModule.listCorosPlanCache().map((plan) => plan.remoteId), ["remote-1"], "a plan COROS no longer lists leaves the cache");
+assert.equal(databaseModule.getCorosPlanCache("remote-1").entries[0].corosProgram.opaqueProgramField, "round-trip");
+
+// The coach's local saves are retired: a plan is a COROS plan.
 let groupedDraftPreview;
 const groupedDraftResponse = JSON.parse(await chatWorkoutTools.handleChatWorkoutTool(
   "draft_training_plan",
@@ -382,208 +512,18 @@ const groupedDraftResponse = JSON.parse(await chatWorkoutTools.handleChatWorkout
   }
 ));
 assert.equal(groupedDraftResponse.ok, true);
-const groupedSaveResult = await chatWorkoutTools.uploadPlanDraftById(
-  groupedDraftPreview.draftId,
-  "metric",
-  "localPlan"
-);
-assert.equal(groupedSaveResult.destination, "localPlan");
-assert.equal(groupedSaveResult.groupedPlanCreated, true);
-assert.deepEqual(groupedSaveResult.remoteWrites, []);
-const persistedGroupedPlan = databaseModule.getTrainingPlanDocument(groupedSaveResult.localPlanId);
-assert.equal(persistedGroupedPlan.name, "Grouped Coach Plan");
-assert.equal(persistedGroupedPlan.source, "coach");
-assert.equal(persistedGroupedPlan.entries.length, 2);
+for (const destination of ["localPlan", "localTemplate"]) {
+  await assert.rejects(
+    chatWorkoutTools.uploadPlanDraftById(groupedDraftPreview.draftId, "metric", destination),
+    /to COROS as a plan, as individual workouts, or on the calendar/,
+    `${destination} no longer writes a local plan`
+  );
+}
 
-const duplicateNativeDocument = library.nativePlanToDocument(duplicateNative);
-assert.equal(duplicateNativeDocument.entries.length, 4, "exact duplicate native entities are collapsed");
-assert.equal(
-  new Set(duplicateNativeDocument.entries.map((entry) => entry.id)).size,
-  duplicateNativeDocument.entries.length,
-  "duplicate idInPlan values receive unique local entry IDs"
-);
-assert.equal(
-  duplicateNativeDocument.entries.some((entry) => entry.id === "coros:remote-duplicates:entity:occurrence-a"),
-  true,
-  "the raw COROS occurrence ID disambiguates reused idInPlan values"
-);
-assert.equal(
-  duplicateNativeDocument.entries.some((entry) => entry.id.startsWith("coros:remote-duplicates:occurrence:shared:")),
-  true,
-  "a stable fingerprint disambiguates occurrences without a raw ID"
-);
-assert.equal(
-  duplicateNativeDocument.entries.some((entry) => entry.id === "coros:remote-duplicates:unique"),
-  true,
-  "non-colliding plans retain their legacy local identity"
-);
-databaseModule.saveTrainingPlanDocument(duplicateNativeDocument, duplicateNative.rawPayload);
-assert.equal(
-  db.prepare("SELECT COUNT(*) AS count FROM training_plan_workout_links WHERE plan_id = ?").get(duplicateNativeDocument.id).count,
-  4
-);
-
-const invalidDuplicateDocument = structuredClone(first);
-invalidDuplicateDocument.id = "plan:duplicate-entry-guard";
-invalidDuplicateDocument.entries[1].id = invalidDuplicateDocument.entries[0].id;
-assert.throws(
-  () => databaseModule.saveTrainingPlanDocument(invalidDuplicateDocument),
-  /contains duplicate entry IDs/i,
-  "persistence rejects inconsistent documents with an actionable error"
-);
-
-databaseModule.saveTrainingPlanDocument(first, rawNative);
-assert.equal(databaseModule.getTrainingPlanDocument(first.id).name, "Build");
-assert.equal(databaseModule.getNativePlanRawPayload(first.id).unknownFutureField.keep, true);
-assert.equal(db.prepare("SELECT COUNT(*) AS count FROM training_plan_workout_links WHERE plan_id = ?").get(first.id).count, 3);
-
-const installedPlan = structuredClone(calendarPlan);
-installedPlan.id = "plan:installed-test";
-installedPlan.calendarInstalls = [{
-  id: "install-1",
-  startDate: "2099-08-03",
-  planRevision: domain.trainingPlanCalendarRevision(installedPlan),
-  state: "active",
-  lastOperation: "install",
-  occurrences: [{
-    planEntryId: installedPlan.entries[0].id,
-    happenDay: "20990803",
-    schedulePlanId: "owned-schedule",
-    scheduleIdInPlan: "owned-occurrence",
-    planProgramId: "owned-program",
-    createdAt: "2099-08-03T12:00:00.000Z"
-  }],
-  failures: [],
-  createdAt: "2099-08-03T12:00:00.000Z",
-  updatedAt: "2099-08-03T12:00:00.000Z"
-}];
-databaseModule.saveTrainingPlanDocument(installedPlan);
-assert.equal(domain.activeTrainingPlanCalendarInstall(installedPlan, "20990101").id, "install-1");
-assert.match(library.buildTrainingPlanCalendarProjection(installedPlan, "2099-08-03", [], "20990101").blockers[0], /already has an active/i);
-assert.throws(() => library.deleteLocalTrainingPlan(installedPlan.id, true), /future calendar workouts/i);
-
-let mockCalendar = [];
-let mockIdentity = 0;
-const writeOrder = [];
-const embeddedUnitSystems = [];
-const appendMockOccurrence = (name, happenDay) => {
-  mockIdentity += 1;
-  mockCalendar.push({
-    planId: `owned-plan-${mockIdentity}`,
-    idInPlan: `owned-id-${mockIdentity}`,
-    planProgramId: `owned-program-${mockIdentity}`,
-    happenDay,
-    name
-  });
-};
-library.setTrainingPlanCalendarAdapterForTests({
-  listScheduled: async (startDay, endDay) => mockCalendar.filter((entry) => entry.happenDay >= startDay && entry.happenDay <= endDay),
-  scheduleLibrary: async (_programId, happenDay) => {
-    writeOrder.push(`library:${happenDay}`);
-    appendMockOccurrence("Uphill repeats", happenDay);
-  },
-  createAndSchedule: async (entry, happenDay, unitSystem, saveToLibrary) => {
-    writeOrder.push(`embedded:${happenDay}`);
-    embeddedUnitSystems.push(unitSystem);
-    assert.equal(saveToLibrary, false, "plan installs keep embedded workouts out of the library");
-    appendMockOccurrence(entry.name, happenDay);
-    return {};
-  },
-  removeScheduled: async (entry) => {
-    writeOrder.push(`remove:${entry.planId}:${entry.idInPlan}`);
-    mockCalendar = mockCalendar.filter((candidate) => !(candidate.planId === entry.planId && candidate.idInPlan === entry.idInPlan));
-  }
-});
-const mutationPlan = structuredClone(generated);
-mutationPlan.id = "plan:mutation-test";
-mutationPlan.startDate = "2099-08-03";
-mutationPlan.weekCount = 1;
-mutationPlan.entries = mutationPlan.entries.slice(0, 2).map((entry, index) => ({ ...entry, weekIndex: 0, dayIndex: index * 2 }));
-mutationPlan.entries[0].programId = "linked-library-program";
-mutationPlan.entries[0].workout = { key: "linked", name: "Uphill repeats", sport: "run", save_to_library: false };
-mutationPlan.calendarInstalls = [];
-databaseModule.saveTrainingPlanDocument(mutationPlan);
-mockCalendar.push({ planId: "preexisting", idInPlan: "morning", planProgramId: "morning-program", happenDay: "20990803", name: "Morning recovery" });
-const installPreview = await library.previewTrainingPlanCalendar(mutationPlan.id, "2099-08-03");
-assert.equal(installPreview.conflicts[0].existing[0].name, "Morning recovery");
-const installResult = await library.addTrainingPlanToCalendar(installPreview.previewId, true, "imperial");
-assert.deepEqual(writeOrder.slice(0, 2), ["library:20990803", "embedded:20990805"], "calendar writes remain serialized in plan order");
-assert.deepEqual(embeddedUnitSystems, ["imperial"], "only embedded workouts are rebuilt with the selected units");
-assert.equal(installResult.scheduledCount, 2);
-assert.equal(installResult.failures.length, 0);
-assert.equal(installResult.plan.calendarInstalls[0].occurrences.length, 2);
-assert.equal(installResult.plan.calendarInstalls[0].occurrences[0].scheduleIdInPlan, "owned-id-1");
-assert.equal(mockCalendar.some((entry) => entry.planId === "preexisting"), true, "confirmed conflicts are kept alongside the plan");
-const duplicatePreview = await library.previewTrainingPlanCalendar(mutationPlan.id, "2099-08-03");
-assert.match(duplicatePreview.blockers[0], /already has an active/i);
-
-const installedMutationPlan = databaseModule.getTrainingPlanDocument(mutationPlan.id);
-installedMutationPlan.calendarInstalls[0].occurrences.push({ planEntryId: installedMutationPlan.entries[0].id, happenDay: "20200101", schedulePlanId: "past-owned", scheduleIdInPlan: "past-id", planProgramId: "past-program", createdAt: "2020-01-01T12:00:00.000Z" });
-databaseModule.saveTrainingPlanDocument(installedMutationPlan);
-mockCalendar.push({ planId: "past-owned", idInPlan: "past-id", planProgramId: "past-program", happenDay: "20200101", name: "Past completed workout" });
-mockCalendar = mockCalendar.filter((entry) => !(entry.planId === "owned-plan-1" && entry.idInPlan === "owned-id-1"));
-mockCalendar.push({ planId: "unrelated", idInPlan: "same-name", planProgramId: "unrelated-program", happenDay: "20990803", name: "Uphill repeats" });
-const removalPreview = await library.previewTrainingPlanCalendarRemoval(mutationPlan.id);
-const removalResult = await library.removeTrainingPlanFromCalendar(removalPreview.previewId, true);
-assert.equal(removalResult.removedCount, 1, "already-absent owned occurrences are handled idempotently");
-assert.equal(mockCalendar.some((entry) => entry.planId === "unrelated" && entry.idInPlan === "same-name"), true, "same-name unrelated workouts are preserved");
-assert.equal(mockCalendar.some((entry) => entry.planId === "past-owned"), true, "past owned workouts are preserved");
-assert.equal(databaseModule.getTrainingPlanDocument(mutationPlan.id).calendarInstalls[0].state, "removed");
-
-const stalePlan = structuredClone(mutationPlan);
-stalePlan.id = "plan:stale-preview";
-stalePlan.calendarInstalls = [];
-databaseModule.saveTrainingPlanDocument(stalePlan);
-const stalePreview = await library.previewTrainingPlanCalendar(stalePlan.id, "2099-08-03");
-mockCalendar.push({ planId: "calendar-change", idInPlan: "new", planProgramId: "new-program", happenDay: "20990805", name: "Changed elsewhere" });
-await assert.rejects(library.addTrainingPlanToCalendar(stalePreview.previewId, true, "imperial"), /calendar changed/i);
-const revisionStalePlan = structuredClone(stalePlan);
-revisionStalePlan.id = "plan:revision-stale-preview";
-databaseModule.saveTrainingPlanDocument(revisionStalePlan);
-const revisionStalePreview = await library.previewTrainingPlanCalendar(revisionStalePlan.id, "2099-08-03");
-revisionStalePlan.entries[0].title = "Changed after preview";
-databaseModule.saveTrainingPlanDocument(revisionStalePlan);
-await assert.rejects(library.addTrainingPlanToCalendar(revisionStalePreview.previewId, true, "imperial"), /plan changed/i);
-
-mockCalendar = [];
-const partialPlan = structuredClone(generated);
-partialPlan.id = "plan:partial-install";
-partialPlan.startDate = "2099-08-03";
-partialPlan.weekCount = 1;
-partialPlan.entries = partialPlan.entries.slice(0, 2).map((entry, index) => ({ ...entry, weekIndex: 0, dayIndex: index * 2, programId: undefined }));
-partialPlan.calendarInstalls = [];
-databaseModule.saveTrainingPlanDocument(partialPlan);
-library.setTrainingPlanCalendarAdapterForTests({
-  listScheduled: async (startDay, endDay) => mockCalendar.filter((entry) => entry.happenDay >= startDay && entry.happenDay <= endDay),
-  createAndSchedule: async (entry, happenDay, unitSystem) => {
-    assert.equal(unitSystem, "metric", "metric plan installs preserve the selected units");
-    if (entry.name === "Trail strength") throw new Error("mock write failure");
-    appendMockOccurrence(entry.name, happenDay);
-    return {};
-  },
-  removeScheduled: async (entry) => {
-    mockCalendar = mockCalendar.filter((candidate) => !(candidate.planId === entry.planId && candidate.idInPlan === entry.idInPlan));
-  }
-});
-const partialPreview = await library.previewTrainingPlanCalendar(partialPlan.id, "2099-08-03");
-const partialResult = await library.addTrainingPlanToCalendar(partialPreview.previewId, true, "metric");
-assert.equal(partialResult.scheduledCount, 1);
-assert.equal(partialResult.failures.length, 1);
-assert.equal(partialResult.plan.calendarInstalls[0].state, "partial");
-assert.equal(partialResult.plan.calendarInstalls[0].occurrences.length, 1, "successful writes persist during a partial install");
-const partialRemovalPreview = await library.previewTrainingPlanCalendarRemoval(partialPlan.id);
-const partialRemoval = await library.removeTrainingPlanFromCalendar(partialRemovalPreview.previewId, true);
-assert.equal(partialRemoval.removedCount, 1, "known occurrences remain removable after a partial install");
-assert.equal(partialRemoval.failures.some((failure) => failure.writeMayHaveSucceeded), true, "unverified writes remain recorded instead of being retried by name");
-library.setTrainingPlanCalendarAdapterForTests();
-
-assert.throws(() => library.deleteLocalTrainingPlan(first.id, false), /confirmation/i);
-assert.throws(() => library.removeTrainingCollection("collection", false), /confirmation/i);
 await assert.rejects(
   library.deleteTrainingLibraryWorkouts({ programIds: ["remote"], confirmed: false }),
   /confirmation/i
 );
-assert.equal(library.getNativePlanWriteCapabilities().create, false);
 
 db.close();
 fs.rmSync(tempRoot, { recursive: true, force: true });
