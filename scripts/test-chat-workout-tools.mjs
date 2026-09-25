@@ -205,6 +205,16 @@ const oneOffCalendarInput = buildTrainingPlanDestinationInput(
 );
 assert.equal(oneOffCalendarInput.workouts[0].schedule_date, "20991206");
 assert.equal(oneOffCalendarInput.workouts[0].save_to_library, false);
+// Put on the calendar, a workout can also be kept in the library — which the
+// calendar path used to rule out by clearing the flag.
+const keptCalendarInput = buildTrainingPlanDestinationInput(
+  heartRateDraft,
+  "calendar",
+  "2099-12-06",
+  true
+);
+assert.equal(keptCalendarInput.workouts[0].schedule_date, "20991206");
+assert.equal(keptCalendarInput.workouts[0].save_to_library, true);
 const oneOffLibraryInput = buildTrainingPlanDestinationInput(
   heartRateDraft,
   "workoutLibrary"
@@ -291,7 +301,7 @@ const mixedDraft = {
 assert.equal(validatePlanDraft(mixedDraft, { todayDay: "20260101" }).ok, true);
 const mixedPreview = buildPlanPreview("draft-mixed", mixedDraft);
 assert.equal(mixedPreview.entries.length, 4);
-assert.match(mixedPreview.summary, /1 Run \/ 1 Bike \/ 1 Pool Swim \/ 1 Strength/);
+assert.match(mixedPreview.summary, /Run, Bike, Pool Swim, Strength$/);
 assert.deepEqual(
   mixedPreview.entries.map((entry) => entry.sport),
   ["run", "bike", "swim", "strength"]
@@ -311,5 +321,33 @@ assert.deepEqual(mixedUploadInput.workouts[2].sport_options, {
   poolLength: { value: 25, unit: "m" }
 });
 assert.equal(mixedUploadInput.workouts[3].steps[0].target_type, "reps");
+
+// A calendar save names the sessions on a day gone by before anything is
+// written; COROS would refuse them one at a time after the rest went through.
+{
+  const { pastCalendarSessions } = await import(
+    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-past`
+  );
+  const sessions = [
+    { name: "Yesterday", schedule_date: "20260925" },
+    { name: "Today", schedule_date: "20260926" },
+    { name: "Undated" }
+  ];
+  assert.deepEqual(
+    pastCalendarSessions(sessions, "20260926").map((item) => item.name),
+    ["Yesterday"]
+  );
+}
+
+// A delete card from before a restart says what happened and what to do.
+{
+  const { confirmWorkoutDeleteById } = await import(
+    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-delete`
+  );
+  await assert.rejects(
+    confirmWorkoutDeleteById("from-before-a-restart"),
+    /expired, and nothing was deleted\. Ask Coach again\./
+  );
+}
 
 console.log("test-chat-workout-tools: ok");

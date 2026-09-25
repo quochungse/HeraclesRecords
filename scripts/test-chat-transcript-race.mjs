@@ -425,10 +425,17 @@ async function main() {
       1,
       "only the new card is waiting — the one the athlete answered stays answered"
     );
+    // Answered, it is drawn as the one "Asked" line — and never again as a card
+    // waiting for an answer.
     assert.doesNotMatch(
-      onScreen,
+      (await harness("text", ".chat-coach-prompt")) ?? "",
       /Bạn muốn mình phân tích tiếp phần nào\?/,
       "the answered card must not come back as if it were a new question"
+    );
+    assert.equal(
+      await harness("text", ".chat-asked-question"),
+      "Bạn muốn mình phân tích tiếp phần nào?",
+      "it stays on screen as the question that was answered"
     );
 
     const saves = await harness("calls", "saveChatSession");

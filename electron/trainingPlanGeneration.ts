@@ -711,7 +711,7 @@ export function trainingPlanGenerationPrompt(request: TrainingPlanGenerationRequ
     "- description: two to four sentences on what the plan is for, how it is built, and any assumption you made. It becomes the plan's overview on COROS.",
     "- Name the plan after the goal, and each session after what it is (\"Threshold 3 × 10 min\", \"Long run\").",
     "",
-    "Call draft_training_plan once with the whole plan. If it is refused, fix every problem it lists and call it again with the whole plan. When it is accepted, reply with a two-sentence summary and nothing else. Nothing is saved or scheduled from here: the plan opens in my plan editor."
+    "Call draft_training_plan once with the whole plan. If it is refused, fix every problem it lists and call it again with the whole plan. When it is accepted, reply with a two-sentence summary and nothing else. Nothing is saved or scheduled from here: the app shows me the plan week by week, and I save, schedule or edit it."
   ].join("\n");
 }
 

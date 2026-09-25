@@ -1149,6 +1149,117 @@ test("an undated coach plan keeps the weeks and days the athlete gave it", async
   );
 });
 
+test("a coach's one-off workout is edited in place, keeping the day it was suggested for", async () => {
+  fakeCoros();
+  let preview;
+  const response = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "draft_workout",
+      { workout: coachRun("Recovery run", 2100), calendar_date: "20990805" },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { preview = drafted; } }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(preview.artifactType, "workout");
+
+  const edited = {
+    ...coachRun("Shorter recovery", 1500),
+    key: "renamed-by-the-builder",
+    schedule_date: "20991231",
+    save_to_library: true
+  };
+  const next = chatWorkoutTools.saveWorkoutDraftEdit(preview.draftId, edited);
+  assert.equal(next.draftId, preview.draftId, "the same card");
+  assert.equal(next.artifactType, "workout");
+  assert.ok(next.editedAt, "marked edited, so the coach is told");
+  assert.equal(next.entries.length, 1);
+  assert.equal(next.entries[0].name, "Shorter recovery");
+  assert.equal(next.entries[0].key, preview.entries[0].key, "the coach's key, not the builder's");
+  assert.equal(next.entries[0].scheduleDate, "2099-08-05", "the day the coach suggested, not one the builder carried");
+  assert.equal(next.entries[0].source.steps[0].target_duration_seconds, 1500);
+  assert.equal(next.name, "Shorter recovery");
+
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit("not-a-draft", edited),
+    /not found/
+  );
+  const plan = await coachDraft(datedBlock);
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit(plan.draftId, edited),
+    /a plan, not a single workout/,
+    "a plan is edited in the plan editor"
+  );
+});
+
+test("a programme is placed by week and day, and the draft's answer is short", async () => {
+  fakeCoros();
+  assert.equal(
+    chatWorkoutTools.CHAT_WORKOUT_TOOL_NAMES.includes("upload_training_plan"),
+    false,
+    "the tool that never wrote anything is gone"
+  );
+  const draftTool = (args) =>
+    chatWorkoutTools.handleChatWorkoutTool("draft_training_plan", args, { allowUpcomingWorkouts: false });
+
+  const answer = JSON.parse(
+    await draftTool({
+      name: "Programme",
+      workouts: [
+        coachRun("Tue easy", 2400, { week: 1, day: "tue" }),
+        coachRun("Sat long", 4800, { week: 1, day: "sat" }),
+        coachRun("Wed tempo", 3000, { week: 2, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(answer.ok, true, JSON.stringify(answer));
+  assert.ok(
+    answer.preview.entries.every((entry) => entry.source === undefined),
+    "the steps the model just wrote are not echoed back to it"
+  );
+  assert.match(answer.message, /do not list every session/);
+  assert.match(answer.preview.summary, /^2 weeks · 1–2 sessions a week · Run$/);
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(answer.draft_id).entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
+    [["Tue easy", 0, 1], ["Sat long", 0, 5], ["Wed tempo", 1, 2]],
+    "each session sits on its week and day, where a list used to go one a day"
+  );
+
+  const mixed = JSON.parse(
+    await draftTool({
+      name: "Mixed",
+      workouts: [
+        coachRun("Dated", 1800, { schedule_date: "20990803" }),
+        coachRun("Placed", 1800, { week: 1, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(mixed.ok, false, "dates and weeks in one plan have no single reading");
+  assert.match(mixed.errors.join(" "), /not a mix/);
+
+  const half = JSON.parse(
+    await draftTool({ name: "Half", workouts: [coachRun("Only a week", 1800, { week: 2 })] })
+  );
+  assert.equal(half.ok, false);
+  assert.match(half.errors.join(" "), /needs both week/);
+});
+
+test("removing an unsaved creation lets its draft go; a saved one is only hidden", async () => {
+  fakeCoros();
+  const unsaved = await coachDraft(datedBlock);
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+  assert.throws(() => chatWorkoutTools.planDraftDocument(unsaved.draftId), /not found/, "the draft is gone");
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+
+  const saved = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(saved.draftId, "metric", "nativePlan");
+  assert.throws(
+    () => chatWorkoutTools.discardPlanDraft(saved.draftId),
+    /hidden, not removed/,
+    "the plan on COROS names this draft"
+  );
+  assert.ok(chatWorkoutTools.planDraftDocument(saved.draftId), "and it stays");
+});
+
 test("deleting a conversation's drafts lets them go", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

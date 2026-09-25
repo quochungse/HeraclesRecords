@@ -519,18 +519,21 @@ for (const analysis of partialCases) {
   );
 }
 
-// An extra field on the marker is not carried through.
+// A field this build does not know rides along on the marker rather than
+// being dropped: a newer build on another machine may have written it, and
+// a save here must not take it away (docs/coach-plan-canvas.md §4, Q4). The
+// four known fields are still validated — the partial cases above.
 const extraFields = parseChatTranscriptJson(
   JSON.stringify([
     {
       kind: "message",
       role: "assistant",
       content: "hi",
-      automation: { ...marker, sessionId: "leaked" }
+      automation: { ...marker, analysisVersion: 2 }
     }
   ])
 );
-assert.deepEqual(extraFields[0].automation, marker);
+assert.deepEqual(extraFields[0].automation, { ...marker, analysisVersion: 2 });
 
 // The shape `runAnalysis` actually writes: four fields, no `bindingId`.
 //
@@ -681,14 +684,14 @@ for (const broken of brokenTraces) {
   assert.equal(parsed[0].kind, "message", "the surrounding turn survives it");
 }
 
-// An extra field on the trace is not carried through either.
+// A field this build does not know rides along on the trace too (Q4).
 assert.deepEqual(
   parseChatTranscriptJson(
     JSON.stringify([
-      { kind: "automationSilent", automation: marker, at: lookedAt, note: "leaked" }
+      { kind: "automationSilent", automation: marker, at: lookedAt, note: "newer build" }
     ])
   ),
-  [{ kind: "automationSilent", automation: marker, at: lookedAt }]
+  [{ kind: "automationSilent", automation: marker, at: lookedAt, note: "newer build" }]
 );
 
 // --- append-on-save: the renderer and the runner racing (section 5.6b) -----
@@ -1044,6 +1047,9 @@ assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
   { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
 ]);
 assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
+// The card reads the sport to draw a ride as speed and a swim in pool units;
+// dropped here, every reopened ride charted its speed as a running pace.
+assert.equal(restoredVisual[0].preview.sportType, 100);
 
 // Removing a creation is a mark on the draft that survives a round trip, and
 // a save that keeps the array's length so `foreignTail` has no tail to put

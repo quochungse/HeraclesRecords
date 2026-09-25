@@ -90,10 +90,10 @@ collector.emit("chat:streamDone", {
 const produced = collector.entries();
 assert.deepEqual(
   produced.map((entry) => entry.kind),
-  ["planDraft", "message"],
-  "the run produced an approval card plus its answer"
+  ["message", "planDraft"],
+  "the run produced its answer and, under it, the approval card it introduces"
 );
-assert.equal(produced[0].draft.draftId, "draft-1");
+assert.equal(produced[1].draft.draftId, "draft-1");
 
 // The runner saves [...existing, syntheticUserTurn, ...produced]; what matters
 // here is that the card survives the store's field-by-field rebuild.
@@ -106,10 +106,10 @@ const transcript = [
 const reloaded = parseChatTranscriptJson(JSON.stringify(transcript));
 assert.deepEqual(
   reloaded.map((entry) => entry.kind),
-  ["message", "planDraft", "message"],
+  ["message", "message", "planDraft"],
   "the approval card is not dropped on reload"
 );
-const reloadedDraft = reloaded[1];
+const reloadedDraft = reloaded[2];
 assert.equal(reloadedDraft.draft.draftId, "draft-1");
 assert.equal(reloadedDraft.draft.entries.length, 1);
 assert.equal(reloadedDraft.draft.name, "Marathon block week 3");
@@ -124,12 +124,12 @@ const rendererSource = require("node:fs").readFileSync(
 );
 assert.match(
   rendererSource,
-  /if \(entry\.kind === "planDraft"\) \{\s*result\.push\(\{ kind: "planDraft", draft: entry\.draft \}\);/,
+  /function fromPersistedEntry\([\s\S]*?if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
   "fromPersistedEntries no longer passes planDraft through unchanged"
 );
 assert.match(
   rendererSource,
-  /if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
+  /function persistKnownEntry\([\s\S]*?if \(entry\.kind === "planDraft"\) \{\s*return \{ kind: "planDraft", draft: entry\.draft \};/,
   "toPersistedEntries no longer passes planDraft through unchanged"
 );
 
@@ -188,7 +188,7 @@ assert.doesNotMatch(
 );
 
 // The marker rides along on the answer, so the card is attributable too.
-assert.deepEqual(reloaded[2].automation, marker);
+assert.deepEqual(reloaded[1].automation, marker);
 
 Module._load = originalLoad;
 console.log("coach analysis plan draft tests passed");

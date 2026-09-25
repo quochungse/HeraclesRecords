@@ -3616,11 +3616,27 @@ export interface ChatEntryMergeMeta {
   mrev?: string;
 }
 
+/**
+ * An entry of a kind this build does not know — written by a newer build on
+ * another synced machine. It is carried verbatim rather than dropped, so a save
+ * here cannot take it out of the conversation (docs/coach-plan-canvas.md §4).
+ *
+ * In memory and over IPC it is this wrapper, because a `kind: string` member
+ * would stop every `entry.kind === "…"` check from narrowing. The row stores
+ * `raw` itself: `chatHistoryStore` unwraps it on the way to SQLite. `raw` holds
+ * everything but `mid`/`mrev`, which sit on the wrapper like on every entry.
+ */
+export interface PersistedChatOpaqueEntry {
+  kind: "opaque";
+  raw: Record<string, unknown>;
+}
+
 /** Persisted coach timeline entry (messages plus inline action cards). */
 export type PersistedChatEntry = ChatEntryMergeMeta &
   (
   | PersistedChatMessageEntry
   | PersistedChatAnalysisSilentEntry
+  | PersistedChatOpaqueEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }

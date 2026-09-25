@@ -174,11 +174,12 @@ assert.equal(collector.cancelled(), false);
 assert.equal(collector.error(), undefined);
 assert.equal(collector.text(), "Easy 40min.");
 
-// Cards land as they stream, the assistant message at done, prompts after it —
-// the order ChatView produces.
+// Cards land as they stream; at done the assistant message goes in front of the
+// turn's cards, which it introduces, and prompts after them — the order
+// ChatView's `settleTurnEntries` produces.
 assert.deepEqual(
   built.map((entry) => entry.kind),
-  ["fitnessTrend", "message", "coachPrompt"]
+  ["message", "fitnessTrend", "coachPrompt"]
 );
 
 // --- a re-emitted card replaces the first rather than appending ------------
@@ -217,7 +218,7 @@ runStream(dedupedPrompts, [
 assert.equal(dedupedPrompts.entries().length, 1);
 assert.equal(dedupedPrompts.entries()[0].prompt.v, 2);
 
-const assistant = built[1];
+const assistant = built[0];
 assert.equal(assistant.role, "assistant");
 assert.equal(assistant.content, "Easy 40min.");
 assert.equal(assistant.reasoningSummary, "checking yesterday");
@@ -318,7 +319,7 @@ assert.equal(copies.entries().length, 1);
 // parser drops would vanish the moment the athlete reopens the conversation.
 const persisted = parseChatTranscriptJson(JSON.stringify(built));
 assert.deepEqual(persisted, built, "every collected entry survives the store");
-assert.deepEqual(persisted[1].automation, marker);
+assert.deepEqual(persisted[0].automation, marker);
 
 // --- 13: a failed turn is not a refund -------------------------------------
 // Usage used to reach the collector only on `chat:streamDone`, which a stream
@@ -463,8 +464,14 @@ assert.deepEqual(persisted[1].automation, marker);
     /const sendStreamError = \(payload: \{[\s\S]{0,240}?\.\.\.\(usage \? \{ usage \} : \{\}\)/,
     "the one error send must carry what the turn spent"
   );
+  // The scripted plan run (`HERACLES_SIMULATE_PLAN_AI`) calls no model, so it
+  // has nothing to carry and sends its error itself; every turn that reaches a
+  // provider must go through `sendStreamError`.
+  const simulation = /async function simulatedPlanTurn\([\s\S]*?\n\}\r?\n/;
+  assert.match(source, simulation, "the simulated run is where this suite expects it");
+  const modelTurns = source.replace(simulation, "");
   assert.equal(
-    (source.match(/send\("chat:streamError"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamError"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );
@@ -480,7 +487,7 @@ assert.deepEqual(persisted[1].automation, marker);
     "the one done send must carry the cost and the model that answered"
   );
   assert.equal(
-    (source.match(/send\("chat:streamDone"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamDone"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );

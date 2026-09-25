@@ -1449,7 +1449,18 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
         }
       },
       distance_km: { type: "number", exclusiveMinimum: 0, description: "Legacy Run/Trail Run shorthand; omit when using steps." },
-      schedule_date: { type: "string", pattern: "^\\d{8}$" },
+      schedule_date: {
+        type: "string",
+        pattern: "^\\d{8}$",
+        description: "For sessions this week or in the next few days. Every session has one, or none does."
+      },
+      week: {
+        type: "integer",
+        minimum: 1,
+        maximum: 52,
+        description: "For a programme to start later: the session's week, from 1. With day, instead of schedule_date."
+      },
+      day: { type: "string", enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
       sort_no: { type: "integer", minimum: 1 },
       save_to_library: { type: "boolean" },
       steps: {
@@ -1501,6 +1512,8 @@ export function buildDraftWorkoutInputSchema(): Record<string, unknown> {
   };
   const {
     schedule_date: _scheduleDate,
+    week: _week,
+    day: _day,
     sort_no: _sortNo,
     save_to_library: _saveToLibrary,
     ...properties

@@ -14,7 +14,6 @@ import {
 import {
   BookOpen,
   Bookmark,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -83,6 +82,7 @@ import type {
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
+  TrainingPlanDocument,
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutIntensityInput,
@@ -102,6 +102,9 @@ import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationModal } from "./CoachCreationModal";
+import { CreationActions } from "./CreationActions";
+import { CoachCreationCard } from "./CoachCreationCard";
+import { creationStatus } from "./creationChoices";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -126,6 +129,7 @@ import {
   upsertPlanDraftEntry,
   upsertWorkoutDeleteEntry,
   isChatVisualEntry,
+  settleTurnEntries,
   type ChatEntry,
   type SourceInfo
 } from "./chatTypes";
@@ -138,6 +142,8 @@ import {
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
 const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
+/* "Edit" on a coach's one-off workout: the workout builder, loaded when used. */
+const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -645,8 +651,17 @@ interface PlanWeekGroup {
   entries: PlanDraftPreviewEntry[];
 }
 
-function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup[] {
+/**
+ * `weekOf` places an undated session in its week of the plan — read off the
+ * document the draft becomes — so an undated plan reads as weeks rather than
+ * as one "Unscheduled" pile.
+ */
+function groupPlanEntriesByWeek(
+  entries: PlanDraftPreviewEntry[],
+  weekOf?: ReadonlyMap<string, number>
+): PlanWeekGroup[] {
   const groups = new Map<string, { start: Date; entries: PlanDraftPreviewEntry[] }>();
+  const planWeeks = new Map<string, PlanDraftPreviewEntry[]>();
   const unscheduled: PlanDraftPreviewEntry[] = [];
   const sortedEntries = [...entries].sort((left, right) => {
     const leftDate = planEntryScheduleDate(left) ?? "9999-99-99";
@@ -658,7 +673,15 @@ function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup
     const scheduleDate = planEntryScheduleDate(entry);
     const date = scheduleDate ? planDateFromSchedule(scheduleDate) : undefined;
     if (!date) {
-      unscheduled.push(entry);
+      const week = weekOf?.get(entry.key);
+      if (week === undefined) {
+        unscheduled.push(entry);
+        continue;
+      }
+      const id = `week-${String(week).padStart(3, "0")}`;
+      const existing = planWeeks.get(id);
+      if (existing) existing.push(entry);
+      else planWeeks.set(id, [entry]);
       continue;
     }
     const start = planWeekStart(date);
@@ -679,6 +702,16 @@ function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup
       dateRange: formatPlanWeekRange(group.start),
       entries: group.entries
     }));
+  for (const [id, grouped] of [...planWeeks.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
+    weeks.push({
+      id,
+      label: `Week ${Number(id.slice(5)) + 1}`,
+      dateRange: "Dated when it goes on the calendar",
+      entries: grouped
+    });
+  }
   if (unscheduled.length > 0) {
     weeks.push({
       id: "unscheduled",
@@ -706,36 +739,17 @@ function WorkoutPreviewCard({
   uploaded?: UploadPlanResult;
   onUpload: (
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const entry = draft.entries[0];
-  const suggestedDate = entry ? planEntryScheduleDate(entry) : undefined;
-  const today = localPlanDateKey(new Date());
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "workoutLibrary" | "calendar">
-  >(suggestedDate ? "calendar" : "workoutLibrary");
-  const [scheduleDate, setScheduleDate] = useState(suggestedDate ?? today);
-  const uploadedResult =
-    uploaded ??
-    (draft.uploadResult
-      ? {
-          planName: draft.name,
-          workoutsCreated: draft.uploadResult.workoutsCreated,
-          workoutsScheduled: draft.uploadResult.workoutsScheduled,
-          entries: [],
-          destination: draft.uploadResult.destination
-        }
-      : undefined);
-  const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
+  const scheduleDate = entry ? planEntryScheduleDate(entry) : undefined;
   const uploadedDestination =
-    uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
-  const calendarDateParts = destination === "calendar"
-    ? planDateParts(scheduleDate)
-    : undefined;
-  const calendarDateInvalid =
-    destination === "calendar" && (!scheduleDate || scheduleDate < today);
+    uploaded?.destination ?? draft.uploadResult?.destination;
+  const isUploaded = Boolean(uploaded || draft.uploadResult || draft.uploadedAt);
+  const calendarDateParts = planDateParts(scheduleDate);
   const SportIcon = sportTheme(entry?.sport).icon;
   const hasStrengthStructure = Boolean(
     entry &&
@@ -779,11 +793,7 @@ function WorkoutPreviewCard({
           >
             <span
               className={`chat-plan-entry-date${calendarDateParts ? "" : " is-undated"}`}
-              title={
-                destination === "calendar"
-                  ? `Add to Calendar on ${scheduleDate}`
-                  : "Save to Workout Library"
-              }
+              title={scheduleDate ? `Suggested for ${scheduleDate}` : "No date suggested"}
             >
               {calendarDateParts ? (
                 <>
@@ -836,139 +846,34 @@ function WorkoutPreviewCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {uploadedDestination === "calendar"
+            {uploadedDestination === "calendar" && scheduleDate
               ? `Added to your COROS Calendar on ${formatPlanDateLabel(scheduleDate)}.`
               : "Saved to your COROS Workout Library."}
           </span>
         </p>
-      ) : (
-        <>
-          <fieldset className="chat-plan-confirmation" disabled={uploading}>
-            <legend>Where should this workout go?</legend>
-            <div className="chat-plan-destination-options">
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "workoutLibrary" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="workoutLibrary"
-                  checked={destination === "workoutLibrary"}
-                  onChange={() => setDestination("workoutLibrary")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <BookOpen size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Workout Library</strong>
-                  <small>Save it as an unscheduled, reusable workout.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "calendar" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="calendar"
-                  checked={destination === "calendar"}
-                  onChange={() => setDestination("calendar")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <CalendarDays size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Calendar</strong>
-                  <small>Add this workout on the date you choose.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-            </div>
-            {destination === "calendar" ? (
-              <label className="chat-workout-calendar-date">
-                <span>Calendar date</span>
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  min={today}
-                  onChange={(event) => setScheduleDate(event.target.value)}
-                />
-              </label>
-            ) : null}
-            <p className="chat-plan-destination-summary" data-tone="ok">
-              {destination === "calendar" ? (
-                <CalendarDays size={13} aria-hidden="true" />
-              ) : (
-                <BookOpen size={13} aria-hidden="true" />
-              )}
-              <span>
-                {destination === "calendar"
-                  ? `This workout will be added to Calendar on ${formatPlanDateLabel(scheduleDate)}.`
-                  : "This workout will be saved to your Workout Library without a calendar date."}
-                {" "}It will remain a one-off workout, not a training plan.
-              </span>
-            </p>
-          </fieldset>
-          <div className="chat-plan-actions">
-            <button
-              type="button"
-              className="chat-plan-upload"
-              onClick={() => onUpload(
-                destination,
-                destination === "calendar" ? scheduleDate : undefined
-              )}
-              disabled={uploading || !entry || calendarDateInvalid}
-            >
-              {uploading ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                destination === "calendar" ? (
-                  <CalendarDays size={14} aria-hidden="true" />
-                ) : (
-                  <Bookmark size={14} aria-hidden="true" />
-                )
-              )}
-              {destination === "calendar" ? "Add to Calendar" : "Save to Library"}
-            </button>
-          </div>
-        </>
-      )}
+      ) : entry ? (
+        <CreationActions draft={draft} uploading={uploading} onUpload={onUpload} />
+      ) : null}
     </div>
   );
 }
 
 function PlanPreviewCard({
   draft,
+  document,
   uploading,
   uploaded,
   onUpload,
   onReview
 }: {
   draft: PlanDraftPreview;
+  document?: TrainingPlanDocument;
   uploading: boolean;
   uploaded?: UploadPlanResult;
   onUpload: (destination: TrainingPlanDestination) => void;
   onReview?: () => void;
 }) {
   const { unitSystem } = useUnitSystem();
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "nativePlan" | "workoutLibrary" | "calendar">
-  >("nativePlan");
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const weekTabsRef = useRef<HTMLDivElement>(null);
   const uploadedResult =
@@ -982,8 +887,18 @@ function PlanPreviewCard({
         }
       : undefined);
   const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
-  const savedTo = uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
-  const planWeeks = groupPlanEntriesByWeek(draft.entries);
+  const savedTo: TrainingPlanDestination =
+    uploadedResult?.destination ?? draft.uploadResult?.destination ?? "nativePlan";
+  const entryPrefix = `entry:${draft.draftId}:`;
+  const weekOf = document
+    ? new Map(
+        document.entries.map((entry) => [
+          entry.id.startsWith(entryPrefix) ? entry.id.slice(entryPrefix.length) : entry.id,
+          entry.weekIndex
+        ])
+      )
+    : undefined;
+  const planWeeks = groupPlanEntriesByWeek(draft.entries, weekOf);
   const scheduledWeekCount = planWeeks.filter(
     (week) => week.id !== "unscheduled"
   ).length;
@@ -1000,10 +915,6 @@ function PlanPreviewCard({
     .map(planEntryScheduleDate)
     .filter((date): date is string => Boolean(date))
     .sort()[0];
-  const scheduledWorkoutCount = draft.entries.filter((entry) =>
-    Boolean(planEntryScheduleDate(entry))
-  ).length;
-  const unscheduledWorkoutCount = draft.entries.length - scheduledWorkoutCount;
   const destinationLabel: Record<TrainingPlanDestination, string> = {
     workoutLibrary: "COROS Workout Library",
     calendar: "COROS Calendar",
@@ -1271,131 +1182,6 @@ function PlanPreviewCard({
           </ul>
         </details>
       ) : null}
-      {!isUploaded ? (
-        <fieldset className="chat-plan-confirmation" disabled={uploading}>
-          <legend>How should this plan be saved?</legend>
-          <div className="chat-plan-destination-options">
-            <label
-              className={`chat-plan-destination-option is-primary${
-                destination === "nativePlan" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="nativePlan"
-                checked={destination === "nativePlan"}
-                onChange={() => setDestination("nativePlan")}
-              />
-              <span className="chat-plan-destination-icon">
-                <BookOpen size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Training Plan</strong>
-                <small>Save these workouts together as one plan in your COROS plans.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "workoutLibrary" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="workoutLibrary"
-                checked={destination === "workoutLibrary"}
-                onChange={() => setDestination("workoutLibrary")}
-              />
-              <span className="chat-plan-destination-icon">
-                <Bookmark size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Individual Workouts</strong>
-                <small>Save each workout separately to the COROS Workout Library.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "calendar" ? " is-selected" : ""
-              }${unscheduledWorkoutCount > 0 ? " is-disabled" : ""}`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="calendar"
-                checked={destination === "calendar"}
-                onChange={() => setDestination("calendar")}
-                disabled={unscheduledWorkoutCount > 0}
-              />
-              <span className="chat-plan-destination-icon">
-                <CalendarDays size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Calendar</strong>
-                <small>
-                  {unscheduledWorkoutCount > 0
-                    ? `${unscheduledWorkoutCount} ${
-                        unscheduledWorkoutCount === 1 ? "workout needs" : "workouts need"
-                      } a date.`
-                    : "Schedule workouts on the dates shown above."}
-                </small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-          </div>
-          <p
-            className="chat-plan-destination-summary"
-            data-tone={
-              destination === "calendar" && draft.conflicts.length > 0
-                ? "alert"
-                : "ok"
-            }
-          >
-            {destination === "calendar" && draft.conflicts.length > 0 ? (
-              <TriangleAlert size={13} aria-hidden="true" />
-            ) : (
-              <CircleCheck size={13} aria-hidden="true" />
-            )}
-            <span>
-              {destination === "nativePlan"
-                ? `This will be saved to COROS as one plan with ${draft.entries.length} ${
-                    draft.entries.length === 1 ? "workout" : "workouts"
-                  }. Put it on the calendar from its page in the Training Library.`
-                : destination === "calendar"
-                  ? `${scheduledWorkoutCount} ${
-                      scheduledWorkoutCount === 1 ? "workout" : "workouts"
-                    } will be added to your COROS Calendar.${
-                      draft.conflicts.length > 0
-                        ? ` Review ${draft.conflicts.length} ${
-                            draft.conflicts.length === 1 ? "conflict" : "conflicts"
-                          } before adding.`
-                        : " No scheduling conflicts."
-                    }`
-                  : `${draft.entries.length} ${
-                      draft.entries.length === 1 ? "workout" : "workouts"
-                    } will be saved individually to your COROS Workout Library. Dates will not be added to Calendar.`}
-            </span>
-          </p>
-        </fieldset>
-      ) : null}
       {uploadedResult || isUploaded ? (
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
@@ -1412,41 +1198,12 @@ function PlanPreviewCard({
           </span>
         </p>
       ) : (
-        <div className="chat-plan-actions">
-          {onReview ? (
-            <button
-              type="button"
-              className="chat-plan-review"
-              onClick={onReview}
-              disabled={uploading}
-              title="Change the plan before saving it"
-            >
-              <BookOpen size={14} aria-hidden="true" />
-              Edit plan first
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="chat-plan-upload"
-            onClick={() => onUpload(destination)}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : destination === "nativePlan" ? (
-              <BookOpen size={14} aria-hidden="true" />
-            ) : destination === "calendar" ? (
-              <CalendarDays size={14} aria-hidden="true" />
-            ) : (
-              <Bookmark size={14} aria-hidden="true" />
-            )}
-            {destination === "nativePlan"
-              ? "Save Plan"
-              : destination === "calendar"
-                ? "Add to Calendar"
-                : "Save Workouts"}
-          </button>
-        </div>
+        <CreationActions
+          draft={draft}
+          uploading={uploading}
+          onUpload={onUpload}
+          onEdit={onReview}
+        />
       )}
     </div>
   );
@@ -1457,16 +1214,19 @@ function CoachDraftPreviewCard({
   uploading,
   uploaded,
   onUpload,
-  onReview
+  onReview,
+  document
 }: {
   draft: PlanDraftPreview;
   uploading: boolean;
   uploaded?: UploadPlanResult;
   onUpload: (
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => void;
   onReview?: () => void;
+  document?: TrainingPlanDocument;
 }) {
   if (draft.artifactType === "workout") {
     return (
@@ -1482,6 +1242,7 @@ function CoachDraftPreviewCard({
   return (
     <PlanPreviewCard
       draft={draft}
+      document={document}
       uploading={uploading}
       uploaded={uploaded}
       onUpload={onUpload}
@@ -1943,8 +1704,44 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /**
+   * Each plan card's document, by draft and edit: the weeks and days the card
+   * draws come from what the draft becomes, not from its dates. `null` is a
+   * read that failed, kept so it is not retried on every render.
+   */
+  const [planDocuments, setPlanDocuments] = useState<
+    Record<string, TrainingPlanDocument | null>
+  >({});
+  /** Whether the plan editor was opened from the popup, which it then reopens. */
+  const reopenCreationAfterEditRef = useRef(false);
+  const planDocumentKeys = timeline.flatMap((entry) =>
+    entry.kind === "planDraft" &&
+    entry.draft.artifactType !== "workout" &&
+    !entry.draft.removedAt
+      ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}`]
+      : []
+  );
+  const missingPlanDocuments = planDocumentKeys
+    .filter((key) => !(key in planDocuments))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingPlanDocuments) return;
+    // Marked before the read lands, so the next render does not ask again; the
+    // answer replaces the mark whenever it arrives.
+    for (const key of missingPlanDocuments.split(",")) {
+      const draftId = key.slice(0, key.lastIndexOf(":"));
+      setPlanDocuments((current) => (key in current ? current : { ...current, [key]: null }));
+      void api
+        .getPlanDraftDocument(draftId)
+        .then((document) => {
+          setPlanDocuments((current) => ({ ...current, [key]: document ?? null }));
+        })
+        .catch(() => undefined);
+    }
+  }, [api, missingPlanDocuments]);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
+  const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
@@ -1970,6 +1767,8 @@ export function ChatView({
   // Ref so the push-event handlers filter on the current request without
   // being recreated (and re-subscribed) on every keystroke.
   const activeRequestIdRef = useRef<string | null>(null);
+  /** The timeline's length when the running turn was sent: what comes after is the turn's. */
+  const turnStartRef = useRef(0);
   const activeSessionIdRef = useRef<string | null>(null);
   /**
    * A turn of the athlete's own is in the air, so the timeline on screen is
@@ -2716,7 +2515,7 @@ export function ChatView({
         const next = prev.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
         persistHistory(activeSessionIdRef.current, next, true);
@@ -2745,17 +2544,26 @@ export function ChatView({
       sourceRef.current = null;
       if (finishReason === "cancelled") {
         restoreResumedCoachPrompt();
+        // A card the turn produced before Stop is on screen and has a draft
+        // behind it; unsaved, it dropped out of the conversation on reload
+        // while its draft stayed.
+        setTimeline((prev) => {
+          if (prev.length > turnStartRef.current) {
+            persistHistory(activeSessionIdRef.current, prev, true);
+          }
+          return prev;
+        });
         return;
       }
       resumedCoachPromptRef.current = null;
       if (finalText || coachPrompts.length > 0) {
         setTimeline((prev) => {
-          let next: ChatEntry[] = [...prev];
+          const closing: ChatEntry[] = [];
           if (source?.mcpError) {
-            next.push({ kind: "toolNotice", message: source.mcpError });
+            closing.push({ kind: "toolNotice", message: source.mcpError });
           }
           if (finalText) {
-            next.push({
+            closing.push({
               kind: "message",
               role: "assistant",
               content: finalText,
@@ -2769,6 +2577,7 @@ export function ChatView({
               ...(model ? { model } : {})
             });
           }
+          let next = settleTurnEntries(prev, turnStartRef.current, closing);
           for (const prompt of coachPrompts) {
             next = upsertCoachPromptEntry(next, prompt);
           }
@@ -2925,18 +2734,23 @@ export function ChatView({
           // for a finished one.
           resumedCoachPromptRef.current = null;
           setTimeline((prev) => {
-            let next: ChatEntry[] = [...prev];
-            if (partialText) {
-              next.push({
-                kind: "message",
-                role: "assistant",
-                content: partialText,
-                source,
-                reasoningSummary,
-                ...(payload.usage ? { usage: payload.usage } : {}),
-                ...(payload.model ? { model: payload.model } : {})
-              });
-            }
+            let next = settleTurnEntries(
+              prev,
+              turnStartRef.current,
+              partialText
+                ? [
+                    {
+                      kind: "message",
+                      role: "assistant",
+                      content: partialText,
+                      source,
+                      reasoningSummary,
+                      ...(payload.usage ? { usage: payload.usage } : {}),
+                      ...(payload.model ? { model: payload.model } : {})
+                    }
+                  ]
+                : []
+            );
             for (const prompt of coachPrompts) {
               next = upsertCoachPromptEntry(next, prompt);
             }
@@ -3502,7 +3316,7 @@ export function ChatView({
     const answeredTimeline = timeline.map((entry, index): ChatEntry =>
       index === answeredPromptIndex && entry.kind === "coachPrompt"
         ? {
-            kind: "coachPrompt",
+            ...entry,
             prompt: {
               ...entry.prompt,
               answer: trimmed,
@@ -3524,6 +3338,7 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
     setCurrentSource(null);
@@ -3567,7 +3382,7 @@ export function ChatView({
         const restoredEntries = timeline.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
         setTimeline(restoredEntries);
@@ -3610,7 +3425,8 @@ export function ChatView({
   const handleUploadPlanDraft = async (
     draftId: string,
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => {
     if (!api || uploadingDraftId) return;
     setUploadingDraftId(draftId);
@@ -3620,7 +3436,8 @@ export function ChatView({
         draftId,
         unitSystem,
         destination,
-        scheduleDate
+        scheduleDate,
+        keepInLibrary
       );
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
@@ -3638,7 +3455,7 @@ export function ChatView({
         const next = prev.map((entry) =>
           entry.kind === "planDraft" && entry.draft.draftId === draftId
             ? {
-                kind: "planDraft" as const,
+                ...entry,
                 draft: {
                   ...entry.draft,
                   uploadedAt: Date.now(),
@@ -3699,13 +3516,16 @@ export function ChatView({
    */
   const handleRemovePlanDraft = (draftId: string) => {
     setOpenCreationId((current) => (current === draftId ? null : current));
+    const removed = planDrafts.find((draft) => draft.draftId === draftId);
+    // Unsaved, the draft goes too; saved, it stays, because the plan on COROS
+    // names it. The card is marked either way.
+    if (api && removed && !removed.uploadedAt && !removed.uploadResult && !uploadedPlans[draftId]) {
+      void api.removePlanDraft(draftId).catch(() => undefined);
+    }
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === draftId
-          ? {
-              kind: "planDraft",
-              draft: { ...entry.draft, removedAt: Date.now() }
-            }
+          ? { ...entry, draft: { ...entry.draft, removedAt: Date.now() } }
           : entry
       );
       persistHistory(activeSessionIdRef.current, next, true);
@@ -3721,17 +3541,20 @@ export function ChatView({
    */
   const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
     setEditingPlanDraftId(null);
-    setOpenCreationId(preview.draftId);
+    setEditingWorkoutDraftId(null);
+    if (reopenCreationAfterEditRef.current) setOpenCreationId(preview.draftId);
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-          ? { kind: "planDraft", draft: { ...entry.draft, ...preview } }
+          ? { ...entry, draft: { ...entry.draft, ...preview } }
           : entry
       );
       persistHistory(activeSessionIdRef.current, next, true);
       return next;
     });
-    showToast("Plan updated. The coach will see your version on its next reply.");
+    showToast(
+      `${preview.artifactType === "workout" ? "Workout" : "Plan"} updated. The coach will see your version on its next reply.`
+    );
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -3740,22 +3563,8 @@ export function ChatView({
     );
     if (planIndex < 0) return;
 
-    let targetIndex = timeline.findIndex(
-      (entry, index) =>
-        index > planIndex &&
-        entry.kind === "message" &&
-        entry.role === "assistant"
-    );
-    if (targetIndex < 0) {
-      for (let index = planIndex - 1; index >= 0; index -= 1) {
-        const entry = timeline[index];
-        if (entry.kind === "message" && entry.role === "assistant") {
-          targetIndex = index;
-          break;
-        }
-      }
-    }
-    if (targetIndex < 0) return;
+    // The card itself: it is drawn in the conversation, under its answer.
+    const targetIndex = planIndex;
 
     const transcript = scrollRef.current;
     const target = transcript?.querySelector<HTMLElement>(
@@ -3878,19 +3687,16 @@ export function ChatView({
   );
   const openCreation =
     planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
-  const trainingPlanDrafts = planDrafts.filter(
-    (draft) => draft.artifactType !== "workout"
-  );
+  const editingWorkout =
+    editingWorkoutDraftId === null
+      ? null
+      : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
   const openCreationKicker =
     openCreation === null
       ? ""
       : openCreation.artifactType === "workout"
         ? "One-off workout"
-        : `Plan ${
-            trainingPlanDrafts.findIndex(
-              (draft) => draft.draftId === openCreation.draftId
-            ) + 1
-          } of ${trainingPlanDrafts.length}`;
+        : "Training plan";
 
   /**
    * Opening the panel is reserved for news, so this has to tell a creation
@@ -4431,6 +4237,50 @@ function AnalysisSilentChip({
   );
 }
 
+  /* The running turn's bubble sits where the turn began, above the cards it
+     produces as it runs, so its answer reads before them — as it will once
+     settled (`settleTurnEntries`). One array with keys, so nothing remounts. */
+  const streamingRow = streaming ? (
+    <div key="streaming-turn" className="chat-row chat-row-assistant">
+      <div className="chat-avatar chat-avatar-assistant">
+        <Sparkles size={16} aria-hidden="true" />
+      </div>
+      <div className="chat-bubble chat-bubble-streaming">
+        {streamingText ? (
+          <>
+            {thinkingText ? (
+              <ThinkingDisclosure content={thinkingText} live />
+            ) : null}
+            <AssistantMarkdown content={streamingText} streaming />
+          </>
+        ) : (
+          <div className="chat-stream-pending">
+            {activeTool || !thinkingText ? (
+              <span className="chat-stream-status">
+                {compacting
+                  ? "Compacting the conversation…"
+                  : activeTool
+                    ? `Using ${activeTool.replace(/_/g, " ")}…`
+                    : resumedCoachPromptRef.current
+                      ? "Resuming plan…"
+                      : "Working on it…"}
+              </span>
+            ) : null}
+            {thinkingText ? (
+              <ThinkingDisclosure content={thinkingText} live />
+            ) : null}
+          </div>
+        )}
+        {currentSource ? <SourceBadge source={currentSource} /> : null}
+      </div>
+    </div>
+  ) : null;
+  const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
+    if (!streamingRow) return rows;
+    const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
+    return [...rows.slice(0, at), streamingRow, ...rows.slice(at)];
+  };
+
   return (
     <div className="chat-view">
       <div className="chat-header">
@@ -4531,7 +4381,7 @@ function AnalysisSilentChip({
             </div>
           ) : null}
 
-          {timeline.map((entry, index) => {
+          {withStreamingRow(timeline.map((entry, index) => {
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
@@ -4555,7 +4405,25 @@ function AnalysisSilentChip({
 
             if (entry.kind === "coachPrompt") {
               if (entry.prompt.answeredAt !== undefined) {
-                return null;
+                // Kept as one line rather than dropped: the question and what
+                // was chosen are part of how the plan came to be, and the coach
+                // reads them on every turn anyway.
+                const chosen = entry.prompt.choices.find(
+                  (choice) => choice.id === entry.prompt.selectedChoiceId
+                );
+                return (
+                  <div
+                    key={entry.prompt.promptId}
+                    className="chat-row chat-row-assistant chat-asked-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">Asked</span>
+                    <span className="chat-asked-question">{entry.prompt.question}</span>
+                    <span className="chat-asked-answer">
+                      {chosen?.label ?? entry.prompt.answer ?? ""}
+                    </span>
+                  </div>
+                );
               }
               return (
                 <ChatRow
@@ -4586,13 +4454,55 @@ function AnalysisSilentChip({
               if (entry.draft.removedAt) {
                 return null;
               }
-              // Creations are read from the panel and the popup it opens, at
-              // every window width. There used to be a second copy of the card
-              // inline here for windows too narrow to hold the panel, and the
-              // width test that chose between them also decided whether the
-              // header's Creations button existed — so narrowing the window
-              // took the button away and left the panel with no way back.
-              return null;
+              const draft = entry.draft;
+              const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
+              // One copy at every window width, and nothing measured: the
+              // copy that used to live here was chosen by a width test, and
+              // that test also decided whether the Creations button existed.
+              return (
+                <div
+                  key={`${draft.draftId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachCreationCard
+                      draft={draft}
+                      document={planDocuments[documentKey] ?? undefined}
+                      uploading={uploadingDraftId === draft.draftId}
+                      uploaded={uploadedPlans[draft.draftId]}
+                      onUpload={(destination, scheduleDate, keepInLibrary) =>
+                        void handleUploadPlanDraft(
+                          draft.draftId,
+                          destination,
+                          scheduleDate,
+                          keepInLibrary
+                        )
+                      }
+                      onEdit={
+                        api && (draft.artifactType !== "workout" || draft.entries[0]?.source)
+                          ? () => {
+                              onError(null);
+                              reopenCreationAfterEditRef.current = false;
+                              if (draft.artifactType === "workout") {
+                                setEditingWorkoutDraftId(draft.draftId);
+                              } else {
+                                setEditingPlanDraftId(draft.draftId);
+                              }
+                            }
+                          : undefined
+                      }
+                      onOpen={() => {
+                        setSelectedPlanDraftId(draft.draftId);
+                        setOpenCreationId(draft.draftId);
+                      }}
+                    />
+                  </div>
+                </div>
+              );
             }
 
             if (entry.kind === "workoutDelete") {
@@ -4685,6 +4595,10 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "opaque") {
+              return null;
+            }
+
             // 5.6: the synthetic user turn an analysis sends is stored with
             // role "user", but it was never typed by the athlete — showing it as
             // their bubble would misattribute the playbook to them.
@@ -4742,43 +4656,7 @@ function AnalysisSilentChip({
                 </div>
               </ChatRow>
             );
-          })}
-
-          {streaming ? (
-            <div className="chat-row chat-row-assistant">
-              <div className="chat-avatar chat-avatar-assistant">
-                <Sparkles size={16} aria-hidden="true" />
-              </div>
-              <div className="chat-bubble chat-bubble-streaming">
-                {streamingText ? (
-                  <>
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                    <AssistantMarkdown content={streamingText} streaming />
-                  </>
-                ) : (
-                  <div className="chat-stream-pending">
-                    {activeTool || !thinkingText ? (
-                      <span className="chat-stream-status">
-                        {compacting
-                          ? "Compacting the conversation…"
-                          : activeTool
-                            ? `Using ${activeTool.replace(/_/g, " ")}…`
-                            : resumedCoachPromptRef.current
-                              ? "Resuming plan…"
-                              : "Working on it…"}
-                      </span>
-                    ) : null}
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                  </div>
-                )}
-                {currentSource ? <SourceBadge source={currentSource} /> : null}
-              </div>
-            </div>
-          ) : null}
+          }))}
 
           {/* Same avatar and bubble as the persisted answer this becomes, so
               the reload at the end of the run does not make the row jump. */}
@@ -4868,25 +4746,8 @@ function AnalysisSilentChip({
             </header>
             <ol className="chat-plan-list">
               {planDrafts.map((draft, index) => {
-                const saved = Boolean(
-                  uploadedPlans[draft.draftId] ||
-                    draft.uploadResult ||
-                    draft.uploadedAt
-                );
+                const status = creationStatus(draft);
                 const isWorkout = draft.artifactType === "workout";
-                const planNumber = isWorkout
-                  ? 0
-                  : planDrafts
-                      .slice(0, index + 1)
-                      .filter((item) => item.artifactType !== "workout").length;
-                const weeks = isWorkout
-                  ? 0
-                  : Math.max(
-                      1,
-                      groupPlanEntriesByWeek(draft.entries).filter(
-                        (week) => week.id !== "unscheduled"
-                      ).length
-                    );
                 const primarySport = draft.entries[0]?.sport;
                 const SportIcon = sportTheme(primarySport).icon;
                 const selected = draft.draftId === selectedPlanDraftId;
@@ -4917,27 +4778,20 @@ function AnalysisSilentChip({
                       </span>
                       <span className="chat-plan-list-copy">
                         <span className="chat-plan-list-kicker">
-                          {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
+                          {isWorkout ? "One-off workout" : "Training plan"}
                         </span>
                         <strong>
                           {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
                         </strong>
                         <span className="chat-plan-list-meta">
-                          <span>
-                            {draft.entries.length}{" "}
-                            {draft.entries.length === 1
-                              ? "workout"
-                              : "workouts"}
-                          </span>
                           {!isWorkout ? (
                             <span>
-                              {weeks} {weeks === 1 ? "week" : "weeks"}
+                              {draft.entries.length}{" "}
+                              {draft.entries.length === 1 ? "session" : "sessions"}
                             </span>
-                          ) : (
-                            <span>Workout Library</span>
-                          )}
-                          <span data-status={saved ? "saved" : "draft"}>
-                            {saved ? "Saved" : "Draft"}
+                          ) : null}
+                          <span data-status={status.saved ? "saved" : "draft"}>
+                            {status.label}
                           </span>
                         </span>
                       </span>
@@ -4977,24 +4831,35 @@ function AnalysisSilentChip({
           <CoachDraftPreviewCard
             key={openCreation.draftId}
             draft={openCreation}
+            document={
+              planDocuments[`${openCreation.draftId}:${openCreation.editedAt ?? 0}`] ??
+              undefined
+            }
             uploading={uploadingDraftId === openCreation.draftId}
             uploaded={uploadedPlans[openCreation.draftId]}
-            onUpload={(destination, scheduleDate) =>
+            onUpload={(destination, scheduleDate, keepInLibrary) =>
               void handleUploadPlanDraft(
                 openCreation.draftId,
                 destination,
-                scheduleDate
+                scheduleDate,
+                keepInLibrary
               )
             }
             onReview={
-              api && openCreation.artifactType !== "workout"
+              api &&
+              (openCreation.artifactType !== "workout" || openCreation.entries[0]?.source)
                 ? () => {
                     /* The card's modal steps aside for the editor — both
                        close on Escape, and the card sits above the editor's
                        layer — and comes back when the editor closes. */
                     onError(null);
                     setOpenCreationId(null);
-                    setEditingPlanDraftId(openCreation.draftId);
+                    reopenCreationAfterEditRef.current = true;
+                    if (openCreation.artifactType === "workout") {
+                      setEditingWorkoutDraftId(openCreation.draftId);
+                    } else {
+                      setEditingPlanDraftId(openCreation.draftId);
+                    }
                   }
                 : undefined
             }
@@ -5008,8 +4873,27 @@ function AnalysisSilentChip({
             draftId={editingPlanDraftId}
             onSaved={handlePlanDraftEdited}
             onClose={() => {
-              setOpenCreationId(editingPlanDraftId);
+              if (reopenCreationAfterEditRef.current) {
+                setOpenCreationId(editingPlanDraftId);
+              }
               setEditingPlanDraftId(null);
+            }}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
+      {api && editingWorkout?.entries[0]?.source ? (
+        <Suspense fallback={null}>
+          <CoachWorkoutEditor
+            api={api}
+            draft={editingWorkout}
+            workout={editingWorkout.entries[0].source}
+            onSaved={handlePlanDraftEdited}
+            onClose={() => {
+              if (reopenCreationAfterEditRef.current) {
+                setOpenCreationId(editingWorkout.draftId);
+              }
+              setEditingWorkoutDraftId(null);
             }}
             onError={onError}
           />

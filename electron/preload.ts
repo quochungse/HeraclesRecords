@@ -968,15 +968,25 @@ const api = {
     draftId: string,
     unitSystem: UnitSystem,
     destination?: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ): Promise<UploadPlanResult> =>
     ipcRenderer.invoke(
       "chat:uploadPlanDraft",
       draftId,
       unitSystem,
       destination,
-      scheduleDate
+      scheduleDate,
+      keepInLibrary
     ),
+  removePlanDraft: (draftId: string): Promise<void> =>
+    ipcRenderer.invoke("chat:removePlanDraft", draftId),
+  editWorkoutDraft: (
+    draftId: string,
+    workout: PlanWorkoutEntryInput,
+    unitSystem?: UnitSystem
+  ): Promise<PlanDraftPreview> =>
+    ipcRenderer.invoke("chat:editWorkoutDraft", draftId, workout, unitSystem),
   getPlanDraftDocument: (draftId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("chat:planDraftDocument", draftId),
   editPlanDraft: (

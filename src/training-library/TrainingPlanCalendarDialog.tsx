@@ -18,6 +18,12 @@ interface TrainingPlanCalendarDialogProps {
    * failed, so Try again adds rather than saving a second copy.
    */
   saveFirst?: () => Promise<TrainingPlanDocument>;
+  /**
+   * The day to open on, `yyyyMMdd` — the Monday the athlete already chose for
+   * a generated plan, which a race plan is counted back from. Ignored once it
+   * has gone by; the next Monday otherwise.
+   */
+  defaultStartDay?: string;
 }
 
 /**
@@ -49,8 +55,19 @@ function userFacingError(cause: unknown): string {
  * without a word from COROS, so the preview is read again on every day
  * picked and says both before anything is written.
  */
-export function TrainingPlanCalendarDialog({ api, plan, onClose, onAdded, saveFirst }: TrainingPlanCalendarDialogProps) {
-  const [startDay, setStartDay] = useState(() => nextMondayKey());
+export function TrainingPlanCalendarDialog({
+  api,
+  plan,
+  onClose,
+  onAdded,
+  saveFirst,
+  defaultStartDay
+}: TrainingPlanCalendarDialogProps) {
+  const [startDay, setStartDay] = useState(() =>
+    defaultStartDay && /^\d{8}$/.test(defaultStartDay) && defaultStartDay >= keyFromDate(new Date())
+      ? defaultStartDay
+      : nextMondayKey()
+  );
   const [preview, setPreview] = useState<TrainingPlanCalendarPreview | null>(null);
   const [loading, setLoading] = useState(true);
   /* What an add is doing now: saving the plan first, or putting it on the calendar. */

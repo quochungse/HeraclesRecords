@@ -40,7 +40,6 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["get_sleep_summary", "db"],
     ["list_scheduled_workouts", "coros"],
     ["search_coros_exercises", "coros"],
-    ["upload_training_plan", "coros"],
     ["delete_workout", "coros"],
     ["draft_workout", null],
     ["draft_training_plan", null],

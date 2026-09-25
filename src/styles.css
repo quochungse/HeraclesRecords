@@ -19784,6 +19784,232 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* A question the coach asked and the athlete answered, kept as one line. */
+.chat-asked-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 4px 10px;
+  width: fit-content;
+  max-width: calc(100% - 42px);
+  margin-left: 42px;
+  padding: 7px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-asked-kicker {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chat-asked-question {
+  min-width: 0;
+}
+
+.chat-asked-answer {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-asked-answer::before {
+  margin-right: 6px;
+  color: var(--text-muted);
+  font-weight: 400;
+  content: "→";
+}
+
+/* A coach's creation under the answer that proposed it: read-only, with the
+   way to save it and a way into the full view. */
+.chat-creation-card {
+  position: relative;
+}
+
+.chat-creation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-creation-head h4 {
+  margin: 2px 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-creation-kicker {
+  color: var(--chat-signal-strong);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.chat-creation-head-aside {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-creation-status {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  color: var(--chat-signal-strong);
+  background: var(--chat-signal-soft);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.chat-creation-status[data-saved="true"] {
+  color: var(--success-text);
+  background: color-mix(in srgb, var(--success-text) 12%, transparent);
+}
+
+.chat-creation-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.chat-creation-figures > div {
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-creation-figures dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.chat-creation-figures dd {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-creation-week {
+  display: grid;
+  gap: 5px;
+}
+
+.chat-creation-week-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-creation-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-creation-days > li {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-creation-days b {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-creation-days span {
+  padding-left: 5px;
+  border-left: 3px solid var(--tl-sport, var(--chat-signal));
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-creation-days > li.is-rest span {
+  padding-left: 0;
+  border-left: 0;
+  color: var(--text-muted);
+}
+
+.chat-creation-steps {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-creation-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-creation-open:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+.chat-creation-open:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .chat-creation-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-creation-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .chat-plan-sports {
   display: inline-flex;
   flex: none;
@@ -20416,123 +20642,6 @@ tr.data-intervals-row-missing {
   margin-top: 2px;
 }
 
-.chat-plan-confirmation {
-  display: grid;
-  gap: 10px;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 76%, transparent);
-}
-
-.chat-plan-confirmation legend {
-  margin-left: -4px;
-  padding: 0 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.chat-plan-destination-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.chat-plan-destination-option.is-primary {
-  grid-column: 1 / -1;
-}
-
-.chat-plan-destination-option {
-  position: relative;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  min-height: 64px;
-  padding: 9px 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.chat-plan-destination-option:hover:not(.is-disabled) {
-  border-color: color-mix(in srgb, var(--text-muted) 62%, transparent);
-  background: var(--glass-bg-hover);
-}
-
-.chat-plan-destination-option:active:not(.is-disabled) {
-  transform: translateY(1px);
-}
-
-.chat-plan-destination-option.is-selected {
-  border-color: var(--chat-signal-border);
-  background: var(--chat-signal-soft);
-}
-
-.chat-plan-destination-option.is-disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-}
-
-.chat-plan-destination-option:has(input:focus-visible) {
-  outline: 2px solid var(--chat-signal);
-  outline-offset: 2px;
-}
-
-.chat-plan-destination-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-muted);
-}
-
-.chat-plan-destination-option.is-selected .chat-plan-destination-icon {
-  border-color: var(--chat-signal-border);
-  color: var(--chat-signal-strong);
-}
-
-.chat-plan-destination-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.chat-plan-destination-copy strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-plan-destination-copy small {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.3;
-}
-
-.chat-plan-destination-check {
-  color: var(--chat-signal-strong);
-  opacity: 0;
-}
-
-.chat-plan-destination-option.is-selected .chat-plan-destination-check {
-  opacity: 1;
-}
-
 .chat-plan-destination-summary {
   display: flex;
   align-items: flex-start;
@@ -20614,6 +20723,26 @@ tr.data-intervals-row-missing {
   --focus-ring-color: var(--chat-signal);
   outline: var(--focus-ring);
   outline-offset: 2px;
+}
+
+.chat-creation-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-creation-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.chat-creation-keep input {
+  margin: 0;
+  accent-color: var(--chat-signal);
 }
 
 .chat-plan-actions {
@@ -20752,14 +20881,6 @@ tr.data-intervals-row-missing {
     justify-content: flex-start;
     max-width: none;
     text-align: left;
-  }
-
-  .chat-plan-destination-options {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-plan-destination-option.is-primary {
-    grid-column: auto;
   }
 
   .chat-workout-calendar-date {
@@ -31711,3 +31832,194 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   opacity: 0.55;
   cursor: default;
 }
+
+/* ============================================== Plan pieces shared with Coach
+ * The week ridge and the stage hues are drawn by the Training Library and by a
+ * coach's plan card in the conversation, which does not load the library's
+ * stylesheet. */
+
+/* ------------------------------------------------------ Stages, as colour */
+
+/*
+ * A week's stage is data — COROS's own six, Preparation to Transition — so it
+ * may take a hue, the same one on the ridge's band and down the edge of the
+ * week. The semantic inks are borrowed rather than a palette invented, so a
+ * stage follows the theme with everything else.
+ */
+[data-stage] {
+  --tl-stage: var(--text-muted);
+}
+
+[data-stage="preparation"] {
+  --tl-stage: var(--text-secondary);
+}
+
+[data-stage="base"] {
+  --tl-stage: var(--success-text);
+}
+
+[data-stage="build"] {
+  --tl-stage: var(--warning-text);
+}
+
+[data-stage="peak"] {
+  --tl-stage: var(--error-text);
+}
+
+[data-stage="race"] {
+  --tl-stage: var(--accent-strong);
+}
+
+[data-stage="transition"] {
+  --tl-stage: var(--text-muted);
+}
+
+/* ------------------------------------------------------- The week ridge */
+
+.plan-ridge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-ridge-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.plan-ridge-caption b {
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.plan-ridge-caption small {
+  font-size: 10px;
+}
+
+.plan-ridge-bars,
+.plan-ridge-stages {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(var(--plan-ridge-weeks), minmax(0, 1fr));
+}
+
+/* A week: its bar, and under it its number. The whole column is the target. */
+.plan-ridge-week {
+  display: flex;
+  height: 100px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover {
+  background: var(--glass-bg);
+}
+
+/* A stack of the week's sports, bottom up in one fixed order, each in the hue
+   its sessions wear below. The hover and this week lift the whole stack. */
+.plan-ridge-bar {
+  display: flex;
+  height: var(--plan-bar-height);
+  flex-direction: column-reverse;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+}
+
+.plan-ridge-seg {
+  min-height: 2px;
+  flex-basis: 0;
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 62%, transparent);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-empty .plan-ridge-bar {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+.plan-ridge-week small {
+  height: 10px;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* This week: the stack at full strength and its number in the accent's ink. */
+.plan-ridge-week.is-current .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-current small {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.plan-ridge-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.plan-ridge-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.plan-ridge-legend > span::before {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--tl-sport, var(--text-muted));
+  content: "";
+}
+
+.plan-ridge-stage {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-ridge-stage[data-stage] {
+  color: var(--tl-stage);
+  background: color-mix(in srgb, var(--tl-stage) 16%, transparent);
+}
+

@@ -767,6 +767,18 @@ Overview, Media, Data, and Settings are in the main bundle.
   unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
   `test:chat-turn-cost` drives the round trip and the formatting.
 
+  **What this build does not know, it carries; what an older build does not know, it can
+  lose.** Since P0.1 of [docs/coach-plan-canvas.md](docs/coach-plan-canvas.md), every parser
+  passes the keys it does not handle through (`keepUnknownKeys`), a kind it does not know
+  travels as `{ kind: "opaque", raw }` and is unwrapped back to `raw` on its way to SQLite,
+  and the renderer carries both (`ChatOpaqueEntry`, `extra`). So a field still has to be
+  listed to be *read* — the paragraph above stands for a field this build uses — but no
+  longer to *survive*. That protects nothing written against a build from before it: an
+  older build drops an unknown field and can win the merge with its copy
+  (`test:chat-transcript-compat`, H3/H4), so **a new field must never go onto an existing
+  entry kind**; new data goes in a table, and a new kind is only an anchor (§4, Q1–Q3).
+  `test:chat-entry-passthrough` drives the whole trip through the renderer's converters.
+
   The same paragraph has a second edge: a field an entry *may* carry has to be
   **optional in the parser too**. `parseAnalysisMarker` demanded all five marker fields
   including `bindingId`, which named an attachment and which `runAnalysis` deliberately stopped

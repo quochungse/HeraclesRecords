@@ -753,7 +753,12 @@ async function main() {
     assert.equal((await harness("calls", "prop:onReadPlan"))[0]?.args[0]?.id, "coros:900", "Open plan opens the saved plan in the reader");
 
     // Straight to the calendar: the day first, then the save and the add as one answer.
+    // The plan starts a week later than the next Monday, and the dialog opens on
+    // that Monday: it used to open on the next one whatever the athlete chose, which
+    // for a race plan put race day a week early without a word.
     await mount(script);
+    await harness("click", '[aria-label="A week later"]');
+    await settle();
     await toOutline();
     await harness("click", NEXT);
     await settle();
@@ -767,6 +772,8 @@ async function main() {
     );
     const straight = await answerPreview();
     assert.equal(straight.planId, "draft:abc", "previewed from the kept draft, before it is on COROS");
+    const chosenStart = (await harness("calls", "outlineTrainingPlan")).at(-1).args[1].startDate;
+    assert.equal(straight.startDay, chosenStart.replace(/-/g, ""), "the dialog opens on the first week the athlete chose");
     assert.equal(await harness("callCount", "saveTrainingPlanToCoros"), 0, "nothing is saved until the day is picked");
     assert.equal(await harness("text", CALENDAR_ADD), "Save & add to calendar");
     await harness("click", CALENDAR_ADD);

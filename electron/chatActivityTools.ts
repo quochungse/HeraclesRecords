@@ -22,6 +22,7 @@ import type {
   TrainingHubActivitySeriesPoint,
   TrainingHubActivityWeather,
   TrainingHubActivityZoneBucket,
+  TrainingHubTrackPoint,
   UnitSystem
 } from "./types";
 import {
@@ -44,6 +45,13 @@ export const CHAT_ACTIVITY_TOOL_NAMES = [
 export type ChatActivityToolName = (typeof CHAT_ACTIVITY_TOOL_NAMES)[number];
 
 const MAX_LAPS = 50;
+
+/**
+ * Points the card's elevation profile keeps. The chart is 140px tall and at
+ * most ~600px wide, so this is ≤ 5px a point, and the track it comes from is
+ * ~400 points of lat/lon the card never draws.
+ */
+const ELEVATION_PROFILE_POINTS = 120;
 
 /**
  * The parts of `get_activity_detail` the coach can ask for. The summary — date,
@@ -567,6 +575,100 @@ function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] 
   }));
 }
 
+type VisualChannel = "hr" | "pace" | "power" | "cadence";
+
+/**
+ * One chart's points: distance and the channel it draws, nothing else. The
+ * card stores every section separately in the transcript, so handing four
+ * sections one array of every recorded channel stored that array four times.
+ */
+function channelSeries(
+  series: TrainingHubActivitySeriesPoint[],
+  channel: VisualChannel
+): TrainingHubActivitySeriesPoint[] {
+  return series.flatMap((point) => {
+    const value = point[channel];
+    if (value === undefined || !Number.isFinite(value)) {
+      return [];
+    }
+    const trimmed: TrainingHubActivitySeriesPoint = {};
+    if (point.distance !== undefined) {
+      trimmed.distance = point.distance;
+    }
+    trimmed[channel] = value;
+    return [trimmed];
+  });
+}
+
+/**
+ * Largest-Triangle-Three-Buckets over point order: one point per bucket, the
+ * one that keeps the most area, so a summit or a dip survives where a bucket
+ * mean or last value would flatten it. Order rather than distance because the
+ * card's x-axis is categorical and spaces points evenly.
+ */
+function largestTriangleThreeBuckets<T>(
+  points: T[],
+  threshold: number,
+  valueOf: (point: T) => number
+): T[] {
+  if (threshold < 3 || points.length <= threshold) {
+    return points;
+  }
+
+  const every = (points.length - 2) / (threshold - 2);
+  const sampled: T[] = [points[0]];
+  let anchor = 0;
+
+  for (let bucket = 0; bucket < threshold - 2; bucket += 1) {
+    const nextStart = Math.floor((bucket + 1) * every) + 1;
+    const nextEnd = Math.min(Math.floor((bucket + 2) * every) + 1, points.length);
+    let nextX = 0;
+    let nextY = 0;
+    for (let index = nextStart; index < nextEnd; index += 1) {
+      nextX += index;
+      nextY += valueOf(points[index]);
+    }
+    const nextCount = Math.max(1, nextEnd - nextStart);
+    nextX /= nextCount;
+    nextY /= nextCount;
+
+    const start = Math.floor(bucket * every) + 1;
+    const end = Math.floor((bucket + 1) * every) + 1;
+    const anchorY = valueOf(points[anchor]);
+    let chosen = start;
+    let largest = -1;
+    for (let index = start; index < end; index += 1) {
+      const area = Math.abs(
+        (anchor - nextX) * (valueOf(points[index]) - anchorY) -
+          (anchor - index) * (nextY - anchorY)
+      );
+      if (area > largest) {
+        largest = area;
+        chosen = index;
+      }
+    }
+    sampled.push(points[chosen]);
+    anchor = chosen;
+  }
+
+  sampled.push(points[points.length - 1]);
+  return sampled;
+}
+
+/** Distance and elevation only: the profile draws no position. */
+function elevationProfile(points: TrainingHubTrackPoint[]): TrainingHubTrackPoint[] {
+  const profile = points.map((point): TrainingHubTrackPoint =>
+    point.distance === undefined
+      ? { elevation: point.elevation }
+      : { distance: point.distance, elevation: point.elevation }
+  );
+  return largestTriangleThreeBuckets(
+    profile,
+    ELEVATION_PROFILE_POINTS,
+    (point) => point.elevation as number
+  );
+}
+
 export function migrateActivityHrTrendPreview(
   legacy: ActivityHrTrendPreview
 ): ActivityVisualPreview {
@@ -611,7 +713,7 @@ export function buildActivityVisualPreview(
   );
 
   if (hrSeriesPoints.length >= 2) {
-    sections.hr = { chartKind: "series", series: downsampled };
+    sections.hr = { chartKind: "series", series: channelSeries(downsampled, "hr") };
   } else if (hrLaps.length >= 2) {
     sections.hr = {
       chartKind: "laps",
@@ -623,14 +725,14 @@ export function buildActivityVisualPreview(
     (point) => point.pace !== undefined && Number.isFinite(point.pace)
   );
   if (pacePoints.length >= 2) {
-    sections.pace = { series: downsampled };
+    sections.pace = { series: channelSeries(downsampled, "pace") };
   }
 
   const powerPoints = downsampled.filter(
     (point) => point.power !== undefined && Number.isFinite(point.power)
   );
   if (powerPoints.length >= 2) {
-    sections.power = { series: downsampled };
+    sections.power = { series: channelSeries(downsampled, "power") };
   }
 
   // Cadence falls back to per-lap averages the way heart rate does. Plenty of
@@ -644,7 +746,7 @@ export function buildActivityVisualPreview(
     (lap) => lap.avgCadence !== undefined && Number.isFinite(lap.avgCadence)
   );
   if (cadencePoints.length >= 2) {
-    sections.cadence = { chartKind: "series", series: downsampled };
+    sections.cadence = { chartKind: "series", series: channelSeries(downsampled, "cadence") };
   } else if (cadenceLaps.length >= 2) {
     sections.cadence = { chartKind: "laps", laps: mapLapPoints(cadenceLaps) };
   }
@@ -653,7 +755,7 @@ export function buildActivityVisualPreview(
     (point) => point.elevation !== undefined && Number.isFinite(point.elevation)
   );
   if (elevationPoints.length >= 2) {
-    sections.elevation = { points: elevationPoints };
+    sections.elevation = { points: elevationProfile(elevationPoints) };
   }
 
   if (detail.laps.length > 0) {
