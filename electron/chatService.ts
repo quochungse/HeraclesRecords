@@ -149,6 +149,7 @@ import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
+  buildCoachWorkoutDefaultsGuide,
   formatAthleteProfile,
   formatCoachDashboard,
   formatRecentActivityMix,
@@ -2554,7 +2555,9 @@ function withLiveToolInstructions(
         "The athlete confirms via the Delete from COROS button in chat.",
       "",
       "Supported workout capabilities (generated from the validator):",
-      buildCoachSportCapabilityGuide()
+      buildCoachSportCapabilityGuide(),
+      "",
+      buildCoachWorkoutDefaultsGuide()
     );
   }
   if (interactionTools.length > 0) {

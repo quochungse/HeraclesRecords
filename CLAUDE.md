@@ -323,6 +323,38 @@ Overview, Media, Data, and Settings are in the main bundle.
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
+  anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
+  it starts, and the two are different questions. `emptyRow` used to answer the second
+  with the empty string, so **a step was invalid the moment it was added** — the
+  validator wants a target above zero and the field was `""`.
+  `resolveStepDefaults` is pure and layered: a `sport × stepKind` table, then "inside a
+  repeat" (one rep, not the session), then the movement for Strength and Hybrid Fitness,
+  then the athlete's own context. `coerce` has the last word, so only a target and an
+  intensity the sport accepts can leave — which is what makes a wrong figure cheap
+  rather than broken.
+  **Four rules it is built on, each held by `npm run test:workout-defaults`.**
+  A default is a valid step, for every combination, with thresholds and without.
+  **Intensity is a zone, never a figure** — `encodeCorosIntensity` already derives bpm
+  and pace from the athlete's own thresholds, so a preset is right for everyone and a
+  number is right for one person. **No default is ever a `load` target**, because COROS
+  answers `0` for `trainingLoad` on every list row. **And no default states a weight**:
+  a movement that takes equipment starts at `none` and the athlete says what they are
+  lifting; only bodyweight movements start at `{weight, bodyweight}`.
+  **An absent context means "COROS has not answered yet", not "no FTP".** The builder
+  mounts inside that round trip, and a zone lowered there would have nothing to raise
+  it again. Only a context that *is* present and lacks a threshold degrades.
+  Strength files a movement through `classifyWorkoutExerciseName` — the rules the
+  exercise picker and `search_coros_exercises` already use — so a fourth list of
+  exercises never has to be kept in step with COROS's. Hybrid Fitness files a station
+  **by name, not by `exerciseKind`**: the kinds are numbers whose meaning COROS does not
+  publish, and guessing would put a sled's 50 m on a rower.
+  The builder and the coach read the same table. `withDefaultTarget`
+  (`corosWorkoutBuilder.ts`) lets a coach step leave its target out entirely — every arm
+  of `resolveRunTarget` throws on a missing figure, so that is a loosening; a step that
+  *names* a `target_type` and omits its figure is still half-written. A step of a repeat
+  group takes the in-repeat default (one rep, and the rest between reps), whatever its kind.
+
 - **Training zones** (`workoutCapabilities.ts` tables, `corosWorkoutEditor.ts` parser) —
   what a zone preset in the workout builder means. Three things about COROS's own model,
   all read off its Settings screens on 2026-09-22 and all previously wrong here:

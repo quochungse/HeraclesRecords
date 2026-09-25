@@ -481,4 +481,50 @@ const reset = resetProgramForCreate({
 assert.equal(reset.id, "0");
 assert.equal((reset.exercises)[0]?.id, "1");
 
+// A step that states no target takes its sport's default rather than
+// refusing. Every arm of `resolveRunTarget` throws on a missing figure, so
+// this is what lets the coach write `{"kind": "warmup"}` and mean it.
+const defaulted = buildWorkoutPayload(
+  "Untargeted",
+  [{ kind: "warmup" }, { kind: "training" }, { kind: "rest" }, { kind: "cooldown" }],
+  "run"
+);
+const defaultedSteps = defaulted.exercises;
+// targetType 2 is time, 5 is distance; 10 minutes of warm-up in COROS seconds.
+assert.equal(defaultedSteps[0]?.targetType, 2);
+assert.equal(defaultedSteps[0]?.targetValue, 600);
+assert.equal(defaultedSteps[2]?.targetValue, 120, "a rest is two minutes");
+assert.equal(defaultedSteps[3]?.targetValue, 600);
+
+// Inside a repeat a step is one rep, and so is its rest: the group is what
+// makes the session, so a training step there does not take twenty minutes.
+const repeated = buildWorkoutPayload(
+  "Untargeted intervals",
+  [{ repeat: 5, steps: [{ kind: "training" }, { kind: "rest" }] }],
+  "run"
+);
+const [, rep, repRest] = repeated.exercises;
+assert.equal(rep?.targetType, 5, "a rep is a distance");
+assert.equal(rep?.targetValue, 40000, "400 m, in COROS centimetres");
+assert.equal(repRest?.targetValue, 90, "the rest between reps is ninety seconds, not two minutes");
+
+// A Strength step takes the figures its movement implies.
+const defaultedStrength = buildWorkoutPayload(
+  "Untargeted strength",
+  [{ kind: "training", exercise_name: "Barbell Deadlift", exercise_id: "1" }],
+  "strength"
+);
+assert.equal(defaultedStrength.exercises[0]?.targetType, 3, "reps");
+assert.equal(defaultedStrength.exercises[0]?.targetValue, 6);
+
+// Naming a target type and omitting its figure is still a half-written step.
+assert.throws(
+  () => buildWorkoutPayload(
+    "Half-written",
+    [{ kind: "training", target_type: "distance" }],
+    "run"
+  ),
+  /target_distance_meters/
+);
+
 console.log("coros workout builder tests passed");

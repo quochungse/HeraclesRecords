@@ -155,6 +155,32 @@ export function buildCoachSportCapabilityGuide(): string {
   }).join("\n");
 }
 
+/**
+ * That a step need not carry a target at all.
+ *
+ * Every field the coach writes is paid for twice — once in the arguments it
+ * generates and once in the schema that described them — so a warm-up it can
+ * write as `{"kind": "warmup"}` is cheaper than one that has to carry ten
+ * minutes in seconds. `withDefaultTarget` fills it from the same table the
+ * builder seeds its rows from (`workoutDefaults.ts`), so a workout drafted
+ * here and one built by hand start from the same figures.
+ *
+ * Deliberately short on specifics: listing every sport's figures would cost
+ * more per turn than the omission saves, and the coach does not need to know
+ * them to leave a field out.
+ */
+export function buildCoachWorkoutDefaultsGuide(): string {
+  return [
+    "A step that states no target takes its sport's default for that kind —",
+    "warm-ups and cool-downs are an easy ten minutes, a rest is a rest, an",
+    "interval is one rep, a Strength step follows the movement it names (a",
+    "deadlift is heavy and low-rep, a plank is held), and a Hybrid Fitness",
+    "station is its competition distance. Omit the target when the default is",
+    "what you meant; state it when it is not. A step that names a target_type",
+    "must still carry that target's figure."
+  ].join(" ");
+}
+
 interface ActivitySportGroup {
   key: string;
   label: string;

@@ -3,6 +3,7 @@
  * Ported from reverse-engineered API behavior (see docs/coros-plan-write-api.md).
  */
 import type {
+  RunWorkoutEditorStepKind,
   UnitSystem,
   WorkoutEditorContext,
   WorkoutIntensityInput,
@@ -30,6 +31,7 @@ import {
   workoutTargetsForStep,
   workoutSportType
 } from "./workoutCapabilities";
+import { resolveStepDefaults } from "./workoutDefaults.js";
 
 export type RunStepKind =
   | "warmup"
@@ -359,6 +361,67 @@ function normalizeRunStep(step: RunWorkoutStep): RunWorkoutStep {
   return normalized;
 }
 
+/**
+ * A step that states no target at all takes the one its sport and kind start
+ * from.
+ *
+ * Every arm of `resolveRunTarget` below throws on a missing figure, so this is
+ * a loosening and not a change: what used to be "Distance steps require
+ * target_distance_meters" is now a warm-up of ten minutes. It exists because
+ * the coach pays for every field it writes — a tool schema is re-sent each
+ * round — and "warm-up" is a complete instruction that should not have to
+ * carry a number the app already has an answer for.
+ *
+ * Only a step that states nothing. One that names a `target_type` and omits
+ * its figure is a half-written step, and still says so.
+ */
+function withDefaultTarget(
+  step: RunWorkoutStep,
+  sport: WorkoutSport,
+  editorKind: RunWorkoutEditorStepKind,
+  insideRepeat: boolean,
+  context?: WorkoutEditorContext
+): RunWorkoutStep {
+  const stated = [
+    step.target_type,
+    step.target_value,
+    step.target_distance_meters,
+    step.target_duration_seconds,
+    step.target_load,
+    step.target_hr_recovery_bpm,
+    step.target_reps,
+    step.target_elevation_gain_meters,
+    step.target_routes
+  ].some((value) => value !== undefined);
+  if (stated) return step;
+  const { target } = resolveStepDefaults({
+    sport,
+    stepKind: editorKind,
+    insideRepeat,
+    exerciseName: step.exercise_name,
+    exerciseKind: step.exercise_kind,
+    context
+  });
+  switch (target.type) {
+    case "time":
+      return { ...step, target_type: "time", target_duration_seconds: target.seconds };
+    case "distance":
+      return { ...step, target_type: "distance", target_distance_meters: target.meters };
+    case "reps":
+      return { ...step, target_type: "reps", target_reps: target.count };
+    case "routes":
+      return { ...step, target_type: "routes", target_routes: target.count };
+    case "elevationGain":
+      return { ...step, target_type: "elevationGain", target_elevation_gain_meters: target.meters };
+    case "hrRecovery":
+      return { ...step, target_type: "hrRecovery", target_hr_recovery_bpm: target.bpm };
+    case "load":
+      return { ...step, target_type: "load", target_load: target.load };
+    case "open":
+      return { ...step, target_type: "open" };
+  }
+}
+
 function resolveRunTarget(
   step: RunWorkoutStep,
   sport: WorkoutSport,
@@ -541,18 +604,26 @@ function buildRunExercise(
   sport: WorkoutSport = "run",
   context?: WorkoutEditorContext
 ): { exercise: Record<string, unknown>; distance: number; time: number } {
-  const normalized = normalizeRunStep(step);
-  const normalizedIntensity = normalized.intensity && context
-    ? intensityForContext(normalized.intensity, context)
-    : normalized.intensity;
-  const { targetType, targetValue, targetDisplayUnit } =
-    resolveRunTarget(normalized, sport, context);
-  const kind = normalized.kind ?? "training";
+  const parsed = normalizeRunStep(step);
+  const kind = parsed.kind ?? "training";
   const capability = WORKOUT_SPORT_CAPABILITIES[sport];
   const editorKind = kind === "interval" ? "training" : kind;
   if (!capability.stepKinds.includes(editorKind)) {
     throw new Error(`${formatWorkoutSport(sport)} does not support ${kind} steps.`);
   }
+  const normalized = withDefaultTarget(
+    parsed,
+    sport,
+    editorKind,
+    /* A step of a repeat group is one rep, whatever its kind says. */
+    groupId !== "0" || kind === "interval",
+    context
+  );
+  const normalizedIntensity = normalized.intensity && context
+    ? intensityForContext(normalized.intensity, context)
+    : normalized.intensity;
+  const { targetType, targetValue, targetDisplayUnit } =
+    resolveRunTarget(normalized, sport, context);
   if (normalizedIntensity) {
     const error = validateWorkoutIntensity(
       sport,
