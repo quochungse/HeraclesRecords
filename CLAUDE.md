@@ -1031,6 +1031,33 @@ separate export rather than a flag, because several pressed chips inside one tra
 segmented control gone wrong. It replaced ~30 hand-written versions whose chips disagreed
 about height, weight, radius, how the chosen one is marked (`.is-active`, `.is-selected`,
 `.active`, `[data-active]`) and which ARIA role a row of exclusive buttons takes.
+**A collapsible group is one row holding every option once, clipped by the group's own
+measured width.** The row is the caller's order; the
+fold is the group being as wide as the chosen chip, with the row slid so that chip sits at the
+left edge; opening widens the group to the row's width and takes the slide off. So the only
+thing that animates is a width, and for the first option — the chosen one whenever nothing has
+been narrowed — `--og-shift` is `0px`, the row never moves at all, and the label is at the same
+pixel from start to finish rather than only at its two ends. `OptionGroup` measures
+`--og-folded`, `--og-open` and `--og-shift` in a `useLayoutEffect` with no dependency list and
+writes them through the ref: most callers rebuild `options` every render, and a measurement
+held in state would render, measure and set state again.
+What it replaced, in order. A `max-width`, which needed a number picked in advance and silently
+clipped any label longer than it. Then two grid columns — a lead chip beside a row holding a
+**second copy** of the chosen option, one collapsing from `1fr` to `0fr` while the other grew;
+that is the instructive one, because its endpoints could be lined up (taking the labels'
+`translateX(-5px)` out, then the group's own 2px `gap`) and the path between them still could
+not: the row begins where the lead ends, so the row's copy slid the lead's whole width to the
+left underneath a copy of itself being clipped away. **Two boxes cannot be cross-faded into
+each other's place while both are in flow.** Dropping the chosen option out of the row would
+stop anything moving, at the cost of an open row that no longer reads in the order it was
+given — the order is the invariant, so the movement is what gets fixed around it.
+One consequence to keep in mind: the chosen chip is inside the row now, so a rule over "every
+label in the row" catches it. The reveal fade is scoped `button:not([aria-checked="true"])` for
+exactly that reason — without it a folded group is a blank pill, because the one chip it shows
+is the one the fade had hidden. `npm run test:option-groups` holds the measured width, the
+single copy and the fade; `test:library-renderer` reads `--og-shift` and both positions, from a
+mount with **every** `coroslink.selection.v1` key cleared (the bare preference name is not the
+storage key, so removing that alone leaves the last choice standing).
 **There is deliberately no automatic fallback** from `expanded` to `collapsible` when a row
 does not fit: it was written that way first and it oscillates, because the measurement that
 says "this does not fit" can only be taken while the row is laid out in full, and folding it

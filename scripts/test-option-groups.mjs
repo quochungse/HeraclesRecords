@@ -25,6 +25,10 @@
  *      the chosen chip is marked the same way whether the group is open or
  *      folded, and the collapsible mode animates a grid column rather than a
  *      magic max-width.
+ *   5. **A collapsible group's open row keeps the declared order, and its
+ *      labels fade rather than travelling.** The order is the invariant: a
+ *      version that lifted the chosen option out of the row to stop anything
+ *      moving left an open row that no longer read in the order it was given.
  *
  * Run: npm run test:option-groups
  */
@@ -284,6 +288,8 @@ assert.match(
  * and an element) or it loses outright and the collapsed state says nothing —
  * which is what a bare `.option-group-trigger` did.
  */
+const component = readFileSync(join(ROOT, COMPONENT), "utf8");
+
 assert.match(
   styles,
   /\.option-group \.option-group-trigger \{\s*background: var\(--accent-soft\);\s*color: var\(--accent-strong\);/,
@@ -295,10 +301,73 @@ assert.doesNotMatch(
   /--accent-ink/,
   "--accent-ink is gone: the chosen chip is a wash now, so there is no filled accent to find ink for"
 );
+/*
+ * **Collapsible animates one measured width, and holds one copy of each
+ * option.**
+ *
+ * Three shapes have stood here. A `max-width` needed a number picked in
+ * advance and silently clipped any label longer than it. Two grid columns —
+ * a lead chip and the row beside it — drew the chosen option twice and
+ * collapsed one while growing the other, so the row's first chip slid the
+ * lead's whole width on the way open, under a copy of itself being clipped
+ * away; lining the endpoints up did not touch the path between them. What
+ * holds now is the group's own width, from the chosen chip's to the row's,
+ * both **measured** in the component — so nothing is clipped that was meant
+ * to be read, and nothing inside the row moves except when the chosen option
+ * is not the first and has to travel to its own place in the order.
+ */
 assert.match(
   styles,
-  /\.option-group--collapsible[^{]*\{\s*display: grid;\s*transition: grid-template-columns/,
-  "collapsible animates a grid column — a max-width needs a magic number that clips longer labels"
+  /\.option-group--collapsible \{[^}]*transition: width var\(--dur-base\)/,
+  "collapsible animates its own width, between the two measured ends"
+);
+assert.match(
+  styles,
+  /\.option-group--collapsible \{[^}]*width: var\(--og-folded/,
+  "folded, that width is the chosen chip's"
+);
+assert.match(
+  styles,
+  /\.option-group--collapsible\[data-open="true"\] \{[^}]*width: var\(--og-open/,
+  "open, it is the whole row's"
+);
+assert.doesNotMatch(
+  component,
+  /option-group-lead/,
+  "there is no lead element: it was a second copy of the chosen option, and the " +
+    "two could not be animated without one sliding past the other"
+);
+assert.match(
+  component,
+  /setProperty\("--og-folded"/,
+  "and the widths are measured rather than chosen"
+);
+
+/*
+ * **A revealed label fades; it does not travel.**
+ *
+ * The row's labels came in from `translateX(-5px)`, which is a 5px shove to
+ * the right on every one of them at the end of the open — and on the row's
+ * first chip that was the whole of what could be seen to move: "All" settling
+ * sideways a beat after it appeared. The clipping edge is already doing the
+ * reveal; the text does not have to go anywhere.
+ *
+ * The open row still holds every option at its declared place, which is what
+ * `option-group-rest` renders. A version of this filtered the chosen option
+ * out of that row so that nothing could move at all, and the cost was an open
+ * row whose order no longer matched the order the caller gave — so the order
+ * is the invariant and the movement is what gets fixed around it.
+ */
+assert.doesNotMatch(
+  styles,
+  /\.option-group--collapsible[^{]*\.option-group-label \{[^}]*translateX/,
+  "a revealed label fades and does not travel — a translateX is a shove to the " +
+    "side on every label at the end of the open"
+);
+assert.match(
+  component,
+  /\{options\.map\(\(option\) => renderOption\(option, true\)\)\}/,
+  "the collapsible row renders every option, in the order it was given"
 );
 assert.doesNotMatch(
   styles,
@@ -306,7 +375,6 @@ assert.doesNotMatch(
   "no magic max-width on the option control: that is what clipped labels in the version it replaces"
 );
 
-const component = readFileSync(join(ROOT, COMPONENT), "utf8");
 assert.match(
   component,
   /aria-checked=\{isSelected\}/,

@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -132,9 +133,6 @@ export function OptionGroup<T extends string>({
   /** Set by a selection, so focus returns to the lead only when the athlete chose. */
   const returnFocusRef = useRef(false);
 
-  const selected =
-    options.find((option) => option.value === value) ?? options[0] ?? null;
-
   const close = useCallback(() => {
     setOpen(false);
   }, []);
@@ -166,6 +164,45 @@ export function OptionGroup<T extends string>({
     };
   }, [mode, open, close]);
 
+  /**
+   * The three lengths the fold is made of, written straight onto the node.
+   *
+   * `--og-folded` is the chosen chip's width, `--og-open` the whole row's, and
+   * `--og-shift` how far along the row that chip sits — so folded the group is
+   * as wide as one chip with the row slid to put it at the left edge, and open
+   * it is as wide as the row with no shift. Both ends are the content's own
+   * width, which is what makes this different from the `max-width` this
+   * replaced: nothing is clipped that was meant to be read.
+   *
+   * Written through the ref rather than held in state, and with no dependency
+   * list. Most callers rebuild `options` on every render, so a dependency on it
+   * re-runs anyway; and a measurement that set state would render, measure and
+   * set state again. Three layout reads after a render is the cheaper half of
+   * that trade.
+   *
+   * `offsetLeft`/`offsetWidth`/`scrollWidth` are the layout's own numbers and
+   * are unaffected by the clip, so the open width can be read while folded.
+   */
+  useLayoutEffect(() => {
+    if (mode !== "collapsible") return;
+    const track = trackRef.current;
+    const row = restRef.current;
+    if (!track || !row) return;
+    const chips = Array.from(row.children).filter(
+      (node): node is HTMLElement => node instanceof HTMLElement
+    );
+    const first = chips[0];
+    if (!first) return;
+    const chosen =
+      chips.find((chip) => chip.getAttribute("aria-checked") === "true") ?? first;
+    track.style.setProperty("--og-folded", `${chosen.offsetWidth}px`);
+    track.style.setProperty("--og-open", `${row.scrollWidth}px`);
+    track.style.setProperty(
+      "--og-shift",
+      `${chosen.offsetLeft - first.offsetLeft}px`
+    );
+  });
+
   // Focus follows the fold: opening puts the keyboard on the row that just
   // appeared, and choosing hands it back to the chip that replaced it. It
   // deliberately does not move when the group closes because the pointer went
@@ -178,6 +215,7 @@ export function OptionGroup<T extends string>({
         ?.focus();
       return;
     }
+
     if (returnFocusRef.current) {
       returnFocusRef.current = false;
       leadRef.current?.focus();
@@ -247,19 +285,34 @@ export function OptionGroup<T extends string>({
 
   const renderOption = (option: OptionGroupOption<T>, inRest: boolean) => {
     const isSelected = option.value === value;
+    /*
+     * Folded, the chosen chip is the only one on screen and the only thing
+     * that can open the row, so it is the trigger as well as its own radio —
+     * there is no separate lead element to be the trigger any more. It keeps
+     * the `option-group-trigger` class because that is what marks a folded
+     * group as having a choice made in it.
+     */
+    const isFoldedLead = inRest && isSelected && !open;
     return (
       <button
         key={option.value}
+        ref={isFoldedLead ? leadRef : undefined}
         type="button"
         role="radio"
+        className={isFoldedLead ? "option-group-trigger" : undefined}
         data-option={option.value}
         aria-checked={isSelected}
+        {...(inRest && isSelected ? { "aria-expanded": open } : {})}
         disabled={disabled || option.disabled}
         // Roving tabindex: the group is one tab stop, and it is the selected
-        // chip. A folded group's row is not reachable by Tab at all.
-        tabIndex={isSelected && (mode === "expanded" || open) ? 0 : -1}
+        // chip — folded, that is the only chip a Tab can reach.
+        tabIndex={isSelected || (inRest && open) ? 0 : -1}
         {...(option.title ? { title: option.title } : {})}
         onClick={(event) => {
+          if (isFoldedLead) {
+            setOpen(true);
+            return;
+          }
           onChange(option.value, event.currentTarget);
           if (inRest) {
             returnFocusRef.current = true;
@@ -289,40 +342,43 @@ export function OptionGroup<T extends string>({
     .join(" ");
 
   if (mode === "collapsible") {
+    /*
+     * **One row, clipped — not a lead chip beside a second copy of itself.**
+     *
+     * The chosen chip used to be drawn twice: once as the lead and again inside
+     * the row, and the two collapsed and grew in opposite directions. Their
+     * endpoints could be made to coincide, but the path between them could not:
+     * the row begins where the lead ends, so while the lead shrank from its own
+     * width to nothing the row's first chip slid that whole width to the left,
+     * under a copy of itself being clipped away. That is the jitter that
+     * survived taking the label translate and the group's gap out.
+     *
+     * So there is one row holding every option in the caller's order, and the
+     * fold is the group's own width clipping it. Folded, the width is the
+     * chosen chip's and the row is shifted so that chip sits at the left edge;
+     * open, the width is the row's and the shift is none. **Nothing inside the
+     * row moves relative to the row at either end or anywhere between** — for
+     * the first option the shift is 0, so the chosen chip is at the same pixel
+     * throughout, and for a later one it travels to its own place in the order,
+     * which is the one thing that has to happen.
+     *
+     * The two widths and the shift are measured rather than guessed — see the
+     * layout effect above. A measured width is not the magic number the old
+     * `max-width` was: it is the content's own, so nothing is ever clipped
+     * that was meant to be read.
+     */
     return (
       <div
         ref={trackRef}
         className={classes}
         data-open={open ? "true" : "false"}
       >
-        {/* The lead is the selected chip and nothing else — no caret. At rest
-            this reads as the current value first and as a control second,
-            which is the right order for something that is mostly read and
-            occasionally changed. The track around it and its hover are what
-            say it opens. */}
-        <div className="option-group-lead">
-          <div className="option-group-lead-inner">
-            <button
-              ref={leadRef}
-              type="button"
-              className="option-group-trigger"
-              aria-expanded={open}
-              aria-label={`${label}: ${selected?.label ?? ""}`}
-              disabled={disabled}
-              onClick={() => setOpen(true)}
-            >
-              {selected?.icon}
-              <span className="option-group-label">{selected?.label}</span>
-            </button>
-          </div>
-        </div>
         <div className="option-group-rest">
           <div
             ref={restRef}
             className="option-group-rest-inner"
             role="radiogroup"
             aria-label={label}
-            aria-hidden={!open}
             onKeyDown={onKeyDown}
           >
             {options.map((option) => renderOption(option, true))}

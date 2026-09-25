@@ -4821,36 +4821,64 @@ input::placeholder {
  * than float over them. The alternative, an animated max-width, needs a magic
  * number that silently clips any label longer than it (110px, as it happens,
  * which is what the version this replaces used).
+ *
+ * The open row holds **every** option, at its own place in the order the
+ * caller declared — the chosen one included. It was filtered out of that row
+ * once so that nothing could move on the way open, and the cost was an open
+ * row whose order no longer matched the order it was given.
  */
-.option-group--collapsible .option-group-lead,
-.option-group--collapsible .option-group-rest {
-  display: grid;
-  transition: grid-template-columns var(--dur-base) var(--ease);
+/*
+ * Collapsible. **One row, clipped by the group's own width.**
+ *
+ * The row holds every option in the caller's order; the fold is the group being
+ * as wide as the chosen chip, with the row slid along so that chip sits at the
+ * left edge. Opening widens the group to the row's own width and takes the
+ * slide off. So the only thing that animates is the group's width, and for the
+ * first option — which is the chosen one whenever the athlete has not narrowed
+ * anything — the slide is zero and the label is at the same pixel from start to
+ * finish.
+ *
+ * It was two elements for a while: a lead chip, and the row beside it holding a
+ * second copy of the same option, one collapsing while the other grew. Their
+ * endpoints could be lined up and the path between them could not — the row
+ * begins where the lead ends, so the row's first chip slid the lead's whole
+ * width to the left while a copy of itself was clipped away over the top of it.
+ * That is the jitter that outlived taking the label's `translateX` and the
+ * group's `gap` out, and it cannot be fixed while the two exist.
+ *
+ * `--og-folded`, `--og-open` and `--og-shift` are measured in `OptionGroup` and
+ * written onto the node. Measured, not chosen: both widths are the content's
+ * own, which is the difference from the `max-width` this began as — that needed
+ * a number picked in advance and silently clipped any label longer than it.
+ *
+ * `content-box`, because the app sets `border-box` globally and these widths
+ * are the row's rather than the track's.
+ */
+.option-group--collapsible {
+  box-sizing: content-box;
+  width: var(--og-folded, max-content);
+  transition: width var(--dur-base) var(--ease);
 }
 
-.option-group--collapsible .option-group-lead {
-  grid-template-columns: 1fr;
+.option-group--collapsible[data-open="true"] {
+  width: var(--og-open, max-content);
 }
 
-.option-group--collapsible .option-group-rest {
-  grid-template-columns: 0fr;
-}
-
-.option-group--collapsible[data-open="true"] .option-group-lead {
-  grid-template-columns: 0fr;
-}
-
-.option-group--collapsible[data-open="true"] .option-group-rest {
-  grid-template-columns: 1fr;
-}
-
-.option-group-lead-inner,
-.option-group-rest-inner {
+.option-group--collapsible .option-group-rest,
+.option-group--collapsible .option-group-rest-inner {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 2px;
-  min-width: 0;
-  overflow: hidden;
+}
+
+.option-group--collapsible .option-group-rest-inner {
+  transform: translateX(calc(-1 * var(--og-shift, 0px)));
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.option-group--collapsible[data-open="true"] .option-group-rest-inner {
+  transform: none;
 }
 
 /*
@@ -4877,21 +4905,33 @@ input::placeholder {
  * Without it the text is sliced by the clipping edge on the way open; with it
  * the row reads as one movement. Inherited from the fold Strength grew for
  * itself, which was the only part of that control worth keeping.
+ *
+ * **Opacity only — no translate.** It used to come in from `translateX(-5px)`,
+ * which is a 5px shove to the right on every label at the end of the open, and
+ * on the row's first chip that was the whole of what the athlete could see
+ * move: "All" settling sideways a beat after it appeared. A reveal does not
+ * need the text to travel; the clipping edge is already doing the work.
+ *
+ * **And only the labels being revealed.** The chosen chip is inside this row
+ * now rather than in a lead element of its own, so a rule over every label in
+ * here took its label with them — and a folded group is nothing but that chip,
+ * which came out blank. It is not being revealed by anything: it is what the
+ * fold shows.
  */
-.option-group--collapsible .option-group-rest .option-group-label {
+.option-group--collapsible
+  .option-group-rest
+  button:not([aria-checked="true"])
+  .option-group-label {
   opacity: 0;
-  transform: translateX(-5px);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
-.option-group--collapsible[data-open="true"] .option-group-rest .option-group-label {
+.option-group--collapsible[data-open="true"]
+  .option-group-rest
+  button:not([aria-checked="true"])
+  .option-group-label {
   opacity: 1;
-  transform: translateX(0);
-  transition:
-    opacity var(--dur-base) var(--ease),
-    transform var(--dur-base) var(--ease);
+  transition: opacity var(--dur-base) var(--ease);
 }
 
 .option-group--collapsible[data-open="true"] .option-group-rest button:nth-child(2) .option-group-label {
