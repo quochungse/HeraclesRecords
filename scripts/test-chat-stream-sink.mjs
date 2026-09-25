@@ -463,8 +463,14 @@ assert.deepEqual(persisted[1].automation, marker);
     /const sendStreamError = \(payload: \{[\s\S]{0,240}?\.\.\.\(usage \? \{ usage \} : \{\}\)/,
     "the one error send must carry what the turn spent"
   );
+  // The scripted plan run (`HERACLES_SIMULATE_PLAN_AI`) calls no model, so it
+  // has nothing to carry and sends its error itself; every turn that reaches a
+  // provider must go through `sendStreamError`.
+  const simulation = /async function simulatedPlanTurn\([\s\S]*?\n\}\r?\n/;
+  assert.match(source, simulation, "the simulated run is where this suite expects it");
+  const modelTurns = source.replace(simulation, "");
   assert.equal(
-    (source.match(/send\("chat:streamError"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamError"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );
@@ -480,7 +486,7 @@ assert.deepEqual(persisted[1].automation, marker);
     "the one done send must carry the cost and the model that answered"
   );
   assert.equal(
-    (source.match(/send\("chat:streamDone"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamDone"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );
