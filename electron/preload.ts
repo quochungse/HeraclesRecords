@@ -979,6 +979,8 @@ const api = {
       scheduleDate,
       keepInLibrary
     ),
+  removePlanDraft: (draftId: string): Promise<void> =>
+    ipcRenderer.invoke("chat:removePlanDraft", draftId),
   editWorkoutDraft: (
     draftId: string,
     workout: PlanWorkoutEntryInput,

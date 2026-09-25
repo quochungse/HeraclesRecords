@@ -2544,6 +2544,15 @@ export function ChatView({
       sourceRef.current = null;
       if (finishReason === "cancelled") {
         restoreResumedCoachPrompt();
+        // A card the turn produced before Stop is on screen and has a draft
+        // behind it; unsaved, it dropped out of the conversation on reload
+        // while its draft stayed.
+        setTimeline((prev) => {
+          if (prev.length > turnStartRef.current) {
+            persistHistory(activeSessionIdRef.current, prev, true);
+          }
+          return prev;
+        });
         return;
       }
       resumedCoachPromptRef.current = null;
@@ -3507,6 +3516,12 @@ export function ChatView({
    */
   const handleRemovePlanDraft = (draftId: string) => {
     setOpenCreationId((current) => (current === draftId ? null : current));
+    const removed = planDrafts.find((draft) => draft.draftId === draftId);
+    // Unsaved, the draft goes too; saved, it stays, because the plan on COROS
+    // names it. The card is marked either way.
+    if (api && removed && !removed.uploadedAt && !removed.uploadResult && !uploadedPlans[draftId]) {
+      void api.removePlanDraft(draftId).catch(() => undefined);
+    }
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
         entry.kind === "planDraft" && entry.draft.draftId === draftId

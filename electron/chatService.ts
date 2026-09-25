@@ -33,6 +33,7 @@ import {
   planDraftDocument,
   savePlanDraftEdit,
   saveWorkoutDraftEdit,
+  discardPlanDraft,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -2387,6 +2388,10 @@ export async function uploadTrainingPlanDraft(
     scheduleDate,
     keepInLibrary === true
   );
+}
+
+export function removePlanDraft(draftId: string): void {
+  discardPlanDraft(draftId);
 }
 
 export function editWorkoutDraft(

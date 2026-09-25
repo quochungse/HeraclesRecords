@@ -322,4 +322,32 @@ assert.deepEqual(mixedUploadInput.workouts[2].sport_options, {
 });
 assert.equal(mixedUploadInput.workouts[3].steps[0].target_type, "reps");
 
+// A calendar save names the sessions on a day gone by before anything is
+// written; COROS would refuse them one at a time after the rest went through.
+{
+  const { pastCalendarSessions } = await import(
+    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-past`
+  );
+  const sessions = [
+    { name: "Yesterday", schedule_date: "20260925" },
+    { name: "Today", schedule_date: "20260926" },
+    { name: "Undated" }
+  ];
+  assert.deepEqual(
+    pastCalendarSessions(sessions, "20260926").map((item) => item.name),
+    ["Yesterday"]
+  );
+}
+
+// A delete card from before a restart says what happened and what to do.
+{
+  const { confirmWorkoutDeleteById } = await import(
+    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-delete`
+  );
+  await assert.rejects(
+    confirmWorkoutDeleteById("from-before-a-restart"),
+    /expired, and nothing was deleted\. Ask Coach again\./
+  );
+}
+
 console.log("test-chat-workout-tools: ok");

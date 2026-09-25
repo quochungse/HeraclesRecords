@@ -669,6 +669,8 @@ export interface CorosLinkApi {
     /** A workout put on the calendar is also kept in the Workout Library. */
     keepInLibrary?: boolean
   ) => Promise<UploadPlanResult>;
+  /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
+  removePlanDraft: (draftId: string) => Promise<void>;
   /** Writes the athlete's edit of a coach's one-off workout back into its draft. */
   editWorkoutDraft: (
     draftId: string,

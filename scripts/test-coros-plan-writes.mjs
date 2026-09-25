@@ -1243,6 +1243,23 @@ test("a programme is placed by week and day, and the draft's answer is short", a
   assert.match(half.errors.join(" "), /needs both week/);
 });
 
+test("removing an unsaved creation lets its draft go; a saved one is only hidden", async () => {
+  fakeCoros();
+  const unsaved = await coachDraft(datedBlock);
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+  assert.throws(() => chatWorkoutTools.planDraftDocument(unsaved.draftId), /not found/, "the draft is gone");
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+
+  const saved = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(saved.draftId, "metric", "nativePlan");
+  assert.throws(
+    () => chatWorkoutTools.discardPlanDraft(saved.draftId),
+    /hidden, not removed/,
+    "the plan on COROS names this draft"
+  );
+  assert.ok(chatWorkoutTools.planDraftDocument(saved.draftId), "and it stays");
+});
+
 test("deleting a conversation's drafts lets them go", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

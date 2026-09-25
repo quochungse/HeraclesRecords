@@ -268,6 +268,15 @@ async function main() {
     "the destination fieldset is gone"
   );
 
+  // Removed before it is saved, the card's draft goes too (P0.8).
+  await harness("click", ".chat-creation-modal-remove");
+  await harness("click", ".chat-creation-modal-footer .chat-local-action.is-danger");
+  await waitFor(() => harness("callCount", "removePlanDraft"), "the unsaved draft is let go");
+  assert.deepEqual((await harness("calls", "removePlanDraft"))[0].args, ["plan-1"]);
+  await waitFor(async () => !(await harness("exists", ".chat-creation-card")), "the card leaves the conversation");
+  await harness("mount", "ChatView", {}, BASE_SCRIPT);
+  await waitFor(() => harness("exists", ".chat-creation-card"), "the plan card is drawn again");
+
   // -------------------------------------------------------------------------
   // An answered question stays in the conversation as one line (P0.3)
   // -------------------------------------------------------------------------
@@ -404,6 +413,38 @@ async function main() {
   );
   await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the card says where it went");
   assert.match(await harness("text", ".chat-creation-status"), /^On calendar /);
+
+  // -------------------------------------------------------------------------
+  // Stopped after it produced a card, the turn keeps the card (P0.8)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1]]
+  });
+  await waitFor(() => harness("callCount", "getChatSession"), "the conversation is open");
+  await harness("setValue", ".chat-composer textarea", "Another block");
+  await harness("click", ".chat-send");
+  const stopped = await waitFor(
+    async () => (await harness("calls", "sendChat"))[0],
+    "the turn reaches main"
+  );
+  await harness("emit", "onChatStreamStart", { requestId: stopped.args[0] });
+  await harness("emit", "onChatStreamInfo", {
+    requestId: stopped.args[0],
+    kind: "planDraft",
+    draft: { ...PREVIEW, draftId: "plan-3", name: "Stopped block" }
+  });
+  await harness("emit", "onChatStreamDone", {
+    requestId: stopped.args[0],
+    fullText: "",
+    finishReason: "cancelled"
+  });
+  await settle();
+  const afterStop = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.ok(
+    afterStop.some((entry) => entry.kind === "planDraft" && entry.draft.draftId === "plan-3"),
+    "the card a stopped turn produced is saved with the conversation"
+  );
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);

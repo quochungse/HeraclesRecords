@@ -338,6 +338,7 @@ import {
   testOpenRouterConnection,
   uploadTrainingPlanDraft,
   editWorkoutDraft,
+  removePlanDraft,
   editPlanDraft,
   generateTrainingPlan,
   outlineTrainingPlan,
@@ -1863,6 +1864,9 @@ function registerIpcHandlers(): void {
       scheduleDate,
       keepInLibrary === true
     )
+  );
+  ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
+    removePlanDraft(draftId)
   );
   ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem) =>
     editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem))

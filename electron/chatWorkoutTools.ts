@@ -1086,7 +1086,9 @@ export async function confirmWorkoutDeleteById(
 ): Promise<DeleteWorkoutResult> {
   const stored = deleteRequestStore.get(requestId);
   if (!stored) {
-    throw new Error("Workout delete request not found or expired.");
+    // Delete requests live in memory only, so a card from before a restart
+    // reaches here. Nothing was deleted, and the coach can stage it again.
+    throw new Error("This delete request has expired, and nothing was deleted. Ask Coach again.");
   }
   if (stored.executedAt) {
     throw new Error("This workout was already deleted.");
@@ -1095,6 +1097,14 @@ export async function confirmWorkoutDeleteById(
   const result = await deleteWorkout(stored.params);
   stored.executedAt = Date.now();
   return result;
+}
+
+/** The sessions a calendar save would put on a day before `today` (both `yyyyMMdd`). */
+export function pastCalendarSessions<T extends { schedule_date?: string }>(
+  workouts: readonly T[],
+  today: string
+): T[] {
+  return workouts.filter((workout) => Boolean(workout.schedule_date) && workout.schedule_date! < today);
 }
 
 export async function uploadPlanDraftById(
@@ -1130,6 +1140,19 @@ export async function uploadPlanDraftById(
     scheduleDate,
     keepInLibrary
   );
+  if (destination === "calendar") {
+    // Said here, by name, before anything is written: COROS refuses a past day
+    // one workout at a time, after the ones before it have gone through. An
+    // edit in the plan editor is not held to today, so this is where it shows.
+    const past = pastCalendarSessions(input.workouts, formatScheduleDay(new Date()));
+    if (past.length > 0) {
+      throw new Error(
+        `${past.map((workout) => `"${workout.name}"`).join(", ")} ${
+          past.length === 1 ? "is" : "are"
+        } on a day that has gone by. Move ${past.length === 1 ? "it" : "them"} in Edit, or save the plan to COROS instead.`
+      );
+    }
+  }
   const uploaded = await uploadTrainingPlan(input, unitSystem);
   const result: UploadPlanResult = {
     ...uploaded,
@@ -1351,6 +1374,21 @@ export function saveWorkoutDraftEdit(
   stored.preview = preview;
   persistPlanDraft(stored);
   return preview;
+}
+
+/**
+ * A creation the athlete removed from the conversation before saving it: the
+ * draft goes too, rather than staying in the table for as long as the
+ * conversation does. A saved one is refused — it is only hidden, because the
+ * plan on COROS names its draft (`coach.draftId`).
+ */
+export function discardPlanDraft(draftId: string): void {
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) return;
+  if (stored.uploadedAt) {
+    throw new Error("A saved creation is hidden, not removed.");
+  }
+  deletePlanDraftsOf([draftId]);
 }
 
 /**

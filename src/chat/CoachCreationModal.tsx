@@ -26,7 +26,7 @@ export function CoachCreationModal({
 }: {
   /** null is closed. */
   draft: PlanDraftPreview | null;
-  /** "One-off workout", or "Plan 2 of 3" — worked out by the caller. */
+  /** "One-off workout" or "Training plan" — worked out by the caller. */
   kicker: string;
   onClose: () => void;
   onViewInChat: () => void;
@@ -63,6 +63,10 @@ export function CoachCreationModal({
   if (!draft) return null;
 
   const isWorkout = draft.artifactType === "workout";
+  // A saved creation is only hidden: its draft is what the plan on COROS links
+  // back to. One not saved yet is removed, draft and all.
+  const saved = Boolean(draft.uploadedAt || draft.uploadResult);
+  const verb = saved ? "Hide" : "Remove";
   const title =
     draft.name || (isWorkout ? "Untitled workout" : "Untitled plan");
 
@@ -117,8 +121,9 @@ export function CoachCreationModal({
           {confirming ? (
             <>
               <span className="chat-creation-modal-confirm">
-                Remove this from Creations? Anything already saved to COROS or
-                your library stays.
+                {saved
+                  ? "Hide this from the conversation? What was saved to COROS stays, and still links back here."
+                  : "Remove this from the conversation? It has not been saved anywhere, so it is gone."}
               </span>
               <button
                 type="button"
@@ -133,7 +138,7 @@ export function CoachCreationModal({
                 onClick={onRemove}
               >
                 <Trash2 size={14} aria-hidden="true" />
-                Remove
+                {verb}
               </button>
             </>
           ) : (
@@ -143,7 +148,7 @@ export function CoachCreationModal({
               onClick={() => setConfirming(true)}
             >
               <Trash2 size={14} aria-hidden="true" />
-              Remove
+              {verb}
             </button>
           )}
         </footer>
