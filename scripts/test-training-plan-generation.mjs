@@ -40,6 +40,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
+/** Line endings folded to `\n`: a Windows checkout has CRLF, and the slices below look for "\n}\n". */
+const readChatService = () =>
+  fs.readFileSync(path.join(repoRoot, "electron", "chatService.ts"), "utf8").replace(/\r\n/g, "\n");
 const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
@@ -465,7 +468,7 @@ await test("sessions written to an accepted outline follow it: its length, count
 });
 
 await test("the outline turn offers its tool alone and withholds every writing tool", () => {
-  const source = fs.readFileSync(path.join(repoRoot, "electron", "chatService.ts"), "utf8");
+  const source = readChatService();
   const body = source.slice(source.indexOf("export async function outlineTrainingPlan("));
   const fn = body.slice(0, body.indexOf("\n}\n") + 2);
   assert.match(fn, /toolPolicy: "read-only"/);
@@ -522,7 +525,7 @@ await test("Coach cannot judge a level from training it was not shown", () => {
 });
 
 await test("both generation turns withhold what the athlete did not share, from the tools and the snapshot", () => {
-  const source = fs.readFileSync(path.join(repoRoot, "electron", "chatService.ts"), "utf8");
+  const source = readChatService();
   assert.match(source, /allow: \(name\) => !withheldTools\.has\(name\) && !toolReadsWithheldSource\(name, sources\)/);
   assert.match(source, /runTools\.set\(requestId, \{ extra: \[\], \.\.\.generationReach\(request, SESSIONS_WITHHELD_TOOLS\) \}\)/);
   assert.match(source, /\.\.\.generationReach\(request, OUTLINE_WITHHELD_TOOLS\)/);
@@ -594,7 +597,7 @@ await test("an accepted draft is held in memory for the run, never persisted", a
 });
 
 await test("the generation runs read-only and lets go of its drafts", () => {
-  const source = fs.readFileSync(path.join(repoRoot, "electron", "chatService.ts"), "utf8");
+  const source = readChatService();
   const body = source.slice(source.indexOf("export async function generateTrainingPlan("));
   const fn = body.slice(0, body.indexOf("\nexport function cancelChat("));
   assert.match(fn, /toolPolicy: "read-only"/, "no write tool is offered to a generation");
