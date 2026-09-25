@@ -4376,7 +4376,25 @@ function AnalysisSilentChip({
 
             if (entry.kind === "coachPrompt") {
               if (entry.prompt.answeredAt !== undefined) {
-                return null;
+                // Kept as one line rather than dropped: the question and what
+                // was chosen are part of how the plan came to be, and the coach
+                // reads them on every turn anyway.
+                const chosen = entry.prompt.choices.find(
+                  (choice) => choice.id === entry.prompt.selectedChoiceId
+                );
+                return (
+                  <div
+                    key={entry.prompt.promptId}
+                    className="chat-row chat-row-assistant chat-asked-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">Asked</span>
+                    <span className="chat-asked-question">{entry.prompt.question}</span>
+                    <span className="chat-asked-answer">
+                      {chosen?.label ?? entry.prompt.answer ?? ""}
+                    </span>
+                  </div>
+                );
               }
               return (
                 <ChatRow

@@ -19784,6 +19784,48 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* A question the coach asked and the athlete answered, kept as one line. */
+.chat-asked-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 4px 10px;
+  width: fit-content;
+  max-width: calc(100% - 42px);
+  margin-left: 42px;
+  padding: 7px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-asked-kicker {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chat-asked-question {
+  min-width: 0;
+}
+
+.chat-asked-answer {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-asked-answer::before {
+  margin-right: 6px;
+  color: var(--text-muted);
+  font-weight: 400;
+  content: "→";
+}
+
 /* A coach's creation under the answer that proposed it: read-only, with the
    way to save it and a way into the full view. */
 .chat-creation-card {

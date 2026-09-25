@@ -113,7 +113,22 @@ const DOCUMENT = {
 const TRANSCRIPT = [
   { kind: "message", role: "user", content: "Build me a base block" },
   { kind: "message", role: "assistant", content: "Three easy weeks to start." },
-  { kind: "planDraft", draft: PREVIEW }
+  { kind: "planDraft", draft: PREVIEW },
+  {
+    kind: "coachPrompt",
+    prompt: {
+      promptId: "q1",
+      question: "Long run on Saturday or Sunday?",
+      choices: [
+        { id: "choice-1", label: "Saturday", response: "Saturday" },
+        { id: "choice-2", label: "Sunday", response: "Sunday" }
+      ],
+      allowCustom: true,
+      answer: "Saturday",
+      selectedChoiceId: "choice-1",
+      answeredAt: 1
+    }
+  }
 ];
 
 const BASE_SCRIPT = {
@@ -251,6 +266,18 @@ async function main() {
     await harness("exists", ".chat-creation-modal fieldset"),
     false,
     "the destination fieldset is gone"
+  );
+
+  // -------------------------------------------------------------------------
+  // An answered question stays in the conversation as one line (P0.3)
+  // -------------------------------------------------------------------------
+  assert.equal(await harness("count", ".chat-asked-row"), 1);
+  assert.equal(await harness("text", ".chat-asked-question"), "Long run on Saturday or Sunday?");
+  assert.equal(await harness("text", ".chat-asked-answer"), "Saturday");
+  assert.equal(
+    await harness("exists", ".chat-coach-prompt"),
+    false,
+    "an answered question is not offered again"
   );
 
   // -------------------------------------------------------------------------
