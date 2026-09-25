@@ -20416,123 +20416,6 @@ tr.data-intervals-row-missing {
   margin-top: 2px;
 }
 
-.chat-plan-confirmation {
-  display: grid;
-  gap: 10px;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 76%, transparent);
-}
-
-.chat-plan-confirmation legend {
-  margin-left: -4px;
-  padding: 0 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.chat-plan-destination-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.chat-plan-destination-option.is-primary {
-  grid-column: 1 / -1;
-}
-
-.chat-plan-destination-option {
-  position: relative;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  min-height: 64px;
-  padding: 9px 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.chat-plan-destination-option:hover:not(.is-disabled) {
-  border-color: color-mix(in srgb, var(--text-muted) 62%, transparent);
-  background: var(--glass-bg-hover);
-}
-
-.chat-plan-destination-option:active:not(.is-disabled) {
-  transform: translateY(1px);
-}
-
-.chat-plan-destination-option.is-selected {
-  border-color: var(--chat-signal-border);
-  background: var(--chat-signal-soft);
-}
-
-.chat-plan-destination-option.is-disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-}
-
-.chat-plan-destination-option:has(input:focus-visible) {
-  outline: 2px solid var(--chat-signal);
-  outline-offset: 2px;
-}
-
-.chat-plan-destination-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-muted);
-}
-
-.chat-plan-destination-option.is-selected .chat-plan-destination-icon {
-  border-color: var(--chat-signal-border);
-  color: var(--chat-signal-strong);
-}
-
-.chat-plan-destination-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.chat-plan-destination-copy strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-plan-destination-copy small {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.3;
-}
-
-.chat-plan-destination-check {
-  color: var(--chat-signal-strong);
-  opacity: 0;
-}
-
-.chat-plan-destination-option.is-selected .chat-plan-destination-check {
-  opacity: 1;
-}
-
 .chat-plan-destination-summary {
   display: flex;
   align-items: flex-start;
@@ -20614,6 +20497,11 @@ tr.data-intervals-row-missing {
   --focus-ring-color: var(--chat-signal);
   outline: var(--focus-ring);
   outline-offset: 2px;
+}
+
+.chat-creation-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .chat-plan-actions {
@@ -20752,14 +20640,6 @@ tr.data-intervals-row-missing {
     justify-content: flex-start;
     max-width: none;
     text-align: left;
-  }
-
-  .chat-plan-destination-options {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-plan-destination-option.is-primary {
-    grid-column: auto;
   }
 
   .chat-workout-calendar-date {

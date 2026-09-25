@@ -291,7 +291,7 @@ const mixedDraft = {
 assert.equal(validatePlanDraft(mixedDraft, { todayDay: "20260101" }).ok, true);
 const mixedPreview = buildPlanPreview("draft-mixed", mixedDraft);
 assert.equal(mixedPreview.entries.length, 4);
-assert.match(mixedPreview.summary, /1 Run \/ 1 Bike \/ 1 Pool Swim \/ 1 Strength/);
+assert.match(mixedPreview.summary, /Run, Bike, Pool Swim, Strength$/);
 assert.deepEqual(
   mixedPreview.entries.map((entry) => entry.sport),
   ["run", "bike", "swim", "strength"]

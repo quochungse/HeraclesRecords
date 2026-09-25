@@ -35,6 +35,7 @@ import {
   workoutSportType
 } from "./workoutCapabilities";
 import { resolveStepDefaults } from "./workoutDefaults.js";
+import { describePlanShape } from "./trainingPlanDomain";
 
 export type RunStepKind =
   | "warmup"
@@ -1418,42 +1419,25 @@ export function buildPlanPreview(
     }
   }));
 
-  const scheduled = draft.workouts.filter((entry) => entry.schedule_date);
-  const libraryOnly = draft.workouts.filter(
-    (entry) => !entry.schedule_date && entry.save_to_library !== false
-  );
-  const sportCounts = new Map<WorkoutSport, number>();
-  for (const entry of draft.workouts) {
-    const sport = entry.sport ?? "run";
-    sportCounts.set(sport, (sportCounts.get(sport) ?? 0) + 1);
-  }
-  const sportSummary = [...sportCounts.entries()]
-    .map(([sport, count]) => `${count} ${formatWorkoutSport(sport)}`)
-    .join(" / ");
-  const workoutSportSummary = formatWorkoutSport(
-    draft.workouts[0]?.sport ?? "run"
-  );
+  const sports = [
+    ...new Set(draft.workouts.map((entry) => formatWorkoutSport(entry.sport ?? "run")))
+  ].join(", ");
 
   const artifactType = options?.artifactType ?? "plan";
   const summaryParts = artifactType === "workout"
-    ? [workoutSportSummary, entries[0]?.volume, entries[0]?.workoutType].filter(Boolean)
+    ? [sports, entries[0]?.volume, entries[0]?.workoutType].filter(Boolean)
     : [
-        `${draft.workouts.length} workout${draft.workouts.length === 1 ? "" : "s"}`,
-        scheduled.length > 0
-          ? `${scheduled.length} scheduled`
-          : "none scheduled",
-        libraryOnly.length > 0
-          ? `${libraryOnly.length} library-only`
-          : undefined,
-        sportSummary
+        describePlanShape(
+          draft.workouts.map((workout) => ({
+            key: workout.key,
+            name: workout.name,
+            source: workout,
+            date: workout.schedule_date
+          })),
+          draft.layout
+        ),
+        sports
       ].filter(Boolean);
-
-  const warnings: string[] = [];
-  if (artifactType === "plan" && scheduled.length === 0) {
-    warnings.push(
-      "No workouts have schedule_date set — they will only be saved to your COROS library."
-    );
-  }
 
   return {
     draftId,
@@ -1462,7 +1446,7 @@ export function buildPlanPreview(
     summary: summaryParts.join(" · "),
     entries,
     conflicts: options?.scheduleConflicts ?? [],
-    warnings
+    warnings: []
   };
 }
 

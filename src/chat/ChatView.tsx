@@ -14,7 +14,6 @@ import {
 import {
   BookOpen,
   Bookmark,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -102,6 +101,8 @@ import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationModal } from "./CoachCreationModal";
+import { CreationActions } from "./CreationActions";
+import { creationStatus } from "./creationChoices";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -711,31 +712,11 @@ function WorkoutPreviewCard({
 }) {
   const { unitSystem } = useUnitSystem();
   const entry = draft.entries[0];
-  const suggestedDate = entry ? planEntryScheduleDate(entry) : undefined;
-  const today = localPlanDateKey(new Date());
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "workoutLibrary" | "calendar">
-  >(suggestedDate ? "calendar" : "workoutLibrary");
-  const [scheduleDate, setScheduleDate] = useState(suggestedDate ?? today);
-  const uploadedResult =
-    uploaded ??
-    (draft.uploadResult
-      ? {
-          planName: draft.name,
-          workoutsCreated: draft.uploadResult.workoutsCreated,
-          workoutsScheduled: draft.uploadResult.workoutsScheduled,
-          entries: [],
-          destination: draft.uploadResult.destination
-        }
-      : undefined);
-  const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
+  const scheduleDate = entry ? planEntryScheduleDate(entry) : undefined;
   const uploadedDestination =
-    uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
-  const calendarDateParts = destination === "calendar"
-    ? planDateParts(scheduleDate)
-    : undefined;
-  const calendarDateInvalid =
-    destination === "calendar" && (!scheduleDate || scheduleDate < today);
+    uploaded?.destination ?? draft.uploadResult?.destination;
+  const isUploaded = Boolean(uploaded || draft.uploadResult || draft.uploadedAt);
+  const calendarDateParts = planDateParts(scheduleDate);
   const SportIcon = sportTheme(entry?.sport).icon;
   const hasStrengthStructure = Boolean(
     entry &&
@@ -779,11 +760,7 @@ function WorkoutPreviewCard({
           >
             <span
               className={`chat-plan-entry-date${calendarDateParts ? "" : " is-undated"}`}
-              title={
-                destination === "calendar"
-                  ? `Add to Calendar on ${scheduleDate}`
-                  : "Save to Workout Library"
-              }
+              title={scheduleDate ? `Suggested for ${scheduleDate}` : "No date suggested"}
             >
               {calendarDateParts ? (
                 <>
@@ -836,118 +813,14 @@ function WorkoutPreviewCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {uploadedDestination === "calendar"
+            {uploadedDestination === "calendar" && scheduleDate
               ? `Added to your COROS Calendar on ${formatPlanDateLabel(scheduleDate)}.`
               : "Saved to your COROS Workout Library."}
           </span>
         </p>
-      ) : (
-        <>
-          <fieldset className="chat-plan-confirmation" disabled={uploading}>
-            <legend>Where should this workout go?</legend>
-            <div className="chat-plan-destination-options">
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "workoutLibrary" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="workoutLibrary"
-                  checked={destination === "workoutLibrary"}
-                  onChange={() => setDestination("workoutLibrary")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <BookOpen size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Workout Library</strong>
-                  <small>Save it as an unscheduled, reusable workout.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "calendar" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="calendar"
-                  checked={destination === "calendar"}
-                  onChange={() => setDestination("calendar")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <CalendarDays size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Calendar</strong>
-                  <small>Add this workout on the date you choose.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-            </div>
-            {destination === "calendar" ? (
-              <label className="chat-workout-calendar-date">
-                <span>Calendar date</span>
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  min={today}
-                  onChange={(event) => setScheduleDate(event.target.value)}
-                />
-              </label>
-            ) : null}
-            <p className="chat-plan-destination-summary" data-tone="ok">
-              {destination === "calendar" ? (
-                <CalendarDays size={13} aria-hidden="true" />
-              ) : (
-                <BookOpen size={13} aria-hidden="true" />
-              )}
-              <span>
-                {destination === "calendar"
-                  ? `This workout will be added to Calendar on ${formatPlanDateLabel(scheduleDate)}.`
-                  : "This workout will be saved to your Workout Library without a calendar date."}
-                {" "}It will remain a one-off workout, not a training plan.
-              </span>
-            </p>
-          </fieldset>
-          <div className="chat-plan-actions">
-            <button
-              type="button"
-              className="chat-plan-upload"
-              onClick={() => onUpload(
-                destination,
-                destination === "calendar" ? scheduleDate : undefined
-              )}
-              disabled={uploading || !entry || calendarDateInvalid}
-            >
-              {uploading ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                destination === "calendar" ? (
-                  <CalendarDays size={14} aria-hidden="true" />
-                ) : (
-                  <Bookmark size={14} aria-hidden="true" />
-                )
-              )}
-              {destination === "calendar" ? "Add to Calendar" : "Save to Library"}
-            </button>
-          </div>
-        </>
-      )}
+      ) : entry ? (
+        <CreationActions draft={draft} uploading={uploading} onUpload={onUpload} />
+      ) : null}
     </div>
   );
 }
@@ -966,9 +839,6 @@ function PlanPreviewCard({
   onReview?: () => void;
 }) {
   const { unitSystem } = useUnitSystem();
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "nativePlan" | "workoutLibrary" | "calendar">
-  >("nativePlan");
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const weekTabsRef = useRef<HTMLDivElement>(null);
   const uploadedResult =
@@ -982,7 +852,8 @@ function PlanPreviewCard({
         }
       : undefined);
   const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
-  const savedTo = uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
+  const savedTo: TrainingPlanDestination =
+    uploadedResult?.destination ?? draft.uploadResult?.destination ?? "nativePlan";
   const planWeeks = groupPlanEntriesByWeek(draft.entries);
   const scheduledWeekCount = planWeeks.filter(
     (week) => week.id !== "unscheduled"
@@ -1000,10 +871,6 @@ function PlanPreviewCard({
     .map(planEntryScheduleDate)
     .filter((date): date is string => Boolean(date))
     .sort()[0];
-  const scheduledWorkoutCount = draft.entries.filter((entry) =>
-    Boolean(planEntryScheduleDate(entry))
-  ).length;
-  const unscheduledWorkoutCount = draft.entries.length - scheduledWorkoutCount;
   const destinationLabel: Record<TrainingPlanDestination, string> = {
     workoutLibrary: "COROS Workout Library",
     calendar: "COROS Calendar",
@@ -1271,131 +1138,6 @@ function PlanPreviewCard({
           </ul>
         </details>
       ) : null}
-      {!isUploaded ? (
-        <fieldset className="chat-plan-confirmation" disabled={uploading}>
-          <legend>How should this plan be saved?</legend>
-          <div className="chat-plan-destination-options">
-            <label
-              className={`chat-plan-destination-option is-primary${
-                destination === "nativePlan" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="nativePlan"
-                checked={destination === "nativePlan"}
-                onChange={() => setDestination("nativePlan")}
-              />
-              <span className="chat-plan-destination-icon">
-                <BookOpen size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Training Plan</strong>
-                <small>Save these workouts together as one plan in your COROS plans.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "workoutLibrary" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="workoutLibrary"
-                checked={destination === "workoutLibrary"}
-                onChange={() => setDestination("workoutLibrary")}
-              />
-              <span className="chat-plan-destination-icon">
-                <Bookmark size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Individual Workouts</strong>
-                <small>Save each workout separately to the COROS Workout Library.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "calendar" ? " is-selected" : ""
-              }${unscheduledWorkoutCount > 0 ? " is-disabled" : ""}`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="calendar"
-                checked={destination === "calendar"}
-                onChange={() => setDestination("calendar")}
-                disabled={unscheduledWorkoutCount > 0}
-              />
-              <span className="chat-plan-destination-icon">
-                <CalendarDays size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Calendar</strong>
-                <small>
-                  {unscheduledWorkoutCount > 0
-                    ? `${unscheduledWorkoutCount} ${
-                        unscheduledWorkoutCount === 1 ? "workout needs" : "workouts need"
-                      } a date.`
-                    : "Schedule workouts on the dates shown above."}
-                </small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-          </div>
-          <p
-            className="chat-plan-destination-summary"
-            data-tone={
-              destination === "calendar" && draft.conflicts.length > 0
-                ? "alert"
-                : "ok"
-            }
-          >
-            {destination === "calendar" && draft.conflicts.length > 0 ? (
-              <TriangleAlert size={13} aria-hidden="true" />
-            ) : (
-              <CircleCheck size={13} aria-hidden="true" />
-            )}
-            <span>
-              {destination === "nativePlan"
-                ? `This will be saved to COROS as one plan with ${draft.entries.length} ${
-                    draft.entries.length === 1 ? "workout" : "workouts"
-                  }. Put it on the calendar from its page in the Training Library.`
-                : destination === "calendar"
-                  ? `${scheduledWorkoutCount} ${
-                      scheduledWorkoutCount === 1 ? "workout" : "workouts"
-                    } will be added to your COROS Calendar.${
-                      draft.conflicts.length > 0
-                        ? ` Review ${draft.conflicts.length} ${
-                            draft.conflicts.length === 1 ? "conflict" : "conflicts"
-                          } before adding.`
-                        : " No scheduling conflicts."
-                    }`
-                  : `${draft.entries.length} ${
-                      draft.entries.length === 1 ? "workout" : "workouts"
-                    } will be saved individually to your COROS Workout Library. Dates will not be added to Calendar.`}
-            </span>
-          </p>
-        </fieldset>
-      ) : null}
       {uploadedResult || isUploaded ? (
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
@@ -1412,41 +1154,12 @@ function PlanPreviewCard({
           </span>
         </p>
       ) : (
-        <div className="chat-plan-actions">
-          {onReview ? (
-            <button
-              type="button"
-              className="chat-plan-review"
-              onClick={onReview}
-              disabled={uploading}
-              title="Change the plan before saving it"
-            >
-              <BookOpen size={14} aria-hidden="true" />
-              Edit plan first
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="chat-plan-upload"
-            onClick={() => onUpload(destination)}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : destination === "nativePlan" ? (
-              <BookOpen size={14} aria-hidden="true" />
-            ) : destination === "calendar" ? (
-              <CalendarDays size={14} aria-hidden="true" />
-            ) : (
-              <Bookmark size={14} aria-hidden="true" />
-            )}
-            {destination === "nativePlan"
-              ? "Save Plan"
-              : destination === "calendar"
-                ? "Add to Calendar"
-                : "Save Workouts"}
-          </button>
-        </div>
+        <CreationActions
+          draft={draft}
+          uploading={uploading}
+          onUpload={onUpload}
+          onEdit={onReview}
+        />
       )}
     </div>
   );
@@ -3875,19 +3588,12 @@ export function ChatView({
   );
   const openCreation =
     planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
-  const trainingPlanDrafts = planDrafts.filter(
-    (draft) => draft.artifactType !== "workout"
-  );
   const openCreationKicker =
     openCreation === null
       ? ""
       : openCreation.artifactType === "workout"
         ? "One-off workout"
-        : `Plan ${
-            trainingPlanDrafts.findIndex(
-              (draft) => draft.draftId === openCreation.draftId
-            ) + 1
-          } of ${trainingPlanDrafts.length}`;
+        : "Training plan";
 
   /**
    * Opening the panel is reserved for news, so this has to tell a creation
@@ -4869,25 +4575,8 @@ function AnalysisSilentChip({
             </header>
             <ol className="chat-plan-list">
               {planDrafts.map((draft, index) => {
-                const saved = Boolean(
-                  uploadedPlans[draft.draftId] ||
-                    draft.uploadResult ||
-                    draft.uploadedAt
-                );
+                const status = creationStatus(draft);
                 const isWorkout = draft.artifactType === "workout";
-                const planNumber = isWorkout
-                  ? 0
-                  : planDrafts
-                      .slice(0, index + 1)
-                      .filter((item) => item.artifactType !== "workout").length;
-                const weeks = isWorkout
-                  ? 0
-                  : Math.max(
-                      1,
-                      groupPlanEntriesByWeek(draft.entries).filter(
-                        (week) => week.id !== "unscheduled"
-                      ).length
-                    );
                 const primarySport = draft.entries[0]?.sport;
                 const SportIcon = sportTheme(primarySport).icon;
                 const selected = draft.draftId === selectedPlanDraftId;
@@ -4918,27 +4607,20 @@ function AnalysisSilentChip({
                       </span>
                       <span className="chat-plan-list-copy">
                         <span className="chat-plan-list-kicker">
-                          {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
+                          {isWorkout ? "One-off workout" : "Training plan"}
                         </span>
                         <strong>
                           {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
                         </strong>
                         <span className="chat-plan-list-meta">
-                          <span>
-                            {draft.entries.length}{" "}
-                            {draft.entries.length === 1
-                              ? "workout"
-                              : "workouts"}
-                          </span>
                           {!isWorkout ? (
                             <span>
-                              {weeks} {weeks === 1 ? "week" : "weeks"}
+                              {draft.entries.length}{" "}
+                              {draft.entries.length === 1 ? "session" : "sessions"}
                             </span>
-                          ) : (
-                            <span>Workout Library</span>
-                          )}
-                          <span data-status={saved ? "saved" : "draft"}>
-                            {saved ? "Saved" : "Draft"}
+                          ) : null}
+                          <span data-status={status.saved ? "saved" : "draft"}>
+                            {status.label}
                           </span>
                         </span>
                       </span>
