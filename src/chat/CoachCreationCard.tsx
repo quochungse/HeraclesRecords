@@ -118,7 +118,11 @@ export function CoachCreationCard({
   document?: TrainingPlanDocument;
   uploading: boolean;
   uploaded?: UploadPlanResult;
-  onUpload: (destination: TrainingPlanDestination, scheduleDate?: string) => void;
+  onUpload: (
+    destination: TrainingPlanDestination,
+    scheduleDate?: string,
+    keepInLibrary?: boolean
+  ) => void;
   onEdit?: () => void;
   onOpen: () => void;
 }) {

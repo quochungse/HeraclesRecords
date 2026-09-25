@@ -142,6 +142,8 @@ import {
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
 const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
+/* "Edit" on a coach's one-off workout: the workout builder, loaded when used. */
+const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -737,7 +739,8 @@ function WorkoutPreviewCard({
   uploaded?: UploadPlanResult;
   onUpload: (
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => void;
 }) {
   const { unitSystem } = useUnitSystem();
@@ -1219,7 +1222,8 @@ function CoachDraftPreviewCard({
   uploaded?: UploadPlanResult;
   onUpload: (
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => void;
   onReview?: () => void;
   document?: TrainingPlanDocument;
@@ -1737,6 +1741,7 @@ export function ChatView({
   }, [api, missingPlanDocuments]);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
+  const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
@@ -3411,7 +3416,8 @@ export function ChatView({
   const handleUploadPlanDraft = async (
     draftId: string,
     destination: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean
   ) => {
     if (!api || uploadingDraftId) return;
     setUploadingDraftId(draftId);
@@ -3421,7 +3427,8 @@ export function ChatView({
         draftId,
         unitSystem,
         destination,
-        scheduleDate
+        scheduleDate,
+        keepInLibrary
       );
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
@@ -3519,6 +3526,7 @@ export function ChatView({
    */
   const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
     setEditingPlanDraftId(null);
+    setEditingWorkoutDraftId(null);
     if (reopenCreationAfterEditRef.current) setOpenCreationId(preview.draftId);
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
@@ -3529,7 +3537,9 @@ export function ChatView({
       persistHistory(activeSessionIdRef.current, next, true);
       return next;
     });
-    showToast("Plan updated. The coach will see your version on its next reply.");
+    showToast(
+      `${preview.artifactType === "workout" ? "Workout" : "Plan"} updated. The coach will see your version on its next reply.`
+    );
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -3662,6 +3672,10 @@ export function ChatView({
   );
   const openCreation =
     planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
+  const editingWorkout =
+    editingWorkoutDraftId === null
+      ? null
+      : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
   const openCreationKicker =
     openCreation === null
       ? ""
@@ -4445,15 +4459,24 @@ function AnalysisSilentChip({
                       document={planDocuments[documentKey] ?? undefined}
                       uploading={uploadingDraftId === draft.draftId}
                       uploaded={uploadedPlans[draft.draftId]}
-                      onUpload={(destination, scheduleDate) =>
-                        void handleUploadPlanDraft(draft.draftId, destination, scheduleDate)
+                      onUpload={(destination, scheduleDate, keepInLibrary) =>
+                        void handleUploadPlanDraft(
+                          draft.draftId,
+                          destination,
+                          scheduleDate,
+                          keepInLibrary
+                        )
                       }
                       onEdit={
-                        api && draft.artifactType !== "workout"
+                        api && (draft.artifactType !== "workout" || draft.entries[0]?.source)
                           ? () => {
                               onError(null);
                               reopenCreationAfterEditRef.current = false;
-                              setEditingPlanDraftId(draft.draftId);
+                              if (draft.artifactType === "workout") {
+                                setEditingWorkoutDraftId(draft.draftId);
+                              } else {
+                                setEditingPlanDraftId(draft.draftId);
+                              }
                             }
                           : undefined
                       }
@@ -4799,15 +4822,17 @@ function AnalysisSilentChip({
             }
             uploading={uploadingDraftId === openCreation.draftId}
             uploaded={uploadedPlans[openCreation.draftId]}
-            onUpload={(destination, scheduleDate) =>
+            onUpload={(destination, scheduleDate, keepInLibrary) =>
               void handleUploadPlanDraft(
                 openCreation.draftId,
                 destination,
-                scheduleDate
+                scheduleDate,
+                keepInLibrary
               )
             }
             onReview={
-              api && openCreation.artifactType !== "workout"
+              api &&
+              (openCreation.artifactType !== "workout" || openCreation.entries[0]?.source)
                 ? () => {
                     /* The card's modal steps aside for the editor — both
                        close on Escape, and the card sits above the editor's
@@ -4815,7 +4840,11 @@ function AnalysisSilentChip({
                     onError(null);
                     setOpenCreationId(null);
                     reopenCreationAfterEditRef.current = true;
-                    setEditingPlanDraftId(openCreation.draftId);
+                    if (openCreation.artifactType === "workout") {
+                      setEditingWorkoutDraftId(openCreation.draftId);
+                    } else {
+                      setEditingPlanDraftId(openCreation.draftId);
+                    }
                   }
                 : undefined
             }
@@ -4833,6 +4862,23 @@ function AnalysisSilentChip({
                 setOpenCreationId(editingPlanDraftId);
               }
               setEditingPlanDraftId(null);
+            }}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
+      {api && editingWorkout?.entries[0]?.source ? (
+        <Suspense fallback={null}>
+          <CoachWorkoutEditor
+            api={api}
+            draft={editingWorkout}
+            workout={editingWorkout.entries[0].source}
+            onSaved={handlePlanDraftEdited}
+            onClose={() => {
+              if (reopenCreationAfterEditRef.current) {
+                setOpenCreationId(editingWorkout.draftId);
+              }
+              setEditingWorkoutDraftId(null);
             }}
             onError={onError}
           />

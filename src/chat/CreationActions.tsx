@@ -39,12 +39,19 @@ export function CreationActions({
 }: {
   draft: PlanDraftPreview;
   uploading: boolean;
-  onUpload: (destination: TrainingPlanDestination, scheduleDate?: string) => void;
+  onUpload: (
+    destination: TrainingPlanDestination,
+    scheduleDate?: string,
+    keepInLibrary?: boolean
+  ) => void;
   onEdit?: () => void;
 }) {
   const today = todayKey();
   const choices = planSaveChoices(draft, today);
   const [showMore, setShowMore] = useState(false);
+  /* A workout put on the calendar is otherwise not kept in the library. */
+  const [keepInLibrary, setKeepInLibrary] = useState(false);
+  const isWorkout = draft.artifactType === "workout";
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const [pending, setPending] = useState<CreationAction["id"] | null>(null);
 
@@ -54,7 +61,11 @@ export function CreationActions({
       return;
     }
     setPending(action.id);
-    onUpload(action.destination, action.date);
+    onUpload(
+      action.destination,
+      action.date,
+      isWorkout && action.destination === "calendar" ? keepInLibrary : undefined
+    );
   };
 
   const button = (action: CreationAction, lead: boolean) => (
@@ -74,6 +85,9 @@ export function CreationActions({
   const calendarOffered = [choices.primary, ...choices.secondary].some(
     (action) => action.id === "putOnCalendar"
   );
+  const schedulesWorkout =
+    isWorkout &&
+    (pickedDate !== null || choices.primary.id === "scheduleWorkout");
 
   return (
     <div className="chat-creation-actions">
@@ -99,6 +113,17 @@ export function CreationActions({
           />
         </label>
       ) : null}
+      {schedulesWorkout ? (
+        <label className="chat-creation-keep">
+          <input
+            type="checkbox"
+            checked={keepInLibrary}
+            onChange={(event) => setKeepInLibrary(event.target.checked)}
+            disabled={uploading}
+          />
+          Also keep in library
+        </label>
+      ) : null}
       <div className="chat-plan-actions">
         {pickedDate !== null ? (
           <>
@@ -109,7 +134,7 @@ export function CreationActions({
               disabled={uploading || !pickedDate || pickedDate < today}
               onClick={() => {
                 setPending("pickWorkoutDate");
-                onUpload("calendar", pickedDate);
+                onUpload("calendar", pickedDate, keepInLibrary);
               }}
             >
               <ActionIcon

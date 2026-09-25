@@ -20730,6 +20730,21 @@ tr.data-intervals-row-missing {
   gap: 8px;
 }
 
+.chat-creation-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.chat-creation-keep input {
+  margin: 0;
+  accent-color: var(--chat-signal);
+}
+
 .chat-plan-actions {
   display: flex;
   flex-wrap: wrap;

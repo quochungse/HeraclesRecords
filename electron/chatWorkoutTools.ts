@@ -581,7 +581,9 @@ export function buildTrainingPlanUploadInput(
 export function buildTrainingPlanDestinationInput(
   plan: CorosTrainingPlanDraft,
   destination: TrainingPlanDestination,
-  scheduleDate?: string
+  scheduleDate?: string,
+  /** A workout scheduled on the calendar is also kept in the library. */
+  keepInLibrary = false
 ): CorosTrainingPlanDraftInput {
   const input = buildTrainingPlanUploadInput(plan);
   if (destination === "workoutLibrary") {
@@ -613,7 +615,7 @@ export function buildTrainingPlanDestinationInput(
       ...input,
       workouts: calendarWorkouts.map((workout) => ({
         ...workout,
-        save_to_library: false
+        save_to_library: keepInLibrary
       }))
     };
   }
@@ -1082,7 +1084,8 @@ export async function uploadPlanDraftById(
   draftId: string,
   unitSystem: UnitSystem = "metric",
   destination: TrainingPlanDestination = "workoutLibrary",
-  scheduleDate?: string
+  scheduleDate?: string,
+  keepInLibrary = false
 ): Promise<UploadPlanResult> {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
@@ -1107,7 +1110,8 @@ export async function uploadPlanDraftById(
   const input = buildTrainingPlanDestinationInput(
     stored.plan,
     destination,
-    scheduleDate
+    scheduleDate,
+    keepInLibrary
   );
   const uploaded = await uploadTrainingPlan(input, unitSystem);
   const result: UploadPlanResult = {
@@ -1270,6 +1274,61 @@ export async function savePlanDraftEdit(
     unitSystem,
     artifactType: "plan"
   });
+  preview.editedAt = Date.now();
+  stored.plan = next;
+  stored.preview = preview;
+  persistPlanDraft(stored);
+  return preview;
+}
+
+/**
+ * The athlete's version of a one-off workout the coach drafted, from the
+ * builder. The key, the day the coach suggested and whether it goes to the
+ * library stay the coach's; the workout itself is the athlete's. Same draft id,
+ * so the card is replaced in place, and `editedAt` restates it to the coach.
+ */
+export function saveWorkoutDraftEdit(
+  draftId: string,
+  workout: PlanWorkoutEntryInput,
+  unitSystem: UnitSystem = "metric"
+): PlanDraftPreview {
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) {
+    throw new Error("Workout draft not found. Ask the coach to write it again.");
+  }
+  if (stored.preview.artifactType !== "workout") {
+    throw new Error("This is a plan, not a single workout.");
+  }
+  if (stored.uploadedAt) {
+    throw new Error("This workout has already been saved, so the Coach card can no longer be edited.");
+  }
+  const original = stored.plan.workouts[0];
+  if (!original) throw new Error("This workout draft holds no workout.");
+  const {
+    key: _key,
+    schedule_date: _date,
+    sort_no: _sort,
+    save_to_library: _library,
+    ...edited
+  } = structuredClone(workout);
+  const name = workout.name.trim() || original.name;
+  const next: CorosTrainingPlanDraft = {
+    ...stored.plan,
+    name,
+    workouts: [
+      {
+        ...edited,
+        key: original.key,
+        name,
+        ...(original.sort_no !== undefined ? { sort_no: original.sort_no } : {}),
+        ...(original.schedule_date ? { schedule_date: original.schedule_date } : {}),
+        ...(original.save_to_library !== undefined ? { save_to_library: original.save_to_library } : {})
+      } as PlanWorkoutEntry
+    ]
+  };
+  const validation = validatePlanDraft(next, { todayDay: "00000000" });
+  if (!validation.ok) throw new Error(validation.errors.join(" "));
+  const preview = buildPlanPreview(draftId, next, { unitSystem, artifactType: "workout" });
   preview.editedAt = Date.now();
   stored.plan = next;
   stored.preview = preview;

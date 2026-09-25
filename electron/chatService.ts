@@ -32,6 +32,7 @@ import {
   generatedPlanDraft,
   planDraftDocument,
   savePlanDraftEdit,
+  saveWorkoutDraftEdit,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -164,6 +165,7 @@ import type {
   TrainingHubUpcomingWorkout,
   UploadPlanResult,
   PlanDraftPreview,
+  PlanWorkoutEntryInput,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanGenerationResult,
@@ -2375,14 +2377,24 @@ export async function uploadTrainingPlanDraft(
   draftId: string,
   unitSystem: UnitSystem = "metric",
   destination: import("./types").TrainingPlanDestination = "workoutLibrary",
-  scheduleDate?: string
+  scheduleDate?: string,
+  keepInLibrary = false
 ): Promise<UploadPlanResult> {
   return uploadPlanDraftById(
     draftId,
     normalizeUnitSystem(unitSystem),
     destination,
-    scheduleDate
+    scheduleDate,
+    keepInLibrary === true
   );
+}
+
+export function editWorkoutDraft(
+  draftId: string,
+  workout: PlanWorkoutEntryInput,
+  unitSystem: UnitSystem = "metric"
+): PlanDraftPreview {
+  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem));
 }
 
 export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {

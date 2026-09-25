@@ -205,6 +205,16 @@ const oneOffCalendarInput = buildTrainingPlanDestinationInput(
 );
 assert.equal(oneOffCalendarInput.workouts[0].schedule_date, "20991206");
 assert.equal(oneOffCalendarInput.workouts[0].save_to_library, false);
+// Put on the calendar, a workout can also be kept in the library — which the
+// calendar path used to rule out by clearing the flag.
+const keptCalendarInput = buildTrainingPlanDestinationInput(
+  heartRateDraft,
+  "calendar",
+  "2099-12-06",
+  true
+);
+assert.equal(keptCalendarInput.workouts[0].schedule_date, "20991206");
+assert.equal(keptCalendarInput.workouts[0].save_to_library, true);
 const oneOffLibraryInput = buildTrainingPlanDestinationInput(
   heartRateDraft,
   "workoutLibrary"

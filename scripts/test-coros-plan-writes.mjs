@@ -1149,6 +1149,48 @@ test("an undated coach plan keeps the weeks and days the athlete gave it", async
   );
 });
 
+test("a coach's one-off workout is edited in place, keeping the day it was suggested for", async () => {
+  fakeCoros();
+  let preview;
+  const response = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "draft_workout",
+      { workout: coachRun("Recovery run", 2100), calendar_date: "20990805" },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { preview = drafted; } }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(preview.artifactType, "workout");
+
+  const edited = {
+    ...coachRun("Shorter recovery", 1500),
+    key: "renamed-by-the-builder",
+    schedule_date: "20991231",
+    save_to_library: true
+  };
+  const next = chatWorkoutTools.saveWorkoutDraftEdit(preview.draftId, edited);
+  assert.equal(next.draftId, preview.draftId, "the same card");
+  assert.equal(next.artifactType, "workout");
+  assert.ok(next.editedAt, "marked edited, so the coach is told");
+  assert.equal(next.entries.length, 1);
+  assert.equal(next.entries[0].name, "Shorter recovery");
+  assert.equal(next.entries[0].key, preview.entries[0].key, "the coach's key, not the builder's");
+  assert.equal(next.entries[0].scheduleDate, "2099-08-05", "the day the coach suggested, not one the builder carried");
+  assert.equal(next.entries[0].source.steps[0].target_duration_seconds, 1500);
+  assert.equal(next.name, "Shorter recovery");
+
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit("not-a-draft", edited),
+    /not found/
+  );
+  const plan = await coachDraft(datedBlock);
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit(plan.draftId, edited),
+    /a plan, not a single workout/,
+    "a plan is edited in the plan editor"
+  );
+});
+
 test("deleting a conversation's drafts lets them go", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

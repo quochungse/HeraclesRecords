@@ -329,6 +329,82 @@ async function main() {
     "and it is saved in that order"
   );
 
+  // -------------------------------------------------------------------------
+  // A one-off workout: its suggested day leads, it can be kept in the library
+  // too, and it can be edited before it is saved (P0.4, P0.5)
+  // -------------------------------------------------------------------------
+  const workout = {
+    key: "recovery",
+    name: "Recovery run",
+    sport: "run",
+    schedule_date: "20991002",
+    steps: [{ kind: "training", target_type: "time", target_duration_seconds: 2100, intensity: { type: "none" } }]
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      TRANSCRIPT[0],
+      { kind: "message", role: "assistant", content: "Go easy tonight." },
+      {
+        kind: "planDraft",
+        draft: {
+          draftId: "workout-1",
+          artifactType: "workout",
+          name: "Recovery run",
+          summary: "Run · 35 min · recovery",
+          entries: [
+            {
+              key: "recovery",
+              name: "Recovery run",
+              sport: "run",
+              scheduleDate: "2099-10-02",
+              saveToLibrary: false,
+              workoutType: "recovery",
+              stepsSummary: "35 min easy",
+              source: workout
+            }
+          ],
+          conflicts: [],
+          warnings: []
+        }
+      }
+    ],
+    uploadTrainingPlanDraft: {
+      planName: "Recovery run",
+      workoutsCreated: 1,
+      workoutsScheduled: 1,
+      entries: [{ key: "recovery", date: "20991002" }],
+      destination: "calendar"
+    }
+  });
+  await waitFor(() => harness("exists", ".chat-creation-card"), "the workout card is drawn");
+  assert.match(
+    (await harness("text", '.chat-creation-card [data-action="scheduleWorkout"]')) ?? "",
+    /^Schedule for /,
+    "the day the coach suggested leads"
+  );
+  assert.equal(await harness("exists", ".chat-creation-keep input"), true, "and it can be kept in the library too");
+  await harness("click", ".chat-creation-card [data-action=\"edit\"]");
+  await waitFor(
+    () => harness("exists", ".calendar-modal-builder"),
+    "Edit opens the workout builder"
+  );
+  await harness("click", '.calendar-modal-builder [aria-label="Close"]');
+  await settle();
+  await page(`(() => { const box = document.querySelector(".chat-creation-keep input"); box.click(); return box.checked; })()`);
+  await harness("click", '.chat-creation-card [data-action="scheduleWorkout"]');
+  const upload = await waitFor(
+    async () => (await harness("calls", "uploadTrainingPlanDraft"))[0],
+    "the workout is saved"
+  );
+  assert.deepEqual(
+    upload.args.slice(2),
+    ["calendar", "2099-10-02", true],
+    "on its day, and kept in the library as asked"
+  );
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the card says where it went");
+  assert.match(await harness("text", ".chat-creation-status"), /^On calendar /);
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);
 
