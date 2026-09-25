@@ -2350,7 +2350,14 @@ input::placeholder {
  * the content. The two tokens above travel down by inheritance, so the column
  * lands in exactly the same place either way.
  */
-.content-fill:has(> .running-view) {
+/*
+ * A view that scrolls inside itself carries its own measure, so the shell's
+ * gutter would only push the scrollbar 28px into the window. The Training
+ * Library was paying both — 28px here and 34px of its own — which is 124px of
+ * the window spent on margins before any content.
+ */
+.content-fill:has(> .running-view),
+.content-fill:has(> .training-library-view) {
   padding: 0;
 }
 

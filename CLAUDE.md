@@ -88,7 +88,7 @@ npm run build            # tsc electron (emits dist-electron) + tsc --noEmit ren
 npm start                # build, then run the packaged-style app
 ```
 
-There is **no linter and no test runner**. Tests are ~122 standalone `scripts/test-*.mjs`
+There is **no linter and no test runner**. Tests are ~143 standalone `scripts/test-*.mjs`
 files using `node:assert/strict`, each wired to its own npm script. `npm run build` is the
 only typecheck. CI (`.github/workflows/build.yml`, `release.yml`) **builds installers but
 runs no tests** — nothing catches a broken test except running it.
@@ -297,9 +297,294 @@ Overview, Media, Data, and Settings are in the main bundle.
   `npm run test:coros-session-restore` holds all of this down. The vault's owner is the
   COROS account, so startup sequences the re-login *before* `prepareSync()` and resumes
   the loop after one — see the block in `main.ts`.
-- **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) — workouts,
-  plans, templates, plan↔activity adherence matching. React never calls COROS directly;
-  it requests one `TrainingLibrarySnapshot`. See [docs/training-library-architecture.md](docs/training-library-architecture.md).
+- **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) —
+  **two entities, two tabs**, and the workouts tab splits **40 / 60** between the list and
+  the reader — the list is a name and two counts, the pane beside it draws a whole step
+  structure. A workout is one session with no date; a plan is a multi-week
+  schedule of them. They share four attributes (name, tags, favourite, archived) and not one
+  figure, so they are two tabs rather than one list with a facet. React never calls COROS
+  directly; it requests one `TrainingLibrarySnapshot`.
+  **A plan is a COROS plan, and nothing else** (rebuilt 2026-09-24, spec
+  [docs/training-plan-coros-first.md](docs/training-plan-coros-first.md)). Every real save goes to
+  COROS through `plan/add` / `plan/update`; the app is where the buttons are and the account is
+  where the data is. What this machine keeps is a **draft** — an edit in progress,
+  `training_plan_drafts`, `personal` tier so it follows the athlete between machines — and the
+  app's own metadata (`training_plan_metadata`: tags, favourite, archived, `origin` user/coach).
+  `coros_plan_cache` (`device`) paints the list at once and stands in offline; every write reads
+  `detail` again first. **There are no local plans**: `dropLocalTrainingPlans` drops
+  `training_plans` and `training_plan_workout_links` on open, keeping a COROS plan's tags,
+  favourite and archived flag and dropping local and coach rows outright — the sessions they had
+  put on the calendar are ordinary COROS workouts and stay; the migration calls nothing on COROS.
+  **Things this screen had and no longer has, each removed on purpose:** local plans and the
+  "Local Copy" fork, calendar installs (`calendarInstalls`, `writeMayHaveSucceeded`, a partial
+  state), rest days, notes, the holding area, free-named phases, a goal and a difficulty —
+  **COROS stores none of them** (`eventTags` on a plan are answered `0000` and dropped; a stage is
+  one of seven values) — plus collections (no COROS endpoint knows one), and the Templates,
+  Adherence and All tabs. `dropRetiredCollectionTable` runs on open too.
+  **The model is cut to what COROS stores** (`TrainingPlanDocument`): `id` is `coros:<remoteId>` or
+  `draft:<uuid>`; `remoteVersion` is COROS's `version`, compared before a write; a session has a
+  week, a day (0 = Monday), an order, a typed `workout` and — read from COROS — its raw
+  `corosProgram` (written back byte for byte unless the session is edited) and `idInPlan`;
+  `weekStages` are COROS's seven (0 Not Set … 6 Transition). `calendar` is `unscheduled` for a
+  plan and `running`/`finished`/`stopped` for COROS's running copy of one. **A plan's length is COROS's**:
+  `totalDay` is the last session's day + 1, so trailing empty weeks do not survive a save and
+  the editor warns about them. More than ten sessions on a day is an error (COROS's limit).
+  **Saving** (`savePlanToCoros`): a changed plan on COROS since the edit began is a conflict the
+  athlete answers (Replace with my edit / Save as a new plan / Keep editing); a plan COROS deleted
+  meanwhile is saved as a new one; the plan is read back and the draft is let go only if every
+  session came back. Only a session written here is priced through `/training/program/calculate`;
+  a kept one goes back with its own program. **Duplicate is `plan/copy` then a rename** ("X Copy"
+  — COROS's copy keeps the name). **Deleting a plan on the calendar takes it off first**, or one with
+  a copy running, so nothing is left scheduled from a plan that is gone: the confirmation says so
+  ("Remove from calendar and delete"), the renderer passes `takeOffCalendar`, and the service
+  `quitSubPlan`s the running copy, deletes the plan and then the copy — never deleting anything if
+  the removal failed, and refusing outright when the flag is absent.
+  **Opening a plan reads it; editing is a button on the reader.** `PlanReader` draws from the
+  snapshot already in hand and asks COROS for nothing (a COROS plan deepens in the background,
+  and that failure is silent because it only refines what is already readable). The editor's
+  draft lives in the view rather than in the editor, so leaving the tab no longer throws the
+  work away — the tab strip used to be *disabled* while editing, which prevented navigation
+  rather than surviving it. **Every open reads `/training/plan/detail` again** — one request;
+  `/training/plan/query` is every plan with every program, and it is asked for only when a detail
+  arrives without programs — and the answer replaces the copy in the reader *and* the list,
+  unless its `version` is older than the one held (COROS raises it by one per update; the cache
+  takes the same rule). Edit and Duplicate wait for that read (`loadingFull`) only when the copy
+  in hand lacks the programs a save writes back, which the list endpoint leaves out for a plan
+  written here. A plan read on its own is joined to its running copy through the cache
+  (`findCachedRunningCorosPlan`), as the snapshot joins the list, so the reader keeps its
+  calendar mark and does not offer to add it again. The cache holds the document only — every
+  write reads the plan from COROS first, so COROS's own payload would be a copy nothing reads.
+  Edit waits while a
+  duplicate is made (`duplicating`), because the reader moves to the copy when it lands.
+  **The editor is the reader with handles on it** (`PlanEditor`): the reader's title (a bordered
+  field), description, figures, ridge and week cards, every week drawn, with **COROS's stage
+  picked per week** in its header. Save goes to COROS; **Save draft** keeps it here, and a draft
+  sits where the plan does rather than in a section of its own (`attachPlanDrafts`): a new
+  plan's draft is a tile among the plans, marked **Draft**, that opens straight into the editor
+  (whose Discard draft is the way to let it go); edits kept for a plan mark that plan's tile
+  **Editing**; its reader shows **Continue editing** outside the ⋯ — one way into the editor,
+  drawn filled, and Edit leaves the ⋯ while it is there — and its ⋯ leads with Clear editing.
+  Otherwise Edit is the ⋯'s first item. A plan holds one draft, and Save draft replaces it. Editing a running copy changes the
+  calendar at once, and the editor says so. **A day's `+` is a menu** — New session (Create
+  workout's builder, opened on the plan's own sport with the sport picker in place, headed "New
+  session" over the plan and the day, and asking about unsaved edits with the plan's own
+  `ConfirmDialog` through `confirmDiscard`) and From workout library (a picker that reads the
+  workout's program from COROS through `libraryWorkoutAsPlanSession`, because a COROS plan holds
+  its own copy of every program rather than a link to the library).
+  **Every workout is written in one builder** (`src/calendar/WorkoutBuilder.tsx`, rows in
+  `workoutBuilderRows.ts`): Create workout (Calendar and Library), a plan session new or edited
+  (`WorkoutBuilderModal`, applied through `editorDraftToPlanWorkoutInput` as before) and **Edit
+  workout** in the Library (read by `getWorkoutForEdit`, saved and verified by `saveWorkoutEdit`, with
+  COROS's `previewWorkoutEdit` load beside the totals). A session and a library workout had a second
+  editor, `WorkoutEditorModal`, with its own defaults, validator and layout; that modal is now only
+  the Calendar's (a scheduled occurrence, and its read-only view of a library workout). An existing
+  workout keeps its sport — stated where the picker would be, never a locked dropdown. **A row read
+  from a workout remembers its node (`BuilderRow.origin`) and an untouched row writes that node back
+  byte for byte**: a row holds display strings (km to three places, pace as `m:ss`), so re-encoding
+  would drift it, and it would drop what the builder has no field for — a step's own name, a
+  strength step's instructions, a send-off, and the `sourceExerciseId` that makes
+  `workoutDraftToCorosProgram` update a COROS exercise in place. A changed step keeps its identity
+  and only what still belongs to it (same kind, same exercise); a step the builder cannot represent
+  arrives `locked` and passes through; a zone somebody chose keeps its heart-rate family
+  (`keepBasis`) until it is changed. `npm run test:workout-builder-rows` holds all of it, and the
+  builder's validator skips an untouched row so a strength workout nobody edited is not held to the
+  exercise catalog loading. A session carries one
+  control, its ⋯ (Edit, Move to…, Duplicate, Copy to next week, Delete), plus Alt + arrows and
+  Delete from the keyboard; a copy is a new session to COROS (`copiedEntry` drops its
+  `idInPlan`, and the write sends its program without `planId` and `star`, as the web app
+  sends a new session).
+  Three rules the suites hold: a session's name keeps a readable width inside a day column, and
+  the problems that block Save are listed at every width; **a rule that styles a library control
+  must name all three scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
+  is portalled there) and `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
+  question it asks through the plan's `ConfirmDialog` sits outside both) — or the control draws as
+  the platform's grey button; and the editor's shortcuts listen on the window, gated on `layer`,
+  because an undo remounts the focused session and a handler on the editor's element then hears
+  nothing. Calendar actions are not in the editor (they need a saved plan); saving lands on the
+  reader. A new plan opens **named** (`defaultPlanName`: "New
+  plan", numbered past the library's) with the name selected. A dialog over the portalled editor
+  (the save conflict) is portalled to `<body>` as well, or the view's stacking context holds it
+  underneath.
+  **The week ridge picks what it measures** (`ridgeMeasure`): load where every week holding a
+  session has some, else hours where every one is timed, else a count — load whenever *any* week had
+  some drew one bar over a plan of unpriced library workouts. The tile's small ridge reads the same
+  measure, so it and the ridge it opens onto agree. Each bar of the reader's is **stacked by sport**
+  in the hues the sessions wear (`weekRidgeSegments`), with a legend past one sport, and the stages
+  run as a band under the bars, coloured by `[data-stage]`.
+  The arithmetic is `planEditorModel.ts`; `test:plan-editor-model`, `test:plan-editor-renderer`.
+  **A session opens inside the reader, not over it** (`PlanSessionView`): the weeks give way
+  to the session, Escape steps back one layer (the session catches it before the sheet does),
+  and the scroll and focus return to the row. Its body is `WorkoutReadOnlyBody`, fed
+  `planWorkoutInputToEditorDraft(entry.workout)` — the view the Workouts tab and the Calendar
+  draw, not a third renderer. That converter defaults a step with no `kind` to `training`
+  like every other reader of these steps, because plans written before the field was required
+  are still on disk and an `undefined` name unmounts the screen on its first `.trim()`. A
+  duration is stated only when every step is timed (`durationComplete`):
+  the figure is a sum of `target_duration_seconds`, so a run written in distances summed its
+  jogs to nine minutes and a 31 km week to "0.1 hours".
+  **A week is seven columns when its card is wide enough** — a container query on
+  `.plan-week-card`, not a media query, because the reader is a 980px sheet rather than the
+  window — and the list below that; every day is rendered and `is-empty` hides only in the
+  list. A running plan folds the weeks before this one to a line (sessions, done, missed),
+  opens scrolled to this week and marks today's column. The ridge (`PlanWeekRidge`) is drawn
+  past two weeks only; each bar is a button that jumps to its week. The reader is a dialog, so
+  its head opens with a close (X), not a back arrow, and its actions sit at the right edge
+  reading inward: **Add to calendar** (the one filled button, `.plan-reader-add-calendar`),
+  Continue editing when edits are kept, ♥, ⋯. A plan already on the calendar shows **On
+  calendar** in that place instead — a success-ink pill (`.plan-reader-scheduled`), a statement
+  and not a control. Edit, Remove from calendar, Duplicate, Archive
+  and Delete are behind the ⋯. The Workouts reader's Edit is a quiet ghost button.
+  Its scroll is a thin thumb at the sheet's edge with the rail's measured edge fade
+  (`has-fade-top`/`has-fade-bottom`). A kept session's "Planned and done" opens its activity
+  through `onOpenActivity` (App: Running or Strength by sport type, Activities for everything
+  else).
+  **The calendar is COROS's running copy of a plan** (`executeSubPlan`), which COROS keeps in step
+  with the calendar both ways: moving a session on the calendar moves it in the copy, and editing
+  the copy moves the calendar. Two things COROS does without a word, which
+  `TrainingPlanCalendarDialog` states before anything is written: **it counts the plan from the
+  Monday of the week the start day is in, and leaves off every session before the start** (a
+  Wednesday start loses week 1's Monday and Tuesday), and **it never checks the calendar** (a day
+  that holds a workout gets the plan's too). The month picker opens on the next Monday and
+  `previewPlanOnCalendar` is read again on every pick; it refuses a past start, a second run of a
+  plan already running, a run of a running copy, a plan with no sessions and a start that keeps
+  none. Whether a plan is already running is answered there from the cache (`runningInstanceId`) —
+  `/training/plan/query` is the heaviest thing COROS serves — and asked of COROS afresh by
+  `executeNativeCorosPlan` just before the write, which refuses a second run itself. "Remove from calendar" is `quitSubPlan` on the running copy, asked of either side — it
+  takes the plan's sessions and nothing else. **COROS gives a removed run `executeStatus 2`, the
+  status of one that ran out**, and moves no `version`; only `endDay`, set to the day of removal,
+  tells them apart. So the copy reads as `stopped`, never `finished`, and **a stopped run is not
+  listed** (`listedPlans`): COROS refuses `executeSubPlan` on it (1031), so there is nothing left
+  to do with it, and the plan it came from, where there is one, is the row. A running copy is
+  listed however its plan fares on COROS, for tracking; when that plan is gone (deleted, or the
+  run was applied from COROS's catalogue — `runOutlivesItsPlan`), "Remove from calendar" warns that
+  the run leaves the list and offers **Duplicate first**. A cached copy kept at an equal version
+  takes its calendar state from the list, or a removal would never reach it. **Saving an edit to a plan with a copy running asks
+  whether the calendar follows** — Keep editing / Save plan only / Save & update calendar
+  (`requestSave`) — because a save to the plan does not touch the copy. Updating is **not**
+  `plan/sync`: measured on 2026-09-25, a session moved in the plan and synced stayed on its old
+  day. `syncPlanToCalendar` rewrites the running copy through `plan/update` instead
+  (`planOntoRunningCopy`), which moves, adds and removes on the calendar in place — and only from
+  today on: a session on a day gone keeps what the copy holds, one before the run's start day is
+  left off. A change made on the calendar from today on is lost; the question says so. The question
+  is asked at the save because anywhere else it is left to memory. The choice survives a save
+  conflict's "Replace with my edit"; "Save as a new plan" has no calendar to update. A running copy whose plan is in the list folds into that plan's row
+  (`groupPlans`), or one plan is listed twice; one whose plan is not — applied in the COROS app
+  from a catalogue plan — stands on its own. **Whether a plan is on the calendar is
+  `PlanCalendarBadge`** — a mark before the name on the tile, the hero and the reader title,
+  sized in `em`, read from `calendar === "running"` or `runningInstanceId`, the same test that
+  picks Add or Remove in the ⋯. Compliance joins a running copy's `remoteId:idInPlan` to
+  `schedulePlanId:scheduleIdInPlan` on a match, which is exactly what a calendar session carries,
+  and a plan reads its figures off its running copy.
+  **A Coach plan stays in the conversation until it is saved** — a chat plan draft
+  (`chat_plan_drafts`), not a library draft, and not listed on the Plans tab. The card's Training
+  Plan destination saves it to COROS as one plan (`origin: "coach"`, the coach's `description` as
+  the overview, its `week_stages` as COROS's).
+  **A plan saved from COROS's official catalogue is written in localization keys** —
+  `name: "P10035"`, sessions `P10281`, descriptions `P11058`, steps `T1120` — which the
+  Training Hub web app resolves against a string table on its CDN
+  (`static.coros.com/locale/coros-traininghub-v2/en-US.prod.js`, keyless, 7,326 keys, vue-i18n
+  syntax, so `{'@'}` means `@`). `corosLocale.ts` fetches it into
+  `<userData>/coros-locale/`, refreshes weekly, and `corosText` swaps a whole value that is a
+  key and nothing else; `nativePlanToDocument` and the library workout names go through it.
+  Three more facts that conversion got wrong on the same plan: **every program arrives with
+  its `exercises`**, even from the list endpoint, and were being dropped (so no COROS session
+  had steps) — they now go program → editor draft → plan input, the editor's own path, and
+  `readNativeCorosPlan` no longer re-fetches a program that already has them (87 requests to
+  open one plan); **a program's `distance` is centimetres** (a 3.5 km run read as 356 km); and
+  **`totalSets` counts steps** on anything but strength. A catalogue plan is not locked
+  (`officalConfig.isOffical: 0`), so it saves like any other.
+  `npm run test:coros-official-plan` holds all of it; `npm run test:coros-plan-writes` holds the
+  write bodies, every endpoint, and the library's saves, calendar and Coach flows against a fake
+  COROS that keeps what it is sent; `npm run verify:coros-plan-api -- --live` repeats the round on
+  the real account with temporary data.
+  The renderer-side arithmetic is in `planFilters.ts`, `planCompliance.ts`, `planReaderModel.ts`,
+  `planEditorModel.ts` and `planDraft.ts`, outside the components for the reason
+  `activityFilters.ts` sits outside `ActivitiesView`. Two rules they exist to state: compliance is
+  `undefined` rather than 0% for a plan not on the calendar, and a session with no match has **no
+  status** rather than "upcoming". `planEntryMetrics` is exported from `trainingPlanDomain.ts` so
+  the row's total and the reader's per-session figures cannot disagree.
+  **The workout list states what the list row carries, and nothing it would have to ask for.**
+  Probed field by field against the live API on 2026-09-22: `/training/program/query` answers
+  with a trimmed row where `trainingLoad`, `essence`, `estimatedValue`, `duration`, `distance`
+  and `estimatedDistance` are **all `0`**, which is why an hour's easy run reads back as a
+  volume of `"1 set(s)"` — `formatUpcomingWorkoutVolume` sees no distance and counts sets
+  instead. What the row does fill in is `exerciseNum`, `totalSets` and `estimatedTime` — the
+  last equals the detail's own `duration` exactly — so `TrainingHubLibraryWorkout` carries
+  `exerciseCount`, `setCount` and `durationSeconds`; the list's columns are **Workout /
+  Exercises / Sets**, and the plan editor's library picker states the time. All three are there
+  in the first paint with no second request. The head that came before, "Workout / Total", stood
+  over the COROS volume string and so named a column that was lying.
+  **A training load is a different matter: only `/training/program/calculate` reports one, and
+  only for a step that carries an intensity target.** Measured: `0` for all six strength
+  sessions in this library and for a distance-only 8 km run, `193` for the same run given a
+  pace band and `104` given a heart-rate band. `/training/program/detail` stores `0` even where
+  `calculate` would answer `193`. So "Load is always 0" is mostly COROS's own answer, and there
+  is no way to obtain one without a `calculate` POST per workout — which is why no column is
+  labelled `Training load` to draw "—" down the whole library. The detail is fetched per visible
+  row anyway, for the row's session shape (`WorkoutDetail` in `WorkoutWorkspace.tsx`); nothing
+  else is asked of COROS.
+  `toProgramFigure` states the rule the rest of `trainingHubService.ts` already followed by
+  hand: **on a COROS program a `0` is a field that was not filled in**, so a `??` chain over
+  these must not stop at one — which is what left `resolveUpcomingWorkoutLoad` unable to reach
+  either of its fallbacks and `previewFromProgram` unable to reach `estimatedTime`.
+  **The list's header is the list's, and the workouts tab has no selection.** The filter chips,
+  the search and the sort sat above the split, so controls that narrow a list were laid out over
+  the pane the list opens; the chips and the search are the column's header now.
+  **The sort went with them, and the list is in name order.** The dropdown offered `Name`,
+  `Duration` and `Training load`, and two of those three could not order anything: the figure
+  a sort by either reads lives on the detail, which arrives a few rows at a time as tiles
+  scroll into view, so the list re-ordered itself under the reader while it was being read —
+  and until a row's detail landed the sort fell back to the list row, where COROS answers `0`
+  for both. Name is the one key every row carries in its first paint, and a library is a list
+  of names. Reintroducing a figure sort means fetching the detail for the whole library first,
+  which is one request per workout.
+  **A name too long for its column ends in an ellipsis, and that needs its own box.**
+  `.tl-row-name` is the flex line — the favourite heart, then the name — and `text-overflow`
+  acts on a block's own inline content, while the text of a flex container is an anonymous
+  flex item. The rules sat on the flex line, so a long name was cut flat at the column edge
+  with nothing to say it had been; they belong on `.tl-row-name-text`.
+  The head is a **sibling of the
+  scrolling list, not the first thing inside it**: sticky within the scroller it stayed put, but
+  the scrollbar is the scroller's own and ran the full height, so a thumb slid past a row that
+  does not move. `.tl-catalog > .tl-index-head` reserves the same gutter with `scrollbar-gutter:
+  stable` over `overflow: hidden` — measured, that takes the same 15px off its content box as a
+  real scrollbar does, which is what keeps each label over its own figures.
+  **The reader's dock is one row, and scheduling is a button in it.** Scheduling had a row of
+  its own above the four actions — an icon, a heading, a date field and a button, standing open
+  across the whole dock for a decision that is made once and then not again. It is a trigger at
+  the head of the row now, beside Edit, and Delete still sits apart at the far end on its
+  `margin-left: auto`. What opens is a **month grid**, not an `<input type="date">`: the native
+  field is drawn by the platform rather than by this app, and it says nothing about the week a
+  session would land in, which is the thing being decided. `MonthDayPicker` builds it from
+  `monthGridWeeks` (`src/calendar/dateUtils.ts`), so a day here and the same day on the calendar
+  screen cannot fall in different weeks. The panel opens **upward** — the dock is the bottom
+  edge of the reader — and is dismissed by a press outside it or by Escape **in the capture
+  phase**, for the reason `OptionGroup` takes it there. It is exempt in `test:option-groups` as
+  a grid whose arrangement is the control.
+  `tomorrow()` now reads the local clock through `keyFromDate` rather than
+  `toISOString().slice(0, 10)`, which reports the day in UTC — a morning east of Greenwich came
+  back as today, so the earliest day the picker offered was one already half spent. The state it
+  feeds is a COROS happen-day key (`yyyyMMdd`) end to end, so nothing reshapes it on the way to
+  `scheduleLibraryWorkout`.
+  The checkbox went from the tiles: the rows in the list layout never had one, so a selection
+  could only be made in tiles and every bulk action was reachable from half the screen — which
+  took the bulk toolbar and its JSON export too. Tagging and deleting are the reader's, acting
+  on the workout on screen.
+  **Three dead facts are gone rather than left saying nothing: the reference line, the
+  `Most used` sort and `lastUsedAt`.** "Not referenced by a plan or a calendar day" was a
+  constant — both counts match the workout's COROS program id against other records and neither
+  match can land: nothing in the renderer writes a plan entry's `programId` from a library
+  workout (the plan editor builds its sessions inline, and the only non-null ones come from an
+  imported COROS plan, whose sessions are plan-internal programs with ids of their own —
+  verified, no library id appears in any plan in this store), and COROS stores a scheduled
+  workout as its own copy under its own id. So every tile read "Unused" and `Most used` ordered
+  by one constant. `usedByPlanIds`, `scheduledCount` and `lastUsedAt` are off
+  `TrainingLibraryWorkout`; the `last_used_at` column and `TrainingWorkoutMetadata.lastUsedAt`
+  stay, because that table syncs and nulling a column on every save would rewrite the value on
+  every machine. Tying a library workout to the plan or the day that used it needs a link
+  recorded at the moment of use, which is a change to what is stored rather than to what is
+  read — reintroducing any of these starts there.
+  See [docs/training-library-architecture.md](docs/training-library-architecture.md).
 - **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
   has, in one list, with a detail pane beside it. It is the only screen some sports ever
   reach — Running covers sport codes 100–103 and Strength 400/402, so a ride, a hike, a swim
@@ -1101,14 +1386,27 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Seventeen controls are exempt**, each named in the test by file *and* by a string from the
+**Twelve controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
-none is a row of options: a grid whose arrangement carries meaning, cards that need a
-sentence (export formats, analysis starters), a list of records (plans, places, search
-results) and a table's sort header.
+none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
+cards that need a sentence (export formats, plan difficulty, analysis starters), a list of
+records (places, search results, exercise facets, muscle layers) and a menu (the base-map
+popup, the start-up view).
+
+**A feature stylesheet must not restate type for whole element types.** The Training Library
+had `.training-library-view :is(button, input, select, textarea) { font: inherit }` — one class
+and one element, exactly the specificity of `.option-group button`, and feature stylesheets load
+after `styles.css`, so it won on source order and the `font` shorthand reset the size every
+component had set. **Every shared control on that screen drew at the page's 16px**: measured, the
+collapsed filter chip came out 16px there against 12px for the same chip elsewhere in the app,
+and so did the select triggers and the buttons. It is `:where(.training-library-view)` now, which
+contributes nothing to specificity — above the UA's own 13.33px Arial on a bare control, below
+anything a component says. This is the trap the note below describes, with a blanket selector
+instead of one rule, so it is worth checking a screen's controls against the same control
+elsewhere rather than against how they look.
 
 **The design vocabulary is a closed set, and `npm run test:design-vocabulary` closes it.**
-Four weights (400/500/600/700), nine font sizes (10/11/12/13/14/18/22/28/36px) plus two
+Four weights (400/500/600/700), ten font sizes (10/11/12/13/14/18/22/28/32/36px) plus two
 `em` steps for text that must follow its parent, four tracking steps
 (`-0.02em` / `0` / `0.06em` / `0.1em`), five unitless leading steps (`1` for figures and
 chips, `1.2` display, `1.3` headings and dense rows, `1.45` body, `1.6` long prose) and six

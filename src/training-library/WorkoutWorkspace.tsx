@@ -1,184 +1,85 @@
 import {
   CalendarPlus,
   Copy,
-  Download,
   Heart,
-  History,
-  Layers,
-  LayoutGrid,
-  Link2,
-  List,
   LoaderCircle,
   Pencil,
   Plus,
-  Route,
-  Search,
   Tag,
-  Trash2,
-  Unlink,
-  X
+  Trash2
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   RunWorkoutEditorNode,
-  TrainingCollection,
   TrainingLibraryWorkout,
   UnitSystem,
-  WorkoutEditPreview,
   WorkoutEditorDocument
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { OptionGroup } from "../components/OptionGroup";
+import { CollapsibleSearch } from "./LibrarySearch";
 import { formatHappenDayLabel } from "../training/formatters";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { workoutSportFromType } from "../../electron/trainingPlanDomain";
-import { SportBadge, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
-import { SelectDropdown } from "../components/SelectDropdown";
-import { WorkoutEditorModal } from "../calendar/WorkoutEditorModal";
+import { SportBadge, sportAccentStyle } from "./sportTheme";
+import { keyFromDate } from "../calendar/dateUtils";
+import { MonthDayPicker } from "./MonthDayPicker";
+import { PromptDialog } from "./PromptDialog";
+import { compareFavoriteThenName } from "./libraryOrder";
+import { TAG_MAX_LENGTH, clampTagInput, parseTagInput } from "./tagInput";
+import { WorkoutReadOnlyBody } from "../calendar/WorkoutEditorModal";
+import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { AddWorkoutModal } from "../calendar/AddWorkoutModal";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue, formatElevationValue } from "../units/units";
 import {
   defineSelectionPreference,
-  selectionIsOneOf,
   useSelectionPreference
 } from "../preferences/selectionPreferences";
 
 interface WorkoutWorkspaceProps {
   api: CorosLinkApi;
   workouts: TrainingLibraryWorkout[];
-  collections: TrainingCollection[];
   onRefresh: () => Promise<void>;
   onMessage: (message: string) => void;
   onError: (message: string) => void;
 }
-
-type WorkoutColumn = "name" | "total" | "load" | "used";
-
-interface WorkoutSort {
-  column: WorkoutColumn;
-  descending: boolean;
-}
-
-const WORKOUT_COLUMNS: Array<{ id: WorkoutColumn; label: string }> = [
-  { id: "total", label: "Total" },
-  { id: "load", label: "Load" },
-  { id: "used", label: "Used" }
-];
-
-/** Tiles have no column headings to click, so sorting gets its own control. */
-const WORKOUT_SORT_OPTIONS: Array<{ value: WorkoutColumn; label: string }> = [
-  { value: "name", label: "Name" },
-  { value: "total", label: "Duration" },
-  { value: "load", label: "Training load" },
-  { value: "used", label: "Most used" }
-];
 
 const WORKOUT_SCOPE_PREFERENCE = defineSelectionPreference<string>({
   key: "trainingLibrary.workouts.scope",
   defaultValue: "all",
   validate: (value): value is string =>
     typeof value === "string" &&
-    (["all", "favorite", "unsettled"].includes(value) || /^sport:\d+$/.test(value))
+    (["all", "favorite", "unsettled"].includes(value) ||
+      /^sport:\d+$/.test(value))
 });
-
-const WORKOUT_SORT_PREFERENCE = defineSelectionPreference<WorkoutSort>({
-  key: "trainingLibrary.workouts.sort",
-  defaultValue: { column: "name", descending: false },
-  validate: (value): value is WorkoutSort => {
-    if (typeof value !== "object" || value === null) return false;
-    const candidate = value as Record<string, unknown>;
-    return (
-      ["name", "total", "load", "used"].includes(String(candidate.column)) &&
-      typeof candidate.descending === "boolean"
-    );
-  }
-});
-
-const WORKOUT_LAYOUT_PREFERENCE =
-  defineSelectionPreference<"grid" | "list">({
-    key: "trainingLibrary.workouts.layout",
-    defaultValue: "grid",
-    validate: selectionIsOneOf(["grid", "list"])
-  });
 
 const UNSETTLED_SYNC = new Set(["pending", "conflicted", "failed", "stale"]);
 /** Enough segments to read an interval comb without drawing thousands of them. */
 const SHAPE_SEGMENT_LIMIT = 96;
 /*
- * A tile's shape needs the step list, and COROS only ships that on
- * /training/program/detail — one request per workout. So tiles ask for it only
+ * A row's shape needs the step list, and COROS only ships that on
+ * /training/program/detail — one request per workout. So rows ask for it only
  * once they scroll into view, a few at a time, and never twice for the same
  * workout. Browsing the library costs a handful of requests, not sixty.
  */
 const SHAPE_BATCH = 3;
-/** Draws the comb a beat before the tile lands, so it is never seen filling in. */
+/** Draws the line a beat before the row lands, so it is never seen filling in. */
 const SHAPE_PREFETCH_MARGIN = "160px";
-const DISTANCE_VOLUME_PATTERN = /([\d.]+)\s*(km|mi|yd|m)\b/i;
-
-/** Legend wording for the step kinds the shape bar can draw, in session order. */
-const STEP_KIND_LABELS: Record<string, string> = {
-  warmup: "Warm-up",
-  training: "Work",
-  rest: "Rest",
-  cooldown: "Cool-down",
-  sendOff: "Send-off"
-};
-const STEP_KIND_ORDER = Object.keys(STEP_KIND_LABELS);
-
-function metricFromVolume(volume: string | undefined, kind: "duration" | "distance"): number {
-  const value = volume?.toLowerCase() ?? "";
-  if (kind === "duration") {
-    const hours = Number(value.match(/([\d.]+)\s*h/)?.[1] ?? 0);
-    const minutes = Number(value.match(/([\d.]+)\s*m(?:in)?/)?.[1] ?? 0);
-    return hours * 3600 + minutes * 60;
-  }
-  const distance = Number(value.match(DISTANCE_VOLUME_PATTERN)?.[1] ?? 0);
-  if (value.includes(" km")) return distance * 1000;
-  if (value.includes(" mi")) return distance * 1609.344;
-  if (value.includes(" yd")) return distance * 0.9144;
-  return distance;
-}
-
-function formatWorkoutVolume(
-  volume: string | undefined,
-  unitSystem: UnitSystem,
-  swim = false
-): string | undefined {
-  if (!volume || !DISTANCE_VOLUME_PATTERN.test(volume)) return volume;
-  const meters = metricFromVolume(volume, "distance");
-  if (unitSystem === "metric" && !swim && meters < 1000) {
-    return `${Math.round(meters)} m`;
-  }
-  return formatDistanceValue(meters, unitSystem, {
-    swim,
-    ...(swim ? { digits: 0 } : {})
-  });
-}
-
+/**
+ * Tomorrow, as a COROS happen-day key.
+ *
+ * Read off the local clock, not `toISOString()`, which reports the day in UTC:
+ * a morning east of Greenwich is still yesterday there, so "tomorrow" came
+ * back as today and the earliest day the picker offered was one the athlete
+ * had already half spent.
+ */
 function tomorrow(): string {
   const date = new Date();
   date.setDate(date.getDate() + 1);
-  return date.toISOString().slice(0, 10);
-}
-
-/** How long ago a workout was last scheduled, short enough for a tile footer. */
-function sinceLabel(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const then = new Date(iso).valueOf();
-  if (Number.isNaN(then)) return null;
-  const days = Math.max(0, Math.round((Date.now() - then) / 86_400_000));
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days}d ago`;
-  if (days < 60) return `${Math.round(days / 7)}w ago`;
-  if (days < 365) return `${Math.round(days / 30)}mo ago`;
-  return `${Math.round(days / 365)}y ago`;
-}
-
-/** COROS reports volume as a distance or a set count; the icon says which. */
-function isSetVolume(volume: string | undefined): boolean {
-  return /set/i.test(volume ?? "");
+  return keyFromDate(date);
 }
 
 function targetLabel(
@@ -206,11 +107,6 @@ function targetLabel(
   return "Open";
 }
 
-/** Repeat groups carry no kind of their own; they borrow their first child's. */
-function nodeKind(node: RunWorkoutEditorNode): string | undefined {
-  return node.nodeType === "step" ? node.kind : node.steps[0]?.kind;
-}
-
 interface ShapeSegment {
   kind: string;
   share: number;
@@ -232,7 +128,9 @@ function workoutShape(
   const push = (node: RunWorkoutEditorNode) => {
     if (segments.length >= SHAPE_SEGMENT_LIMIT || node.nodeType === "repeat") return;
     const target = node.target;
-    const weight =
+    /* Per set, times the sets — the weighting the reader's strength bar
+       uses, so a row's line and the chart it opens agree. */
+    const perSet =
       target.type === "time"
         ? target.seconds
         : target.type === "distance"
@@ -240,6 +138,7 @@ function workoutShape(
           : target.type === "reps"
             ? target.count * 4
             : 120;
+    const weight = perSet * Math.max(1, node.sets ?? 1);
     segments.push({
       kind: node.kind,
       share: Math.max(weight, 1),
@@ -264,7 +163,8 @@ function workoutShape(
 /*
  * The calendar's structure bar sizes its segments by flex-grow and floors the
  * tiny ones, so a 20-second recovery between reps never collapses to nothing.
- * The tile borrows the rule outright — the two bars should read as one idea.
+ * The row's line borrows the rule outright — the two bars should read as one
+ * idea, one drawn a few pixels high.
  */
 function combGrow(segments: ShapeSegment[]): number[] {
   const largest = Math.max(0, ...segments.map((segment) => segment.share));
@@ -274,28 +174,32 @@ function combGrow(segments: ShapeSegment[]): number[] {
 }
 
 /*
- * Past this many steps the gapped pills stop fitting a tile's width, so the
- * comb closes up into a striped band instead of overflowing. A 20 × 30s set
- * genuinely looks like that.
+ * Past this many steps the gapped segments stop fitting the row's width, so
+ * the line closes up into a striped band instead of overflowing. A 20 × 30s
+ * set genuinely looks like that.
  */
 const COMB_DENSE_AT = 30;
 
-function downloadSelection(workouts: TrainingLibraryWorkout[]) {
-  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), workouts }, null, 2)], {
-    type: "application/json"
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `coroslink-workouts-${new Date().toISOString().slice(0, 10)}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+/**
+ * What one `/training/program/detail` answer is worth to a row: its session
+ * shape. The figures beside it — `exerciseNum` and `totalSets` — come off the
+ * list itself, so neither waits on this.
+ */
+interface WorkoutDetail {
+  shape: ShapeSegment[];
+}
+
+function workoutDetail(
+  document: WorkoutEditorDocument,
+  unitSystem: UnitSystem
+): WorkoutDetail {
+  const swim = document.draft.sport === "swim";
+  return { shape: workoutShape(document.draft.nodes, unitSystem, swim) };
 }
 
 export function WorkoutWorkspace({
   api,
   workouts,
-  collections,
   onRefresh,
   onMessage,
   onError
@@ -305,28 +209,37 @@ export function WorkoutWorkspace({
   const [scope, setScope] = useSelectionPreference(
     WORKOUT_SCOPE_PREFERENCE
   );
-  const [sort, setSort] = useSelectionPreference(WORKOUT_SORT_PREFERENCE);
-  const [layout, setLayout] = useSelectionPreference(
-    WORKOUT_LAYOUT_PREFERENCE
-  );
-  const [selected, setSelected] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(workouts[0]?.id ?? null);
   const [visibleCount, setVisibleCount] = useState(60);
   const [previewDocument, setPreviewDocument] = useState<WorkoutEditorDocument | null>(null);
-  const [previewMetrics, setPreviewMetrics] = useState<WorkoutEditPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState(tomorrow);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const scheduleRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<string[]>([]);
-  const [duplicateSport, setDuplicateSport] = useState<number | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<TrainingLibraryWorkout | null>(null);
   const [creating, setCreating] = useState(false);
-  /** Step structure per workout id; an empty array means "asked, none to draw". */
-  const [shapes, setShapes] = useState<Record<string, ShapeSegment[]>>({});
+  const [prompting, setPrompting] = useState<"duplicate" | "tags" | null>(null);
+  /** What the detail said, per workout id. Present means "asked and answered". */
+  const [details, setDetails] = useState<Record<string, WorkoutDetail>>({});
   const [shapeQueue, setShapeQueue] = useState<string[]>([]);
   const requestedShapes = useRef(new Set<string>());
   const shapeBusy = useRef(false);
   const shapeObserver = useRef<IntersectionObserver | null>(null);
+
+  /*
+   * COROS's movement catalog for the selected workout's sport. A strength
+   * step's own `exerciseName` is a localization key — the live library answers
+   * `T1041` for a bench press — so without this every exercise in a session
+   * reads as its step kind, which is the same word nine times. The hook holds
+   * one request per sport for the life of the window and answers every other
+   * sport with an empty catalog rather than a request.
+   */
+  const exerciseCatalog = useWorkoutExerciseCatalog(
+    api,
+    workoutSportFromType(workouts.find((workout) => workout.id === activeId)?.sportType)
+  );
 
   const scopes = useMemo(() => {
     const options = [{ id: "all", label: "All" }];
@@ -353,6 +266,49 @@ export function WorkoutWorkspace({
     if (!scopeAvailable) setScope("all");
   }, [scopeAvailable, setScope]);
 
+  /*
+   * The schedule panel is folded again by reading another workout. It hangs
+   * off the dock rather than off the workout, so nothing else takes it down —
+   * and a date chosen for one session standing open over the next one is an
+   * offer to schedule the wrong thing.
+   */
+  useEffect(() => {
+    setScheduleOpen(false);
+  }, [activeId]);
+
+  /*
+   * Open, it is dismissed by a press outside it or by Escape.
+   *
+   * Escape is taken in the capture phase for the reason `OptionGroup` takes
+   * it there: the reader sits inside a screen whose modals close on Escape
+   * from their own `document` listener, and two listeners on one node are not
+   * separated by `stopPropagation()`.
+   */
+  useEffect(() => {
+    if (!scheduleOpen) return;
+    /* Opened, the keyboard lands on the day that is already chosen, so the
+       grid can be walked from where the decision starts. */
+    scheduleRef.current
+      ?.querySelector<HTMLButtonElement>(".tl-daypick-day.is-selected")
+      ?.focus();
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!scheduleRef.current?.contains(event.target as Node)) setScheduleOpen(false);
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setScheduleOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [scheduleOpen]);
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matching = workouts.filter((workout) => {
@@ -365,34 +321,20 @@ export function WorkoutWorkspace({
       return true;
     });
 
-    const direction = sort.descending ? -1 : 1;
-    return matching.sort((left, right) => {
-      if (sort.column === "name") return left.name.localeCompare(right.name) * direction;
-      if (sort.column === "load") {
-        return ((left.trainingLoad ?? 0) - (right.trainingLoad ?? 0)) * direction;
-      }
-      if (sort.column === "used") {
-        return (
-          (left.usedByPlanIds.length + left.scheduledCount - right.usedByPlanIds.length - right.scheduledCount) *
-          direction
-        );
-      }
-      return (
-        (metricFromVolume(left.volume, "duration") - metricFromVolume(right.volume, "duration")) * direction
-      );
-    });
-  }, [workouts, query, scope, sort]);
-
-  /*
-   * The tile meter is self-referential: a bar reads as a share of the heaviest
-   * workout in the library, so it stays honest without asserting thresholds
-   * COROS never publishes. The whole library, not the filtered set, so the bars
-   * do not resize under the reader when a filter changes.
-   */
-  const heaviestLoad = useMemo(
-    () => workouts.reduce((most, workout) => Math.max(most, workout.trainingLoad ?? 0), 0),
-    [workouts]
-  );
+    /*
+     * One order — favourites first, then by name — and no control to change it.
+     *
+     * `Name`, `Duration` and `Training load` stood in a dropdown here, and two
+     * of the three could not order anything: the detail a figure sort reads
+     * arrives a few rows at a time, as tiles scroll into view, so the list
+     * re-ordered itself under the reader while it was being read — and a
+     * library the athlete had not scrolled through yet sorted by the list
+     * row's figures, which `/training/program/query` answers with `0` for
+     * every workout it holds. Name and the favourite flag are the keys every
+     * row carries in its first paint. See `libraryOrder.ts`.
+     */
+    return matching.sort(compareFavoriteThenName);
+  }, [workouts, query, scope]);
 
   /*
    * The observer is built on the first tile that mounts rather than in an
@@ -427,32 +369,55 @@ export function WorkoutWorkspace({
     []
   );
 
-  /* One batch in flight at a time; finishing it trims the queue and re-runs. */
+  /*
+   * One batch in flight at a time; finishing it trims the queue, and the
+   * shorter queue re-runs this.
+   *
+   * **Nothing here may be abandoned on cleanup, and that is the whole point.**
+   * This used to hold a `cancelled` flag that its cleanup raised, which
+   * deadlocked the moment the observer saw a second tile — which is to say
+   * immediately, every time, because a screen of tiles reports in more than
+   * one callback:
+   *
+   *   1. queue grows        → deps change → cleanup raises `cancelled`
+   *   2. effect re-runs     → `shapeBusy` is still true → returns at once
+   *   3. the batch settles  → `cancelled`, so its shapes are thrown away and
+   *                           the queue is never trimmed
+   *   4. `shapeBusy` is false, the queue is full, and no state changed —
+   *      so nothing ever runs again
+   *
+   * Every tile then drew its load bar instead of its shape for the life of
+   * the window, and the only thing that filled one in was opening that
+   * workout, because the reader writes its own shape on the way past. It
+   * typechecks, throws nothing, and looks like a design decision.
+   *
+   * A `setShapes` after unmount is a no-op in React 18, so there is nothing
+   * to protect against here that is worth a stall.
+   */
   useEffect(() => {
     if (shapeBusy.current || !shapeQueue.length) return;
     shapeBusy.current = true;
     const batch = shapeQueue.slice(0, SHAPE_BATCH);
-    let cancelled = false;
 
     void Promise.all(
       batch.map(async (id) => {
-        let segments: ShapeSegment[] = [];
+        let detail: WorkoutDetail = { shape: [] };
         try {
-          const document = await api.getWorkoutForEdit({ kind: "library", programId: id }, unitSystem);
-          segments = workoutShape(document.draft.nodes, unitSystem, document.draft.sport === "swim");
+          detail = workoutDetail(
+            await api.getWorkoutForEdit({ kind: "library", programId: id }, unitSystem),
+            unitSystem
+          );
         } catch {
-          /* A tile that cannot draw its shape falls back to its load bar. */
+          /* A row that cannot read its detail draws no line. */
         }
-        if (!cancelled) setShapes((current) => ({ ...current, [id]: segments }));
+        setDetails((current) => ({ ...current, [id]: detail }));
       })
     ).finally(() => {
       shapeBusy.current = false;
-      if (!cancelled) setShapeQueue((current) => current.slice(batch.length));
+      /* By id, not by count: the observer appends while a batch is in flight,
+         so the queue this trims is not the one the batch was taken from. */
+      setShapeQueue((current) => current.filter((id) => !batch.includes(id)));
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [api, shapeQueue, unitSystem]);
 
   /*
@@ -461,7 +426,7 @@ export function WorkoutWorkspace({
    * the viewport edge again to announce itself.
    */
   const redrawShape = useCallback((id: string) => {
-    setShapes((current) => {
+    setDetails((current) => {
       const next = { ...current };
       delete next[id];
       return next;
@@ -471,50 +436,50 @@ export function WorkoutWorkspace({
   }, []);
 
   const active = workouts.find((workout) => workout.id === activeId);
-  const shape = useMemo(
-    () => previewDocument
-      ? workoutShape(previewDocument.draft.nodes, unitSystem, previewDocument.draft.sport === "swim")
-      : [],
-    [previewDocument, unitSystem]
-  );
-  /** Kinds actually drawn, in session order, so the legend never lists a ghost. */
-  const shapeKinds = useMemo(
-    () => STEP_KIND_ORDER.filter((kind) => shape.some((segment) => segment.kind === kind)),
-    [shape]
+
+  /*
+   * One object per workout being edited, not one per render. The editor loads
+   * its document in an effect keyed on this ref, and a literal written into
+   * the JSX was a new object every time this screen rendered — which it does
+   * a few seconds after the editor opens, when the next batch of row shapes
+   * lands. Each of those threw the draft away and loaded it again: a flash
+   * back to the skeleton, and any edit made in the meantime gone.
+   */
+  const editRef = useMemo(
+    () => (editId ? { kind: "library" as const, programId: editId } : null),
+    [editId]
   );
 
   useEffect(() => {
     if (!activeId) {
       setPreviewDocument(null);
-      setPreviewMetrics(null);
       return;
     }
     let cancelled = false;
     setPreviewLoading(true);
     setPreviewDocument(null);
-    setPreviewMetrics(null);
+    /* Claimed before the request, not after it: the tile observer runs while
+       this is in flight, and would otherwise queue the same workout for a
+       shape this call is already fetching — one duplicate COROS request per
+       mount, for whichever workout the reader opens with. */
+    requestedShapes.current.add(activeId);
     void api
       .getWorkoutForEdit({ kind: "library", programId: activeId }, unitSystem)
       .then(async (document) => {
         if (cancelled) return;
         setPreviewDocument(document);
-        /* The reader just paid for this workout's steps; its tile draws for free. */
-        requestedShapes.current.add(activeId);
-        setShapes((current) => ({
+        /* The reader just paid for this workout's detail; its row reads it free. */
+        setDetails((current) => ({
           ...current,
-          [activeId]: workoutShape(document.draft.nodes, unitSystem, document.draft.sport === "swim")
+          [activeId]: workoutDetail(document, unitSystem)
         }));
-        try {
-          const metrics = await api.previewWorkoutEdit(
-            document.ref,
-            document.revision,
-            document.draft,
-            unitSystem
-          );
-          if (!cancelled) setPreviewMetrics(metrics);
-        } catch {
-          // The complete step structure is still useful when the estimate is unavailable.
-        }
+        /*
+         * `previewWorkoutEdit` stood here — a second COROS request per
+         * selection, whose whole job was to fill a four-figure strip above
+         * the steps. The shared view computes every one of those from the
+         * draft that has already arrived, so selecting a workout costs one
+         * request now instead of two.
+         */
       })
       .catch((cause: unknown) => {
         if (!cancelled) onError(cause instanceof Error ? cause.message : String(cause));
@@ -543,10 +508,13 @@ export function WorkoutWorkspace({
     if (!active || !scheduleDate) return;
     setBusy("schedule");
     try {
-      const happenDay = scheduleDate.replace(/-/g, "");
+      const happenDay = scheduleDate;
       await api.scheduleLibraryWorkout(active.id, happenDay);
-      await api.updateWorkoutMetadata([active.id], { lastUsedAt: new Date().toISOString() });
       onMessage(`Scheduled "${active.name}" on ${formatHappenDayLabel(happenDay)}.`);
+      /* Folded again on the way out: the date has been spent, and a panel
+         left standing open reads as though nothing happened. It stays open
+         on a failure, where the date is still the thing being decided. */
+      setScheduleOpen(false);
       await onRefresh();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
@@ -555,16 +523,15 @@ export function WorkoutWorkspace({
     }
   };
 
-  const duplicate = async () => {
-    if (!active) return;
-    const name = window.prompt("Name for the duplicate", `${active.name} Copy`);
-    if (!name?.trim()) return;
+  const duplicate = async (name: string) => {
+    if (!active || !name.trim()) return;
+    setPrompting(null);
     setBusy("duplicate");
     try {
       const result = await api.duplicateLibraryWorkout(
         active.id,
         name.trim(),
-        duplicateSport ?? active.sportType
+        active.sportType
       );
       onMessage(`Created "${result.name}" in the workout library.`);
       await onRefresh();
@@ -576,24 +543,20 @@ export function WorkoutWorkspace({
     }
   };
 
-  const applyTags = () => {
-    const targets = selected.length ? selected : activeId ? [activeId] : [];
-    if (!targets.length) return;
-    const existing = workouts.find((workout) => targets.includes(workout.id))?.tags.join(", ") ?? "";
-    const value = window.prompt("Tags, separated by commas", existing);
-    if (value === null) return;
-    void updateMetadata(targets, {
-      tags: [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]
-    });
+  /* Tags are the reader's: they act on the workout on screen. */
+  const saveTags = (value: string) => {
+    setPrompting(null);
+    if (!activeId) return;
+    void updateMetadata([activeId], { tags: parseTagInput(value) });
   };
 
   const deleteConfirmed = async () => {
+    if (!pendingDelete || busy === "delete") return;
     setBusy("delete");
     try {
-      await api.deleteTrainingLibraryWorkouts({ programIds: pendingDelete, confirmed: true });
-      onMessage(`Deleted ${pendingDelete.length} workout${pendingDelete.length === 1 ? "" : "s"} from COROS.`);
-      setSelected([]);
-      setPendingDelete([]);
+      await api.deleteTrainingLibraryWorkouts({ programIds: [pendingDelete.id], confirmed: true });
+      onMessage(`Deleted "${pendingDelete.name}" from COROS.`);
+      setPendingDelete(null);
       setActiveId(null);
       await onRefresh();
     } catch (cause) {
@@ -603,651 +566,408 @@ export function WorkoutWorkspace({
     }
   };
 
-  /** Shared by the tile and the row so selection behaves identically. */
-  const workoutMark = (id: string, name: string, isSelected: boolean) => (
-    <button
-      type="button"
-      className="tl-mark"
-      role="checkbox"
-      aria-checked={isSelected}
-      aria-label={`Select ${name}`}
-      onClick={() =>
-        setSelected((current) =>
-          current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
-        )
-      }
-    />
-  );
-
-  const toggleSort = (column: WorkoutColumn) =>
-    setSort((current) =>
-      current.column === column
-        ? { column, descending: !current.descending }
-        : { column, descending: column !== "name" }
-    );
-
-  const sortIndicator = (column: WorkoutColumn) =>
-    sort.column === column ? (sort.descending ? " ↓" : " ↑") : "";
-
-  const exportTargets = selected.length
-    ? workouts.filter((workout) => selected.includes(workout.id))
-    : active
-      ? [active]
-      : [];
-
-  /*
-   * Reader figures resolve once, so a cell the strip has to ellipsize can
-   * still carry its full string on the title attribute.
-   */
-  const readerTime = previewMetrics?.durationSeconds
-    ? `${Math.round(previewMetrics.durationSeconds / 60)}m`
-    : null;
-  const activeSport = workoutSportFromType(active?.sportType);
-  const readerDistance = previewMetrics?.distanceMeters
-    ? formatDistanceValue(previewMetrics.distanceMeters, unitSystem, {
-        swim: activeSport === "swim",
-        ...(activeSport === "swim" ? { digits: 0 } : {})
-      })
-    : (formatWorkoutVolume(active?.volume, unitSystem, activeSport === "swim") ?? null);
-  const readerLoadSource = previewMetrics?.trainingLoad || active?.trainingLoad;
-  const readerLoad = readerLoadSource ? Math.round(readerLoadSource) : null;
-  const readerSteps = previewDocument?.draft.nodes.length ?? null;
-  const ActiveSportIcon = sportTheme(activeSport).icon;
-
   return (
-    <div className="tl-panel tl-split">
-      <section className="tl-catalog" aria-label={`${filtered.length} workouts`}>
-        <div className="tl-filters">
-          <label className="tl-search">
-            <Search size={15} />
-            <span className="sr-only">Search workouts</span>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search workouts and tags"
-            />
-          </label>
-          <OptionGroup
-            label="Filter workouts"
-            className="tl-chips"
-            value={scope}
-            options={scopes.map((option) => ({
-              value: option.id,
-              label: option.label
-            }))}
-            onChange={setScope}
-          />
-          <div className="tl-filters-tail">
-            <SelectDropdown
-              className="tl-quiet-select"
-              label="Sort workouts"
-              value={sort.column}
-              options={WORKOUT_SORT_OPTIONS}
-              onChange={(value) => setSort({ column: value, descending: value !== "name" })}
-            />
+    <div className="tl-panel tl-workouts">
+      <div className="tl-split">
+        <section className="tl-catalog" aria-label={`${filtered.length} workouts`}>
+          {/*
+           * The list's own header, not the screen's. It stood above the split,
+           * spanning both panes, which put the chips and the search over the
+           * reader as well — controls that narrow a list, laid out over the
+           * thing the list opens. The census that used to head the column
+           * ("Workout / Total") is gone with it, and so is the sort: a
+           * dropdown over `Name`, `Duration` and `Training load` offered two
+           * orders COROS has no figures for. What narrows the list is here —
+           * the scope chips and the search; what the list is in is one order,
+           * by name.
+           */}
+          <div className="tl-filters">
             <OptionGroup
-              label="Workout layout"
-              className="tl-layout-switch"
-              tone="quiet"
-              iconOnly
-              value={layout}
-              options={[
-                {
-                  value: "grid",
-                  label: "Tiles",
-                  icon: <LayoutGrid size={14} aria-hidden="true" />
-                },
-                {
-                  value: "list",
-                  label: "List",
-                  icon: <List size={14} aria-hidden="true" />
-                }
-              ]}
-              onChange={(next) => setLayout(next as "grid" | "list")}
+              label="Filter workouts"
+              className="tl-chips"
+              /* The header has one line to give, and the sports in it grow
+                 with the library — so the chips fold to the chosen one and
+                 open in place. */
+              mode="collapsible"
+              value={scope}
+              options={scopes.map((option) => ({
+                value: option.id,
+                label: option.label
+              }))}
+              onChange={setScope}
             />
-            <button type="button" className="primary-button" onClick={() => setCreating(true)}>
-              <Plus size={14} /> New workout
-            </button>
-          </div>
-        </div>
-
-        {selected.length ? (
-          <div className="tl-bulk" role="toolbar" aria-label="Actions for selected workouts">
-            <strong>{selected.length} selected</strong>
-            <button type="button" onClick={applyTags}>
-              <Tag size={13} /> Tag
-            </button>
-            {collections.length ? (
-              <SelectDropdown
-                className="tl-quiet-select"
-                label="Move selected workouts to a collection"
-                value=""
-                options={[
-                  { value: "", label: "Move to collection" },
-                  ...collections.map((collection) => ({ value: collection.id, label: collection.name }))
-                ]}
-                onChange={(value) => {
-                  if (value) void updateMetadata(selected, { collectionId: value });
-                }}
+            <div className="tl-filters-tail">
+              <CollapsibleSearch
+                value={query}
+                onChange={setQuery}
+                label="Search workouts"
               />
-            ) : null}
-            <button type="button" onClick={() => downloadSelection(exportTargets)}>
-              <Download size={13} /> Export
-            </button>
-            <button type="button" className="danger" onClick={() => setPendingDelete(selected)}>
-              <Trash2 size={13} /> Delete
-            </button>
-            <button type="button" aria-label="Clear selection" onClick={() => setSelected([])}>
-              <X size={13} />
-            </button>
-          </div>
-        ) : null}
-
-        {filtered.length === 0 ? (
-          <div className="tl-empty">
-            <h3>No workouts match</h3>
-            <p>Clear the search or choose another filter.</p>
-          </div>
-        ) : layout === "grid" ? (
-          <ul className="tl-grid" role="list">
-            {filtered.slice(0, visibleCount).map((workout) => {
-              const isSelected = selected.includes(workout.id);
-              const references = workout.usedByPlanIds.length + workout.scheduledCount;
-              const sport = workoutSportFromType(workout.sportType);
-              const SportGlyph = sportTheme(sport).icon;
-              const VolumeIcon = isSetVolume(workout.volume) ? Layers : Route;
-              const load = workout.trainingLoad ? Math.round(workout.trainingLoad) : null;
-              /* A sliver of fill so the lightest session still draws something. */
-              const loadShare = load && heaviestLoad ? Math.max(3, (load / heaviestLoad) * 100) : 0;
-              const lastUsed = sinceLabel(workout.lastUsedAt);
-              const tags = workout.tags.slice(0, 3);
-              const tileShape = shapes[workout.id];
-              const hasShape = Boolean(tileShape?.length);
-
-              return (
-                <li
-                  className={`tl-card${activeId === workout.id ? " is-active" : ""}${
-                    isSelected ? " is-selected" : ""
-                  }`}
-                  key={workout.id}
-                  ref={observeTile}
-                  data-workout-id={workout.id}
-                  data-accent={sport ?? "other"}
-                  style={sportAccentStyle(sport)}
-                >
-                  {workoutMark(workout.id, workout.name, isSelected)}
-                  <button
-                    type="button"
-                    className="tl-card-open"
-                    onClick={() => setActiveId(workout.id)}
-                  >
-                    <SportGlyph className="tl-wk-glyph" size={132} strokeWidth={1} aria-hidden="true" />
-                    <span className="tl-card-top">
-                      {workout.favorite ? (
-                        <Heart size={11} fill="currentColor" strokeWidth={0} aria-label="Favorite" />
-                      ) : null}
-                      <SportBadge sport={sport ?? "run"} />
-                      {UNSETTLED_SYNC.has(workout.syncState) ? (
-                        <i className="tl-flag">{workout.syncState}</i>
-                      ) : null}
-                    </span>
-                    <span className="tl-card-name">{workout.name}</span>
-                    {tags.length ? (
-                      <span className="tl-wk-tags">
-                        {tags.map((tag) => (
-                          <em key={tag}>{tag}</em>
-                        ))}
-                        {workout.tags.length > tags.length ? (
-                          <em className="is-more">+{workout.tags.length - tags.length}</em>
-                        ) : null}
-                      </span>
-                    ) : null}
-                    <span className="tl-wk-meter">
-                      <span className="tl-wk-meter-head">
-                        <small>{hasShape ? "Session shape" : "Training load"}</small>
-                        <span className="tl-wk-load">
-                          <b className={load ? "" : "is-nil"}>{load ?? "—"}</b>
-                          <em>load</em>
-                        </span>
-                      </span>
-                      {hasShape ? (
-                        <span
-                          className="tl-wk-shape"
-                          data-dense={tileShape.length > COMB_DENSE_AT ? "true" : undefined}
-                          role="img"
-                          aria-label={`Workout structure: ${tileShape
-                            .map((segment) => segment.label)
-                            .join(", ")}`}
-                        >
-                          {combGrow(tileShape).map((grow, index) => (
-                            <i
-                              key={index}
-                              className={`is-${tileShape[index].kind}`}
-                              style={{ flexGrow: grow }}
-                              title={tileShape[index].label}
-                            />
-                          ))}
-                        </span>
-                      ) : (
-                        <span
-                          className={`tl-wk-track${load ? "" : " is-nil"}`}
-                          aria-hidden="true"
-                          title={
-                            load
-                              ? `${load} training load — ${Math.round((load / heaviestLoad) * 100)}% of the heaviest workout in your library`
-                              : "COROS has not reported a training load for this workout"
-                          }
-                        >
-                          {load ? <i style={{ width: `${loadShare}%` }} /> : null}
-                        </span>
-                      )}
-                    </span>
-                    <span className="tl-wk-foot">
-                      <span>
-                        <VolumeIcon size={11} aria-hidden="true" />
-                        <b>{formatWorkoutVolume(workout.volume, unitSystem, workoutSportFromType(workout.sportType) === "swim") ?? "No volume"}</b>
-                      </span>
-                      <span>
-                        <Link2 size={11} aria-hidden="true" />
-                        {references ? (
-                          <>
-                            <b>{references}</b> {references === 1 ? "use" : "uses"}
-                          </>
-                        ) : (
-                          "Unused"
-                        )}
-                      </span>
-                      {lastUsed ? (
-                        <span>
-                          <History size={11} aria-hidden="true" />
-                          {lastUsed}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-            {visibleCount < filtered.length ? (
-              <li>
-                <button
-                  type="button"
-                  className="tl-load-more"
-                  onClick={() => setVisibleCount((value) => value + 60)}
-                >
-                  Show 60 more of {filtered.length}
-                </button>
-              </li>
-            ) : null}
-          </ul>
-        ) : (
-          <div className="tl-index">
-            <div className="tl-index-head tl-workout-row">
-              <span />
-              <button
-                type="button"
-                className="tl-sortable"
-                aria-pressed={sort.column === "name"}
-                onClick={() => toggleSort("name")}
-              >
-                workout{sortIndicator("name")}
-              </button>
-              {WORKOUT_COLUMNS.map((column) => (
-                <button
-                  type="button"
-                  key={column.id}
-                  className="tl-sortable is-numeric"
-                  aria-pressed={sort.column === column.id}
-                  onClick={() => toggleSort(column.id)}
-                >
-                  {column.label}
-                  {sortIndicator(column.id)}
-                </button>
-              ))}
             </div>
-
-            <ul role="list">
-              {filtered.slice(0, visibleCount).map((workout) => {
-                const isSelected = selected.includes(workout.id);
-                const references = workout.usedByPlanIds.length + workout.scheduledCount;
-                const sport = workoutSportFromType(workout.sportType);
-                const details = workout.tags.slice(0, 2);
-
-                return (
-                  <li
-                    className={`tl-workout-row tl-row${activeId === workout.id ? " is-active" : ""}${
-                      isSelected ? " is-selected" : ""
-                    }`}
-                    key={workout.id}
-                    data-accent={sport ?? "other"}
-                    style={sportAccentStyle(sport)}
-                  >
-                    {workoutMark(workout.id, workout.name, isSelected)}
-                    <button type="button" className="tl-row-open" onClick={() => setActiveId(workout.id)}>
-                      <span className="tl-row-name">
-                        {workout.favorite ? (
-                          <Heart size={12} fill="currentColor" strokeWidth={0} aria-label="Favorite" />
-                        ) : null}
-                        {workout.name}
-                      </span>
-                      <span className="tl-row-sub">
-                        <SportBadge sport={sport ?? "run"} compact />
-                        {details.map((detail, index) => (
-                          <em key={index}>{detail}</em>
-                        ))}
-                        {UNSETTLED_SYNC.has(workout.syncState) ? (
-                          <i className="tl-flag">{workout.syncState}</i>
-                        ) : null}
-                      </span>
-                    </button>
-                    <span className={`tl-fig${workout.volume ? "" : " is-nil"}`}>
-                      {formatWorkoutVolume(workout.volume, unitSystem, workoutSportFromType(workout.sportType) === "swim") ?? "—"}
-                    </span>
-                    <span className={`tl-fig${workout.trainingLoad ? "" : " is-nil"}`}>
-                      {workout.trainingLoad ? Math.round(workout.trainingLoad) : "—"}
-                    </span>
-                    <span className={`tl-fig${references ? "" : " is-nil"}`}>{references || "—"}</span>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {visibleCount < filtered.length ? (
-              <button
-                type="button"
-                className="tl-load-more"
-                onClick={() => setVisibleCount((value) => value + 60)}
-              >
-                Show 60 more of {filtered.length}
-              </button>
-            ) : null}
           </div>
-        )}
-      </section>
 
-      <aside className="tl-reader" aria-live="polite">
-        {!active ? (
-          <div className="tl-empty">
-            <h3>Pick a workout</h3>
-            <p>Its full step structure and references appear here.</p>
-          </div>
-        ) : (
-          <>
-            <div className="tl-reader-scroll">
-              <header>
-                <p className="tl-eyebrow tl-reader-sport has-icon" style={sportChipStyle(activeSport)}>
-                  <ActiveSportIcon size={12} strokeWidth={2.2} aria-hidden="true" />
-                  {formatWorkoutSport(activeSport ?? "run")}
-                </p>
-                <h2>{active.name}</h2>
-                {active.tags.length ? (
-                  <ul className="tl-reader-tags" aria-label="Workout tags">
-                    {active.tags.slice(0, 8).map((tag) => (
-                      <li key={tag}>{tag}</li>
-                    ))}
-                    {active.tags.length > 8 ? <li>+{active.tags.length - 8} more</li> : null}
-                  </ul>
-                ) : null}
-                <button
-                  type="button"
-                  className={`tl-reader-favorite${active.favorite ? " is-active" : ""}`}
-                  aria-label={active.favorite ? "Remove from favorites" : "Add to favorites"}
-                  onClick={() => void updateMetadata([active.id], { favorite: !active.favorite })}
-                >
-                  <Heart size={16} fill={active.favorite ? "currentColor" : "none"} />
-                </button>
-              </header>
-
-              <dl className="tl-reader-metrics">
-              <div>
-                <dt>Time</dt>
-                <dd className={readerTime ? "" : "is-nil"} title={readerTime ?? undefined}>
-                  {readerTime ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>Distance</dt>
-                <dd className={readerDistance ? "" : "is-nil"} title={readerDistance ?? undefined}>
-                  {readerDistance ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>Load</dt>
-                <dd className={readerLoad ? "" : "is-nil"} title={readerLoad ? String(readerLoad) : undefined}>
-                  {readerLoad ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>Steps</dt>
-                <dd className={readerSteps ? "" : "is-nil"}>{readerSteps ?? "—"}</dd>
-              </div>
-            </dl>
-
-            {shape.length ? (
-              <figure className="tl-shape" style={sportAccentStyle(activeSport)}>
-                <div
-                  role="img"
-                  data-dense={shape.length > COMB_DENSE_AT ? "true" : undefined}
-                  aria-label={`Step structure of ${active.name}, ${shape.length} steps`}
-                >
-                  {combGrow(shape).map((grow, index) => (
-                    <span
-                      key={index}
-                      className={`is-${shape[index].kind}`}
-                      style={{ flexGrow: grow }}
-                      title={shape[index].label}
-                    />
-                  ))}
-                </div>
-                <figcaption>
-                  <span>Step structure, by share of the session</span>
-                  {shapeKinds.length ? (
-                    <span className="tl-shape-legend" aria-hidden="true">
-                      {shapeKinds.map((kind) => (
-                        <span key={kind}>
-                          <em className={`is-${kind}`} />
-                          {STEP_KIND_LABELS[kind]}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </figcaption>
-              </figure>
-            ) : null}
-
-            {previewLoading ? (
-              <p className="tl-reader-loading">
-                <LoaderCircle className="is-spinning" size={16} /> Loading the full structure
+          {filtered.length === 0 ? (
+            /*
+             * Two empties, and they are different screens: a filter that matched
+             * nothing, and a library with nothing in it. The second one told an
+             * athlete with no COROS workouts to clear a search they never typed,
+             * and never mentioned that they could build one — which the button
+             * standing in the corner of this column now does.
+             */
+            <div className="tl-empty">
+              <h3>{workouts.length ? "No workouts match" : "No workouts yet"}</h3>
+              <p>
+                {workouts.length
+                  ? "Clear the search or choose another filter."
+                  : "Build your first structured workout here, or refresh to pull the ones already in your COROS library."}
               </p>
-            ) : previewDocument ? (
-              <div className="tl-steps-block">
-                <p className="tl-steps-label">
-                  Session steps <span>{previewDocument.draft.nodes.length}</span>
-                </p>
-                <ol className="tl-steps">
-                  {previewDocument.draft.nodes.map((node) => (
-                    <li key={node.id} data-kind={nodeKind(node)}>
-                      <span className="tl-step-head">
-                        <b>{node.name}</b>
-                        <small className={node.nodeType === "repeat" ? "is-rounds" : ""}>
-                          {targetLabel(node, unitSystem, previewDocument?.draft.sport === "swim")}
-                        </small>
-                      </span>
-                      {node.nodeType === "repeat" ? (
-                        <span className="tl-step-children">
-                          {node.steps.map((step) => (
-                            <em key={step.id}>
-                              {step.name} <small>{targetLabel(step, unitSystem, previewDocument?.draft.sport === "swim")}</small>
-                            </em>
-                          ))}
-                        </span>
-                      ) : null}
-                      {!node.editable ? (
-                        <i className="tl-flag" title={node.unsupportedReason}>
-                          read only
-                        </i>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ) : null}
-
-            <p
-              className={`tl-reader-references${
-                active.usedByPlanIds.length || active.scheduledCount ? " is-linked" : ""
-              }`}
-            >
-              {active.usedByPlanIds.length || active.scheduledCount ? (
-                <>
-                  <Link2 size={13} />
-                  {`Used by ${active.usedByPlanIds.length} plan${
-                    active.usedByPlanIds.length === 1 ? "" : "s"
-                  } and scheduled ${active.scheduledCount} time${active.scheduledCount === 1 ? "" : "s"}.`}
-                </>
-              ) : (
-                <>
-                  <Unlink size={13} />
-                  Not referenced by a plan or a calendar day.
-                </>
-              )}
-            </p>
+              {workouts.length ? (
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => {
+                    setQuery("");
+                    setScope("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : null}
             </div>
+          ) : (
+            <>
+              {/*
+               * Three labels, because there are now three figures to name and
+               * two of them are numbers in a column. The head this replaces
+               * said "Workout / Total", where `Total` stood over the COROS
+               * volume string — the one figure the program list gets wrong —
+               * so it named a column that was lying. Labels, not controls:
+               * the list is in name order and there is nothing to change it
+               * to — a clickable heading would offer the two orders the sort
+               * dropdown was removed for offering.
+               *
+               * **A sibling of the scrolling list, not the first thing inside
+               * it.** Sticky inside the scroller it stayed put, but the
+               * scrollbar is the scroller's own and ran the full height — a
+               * thumb sliding past a row that does not move. Out here the
+               * scrollbar starts under it; `.tl-catalog > .tl-index-head`
+               * reserves the same gutter so the columns still line up.
+               */}
+              <div className="tl-index-head tl-workout-row">
+                <span className="tl-column-label">Workout</span>
+                <span className="tl-column-label is-numeric">Exercises</span>
+                <span className="tl-column-label is-numeric">Sets</span>
+              </div>
 
-            <footer className="tl-reader-dock">
-              <form
-                className="tl-reader-schedule"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void schedule();
-                }}
-              >
-                <div className="tl-reader-schedule-heading">
-                  <span className="tl-reader-schedule-icon" aria-hidden="true">
-                    <CalendarPlus size={15} />
-                  </span>
-                  <span>
-                    <strong>Schedule workout</strong>
-                    <small>Add it to your COROS calendar</small>
-                  </span>
-                </div>
-                <div className="tl-reader-schedule-controls">
-                  <label>
-                    <span className="sr-only">Schedule date</span>
-                    <input
-                      type="date"
-                      value={scheduleDate}
-                      min={tomorrow()}
-                      onChange={(event) => setScheduleDate(event.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={!scheduleDate || busy === "schedule"}
-                  >
-                    {busy === "schedule" ? "Scheduling" : "Schedule"}
-                  </button>
-                </div>
-              </form>
+              <div className="tl-index">
+                <ul role="list">
+                  {filtered.slice(0, visibleCount).map((workout) => {
+                    const sport = workoutSportFromType(workout.sportType);
+                    const tags = workout.tags.slice(0, 2);
+                    const shape = details[workout.id]?.shape;
 
-              <div className="tl-reader-actions">
-                <div className="tl-reader-actions-main">
+                    return (
+                      <li
+                        className={`tl-workout-row tl-row${activeId === workout.id ? " is-active" : ""}`}
+                        key={workout.id}
+                        ref={observeTile}
+                        data-workout-id={workout.id}
+                        data-accent={sport ?? "other"}
+                        style={sportAccentStyle(sport)}
+                      >
+                        <button type="button" className="tl-row-open" onClick={() => setActiveId(workout.id)}>
+                          <span className="tl-row-name">
+                            {workout.favorite ? (
+                              <Heart size={12} fill="currentColor" strokeWidth={0} aria-label="Favorite" />
+                            ) : null}
+                            {/* The name is its own box so it can end in an
+                                ellipsis: `text-overflow` acts on a block's own
+                                inline content, and the text of a flex container
+                                is an anonymous flex item — so the rules on the
+                                row clipped a long name flat instead. */}
+                            <span className="tl-row-name-text">{workout.name}</span>
+                          </span>
+                          <span className="tl-row-sub">
+                            <SportBadge sport={sport ?? "run"} compact />
+                            {tags.map((tag, index) => (
+                              <em key={index}>{tag}</em>
+                            ))}
+                            {UNSETTLED_SYNC.has(workout.syncState) ? (
+                              <i className="tl-flag">{workout.syncState}</i>
+                            ) : null}
+                          </span>
+                          {/*
+                           * The session's shape, a few pixels high: an overview
+                           * of how the work is laid out, not the chart the
+                           * reader draws. It waits on the detail, which the row
+                           * asks for as it scrolls into view, so the slot is
+                           * always there — a line that appeared on some rows
+                           * and not others would move every row under it.
+                           */}
+                          <span
+                            className="tl-row-shape"
+                            data-dense={shape && shape.length > COMB_DENSE_AT ? "true" : undefined}
+                            {...(shape?.length
+                              ? {
+                                  role: "img",
+                                  "aria-label": `Workout structure: ${shape
+                                    .map((segment) => segment.label)
+                                    .join(", ")}`
+                                }
+                              : { "aria-hidden": true })}
+                          >
+                            {shape?.length
+                              ? combGrow(shape).map((grow, index) => (
+                                  <i
+                                    key={index}
+                                    className={`is-${shape[index]!.kind}`}
+                                    style={{ flexGrow: grow }}
+                                  />
+                                ))
+                              : null}
+                          </span>
+                        </button>
+                        {/*
+                         * How many movements, and how many sets they come to.
+                         *
+                         * `exerciseNum` and `totalSets` are the only figures
+                         * besides `estimatedTime` that COROS fills in on a
+                         * library row, so both are on screen in the first paint
+                         * with nothing fetched. The row showed the COROS volume
+                         * alone before, which that endpoint reports as
+                         * "1 set(s)" for an hour's run. Load is not here: COROS
+                         * only computes it for a step with an intensity target,
+                         * so it would be a dash down most libraries.
+                         */}
+                        <span className={`tl-fig${workout.exerciseCount ? "" : " is-nil"}`}>
+                          {workout.exerciseCount ?? "—"}
+                        </span>
+                        <span className={`tl-fig${workout.setCount ? "" : " is-nil"}`}>
+                          {workout.setCount ?? "—"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {visibleCount < filtered.length ? (
                   <button
                     type="button"
-                    className="primary-button"
+                    className="tl-load-more"
+                    onClick={() => setVisibleCount((value) => value + 60)}
+                  >
+                    Show 60 more of {filtered.length}
+                  </button>
+                ) : null}
+              </div>
+            </>
+          )}
+
+          {/*
+           * Floating in the column's own corner, over the list rather than in
+           * a row above it. Making a workout is the one thing this screen is
+           * for that is not reading one, and it kept the control row a size
+           * wider than the controls in it. The scroll area carries the height
+           * of this button as bottom padding, so the last row can be scrolled
+           * clear of it — see `.tl-catalog > :is(.tl-grid, .tl-index)`.
+           */}
+          <button
+            type="button"
+            className="tl-catalog-new primary-button"
+            onClick={() => setCreating(true)}
+          >
+            <Plus size={15} aria-hidden="true" /> New workout
+          </button>
+        </section>
+
+        <aside className="tl-reader" aria-live="polite">
+          {!active ? (
+            <div className="tl-empty">
+              <h3>Pick a workout</h3>
+              <p>Its full step structure appears here.</p>
+            </div>
+          ) : (
+            <>
+              <div className="tl-reader-scroll">
+                {previewLoading ? (
+                  <p className="tl-reader-loading">
+                    <LoaderCircle className="is-spinning" size={16} /> Loading the full structure
+                  </p>
+                ) : previewDocument ? (
+                  /*
+                   * The Calendar's own workout view, not a second one built from
+                   * the same payload. This pane used to draw its own hero, its
+                   * own four-metric list and its own step list off the same
+                   * `WorkoutEditorDocument` — the drift `WorkoutStructure`
+                   * exists to prevent, one level up, between two surfaces that
+                   * never show each other.
+                   *
+                   * Everything this screen knows about the workout that the
+                   * Calendar does not — that it is a favourite and what the
+                   * athlete has tagged it — rides in the hero's slots. They
+                   * were blocks stacked under the steps, which is a long way
+                   * from the name they are about.
+                   */
+                  <WorkoutReadOnlyBody
+                    draft={previewDocument.draft}
+                    context={previewDocument.context}
+                    exercisesById={exerciseCatalog.byId}
+                    title={active.name}
+                    heroAside={
+                      <button
+                        type="button"
+                        className={`tl-reader-favorite${active.favorite ? " is-active" : ""}`}
+                        aria-label={active.favorite ? "Remove from favorites" : "Add to favorites"}
+                        onClick={() => void updateMetadata([active.id], { favorite: !active.favorite })}
+                      >
+                        <Heart size={16} fill={active.favorite ? "currentColor" : "none"} />
+                      </button>
+                    }
+                    {...(active.tags.length
+                      ? {
+                          subtitleAside: (
+                            <ul className="tl-reader-tags" aria-label="Workout tags">
+                              {active.tags.slice(0, 8).map((tag) => (
+                                <li key={tag}>{tag}</li>
+                              ))}
+                              {active.tags.length > 8 ? (
+                                <li>+{active.tags.length - 8} more</li>
+                              ) : null}
+                            </ul>
+                          )
+                        }
+                      : {})}
+                  />
+                ) : (
+                  <p className="tl-reader-loading">
+                    This workout has no structure stored on COROS.
+                  </p>
+                )}
+              </div>
+
+              <footer className="tl-reader-dock">
+                {/* Everything you can do to this workout, in one row.
+                    Scheduling had a row of its own above it — a heading, an
+                    icon, a date field and a button standing open across the
+                    dock for a decision that is made once and then not again,
+                    while the four buttons below it shared the line they were
+                    already on. It is a button here like the rest, and the date
+                    comes out only when it is asked for. */}
+                <div className="tl-reader-actions">
+                  {/*
+                   * Scheduling leads the row, folded until it is reached for —
+                   * the same shape as the list's search: a control you only
+                   * open once you have decided to use it. The panel opens
+                   * upward, because the dock is the bottom edge of the reader
+                   * and there is nothing below it.
+                   */}
+                  <div className="tl-schedule-pop" ref={scheduleRef}>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      aria-haspopup="dialog"
+                      aria-expanded={scheduleOpen}
+                      onClick={() => setScheduleOpen((open) => !open)}
+                    >
+                      <CalendarPlus size={14} /> Schedule
+                    </button>
+                    {scheduleOpen ? (
+                      <form
+                        className="tl-schedule-pop-panel"
+                        role="dialog"
+                        aria-label={`Schedule ${active.name}`}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void schedule();
+                        }}
+                      >
+                        <MonthDayPicker
+                          label="Schedule date"
+                          value={scheduleDate}
+                          min={tomorrow()}
+                          onChange={setScheduleDate}
+                        />
+                        <p className="tl-schedule-pop-day">
+                          {formatHappenDayLabel(scheduleDate)}
+                        </p>
+                        <button
+                          type="submit"
+                          className="primary-button"
+                          disabled={!scheduleDate || busy === "schedule"}
+                        >
+                          {busy === "schedule" ? "Scheduling" : "Schedule"}
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button tl-reader-edit"
                     disabled={!previewDocument?.canEdit}
                     onClick={() => setEditId(active.id)}
                   >
                     <Pencil size={14} /> Edit
                   </button>
-                  <div className="tl-reader-duplicate">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      disabled={busy === "duplicate"}
-                      onClick={() => void duplicate()}
-                    >
-                      <Copy size={14} /> Duplicate as
-                    </button>
-                    <SelectDropdown
-                      className="tl-quiet-select"
-                      label="Sport for the duplicate"
-                      value={String(duplicateSport ?? active.sportType ?? 1)}
-                      options={Array.from({ length: 9 }, (_, index) => ({
-                        value: String(index + 1),
-                        label: formatWorkoutSport(workoutSportFromType(index + 1) ?? "run")
-                      }))}
-                      onChange={(value) => setDuplicateSport(Number(value))}
-                    />
-                  </div>
-                </div>
-                <div className="tl-reader-actions-meta">
-                  <button type="button" className="ghost-button" onClick={applyTags}>
+                  <button type="button" className="ghost-button" onClick={() => setPrompting("tags")}>
                     <Tag size={14} /> Tags
+                  </button>
+                  {/* A copy of this workout, in this workout's sport. The sport
+                      picker beside it offered to change that on the way
+                      through, which is a second decision bolted to a button
+                      whose job is "make me another one of these". Changing
+                      sport belongs in the editor, where every other property
+                      of a workout is changed. */}
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={busy === "duplicate"}
+                    onClick={() => setPrompting("duplicate")}
+                  >
+                    <Copy size={14} /> Duplicate
                   </button>
                   <button
                     type="button"
                     className="ghost-button danger"
-                    onClick={() => setPendingDelete([active.id])}
+                    onClick={() => setPendingDelete(active)}
                   >
                     <Trash2 size={14} /> Delete
                   </button>
                 </div>
-              </div>
-            </footer>
-          </>
-        )}
-      </aside>
+              </footer>
+            </>
+          )}
+        </aside>
+      </div>
 
-      {pendingDelete.length ? (
-        <div className="tl-dialog-backdrop">
-          <section
-            className="tl-dialog"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="workout-delete-title"
-          >
-            <h2 id="workout-delete-title">
-              Delete {pendingDelete.length} workout{pendingDelete.length === 1 ? "" : "s"} from COROS?
-            </h2>
-            <p>
-              This cannot be undone. Calendar copies stay in place, and plan references will remain but
-              point at nothing.
-            </p>
-            <ul>
-              {workouts
-                .filter((workout) => pendingDelete.includes(workout.id))
-                .map((workout) => (
-                  <li key={workout.id}>
-                    <strong>{workout.name}</strong>
-                    <span>
-                      {workout.usedByPlanIds.length} plan references · {workout.scheduledCount} scheduled
-                    </span>
-                  </li>
-                ))}
-            </ul>
-            <footer>
-              <button type="button" className="ghost-button" onClick={() => setPendingDelete([])}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-button danger"
-                disabled={busy === "delete"}
-                onClick={() => void deleteConfirmed()}
-              >
-                {busy === "delete" ? "Deleting" : "Delete"}
-              </button>
-            </footer>
-          </section>
-        </div>
+      {pendingDelete ? (
+        <ConfirmDialog
+          title={`Delete "${pendingDelete.name}" from COROS?`}
+          description="This removes the workout from your COROS library and cannot be undone. Sessions already on your calendar or in a plan are copies of their own, and stay as they are."
+          confirmLabel="Delete workout"
+          danger
+          busy={busy === "delete" ? { target: "confirm", label: "Deleting…" } : undefined}
+          onConfirm={() => void deleteConfirmed()}
+          onCancel={() => setPendingDelete(null)}
+        />
       ) : null}
 
-      {editId ? (
-        <WorkoutEditorModal
+      {editId && editRef ? (
+        /* The builder Create workout opens, read from COROS — so a workout is
+           edited in the form it was written in, not a second editor beside it. */
+        <WorkoutBuilderModal
           api={api}
-          editRef={{ kind: "library", programId: editId }}
+          source={{ kind: "library", editRef }}
+          heading={{ title: "Edit library workout" }}
+          confirmDiscard={({ keep, discard }) => (
+            <ConfirmDialog
+              title="Discard unsaved changes?"
+              description="Your edits have not been sent to COROS. Closing the workout throws them away."
+              confirmLabel="Discard changes"
+              cancelLabel="Keep editing"
+              danger
+              onConfirm={discard}
+              onCancel={keep}
+            />
+          )}
           onClose={() => setEditId(null)}
           onSaved={(result) => {
             redrawShape(editId);
@@ -1262,7 +982,7 @@ export function WorkoutWorkspace({
       {creating ? (
         <AddWorkoutModal
           api={api}
-          dateKey={tomorrow().replace(/-/g, "")}
+          dateKey={tomorrow()}
           sportTypes={[]}
           libraryOnly
           onClose={() => setCreating(false)}
@@ -1272,6 +992,32 @@ export function WorkoutWorkspace({
             void onRefresh();
           }}
           onError={(message) => message && onError(message)}
+        />
+      ) : null}
+
+      {prompting === "duplicate" && active ? (
+        <PromptDialog
+          title="Name the duplicate"
+          description={`A copy of "${active.name}" is created in your COROS workout library.`}
+          label="Name for the duplicate"
+          initialValue={`${active.name} Copy`}
+          confirmLabel="Duplicate"
+          onConfirm={(name) => void duplicate(name)}
+          onCancel={() => setPrompting(null)}
+        />
+      ) : null}
+
+      {prompting === "tags" && active ? (
+        <PromptDialog
+          title="Tag this workout"
+          description={`Tags are local labels you can search and filter by. Separate them with commas; each one is held to ${TAG_MAX_LENGTH} characters.`}
+          label="Tags, separated by commas"
+          initialValue={active.tags.join(", ")}
+          placeholder="tempo, threshold, race week"
+          sanitize={clampTagInput}
+          confirmLabel="Save tags"
+          onConfirm={saveTags}
+          onCancel={() => setPrompting(null)}
         />
       ) : null}
     </div>

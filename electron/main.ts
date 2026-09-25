@@ -60,6 +60,7 @@ import {
   initializeActivityDetailCache,
   sweepActivityDetailCache
 } from "./activityDetailCache";
+import { initializeCorosLocale } from "./corosLocale";
 import {
   clearDownloadTransferredByFileName,
   deleteDownload,
@@ -166,21 +167,24 @@ import type {
   WorkoutSport
 } from "./types";
 import {
-  addTrainingPlanToCalendar,
-  deleteLocalTrainingPlan,
+  deletePlanFromCoros,
   deleteTrainingLibraryWorkouts,
+  discardPlanDraft,
+  duplicatePlanOnCoros,
   getNativeTrainingPlan,
   getTrainingLibrarySnapshot,
+  libraryWorkoutAsPlanSession,
+  previewPlanOnCalendar,
+  putPlanOnCalendar,
+  listTrainingLibraryWorkouts,
   refreshTrainingActivityMatches,
-  previewTrainingPlanCalendar,
-  previewTrainingPlanCalendarRemoval,
-  removeTrainingPlanFromCalendar,
-  removeTrainingCollection,
-  saveLocalTrainingPlan,
   saveManualActivityMatch,
+  savePlanDraft,
+  savePlanToCoros,
+  syncPlanToCalendar,
+  takePlanOffCalendar,
   updateWorkoutMetadata,
-  updateTrainingPlanMetadata,
-  upsertTrainingCollection
+  updateTrainingPlanMetadata
 } from "./trainingLibraryService";
 import { normalizeUnitSystem } from "./unitSystem.js";
 import {
@@ -766,6 +770,8 @@ app.whenReady().then(() => {
     }
   });
   initializeDatabase(app.getPath("userData"));
+  // COROS's string table, for official plans that name their sessions by key.
+  initializeCorosLocale(app.getPath("userData"));
   // Activity details are files beside the database, not rows in it: 2.5 MB
   // each, 98% sample series, and the rows sync.
   initializeActivityDetailCache(app.getPath("userData"));
@@ -1997,43 +2003,39 @@ function registerIpcHandlers(): void {
   ipcMain.handle("trainingLibrary:getNativePlan", (_event, remoteId: string) =>
     getNativeTrainingPlan(remoteId)
   );
-  ipcMain.handle("trainingLibrary:savePlan", (_event, plan) =>
-    saveLocalTrainingPlan(plan)
-  );
-  ipcMain.handle("trainingLibrary:updatePlanMetadata", (_event, id, patch) =>
+  ipcMain.handle("trainingLibrary:updatePlanMetadata", (_event, id: string, patch) =>
     updateTrainingPlanMetadata(id, patch)
+  );
+  ipcMain.handle("trainingLibrary:savePlan", (_event, request) => savePlanToCoros(request));
+  ipcMain.handle("trainingLibrary:duplicatePlan", (_event, planId: string) =>
+    duplicatePlanOnCoros(planId)
   );
   ipcMain.handle(
     "trainingLibrary:deletePlan",
-    (_event, id: string, confirmed: boolean) => deleteLocalTrainingPlan(id, confirmed)
+    (_event, planId: string, confirmed: boolean, options?: { takeOffCalendar?: boolean }) =>
+      deletePlanFromCoros(planId, confirmed, options)
   );
-  ipcMain.handle(
-    "trainingLibrary:previewPlanCalendar",
-    (_event, planId: string, startDate: string) => previewTrainingPlanCalendar(planId, startDate)
+  ipcMain.handle("trainingLibrary:workouts", () => listTrainingLibraryWorkouts());
+  ipcMain.handle("trainingLibrary:previewPlanCalendar", (_event, planId: string, startDay: string) =>
+    previewPlanOnCalendar(planId, startDay)
   );
-  ipcMain.handle(
-    "trainingLibrary:addPlanToCalendar",
-    (_event, previewId: string, confirmed: boolean, unitSystem?: UnitSystem) =>
-      addTrainingPlanToCalendar(previewId, confirmed, normalizeUnitSystem(unitSystem))
+  ipcMain.handle("trainingLibrary:addPlanToCalendar", (_event, planId: string, startDay: string) =>
+    putPlanOnCalendar(planId, startDay)
   );
-  ipcMain.handle(
-    "trainingLibrary:previewPlanCalendarRemoval",
-    (_event, planId: string) => previewTrainingPlanCalendarRemoval(planId)
+  ipcMain.handle("trainingLibrary:removePlanFromCalendar", (_event, planId: string) =>
+    takePlanOffCalendar(planId)
   );
-  ipcMain.handle(
-    "trainingLibrary:removePlanFromCalendar",
-    (_event, previewId: string, confirmed: boolean) => removeTrainingPlanFromCalendar(previewId, confirmed)
+  ipcMain.handle("trainingLibrary:syncPlanToCalendar", (_event, planId: string) =>
+    syncPlanToCalendar(planId)
+  );
+  ipcMain.handle("trainingLibrary:saveDraft", (_event, draft) => savePlanDraft(draft));
+  ipcMain.handle("trainingLibrary:deleteDraft", (_event, id: string) => discardPlanDraft(id));
+  ipcMain.handle("trainingLibrary:librarySession", (_event, programId: string) =>
+    libraryWorkoutAsPlanSession(programId)
   );
   ipcMain.handle(
     "trainingLibrary:updateWorkoutMetadata",
     (_event, programIds, patch) => updateWorkoutMetadata(programIds, patch)
-  );
-  ipcMain.handle("trainingLibrary:saveCollection", (_event, collection) =>
-    upsertTrainingCollection(collection)
-  );
-  ipcMain.handle(
-    "trainingLibrary:deleteCollection",
-    (_event, id: string, confirmed: boolean) => removeTrainingCollection(id, confirmed)
   );
   ipcMain.handle("trainingLibrary:deleteWorkouts", (_event, request) =>
     deleteTrainingLibraryWorkouts(request)

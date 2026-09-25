@@ -3,7 +3,10 @@
  * Ported from reverse-engineered API behavior (see docs/coros-plan-write-api.md).
  */
 import type {
+  PlanDraftPreview,
+  PlanDraftPreviewEntry,
   RunWorkoutEditorStepKind,
+  TrainingPlanWeekStage,
   UnitSystem,
   WorkoutEditorContext,
   WorkoutIntensityInput,
@@ -126,37 +129,20 @@ export interface PlanWorkoutEntry {
 export interface CorosTrainingPlanDraft {
   name: string;
   workouts: PlanWorkoutEntry[];
+  /** The plan's overview on COROS, when the coach wrote one. */
+  description?: string;
+  /** COROS's stage for a week, counted from the first week of the plan. */
+  weekStages?: { weekIndex: number; stage: TrainingPlanWeekStage }[];
+  /**
+   * Where each undated session sits, by workout key. A coach writes an
+   * undated plan as a list, and the plan editor is where the athlete gives it
+   * weeks and days; without this the next reading would lay the list out one
+   * session a day again.
+   */
+  layout?: Record<string, { weekIndex: number; dayIndex: number }>;
 }
 
-export interface PlanDraftPreviewEntry {
-  key: string;
-  name: string;
-  sport?: WorkoutSport;
-  scheduleDate?: string;
-  volume?: string;
-  saveToLibrary: boolean;
-  workoutType: string;
-  stepsSummary?: string;
-}
-
-export interface PlanDraftPreview {
-  draftId: string;
-  /** Distinguishes a multi-workout plan from a reusable one-off workout. */
-  artifactType?: "plan" | "workout";
-  name: string;
-  summary: string;
-  entries: PlanDraftPreviewEntry[];
-  conflicts: string[];
-  warnings: string[];
-  uploadedAt?: number;
-  uploadResult?: {
-    workoutsScheduled: number;
-    workoutsCreated: number;
-    destination?: import("./types").TrainingPlanDestination;
-    localPlanId?: string;
-    groupedPlanCreated?: boolean;
-  };
-}
+export type { PlanDraftPreview, PlanDraftPreviewEntry } from "./types";
 
 export interface PlanValidationResult {
   ok: boolean;

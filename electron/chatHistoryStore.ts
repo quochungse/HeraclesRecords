@@ -371,13 +371,9 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
               value.uploadResult.destination === "nativePlanAndCalendar"
                 ? value.uploadResult.destination
                 : undefined,
-            localPlanId:
-              typeof value.uploadResult.localPlanId === "string"
-                ? value.uploadResult.localPlanId
-                : undefined,
-            groupedPlanCreated:
-              typeof value.uploadResult.groupedPlanCreated === "boolean"
-                ? value.uploadResult.groupedPlanCreated
+            planId:
+              typeof value.uploadResult.planId === "string"
+                ? value.uploadResult.planId
                 : undefined
           }
         : undefined

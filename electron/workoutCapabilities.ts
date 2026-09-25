@@ -1464,6 +1464,22 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       name: { type: "string", description: "Plan name" },
+      description: {
+        type: "string",
+        description: "What the plan is for and how it is built; becomes the plan's overview on COROS."
+      },
+      week_stages: {
+        type: "array",
+        description: "COROS's stage for each week that has one, week 1 being the week of the first session.",
+        items: {
+          type: "object",
+          properties: {
+            week: { type: "integer", minimum: 1 },
+            stage: { type: "string", enum: ["preparation", "base", "build", "peak", "race", "transition"] }
+          },
+          required: ["week", "stage"]
+        }
+      },
       workouts: { type: "array", minItems: 1, items: workout }
     },
     required: ["name", "workouts"]

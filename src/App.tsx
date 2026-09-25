@@ -62,7 +62,6 @@ import type {
   TrainingHubSportType,
   TrainingHubStatus,
   TrainingHubUpcomingWorkout,
-  TrainingPlanDocument,
   WatchStatus,
   WatchTrack,
   WatchTransferProgress,
@@ -135,6 +134,8 @@ import {
   type WatchFeatureIcon,
   type WatchPresentation,
 } from "./watchModels";
+import { isRunSportType } from "./running/runSurface";
+import { isStrengthSportType } from "./training/sportTypes";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
@@ -370,7 +371,6 @@ export default function App() {
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
   const [coachPrefill, setCoachPrefill] = useState<string | null>(null);
-  const [pendingCoachPlan, setPendingCoachPlan] = useState<TrainingPlanDocument | null>(null);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const [activeMediaTab, setActiveMediaTab] = useSelectionPreference(
     MEDIA_TAB_PREFERENCE,
@@ -2842,11 +2842,33 @@ export default function App() {
                       setCoachPrefill(prompt ?? null);
                       setActiveView("coach");
                     }}
-                    pendingPlan={pendingCoachPlan}
-                    onPendingPlanConsumed={() => setPendingCoachPlan(null)}
                     onMessage={setMessage}
                     onError={setError}
                     onScheduleChanged={handleExternalScheduleChange}
+                    /*
+                     * A planned session that was trained, opened as the activity
+                     * it became — on the screen built for its sport, the way
+                     * Activities hands one over, and in Activities itself for a
+                     * ride or a swim, which have no screen of their own.
+                     */
+                    onOpenActivity={(activityId) => {
+                      const activity = trainingHubActivities.find(
+                        (candidate) => candidate.activityId === activityId
+                      );
+                      if (activity && isRunSportType(activity.sportType)) {
+                        setSportScreenRequest({ view: "running", activityId, startTime: activity.startTime });
+                        setActiveView("running");
+                      } else if (activity && isStrengthSportType(activity.sportType)) {
+                        setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime });
+                        setActiveView("strength");
+                      } else if (activity) {
+                        void handleTrainingHubActivityDetail(activity);
+                        setActiveView("training");
+                      } else {
+                        setMessage("That activity is not in the loaded history yet. Opening Activities.");
+                        setActiveView("training");
+                      }
+                    }}
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
@@ -2996,10 +3018,6 @@ export default function App() {
                     onPlanUploaded={() => {
                       void loadTrainingHubData();
                       setCalendarRefreshToken((token) => token + 1);
-                    }}
-                    onReviewPlan={(plan) => {
-                      setPendingCoachPlan(plan);
-                      setActiveView("library");
                     }}
                     onActivityChange={setCoachStreaming}
                     pendingPrompt={coachPrefill}

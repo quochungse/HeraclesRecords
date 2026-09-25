@@ -1,9 +1,11 @@
 # COROS Training Plan Write API (internal)
 
 Reverse-engineered from the COROS Training Hub web app. The workout-program and
-calendar contracts below have been verified against the live API. Native
-Training Plan Library support has only been verified for reads as of
-2026-07-29. These endpoints are **undocumented** and may change.
+calendar contracts below have been verified against the live API. The native
+Training Plan Library — create, update, copy, delete, put on the calendar, take
+off it, and sync — was verified end to end on 2026-09-24, with payloads taken
+from the Training Hub web app's own bundle. These endpoints are
+**undocumented** and may change.
 
 All requests use the existing Training Hub session (`accesstoken` + `yfheader`
 with `userId`) against the regional `teamapi*.coros.com` host.
@@ -27,44 +29,161 @@ through the athlete's authenticated Training Hub session.
 | `/training/exercise/query` | GET | Resolve Strength and HYROX exercise IDs/names |
 | `/training/schedule/query` | GET | Read calendar (`startDate`, `endDate`, `supportRestExercise=1`) |
 | `/training/schedule/update` | POST | Add, edit, or delete calendar entries (`status: 1`, `2`, or `3`) |
-| `/training/plan/query` | POST | List native COROS Training Plan Library records; read verified |
-| `/training/plan/detail` | GET | Read native plan detail (`id`, `supportRestExercise=1`); read verified |
+| `/training/plan/query` | POST | List native plans, templates and instances alike (body `{}`) |
+| `/training/plan/detail` | GET | Read one plan (`id`, `supportRestExercise=1`) |
+| `/training/plan/add` | POST | Create a plan; `data` is its id |
+| `/training/plan/update` | POST | Replace a plan with the body; no `data` |
+| `/training/plan/copy` | POST | Duplicate (`?id=&region=`, body = the detail); `data` is the copy |
+| `/training/plan/delete` | POST | Delete (body `[id]`), soft; no `data` |
+| `/training/plan/sync` | POST | Push a plan's edits into its running instance (`?planId=`); `data` is a task id. **Not used by the app** — it does not carry a move (below) |
+| `/training/plan/syncstatus` | GET | Poll that task (`?taskId=`); `data` is `2` when done |
+| `/training/schedule/executeSubPlan` | POST | Put a plan on the calendar (`?subPlanId=&startDay=`, body `{}`); no `data` |
+| `/training/schedule/quitSubPlan` | POST | Take an instance off the calendar (`?subPlanId=`, body `{}`); no `data` |
 
 ## Native COROS Training Plan Library
 
-CorosLink keeps native plans behind `corosTrainingPlanAdapter.ts`, separate
-from individual `/training/program/*` workout operations. The adapter maps the
-known plan, entity, program, and week-stage fields into typed models while
-retaining the complete raw payload for forward-compatible, lossless caching.
+The app reaches these only through `corosTrainingPlanAdapter.ts`, which calls
+two allowlisted bridges in `trainingHubService.ts`:
+`readNativeTrainingPlanEndpoint` (query, detail) and
+`writeNativeTrainingPlanEndpoint` (the six writes). The body builders are
+pure (`buildNativePlanCreateBody`, `buildNativePlanUpdateBody`) and
+`npm run test:coros-plan-writes` holds them against the captured requests in
+`scripts/fixtures/coros-plan-write/`. `npm run verify:coros-plan-api -- --live`
+runs the whole lifecycle against the signed-in account through the same
+adapter and removes what it made.
 
-The 2026-07-29 first-party Training Hub bundle references these additional
-operations:
+Where the web app's code lives, for re-checking: `https://t.coros.com/` loads
+`main-*.js`, whose lazy chunks hold `savePlan` (the `this.addPlan(x)` call),
+`updatePlan` (`Object.assign(this.detail, {…})`), `api4DeletePlan({data:[t]})`,
+`api4copyPlan`, `usePlan` → `executeSubPlan`, `handleQuit` → `quitSubPlan` and
+`doUpdatePlan` → `plan/sync` (the one the app does not call). Chunk names change
+per build; search for those strings.
 
-| Path | Method | Observed first-party purpose | CorosLink status |
-|---|---|---|---|
-| `/training/plan/add` | POST | Create grouped plan | Feature-gated; write payload not live verified |
-| `/training/plan/update` | POST | Update grouped plan | Feature-gated; concurrency/write behavior not live verified |
-| `/training/plan/copy` | POST | Duplicate grouped plan | Feature-gated; write payload not live verified |
-| `/training/plan/delete` | POST | Delete grouped plan | Feature-gated; delete/active-plan behavior not live verified |
-| `/training/schedule/executeSubPlan` | POST | Activate/schedule a plan | Feature-gated; activation payload not live verified |
-| `/training/schedule/quitSubPlan` | POST | Remove active plan | Feature-gated; cleanup semantics not live verified |
+### A plan's shape
 
-The bundle assembles plan-create data from fields including `name`, `overview`,
-`entities`, `programs`, `weekStages`, `maxIdInPlan`, `totalDay`, `unit`,
-`sourceId`, `sourceUrl`, `minWeeks`, `maxWeeks`, `region`, `pbVersion`, and
-`versionObjects`. That observation is not sufficient evidence to send a write:
-required defaults, identity allocation, version checks, and cleanup behavior
-remain uncertain. CorosLink therefore does not guess these payloads.
+```json
+{
+  "name": "Base block", "overview": "…",
+  "entities": [{ "happenDay": "", "idInPlan": 1, "dayNo": 0,
+                 "sortNo": 1, "sortNoInPlan": 1, "sortNoInSchedule": 1 }],
+  "programs": [{ "…full program…": "…", "idInPlan": 1 }],
+  "weekStages": [{ "weekNo": 1, "stage": 2,
+                   "trainSum": { "planDistance": 0, "planDuration": 0, "planTrainingLoad": 0 },
+                   "sumByType": [] }],
+  "maxIdInPlan": 1, "totalDay": 1, "unit": 0,
+  "sourceId": "…", "sourceUrl": "…", "minWeeks": 1, "maxWeeks": 1,
+  "region": 1, "pbVersion": 5,
+  "versionObjects": [{ "id": 1, "status": 1 }]
+}
+```
 
-Native plan query and detail were checked with a saved Training Hub session and
-no credentials or sensitive headers were logged. Some active-plan detail
-responses omit `programs`; the adapter merges detail-only fields with the full
-grouped arrays returned by `/training/plan/query`.
+- **A session is an entity plus a program sharing `idInPlan`.** The program is
+  a complete COROS program — `/training/program/detail`, or a calculated one —
+  and COROS stores it as a copy with an id of its own. Nothing links it back to
+  a library workout; editing either leaves the other alone.
+- `dayNo` counts days across the whole plan, Monday first (week = `dayNo / 7`).
+- **`totalDay` is the last session's `dayNo` + 1**, so a plan cannot end in an
+  empty week.
+- **`minWeeks` / `maxWeeks` are the fewest and most sessions in a week** that has
+  any — not week counts, whatever the names say.
+- **A week's `stage` is an enum**, the index the web app's picker returns:
+  0 Not Set (`R6014`), 1 Preparation (`C1026`), 2 Base (`C1027`), 3 Build
+  (`C1028`), 4 Peak (`C1029`), 5 Race (`C1030`), 6 Transition (`C1031`). There
+  is no Taper and no naming a stage. `COROS_WEEK_STAGES` in the adapter.
+- `sourceId` / `sourceUrl` are the plan's thumbnail; the web app picks one of
+  COROS's defaults at random.
+- **A plan holds no rest days and no notes.** `eventTags` sent with `plan/add`
+  or `plan/update` is answered `0000` and dropped. Tags live on the calendar
+  only (`schedule/update` `{eventTags:[{name, type, happenDay, operation}]}`,
+  operation 1 add / 2 edit with `id, planId` / 3 delete with `id`; type 1 Other,
+  2 Race, 3 Test). A rest day is an empty day.
+- The web app refuses an eleventh session on one day.
 
-Until a cleanup-safe, explicitly opted-in verifier proves the complete
-create/read/update/activate/remove/delete lifecycle, the UI exposes the exact
-limitation and preserves the verified alternatives: local grouped templates,
-individual Workout Library writes, and direct calendar scheduling.
+### Update
+
+`update` takes the whole plan every time — the detail as read, with the
+fields above replaced — and `versionObjects` names only what changed:
+
+| Change | versionObject |
+|---|---|
+| session added | `{ id: <new idInPlan>, status: 1 }` |
+| session edited or moved | `{ id, labelId?, planProgramId, planId, status: 2 }` |
+| session removed (also drop it from `entities` and `programs`) | `{ id, labelId?, planProgramId, planId, status: 3 }` |
+
+A new session takes the next id past `maxIdInPlan`; ids are never reused.
+Its program goes without `planId` and `star` — the web app sends a library
+workout that way, and COROS gives the session program ids of its own — so a
+session copied inside a plan, or out of another one, is sent the same way
+rather than naming the session it came from (`newPlanProgram`).
+`version` goes up by one per update. **Nothing refuses a stale write that we
+know of**, so `savePlanToCoros` compares `version` against the one the edit
+began from and answers a conflict before anything is priced or written.
+
+### Copy, delete
+
+- `copy` keeps the original's **name** and records `originId`. A copy of an
+  instance is a plan that is not on the calendar (`executeStatus 0`).
+- `delete` is **soft**: the plan leaves `plan/query`, while `detail` still
+  answers for it with `status: 0`. Absence from the list is the only test.
+
+### On the calendar: instances
+
+- `executeSubPlan?subPlanId=<plan>&startDay=yyyyMMdd` makes an **instance** — a
+  plan with `executeStatus 1`, `sourcePlanId` naming the original, and
+  `startDay` / `endDay`. The original stays `executeStatus 0`. **The answer
+  carries no id**; find the new instance in `plan/query` by `sourcePlanId`.
+- **`dayNo 0` lands on the Monday of the week holding `startDay`, and sessions
+  before `startDay` are dropped.** A Wednesday start loses Monday and Tuesday of
+  week 1; a Sunday start loses the whole week.
+- **Nothing is checked against the calendar.** A day that already holds a
+  workout gets the plan's session beside it.
+- Each calendar entry carries `planId` = the instance and the plan's
+  `idInPlan`; the plan's stages are copied onto the calendar's own
+  `weekStages` (keyed by `firstDayInWeek`, `planId` = the account's schedule).
+- **Editing the instance with `plan/update` changes the calendar at once** —
+  adding, removing, moving (entities carry real `happenDay`s, counted from that
+  Monday). Moving a session on the calendar instead (`schedule/update`,
+  `versionObjects:[{type:0, id, status:2, planId, planProgramId}]` with the
+  moved entity and its program) updates the instance's `dayNo` **and raises its
+  `version`** (0 → 1, measured 2026-09-25, list and detail alike) — so a cached
+  copy compared by version cannot miss a move made on the calendar.
+- **Editing the original leaves the instance alone.** `plan/sync?planId=<original>`
+  (no body) pushes the original into the instance in place (same id) and
+  answers a task id; poll `syncstatus?taskId=` until `2` (the web app polls
+  every second, without end). **Sync overwrites the instance**: a session added
+  to the instance directly is gone after it. **And it does not carry a move**
+  (measured 2026-09-25): a session moved from day 0 to day 1 in the original and
+  then synced stayed on day 0, in the instance and on the calendar. The app
+  therefore never uses sync; it writes the original's sessions onto the instance
+  with `plan/update`, which moves, adds and removes on the calendar in place.
+- `quitSubPlan?subPlanId=<instance>` removes every session of the plan and
+  nothing else — a one-off workout on the same day stays. The instance stays
+  listed with `executeStatus 2`, and the calendar's stage for its weeks goes
+  back to Not Set. Measured 2026-09-25:
+  - **`executeStatus 2` is also what a run that ran out reports**; only `endDay`
+    tells them apart. `executeSubPlan` sets it past the last session (a 17-day
+    plan from Monday 20270104 went on with `endDay` 20270127); `quitSubPlan`
+    moves it to the day of removal (20260925, before `startDay` for a run not
+    yet begun). The library reads a run whose `endDay` falls before its last
+    session day as `stopped`, not `finished`.
+  - **`version` does not move**, and the `plan/query` row loses its `entities`
+    and `programs` while `detail` keeps them.
+  - **A stopped run cannot go back on the calendar**: `executeSubPlan` on it
+    answers `1031 Parameter input error`. Copying it is the way to reuse it.
+- `schedule/copyWeek?sourceFirstDayOfWeek=&targetFirstDayOfWeek=` copies a
+  calendar week; `schedule/deleteWeek?targetFirstDayOfWeek=` empties one —
+  **everything** in it, from any plan.
+- `rescheduleScheduledWorkout` in `trainingHubService.ts` says a
+  `schedule/update` with `status: 2` is refused with 17004. The move above,
+  with `type: 0` and the entity, was accepted on 2026-09-24; which part made the
+  difference has not been isolated.
+
+### Official plans
+
+A plan saved from COROS's catalogue is written in localization keys (`P10035`)
+and carries `officalConfig.isOffical: 0` — it is the athlete's plan, and
+update, copy and the instance edits above all work on it. Its keys resolve
+through `corosLocale.ts`.
 
 ## Create library workout
 
@@ -274,17 +393,20 @@ For each unique workout definition:
 One-off calendar workouts can skip the library step and embed the program
 directly in the schedule update payload.
 
-CorosLink's Coach “plan” is a local, confirmation-gated draft. The athlete must
-choose Workout Library, Calendar, local CorosLink template, COROS Plan Library,
-or Plan + Calendar on the card. The native grouped choices remain disabled
-while their writes are unverified. The active alternatives write individual
-workouts, write dated calendar occurrences, or save only to local SQLite. An AI
-tool call cannot execute the upload path.
+The Coach's plan is a confirmation-gated draft: an AI tool call cannot execute
+the upload path. Today the card offers Workout Library, Calendar and two local
+saves, with the native grouped choices disabled; that is being replaced by a
+direct native plan write — see
+[training-plan-coros-first.md](training-plan-coros-first.md).
 
 ## Fixtures
 
-See `scripts/fixtures/coros-plan-write/` for redacted request/response samples.
-For a cleanup-safe live contract check, run `npm run verify:coach-workout-api`
+See `scripts/fixtures/coros-plan-write/` for redacted request/response samples:
+`program-*` and `schedule-update-*` for the workout flow, `plan-*` and
+`schedule-*-subplan` for native plans (captured 2026-09-24, user ids, names and
+avatars replaced). `npm run verify:coros-plan-api -- --live` is the live check
+for native plans.
+For a cleanup-safe live contract check of workouts, run `npm run verify:coach-workout-api`
 while a COROS session is saved in CorosLink. The verifier creates, schedules,
 edits, reads back, checks library/calendar isolation for Run, then creates,
 round-trips, edits, and deletes a representative workout for every supported

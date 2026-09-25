@@ -22,6 +22,11 @@ import {
   pruneChatPlanDrafts,
   saveChatPlanDraft
 } from "./database";
+import { savePlanToCoros } from "./trainingLibraryService";
+import {
+  COROS_WEEK_STAGES,
+  trainingPlanFromCoachDraftPreview
+} from "./trainingPlanDomain";
 import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
@@ -30,6 +35,7 @@ import type {
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
   TrainingPlanDocument,
+  TrainingPlanWeekStage,
   UploadPlanResult,
   WorkoutDeletePreview,
   UnitSystem
@@ -39,11 +45,6 @@ import {
   buildDraftWorkoutInputSchema
 } from "./workoutCapabilities";
 import { formatDistanceValue } from "./unitSystem.js";
-import {
-  createTrainingPlan,
-  trainingPlanFromCoachDraftPreview
-} from "./trainingPlanDomain";
-import { saveLocalTrainingPlan } from "./trainingLibraryService";
 import {
   EXERCISE_SEARCH_EQUIPMENT,
   EXERCISE_SEARCH_MOVEMENTS,
@@ -473,7 +474,21 @@ function toPlanDraft(args: Record<string, unknown>): CorosTrainingPlanDraft {
       save_to_library: entry.save_to_library
     };
   });
-  return { name, workouts };
+  const description = typeof args.description === "string" ? args.description.trim() : "";
+  const weekStages = (Array.isArray(args.week_stages) ? args.week_stages : []).flatMap((item) => {
+    const record = (item ?? {}) as Record<string, unknown>;
+    const week = Number(record.week);
+    const stage = COROS_WEEK_STAGES.find((candidate) => candidate.slug === record.stage);
+    return Number.isInteger(week) && week >= 1 && stage && stage.value > 0
+      ? [{ weekIndex: week - 1, stage: stage.value as TrainingPlanWeekStage }]
+      : [];
+  });
+  return {
+    name,
+    workouts,
+    ...(description ? { description } : {}),
+    ...(weekStages.length ? { weekStages } : {})
+  };
 }
 
 function handleDraftWorkout(
@@ -529,68 +544,6 @@ export function buildTrainingPlanUploadInput(
       save_to_library: entry.save_to_library
     }))
   };
-}
-
-function normalizePlanDate(value?: string): string | undefined {
-  if (!value) return undefined;
-  const digits = value.replace(/-/g, "");
-  if (!/^\d{8}$/.test(digits)) return undefined;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-}
-
-function dateDayOffset(start: string, current: string): number {
-  const startDate = new Date(`${start}T12:00:00`);
-  const currentDate = new Date(`${current}T12:00:00`);
-  return Math.max(0, Math.round((currentDate.valueOf() - startDate.valueOf()) / 86_400_000));
-}
-
-function saveDraftAsLocalTemplate(
-  draftId: string,
-  plan: CorosTrainingPlanDraft
-): TrainingPlanDocument {
-  const scheduledDates = plan.workouts
-    .map((entry) => normalizePlanDate(entry.schedule_date))
-    .filter((date): date is string => Boolean(date))
-    .sort();
-  const startDate = scheduledDates[0];
-  const document = createTrainingPlan(plan.name, "template");
-  document.id = `template:coach:${draftId}`;
-  document.description = "Generated in Coach and saved locally for reuse.";
-  document.startDate = startDate;
-  document.entries = plan.workouts.map((workout, index) => {
-    const scheduledDate = normalizePlanDate(workout.schedule_date);
-    const offset = startDate && scheduledDate
-      ? dateDayOffset(startDate, scheduledDate)
-      : undefined;
-    return {
-      id: `entry:${draftId}:${workout.key || index}`,
-      kind: "workout" as const,
-      weekIndex: offset === undefined ? Math.floor(index / 7) : Math.floor(offset / 7),
-      dayIndex: offset === undefined ? undefined : offset % 7,
-      sortOrder: workout.sort_no ?? index,
-      title: workout.name,
-      workout: {
-        key: workout.key,
-        name: workout.name,
-        description: workout.description,
-        sport: workout.sport ?? "run",
-        sport_options: workout.sport_options,
-        steps: workout.steps,
-        distance_km: workout.distance_km,
-        schedule_date: workout.schedule_date,
-        sort_no: workout.sort_no,
-        save_to_library: workout.save_to_library
-      }
-    };
-  });
-  document.weekCount = Math.max(
-    1,
-    ...document.entries.map((entry) => entry.weekIndex + 1)
-  );
-  document.sportMix = [
-    ...new Set(plan.workouts.map((entry) => entry.sport ?? "run"))
-  ];
-  return saveLocalTrainingPlan(document);
 }
 
 export function buildTrainingPlanDestinationInput(
@@ -746,7 +699,7 @@ async function handleDraftTrainingPlan(
     },
     message: artifactType === "workout"
       ? "Workout draft saved. Tell the athlete to review it, choose Workout Library or Calendar, and confirm. The workout is not a training plan."
-      : "Draft saved. Tell the athlete to review the plan preview and save it as a grouped Training Plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
+      : "Draft saved. Tell the athlete to review the plan card: they can save it to COROS as a plan, or explicitly choose individual COROS workouts or Calendar. Do not call upload_training_plan; the athlete confirms from the card."
   });
 }
 
@@ -1083,69 +1036,84 @@ export async function uploadPlanDraftById(
     throw new Error("This training plan was already uploaded.");
   }
 
-  if (destination === "nativePlan" || destination === "nativePlanAndCalendar") {
-    throw new Error(
-      "Native COROS plan writes are unavailable because the create/update payload has not been live-verified safely. Choose Workout Library, Calendar, or Local template."
-    );
+  if (destination === "nativePlan") {
+    return savePlanDraftAsCorosPlan(stored, unitSystem);
+  }
+  if (destination !== "workoutLibrary" && destination !== "calendar") {
+    throw new Error("Save the plan to COROS as a plan, as individual workouts, or on the calendar.");
   }
 
-  let result: UploadPlanResult;
-  if (destination === "localPlan") {
-    const saved = saveLocalTrainingPlan(
-      trainingPlanFromCoachDraftPreview(stored.preview)
-    );
-    result = {
-      planName: saved.name,
-      workoutsCreated: 0,
-      workoutsScheduled: 0,
-      entries: [],
-      destination,
-      localPlanId: saved.id,
-      groupedPlanCreated: true,
-      remoteWrites: []
-    };
-  } else if (destination === "localTemplate") {
-    const saved = saveDraftAsLocalTemplate(draftId, stored.plan);
-    result = {
-      planName: saved.name,
-      workoutsCreated: 0,
-      workoutsScheduled: 0,
-      entries: [],
-      destination,
-      localPlanId: saved.id,
-      groupedPlanCreated: false,
-      remoteWrites: []
-    };
-  } else {
-    if (scheduleDate && stored.preview.artifactType !== "workout") {
-      throw new Error("A calendar date can only override a one-off workout draft.");
-    }
-    const input = buildTrainingPlanDestinationInput(
-      stored.plan,
-      destination,
-      scheduleDate
-    );
-    const uploaded = await uploadTrainingPlan(input, unitSystem);
-    result = {
-      ...uploaded,
-      destination,
-      groupedPlanCreated: false,
-      remoteWrites: destination === "calendar"
-        ? input.workouts.map((workout) => `Schedule ${workout.name} on ${workout.schedule_date}`)
-        : input.workouts.map((workout) => `Create workout ${workout.name}`)
-    };
+  if (scheduleDate && stored.preview.artifactType !== "workout") {
+    throw new Error("A calendar date can only override a one-off workout draft.");
   }
+  const input = buildTrainingPlanDestinationInput(
+    stored.plan,
+    destination,
+    scheduleDate
+  );
+  const uploaded = await uploadTrainingPlan(input, unitSystem);
+  const result: UploadPlanResult = {
+    ...uploaded,
+    destination,
+    remoteWrites: destination === "calendar"
+      ? input.workouts.map((workout) => `Schedule ${workout.name} on ${workout.schedule_date}`)
+      : input.workouts.map((workout) => `Create workout ${workout.name}`)
+  };
+  markDraftSaved(stored, result);
+  return result;
+}
+
+function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void {
   stored.uploadedAt = Date.now();
   stored.preview.uploadedAt = stored.uploadedAt;
   stored.preview.uploadResult = {
     workoutsScheduled: result.workoutsScheduled,
     workoutsCreated: result.workoutsCreated,
-    destination,
-    localPlanId: result.localPlanId,
-    groupedPlanCreated: result.groupedPlanCreated
+    destination: result.destination,
+    ...(result.planId ? { planId: result.planId } : {})
   };
   persistPlanDraft(stored);
-  markChatPlanDraftUploaded(draftId, stored.uploadedAt);
+  markChatPlanDraftUploaded(stored.draftId, stored.uploadedAt);
+}
+
+/** The coach's plan as the plan editor and a COROS save read it. */
+function coachDraftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
+  return trainingPlanFromCoachDraftPreview(stored.preview, {
+    description: stored.plan.description,
+    weekStages: stored.plan.weekStages,
+    layout: stored.plan.layout
+  });
+}
+
+/**
+ * A plan the coach wrote, saved to COROS whole. It is a COROS plan from here
+ * on — listed with the athlete's other plans, marked as the coach's — and the
+ * card says where it went.
+ */
+async function savePlanDraftAsCorosPlan(
+  stored: StoredPlanDraft,
+  unitSystem: UnitSystem
+): Promise<UploadPlanResult> {
+  if (stored.preview.artifactType === "workout") {
+    throw new Error("A single workout is saved to the library or the calendar, not as a plan.");
+  }
+  const saved = await savePlanToCoros({
+    plan: coachDraftDocument(stored),
+    unitSystem,
+    origin: "coach",
+    coach: { draftId: stored.draftId }
+  });
+  if (!saved.ok) throw new Error("COROS did not take the plan. Try again.");
+  const result: UploadPlanResult = {
+    planName: saved.plan.name,
+    workoutsCreated: saved.plan.entries.length,
+    workoutsScheduled: 0,
+    entries: [],
+    destination: "nativePlan",
+    planId: saved.plan.id,
+    remoteWrites: [`Create plan ${saved.plan.name}`]
+  };
+  markDraftSaved(stored, result);
   return result;
 }
 

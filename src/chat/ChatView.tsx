@@ -963,8 +963,8 @@ function PlanPreviewCard({
 }) {
   const { unitSystem } = useUnitSystem();
   const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "localPlan" | "workoutLibrary" | "calendar">
-  >("localPlan");
+    Extract<TrainingPlanDestination, "nativePlan" | "workoutLibrary" | "calendar">
+  >("nativePlan");
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const weekTabsRef = useRef<HTMLDivElement>(null);
   const uploadedResult =
@@ -978,6 +978,7 @@ function PlanPreviewCard({
         }
       : undefined);
   const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
+  const savedTo = uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
   const planWeeks = groupPlanEntriesByWeek(draft.entries);
   const scheduledWeekCount = planWeeks.filter(
     (week) => week.id !== "unscheduled"
@@ -1002,8 +1003,9 @@ function PlanPreviewCard({
   const destinationLabel: Record<TrainingPlanDestination, string> = {
     workoutLibrary: "COROS Workout Library",
     calendar: "COROS Calendar",
+    /* Where a card saved before plans went to COROS says it went. */
     localPlan: "Heracles Records Training Library",
-    nativePlan: "COROS Plan Library",
+    nativePlan: "your COROS plans",
     localTemplate: "Local Heracles Records template",
     nativePlanAndCalendar: "COROS plan + Calendar"
   };
@@ -1271,23 +1273,23 @@ function PlanPreviewCard({
           <div className="chat-plan-destination-options">
             <label
               className={`chat-plan-destination-option is-primary${
-                destination === "localPlan" ? " is-selected" : ""
+                destination === "nativePlan" ? " is-selected" : ""
               }`}
             >
               <input
                 className="sr-only"
                 type="radio"
                 name={`plan-destination-${draft.draftId}`}
-                value="localPlan"
-                checked={destination === "localPlan"}
-                onChange={() => setDestination("localPlan")}
+                value="nativePlan"
+                checked={destination === "nativePlan"}
+                onChange={() => setDestination("nativePlan")}
               />
               <span className="chat-plan-destination-icon">
                 <BookOpen size={16} aria-hidden="true" />
               </span>
               <span className="chat-plan-destination-copy">
                 <strong>Training Plan</strong>
-                <small>Keep these workouts together as one editable plan in Heracles Records.</small>
+                <small>Save these workouts together as one plan in your COROS plans.</small>
               </span>
               <CircleCheck
                 className="chat-plan-destination-check"
@@ -1369,10 +1371,10 @@ function PlanPreviewCard({
               <CircleCheck size={13} aria-hidden="true" />
             )}
             <span>
-              {destination === "localPlan"
-                ? `This will be saved as one grouped plan with ${draft.entries.length} ${
+              {destination === "nativePlan"
+                ? `This will be saved to COROS as one plan with ${draft.entries.length} ${
                     draft.entries.length === 1 ? "workout" : "workouts"
-                  } in your Heracles Records Training Library.`
+                  }. Put it on the calendar from its page in the Training Library.`
                 : destination === "calendar"
                   ? `${scheduledWorkoutCount} ${
                       scheduledWorkoutCount === 1 ? "workout" : "workouts"
@@ -1394,9 +1396,11 @@ function PlanPreviewCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {(uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination) === "localPlan"
+            {savedTo === "nativePlan"
+              ? `Saved to ${destinationLabel.nativePlan} as “${draft.name}”.`
+              : savedTo === "localPlan"
               ? `Saved as a grouped plan in ${destinationLabel.localPlan}.`
-              : `Saved to ${destinationLabel[uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination]}. ${
+              : `Saved to ${destinationLabel[savedTo]}. ${
                   uploadedResult?.workoutsScheduled ?? draft.uploadResult?.workoutsScheduled ?? 0
                 } scheduled, ${
                   uploadedResult?.workoutsCreated ?? draft.uploadResult?.workoutsCreated ?? 0
@@ -1425,14 +1429,14 @@ function PlanPreviewCard({
           >
             {uploading ? (
               <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : destination === "localPlan" ? (
+            ) : destination === "nativePlan" ? (
               <BookOpen size={14} aria-hidden="true" />
             ) : destination === "calendar" ? (
               <CalendarDays size={14} aria-hidden="true" />
             ) : (
               <Bookmark size={14} aria-hidden="true" />
             )}
-            {destination === "localPlan"
+            {destination === "nativePlan"
               ? "Save Plan"
               : destination === "calendar"
                 ? "Add to Calendar"
@@ -3655,8 +3659,7 @@ export function ChatView({
                     workoutsScheduled: result.workoutsScheduled,
                     workoutsCreated: result.workoutsCreated,
                     destination: result.destination,
-                    localPlanId: result.localPlanId,
-                    groupedPlanCreated: result.groupedPlanCreated
+                    ...(result.planId ? { planId: result.planId } : {})
                   }
                 }
               }

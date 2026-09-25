@@ -367,6 +367,158 @@ app.whenReady().then(async () => {
     "and the line is actually there, rather than both being collapsed"
   );
 
+  /*
+   * Edit workout, in the Training Library, is the same builder.
+   *
+   * It had an editor of its own (`WorkoutEditorModal`), with its own defaults,
+   * validator and layout. Now it opens Create workout's builder read from
+   * COROS, keeps the sport, prices the draft with COROS's own load as the old
+   * editor did, and a save writes back the steps nobody touched exactly as
+   * they were read — `sourceExerciseId` and the step's own name included,
+   * because those are what let COROS update an exercise in place.
+   */
+  await win.webContents.debugger.sendCommand("Emulation.clearDeviceMetricsOverride");
+  {
+    const LIBRARY_DOCUMENT = {
+      ref: { kind: "library", programId: "wk-1" },
+      revision: "rev-1",
+      canEdit: true,
+      context: CONTEXT,
+      draft: {
+        name: "Tempo",
+        overview: "Controlled, not racing.",
+        sportType: 1,
+        sport: "run",
+        nodes: [
+          {
+            id: "step-1",
+            sourceExerciseId: "1",
+            nodeType: "step",
+            kind: "warmup",
+            name: "Jog in",
+            target: { type: "time", seconds: 900 },
+            intensity: { type: "none" },
+            editable: true
+          },
+          {
+            id: "step-2",
+            sourceExerciseId: "2",
+            nodeType: "step",
+            kind: "training",
+            name: "Tempo block",
+            target: { type: "distance", meters: 6437 },
+            intensity: { type: "pace", lowSecondsPerKm: 271.2, highSecondsPerKm: 280.7, displayUnit: "km" },
+            editable: true
+          }
+        ]
+      }
+    };
+    await harness("mount", "WorkoutWorkspace", {
+      width: 1300,
+      height: 820,
+      workouts: [{
+        id: "wk-1",
+        programId: "wk-1",
+        name: "Tempo",
+        sportType: 1,
+        volume: "1 set(s)",
+        trainingLoad: 0,
+        exerciseCount: 2,
+        setCount: 2,
+        durationSeconds: 2400,
+        tags: [],
+        favorite: false,
+        archived: false,
+        syncState: "synced",
+        updatedAt: "2026-02-01T00:00:00.000Z"
+      }]
+    }, {
+      getWorkoutForEdit: LIBRARY_DOCUMENT,
+      getWorkoutEditorContext: CONTEXT,
+      listWorkoutExercises: [],
+      previewWorkoutEdit: { trainingLoad: 193, durationSeconds: 2400, distanceMeters: 9437 },
+      saveWorkoutEdit: { verified: true, document: LIBRARY_DOCUMENT }
+    });
+    await settle();
+    await evaluate(
+      `Array.from(document.querySelectorAll("button")).find((node) => node.textContent.trim() === "Edit").click()`
+    );
+    await settle(20);
+
+    assert.equal(await count(".workout-editor-modal"), 0, "not the old editor");
+    assert.equal(
+      await evaluate(`document.querySelector(".calendar-modal-builder .calendar-modal-header h3")?.textContent`),
+      "Edit library workout"
+    );
+    assert.equal(
+      await evaluate(`document.querySelector(".calendar-builder-sport-value")?.textContent`),
+      "Run",
+      "a COROS workout keeps its sport: it is stated where the picker would be"
+    );
+    assert.equal(
+      await evaluate(`document.querySelector('.calendar-builder-settings input[type="text"]').value`),
+      "Tempo",
+      "its name is read in"
+    );
+    assert.deepEqual(
+      await evaluate(`Array.from(document.querySelectorAll(".calendar-builder-row .calendar-builder-row-toggle > strong")).map((node) => node.textContent)`),
+      ["Warm-up", "Training"],
+      "and its steps, as the builder's rows"
+    );
+    const saveButton = `Array.from(document.querySelectorAll(".calendar-builder-footer .primary-button")).find((node) => node.textContent.includes("Save changes"))`;
+    assert.equal(await evaluate(`${saveButton}.disabled`), true, "nothing changed, nothing to save");
+    assert.match(
+      await evaluate(`document.querySelector(".calendar-builder-totals").textContent`),
+      /193 TL/,
+      "COROS's load for the draft sits beside the builder's own totals"
+    );
+
+    // Escape with an edit asks first, in the library's own dialog.
+    await evaluate(
+      `(() => {
+         const input = document.querySelector('.calendar-builder-settings input[type="text"]');
+         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+         setter.call(input, "Tempo, steady");
+         input.dispatchEvent(new Event("input", { bubbles: true }));
+         return true;
+       })()`
+    );
+    await settle();
+    await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })), true`);
+    await settle();
+    assert.equal(
+      await evaluate(`document.querySelector(".tl-dialog h2")?.textContent`),
+      "Discard unsaved changes?",
+      "unsaved edits are asked about before they are thrown away"
+    );
+    await evaluate(
+      `Array.from(document.querySelectorAll(".tl-dialog button")).find((node) => node.textContent.trim() === "Keep editing").click()`
+    );
+    await settle();
+    assert.equal(await count(".calendar-modal-builder"), 1, "Keep editing keeps it");
+
+    await evaluate(`${saveButton}.click()`);
+    await settle(12);
+    const saves = await evaluate(
+      `window.__harness.calls("saveWorkoutEdit").map((call) => call.args)`
+    );
+    assert.equal(saves.length, 1, "Save goes to COROS once");
+    const [ref, revision, draft] = saves[0];
+    assert.deepEqual(ref, { kind: "library", programId: "wk-1" });
+    assert.equal(revision, "rev-1", "against the revision it was read at");
+    assert.equal(draft.name, "Tempo, steady");
+    assert.deepEqual(
+      draft.nodes,
+      LIBRARY_DOCUMENT.draft.nodes,
+      "the steps nobody touched go back exactly as they were read"
+    );
+    assert.deepEqual(
+      await evaluate(`window.__harness.calls("prop:onMessage").map((call) => call.args[0])`),
+      ["Workout saved and verified."]
+    );
+    assert.equal(await count(".calendar-modal-builder"), 0, "and the builder closes");
+  }
+
   const errors = await evaluate("window.__harness.consoleErrors()");
   assert.deepEqual(errors, [], "the dialog mounted without console errors");
 

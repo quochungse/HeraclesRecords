@@ -91,11 +91,6 @@ const EXEMPT = [
     why: "A searchable grid of every COROS activity type: the search box above it makes this a combobox, not a fixed set."
   },
   {
-    file: "src/training-library/PlanCompare.tsx",
-    marker: "plan-compare-picker",
-    why: "The buttons are plans the athlete has, not options — a record list that happens to allow three."
-  },
-  {
     file: "src/trainingMap/ActivityGlobeCard.tsx",
     marker: "recentPlaces.map",
     why: "Places visited, drawn from the data. Selecting one moves the globe; it does not choose a mode."
@@ -111,19 +106,14 @@ const EXEMPT = [
     why: "A menu, with the menu roles and a popup of its own."
   },
   {
-    file: "src/training-library/TrainingLibraryView.tsx",
-    marker: "tl-sortable",
-    why: "A table's sort header: pressed means 'sorted by this column', which is not a choice between options."
+    file: "src/training-library/MonthDayPicker.tsx",
+    marker: "tl-daypick-day",
+    why: "A month of days: the grid's arrangement is the control — a day is found by the week it sits in, which a row of chips cannot say."
   },
   {
     file: "src/calendar/ExercisePickerDialog.tsx",
     marker: "exercise-picker-facet",
     why: "The exercise library's value column: a scrolling column of up to sixteen muscles, each a picture of where it sits on the body, its anatomical name and how many movements are filed under it. A chip row holds none of that, and the picture is the point — it is what makes the column readable without knowing the words."
-  },
-  {
-    file: "src/training-library/WorkoutWorkspace.tsx",
-    marker: "tl-sortable",
-    why: "Same control as above, on the workout table."
   },
   {
     file: "src/strength/BodyMapV2.tsx",

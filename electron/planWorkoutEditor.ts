@@ -19,8 +19,16 @@ function editorNodeId(prefix: string): string {
   return `${prefix}-plan-${planEditorNodeCounter}`;
 }
 
-function editorKind(kind: RunWorkoutCreateStep["kind"]): RunWorkoutEditorStepKind {
-  return kind === "interval" ? "training" : kind;
+/*
+ * A step with no kind is a training step. The type says the field is
+ * required, but plans written before it was are still on disk, and every
+ * other reader of these steps (`workoutMetrics`, `formatRunStepSummary`)
+ * already defaults it — this one passed `undefined` through as the step's
+ * name, and the first `.trim()` downstream took the screen with it.
+ */
+function editorKind(kind: RunWorkoutCreateStep["kind"] | undefined): RunWorkoutEditorStepKind {
+  if (!kind || kind === "interval") return "training";
+  return kind;
 }
 
 function editorTarget(step: RunWorkoutCreateStep): RunWorkoutEditorTarget {
@@ -50,7 +58,7 @@ function editorStep(step: RunWorkoutCreateStep, sport: WorkoutSport): RunWorkout
     id: editorNodeId("step"),
     nodeType: "step",
     kind: editorKind(step.kind),
-    name: step.name?.trim() || (step.kind === "interval" ? "Training" : step.kind),
+    name: step.name?.trim() || (!step.kind || step.kind === "interval" ? "Training" : step.kind),
     target: editorTarget(step),
     intensity: structuredClone(step.intensity ?? WORKOUT_SPORT_CAPABILITIES[sport].defaultIntensity),
     exerciseId: step.exercise_id,
@@ -172,19 +180,25 @@ export function editorDraftToPlanWorkoutInput(
   };
 }
 
-/** Replace a plan-owned workout copy without mutating its linked library source. */
+/**
+ * A session's workout replaced by an edit of it.
+ *
+ * The COROS program it was read with goes: it describes the steps as they
+ * were, and a save that found it would write those back over the edit. With
+ * it gone the save rebuilds the program from `workout` (`buildCalculatedPlanProgram`),
+ * and so do the planned figures, which were the old program's.
+ */
 export function replaceTrainingPlanEntryWorkout(
   entry: TrainingPlanEntry,
   workout: PlanWorkoutEntryInput
 ): TrainingPlanEntry {
-  return {
-    ...entry,
-    title: workout.name,
-    workout: structuredClone(workout),
-    programId: undefined,
-    plannedDurationSeconds: undefined,
-    plannedDistanceMeters: undefined,
-    plannedTrainingLoad: undefined,
-    plannedStrengthSets: undefined
-  };
+  const {
+    corosProgram: _program,
+    plannedDurationSeconds: _duration,
+    plannedDistanceMeters: _distance,
+    plannedTrainingLoad: _load,
+    plannedStrengthSets: _sets,
+    ...rest
+  } = entry;
+  return { ...rest, title: workout.name, workout: structuredClone(workout) };
 }

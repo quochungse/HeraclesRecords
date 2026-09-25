@@ -74,7 +74,12 @@ const repoRelative = (file) => relative(ROOT, file).split(sep).join("/");
 
 /** The whole vocabulary. Adding an entry is the deliberate act; see the header. */
 const WEIGHTS = new Set([400, 500, 600, 700]);
-const SIZES_PX = new Set([10, 11, 12, 13, 14, 18, 22, 28, 36]);
+/*
+ * 32px was added for the Training Library's own title, by request. It puts
+ * three steps inside the 28–36px range, which is the kind of crowding the top
+ * of this scale had avoided — worth knowing before a fourth is asked for.
+ */
+const SIZES_PX = new Set([10, 11, 12, 13, 14, 18, 22, 28, 32, 36]);
 /**
  * The relative ladder. `em` is not a loophole here — it is the only thing that
  * works for text which has to follow whatever size its parent ended up at, and

@@ -58,12 +58,16 @@ import type {
   TrainingHubScheduledWorkoutEntry,
   TrainingHubLibraryWorkout,
   TrainingActivityMatch,
-  TrainingCollection,
   TrainingLibraryDeleteRequest,
   TrainingLibrarySnapshot,
+  TrainingLibraryWorkout,
   TrainingPlanDocument,
-  TrainingPlanCalendarMutationResult,
   TrainingPlanCalendarPreview,
+  TrainingPlanDraftRecord,
+  TrainingPlanMetadata,
+  TrainingPlanSaveRequest,
+  TrainingPlanSaveResult,
+  LibraryPlanSession,
   TrainingPlanDestination,
   TrainingPlanMetadataPatch,
   WorkoutMetadataPatch,
@@ -287,29 +291,41 @@ export interface CorosLinkApi {
   ) => Promise<TrainingHubLibraryWorkout>;
   getTrainingLibrarySnapshot: () => Promise<TrainingLibrarySnapshot>;
   getNativeTrainingPlan: (remoteId: string) => Promise<TrainingPlanDocument>;
-  saveLocalTrainingPlan: (plan: TrainingPlanDocument) => Promise<TrainingPlanDocument>;
   updateTrainingPlanMetadata: (
     id: string,
     patch: TrainingPlanMetadataPatch
-  ) => Promise<TrainingPlanDocument>;
-  deleteLocalTrainingPlan: (id: string, confirmed: boolean) => Promise<void>;
-  previewTrainingPlanCalendar: (planId: string, startDate: string) => Promise<TrainingPlanCalendarPreview>;
-  addTrainingPlanToCalendar: (
-    previewId: string,
+  ) => Promise<TrainingPlanMetadata>;
+  /** Writes a plan to COROS and reads it back; a plan changed there since the edit began is a conflict. */
+  saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest) => Promise<TrainingPlanSaveResult>;
+  /** A COROS copy of the plan, named "… Copy". */
+  duplicateTrainingPlan: (planId: string) => Promise<TrainingPlanDocument>;
+  /** `takeOffCalendar`: a plan on the calendar is taken off it first; without it, one is refused. */
+  deleteTrainingPlan: (
+    planId: string,
     confirmed: boolean,
-    unitSystem: UnitSystem
-  ) => Promise<TrainingPlanCalendarMutationResult>;
-  previewTrainingPlanCalendarRemoval: (planId: string) => Promise<TrainingPlanCalendarPreview>;
-  removeTrainingPlanFromCalendar: (previewId: string, confirmed: boolean) => Promise<TrainingPlanCalendarMutationResult>;
+    options?: { takeOffCalendar?: boolean }
+  ) => Promise<void>;
+  /** The workout library alone, for a picker that needs nothing else. */
+  listTrainingLibraryWorkouts: () => Promise<TrainingLibraryWorkout[]>;
+  /** What putting a plan on the calendar from a day (yyyyMMdd) would do. */
+  previewTrainingPlanCalendar: (planId: string, startDay: string) => Promise<TrainingPlanCalendarPreview>;
+  /** Puts a plan on the COROS calendar; answers its running copy. */
+  addTrainingPlanToCalendar: (planId: string, startDay: string) => Promise<TrainingPlanDocument>;
+  /** Takes a plan's running copy off the COROS calendar. */
+  removeTrainingPlanFromCalendar: (planId: string) => Promise<void>;
+  /** Carries a plan's edits onto its running copy; answers the copy. */
+  syncTrainingPlanToCalendar: (planId: string) => Promise<TrainingPlanDocument>;
+  /** Keeps an edit in progress on this machine (and, through sync, the others). */
+  saveTrainingPlanDraft: (
+    draft: Omit<TrainingPlanDraftRecord, "savedAt" | "id"> & { id?: string }
+  ) => Promise<TrainingPlanDraftRecord>;
+  deleteTrainingPlanDraft: (id: string) => Promise<void>;
+  /** A library workout read in full, as a session to add to a plan. */
+  libraryWorkoutAsPlanSession: (programId: string) => Promise<LibraryPlanSession>;
   updateWorkoutMetadata: (
     programIds: string[],
     patch: WorkoutMetadataPatch
   ) => Promise<void>;
-  saveTrainingCollection: (
-    collection: Pick<TrainingCollection, "id" | "name"> &
-      Partial<Pick<TrainingCollection, "description" | "color">>
-  ) => Promise<TrainingCollection>;
-  deleteTrainingCollection: (id: string, confirmed: boolean) => Promise<void>;
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ) => Promise<string[]>;

@@ -335,9 +335,8 @@ export function applyBackup(
       if (columns.length === 0) continue;
       const placeholders = columns.map(() => "?").join(", ");
       // OR IGNORE is what makes a merge additive: a row whose primary key is
-      // already here — or that would collide with any other unique constraint,
-      // such as `training_plans.remote_id` — is skipped, leaving this
-      // machine's copy exactly as it was.
+      // already here — or that would collide with any other unique constraint
+      // — is skipped, leaving this machine's copy exactly as it was.
       const conflict = mode === "replace" ? "REPLACE" : "IGNORE";
       const statement = database.prepare(
         `INSERT OR ${conflict} INTO ${table} (${columns.join(", ")}) ` +

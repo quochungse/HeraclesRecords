@@ -61,12 +61,16 @@ import type {
   TrainingHubScheduledWorkoutEntry,
   TrainingHubLibraryWorkout,
   TrainingActivityMatch,
-  TrainingCollection,
   TrainingLibraryDeleteRequest,
   TrainingLibrarySnapshot,
+  TrainingLibraryWorkout,
   TrainingPlanDocument,
-  TrainingPlanCalendarMutationResult,
   TrainingPlanCalendarPreview,
+  TrainingPlanDraftRecord,
+  TrainingPlanMetadata,
+  TrainingPlanSaveRequest,
+  TrainingPlanSaveResult,
+  LibraryPlanSession,
   TrainingPlanDestination,
   TrainingPlanMetadataPatch,
   WorkoutMetadataPatch,
@@ -396,39 +400,43 @@ const api = {
     ipcRenderer.invoke("trainingLibrary:snapshot"),
   getNativeTrainingPlan: (remoteId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("trainingLibrary:getNativePlan", remoteId),
-  saveLocalTrainingPlan: (plan: TrainingPlanDocument): Promise<TrainingPlanDocument> =>
-    ipcRenderer.invoke("trainingLibrary:savePlan", plan),
   updateTrainingPlanMetadata: (
     id: string,
     patch: TrainingPlanMetadataPatch
-  ): Promise<TrainingPlanDocument> =>
+  ): Promise<TrainingPlanMetadata> =>
     ipcRenderer.invoke("trainingLibrary:updatePlanMetadata", id, patch),
-  deleteLocalTrainingPlan: (id: string, confirmed: boolean): Promise<void> =>
-    ipcRenderer.invoke("trainingLibrary:deletePlan", id, confirmed),
-  previewTrainingPlanCalendar: (planId: string, startDate: string): Promise<TrainingPlanCalendarPreview> =>
-    ipcRenderer.invoke("trainingLibrary:previewPlanCalendar", planId, startDate),
-  addTrainingPlanToCalendar: (
-    previewId: string,
+  saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest): Promise<TrainingPlanSaveResult> =>
+    ipcRenderer.invoke("trainingLibrary:savePlan", request),
+  duplicateTrainingPlan: (planId: string): Promise<TrainingPlanDocument> =>
+    ipcRenderer.invoke("trainingLibrary:duplicatePlan", planId),
+  deleteTrainingPlan: (
+    planId: string,
     confirmed: boolean,
-    unitSystem: UnitSystem
-  ): Promise<TrainingPlanCalendarMutationResult> =>
-    ipcRenderer.invoke("trainingLibrary:addPlanToCalendar", previewId, confirmed, unitSystem),
-  previewTrainingPlanCalendarRemoval: (planId: string): Promise<TrainingPlanCalendarPreview> =>
-    ipcRenderer.invoke("trainingLibrary:previewPlanCalendarRemoval", planId),
-  removeTrainingPlanFromCalendar: (previewId: string, confirmed: boolean): Promise<TrainingPlanCalendarMutationResult> =>
-    ipcRenderer.invoke("trainingLibrary:removePlanFromCalendar", previewId, confirmed),
+    options?: { takeOffCalendar?: boolean }
+  ): Promise<void> => ipcRenderer.invoke("trainingLibrary:deletePlan", planId, confirmed, options),
+  listTrainingLibraryWorkouts: (): Promise<TrainingLibraryWorkout[]> =>
+    ipcRenderer.invoke("trainingLibrary:workouts"),
+  previewTrainingPlanCalendar: (planId: string, startDay: string): Promise<TrainingPlanCalendarPreview> =>
+    ipcRenderer.invoke("trainingLibrary:previewPlanCalendar", planId, startDay),
+  addTrainingPlanToCalendar: (planId: string, startDay: string): Promise<TrainingPlanDocument> =>
+    ipcRenderer.invoke("trainingLibrary:addPlanToCalendar", planId, startDay),
+  removeTrainingPlanFromCalendar: (planId: string): Promise<void> =>
+    ipcRenderer.invoke("trainingLibrary:removePlanFromCalendar", planId),
+  syncTrainingPlanToCalendar: (planId: string): Promise<TrainingPlanDocument> =>
+    ipcRenderer.invoke("trainingLibrary:syncPlanToCalendar", planId),
+  saveTrainingPlanDraft: (
+    draft: Omit<TrainingPlanDraftRecord, "savedAt" | "id"> & { id?: string }
+  ): Promise<TrainingPlanDraftRecord> =>
+    ipcRenderer.invoke("trainingLibrary:saveDraft", draft),
+  deleteTrainingPlanDraft: (id: string): Promise<void> =>
+    ipcRenderer.invoke("trainingLibrary:deleteDraft", id),
+  libraryWorkoutAsPlanSession: (programId: string): Promise<LibraryPlanSession> =>
+    ipcRenderer.invoke("trainingLibrary:librarySession", programId),
   updateWorkoutMetadata: (
     programIds: string[],
     patch: WorkoutMetadataPatch
   ): Promise<void> =>
     ipcRenderer.invoke("trainingLibrary:updateWorkoutMetadata", programIds, patch),
-  saveTrainingCollection: (
-    collection: Pick<TrainingCollection, "id" | "name"> &
-      Partial<Pick<TrainingCollection, "description" | "color">>
-  ): Promise<TrainingCollection> =>
-    ipcRenderer.invoke("trainingLibrary:saveCollection", collection),
-  deleteTrainingCollection: (id: string, confirmed: boolean): Promise<void> =>
-    ipcRenderer.invoke("trainingLibrary:deleteCollection", id, confirmed),
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ): Promise<string[]> =>

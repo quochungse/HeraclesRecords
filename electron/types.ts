@@ -2474,11 +2474,14 @@ export type TrainingLibrarySyncState =
   | "failed"
   | "stale";
 
-export type TrainingPlanSource =
-  | "coros"
-  | "local"
-  | "template"
-  | "coach";
+/**
+ * A week's stage, as COROS stores it: an index into its own list, not a name.
+ * 0 Not Set, 1 Preparation, 2 Base, 3 Build, 4 Peak, 5 Race, 6 Transition —
+ * `COROS_WEEK_STAGES` in `trainingPlanDomain.ts` carries the labels.
+ * There is no Taper and no naming a stage, which is why the free-text phases
+ * this replaced are gone rather than mapped.
+ */
+export type TrainingPlanWeekStage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TrainingPlanDifficulty =
   | "beginner"
@@ -2486,41 +2489,64 @@ export type TrainingPlanDifficulty =
   | "advanced"
   | "custom";
 
+/**
+ * Where a Coach plan card can be saved. `localPlan`, `localTemplate` and
+ * `nativePlanAndCalendar` are retired — a plan is a COROS plan now
+ * (docs/training-plan-coros-first.md) — and stay in the union only so a
+ * transcript that recorded one still reads.
+ */
 export type TrainingPlanDestination =
   | "workoutLibrary"
   | "calendar"
-  | "localPlan"
   | "nativePlan"
-  | "localTemplate"
-  | "nativePlanAndCalendar";
+  | "localPlan"
+  | "nativePlanAndCalendar"
+  | "localTemplate";
 
-export type TrainingPlanEntryKind = "workout" | "rest" | "note";
-
-export interface TrainingPlanPhase {
-  id: string;
-  name: string;
-  startWeek: number;
-  endWeek: number;
-  kind?: "base" | "build" | "peak" | "taper" | "recovery" | "custom";
-}
-
+/**
+ * One session in a plan.
+ *
+ * Every entry is a workout on a day: COROS stores a plan as sessions and
+ * nothing else, so the rest days, notes and day-less "holding area" entries
+ * this used to carry are gone with the local plans that held them.
+ */
 export interface TrainingPlanEntry {
   id: string;
-  kind: TrainingPlanEntryKind;
   weekIndex: number;
-  /** Zero-based day within the plan week; undefined places the entry in the holding area. */
-  dayIndex?: number;
+  /** Monday = 0 through Sunday = 6. */
+  dayIndex: number;
+  /** Order within the day. */
   sortOrder: number;
-  title?: string;
-  workout?: PlanWorkoutEntryInput;
-  programId?: string;
-  remotePlanProgramId?: string;
+  title: string;
+  workout: PlanWorkoutEntryInput;
+  /**
+   * The session's COROS program exactly as the plan holds it. Written back
+   * untouched while the session is not edited, so a round trip through the
+   * editor loses none of the fields the workout codec does not model; an edit
+   * drops it, and the save rebuilds the program from `workout`.
+   */
+  corosProgram?: Record<string, unknown>;
+  /** The session's id inside its COROS plan; absent for a session not saved yet. */
+  idInPlan?: string;
+  /** On a plan that is on the calendar: the day COROS put this session on (yyyyMMdd). */
+  happenDay?: string;
   plannedDurationSeconds?: number;
   plannedDistanceMeters?: number;
   plannedTrainingLoad?: number;
   plannedStrengthSets?: number;
-  notes?: string;
 }
+
+/** A library workout copied in full, as a session ready to place on a plan day. */
+export type LibraryPlanSession = Pick<
+  TrainingPlanEntry,
+  | "title"
+  | "workout"
+  | "corosProgram"
+  | "plannedDurationSeconds"
+  | "plannedDistanceMeters"
+  | "plannedTrainingLoad"
+  | "plannedStrengthSets"
+>;
 
 export interface TrainingPlanGenerationRequest {
   goal: string;
@@ -2536,118 +2562,137 @@ export interface TrainingPlanGenerationRequest {
   constraints?: string;
 }
 
-export interface TrainingPlanCalendarOccurrence {
-  planEntryId: string;
-  happenDay: string;
-  schedulePlanId: string;
-  scheduleIdInPlan: string;
-  planProgramId: string;
-  pbVersion?: number;
-  createdAt: string;
-  removedAt?: string;
+/**
+ * What a plan is doing on the COROS calendar. A plan put there becomes an
+ * *instance* — a copy COROS makes, dated from the Monday of its start week —
+ * so this is read off COROS and never written by the app.
+ *
+ * `finished` and `stopped` are both COROS's `executeStatus 2`, and differ by
+ * whether the run reached its last day: "Remove from calendar" (`quitSubPlan`)
+ * sets the same status and moves `endDay` to the day it was removed — before
+ * `startDay`, for a run taken off before it began. A stopped run cannot go
+ * back on the calendar: COROS refuses `executeSubPlan` on it with 1031.
+ */
+export type TrainingPlanCalendarState = "unscheduled" | "running" | "finished" | "stopped";
+
+/** Why a Coach plan exists, carried in plan metadata so it outlives the save. */
+export interface TrainingPlanCoachContext {
+  /** The chat plan draft it was saved from. */
+  draftId?: string;
 }
 
-export interface TrainingPlanCalendarFailure {
-  planEntryId: string;
-  happenDay: string;
-  message: string;
-  /** True when COROS may have accepted the write but its identity could not be verified. */
-  writeMayHaveSucceeded?: boolean;
-}
-
-export interface TrainingPlanCalendarInstall {
-  id: string;
-  startDate: string;
-  planRevision: string;
-  state: "active" | "partial" | "removed";
-  lastOperation?: "install" | "remove";
-  occurrences: TrainingPlanCalendarOccurrence[];
-  failures: TrainingPlanCalendarFailure[];
-  createdAt: string;
+/** App-side facts about a COROS plan, which COROS has no field for. */
+export interface TrainingPlanMetadata {
+  /** `coros:<remoteId>`. */
+  planId: string;
+  favorite: boolean;
+  tags: string[];
+  archived: boolean;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
   updatedAt: string;
 }
 
+/**
+ * A plan, as the library reads and writes it: a COROS plan, or a draft of one.
+ *
+ * The shape is cut to what COROS stores (docs/training-plan-coros-first.md §2),
+ * so saving a draft loses nothing. Goal, free-text phases, a start date on the
+ * plan itself, and the calendar bookkeeping of local installs are all gone.
+ */
 export interface TrainingPlanDocument {
+  /** `coros:<remoteId>` for a plan on COROS, `draft:<uuid>` for a new one not saved yet. */
   id: string;
   remoteId?: string;
+  /** COROS's `version`, which every update bumps. */
+  remoteVersion?: number;
   name: string;
   description: string;
-  goal: string;
-  difficulty: TrainingPlanDifficulty;
-  notes: string;
-  source: TrainingPlanSource;
-  sportMix: WorkoutSport[];
   weekCount: number;
-  startDate?: string;
-  phases: TrainingPlanPhase[];
+  /** Only weeks with a stage set; a week not listed is Not Set. */
+  weekStages: Array<{ weekIndex: number; stage: TrainingPlanWeekStage }>;
   entries: TrainingPlanEntry[];
-  calendarInstalls?: TrainingPlanCalendarInstall[];
+  sportMix: WorkoutSport[];
+  calendar: TrainingPlanCalendarState;
+  /**
+   * For an instance: the Monday its week 1 falls on (YYYY-MM-DD), which is
+   * where COROS counts `dayNo` from. Absent on a plan that is not on the
+   * calendar — a plan has no start date of its own.
+   */
+  startDate?: string;
+  /** For an instance: the plan it was made from. */
+  sourcePlanId?: string;
+  /** For a plan with an instance running from it: that instance's id. */
+  runningInstanceId?: string;
   tags: string[];
-  collectionId?: string;
   favorite: boolean;
   archived: boolean;
-  syncState: TrainingLibrarySyncState;
-  remoteVersion?: number;
-  remoteUpdatedAt?: number;
-  lastSyncedAt?: string;
-  createdAt: string;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
   updatedAt: string;
 }
+
+/**
+ * An edit in progress, kept on this machine and synced with the others
+ * (`personal`). A draft is not a plan: it cannot be scheduled or copied, and
+ * becomes one only when it is saved to COROS. The Plans tab draws a new
+ * plan's draft as a tile and marks a plan whose edits are held here.
+ */
+export interface TrainingPlanDraftRecord {
+  id: string;
+  /** The COROS plan being edited; absent for a plan that does not exist yet. */
+  baseRemoteId?: string;
+  /** The version that plan had when the edit began. */
+  baseVersion?: number;
+  plan: TrainingPlanDocument;
+  savedAt: string;
+}
+
+export interface TrainingPlanSaveRequest {
+  plan: TrainingPlanDocument;
+  unitSystem: UnitSystem;
+  /** The draft this save finishes, deleted once the plan is on COROS. */
+  draftId?: string;
+  /** The version the edit began from; a plan changed since is refused unless `overwrite`. */
+  expectedVersion?: number;
+  overwrite?: boolean;
+  /** Save as a new COROS plan even though `plan.remoteId` names one. */
+  asNew?: boolean;
+  origin?: "user" | "coach";
+  coach?: TrainingPlanCoachContext;
+}
+
+export type TrainingPlanSaveResult =
+  | { ok: true; plan: TrainingPlanDocument }
+  | { ok: false; conflict: { currentVersion?: number; expectedVersion: number } };
 
 export interface TrainingPlanCalendarPreviewEntry {
-  planEntryId: string;
+  entryId: string;
   name: string;
-  happenDay: string;
   sport?: WorkoutSport;
-  schedulePlanId?: string;
-  scheduleIdInPlan?: string;
-  planProgramId?: string;
-  pbVersion?: number;
-}
-
-export interface TrainingPlanCalendarConflict {
+  /** yyyyMMdd. */
   happenDay: string;
-  existing: Array<{
-    name: string;
-    schedulePlanId: string;
-    scheduleIdInPlan: string;
-  }>;
+  /** Before the start day, so COROS will leave it off the calendar. */
+  dropped: boolean;
+  /** What the calendar already holds that day. */
+  existing: string[];
 }
 
+/** What putting a plan on the calendar from a given day would do. */
 export interface TrainingPlanCalendarPreview {
-  previewId: string;
-  operation: "install" | "remove";
   planId: string;
-  planName: string;
-  planRevision: string;
-  startDate: string;
+  /** yyyyMMdd, as chosen. */
+  startDay: string;
+  /** yyyyMMdd: the Monday COROS counts the plan's days from. */
+  anchorDay: string;
   entries: TrainingPlanCalendarPreviewEntry[];
-  conflicts: TrainingPlanCalendarConflict[];
   blockers: string[];
-  expiresAt: string;
-}
-
-export interface TrainingPlanCalendarMutationResult {
-  plan: TrainingPlanDocument;
-  scheduledCount: number;
-  removedCount: number;
-  failures: TrainingPlanCalendarFailure[];
-}
-
-export interface TrainingCollection {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface TrainingWorkoutMetadata {
   programId: string;
   favorite: boolean;
   tags: string[];
-  collectionId?: string;
   source: "coros" | "local" | "activity" | "coach";
   syncState: TrainingLibrarySyncState;
   lastUsedAt?: string;
@@ -2655,16 +2700,35 @@ export interface TrainingWorkoutMetadata {
   cachedVersion?: string;
 }
 
+/*
+ * **Three fields that used to be here are gone: `usedByPlanIds`,
+ * `scheduledCount` and `lastUsedAt`.**
+ *
+ * The first two matched a library workout's COROS program id against plan
+ * entries and scheduled days, and neither match can land. Nothing in the app
+ * ever writes a plan entry's `programId` from a library workout — the plan
+ * editor builds its sessions inline, and the only non-null ones come from an
+ * imported COROS plan, whose sessions are plan-internal programs with ids of
+ * their own (checked against this account's store: not one library id appears
+ * in any plan). And COROS stores a scheduled workout as its own copy under its
+ * own id. So both counts were zero on every workout in every library, which
+ * made the screen say "Unused" about all of them and gave the `Most used` sort
+ * one constant to order by. `lastUsedAt` was the fallback that survived them
+ * and had one writer and one reader, both on the screen that has stopped
+ * asking; the `last_used_at` column and `TrainingWorkoutMetadata.lastUsedAt`
+ * are left alone, because that table syncs and nulling a column on every save
+ * would rewrite the value on every machine.
+ *
+ * Tying a library workout to the plan or the day that used it needs a link
+ * written at the moment of use. That is a change to what is stored, and
+ * reintroducing any of these has to start there rather than here.
+ */
 export interface TrainingLibraryWorkout extends TrainingHubLibraryWorkout {
   favorite: boolean;
   tags: string[];
-  collectionId?: string;
   source: TrainingWorkoutMetadata["source"];
   syncState: TrainingLibrarySyncState;
-  lastUsedAt?: string;
   lastSyncedAt?: string;
-  usedByPlanIds: string[];
-  scheduledCount: number;
 }
 
 export interface NativeCorosPlanSummary {
@@ -2677,6 +2741,9 @@ export interface NativeCorosPlanSummary {
   startDay?: string;
   endDay?: string;
   executeStatus?: number;
+  /** On an instance — the copy `executeSubPlan` puts on the calendar — the
+      plan it was made from. Absent on a plan nobody has scheduled. */
+  sourcePlanId?: string;
   inSchedule?: boolean;
   workoutCount: number;
   sportTypes: number[];
@@ -2709,9 +2776,12 @@ export interface NativeCorosPlanProgram {
   name: string;
   overview?: string;
   sportType?: number;
+  /** Centimetres, as COROS sends every program distance. */
   planDistance?: number;
   planDuration?: number;
   planTrainingLoad?: number;
+  /** COROS's `totalSets`, which counts steps for every sport; only a strength
+      session's is a count of sets. */
   planSets?: number;
   exercises?: TrainingHubScheduledExercise[];
 }
@@ -2728,17 +2798,6 @@ export interface NativeCorosPlanDetail extends NativeCorosPlanSummary {
   }>;
   /** Lossless payload retained only at the remote adapter boundary. */
   rawPayload: Record<string, unknown>;
-}
-
-export interface TrainingPlanWriteCapabilities {
-  create: boolean;
-  update: boolean;
-  duplicate: boolean;
-  delete: boolean;
-  activate: boolean;
-  removeActive: boolean;
-  reason?: string;
-  verifiedAt?: string;
 }
 
 export interface TrainingActivityMatch {
@@ -2769,21 +2828,19 @@ export interface TrainingActivityMatch {
 
 export interface TrainingLibrarySnapshot {
   workouts: TrainingLibraryWorkout[];
+  /** Every plan COROS holds for the account, templates and instances alike. */
   plans: TrainingPlanDocument[];
-  nativePlans: NativeCorosPlanSummary[];
-  collections: TrainingCollection[];
+  drafts: TrainingPlanDraftRecord[];
   matches: TrainingActivityMatch[];
   cachedAt: string;
   stale: boolean;
   offline: boolean;
   partialFailures: string[];
-  nativePlanWrites: TrainingPlanWriteCapabilities;
 }
 
 export interface WorkoutMetadataPatch {
   favorite?: boolean;
   tags?: string[];
-  collectionId?: string | null;
   source?: TrainingWorkoutMetadata["source"];
   lastUsedAt?: string;
 }
@@ -2791,7 +2848,6 @@ export interface WorkoutMetadataPatch {
 export interface TrainingPlanMetadataPatch {
   favorite?: boolean;
   tags?: string[];
-  collectionId?: string | null;
   archived?: boolean;
 }
 
@@ -2933,8 +2989,8 @@ export interface PlanDraftPreview {
     workoutsScheduled: number;
     workoutsCreated: number;
     destination?: TrainingPlanDestination;
-    localPlanId?: string;
-    groupedPlanCreated?: boolean;
+    /** The COROS plan it became, for a plan saved whole. */
+    planId?: string;
   };
 }
 
@@ -3172,8 +3228,8 @@ export interface UploadPlanResult {
   workoutsScheduled: number;
   entries: UploadPlanResultEntry[];
   destination?: TrainingPlanDestination;
-  localPlanId?: string;
-  groupedPlanCreated?: boolean;
+  /** The COROS plan it became, for a plan saved whole. */
+  planId?: string;
   remoteWrites?: string[];
 }
 
@@ -3199,6 +3255,28 @@ export interface TrainingHubLibraryWorkout {
   sportType?: number;
   volume?: string;
   trainingLoad?: number;
+  /**
+   * How long COROS expects the session to take.
+   *
+   * On the list row this is `estimatedTime`, which the program-query payload
+   * does carry — unlike `duration`, `distance` and `trainingLoad`, which it
+   * writes as `0` — and which matches the detail's `duration` exactly (probed
+   * live 2026-09-22: 690, 360, 1618 and 1096 seconds against the same four
+   * details). So it is the one figure a library row can state without asking
+   * COROS a second question, and it is the figure every workout has.
+   */
+  durationSeconds?: number;
+  /**
+   * How many movements the session holds and how many sets they add up to.
+   *
+   * `exerciseNum` and `totalSets`, and both are **real on the list row** —
+   * probed live: 9 and 9 for one strength session, 11 and 21 for another. They
+   * are the only figures besides `estimatedTime` that `/training/program/query`
+   * fills in, which is what makes them the two a row can state without asking
+   * COROS a second question.
+   */
+  exerciseCount?: number;
+  setCount?: number;
   createTimestamp?: number;
 }
 
