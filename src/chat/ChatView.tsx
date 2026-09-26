@@ -700,6 +700,24 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
   }
 );
 
+/**
+ * The "Draw the outline" AI Plan sends on its own as a conversation opens on
+ * its brief (UAT): the athlete pressed nothing, so it is not drawn as their
+ * message. It stays in the transcript — the outline's answer needs a turn of
+ * the athlete's in front of it on the wire — and is recognised by where it
+ * is: the first entry after the brief that begins the conversation.
+ */
+function isAutomaticOutlineStep(timeline: readonly ChatEntry[], index: number): boolean {
+  const entry = timeline[index];
+  return (
+    index === 1 &&
+    timeline[0]?.kind === "planBrief" &&
+    entry?.kind === "message" &&
+    entry.role === "user" &&
+    entry.content === outlineStepText()
+  );
+}
+
 export function ChatView({
   api,
   onError,
@@ -1100,9 +1118,6 @@ export function ChatView({
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Which conversation `seenPlanDraftIdsRef` is describing. */
-  const planPanelSessionRef = useRef<string | null>(null);
-  const seenPlanDraftIdsRef = useRef<Set<string>>(new Set());
   const chatHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -3327,33 +3342,15 @@ export function ChatView({
       : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
   const editingWorkout = editingWorkoutDraft ? withSources(editingWorkoutDraft) : null;
 
-  /**
-   * Opening the panel is reserved for news, so this has to tell a creation
-   * that just arrived from one that was already in the transcript when the
-   * conversation was opened. Ids seen for this session are what separates
-   * them; switching conversations adopts whatever is there and closes up,
-   * because scrolling back through an old chat is not the coach proposing
-   * anything.
+  /*
+   * The Creations list opens only when asked for (UAT): a creation is read in
+   * the conversation, on its card, so a new one does not pull the list open.
+   * Switching conversations closes it, with any details open.
    */
-  const planDraftIdKey = planDrafts.map((draft) => draft.draftId).join("|");
   useEffect(() => {
-    const ids = planDrafts.map((draft) => draft.draftId);
-    if (planPanelSessionRef.current !== activeSessionId) {
-      planPanelSessionRef.current = activeSessionId;
-      seenPlanDraftIdsRef.current = new Set(ids);
-      setPlanPanelOpen(false);
-      setOpenCreationId(null);
-      return;
-    }
-    const fresh = ids.filter((id) => !seenPlanDraftIdsRef.current.has(id));
-    if (fresh.length === 0) return;
-    for (const id of fresh) seenPlanDraftIdsRef.current.add(id);
-    setPlanPanelOpen(true);
-    // `planDrafts` is rebuilt on every render; the id list is what actually
-    // changes, and re-running on the array identity would reopen the panel on
-    // every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, planDraftIdKey]);
+    setPlanPanelOpen(false);
+    setOpenCreationId(null);
+  }, [activeSessionId]);
 
   const providerSwitch = (
     <ProviderSwitch
@@ -3866,47 +3863,72 @@ function AnalysisSilentChip({
 
   /* The running turn's bubble sits where the turn began, above the cards it
      produces as it runs, so its answer reads before them — as it will once
-     settled (`settleTurnEntries`). One array with keys, so nothing remounts. */
-  const streamingRow = streaming ? (
-    <div key="streaming-turn" className="chat-row chat-row-assistant">
+     settled (`settleTurnEntries`). One array with keys, so nothing remounts.
+
+     A pipeline step is the exception for its progress (UAT): the trail that
+     says Coach is drawing the outline or writing the sessions is a row of its
+     own at the very end, under whatever the step has produced so far — above
+     a chart the step drew, it read as finished while it was still working.
+     The step's words, when it has any, still stand where the turn began. */
+  const stepActive = Boolean(streaming && stepRun && stepRun.requestId === activeRequestIdRef.current);
+  const pendingStatus = (
+    <div className="chat-stream-pending">
+      {activeTool || !thinkingText ? (
+        <span className="chat-stream-status">
+          {compacting
+            ? "Compacting the conversation…"
+            : activeTool
+              ? `Using ${activeTool.replace(/_/g, " ")}…`
+              : resumedCoachPromptRef.current
+                ? "Resuming plan…"
+                : "Working on it…"}
+        </span>
+      ) : null}
+      {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
+    </div>
+  );
+  const streamedAnswer = streamingText ? (
+    <>
+      {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
+      <AssistantMarkdown content={streamingText} streaming />
+    </>
+  ) : null;
+  const assistantRow = (key: string, children: ReactNode) => (
+    <div key={key} className="chat-row chat-row-assistant">
       <div className="chat-avatar chat-avatar-assistant">
         <Sparkles size={16} aria-hidden="true" />
       </div>
-      <div className="chat-bubble chat-bubble-streaming">
-        {stepRun && stepRun.requestId === activeRequestIdRef.current ? <CoachStepTrail run={stepRun} /> : null}
-        {streamingText ? (
-          <>
-            {thinkingText ? (
-              <ThinkingDisclosure content={thinkingText} live />
-            ) : null}
-            <AssistantMarkdown content={streamingText} streaming />
-          </>
-        ) : (
-          <div className="chat-stream-pending">
-            {activeTool || !thinkingText ? (
-              <span className="chat-stream-status">
-                {compacting
-                  ? "Compacting the conversation…"
-                  : activeTool
-                    ? `Using ${activeTool.replace(/_/g, " ")}…`
-                    : resumedCoachPromptRef.current
-                      ? "Resuming plan…"
-                      : "Working on it…"}
-              </span>
-            ) : null}
-            {thinkingText ? (
-              <ThinkingDisclosure content={thinkingText} live />
-            ) : null}
-          </div>
-        )}
-        {currentSource ? <SourceBadge source={currentSource} /> : null}
-      </div>
+      <div className="chat-bubble chat-bubble-streaming">{children}</div>
     </div>
-  ) : null;
+  );
+  const streamingRow = !streaming
+    ? null
+    : stepActive
+      ? streamedAnswer
+        ? assistantRow("streaming-turn", streamedAnswer)
+        : null
+      : assistantRow(
+          "streaming-turn",
+          <>
+            {streamedAnswer ?? pendingStatus}
+            {currentSource ? <SourceBadge source={currentSource} /> : null}
+          </>
+        );
+  const stepTrailRow =
+    stepActive && stepRun
+      ? assistantRow(
+          "streaming-step",
+          <>
+            <CoachStepTrail run={stepRun} />
+            {streamedAnswer ? null : pendingStatus}
+            {currentSource ? <SourceBadge source={currentSource} /> : null}
+          </>
+        )
+      : null;
   const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
-    if (!streamingRow) return rows;
     const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
-    return [...rows.slice(0, at), streamingRow, ...rows.slice(at)];
+    const placed = streamingRow ? [...rows.slice(0, at), streamingRow, ...rows.slice(at)] : rows;
+    return stepTrailRow ? [...placed, stepTrailRow] : placed;
   };
 
   return (
@@ -4041,6 +4063,7 @@ function AnalysisSilentChip({
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
+            if (isAutomaticOutlineStep(timeline, index)) return null;
 
             if (entry.kind === "toolNotice") {
               return (
@@ -4158,7 +4181,9 @@ function AnalysisSilentChip({
                       sources={conversationSettings?.sources}
                       editing={editingBriefId === brief.artifactId}
                       onEdit={
-                        briefIsPlan(brief.artifactId)
+                        // Once there is an outline the brief is settled: the
+                        // outline is what is adjusted or redrawn from then on.
+                        brief.outline || briefIsPlan(brief.artifactId)
                           ? undefined
                           : () => {
                               setBriefSave({ saving: false });

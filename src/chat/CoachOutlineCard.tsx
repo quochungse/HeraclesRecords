@@ -1,4 +1,4 @@
-import { RotateCw } from "lucide-react";
+import { ArrowRight, RotateCw } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import type { PlanBrief, WorkoutSport } from "../../electron/types";
 import { PLAN_WEEKDAYS } from "../../electron/trainingPlanGeneration";
@@ -169,23 +169,6 @@ export function CoachOutlineCard({
       ) : (
         <div className="chat-creation-actions">
           <div className="chat-plan-actions">
-            {onWriteSessions ? (
-              <button
-                type="button"
-                className="chat-plan-upload"
-                disabled={busy || problems.length > 0 || Boolean(blocked)}
-                title={
-                  blocked
-                    ? blocked
-                    : problems.length
-                      ? "Adjust or redraw the outline so it fits the brief first"
-                      : undefined
-                }
-                onClick={onWriteSessions}
-              >
-                Write the sessions
-              </button>
-            ) : null}
             <button type="button" className="chat-plan-review" disabled={!onAdjust} onClick={onAdjust}>
               {editing ? "Continue adjusting" : "Adjust outline"}
             </button>
@@ -198,6 +181,26 @@ export function CoachOutlineCard({
             >
               <RotateCw size={13} aria-hidden="true" /> Redraw with a note
             </button>
+            {/* The way on, at the row's end with an arrow: the outline is a
+                step, and the sessions are the next one. */}
+            {onWriteSessions ? (
+              <button
+                type="button"
+                className="chat-plan-upload chat-outline-next"
+                disabled={busy || problems.length > 0 || Boolean(blocked)}
+                title={
+                  blocked
+                    ? blocked
+                    : problems.length
+                      ? "Adjust or redraw the outline so it fits the brief first"
+                      : undefined
+                }
+                onClick={onWriteSessions}
+              >
+                Write the sessions
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
           {noteOpen ? (
             <form

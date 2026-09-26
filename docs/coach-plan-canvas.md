@@ -1129,4 +1129,9 @@ Ba thay đổi sau khi dùng thử bản P0–P3:
 3. **Ask Coach từ ngoài cuộc chat hỏi chọn cuộc chat.** `CoachAskPicker`: New conversation hoặc
    một cuộc gần đây, cuộc tạo ra plan (nếu có) đứng đầu. Chip `PlanRef` chỉ đi vào cuộc chat
    chứa draft của nó; nơi khác thì tên plan nằm trong câu hỏi.
-
+4. **Sau khi có outline:** card brief bỏ Edit brief; nút **Write the sessions** nằm cuối hàng, có mũi
+   tên. Tin "Draw the outline" do AI Plan tự gửi không hiện như tin của user (vẫn nằm trong
+   transcript để lượt trả lời có một lượt user phía trước trên wire). Card tiến trình của bước
+   (Drawing the outline / Writing the sessions) luôn là hàng cuối, dưới các card bước đó vừa tạo.
+5. **Canvas Creations không tự mở** khi có creation mới: xem trực tiếp trên card trong cuộc chat;
+   canvas chỉ là mục lục, mở bằng nút Creations.

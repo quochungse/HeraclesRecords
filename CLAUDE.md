@@ -903,8 +903,16 @@ Overview, Media, Data, and Settings are in the main bundle.
   by `generatedPlanProblems`. Unlike the generator's, the accepted draft is **not** held in memory:
   `planGenerations` carries the brief's `artifactId`, and `handleDraftTrainingPlan` writes it to
   `chat_plan_drafts` as that artifact's version 1, so brief, outline and plan are one creation.
-  From then on the brief and outline refuse changes and their cards say so. While a step runs,
-  its bubble draws `CoachStepTrail`, folded from the stream by `stepRunEvent` over `runTrail.ts`.
+  From then on the brief and outline refuse changes and their cards say so. **The brief card
+  stops offering Edit brief once an outline exists** — the outline is what is adjusted or redrawn
+  from there — and the outline card's **Write the sessions** ends its row with an arrow, as the
+  next step. While a step runs, `CoachStepTrail` (folded from the stream by `stepRunEvent` over
+  `runTrail.ts`) is **a row of its own at the end of the transcript**, under the cards the step has
+  produced so far; the step's words, if any, stay where the turn began. The "Draw the outline" an
+  AI Plan conversation sends on its own is kept in the transcript — the answer needs a turn of the
+  athlete's in front of it on the wire — but not drawn (`isAutomaticOutlineStep`: the first entry
+  after the brief that opens the conversation). **The Creations list never opens by itself**: a
+  creation is read on its card, and the list is an index opened from its button.
   **A step does not carry the conversation** (P2.4): `pipelineWire` sends the step's prompt —
   which holds the brief and the outline — after the six messages before it, never the whole
   transcript or its compaction summary, and the renderer skips `compactBeforeSend` for a step.

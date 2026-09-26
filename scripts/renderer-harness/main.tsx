@@ -532,7 +532,11 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       </main>
     );
   },
-  ChatView: (options) => (
+  // `styles: true` loads the app stylesheet, for a suite that measures layout;
+  // the older Coach suites stand on the unstyled ground they were written on.
+  ChatView: (options) => {
+    if (options.styles === true) loadAppStyles();
+    return (
     <ChatView
       api={api}
       onError={spy("onError") as () => void}
@@ -544,7 +548,8 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       pendingPrompt={options.pendingPrompt as ComponentProps<typeof ChatView>["pendingPrompt"]}
       onPendingPromptConsumed={spy("onPendingPromptConsumed") as () => void}
     />
-  ),
+    );
+  },
   AnalysisDetailView: (options) => (
     <AnalysisDetailView
       api={api}

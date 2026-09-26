@@ -1051,6 +1051,16 @@ async function main() {
     false,
     "the brief stops asking for an outline once it has one"
   );
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-brief-card button")].some((b) => /Edit brief|Continue editing/.test(b.textContent))`),
+    false,
+    "nor offers to be edited: the outline is what changes from here (UAT)"
+  );
+  assert.equal(
+    await page(`(() => { const row = [...document.querySelectorAll(".chat-outline-card .chat-plan-actions > button")]; const last = row.at(-1); return last?.textContent.trim() === "Write the sessions" && Boolean(last.querySelector("svg")); })()`),
+    true,
+    "the way on to the sessions ends the row, with an arrow (UAT)"
+  );
   const outlineText = (await harness("text", ".chat-outline-card")) ?? "";
   assert.match(outlineText, /Plan outline[\s\S]*8 weeks · 4–5.5 h a week · 5 sessions/);
   assert.match(outlineText, /What Coach read: About four hours a week lately\./);
@@ -1136,6 +1146,13 @@ async function main() {
     getPlanArtifacts: [{ artifactId: "brief-2", draftId: "brief-2-v1", version: 1, author: "coach", createdAt: 1 }]
   });
   await harness("emit", "onChatStreamInfo", { requestId: sessions.args[0], kind: "planDraft", draft: WRITTEN });
+  await waitFor(() => harness("exists", ".chat-creation-card"), "the plan's card lands while the step still runs");
+  assert.equal(
+    await page(`Boolean([...document.querySelectorAll(".chat-row")].at(-1)?.querySelector(".chat-step-trail"))`),
+    true,
+    "the step's progress stays under what it has produced, at the very end (UAT)"
+  );
+  assert.equal(await harness("exists", "aside.chat-canvas"), false, "a new creation does not pull the Creations list open (UAT)");
   await harness("emit", "onChatStreamDone", { requestId: sessions.args[0], fullText: "Written.", finishReason: "stop" });
   await waitFor(async () => !(await harness("exists", ".chat-step-trail")), "the trail goes with the turn");
   await waitFor(() => harness("exists", ".chat-creation-card[data-draft-id='brief-2-v1'], .chat-creation-card"), "the plan's card lands");
@@ -1255,6 +1272,11 @@ async function main() {
     "Start plan draws the outline without another press"
   );
   assert.equal(outlineTurn.args[3], "s-new", "in the new conversation");
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-row-user")].some((row) => row.textContent.includes("Draw the outline"))`),
+    false,
+    "the athlete pressed nothing, so no message of theirs is drawn for it (UAT)"
+  );
   assert.deepEqual(outlineTurn.args[4], { step: "outline", artifactId: "brief-new" }, "as the outline step of that brief");
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.equal(await harness("callCount", "sendChat"), 1, "and only once");

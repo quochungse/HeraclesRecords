@@ -523,6 +523,22 @@ async function main() {
       /same key/i.test(line)
     );
     assert.deepEqual(keyWarnings, [], "a duplicated card must not collide on its key");
+
+    // A chart has no width of its own, so its card takes the row: sized to
+    // its content, Fitness trends drew 133px wide and read as missing. Read
+    // off the computed style, which a window without frames still answers.
+    await harness("mount", "ChatView", { styles: true }, {
+      ...BASE_SCRIPT,
+      __persistChatSessions: false,
+      getChatSession: [{ kind: "message", role: "user", content: "Xu hướng thể lực" }, card]
+    });
+    await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+    await waitFor(() => harness("exists", ".chat-visual-card"), "the chart card is on screen");
+    const sizing = await win.webContents.executeJavaScript(
+      `(() => { const card = document.querySelector(".chat-visual-card"); const bubble = card.parentElement; return { grow: getComputedStyle(bubble).flexGrow, width: getComputedStyle(card).width === getComputedStyle(bubble).width }; })()`,
+      true
+    );
+    assert.deepEqual(sizing, { grow: "1", width: true }, "the chart's bubble takes the row and its card fills it");
   }
 
   console.log("chat transcript race tests passed");

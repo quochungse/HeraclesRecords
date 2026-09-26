@@ -20832,6 +20832,12 @@ tr.data-intervals-row-missing {
   gap: 8px;
 }
 
+/* The outline's way on to the sessions stands at the row's end, as a next
+   step does, apart from the buttons that change the outline itself. */
+.chat-outline-next {
+  margin-left: auto;
+}
+
 .chat-plan-review {
   display: inline-flex;
   align-items: center;
@@ -20921,6 +20927,21 @@ tr.data-intervals-row-missing {
   flex-direction: column;
   gap: 10px;
   min-width: min(100%, 420px);
+}
+
+/* A chart has no width of its own — Recharts' ResponsiveContainer takes what
+   its box is given — and the bubble around it sizes to its content, so the
+   card's percentage had nothing to resolve against: Fitness trends drew 133px
+   wide, a chart 103px across, which read as missing. The bubble that holds a
+   chart takes the row instead, and the card fills it. */
+.chat-bubble-plan:has(> :is(.chat-visual-card, .chat-hr-trend-card)) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-bubble-plan > :is(.chat-visual-card, .chat-hr-trend-card) {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chat-hr-trend-card-header,
