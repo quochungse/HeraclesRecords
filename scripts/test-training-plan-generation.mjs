@@ -284,38 +284,6 @@ await test("a length left to Coach is 4 to 24 weeks, counted from the last sessi
     session(`w${week}-thu`, dayOf("2026-08-03", week, 3))
   ]);
   assert.deepEqual(generation.generatedPlanProblems(four, open), []);
-  const preview = {
-    draftId: "d4", name: "Four", summary: "", conflicts: [], warnings: [],
-    entries: four.map((source) => ({ key: source.key, name: source.name, sport: "run", saveToLibrary: false, workoutType: "run", source }))
-  };
-  assert.equal(generation.trainingPlanFromDraftPreview(preview, open).weekCount, 4, "the plan is as long as Coach made it");
-});
-
-await test("the plan takes the coach's overview and stages, and nothing else", () => {
-  const preview = {
-    draftId: "d1",
-    name: " 10K build ",
-    summary: "4 workouts · 4 scheduled · 4 Run",
-    conflicts: [],
-    warnings: ["Review loads."],
-    entries: fitting.map((source) => ({ key: source.key, name: source.name, sport: "run", saveToLibrary: false, workoutType: "run", source }))
-  };
-  const plan = generation.trainingPlanFromDraftPreview(
-    preview,
-    { ...request, constraints: "Left knee" },
-    {
-      description: "Two weeks sharpening toward a 10K.",
-      weekStages: [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 4 }, { weekIndex: 2, stage: 5 }, { weekIndex: 1, stage: 0 }]
-    }
-  );
-  assert.equal(plan.name, "10K build");
-  assert.equal(plan.description, "Two weeks sharpening toward a 10K.");
-  assert.deepEqual(plan.weekStages, [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 4 }], "a stage past the plan, or Not Set, is dropped");
-  assert.equal(plan.weekCount, 2);
-  assert.equal(plan.origin, "coach");
-  assert.equal(plan.coach, undefined);
-  assert.deepEqual(plan.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 0], [0, 3], [1, 0], [1, 3]]);
-  assert.equal(plan.entries.every((entry) => entry.workout.save_to_library === false), true);
 });
 
 await test("the prompt states the request as the rules the tool checks", () => {
@@ -353,18 +321,6 @@ await test("the prompt states the request as the rules the tool checks", () => {
   assert.match(coach, /about 5–8 hours a week; no week over 8 hours/);
   assert.match(coach, /Choose how many sessions a week/);
   assert.doesNotMatch(coach, /In my words/, "an empty detail says nothing");
-});
-
-await test("Continue in Coach hands over a question, not the tool contract", () => {
-  const handoff = generation.trainingPlanCoachHandoff({ ...request, constraints: "Left knee" });
-  assert.match(handoff, /^Help me build a training plan\./);
-  assert.match(handoff, /2 weeks from Monday 2026-08-03\./);
-  assert.match(handoff, /My week: Monday up to 60 min; Thursday up to 60 min\./);
-  assert.match(handoff, /Constraints: Left knee/);
-  assert.doesNotMatch(handoff, /draft_training_plan|Do not ask/);
-  const coach = generation.trainingPlanCoachHandoff({ ...request, weeks: undefined, week: { mode: "coach", sessionsPerWeek: 4, blockedDayIndexes: [] } });
-  assert.match(coach, /you choose how long/);
-  assert.match(coach, /You decide my week \(4 sessions a week\)\./);
 });
 
 // --- The outline ----------------------------------------------------------
@@ -458,24 +414,20 @@ await test("sessions written to an accepted outline follow it: its length, count
   const prompt = generation.trainingPlanGenerationPrompt(open);
   assert.match(prompt, /The outline I accepted — write the sessions to it/);
   assert.match(prompt, /What you read of my training when you drew it: About 30 km a week lately/);
-  const preview = {
-    draftId: "o1", name: "Outlined", summary: "", conflicts: [], warnings: [],
-    entries: fitting.map((source) => ({ key: source.key, name: source.name, sport: "run", saveToLibrary: false, workoutType: "run", source }))
-  };
-  const plan = generation.trainingPlanFromDraftPreview(preview, open, { weekStages: [{ weekIndex: 0, stage: 6 }] });
-  assert.deepEqual(plan.weekStages, [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 3 }], "the accepted outline's stages, not the draft's");
-  assert.equal(plan.weekCount, 2);
 });
 
-await test("the outline turn offers its tool alone and withholds every writing tool", () => {
+await test("the outline step offers its tool alone and withholds every writing tool", () => {
   const source = readChatService();
-  const body = source.slice(source.indexOf("export async function outlineTrainingPlan("));
+  const body = source.slice(source.indexOf("async function streamOutlineStep("));
   const fn = body.slice(0, body.indexOf("\n}\n") + 2);
   assert.match(fn, /toolPolicy: "read-only"/);
   assert.match(fn, /extra: \[PLAN_OUTLINE_TOOL_DEFINITION\]/);
-  assert.match(fn, /\.\.\.generationReach\(request, OUTLINE_WITHHELD_TOOLS\)/);
+  assert.match(fn, /\.\.\.pipelineReach\(sources\)/);
   assert.match(fn, /finally \{\s*runTools\.delete\(requestId\);/, "a run's tools go when it ends, however it ends");
-  assert.match(source, /const OUTLINE_WITHHELD_TOOLS = new Set\(\["draft_training_plan", "draft_workout"\]\)/);
+  assert.match(
+    source,
+    /const PIPELINE_WITHHELD_TOOLS = new Set\(\[\s*"draft_training_plan",\s*"draft_workout",\s*"revise_training_plan",\s*PLAN_BRIEF_TOOL\s*\]\)/
+  );
   const execute = source.slice(source.indexOf("async function executeChatTool("));
   assert.ok(
     execute.indexOf("runTools.get(requestId)") < execute.indexOf("isToolAllowedUnderPolicy(name, toolPolicy)"),
@@ -524,11 +476,11 @@ await test("Coach cannot judge a level from training it was not shown", () => {
   assert.deepEqual(fields({ difficulty: "advanced", sources: { activities: false, sleep: false, zones: false } }), []);
 });
 
-await test("both generation turns withhold what the athlete did not share, from the tools and the snapshot", () => {
+await test("both pipeline steps withhold what the conversation does not share, from the tools and the snapshot", () => {
   const source = readChatService();
-  assert.match(source, /allow: \(name\) => !withheldTools\.has\(name\) && !toolReadsWithheldSource\(name, sources\)/);
-  assert.match(source, /runTools\.set\(requestId, \{ extra: \[\], \.\.\.generationReach\(request, SESSIONS_WITHHELD_TOOLS\) \}\)/);
-  assert.match(source, /\.\.\.generationReach\(request, OUTLINE_WITHHELD_TOOLS\)/);
+  assert.match(source, /allow: \(name\) => !withheld\.has\(name\) && !toolReadsWithheldSource\(name, sources\)/);
+  assert.match(source, /runTools\.set\(requestId, \{ extra: \[\], \.\.\.pipelineReach\(sources, SESSIONS_STEP_WITHHELD_TOOLS\) \}\)/);
+  assert.match(source, /\.\.\.pipelineReach\(sources\),/);
   assert.equal((source.match(/runTools\.get\(requestId\)\?\.context/g) ?? []).length, 5, "every provider's snapshot is built with the run's scope");
   const context = source.slice(source.indexOf("async function buildTrainingContext("));
   assert.match(context, /includeActivities = permissions\?\.recentActivities !== false && scope\?\.activities !== false/);
@@ -563,47 +515,15 @@ await test("the draft tool refuses a draft that breaks the request, and keeps no
   assert.equal(drafts.length, 0, "a refused draft is not announced");
 });
 
-await test("an accepted draft is held in memory for the run, never persisted", async () => {
-  const drafts = [];
-  const answer = JSON.parse(
-    await chatWorkoutTools.handleChatWorkoutTool(
-      "draft_training_plan",
-      {
-        name: "10K build",
-        description: "Two sharp weeks.",
-        week_stages: [{ week: 1, stage: "build" }, { week: 2, stage: "peak" }],
-        workouts: liveWorkouts
-      },
-      { planRequest: liveRequest, onPlanDraft: (preview) => drafts.push(preview) }
-    )
-  );
-  assert.equal(answer.ok, true, JSON.stringify(answer));
-  assert.equal(drafts.length, 1);
-  assert.equal(answer.draft_id, drafts[0].draftId);
-  assert.doesNotMatch(answer.message, /plan card|upload_training_plan/, "there is no card to point the athlete at");
-
-  const held = chatWorkoutTools.generatedPlanDraft(answer.draft_id);
-  assert.equal(held.plan.description, "Two sharp weeks.");
-  assert.deepEqual(held.plan.weekStages, [{ weekIndex: 0, stage: 3 }, { weekIndex: 1, stage: 4 }]);
-  const plan = generation.trainingPlanFromDraftPreview(held.preview, liveRequest, {
-    description: held.plan.description,
-    weekStages: held.plan.weekStages
-  });
-  assert.equal(plan.entries.length, 4);
-  assert.deepEqual(plan.weekStages, [{ weekIndex: 0, stage: 3 }, { weekIndex: 1, stage: 4 }]);
-
-  chatWorkoutTools.forgetGeneratedPlanDrafts([answer.draft_id]);
-  assert.equal(chatWorkoutTools.generatedPlanDraft(answer.draft_id), undefined);
-});
-
-await test("the generation runs read-only and lets go of its drafts", () => {
+await test("the sessions step runs read-only on the conversation's AI, and lets go of its run", () => {
   const source = readChatService();
-  const body = source.slice(source.indexOf("export async function generateTrainingPlan("));
-  const fn = body.slice(0, body.indexOf("\nexport function cancelChat("));
-  assert.match(fn, /toolPolicy: "read-only"/, "no write tool is offered to a generation");
-  assert.match(fn, /runtime: request\.runtime/, "the AI panel's choice reaches the run, as an analysis's does");
-  assert.match(fn, /finally \{[^}]*forgetGeneratedPlanDrafts\(run\.drafts\./, "its drafts go when it ends, however it ends");
+  const body = source.slice(source.indexOf("async function streamSessionsStep("));
+  const fn = body.slice(0, body.indexOf("\n}\n") + 2);
+  assert.match(fn, /toolPolicy: "read-only"/, "no write tool but the draft is offered to the step");
+  assert.match(fn, /runtime: request\.runtime/, "the conversation's AI reaches the run, as an analysis's does");
+  assert.match(fn, /finally \{\s*planGenerations\.delete\(requestId\);\s*runTools\.delete\(requestId\);/, "it lets go when it ends, however it ends");
   assert.match(source, /planRequest: generation\?\.request/, "the draft tool is told what the athlete asked for");
+  assert.match(source, /planArtifactId: generation\.artifactId/, "and whose first version the draft is");
 });
 
 console.log(`training plan generation OK — ${passed} checks`);

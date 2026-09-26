@@ -163,8 +163,6 @@ import type {
   SaveChatSessionOptions,
   StrengthHistoryRequest,
   TrainingHubStatus,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineRevision,
   UnitSystem,
   WorkoutSport
 } from "./types";
@@ -331,7 +329,6 @@ import {
   saveChatSessionEntries,
   saveChatSettings,
   setChatSessionPinnedById,
-  streamChat,
   testClaudeCodeConnection,
   testAnthropicApiConnection,
   testLocalChatConnection,
@@ -343,10 +340,15 @@ import {
   restorePlanVersion,
   syncPlanFromCoros,
   listPlanCalendarStates,
+  streamConversationTurn,
+  getConversationSettings,
+  setConversationSettings,
+  listConversationPlanBriefs,
+  editPlanBrief,
+  adjustPlanOutline,
+  createPlanBriefForSession,
   findChatSessionForDraft,
   editPlanDraft,
-  generateTrainingPlan,
-  outlineTrainingPlan,
   getPlanDraftDocument,
   confirmWorkoutDelete
 } from "./chatService";
@@ -1594,10 +1596,43 @@ function registerIpcHandlers(): void {
   // Kicks off streaming; assistant text is pushed via chat:stream* events.
   ipcMain.handle(
     "chat:send",
-    (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem) =>
-      streamChat(createWindowSink(mainWindow), requestId, messages, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
+    (
+      _event,
+      requestId: string,
+      messages: ChatMessage[],
+      unitSystem?: UnitSystem,
+      sessionId?: string,
+      pipeline?: import("./types").ChatPipelineStep
+    ) =>
+      streamConversationTurn(
+        createWindowSink(mainWindow),
+        requestId,
+        messages,
+        normalizeUnitSystem(unitSystem),
+        typeof sessionId === "string" && sessionId ? sessionId : undefined,
+        (pipeline?.step === "outline" || pipeline?.step === "sessions") && typeof pipeline.artifactId === "string"
+          ? {
+              step: pipeline.step,
+              artifactId: pipeline.artifactId,
+              ...(typeof pipeline.note === "string" && pipeline.note.trim() ? { note: pipeline.note.trim() } : {})
+            }
+          : undefined
+      )
+  );
+  ipcMain.handle("chat:planBriefs", (_event, artifactIds: string[]) => listConversationPlanBriefs(artifactIds));
+  ipcMain.handle(
+    "chat:updatePlanBrief",
+    (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
+  );
+  ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string) => createPlanBriefForSession(sessionId));
+  ipcMain.handle("chat:updatePlanOutline", (_event, artifactId: string, outline: unknown) =>
+    adjustPlanOutline(artifactId, outline)
+  );
+  ipcMain.handle("chat:conversationSettings", (_event, sessionId: string) =>
+    getConversationSettings(sessionId)
+  );
+  ipcMain.handle("chat:setConversationSettings", (_event, settings: import("./types").ConversationSettings) =>
+    setConversationSettings(settings)
   );
 
   ipcMain.handle("chat:cancel", (_event, requestId: string) =>
@@ -2044,29 +2079,7 @@ function registerIpcHandlers(): void {
     updateTrainingPlanMetadata(id, patch)
   );
   ipcMain.handle("trainingLibrary:savePlan", (_event, request) => savePlanToCoros(request));
-  // Streams its progress on the chat:stream* channels; stopped with chat:cancel.
-  ipcMain.handle(
-    "trainingLibrary:generatePlan",
-    (_event, requestId: string, request: TrainingPlanGenerationRequest, unitSystem?: UnitSystem) =>
-      generateTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
-  );
-  // The plan's shape before its sessions; the same streams, the same cancel.
-  ipcMain.handle(
-    "trainingLibrary:outlinePlan",
-    (
-      _event,
-      requestId: string,
-      request: TrainingPlanGenerationRequest,
-      unitSystem?: UnitSystem,
-      revision?: TrainingPlanOutlineRevision
-    ) =>
-      outlineTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem),
-        ...(revision ? { revision } : {})
-      })
-  );
+
   ipcMain.handle("trainingLibrary:duplicatePlan", (_event, planId: string) =>
     duplicatePlanOnCoros(planId)
   );

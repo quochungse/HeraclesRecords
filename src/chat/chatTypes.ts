@@ -101,6 +101,23 @@ export interface ChatPlanEventEntry {
   event: PlanEvent;
 }
 
+/** Coach set out a plan brief (P2.1); an anchor, its brief read from `chat:planBriefs`. */
+export interface ChatPlanBriefEntry {
+  kind: "planBrief";
+  artifactId: string;
+}
+
+/**
+ * Where Coach drew a brief's outline (P2.2); an anchor. The artifact keeps
+ * only its current outline, so an anchor whose version is behind it marks an
+ * outline since redrawn or adjusted.
+ */
+export interface ChatPlanOutlineEntry {
+  kind: "planOutline";
+  artifactId: string;
+  outlineVersion: number;
+}
+
 /**
  * An entry a newer build wrote, of a kind this one cannot draw. It keeps its
  * place in the timeline and goes back to the store untouched, so this window's
@@ -117,6 +134,8 @@ export type ChatEntry = (
   | ChatPlanDraftEntry
   | ChatPlanEventEntry
   | ChatPlanRefsEntry
+  | ChatPlanBriefEntry
+  | ChatPlanOutlineEntry
   | ChatWorkoutDeleteEntry
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
@@ -283,6 +302,8 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   planDraft: ["draft"],
   planEvent: ["event"],
   planRefs: ["refs"],
+  planBrief: ["artifactId"],
+  planOutline: ["artifactId", "outlineVersion"],
   workoutDelete: ["preview"],
   activityVisual: ["preview"],
   activityHrTrend: ["preview"],
@@ -323,6 +344,12 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "planBrief") {
+    return { kind: "planBrief", artifactId: entry.artifactId };
+  }
+  if (entry.kind === "planOutline") {
+    return { kind: "planOutline", artifactId: entry.artifactId, outlineVersion: entry.outlineVersion };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
@@ -392,6 +419,12 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "planBrief") {
+    return { kind: "planBrief", artifactId: entry.artifactId };
+  }
+  if (entry.kind === "planOutline") {
+    return { kind: "planOutline", artifactId: entry.artifactId, outlineVersion: entry.outlineVersion };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };

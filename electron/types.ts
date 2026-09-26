@@ -2455,6 +2455,18 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
+      /** Coach set out a plan brief for the athlete to check (P2.1). */
+      kind: "planBrief";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
+      /** Coach drew a brief's outline (P2.2); `brief` carries it. */
+      kind: "planOutline";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
       kind: "workoutDelete";
       preview: WorkoutDeletePreview;
     }
@@ -2636,6 +2648,71 @@ export interface TrainingPlanGenerationRequest {
   outline?: TrainingPlanOutline;
 }
 
+/**
+ * What one conversation reads and which AI answers it (P2.0, D13/D14), for
+ * every turn in it — chat, and analyses running in it. `runtime` holds only
+ * what differs from Coach's settings; an analysis's own runtime wins over it.
+ */
+export interface ConversationSettings {
+  sessionId: string;
+  sources: TrainingPlanDataSources;
+  runtime?: AnalysisRuntime;
+}
+
+/**
+ * A plan brief (docs/coach-plan-canvas.md, P2.1): what the athlete wants a
+ * plan to be, before it has a shape — the generator's request without the
+ * parts the conversation owns (its sources and AI) or that come later (the
+ * outline).
+ */
+export type PlanBriefRequest = Omit<TrainingPlanGenerationRequest, "runtime" | "sources" | "outline">;
+
+/** A brief's fields as its card and Coach's tool name them. */
+export type PlanBriefField = "goal" | "dates" | "sports" | "level" | "week" | "constraints";
+
+/** Where Coach took a field from: what was said in the conversation, or the athlete's data. */
+export type PlanBriefOrigin = "chat" | "data";
+
+export interface PlanBrief {
+  /** The creation it opens: its versions, once written, carry this id. */
+  artifactId: string;
+  sessionId?: string;
+  request: PlanBriefRequest;
+  /** Fields Coach filled in, and from where; a field absent here is the form's default. */
+  origins: Partial<Record<PlanBriefField, PlanBriefOrigin>>;
+  /** The plan's shape, once drawn (P2.2): only the current one is kept. */
+  outline?: PlanBriefOutline;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * A brief's outline as stored (P2.2). `version` counts every outline the
+ * artifact has had — each drawing, redrawing and adjustment is the next — so a
+ * `planOutline` anchor can tell whether the outline it marks is still the one
+ * on its artifact.
+ */
+export interface PlanBriefOutline {
+  outline: TrainingPlanOutline;
+  version: number;
+  /** Who made this one: Coach drew it, or the athlete adjusted it by hand. */
+  author: "coach" | "athlete";
+  updatedAt: string;
+}
+
+/**
+ * A conversation turn that is a step of the plan pipeline (P2.2), not a
+ * question: its tool set, its policy and its prompt come from the step. The
+ * renderer shows the step's words; the main process sends the step's prompt.
+ */
+export interface ChatPipelineStep {
+  /** Draw (or redraw) the brief's outline (P2.2), or write its sessions to it (P2.3). */
+  step: "outline" | "sessions";
+  artifactId: string;
+  /** A redraw: what the athlete wants changed in the outline there is. */
+  note?: string;
+}
+
 /** The athlete's data a generation may read, each on or off. */
 export interface TrainingPlanDataSources {
   /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
@@ -2683,21 +2760,6 @@ export interface TrainingPlanOutlineRevision {
   outline: TrainingPlanOutline;
   note: string;
 }
-
-export type TrainingPlanOutlineResult =
-  | { ok: true; outline: TrainingPlanOutline }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-outline"; message: string };
-
-/**
- * How a generation ended. The stream carries its progress; this carries its
- * outcome, so the generator does not have to rebuild it from stream events.
- * `plan` is a new plan document, not yet saved anywhere.
- */
-export type TrainingPlanGenerationResult =
-  | { ok: true; plan: TrainingPlanDocument }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-plan"; message: string };
 
 /**
  * What a plan is doing on the COROS calendar. A plan put there becomes an
@@ -3162,6 +3224,8 @@ export interface CoachOpenRequest {
   /** A Coach creation; its conversation is opened when it can be found. */
   draftId?: string;
   refs?: PlanRef[];
+  /** AI Plan (P2.5): a new conversation that opens on a blank plan brief. */
+  newPlan?: boolean;
 }
 
 /**
@@ -3796,6 +3860,10 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "planEvent"; event: PlanEvent }
   | { kind: "planRefs"; refs: PlanRef[] }
+  /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
+  | { kind: "planBrief"; artifactId: string }
+  /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */
+  | { kind: "planOutline"; artifactId: string; outlineVersion: number }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

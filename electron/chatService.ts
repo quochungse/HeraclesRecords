@@ -4,7 +4,14 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
-import { deleteSettings, getSetting, setSetting } from "./database";
+import {
+  deleteChatConversationSettingsRow,
+  deleteSettings,
+  getChatConversationSettingsRow,
+  getSetting,
+  saveChatConversationSettingsRow,
+  setSetting
+} from "./database";
 import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
@@ -28,8 +35,6 @@ import {
   uploadPlanDraftById,
   confirmWorkoutDeleteById,
   deletePlanDraftsOf,
-  forgetGeneratedPlanDrafts,
-  generatedPlanDraft,
   planDraftDocument,
   savePlanDraftEdit,
   saveWorkoutDraftEdit,
@@ -47,11 +52,22 @@ import {
   generationRequestProblems,
   parsePlanOutline,
   planOutlineProblems,
-  trainingPlanFromDraftPreview,
   trainingPlanGenerationPrompt,
   toolReadsWithheldSource,
   trainingPlanOutlinePrompt
 } from "./trainingPlanGeneration";
+import { PLAN_BRIEF_TOOL } from "./planBrief";
+import {
+  briefForOutline,
+  briefForSessions,
+  createBlankPlanBrief,
+  deletePlanBriefs,
+  listPlanBriefs,
+  savePlanOutline,
+  updatePlanBrief,
+  updatePlanOutline
+} from "./chatPlanBriefs";
+import type { ChatPipelineStep, PlanBrief, PlanBriefRequest } from "./types";
 import {
   simulatePlanAi,
   simulatedDraftArgs,
@@ -179,15 +195,13 @@ import type {
   PlanVersionWritten,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
-  TrainingPlanGenerationResult,
-  TrainingPlanOutline,
-  TrainingPlanOutlineResult,
   TrainingPlanOutlineRevision,
   DeleteWorkoutResult,
   UnitSystem,
   WorkoutDeletePreview
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
+import { pipelineWire } from "./chatContextCompaction";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
@@ -510,14 +524,110 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
   return setChatSessionPinned(id, pinned);
 }
 
+/** A conversation's settings (P2.0): everything shared, and Coach's AI, until changed. */
+export function getConversationSettings(sessionId: string): import("./types").ConversationSettings {
+  const row = getChatConversationSettingsRow(sessionId);
+  let sources = { activities: true, sleep: true, zones: true };
+  let runtime: import("./types").AnalysisRuntime | undefined;
+  try {
+    const parsed = row?.sourcesJson ? (JSON.parse(row.sourcesJson) as Record<string, unknown>) : {};
+    sources = {
+      activities: parsed.activities !== false,
+      sleep: parsed.sleep !== false,
+      zones: parsed.zones !== false
+    };
+  } catch {
+    /* A row this build cannot read shares everything, as if there were none. */
+  }
+  try {
+    const parsed = row?.runtimeJson ? (JSON.parse(row.runtimeJson) as Record<string, unknown>) : undefined;
+    if (parsed) {
+      runtime = {
+        ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
+        ...(typeof parsed.model === "string" && parsed.model ? { model: parsed.model } : {}),
+        ...(isAnthropicEffortName(parsed.effort) ? { effort: parsed.effort } : {})
+      };
+      if (!Object.keys(runtime).length) runtime = undefined;
+    }
+  } catch {
+    runtime = undefined;
+  }
+  return { sessionId, sources, ...(runtime ? { runtime } : {}) };
+}
+
+export function setConversationSettings(
+  settings: import("./types").ConversationSettings
+): import("./types").ConversationSettings {
+  const sources = {
+    activities: settings.sources?.activities !== false,
+    sleep: settings.sources?.sleep !== false,
+    zones: settings.sources?.zones !== false
+  };
+  const everything = sources.activities && sources.sleep && sources.zones;
+  const runtime = settings.runtime && Object.keys(settings.runtime).length ? settings.runtime : undefined;
+  if (everything && !runtime) {
+    // Nothing that differs from Coach's settings: no row to keep in step.
+    deleteChatConversationSettingsRow(settings.sessionId);
+  } else {
+    saveChatConversationSettingsRow(
+      settings.sessionId,
+      everything ? null : JSON.stringify(sources),
+      runtime ? JSON.stringify(runtime) : null
+    );
+  }
+  return getConversationSettings(settings.sessionId);
+}
+
+/**
+ * A turn of the conversation, as the renderer sends it: with that
+ * conversation's sources and AI (P2.0, D13/D14).
+ */
+export async function streamConversationTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  sessionId?: string,
+  pipeline?: ChatPipelineStep
+): Promise<void> {
+  let settings: import("./types").ConversationSettings | undefined;
+  try {
+    settings = sessionId ? getConversationSettings(sessionId) : undefined;
+  } catch {
+    settings = undefined;
+  }
+  if (pipeline?.step === "outline") {
+    return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+  }
+  if (pipeline?.step === "sessions") {
+    return streamSessionsStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+  }
+  return streamChat(sink, requestId, messages, {
+    unitSystem,
+    ...(sessionId ? { sessionId } : {}),
+    ...(settings?.runtime ? { runtime: settings.runtime } : {}),
+    ...(settings ? { sources: settings.sources } : {})
+  });
+}
+
+function isChatProviderName(value: unknown): value is ChatProvider {
+  return value === "claude-code" || value === "claude-api" || value === "chatgpt" || value === "openrouter" || value === "local";
+}
+
+function isAnthropicEffortName(value: unknown): value is import("./types").AnthropicEffort {
+  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max";
+}
+
 export function deleteChatSessionById(id: string): void {
   // Read before the row goes: the transcript is the only record of which
   // drafts were this conversation's.
-  const draftIds = getChatSession(id).flatMap((entry) =>
-    entry.kind === "planDraft" ? [entry.draft.draftId] : []
-  );
+  const entries = getChatSession(id);
+  const draftIds = entries.flatMap((entry) => (entry.kind === "planDraft" ? [entry.draft.draftId] : []));
+  const briefIds = entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : []));
   deleteChatSession(id);
   deletePlanDraftsOf(draftIds);
+  deletePlanBriefs(briefIds);
+  deleteChatConversationSettingsRow(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1034,6 +1144,14 @@ export function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
 
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
+  /**
+   * What the conversation shares (P2.0). A source switched off is withheld
+   * from every tool that reads it and from the snapshot, and said in the
+   * prompt. Absent is everything, as before.
+   */
+  sources?: import("./types").TrainingPlanDataSources;
+  /** The conversation the turn is in: what a brief Coach sets out belongs to (P2.1). */
+  sessionId?: string;
   /** Analysis runs override the saved provider/model/effort (decision 2). */
   runtime?: AnalysisRuntime;
   /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
@@ -1377,6 +1495,44 @@ export async function streamChat(
   requestId: string,
   messages: ChatMessage[],
   options: StreamChatOptions = {}
+): Promise<void> {
+  // A run that set its own reach (a plan generation) keeps it; otherwise the
+  // conversation's sources are this turn's, and only for this turn.
+  const reach = conversationReach(options.sources);
+  const ownsReach = Boolean(reach) && !runTools.has(requestId);
+  if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
+  if (options.sessionId) turnSessions.set(requestId, options.sessionId);
+  try {
+    await streamChatTurn(sink, requestId, messages, options);
+  } finally {
+    if (ownsReach) runTools.delete(requestId);
+    turnSessions.delete(requestId);
+  }
+}
+
+/** The conversation each turn in flight belongs to, for the tools that file something under it. */
+const turnSessions = new Map<string, string>();
+
+/**
+ * A conversation's sources as a turn's reach (P2.0): the tools that read a
+ * withheld source are not offered, the snapshot leaves it out, and the prompt
+ * says so. Nothing when everything is shared.
+ */
+export function conversationReach(
+  sources: import("./types").TrainingPlanDataSources | undefined
+): Pick<RunTools, "allow" | "context"> | undefined {
+  if (!sources || (sources.activities && sources.sleep && sources.zones)) return undefined;
+  return {
+    allow: (name) => !toolReadsWithheldSource(name, sources),
+    context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true }
+  };
+}
+
+async function streamChatTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  options: StreamChatOptions
 ): Promise<void> {
   const unitSystem = normalizeUnitSystem(options.unitSystem);
   const toolPolicy: ChatToolPolicy =
@@ -2066,49 +2222,6 @@ function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
   return run ? [...tools.filter((tool) => run.allow(tool.name)), ...run.extra] : tools;
 }
 
-/**
- * How a stream ended, as a sink hears it: `streamChat` reports an end through
- * events and never by throwing, so a caller that needs the outcome listens.
- */
-function watchStreamEnd(sink: ChatStreamSink): {
-  sink: ChatStreamSink;
-  heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } };
-} {
-  const heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } } = {};
-  return {
-    heard,
-    sink: {
-      emit(channel, payload) {
-        const event = payload as { finishReason?: string; fullText?: string; message?: string };
-        if (channel === "chat:streamDone") {
-          heard.end = { kind: "done", cancelled: event.finishReason === "cancelled", text: event.fullText ?? "" };
-        } else if (channel === "chat:streamError") {
-          heard.end = { kind: "error", message: event.message ?? "Training Coach stopped before it finished." };
-        }
-        sink.emit(channel, payload);
-      },
-      ...(sink.bindAbort ? { bindAbort: (controller: AbortController) => sink.bindAbort!(controller) } : {})
-    }
-  };
-}
-
-/** Tools a generation never needs: an outline turn writes nothing, and no turn writes a single workout. */
-const OUTLINE_WITHHELD_TOOLS = new Set(["draft_training_plan", "draft_workout"]);
-const SESSIONS_WITHHELD_TOOLS = new Set(["draft_workout"]);
-
-/**
- * A generation's reach, from the tools a phase never needs and the sources
- * the athlete withheld: a withheld source is behind no tool the turn is
- * offered, and in no part of the snapshot it starts from.
- */
-function generationReach(request: TrainingPlanGenerationRequest, withheldTools: ReadonlySet<string>): Pick<RunTools, "allow" | "context"> {
-  const sources = request.sources;
-  return {
-    allow: (name) => !withheldTools.has(name) && !toolReadsWithheldSource(name, sources),
-    ...(sources ? { context: { activities: sources.activities, zones: sources.zones } } : {})
-  };
-}
-
 /** What the simulated turn reads before it thinks, by the source each tool belongs to. */
 const SIMULATED_READS: readonly [tool: string, source: keyof import("./types").TrainingPlanDataSources][] = [
   ["list_recent_activities", "activities"],
@@ -2226,113 +2339,86 @@ async function simulatedPlanTurn(
 }
 
 /**
- * Plan generations in flight, by request id: what the athlete asked for, which
- * the draft tool checks every draft against, and the drafts it accepted.
+ * Sessions steps in flight (P2.3), by request id: the brief's request with
+ * its outline, which the draft tool checks every draft against, the drafts
+ * it accepted, and the brief whose first version they are.
  */
 const planGenerations = new Map<
   string,
-  { request: TrainingPlanGenerationRequest; drafts: PlanDraftPreview[] }
+  {
+    request: TrainingPlanGenerationRequest;
+    drafts: PlanDraftPreview[];
+    artifactId: string;
+  }
 >();
 
-/**
- * The AI plan generator's one turn.
- *
- * It streams like a chat turn — the generator draws its progress from the
- * same `chat:stream*` events — but it is not one, in three ways that used to
- * rest on a sentence in the prompt:
- *
- * - **It runs read-only.** `chat:send` offers every tool, so a generation could
- *   reach `upload_training_plan`, `delete_workout` and every MCP server the
- *   athlete connected, with "never call upload_training_plan" as the only
- *   guard. Read-only also answers `request_coach_input` with "assume and
- *   continue"; offered interactively, it ended the turn to wait for an answer
- *   the generator has nowhere to show, and the run failed with no plan.
- * - **A draft that breaks the request is refused inside the turn**, with the
- *   reasons, so the model fixes it and calls the tool again — the checks used
- *   to run only after the turn ended, throwing away the whole plan over one
- *   week with three sessions instead of four.
- * - **Its drafts never reach `chat_plan_drafts`**, and are let go when it ends.
- *
- * Cancelled through `chat:cancel`, like any stream.
- */
-export async function generateTrainingPlan(
-  sink: ChatStreamSink,
-  requestId: string,
-  request: TrainingPlanGenerationRequest,
-  options: { unitSystem?: UnitSystem } = {}
-): Promise<TrainingPlanGenerationResult> {
-  const invalid = generationRequestProblems(request, new Date())[0];
-  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
+/** What a pipeline step never needs: it writes nothing but its own step. */
+const PIPELINE_WITHHELD_TOOLS = new Set([
+  "draft_training_plan",
+  "draft_workout",
+  "revise_training_plan",
+  PLAN_BRIEF_TOOL
+]);
 
-  const run = { request, drafts: [] as PlanDraftPreview[] };
-  planGenerations.set(requestId, run);
-  runTools.set(requestId, { extra: [], ...generationReach(request, SESSIONS_WITHHELD_TOOLS) });
-  const { sink: watching, heard } = watchStreamEnd(sink);
-  try {
-    if (simulatePlanAi()) {
-      await simulatedPlanTurn(watching, requestId, "plan", request, normalizeUnitSystem(options.unitSystem));
-    } else {
-      await streamChat(
-        watching,
-        requestId,
-        [{ role: "user", content: trainingPlanGenerationPrompt(request) }],
-        {
-          unitSystem: normalizeUnitSystem(options.unitSystem),
-          toolPolicy: "read-only",
-          ...(request.runtime ? { runtime: request.runtime } : {})
-        }
-      );
-    }
-    const outcome = heard.end;
-    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
-    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
-    const accepted = run.drafts.at(-1);
-    const draft = accepted ? generatedPlanDraft(accepted.draftId) : undefined;
-    if (!draft) {
-      return {
-        ok: false,
-        reason: "no-plan",
-        message: outcome.text.trim()
-          ? "Training Coach answered but never handed over a plan that fits what you asked for."
-          : "Training Coach finished without writing a plan."
-      };
-    }
-    const plan = trainingPlanFromDraftPreview(draft.preview, request, {
-      description: draft.plan.description,
-      weekStages: draft.plan.weekStages
-    });
-    return { ok: true, plan };
-  } catch (cause) {
-    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
-  } finally {
-    planGenerations.delete(requestId);
-    runTools.delete(requestId);
-    forgetGeneratedPlanDrafts(run.drafts.map((preview) => preview.draftId));
-  }
+/** What the sessions step withholds: every writing tool but the one it writes the plan with. */
+const SESSIONS_STEP_WITHHELD_TOOLS = new Set(
+  [...PIPELINE_WITHHELD_TOOLS].filter((name) => name !== "draft_training_plan")
+);
+
+/** The pipeline step's reach: the conversation's sources, and none of the writing tools it has no use for. */
+function pipelineReach(
+  sources: import("./types").TrainingPlanDataSources,
+  withheld: ReadonlySet<string> = PIPELINE_WITHHELD_TOOLS
+): Pick<RunTools, "allow" | "context"> {
+  const everything = sources.activities && sources.sleep && sources.zones;
+  return {
+    allow: (name) => !withheld.has(name) && !toolReadsWithheldSource(name, sources),
+    ...(everything
+      ? {}
+      : { context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true } })
+  };
 }
 
 /**
- * The generator's outline turn: the plan's shape, week by week, before any
- * session is written.
+ * "Draw the outline", as a turn of the conversation (P2.2). It is the
+ * generator's outline turn with the brief as its request and the
+ * conversation's sources and AI: read-only, offered `propose_plan_outline`
+ * and none of the writing tools, and checked inside the turn by
+ * `planOutlineProblems`. The athlete's visible words are replaced on the wire
+ * by the outline prompt, which carries the brief and — for a redraw — the
+ * outline there is and what to change in it. An accepted outline is written
+ * to the brief's artifact as its next version and announced as a
+ * `planOutline` anchor.
  *
- * Its tool, `propose_plan_outline`, is offered to this turn alone, and the
- * writing tools are withheld from it. Like the draft tool in the sessions
- * turn, it refuses an outline that breaks the request and hands the reasons
- * back, so the model fixes it in the same turn. A redraw carries the outline
- * already proposed and the athlete's words about what to change.
+ * A step that cannot run — no brief, a brief that became a plan, one still
+ * missing what an outline needs — rejects before anything is streamed, so the
+ * renderer undoes the turn as it does for any send that fails.
  */
-export async function outlineTrainingPlan(
+async function streamOutlineStep(
   sink: ChatStreamSink,
   requestId: string,
-  request: TrainingPlanGenerationRequest,
-  options: { unitSystem?: UnitSystem; revision?: TrainingPlanOutlineRevision } = {}
-): Promise<TrainingPlanOutlineResult> {
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForOutline(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
   const invalid = generationRequestProblems(request, new Date())[0];
-  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
-  let accepted: TrainingPlanOutline | undefined;
+  if (invalid) throw new Error(invalid.message);
+  const note = pipeline.note?.trim();
+  const revision = note && brief.outline ? { outline: brief.outline.outline, note } : undefined;
+
+  let written: number | undefined;
   runTools.set(requestId, {
     extra: [PLAN_OUTLINE_TOOL_DEFINITION],
-    ...generationReach(request, OUTLINE_WITHHELD_TOOLS),
+    ...pipelineReach(sources),
     handle: async (_name, args) => {
       const parsed = parsePlanOutline(args);
       const problems = parsed.outline ? planOutlineProblems(parsed.outline, request) : parsed.errors;
@@ -2344,44 +2430,92 @@ export async function outlineTrainingPlan(
           action: `Fix every problem listed and call ${PLAN_OUTLINE_TOOL} again with the whole outline. Do not ask the athlete.`
         });
       }
-      accepted = parsed.outline;
-      return JSON.stringify({ ok: true, message: "Outline accepted. Reply with one sentence and nothing else; the athlete reads the outline in the app." });
+      const saved = savePlanOutline(brief.artifactId, parsed.outline, "coach", written);
+      written = saved.outline?.version;
+      sink.emit("chat:streamInfo", { requestId, kind: "planOutline", brief: saved });
+      return JSON.stringify({
+        ok: true,
+        message:
+          "Outline accepted and shown to the athlete on a card. Reply with one sentence and nothing else: do not restate the weeks."
+      });
     }
   });
-  const { sink: watching, heard } = watchStreamEnd(sink);
   try {
     if (simulatePlanAi()) {
-      await simulatedPlanTurn(watching, requestId, "outline", request, normalizeUnitSystem(options.unitSystem), options.revision);
+      await simulatedPlanTurn(sink, requestId, "outline", request, unitSystem, revision);
     } else {
-      await streamChat(
-        watching,
-        requestId,
-        [{ role: "user", content: trainingPlanOutlinePrompt(request, options.revision) }],
-        {
-          unitSystem: normalizeUnitSystem(options.unitSystem),
-          toolPolicy: "read-only",
-          ...(request.runtime ? { runtime: request.runtime } : {})
-        }
-      );
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanOutlinePrompt(request, revision)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
     }
-    const outcome = heard.end;
-    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
-    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
-    if (!accepted) {
-      return {
-        ok: false,
-        reason: "no-outline",
-        message: outcome.text.trim()
-          ? "Training Coach answered but never handed over an outline that fits what you asked for."
-          : "Training Coach finished without drawing an outline."
-      };
-    }
-    return { ok: true, outline: accepted };
-  } catch (cause) {
-    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
   } finally {
     runTools.delete(requestId);
   }
+}
+
+/**
+ * "Write the sessions", as a turn of the conversation (P2.3). The generator's
+ * sessions turn, bound to the outline the brief holds: read-only, checked
+ * inside the turn by `generatedPlanProblems` against the brief, its week and
+ * the outline — each week's count, its hours and its stage. What it accepts
+ * is not held in memory as the generator's drafts are but written to
+ * `chat_plan_drafts` as version 1 of the brief's own artifact, so the brief,
+ * the outline and the plan are one creation from here on.
+ */
+async function streamSessionsStep(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForSessions(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    outline: brief.outline.outline,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) throw new Error(invalid.message);
+  const outlineProblems = planOutlineProblems(brief.outline.outline, request);
+  if (outlineProblems.length) {
+    throw new Error(`The outline no longer fits the brief: ${outlineProblems[0]} Adjust or redraw it first.`);
+  }
+
+  planGenerations.set(requestId, { request, drafts: [], artifactId: brief.artifactId });
+  runTools.set(requestId, { extra: [], ...pipelineReach(sources, SESSIONS_STEP_WITHHELD_TOOLS) });
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(sink, requestId, "plan", request, unitSystem);
+    } else {
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanGenerationPrompt(request)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
+    }
+  } finally {
+    planGenerations.delete(requestId);
+    runTools.delete(requestId);
+  }
+}
+
+/** AI Plan (P2.5): the blank brief a new conversation opens on, with its anchor saved in it. */
+export function createPlanBriefForSession(sessionId: string): PlanBrief {
+  return createBlankPlanBrief(sessionId);
+}
+
+/** The athlete's adjustment of a brief's outline, from its own screen (P2.2). */
+export function adjustPlanOutline(artifactId: string, outline: unknown): PlanBrief {
+  return updatePlanOutline(artifactId, outline);
 }
 
 export function cancelChat(requestId: string): void {
@@ -2428,6 +2562,16 @@ export function findChatSessionForDraft(draftId: string): string | null {
 
 export function listPlanCalendarStates(draftIds: string[]): import("./types").PlanCalendarState[] {
   return planCalendarStates(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
+}
+
+/** The briefs behind a conversation's `planBrief` anchors (P2.1). */
+export function listConversationPlanBriefs(artifactIds: string[]): PlanBrief[] {
+  return listPlanBriefs(Array.isArray(artifactIds) ? artifactIds.filter((id) => typeof id === "string") : []);
+}
+
+/** The athlete's edit of a brief, from its own screen. */
+export function editPlanBrief(artifactId: string, request: PlanBriefRequest): PlanBrief {
+  return updatePlanBrief(artifactId, request);
 }
 
 export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {
@@ -2664,6 +2808,7 @@ export function getClaudeCodeTools(
       tool.name === "draft_training_plan" ||
       tool.name === "revise_training_plan" ||
       tool.name === "get_plan_draft" ||
+      tool.name === PLAN_BRIEF_TOOL ||
       tool.name === "search_coros_exercises"
     );
   });
@@ -2732,6 +2877,10 @@ async function executeChatTool(
       onPlanEvent: (event) => {
         send("chat:streamInfo", { requestId, kind: "planEvent", event });
       },
+      onPlanBrief: (brief) => {
+        send("chat:streamInfo", { requestId, kind: "planBrief", brief });
+      },
+      sessionId: turnSessions.get(requestId),
       onPlanDraft: (preview: PlanDraftPreview) => {
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
@@ -2741,6 +2890,7 @@ async function executeChatTool(
         });
       },
       planRequest: generation?.request,
+      ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
       onWorkoutDelete: (preview) => {
         send("chat:streamInfo", {
           requestId,
@@ -3052,6 +3202,13 @@ export function withLiveToolInstructions(
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
+      ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
+        ? [
+            "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +
+              "already know and stop, rather than asking question after question. The athlete corrects the brief on " +
+              "its card and asks for the outline from there. Draft a plan of two weeks or less straight away."
+          ]
+        : []),
       ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
       "",
       "Supported workout capabilities (generated from the validator):",
@@ -3121,6 +3278,13 @@ interface TrainingContextScope {
   activities: boolean;
   /** The threshold anchors in the athlete profile. */
   zones: boolean;
+  /** Nights and HRV — no part of the snapshot, so this only says so in the prompt. */
+  sleep?: boolean;
+  /**
+   * Say what is withheld in the prompt: a conversation's settings do (P2.0);
+   * a plan generation says it in its own prompt already.
+   */
+  announce?: boolean;
 }
 
 async function buildTrainingContext(
@@ -3133,7 +3297,10 @@ async function buildTrainingContext(
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
     customInstructions,
-    roleInstructions
+    roleInstructions,
+    scope?.announce
+      ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
+      : undefined
   );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +

@@ -5,6 +5,7 @@ import {
   createIdleWatchdog,
   getChatAuthStatus,
   getChatSettings,
+  getConversationSettings,
   listPlanArtifactVersions,
   streamChat
 } from "./chatService";
@@ -68,6 +69,7 @@ import type {
   CoachAnalysisUpdate,
   PersistedChatEntry,
   PlanArtifactVersion,
+  ConversationSettings,
   ProviderAuthVerdict
 } from "./types";
 
@@ -148,6 +150,25 @@ export function parseAnalysisOutput(text: string): AnalysisOutput {
 // Re-exported so callers that already talk to the runner do not need a second
 // import for the one constant behind its decision.
 export { ANALYSIS_DEFAULT_EFFORT };
+
+/**
+ * An analysis's runtime over its conversation's (P2.0, D14). A provider and a
+ * model are one choice — a model picked for Claude means nothing to OpenRouter —
+ * so the pair comes whole from whichever side made it, the analysis first;
+ * effort stands alone and is taken the same way.
+ */
+export function analysisRuntimeOver(
+  analysis: AnalysisRuntime,
+  conversation: AnalysisRuntime | undefined
+): AnalysisRuntime {
+  const pair = analysis.provider || analysis.model ? analysis : conversation ?? {};
+  const effort = analysis.effort || conversation?.effort;
+  return {
+    ...(pair.provider ? { provider: pair.provider } : {}),
+    ...(pair.model ? { model: pair.model } : {}),
+    ...(effort ? { effort } : {})
+  };
+}
 
 /** The runtime a run actually uses, with section 7's default filled in. */
 export function resolveAnalysisRuntime(
@@ -567,6 +588,12 @@ export interface CoachAnalysisRunnerDeps {
    * out; the index then lists each card as its own creation.
    */
   getPlanArtifacts?(draftIds: string[]): PlanArtifactVersion[];
+  /**
+   * The conversation's own settings (P2.0): its sources apply to the run, and
+   * its AI stands wherever the analysis has not chosen its own. Optional, for
+   * a suite with no database.
+   */
+  getConversationSettings?(sessionId: string): ConversationSettings | undefined;
   /** 5.7: the conversation's rolling summary and what it covers. */
   getSessionSummary(sessionId: string): StoredTranscriptSummary;
   setSessionSummary(sessionId: string, summary: string, through: number): void;
@@ -712,6 +739,14 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       return getChatSession(sessionId);
     },
     getSessionSummary: (sessionId) => readSessionSummary(sessionId),
+    // A conversation whose settings cannot be read runs on the analysis's own.
+    getConversationSettings: (sessionId) => {
+      try {
+        return getConversationSettings(sessionId);
+      } catch {
+        return undefined;
+      }
+    },
     // Without the versions the index lists each card as its own creation,
     // which is worse but not wrong — not a reason to fail the run.
     getPlanArtifacts: (draftIds) => {
@@ -1393,7 +1428,11 @@ async function runOneBinding(
 
   // Section 7's default is resolved once, here, so the run log records what the
   // run actually used rather than what the definition happened to leave blank.
-  const runtime = resolveAnalysisRuntime(analysis);
+  const conversation = resolved.getConversationSettings?.(analysis.sessionId);
+  const runtime = resolveAnalysisRuntime({
+    ...analysis,
+    runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
+  });
   const startedAt = resolved.now().toISOString();
   let run = resolved.recordRun({
     analysisId: analysis.id,
@@ -1488,6 +1527,7 @@ async function runOneBinding(
       {
         runtime,
         toolPolicy: "read-only",
+        ...(conversation ? { sources: conversation.sources } : {}),
         ...(analysis.role ? { roleInstructions: analysis.role } : {})
       }
     );

@@ -196,7 +196,7 @@ const draft = {
 // Its own row loses it; the union with the newer machine's row keeps it.
 {
   const brief = {
-    kind: "planBrief",
+    kind: "futureAnchor",
     artifactId: "artifact-1",
     mid: "1-000000000003-0000-aa",
     mrev: "1-000000000003-0000-aa"
@@ -206,7 +206,7 @@ const draft = {
     { kind: "message", role: "user", content: "Build me a plan" }
   ]);
   assert.equal(
-    olderRow.some((entry) => entry.kind === "planBrief"),
+    olderRow.some((entry) => entry.kind === "futureAnchor"),
     false,
     "H1: the older build's own row loses the entry"
   );
@@ -214,7 +214,7 @@ const draft = {
 
   const merged = mergeTranscripts(newer, olderRow);
   assert.deepEqual(
-    merged.filter((entry) => entry.kind === "planBrief"),
+    merged.filter((entry) => entry.kind === "futureAnchor"),
     [brief],
     "H1: the union keeps it, untouched"
   );
@@ -225,7 +225,7 @@ const draft = {
 const newerRow = [
   { ...question, futureField: "refers to week 6" },
   {
-    kind: "planBrief",
+    kind: "futureAnchor",
     artifactId: "artifact-1",
     fields: { goal: "Hanoi Half" },
     mid: "1-000000000003-0000-aa",
@@ -269,7 +269,7 @@ const newerJson = JSON.stringify(newerRow);
 
   assert.equal(brief.kind, "opaque");
   assert.deepEqual(brief.raw, {
-    kind: "planBrief",
+    kind: "futureAnchor",
     artifactId: "artifact-1",
     fields: { goal: "Hanoi Half" }
   });

@@ -1098,6 +1098,8 @@ const KNOWN_ENTRY_KINDS = new Set([
   "planDraft",
   "planEvent",
   "planRefs",
+  "planBrief",
+  "planOutline",
   "coachPrompt",
   "workoutDelete",
   "activityVisual",
@@ -1164,9 +1166,9 @@ function parseEntry(value: unknown): PersistedChatEntry | null {
 function cardEntry<T extends PersistedChatEntry>(
   entry: T,
   value: Record<string, unknown>,
-  payloadKey: string
+  ...payloadKeys: string[]
 ): T {
-  return keepUnknownKeys(entry, value, [...ENTRY_META_KEYS, payloadKey]);
+  return keepUnknownKeys(entry, value, [...ENTRY_META_KEYS, ...payloadKeys]);
 }
 
 function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | null {
@@ -1181,6 +1183,28 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
       ? value.refs.map(parsePlanRef).filter((ref): ref is PlanRef => ref !== null)
       : [];
     return refs.length ? cardEntry({ kind: "planRefs", refs }, value, "refs") : null;
+  }
+
+  if (value.kind === "planBrief") {
+    // An anchor (Q3): the brief itself is its `chat_plan_artifacts` row.
+    return typeof value.artifactId === "string" && value.artifactId
+      ? cardEntry({ kind: "planBrief", artifactId: value.artifactId }, value, "artifactId")
+      : null;
+  }
+
+  if (value.kind === "planOutline") {
+    // An anchor (Q3): the outline itself is on the artifact's row.
+    return typeof value.artifactId === "string" &&
+      value.artifactId &&
+      Number.isInteger(value.outlineVersion) &&
+      (value.outlineVersion as number) > 0
+      ? cardEntry(
+          { kind: "planOutline", artifactId: value.artifactId, outlineVersion: value.outlineVersion as number },
+          value,
+          "artifactId",
+          "outlineVersion"
+        )
+      : null;
   }
 
   if (value.kind === "planEvent") {

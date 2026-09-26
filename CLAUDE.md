@@ -395,10 +395,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   sends a new session).
   Three rules the suites hold: a session's name keeps a readable width inside a day column, and
   the problems that block Save are listed at every width; **a rule that styles a library control
-  must name all three scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
-  is portalled there) and `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
-  question it asks through the plan's `ConfirmDialog` sits outside both) — or the control draws as
-  the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
+  must name all four scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
+  is portalled there), `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
+  question it asks through the plan's `ConfirmDialog` sits outside both) and
+  `.coach-sheet` (Coach's per-conversation settings and a plan brief's screen reuse the
+  generator's sheets, portalled to `<body>`) — or the control draws as the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
   reader's week cards and takes the library's **tokens** block as a fourth scope, but no control
   rule, since it edits nothing; without the tokens its day wells drew as the browser's black
   dashed border. And the editor's shortcuts listen on the window, gated on `layer`,
@@ -537,53 +538,37 @@ Overview, Media, Data, and Settings are in the main bundle.
   card's come from one function, `artifactActions`. The composer is a container
   (`chat-composer`), because the canvas narrows the conversation on a wide window too.
   Drafts are deleted with their conversation; the 24-hour prune is gone.
-  **The AI plan generator (`TrainingPlanGenerator`) is two turns of its own, not a chat message.**
-  Four steps: Goal (a race — its day decides the length and ends the plan — a base, a comeback,
-  hybrid, or "Something else" in the athlete's words; a length Coach may choose), Your week (days
-  cycling Rest / Train / Long day / "Coach picks", each with the most time it has (an hour, two for the long day, or Free: no limit), or "Let Coach decide"
-  where every answer may be "Not sure"), **Outline**, Sessions. `trainingLibrary:outlinePlan` →
-  `outlineTrainingPlan` proposes the plan's shape through `propose_plan_outline`, a tool offered
-  to that turn alone; the athlete reads it a bar a week and may have it redrawn in their own words.
-  `trainingLibrary:generatePlan` → `generateTrainingPlan` then writes the sessions **to the
-  accepted outline** (`request.outline`): its length, each week's exact count, its hours within a
-  fifth and its stages, which become the plan's. Both stream on `chat:stream*`, resolve with a
-  result, stop with `chat:cancel`, and run **read-only** — `chat:send` offered `upload_training_plan`,
-  `delete_workout` and every MCP server with one line of prompt as the guard, and its
-  `request_coach_input` ended the turn waiting for an answer the dialog cannot show. **A run's own
-  tools are `runTools` in `chatService.ts`**: a run adds tools and withholds others by request id,
-  consulted where every provider builds its list and again in `executeChatTool`, *before* the
-  policy. The rules live in `electron/trainingPlanGeneration.ts` (no `node:` imports; the form
-  reads them too): **a generated plan starts on a Monday and counts Monday-to-Sunday weeks**; a
-  usual week is a **band** of sessions (flex days may be used or not); race day holds the race
-  whatever the day usually is. Both tools check what they are handed *inside* the turn and hand
-  the reasons back (`planOutlineProblems`, `generatedPlanProblems`), where the checks used to run
-  after the turn and throw away the whole plan over one short week. **What the athlete does not
-  share is withheld twice** (`request.sources`): from every tool that reads it — local, and COROS
-  MCP's by what its name says (`toolReadsWithheldSource`) — and from the snapshot the turn starts
-  from (`buildTrainingContext`'s scope); a switch that only edited the prompt would be a lie. Switching one under a drawn outline asks first and, on
-  yes, draws the outline again — it was drawn from what Coach could read.
-  "From my data" needs the activities. **The AI is the athlete's choice per plan**
-  (`request.runtime`, the override an analysis uses): only what differs from Coach's settings
-  travels, and a "Default model" travels as no model, since the Messages API reads `""` as an id.
-  **A generation's drafts never reach `chat_plan_drafts`**; the plan's overview is the coach's
-  `description`. The finished plan is **kept as a library draft the moment it arrives** — before
-  the athlete decides anything — so closing the last step loses nothing. That step offers **Save to COROS** (letting the draft go) and **Add to calendar**, which asks for the day first:
-  `previewPlanOnCalendar` reads a `draft:` id from this machine, so the preview comes before the
-  plan is on COROS, and the dialog's `saveFirst` saves and schedules it as one answer. **Edit
-  plan** opens the editor over the generator, which waits hidden (`covered`) and comes back
-  showing what Save draft kept (`editedDraft`); a save to COROS or a discard from the editor
-  closes it, since the plan left with them. A run
-  shows what Coach is doing as it happens (`runTrail.ts`): a line per read, per heading of the
-  thinking summary and per draft the check sends back — only what the stream said.
-  **`npm run dev:simulate-plan-ai` runs both turns without a provider** (`HERACLES_SIMULATE_PLAN_AI=1`,
+  **AI Plan opens Coach; the plan generator dialog is gone** (P2.5 of
+  docs/coach-plan-canvas.md). The Library's AI Plan button calls `onOpenCoach({ newPlan: true })`,
+  and Coach starts a conversation named "New plan" on a blank brief (`chat:createPlanBrief`, the
+  form's defaults from the next Monday, no model asked), renamed after the goal once the brief has
+  one. From there the plan is the conversation's pipeline — brief, outline, sessions, described
+  under Coach below — and the plan it writes is a Coach creation, not a library draft.
+  `TrainingPlanGenerator`, its outline and run steps, `trainingLibrary:generatePlan`/`outlinePlan`,
+  the in-memory `generatedDrafts` and `trainingPlanFromDraftPreview` were removed with it; a library
+  draft an older build's generator kept is an ordinary library draft. What survived is what the
+  brief and the steps reuse: `GeneratorGoalStep`, `GeneratorWeekStep`, `GeneratorProviderPanel`,
+  `planGeneratorModel.ts`, `planGeneratorRuntime.ts` and `runTrail.ts`.
+  The rules live in `electron/trainingPlanGeneration.ts` (no `node:` imports; the form reads them
+  too): **a generated plan starts on a Monday and counts Monday-to-Sunday weeks**; a usual week is
+  a **band** of sessions (flex days may be used or not); race day holds the race whatever the day
+  usually is. Both steps' tools check what they are handed *inside* the turn and hand the reasons
+  back (`planOutlineProblems`, `generatedPlanProblems`), where the checks used to run after the turn
+  and throw away the whole plan over one short week, and a plan written to an outline takes the
+  outline's stages. **A run's own tools are `runTools` in `chatService.ts`**: a run adds tools and
+  withholds others by request id, consulted where every provider builds its list and again in
+  `executeChatTool`, *before* the policy. **What the athlete does not share is withheld twice** —
+  from every tool that reads it (local, and COROS MCP's by what its name says,
+  `toolReadsWithheldSource`) and from the snapshot the turn starts from (`buildTrainingContext`'s
+  scope); a switch that only edited the prompt would be a lie. "From my data" needs the activities.
+  **`npm run dev:simulate-plan-ai` runs both steps without a provider** (`HERACLES_SIMULATE_PLAN_AI=1`,
   `trainingPlanSimulation.ts`): a script in the model's place streams thinking and announced reads,
-  then hands its outline and plan to the *real* tools, so the checks, the draft, the library save
-  and COROS all run as they do for a real turn. Its first draft is a session short on purpose, to
-  show the check's hand-back. It reads nothing and says so, in its thinking and in the plan's
-  name. `test:training-plan-simulation` holds that the script passes the checks for every shape
-  of request — a script the checks refuse is a bug in one of the two. The form's arithmetic is
-  `planGeneratorModel.ts` and `planGeneratorRuntime.ts`. `test:training-plan-generation`,
-  `test:plan-generator-model`, `test:plan-generator-renderer`.
+  then hands its outline and plan to the *real* tools, so the checks, the store and COROS all run as
+  they do for a real turn. Its first draft is a session short on purpose, to show the check's
+  hand-back. It reads nothing and says so, in its thinking and in the plan's name.
+  `test:training-plan-simulation` holds that the script passes the checks for every shape of request
+  and runs both steps through `streamConversationTurn`; `test:training-plan-generation` and
+  `test:plan-generator-model` hold the rules and the form's arithmetic.
   **A plan saved from COROS's official catalogue is written in localization keys** —
   `name: "P10035"`, sessions `P10281`, descriptions `P11058`, steps `T1120` — which the
   Training Hub web app resolves against a string table on its CDN
@@ -806,6 +791,52 @@ Overview, Media, Data, and Settings are in the main bundle.
   recognised by its `server__` prefix). Every call travels as `kind: "mcp"` on the stream,
   which is why the badge once said "MCP" for a turn that only read the Training Hub API; an
   unlisted local tool would fall back to that label.
+
+  **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
+  P2.0 of docs/coach-plan-canvas.md). No row means everything shared and Coach's settings, and
+  `setConversationSettings` deletes the row when that is what is chosen, so only a difference is
+  stored. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
+  and hands `streamChat` its `sources` and `runtime`, and `streamChat` turns withheld sources into
+  a `runTools` reach (`conversationReach`) — withheld from every tool that reads them *and* from
+  the snapshot, as the generator does — unless the run already brought a reach of its own. An
+  analysis in the conversation takes its sources, and its runtime through `analysisRuntimeOver`:
+  a provider and a model are **one** choice, so the pair comes whole from whichever side made
+  it, the analysis first, and effort is taken the same way on its own — merged field by field,
+  a model picked for Claude went out to the conversation's OpenRouter. The row goes with the
+  conversation.
+
+  **A plan longer than two weeks starts as a brief** (P2.1): `request_plan_brief` writes the
+  generator's request — less the conversation's sources and AI — to a `chat_plan_artifacts` row,
+  marking each field Coach filled `chat` or `data`, and the transcript gets only an anchor,
+  `{ kind: "planBrief", artifactId }`. The athlete edits it on `CoachBriefEditor`, which is the
+  generator's own Goal and Your week steps; a field they change loses its mark. The brief is the
+  artifact's first state: its versions, when the sessions are written, carry the same
+  `artifactId`, and a brief with a version is changed through the plan from then on. The tool is
+  interactive only (`test:coach-analysis-guards`), and it needs the turn's conversation, which is
+  why `StreamChatOptions` carries a `sessionId`.
+
+  **The outline is a turn of the conversation, not a dialog** (P2.2). "Draw the outline" on the
+  brief's card — and "Redraw with a note" on the outline's — sends `chat:send` a fifth argument,
+  `ChatPipelineStep`; the athlete sees their words, and `streamOutlineStep` replaces them on the
+  wire with the generator's outline prompt built from the brief. The turn is read-only, offered
+  `propose_plan_outline`, and withheld every writing tool; a brief that is gone, has become a
+  plan or is still missing a field rejects the send before anything streams. The artifact keeps
+  **one** outline (`outline_json`), with `outline_version` counting every draw, redraw and hand
+  adjustment; the transcript holds `planOutline { artifactId, outlineVersion }` anchors and the
+  card is drawn at the **latest** one, earlier ones folding to a line. Adjust outline
+  (`CoachOutlineEditor`) asks no model and writes no anchor: `chat:updatePlanOutline` refuses
+  exactly what `planOutlineProblems` hands Coach. `test:plan-outline` runs the real turn under
+  `HERACLES_SIMULATE_PLAN_AI`.
+  **"Write the sessions" is the generator's sessions turn bound to that outline** (P2.3,
+  `step: "sessions"`): read-only, `draft_training_plan` its only writing tool, checked in the turn
+  by `generatedPlanProblems`. Unlike the generator's, the accepted draft is **not** held in memory:
+  `planGenerations` carries the brief's `artifactId`, and `handleDraftTrainingPlan` writes it to
+  `chat_plan_drafts` as that artifact's version 1, so brief, outline and plan are one creation.
+  From then on the brief and outline refuse changes and their cards say so. While a step runs,
+  its bubble draws `CoachStepTrail`, folded from the stream by `stepRunEvent` over `runTrail.ts`.
+  **A step does not carry the conversation** (P2.4): `pipelineWire` sends the step's prompt —
+  which holds the brief and the outline — after the six messages before it, never the whole
+  transcript or its compaction summary, and the renderer skips `compactBeforeSend` for a step.
 
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`

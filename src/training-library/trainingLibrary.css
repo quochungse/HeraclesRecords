@@ -36,11 +36,15 @@
  * `.chat-canvas` is Coach's canvas, which reads a creation with the reader's
  * week cards: it takes the tokens and no control rule, since it edits nothing.
  * Without them its day wells drew as the browser's black dashed border.
+ * `.coach-sheet` holds Coach's own sheets — a conversation's settings (P2.0)
+ * and a plan brief's screen (P2.1) — drawn
+ * with the generator's sheet and portalled to <body>.
  */
 .training-library-view,
 .tl-plan-modal-backdrop,
 .tl-dialog-backdrop,
-.chat-canvas {
+.chat-canvas,
+.coach-sheet {
   /*
    * Hairlines derive from the text colour rather than --glass-border, which is
    * a 0.1-alpha dark on the paper theme and disappears against a white panel.
@@ -83,7 +87,7 @@
 }
 
 /* Highlighted text takes the accent, never the system blue. */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) ::selection {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) ::selection {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--accent) 38%, transparent);
 }
@@ -112,7 +116,7 @@
  * sits in, so the editor came out with no dashed day wells, no tile ground and
  * no rules at all.
  */
-:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
+:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) {
   color-scheme: dark;
 
   --tl-ground: #16171b;
@@ -156,7 +160,7 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
+:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) {
   color-scheme: light;
 
   --tl-ground: #e6eaf1;
@@ -242,7 +246,7 @@
  * `.tl-search input:focus { outline: none }`, which is a `:focus` rule and so
  * covers every way the field can be focused.
  */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop)
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet)
   :is(button, input, select, textarea, [role="checkbox"]):not(.tl-search input, .plan-editor-search input):focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
@@ -253,14 +257,16 @@
  * `.primary-button` is a 44px marketing button. Both are quieted here to sit on
  * a hairline row without shouting.
  *
- * **Three scopes, because a library control is not always inside the library.**
+ * **Four scopes, because a library control is not always inside the library.**
  * The plan editor is portalled into `.tl-plan-modal-backdrop`, and the workout
  * modal it opens for a session portals to `body` — so the "Discard unsaved
  * changes?" asked over a session sat outside both, and its Keep editing drew as
  * the platform's grey button beside a 44px Discard. `.tl-dialog-backdrop` is
  * the dialog's own root, so a `tl-dialog` is styled wherever it is mounted.
+ * `.coach-sheet` is a fourth: Coach's per-conversation settings and brief
+ * reuse the generator's sheets, portalled to `body` outside the library.
  */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) :is(.primary-button, .ghost-button) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) :is(.primary-button, .ghost-button) {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -273,7 +279,7 @@
   cursor: pointer;
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .primary-button {
   border: 0;
   color: #fff;
   background: var(--accent-gradient);
@@ -287,7 +293,7 @@
     filter var(--dur-fast) var(--ease);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .primary-button:hover:not(:disabled) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.26),
     0 10px 26px color-mix(in srgb, var(--accent) 38%, transparent);
@@ -295,12 +301,12 @@
   transform: translateY(-1px);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button:active:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .primary-button:active:not(:disabled) {
   transform: translateY(0);
   filter: brightness(0.97);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .ghost-button {
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   background: var(--glass-bg);
@@ -313,7 +319,7 @@
     box-shadow var(--dur-fast) var(--tl-ease-out);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .ghost-button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   color: var(--text-primary);
   background: var(--glass-bg-hover);
@@ -321,17 +327,17 @@
   transform: translateY(-1px);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button.danger:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .ghost-button.danger:hover:not(:disabled) {
   color: var(--error-text);
   border-color: var(--error-border);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) :is(.primary-button, .ghost-button):disabled {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) :is(.primary-button, .ghost-button):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .icon-button {
   display: inline-flex;
   width: 30px;
   height: 30px;
@@ -346,16 +352,16 @@
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .icon-button:hover:not(:disabled) {
   color: var(--text-primary);
   background: var(--glass-bg-hover);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button.danger:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .icon-button.danger:hover:not(:disabled) {
   color: var(--error-text);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button:disabled {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) .icon-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
@@ -4456,248 +4462,7 @@
 .plan-generator-week-summary dt { color: var(--text-muted); font-size: 10px; font-weight: 500; }
 .plan-generator-week-summary dd { margin: 0; overflow: hidden; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 
-/* The outline: a bar a week, as tall as its hours and in its stage's hue,
-   and the week picked out below. A lighter week is the same hue, fainter. */
-.plan-generator-outline-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.plan-generator-outline-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-
-.plan-generator-outline-legend li::before {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-xs);
-  background: var(--tl-stage);
-  content: "";
-}
-
-.plan-generator-outline-bars {
-  display: flex;
-  height: 168px;
-  align-items: stretch;
-  gap: 4px;
-  padding-bottom: 2px;
-  border-bottom: 1px solid var(--tl-rule);
-}
-
-.plan-generator-outline-bar {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 5px;
-  padding: 0 0 4px;
-  border: 0;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  color: var(--text-muted);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.plan-generator-outline-bar > small { font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.plan-generator-outline-bar > em { font-size: 11px; font-style: normal; font-weight: 500; }
-
-.plan-generator-outline-bar > span {
-  width: 70%;
-  max-width: 34px;
-  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  background: var(--tl-stage);
-  opacity: 0.8;
-  transition: opacity var(--dur-fast) var(--ease);
-}
-
-.plan-generator-outline-bar.is-lighter > span { opacity: 0.45; }
-.plan-generator-outline-bar:hover { background: var(--glass-bg); }
-.plan-generator-outline-bar.is-selected { color: var(--text-primary); background: var(--glass-bg); }
-.plan-generator-outline-bar.is-selected > span { opacity: 1; }
-.plan-generator-outline-bar.is-selected > em { font-weight: 600; }
-
-.plan-generator-outline-bar:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.plan-generator-outline-week {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  box-shadow: inset 3px 0 0 var(--tl-stage);
-}
-
-.plan-generator-outline-week > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.plan-generator-outline-week > header > span { color: var(--text-muted); font-size: 11px; }
-.plan-generator-outline-week > header > strong { color: var(--tl-stage); font-size: 13px; font-weight: 600; }
-.plan-generator-outline-week > header > small { margin-left: auto; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
-.plan-generator-outline-week > p { margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.45; }
-
-.plan-generator-outline-week ul {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.plan-generator-outline-week li {
-  display: grid;
-  grid-template-columns: 34px 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.plan-generator-outline-week li > span { color: var(--text-muted); font-size: 11px; font-weight: 600; }
-.plan-generator-outline-week li > i { width: 8px; height: 8px; border-radius: 50%; background: var(--sport-accent, var(--accent)); }
-.plan-generator-outline-week li > strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.plan-generator-outline-week li > small { color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
-
 .plan-generator-note > strong { color: var(--text-primary); font-weight: 600; }
-
-.plan-generator-redraw {
-  display: flex;
-  gap: 8px;
-}
-
-.plan-generator-redraw input { flex: 1; min-width: 0; }
-
-.plan-generator-redraw input:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-/* What the check has sent back so far: the run is working, not stuck. */
-.plan-generator-run-checks {
-  margin: 6px 0 0;
-  color: var(--warning-text);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-/* Writing to an outline: its weeks, in the state the whole draft is in. */
-.plan-generator-run.has-weeks { max-width: 640px; }
-
-.plan-generator-run-weeks {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 6px;
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-  text-align: left;
-}
-
-.plan-generator-run-weeks li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 3px 8px;
-  padding: 9px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  box-shadow: inset 3px 0 0 var(--tl-stage);
-}
-
-.plan-generator-run-weeks li > span { font-size: 12px; font-weight: 600; }
-.plan-generator-run-weeks li > small { grid-column: 1 / -1; color: var(--text-secondary); font-size: 11px; }
-.plan-generator-run-weeks li > em { color: var(--text-muted); font-size: 10px; font-style: normal; font-weight: 600; }
-.plan-generator-run-weeks li[data-state="Writing…"] > em { color: var(--warning-text); }
-.plan-generator-run-weeks li[data-state="Checked"] > em { color: var(--success-text); }
-.plan-generator-run-weeks li[data-state="Queued"] { opacity: 0.6; }
-
-/* The plan, kept: its name, where it is, its figures and its shape. */
-.plan-generator-done {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.plan-generator-done-weeks-title { margin: 12px 0 0; }
-.plan-generator-done-weeks { margin: 0; }
-
-.plan-generator-done-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.plan-generator-done-mark {
-  display: grid;
-  width: 60px;
-  height: 60px;
-  flex: none;
-  border: 1px solid var(--success-border);
-  border-radius: 50%;
-  color: var(--success-text);
-  background: var(--success-bg);
-  place-items: center;
-}
-
-/* Still being kept or saved: not a success yet, so not in its ink. */
-.plan-generator-done-mark.is-busy {
-  border-color: var(--tl-rule);
-  color: var(--text-secondary);
-  background: var(--glass-bg);
-}
-
-.plan-generator-done-title {
-  margin: 0;
-  color: var(--success-text);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.plan-generator-done-name { display: block; margin-top: 4px; font-size: 14px; font-weight: 600; line-height: 1.3; }
-.plan-generator-done-kept,
-.plan-generator-done-overview { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
-.plan-generator-done-overview { color: var(--text-primary); font-size: 13px; }
-
-.plan-generator-done-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  padding: 9px 11px;
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  background: var(--warning-bg);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.plan-generator-done-warning svg { flex: none; margin-top: 2px; color: var(--warning-text); }
-
-.plan-generator-done-figures {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 4px 0 0;
-  border-block: 1px solid var(--tl-rule);
-}
-
-.plan-generator-done-figures > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
-.plan-generator-done-figures dt { color: var(--text-muted); font-size: 10px; font-weight: 500; }
-.plan-generator-done-figures dd { margin: 0; font-family: var(--font-display); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
 
 .plan-generator-stepper {
   display: flex;
@@ -4784,13 +4549,6 @@ button.plan-generator-provider:disabled { cursor: default; opacity: 0.6; }
 button.plan-generator-provider:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
-}
-
-.plan-generator-provider .plan-generator-provider-change {
-  flex: none;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .plan-generator-aside-eyebrow { margin-top: 20px; }
@@ -5036,198 +4794,9 @@ button.plan-generator-provider:focus-visible {
   white-space: nowrap;
 }
 
-/* The card carries no status mark: the line under the name says what the
-   provider needs when it is not set up, in the warning ink. */
-.plan-generator-provider-text { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
 .plan-generator-provider strong { color: var(--text-primary); font-size: 12px; }
 .plan-generator-provider small { color: var(--text-secondary); font-size: 10px; line-height: 1.45; }
 .plan-generator-provider.is-blocked small { color: var(--warning-text); }
-/* A run takes the form's place rather than a corner of the side column: on a
-   narrow window that column stacks with the form, and a run drawn in it was
-   off screen from wherever the athlete had scrolled to. */
-/* Top-aligned, not centred: the trail grows under the title, and a centred
-   column moved everything above it up the screen with every line. */
-.plan-generator-run {
-  display: flex;
-  min-height: 100%;
-  align-items: center;
-  flex-direction: column;
-  justify-content: flex-start;
-  margin: 0 auto;
-  max-width: 440px;
-  padding: 24px 0;
-  text-align: center;
-}
-
-.plan-generator-run > strong { font-size: 14px; }
-
-.plan-generator-run-activity {
-  min-height: 1.45em;
-  margin: 5px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.plan-generator-run-time {
-  margin: 16px 0 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.plan-generator-elapsed {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text-secondary);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-
-.plan-generator-failure {
-  display: grid;
-  align-items: start;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 10px;
-  margin-bottom: 20px;
-  padding: 12px 14px;
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius-sm);
-  background: var(--warning-bg);
-}
-
-.plan-generator-failure > svg { margin-top: 1px; color: var(--warning-text); }
-.plan-generator-failure-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; grid-column: 2; }
-
-.plan-generator-pulse {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 11px;
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  border-radius: 50%;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  place-items: center;
-  animation: plan-generator-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes plan-generator-pulse {
-  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 0%, transparent); transform: scale(1.04); }
-}
-
-.plan-generator-stages {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  gap: 7px;
-  margin: 14px 0 0;
-  padding: 13px 2px 0;
-  border-top: 1px solid var(--tl-rule-soft);
-  list-style: none;
-  text-align: left;
-}
-
-.plan-generator-stages li { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 11px; }
-.plan-generator-stages li.is-active { color: var(--text-primary); font-weight: 600; }
-.plan-generator-stages li.is-done { color: var(--accent); }
-
-.plan-generator-stage-dot {
-  display: grid;
-  width: 15px;
-  height: 15px;
-  flex: none;
-  border: 1px solid var(--tl-rule);
-  border-radius: 50%;
-  place-items: center;
-}
-
-.plan-generator-stages li.is-active .plan-generator-stage-dot { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-
-.plan-generator-stages li.is-active .plan-generator-stage-dot::after {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-  content: "";
-  animation: plan-generator-stage-blink 1.1s ease-in-out infinite;
-}
-
-.plan-generator-stages li.is-done .plan-generator-stage-dot {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-@keyframes plan-generator-stage-blink {
-  50% { opacity: 0.35; }
-}
-
-/* What Coach has done so far and the words it is on: the wait reads as work. */
-.plan-generator-trail {
-  width: 100%;
-  margin: 14px 0 0;
-  padding: 13px 2px 0;
-  border-top: 1px solid var(--tl-rule-soft);
-  text-align: left;
-}
-
-.plan-generator-trail .tl-eyebrow { margin: 0 0 8px; }
-
-.plan-generator-trail ol {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.plan-generator-trail li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.plan-generator-trail li.is-latest { color: var(--text-primary); font-weight: 600; }
-.plan-generator-trail li small { color: var(--text-muted); font-size: 10px; font-weight: 500; }
-
-.plan-generator-trail-mark {
-  display: grid;
-  width: 15px;
-  height: 16px;
-  flex: none;
-  color: var(--accent);
-  place-items: center;
-}
-
-.plan-generator-trail li[data-kind="check"] .plan-generator-trail-mark { color: var(--warning-text); }
-.plan-generator-trail li[data-kind="passed"] .plan-generator-trail-mark { color: var(--success-text); }
-
-.plan-generator-trail-earlier {
-  margin: 0 0 6px 23px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.plan-generator-trail-thought {
-  margin: 10px 0 0;
-  padding: 9px 11px;
-  border: 1px solid var(--tl-rule-soft);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-style: italic;
-  line-height: 1.45;
-}
-
-.plan-generator-failure strong { font-size: 12px; }
-.plan-generator-failure p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 
 .plan-generator > footer,
 .plan-calendar-dialog > footer {
@@ -5249,7 +4818,6 @@ button.plan-generator-provider:focus-visible {
   color: var(--text-muted);
   font-size: 11px;
 }
-
 
 .plan-calendar-loading,
 .plan-calendar-error {
@@ -5378,11 +4946,6 @@ button.plan-generator-provider:focus-visible {
   .plan-calendar-summary { grid-template-columns: 1fr; }
   .plan-calendar-summary > span { border-top: 1px solid var(--tl-rule); border-left: 0; }
   .plan-calendar-summary > span:first-child { border-top: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .plan-generator-pulse { animation: none; }
-  .plan-generator-stages li.is-active .plan-generator-stage-dot::after { animation: none; }
 }
 
 /* ------------------------------------------------------- The plan reader */

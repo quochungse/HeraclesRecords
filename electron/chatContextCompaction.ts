@@ -4,10 +4,12 @@ import type {
   CompactContextSettings,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanBrief,
   PlanDraftPreview,
   PlanEvent,
   PlanRef
 } from "./types";
+import { briefLine, outlineLine } from "./planBrief";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -248,7 +250,8 @@ const VERSION_AUTHORS: Record<PlanArtifactVersion["author"], string> = {
  */
 export function creationIndex(
   entries: PersistedChatEntry[],
-  versions: readonly PlanArtifactVersion[]
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = []
 ): string | null {
   const known = new Map(versions.map((version) => [version.draftId, version]));
   const creations = new Map<string, { draft: PlanDraftPreview; version?: PlanArtifactVersion }>();
@@ -265,7 +268,17 @@ export function creationIndex(
         : true);
     if (newer) creations.set(artifactId, { draft: entry.draft, version });
   }
-  if (creations.size === 0) return null;
+  // A brief is listed until it has a version: from then on the plan is the creation (P2.1).
+  const briefById = new Map(briefs.map((brief) => [brief.artifactId, brief]));
+  const briefLines = [
+    ...new Set(entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ].flatMap((artifactId) => {
+    const brief = briefById.get(artifactId);
+    if (!brief || creations.has(artifactId)) return [];
+    const shape = brief.outline ? outlineLine(brief.outline) : "no outline yet";
+    return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · ${shape}`];
+  });
+  if (creations.size === 0 && briefLines.length === 0) return null;
   const lines = [...creations.values()].map(({ draft, version }) => {
     const kind = draft.artifactType === "workout" ? "Workout" : "Plan";
     const made = version
@@ -276,8 +289,11 @@ export function creationIndex(
     return `- ${kind} "${draft.name}" · draft_id ${draft.draftId} · ${made}${edited}${shape} · ${creationState(draft)}`;
   });
   return [
-    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id.]",
-    ...lines
+    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id." +
+      (briefLines.length ? " Fill in a brief with request_plan_brief and its brief_id; the athlete edits it on its card." : "") +
+      "]",
+    ...lines,
+    ...briefLines
   ].join("\n");
 }
 
@@ -285,9 +301,10 @@ export function creationIndex(
 export function withCreationIndex(
   messages: ChatMessage[],
   entries: PersistedChatEntry[],
-  versions: readonly PlanArtifactVersion[]
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = []
 ): ChatMessage[] {
-  const note = creationIndex(entries, versions);
+  const note = creationIndex(entries, versions, briefs);
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {
@@ -390,6 +407,38 @@ export function planTranscriptContext(
  * and it has to be obvious to the model that this is a compression of the
  * conversation rather than something the athlete just said.
  */
+/** How many messages before its own a pipeline step's turn carries (P2.4). */
+export const PIPELINE_RECENT_MESSAGES = 6;
+
+/**
+ * What a step of the plan pipeline sends (docs/coach-plan-canvas.md, P2.4):
+ * the last few messages before the step and the step's own prompt, which
+ * carries the brief and the outline. Not the whole conversation — a step's
+ * cost must not grow with how long the athlete has been talking — and not a
+ * summary either: a summary exists only once compaction has run, and making
+ * one for the step would cost a call of its own. The system prompt and the
+ * training snapshot are added by `streamChat` as for any turn.
+ *
+ * The step's message is the last user message of the wire the renderer
+ * sent; what it said there (the athlete's words, the creation index) is
+ * replaced by `prompt`. The kept messages start at a user message, which
+ * every provider wants first, and the summary a compacted conversation opens
+ * with is never among them.
+ */
+export function pipelineWire(
+  messages: readonly ChatMessage[],
+  prompt: string,
+  recent = PIPELINE_RECENT_MESSAGES
+): ChatMessage[] {
+  const last = messages.map((message) => message.role).lastIndexOf("user");
+  const before = (last < 0 ? messages : messages.slice(0, last)).filter(
+    (message) => !(message.role === "user" && message.content.startsWith("[Earlier in this conversation, summarised]"))
+  );
+  const kept = before.slice(Math.max(0, before.length - recent));
+  while (kept.length && kept[0]!.role !== "user") kept.shift();
+  return [...kept, { role: "user", content: prompt }];
+}
+
 export function summaryContextMessage(summary: string): ChatMessage {
   return {
     role: "user",

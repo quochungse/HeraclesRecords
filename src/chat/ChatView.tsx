@@ -61,7 +61,12 @@ import type {
   McpServerStatus,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanBrief,
+  PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
   CoachOpenRequest,
+  ConversationSettings,
   PlanCalendarState,
   PlanDraftPreview,
   PlanRef,
@@ -88,8 +93,18 @@ import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
+import { CoachBriefCard } from "./CoachBriefCard";
+import { CoachOutlineCard } from "./CoachOutlineCard";
+import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
+import { EMPTY_NOTES } from "../training-library/runTrail";
+import { briefOpenProblems, briefTitle } from "./planBriefModel";
+import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
+import { ConfirmDialog } from "../training-library/ConfirmDialog";
+import { createPortal } from "react-dom";
+import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import { refinementChips } from "./creationChoices";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
 import {
   creationVersions,
   isLatestVersion,
@@ -139,6 +154,12 @@ const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
+const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
+const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
+const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
+
+/** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
+const NEW_PLAN_TITLE = "New plan";
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -313,6 +334,13 @@ interface ChatViewProps {
    */
   active?: boolean;
 }
+
+/** The sources a conversation can share, in the order its strip names them. */
+const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][] = [
+  ["activities", "Activities"],
+  ["sleep", "Sleep"],
+  ["zones", "Zones"]
+];
 
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
@@ -730,6 +758,13 @@ export function ChatView({
     Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
+  /** A pipeline step's turn while it runs, and its trail (P2.3). */
+  const [stepRun, setStepRun] = useState<StepRun | null>(null);
+  const advanceStep = (requestId: string, event: Parameters<typeof stepRunEvent>[1]) =>
+    setStepRun((current) => (current?.requestId === requestId ? stepRunEvent(current, event) : current));
+  useEffect(() => {
+    if (!streaming) setStepRun(null);
+  }, [streaming]);
   /** A summariser turn is running ahead of the athlete's own. */
   const [compacting, setCompacting] = useState(false);
   /** Read by Stop, which fires from a handler the state has not reached. */
@@ -862,6 +897,115 @@ export function ChatView({
   };
   /** The version the calendar dialog is open for. */
   const [calendarFor, setCalendarFor] = useState<string | null>(null);
+  /**
+   * The briefs behind the conversation's brief cards (P2.1), by artifact.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [planBriefs, setPlanBriefs] = useState<Record<string, PlanBrief | null>>({});
+  const missingBriefs = [
+    ...new Set(timeline.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ]
+    .filter((artifactId) => !(artifactId in planBriefs))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingBriefs) return;
+    const ids = missingBriefs.split(",");
+    setPlanBriefs((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getPlanBriefs(ids)
+      .then((briefs) =>
+        setPlanBriefs((current) => ({ ...current, ...Object.fromEntries(briefs.map((brief) => [brief.artifactId, brief])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingBriefs]);
+  /** The anchor each outline's card is drawn at: its latest (P2.2). */
+  const outlineAnchors = latestOutlineAnchors(timeline);
+  /** The brief whose screen is open, and how its save is going. */
+  const [editingBriefId, setEditingBriefId] = useState<string | null>(null);
+  const [briefSave, setBriefSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
+  /** The earliest Monday a plan may start on, for reading a brief's dates. */
+  const briefMonday = firstPlanMonday();
+  const saveBrief = async (artifactId: string, request: PlanBriefRequest) => {
+    if (!api) return;
+    setBriefSave({ saving: true });
+    try {
+      const before = planBriefs[artifactId];
+      const saved = await api.updatePlanBrief(artifactId, request);
+      setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      // A conversation AI Plan opened is named after the goal once it has one (P2.5).
+      const sessionId = activeSessionIdRef.current;
+      const title = sessions.find((session) => session.id === sessionId)?.title;
+      if (sessionId && title === NEW_PLAN_TITLE && saved.request.goal.trim()) {
+        void api
+          .renameChatSession(sessionId, briefTitle(saved.request))
+          .then((summary) => {
+            if (summary) setSessions((current) => current.map((session) => (session.id === summary.id ? summary : session)));
+          })
+          .catch(() => undefined);
+      }
+      setBriefSave({ saving: false });
+      setEditingBriefId(null);
+      // The outline was drawn from the brief as it was (P2.2): ask, as the
+      // generator asks when a source is switched under a drawn outline.
+      if (saved.outline && JSON.stringify(before?.request) !== JSON.stringify(saved.request)) {
+        setRedrawAsk(artifactId);
+      }
+    } catch (caught) {
+      setBriefSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+    }
+  };
+  /** A brief changed under its outline: whether to have it redrawn (P2.2). */
+  const [redrawAsk, setRedrawAsk] = useState<string | null>(null);
+  /** The outline whose Adjust screen is open, and how its save is going (P2.2). */
+  const [editingOutlineId, setEditingOutlineId] = useState<string | null>(null);
+  const [outlineSave, setOutlineSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
+  const saveOutline = async (artifactId: string, outline: TrainingPlanOutline) => {
+    if (!api) return;
+    setOutlineSave({ saving: true });
+    try {
+      const saved = await api.updatePlanOutline(artifactId, outline);
+      setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      setOutlineSave({ saving: false });
+      setEditingOutlineId(null);
+    } catch (caught) {
+      setOutlineSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+    }
+  };
+  /**
+   * What this conversation reads and which AI answers it (P2.0), read when
+   * the conversation opens; a turn reads it again in the main process.
+   */
+  const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
+  const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
+  useEffect(() => {
+    setConversationSettingsState(null);
+    if (!api || !activeSessionId) return;
+    let live = true;
+    void api
+      .getConversationSettings(activeSessionId)
+      .then((settings) => {
+        if (live) setConversationSettingsState(settings);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, activeSessionId]);
+  const conversationSettingsWriteRef = useRef(0);
+  const updateConversationSettings = (next: ConversationSettings) => {
+    setConversationSettingsState(next);
+    // Only the last write's answer, and only for the conversation still open:
+    // two quick switches would otherwise settle on the first one's reply.
+    const write = ++conversationSettingsWriteRef.current;
+    void api
+      ?.setConversationSettings(next)
+      .then((saved) => {
+        if (write === conversationSettingsWriteRef.current && saved.sessionId === activeSessionIdRef.current) {
+          setConversationSettingsState(saved);
+        }
+      })
+      .catch(() => undefined);
+  };
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
@@ -1008,6 +1152,10 @@ export function ChatView({
    */
   const openAsked = async (request: CoachOpenRequest) => {
     if (!api) return;
+    if (request.newPlan) {
+      await startPlanConversation();
+      return;
+    }
     const sessionId = request.draftId
       ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
       : null;
@@ -1022,6 +1170,32 @@ export function ChatView({
     }
     if (request.prompt) composerRef.current?.setDraft(request.prompt);
     requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /**
+   * AI Plan (P2.5): a new conversation named "New plan" that opens on a blank
+   * brief — the generator's defaults, no model asked. It takes Coach's
+   * settings, as any new conversation does, and is named after the goal once
+   * the brief has one.
+   */
+  const startPlanConversation = async () => {
+    if (!api || streaming || exportingLatestActivity) return;
+    onError(null);
+    try {
+      const created = await api.createChatSession(chatSettings.provider);
+      const brief = await api.createPlanBrief(created.id);
+      const titled = (await api.renameChatSession(created.id, NEW_PLAN_TITLE).catch(() => null)) ?? created;
+      setSessions((current) => [titled, ...current]);
+      setActiveSessionId(created.id);
+      persistedBaseRef.current = 0;
+      resetEphemeralChatState();
+      setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+      const entries: ChatEntry[] = [{ kind: "planBrief", artifactId: brief.artifactId }];
+      setTimeline(entries);
+      persistHistory(created.id, entries, true);
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : "Could not start a plan.");
+    }
   };
 
   const resetEphemeralChatState = () => {
@@ -1784,6 +1958,7 @@ export function ChatView({
         }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setActiveTool(null);
+        advanceStep(payload.requestId, { kind: "text", delta: payload.delta });
         streamedTextRef.current += payload.delta;
         setStreamingText((prev) => prev + payload.delta);
       }),
@@ -1792,6 +1967,15 @@ export function ChatView({
         // analysis's transcript is reloaded from disk when its run ends.
         if (payload.requestId === liveAnalysisRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
+        if (payload.kind === "context" && payload.snapshotIncluded) {
+          advanceStep(payload.requestId, { kind: "snapshot" });
+        } else if (payload.kind === "thinking") {
+          advanceStep(payload.requestId, { kind: "thinking", delta: payload.delta });
+        } else if (payload.kind === "mcp" && payload.status === "call") {
+          advanceStep(payload.requestId, { kind: "call", tool: payload.tool });
+        } else if (payload.kind === "planDraft" || payload.kind === "planOutline") {
+          advanceStep(payload.requestId, { kind: "passed" });
+        }
         if (payload.kind === "context") {
           sourceRef.current = {
             snapshotIncluded: payload.snapshotIncluded,
@@ -1804,6 +1988,32 @@ export function ChatView({
           setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
         } else if (payload.kind === "planEvent") {
           setTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
+        } else if (payload.kind === "planBrief") {
+          const brief = payload.brief;
+          setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+          // Filling in a brief already on screen changes its card, not the timeline.
+          setTimeline((prev) =>
+            prev.some((entry) => entry.kind === "planBrief" && entry.artifactId === brief.artifactId)
+              ? prev
+              : [...prev, { kind: "planBrief", artifactId: brief.artifactId }]
+          );
+        } else if (payload.kind === "planOutline") {
+          const brief = payload.brief;
+          const outlineVersion = brief.outline?.version;
+          setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+          if (outlineVersion !== undefined) {
+            // A turn whose outline is accepted twice rewrites its version, not its anchor.
+            setTimeline((prev) =>
+              prev.some(
+                (entry) =>
+                  entry.kind === "planOutline" &&
+                  entry.artifactId === brief.artifactId &&
+                  entry.outlineVersion === outlineVersion
+              )
+                ? prev
+                : [...prev, { kind: "planOutline", artifactId: brief.artifactId, outlineVersion }]
+            );
+          }
         } else if (payload.kind === "workoutDelete") {
           setTimeline((prev) =>
             upsertWorkoutDeleteEntry(prev, payload.preview)
@@ -2435,7 +2645,9 @@ export function ChatView({
     trimmed: string,
     answeredPrompt?: { promptId: string; choiceId: string },
     /** What the question is about, when a chip says so rather than the composer. */
-    aboutRefs?: PlanRef[]
+    aboutRefs?: PlanRef[],
+    /** A step of the plan pipeline (P2.2): the words shown, the step's turn sent. */
+    pipeline?: ChatPipelineStep
   ): Promise<boolean> => {
     if (!api || !trimmed || streaming || exportingLatestActivity) return false;
     if (isLatestActivityFileRequest(trimmed)) {
@@ -2462,7 +2674,9 @@ export function ChatView({
       );
       return false;
     }
-    let answeredPromptIndex = answeredPrompt
+    let answeredPromptIndex = pipeline
+      ? -1
+      : answeredPrompt
       ? timeline.findIndex(
           (entry) =>
             entry.kind === "coachPrompt" &&
@@ -2470,7 +2684,7 @@ export function ChatView({
             entry.prompt.answeredAt === undefined
         )
       : -1;
-    if (answeredPromptIndex < 0) {
+    if (answeredPromptIndex < 0 && !pipeline) {
       for (let index = timeline.length - 1; index >= 0; index -= 1) {
         const entry = timeline[index];
         if (entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined) {
@@ -2511,6 +2725,7 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    setStepRun(pipeline ? { requestId, step: pipeline.step, notes: EMPTY_NOTES, attempts: 0 } : null);
     turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
@@ -2531,10 +2746,11 @@ export function ChatView({
     // `tailStart` measured in one and sliced from the other would cut the
     // conversation at a boundary that does not exist in it.
     const persisted = toPersistedEntries(nextEntries);
-    const context = await compactBeforeSend(
-      activeSessionIdRef.current,
-      persisted
-    );
+    // A pipeline step carries only its recent messages (P2.4), so compacting
+    // before it would pay a summariser call for a summary it never sends.
+    const context = pipeline
+      ? null
+      : await compactBeforeSend(activeSessionIdRef.current, persisted);
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
@@ -2547,6 +2763,10 @@ export function ChatView({
     const versions = creationIds.length
       ? await api.getPlanArtifacts(creationIds).catch(() => artifactVersions)
       : [];
+    const briefIds = [
+      ...new Set(persisted.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+    ];
+    const briefs = briefIds.length ? await api.getPlanBriefs(briefIds).catch(() => []) : [];
     if (activeRequestIdRef.current !== requestId) return true;
     const wireMessages = withCreationIndex(
       [
@@ -2554,10 +2774,11 @@ export function ChatView({
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
       persisted,
-      Array.isArray(versions) ? versions : []
+      Array.isArray(versions) ? versions : [],
+      Array.isArray(briefs) ? briefs : []
     );
     try {
-      await api.sendChat(requestId, wireMessages, unitSystem);
+      await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined, pipeline);
     } catch (caught) {
       activeRequestIdRef.current = null;
       setStreaming(false);
@@ -2576,6 +2797,20 @@ export function ChatView({
     }
     return true;
   };
+
+  /** "Draw the outline", or a redraw with the athlete's note, as a turn of the conversation (P2.2). */
+  const drawOutline = (artifactId: string, note?: string) =>
+    sendMessage(outlineStepText(note), undefined, [], {
+      step: "outline",
+      artifactId,
+      ...(note?.trim() ? { note: note.trim() } : {})
+    });
+
+  /** "Write the sessions" to the brief's outline, as a turn of the conversation (P2.3). */
+  const writeSessions = (artifactId: string) =>
+    sendMessage("Write the sessions", undefined, [], { step: "sessions", artifactId });
+  /** Whether a brief's sessions are written: it has a version, and is a plan from then on. */
+  const briefIsPlan = (artifactId: string) => artifactVersions.some((version) => version.artifactId === artifactId);
 
   const handleCoachPromptChoice = async (
     prompt: CoachInputPrompt,
@@ -3524,6 +3759,7 @@ function AnalysisSilentChip({
         <Sparkles size={16} aria-hidden="true" />
       </div>
       <div className="chat-bubble chat-bubble-streaming">
+        {stepRun && stepRun.requestId === activeRequestIdRef.current ? <CoachStepTrail run={stepRun} /> : null}
         {streamingText ? (
           <>
             {thinkingText ? (
@@ -3624,6 +3860,34 @@ function AnalysisSilentChip({
       <div className="chat-layout">
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
+          {conversationSettings ? (
+            <button
+              type="button"
+              className="chat-conversation-settings"
+              data-action="conversationSettings"
+              onClick={() => setConversationSettingsOpen(true)}
+              title="What Coach reads here, and which AI answers"
+            >
+              <span>
+                Reads:{" "}
+                {SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
+                  .map(([, label]) => label)
+                  .join(" · ") || "nothing of yours"}
+              </span>
+              <span>
+                AI:{" "}
+                {conversationSettings.runtime
+                  ? [
+                      COACH_PROVIDER_LABELS[conversationSettings.runtime.provider ?? chatSettings.provider],
+                      conversationSettings.runtime.model,
+                      conversationSettings.runtime.effort
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Coach's settings"}
+              </span>
+            </button>
+          ) : null}
           <div className="chat-transcript" ref={scrollRef}>
         <div className="chat-thread">
           {timeline.length === 0 && !streaming ? (
@@ -3740,6 +4004,89 @@ function AnalysisSilentChip({
                       {ref.scope === "plan" ? "" : ` · ${ref.label}`}
                     </span>
                   ))}
+                </div>
+              );
+            }
+
+            if (entry.kind === "planBrief") {
+              const brief = planBriefs[entry.artifactId];
+              if (!brief) return null;
+              return (
+                <div
+                  key={`brief:${entry.artifactId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachBriefCard
+                      brief={brief}
+                      firstMonday={briefMonday}
+                      sources={conversationSettings?.sources}
+                      editing={editingBriefId === brief.artifactId}
+                      onEdit={
+                        briefIsPlan(brief.artifactId)
+                          ? undefined
+                          : () => {
+                              setBriefSave({ saving: false });
+                              setEditingBriefId(brief.artifactId);
+                            }
+                      }
+                      onDrawOutline={
+                        brief.outline || briefOpenProblems(brief.request, conversationSettings?.sources).length
+                          ? undefined
+                          : () => void drawOutline(brief.artifactId)
+                      }
+                      busy={streaming}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "planOutline") {
+              const brief = planBriefs[entry.artifactId];
+              if (!brief?.outline) return null;
+              if (outlineAnchors.get(entry.artifactId) !== index) {
+                // Redrawn below: the artifact keeps one outline, the latest card draws it.
+                return (
+                  <div
+                    key={`outline:${entry.artifactId}:${entry.outlineVersion}#${index}`}
+                    className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">Outline</span>
+                    <span className="chat-asked-question">v{entry.outlineVersion}</span>
+                    <span className="chat-version-note">Redrawn below</span>
+                  </div>
+                );
+              }
+              const outlined = brief as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> };
+              return (
+                <div
+                  key={`outline:${entry.artifactId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachOutlineCard
+                      brief={outlined}
+                      busy={streaming}
+                      editing={editingOutlineId === brief.artifactId}
+                      written={briefIsPlan(brief.artifactId)}
+                      onWriteSessions={() => void writeSessions(brief.artifactId)}
+                      onAdjust={() => {
+                        setOutlineSave({ saving: false });
+                        setEditingOutlineId(brief.artifactId);
+                      }}
+                      onRedraw={(note) => void drawOutline(brief.artifactId, note)}
+                    />
+                  </div>
                 </div>
               );
             }
@@ -4164,6 +4511,65 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      {editingBriefId && planBriefs[editingBriefId] && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            brief={planBriefs[editingBriefId]!}
+            firstMonday={briefMonday}
+            sources={conversationSettings.sources}
+            saving={briefSave.saving}
+            error={briefSave.error}
+            onSourcesChange={(sources) => updateConversationSettings({ ...conversationSettings, sources })}
+            onSave={(request) => void saveBrief(editingBriefId, request)}
+            onClose={() => setEditingBriefId(null)}
+          />
+        </Suspense>
+      ) : null}
+      {editingOutlineId && planBriefs[editingOutlineId]?.outline ? (
+        <Suspense fallback={null}>
+          <CoachOutlineEditor
+            brief={planBriefs[editingOutlineId] as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> }}
+            saving={outlineSave.saving}
+            error={outlineSave.error}
+            onSave={(outline) => void saveOutline(editingOutlineId, outline)}
+            onClose={() => setEditingOutlineId(null)}
+          />
+        </Suspense>
+      ) : null}
+      {redrawAsk && planBriefs[redrawAsk]?.outline
+        ? createPortal(
+            <ConfirmDialog
+              title="Redraw the outline?"
+              description="The outline was drawn from the brief as it was. Coach can draw it again from the brief as it is now; keeping it leaves the outline as it stands, with anything that no longer fits listed on its card."
+              cancelLabel="Keep the outline"
+              confirmLabel="Redraw the outline"
+              onConfirm={() => {
+                const artifactId = redrawAsk;
+                setRedrawAsk(null);
+                void drawOutline(artifactId);
+              }}
+              onCancel={() => setRedrawAsk(null)}
+            />,
+            document.body
+          )
+        : null}
+      {conversationSettingsOpen && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachConversationSettings
+            portal
+            chatSettings={chatSettings}
+            conversation={conversationSettings}
+            readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
+            claudeStatus={claudeStatus}
+            onChange={updateConversationSettings}
+            onClose={() => setConversationSettingsOpen(false)}
+            onOpenCoachSettings={() => {
+              setConversationSettingsOpen(false);
+              setSettingsOpen(true);
+            }}
+          />
+        </Suspense>
+      ) : null}
       {api && calendarFor ? (
         <Suspense fallback={null}>
           <CoachCalendarDialog

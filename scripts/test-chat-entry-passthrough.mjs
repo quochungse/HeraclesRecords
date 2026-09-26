@@ -84,7 +84,7 @@ const row = [
     mrev: "1-000000000001-0000-aa"
   },
   {
-    kind: "planBrief",
+    kind: "futureAnchor",
     artifactId: "artifact-1",
     mid: "1-000000000002-0000-aa",
     mrev: "1-000000000002-0000-aa"
@@ -174,7 +174,7 @@ function throughWindow(json, edit = (timeline) => timeline) {
   assert.equal(saved[0].refs[0], "artifact-1");
   assert.deepEqual(
     { ...saved[1], mid: undefined, mrev: undefined },
-    { kind: "planBrief", artifactId: "artifact-1", mid: undefined, mrev: undefined }
+    { kind: "futureAnchor", artifactId: "artifact-1", mid: undefined, mrev: undefined }
   );
   assert.equal(saved[1].mid, row[1].mid);
   assert.equal(saved[2].cardNote, "top level");
