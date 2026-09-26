@@ -10,6 +10,7 @@ import {
   type ReactNode
 } from "react";
 import {
+  AlertTriangle,
   ArrowUpRight,
   CalendarRange,
   Cloud,
@@ -74,7 +75,8 @@ import type {
   UploadPlanResult,
   WorkoutDeletePreview,
   ScheduleChangeSet,
-  ScheduleRef
+  ScheduleRef,
+  TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
@@ -94,7 +96,7 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
-import { scheduleChangeIds } from "./scheduleChangeModel";
+import { proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
@@ -105,14 +107,17 @@ import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
+import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import { refinementChips } from "./creationChoices";
 import {
   requestRuntime,
   runtimeFromSettings,
+  runtimeModelOptions,
+  runtimeSummary,
   type GeneratorRuntime
 } from "../training-library/planGeneratorRuntime";
-import { coachProviderReadiness } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
 import {
   creationVersions,
   isLatestVersion,
@@ -170,11 +175,44 @@ const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
 const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
+const ConversationAiSheet = lazy(() =>
+  import("./CoachConversationSettings").then((module) => ({ default: module.ConversationAiSheet }))
+);
 const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
 const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
 
 /** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
 const NEW_PLAN_TITLE = "New plan";
+/** What an empty conversation offers (R3): three intents, each a few ways in. */
+const EMPTY_INTENTS: readonly {
+  title: string;
+  prompts: readonly { text: string; detail?: string; plan?: boolean }[];
+}[] = [
+  {
+    title: "Review",
+    prompts: [
+      { text: "How did my latest session go?" },
+      { text: "How does this week compare with last week?" },
+      { text: "Am I recovered enough for a hard session?" }
+    ]
+  },
+  {
+    title: "Plan",
+    prompts: [
+      { text: "Start a training plan…", detail: "Your goal and your week, then an outline", plan: true },
+      { text: "Give me one session for today" },
+      { text: "Build a balanced week from my recent training" }
+    ]
+  },
+  {
+    title: "Adjust",
+    prompts: [
+      { text: "Rearrange this week around my schedule" },
+      { text: "I'm ill, ease the next few days" },
+      { text: "Add strength around my endurance sessions" }
+    ]
+  }
+];
 /** Below this window width the conversation list folds while the Workbench is open. */
 const WORKBENCH_FOLD_WIDTH = 1600;
 /** Below this window width the Workbench is a sheet over the conversation. */
@@ -930,6 +968,7 @@ export function ChatView({
   /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
   const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
+  const [aiSheetOpen, setAiSheetOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
     if (!api || !activeSessionId) return;
@@ -1411,7 +1450,7 @@ export function ChatView({
    */
   const openRunConversation = async (sessionId: string) => {
     if (!api) return;
-    const listed = await refreshSessions(chatSettings.provider);
+    const listed = await refreshSessions();
     if (!listed.some((session) => session.id === sessionId)) {
       onError("That conversation is no longer here — it may have been deleted.");
       return;
@@ -1422,10 +1461,12 @@ export function ChatView({
     await loadSession(sessionId);
   };
 
+  /* Every conversation, whichever AI answers it (Q1): the list used to be the
+     current provider's, so switching AI swapped it for another list. */
   const refreshSessions = useCallback(
-    async (provider: ChatProvider) => {
+    async () => {
       if (!api) return [];
-      const listed = await api.listChatSessions(provider);
+      const listed = await api.listChatSessions();
       setSessions(listed);
       return listed;
     },
@@ -1434,7 +1475,7 @@ export function ChatView({
 
   const ensureActiveSession = async (provider: ChatProvider) => {
     if (!api) return null;
-    const listed = await refreshSessions(provider);
+    const listed = await refreshSessions();
     if (listed.length > 0) {
       await loadSession(listed[0].id);
       return listed[0].id;
@@ -1486,15 +1527,11 @@ export function ChatView({
    */
   useEffect(() => {
     if (!api?.onCoachAnalysisRunUpdate) return;
-    // The provider on screen, not the run's: an analysis may run on one of
-    // its own (decision 2), and that conversation belongs to that provider's
-    // list rather than this one.
-    const provider = chatSettings.provider;
     return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId) return;
-      void refreshSessions(provider).catch(() => undefined);
+      void refreshSessions().catch(() => undefined);
     });
-  }, [api, chatSettings.provider, refreshSessions]);
+  }, [api, refreshSessions]);
 
   /**
    * 9.3: a run into a conversation the athlete is *not* looking at is exactly
@@ -1643,10 +1680,6 @@ export function ChatView({
    */
   useEffect(() => {
     if (!api?.onSyncChanged) return;
-    // The provider on screen, for the reason the run-update subscription gives:
-    // the list belongs to a provider, and a merged conversation of another
-    // provider's is not in it.
-    const provider = chatSettings.provider;
     return api.onSyncChanged((change) => {
       if (change.tables.includes("coach_analyses")) {
         // Which conversations carry the ⚡ mark is a fact about the analyses,
@@ -1668,7 +1701,7 @@ export function ChatView({
       }
 
       if (!change.tables.includes("chat_sessions")) return;
-      void refreshSessions(provider).catch(() => undefined);
+      void refreshSessions().catch(() => undefined);
 
       const sessionId = activeSessionIdRef.current;
       if (!sessionId) return;
@@ -1683,7 +1716,7 @@ export function ChatView({
       }
       void reloadTranscript(sessionId);
     });
-  }, [api, chatSettings.provider, refreshSessions]);
+  }, [api, refreshSessions]);
 
   // Load sign-in/provider state on mount.
   useEffect(() => {
@@ -2448,7 +2481,8 @@ export function ChatView({
     onError(null);
     try {
       await api.deleteChatSession(sessionId);
-      const listed = await refreshSessions(chatSettings.provider);
+      clearComposerDraft(sessionId);
+      const listed = await refreshSessions();
       if (sessionId === activeSessionId) {
         if (listed.length > 0) {
           await loadSession(listed[0].id);
@@ -2474,7 +2508,9 @@ export function ChatView({
     try {
       const saved = await api.saveChatSettings(nextSettings);
       setChatSettings(saved);
-      await ensureActiveSession(provider);
+      // Coach's default AI changes which provider a new conversation starts
+      // with; the one open keeps its own (Q1).
+      if (!activeSessionIdRef.current) await ensureActiveSession(provider);
       if (provider === "claude-code") {
         const status = await api.getClaudeCodeStatus();
         setClaudeStatus(status);
@@ -2732,7 +2768,7 @@ export function ChatView({
     // The AI this conversation answers with (P2.0), which may not be Coach's:
     // a key missing for Coach's provider must not block a conversation that
     // uses another, and one missing for the conversation's must.
-    const turnProvider = conversationSettings?.runtime?.provider ?? chatSettings.provider;
+    const turnProvider = effectiveRuntime.provider;
     if (
       turnProvider === "openrouter" &&
       !chatSettings.openRouter.hasApiKey
@@ -2930,6 +2966,22 @@ export function ChatView({
     sendMessage("Write the sessions", undefined, [], { step: "sessions", artifactId });
   /** Whether a brief's sessions are written: it has a version, and is a plan from then on. */
   const briefIsPlan = (artifactId: string) => artifactVersions.some((version) => version.artifactId === artifactId);
+
+  /** Where in the transcript something waits on the athlete (R3), in order. */
+  const waitingIndices = timeline.flatMap((entry, index) => {
+    if (entry.kind === "coachPrompt") return entry.prompt.answeredAt === undefined ? [index] : [];
+    if (entry.kind === "scheduleChange") {
+      const set = scheduleChanges[entry.changeSetId];
+      return set && proposedLines(set).length ? [index] : [];
+    }
+    if (entry.kind === "planBrief") {
+      return planBriefs[entry.artifactId] && !briefIsPlan(entry.artifactId) ? [index] : [];
+    }
+    return [];
+  });
+  const [waitingCursor, setWaitingCursor] = useState(0);
+  /** The sources of a plan being started from the empty conversation, while its brief is open (R3). */
+  const [newPlanSources, setNewPlanSources] = useState<TrainingPlanDataSources | null>(null);
 
   const handleCoachPromptChoice = async (
     prompt: CoachInputPrompt,
@@ -3257,8 +3309,11 @@ export function ChatView({
    * answered with one model while the pill named another.
    */
   const conversationRuntime = conversationSettings?.runtime;
+  /** The provider this conversation was started with, which it keeps (Q1). */
+  const conversationProvider =
+    sessions.find((session) => session.id === activeSessionId)?.provider ?? chatSettings.provider;
   const effectiveRuntime: GeneratorRuntime = {
-    ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? chatSettings.provider),
+    ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? conversationProvider),
     ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
     ...(conversationRuntime?.effort ? { effort: conversationRuntime.effort } : {})
   };
@@ -3508,7 +3563,7 @@ export function ChatView({
       changeCoachRuntime(next);
       return;
     }
-    const override = requestRuntime(next, chatSettings);
+    const override = requestRuntime(next, chatSettings, conversationProvider);
     const { runtime: _previous, ...rest } = conversationSettings;
     updateConversationSettings(override ? { ...rest, runtime: override } : rest);
     if (next.provider === "claude-code" && api) {
@@ -3557,7 +3612,25 @@ export function ChatView({
       />
     </div>
   );
-  const providerControls = renderProviderControls(effectiveRuntime, changeConversationRuntime);
+  /*
+   * The composer states the conversation's AI as one chip (UAT after R3):
+   * three pickers under the words read as settings to fiddle with on every
+   * turn. The chip opens "AI for this conversation", where it is changed.
+   */
+  const aiReadiness = coachProviderReadiness(chatSettings, authStatus, claudeStatus);
+  /* Only once its status has been read: a sign-in still being checked is not
+     a warning. */
+  const aiStatusRead =
+    (effectiveRuntime.provider !== "claude-code" || claudeStatus !== null) &&
+    (effectiveRuntime.provider !== "chatgpt" || authStatus !== null);
+  const aiBlocked = aiStatusRead && aiReadiness[effectiveRuntime.provider] === false;
+  const aiModelLine = runtimeSummary(
+    effectiveRuntime,
+    runtimeModelOptions(effectiveRuntime.provider, chatSettings, claudeStatus)
+  );
+  // The chip names the model; a local one says it is local, since its name
+  // alone ("No model chosen", "llama3") does not.
+  const aiSummary = effectiveRuntime.provider === "local" ? `Local · ${aiModelLine}` : aiModelLine;
   /* What the question points at, previewed from the plans already in hand
      (UAT, option A): no request is made for it. */
   const composerRefs: ComposerRef[] = [
@@ -3573,6 +3646,21 @@ export function ChatView({
       onRemove: () => setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
     }))
   ];
+  const providerControls = (
+    <button
+      type="button"
+      className={`chat-ai-chip${aiBlocked ? " is-blocked" : ""}`}
+      data-action="conversationAi"
+      disabled={savingSettings || isBusy}
+      aria-haspopup="dialog"
+      aria-label={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}, ${aiSummary}${aiBlocked ? ", not set up" : ""}. Change`}
+      title={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}`}
+      onClick={() => setAiSheetOpen(true)}
+    >
+      {aiBlocked ? <AlertTriangle size={13} aria-hidden="true" /> : <Sparkles size={13} aria-hidden="true" />}
+      <span>{aiSummary}</span>
+    </button>
+  );
   const coachProviderControls = renderProviderControls(coachRuntime, changeCoachRuntime);
 
   const conversationSidebarOpen = chatSettings.sidebarOpen !== false;
@@ -3614,14 +3702,18 @@ export function ChatView({
     />
   ) : null;
 
-  const settingsModalProps = {
-    api,
-    open: settingsOpen,
-    chatSettings,
-    onClose: () => setSettingsOpen(false),
-    onUpdateChatSettings: (patch: Partial<ChatSettings>) =>
-      void handleUpdateChatSettings(patch)
-  };
+  /* Coach's own settings are a dialog of their own (UAT after R3): as a
+     section of the app's Settings they buried that page's content. */
+  const openSettings = () => setSettingsOpen(true);
+  const settingsModal = (
+    <ChatSettingsModal
+      api={api}
+      open={settingsOpen}
+      chatSettings={chatSettings}
+      onClose={() => setSettingsOpen(false)}
+      onUpdateChatSettings={(patch: Partial<ChatSettings>) => void handleUpdateChatSettings(patch)}
+    />
+  );
 
   if (checkingAuth) {
     return (
@@ -3642,7 +3734,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
               Settings
@@ -3665,7 +3757,7 @@ export function ChatView({
                 <button
                   type="button"
                   className="primary-button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
                   Add API key
@@ -3690,8 +3782,7 @@ export function ChatView({
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -3709,7 +3800,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
               Settings
@@ -3785,8 +3876,7 @@ export function ChatView({
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -3803,7 +3893,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
               aria-label="Open settings"
             >
               <Settings2 size={16} aria-hidden="true" />
@@ -3828,7 +3918,7 @@ export function ChatView({
                 <button
                   type="button"
                   className="primary-button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
                   Add API key
@@ -3853,8 +3943,7 @@ export function ChatView({
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -3875,7 +3964,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
               aria-label="Open settings"
             >
               <Settings2 size={16} aria-hidden="true" />
@@ -3913,8 +4002,7 @@ export function ChatView({
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -4149,7 +4237,7 @@ function AnalysisSilentChip({
         creations={listedCreations.length}
         creationsOpen={workbenchOpen}
         onToggleCreations={() => (workbenchOpen ? closeWorkbench() : setPlanPanelOpen(true))}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => openSettings()}
         trailing={
           isChatGptProvider ? (
             <button
@@ -4171,34 +4259,58 @@ function AnalysisSilentChip({
         <div className="chat-main">
           <div className="chat-transcript" ref={scrollRef}>
         <div className="chat-thread">
+          {/* What waits on the athlete here (R3), as a bar that jumps to each
+              in turn: a question, a change to decide, a brief not yet a plan. */}
+          {waitingIndices.length && !streaming ? (
+            <button
+              type="button"
+              className="chat-waiting-bar"
+              onClick={() => {
+                const target = waitingIndices[waitingCursor % waitingIndices.length];
+                setWaitingCursor((value) => value + 1);
+                scrollRef.current
+                  ?.querySelector(`[data-chat-entry-index="${target}"]`)
+                  ?.scrollIntoView({ block: "center", behavior: "smooth" });
+              }}
+            >
+              {waitingIndices.length === 1
+                ? "1 thing waiting on you"
+                : `${waitingIndices.length} things waiting on you`}{" "}
+              · Jump ↓
+            </button>
+          ) : null}
           {timeline.length === 0 && !streaming ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">
                 <Sparkles size={28} aria-hidden="true" />
               </div>
-              <h3>How can I help with your training?</h3>
-              <div className="chat-suggestions">
-                {[
-                  "How was my latest activity?",
-                  "Break down my latest workout by lap",
-                  "Create one workout for today and save it to my Workout Library",
-                  "Build a balanced week from my recent training",
-                  "Schedule bike intervals for Saturday",
-                  "Add strength around my endurance sessions",
-                  "Am I recovered enough for a hard session?",
-                  "Download my latest activity FIT file"
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    className="chat-suggestion"
-                    onClick={() => {
-                      composerRef.current?.setDraft(suggestion);
-                      composerRef.current?.focus();
-                    }}
-                  >
-                    {suggestion}
-                  </button>
+              <h3>What do you want to work on?</h3>
+              {/* Three things a conversation is for (R3), in place of eight
+                  suggestions of equal weight — one of them a FIT download. A
+                  plan starts on its brief, as AI Plan in the Library does. */}
+              <div className="chat-intents">
+                {EMPTY_INTENTS.map((intent) => (
+                  <section key={intent.title} className="chat-intent" aria-label={intent.title}>
+                    <span className="chat-creation-kicker">{intent.title}</span>
+                    {intent.prompts.map((prompt) => (
+                      <button
+                        key={prompt.text}
+                        type="button"
+                        className={prompt.plan ? "chat-suggestion is-plan" : "chat-suggestion"}
+                        onClick={() => {
+                          if (prompt.plan) {
+                            setNewPlanSources({ activities: true, sleep: true, zones: true });
+                            return;
+                          }
+                          composerRef.current?.setDraft(prompt.text);
+                          composerRef.current?.focus();
+                        }}
+                      >
+                        {prompt.text}
+                        {prompt.detail ? <small>{prompt.detail}</small> : null}
+                      </button>
+                    ))}
+                  </section>
                 ))}
               </div>
               {/* Said once, where a conversation starts, rather than under
@@ -4259,6 +4371,7 @@ function AnalysisSilentChip({
                   key={entry.prompt.promptId}
                   settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
                     <MessageCircle size={16} aria-hidden="true" />
@@ -4842,7 +4955,7 @@ function AnalysisSilentChip({
           </Suspense>
         ) : null}
       </div>
-      <ChatSettingsModal {...settingsModalProps} />
+      {settingsModal}
       {contextHistoryDialog}
       {/* Held until a conversation is open: Coach mounting for the first time
           from the Calendar opens its newest one, and a pick made before that
@@ -4878,6 +4991,25 @@ function AnalysisSilentChip({
           />
         </Suspense>
       ) : null}
+      {newPlanSources ? (
+        // "Start a training plan…" from the empty conversation (R3): the same
+        // brief screen AI Plan opens in the Library, and the same way on.
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            mode="new"
+            request={defaultPlanBriefRequest(firstPlanMonday())}
+            firstMonday={firstPlanMonday()}
+            sources={newPlanSources}
+            onSourcesChange={setNewPlanSources}
+            onSave={(request) => {
+              const sources = newPlanSources;
+              setNewPlanSources(null);
+              void startPlanConversation({ request, sources });
+            }}
+            onClose={() => setNewPlanSources(null)}
+          />
+        </Suspense>
+      ) : null}
       {editingOutlineId && planBriefs[editingOutlineId]?.outline ? (
         <Suspense fallback={null}>
           <CoachOutlineEditor
@@ -4906,19 +5038,36 @@ function AnalysisSilentChip({
             document.body
           )
         : null}
+      {aiSheetOpen ? (
+        <Suspense fallback={null}>
+          <ConversationAiSheet
+            chatSettings={chatSettings}
+            runtime={effectiveRuntime}
+            readiness={aiReadiness}
+            claudeStatus={claudeStatus}
+            onChange={changeConversationRuntime}
+            onClose={() => setAiSheetOpen(false)}
+            onOpenCoachSettings={() => {
+              setAiSheetOpen(false);
+              openSettings();
+            }}
+          />
+        </Suspense>
+      ) : null}
       {conversationSettingsOpen && conversationSettings ? (
         <Suspense fallback={null}>
           <CoachConversationSettings
             portal
             chatSettings={chatSettings}
             conversation={conversationSettings}
+            baseProvider={conversationProvider}
             readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
             claudeStatus={claudeStatus}
             onChange={updateConversationSettings}
             onClose={() => setConversationSettingsOpen(false)}
             onOpenCoachSettings={() => {
               setConversationSettingsOpen(false);
-              setSettingsOpen(true);
+              openSettings();
             }}
           />
         </Suspense>

@@ -54,7 +54,8 @@ export interface ChatSessionRow {
 }
 
 export interface ChatSessionDatabase {
-  listSessions(provider: ChatProvider): ChatSessionRow[];
+  /** Every conversation when `provider` is absent. */
+  listSessions(provider?: ChatProvider): ChatSessionRow[];
   getSession(id: string): ChatSessionRow | undefined;
   insertSession(
     id: string,
@@ -1471,8 +1472,34 @@ function countMessages(entries: PersistedChatEntry[]): number {
   return entries.filter((entry) => entry.kind === "message").length;
 }
 
-function toSessionSummary(row: ChatSessionRow): ChatSessionSummary {
+/** The rows a conversation's anchors name, for what waits in them to be counted. */
+export interface SessionAnchors {
+  changeSetIds: string[];
+  briefIds: string[];
+}
+
+/**
+ * Counts what in a conversation's anchored rows waits on the athlete. The
+ * store reads only the transcript; the rows are another module's, so the
+ * caller that lists conversations says how to count them.
+ */
+export type WaitingCounter = (anchors: SessionAnchors) => { decisions: number; briefs: number };
+
+function toSessionSummary(row: ChatSessionRow, countWaiting?: WaitingCounter): ChatSessionSummary {
   const entries = parseChatTranscriptJson(row.messages_json);
+  const questions = entries.filter(
+    (entry) => entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined
+  ).length;
+  const anchors: SessionAnchors = {
+    changeSetIds: [
+      ...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))
+    ],
+    briefIds: [...new Set(entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))]
+  };
+  const counted =
+    countWaiting && (anchors.changeSetIds.length || anchors.briefIds.length)
+      ? countWaiting(anchors)
+      : { decisions: 0, briefs: 0 };
   return {
     id: row.id,
     provider: normalizeProvider(row.provider),
@@ -1481,17 +1508,34 @@ function toSessionSummary(row: ChatSessionRow): ChatSessionSummary {
     updatedAt: row.updated_at,
     createdAt: row.created_at,
     messageCount: countMessages(entries),
-    pinnedAt: row.pinned_at ?? null
+    pinnedAt: row.pinned_at ?? null,
+    waiting: { questions, ...counted }
   };
 }
 
+/**
+ * The conversations, newest first. Without a provider, every one of them
+ * (Coach Workbench review, Q1): a conversation's AI is its own, so the list
+ * is not split by which AI answered — switching the composer's AI used to
+ * swap the whole list for another provider's.
+ */
 export function listChatSessions(
-  provider: ChatProvider,
-  database: ChatSessionDatabase = defaultDatabase
+  provider?: ChatProvider,
+  database: ChatSessionDatabase = defaultDatabase,
+  countWaiting?: WaitingCounter
 ): ChatSessionSummary[] {
   return database
-    .listSessions(normalizeProvider(provider))
-    .map((row) => toSessionSummary(row));
+    .listSessions(provider === undefined ? undefined : normalizeProvider(provider))
+    .map((row) => toSessionSummary(row, countWaiting));
+}
+
+/** The provider a conversation was started with, which it keeps (Q1). */
+export function getChatSessionProvider(
+  id: string,
+  database: ChatSessionDatabase = defaultDatabase
+): ChatProvider | undefined {
+  const row = database.getSession(id);
+  return row ? normalizeProvider(row.provider) : undefined;
 }
 
 export function getChatSession(

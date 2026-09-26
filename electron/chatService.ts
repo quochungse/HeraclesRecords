@@ -61,6 +61,7 @@ import { PLAN_BRIEF_TOOL } from "./planBrief";
 import {
   briefForOutline,
   briefForSessions,
+  briefWaiting,
   createPlanBrief,
   deletePlanBriefs,
   listPlanBriefs,
@@ -151,6 +152,7 @@ import {
   deleteChatSession,
   getChatSession,
   listChatSessions,
+  getChatSessionProvider,
   saveChatSession,
   setChatSessionPinned
 } from "./chatHistoryStore";
@@ -500,9 +502,26 @@ function isSameClaudeCodeRecord(
   );
 }
 
-export function listChatSessionsForProvider(provider: ChatProvider) {
-  return listChatSessions(provider);
+/**
+ * Every conversation, each with what waits on the athlete in it (R3): the
+ * calendar changes still to decide and the briefs not yet a plan, read from
+ * their own rows, beside the unanswered questions the transcript holds.
+ */
+export function listAllChatSessions() {
+  return listChatSessions(undefined, undefined, ({ changeSetIds, briefIds }) => ({
+    decisions: changeSetIds.length
+      ? readScheduleChanges(changeSetIds).reduce(
+          (count, set) =>
+            count + set.lines.filter((line) => line.status === "proposed" && KNOWN_CHANGE_OPS.has(line.op)).length,
+          0
+        )
+      : 0,
+    briefs: briefIds.filter((artifactId) => briefWaiting(artifactId)).length
+  }));
 }
+
+/** The ops a line this build can apply may have; a newer build's is not waiting on this one. */
+const KNOWN_CHANGE_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
 
 export function getChatSessionEntries(id: string) {
   return getChatSession(id);
@@ -552,6 +571,11 @@ export function getConversationSettings(sessionId: string): import("./types").Co
   } catch {
     runtime = undefined;
   }
+  // A conversation keeps the provider it was started with (Q1 of the Coach
+  // Workbench review): Coach's default names the provider of a new one, and
+  // changing it later moves no conversation already under way.
+  const own = getChatSessionProvider(sessionId);
+  if (own && !runtime?.provider) runtime = { ...(runtime ?? {}), provider: own };
   return { sessionId, sources, ...(runtime ? { runtime } : {}) };
 }
 
@@ -564,7 +588,12 @@ export function setConversationSettings(
     zones: settings.sources?.zones !== false
   };
   const everything = sources.activities && sources.sleep && sources.zones;
-  const runtime = settings.runtime && Object.keys(settings.runtime).length ? settings.runtime : undefined;
+  // The conversation's own provider goes without saying: only a change of it
+  // is stored, so a row holds only what differs.
+  const own = getChatSessionProvider(settings.sessionId);
+  const { provider: _own, ...rest } = settings.runtime ?? {};
+  const stated = settings.runtime?.provider && settings.runtime.provider !== own ? settings.runtime : rest;
+  const runtime = Object.keys(stated).length ? stated : undefined;
   if (everything && !runtime) {
     // Nothing that differs from Coach's settings: no row to keep in step.
     deleteChatConversationSettingsRow(settings.sessionId);
@@ -805,7 +834,24 @@ export function getChatAuthStatus(): ChatAuthStatus {
   if (!token) {
     return { signedIn: false };
   }
-  return { signedIn: true, email: token.email, expiresAt: token.expires_at };
+  /* Name and plan are read off the stored id_token rather than stored
+     beside it, so a token saved by an older build reads the same. */
+  const claims = token.id_token ? decodeJwtClaims(token.id_token) : undefined;
+  const authClaim = claims?.["https://api.openai.com/auth"] as
+    | { chatgpt_plan_type?: unknown }
+    | undefined;
+  const name = typeof claims?.name === "string" && claims.name.trim() ? claims.name.trim() : undefined;
+  const plan =
+    typeof authClaim?.chatgpt_plan_type === "string" && authClaim.chatgpt_plan_type.trim()
+      ? authClaim.chatgpt_plan_type.trim()
+      : undefined;
+  return {
+    signedIn: true,
+    email: token.email ?? (typeof claims?.email === "string" ? claims.email : undefined),
+    ...(name ? { name } : {}),
+    ...(plan ? { plan } : {}),
+    expiresAt: token.expires_at
+  };
 }
 
 export function logoutChat(): ChatAuthStatus {

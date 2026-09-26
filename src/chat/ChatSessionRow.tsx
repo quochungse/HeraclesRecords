@@ -22,7 +22,7 @@ import type {
   ChatSessionSummary,
   CoachAnalysisSessionAttention
 } from "../../electron/types";
-import { formatSessionRelativeTime } from "./chatSessionGroups";
+import { formatSessionRelativeTime, waitingLabel } from "./chatSessionGroups";
 
 const MENU_WIDTH = 180;
 const MENU_GAP = 6;
@@ -308,6 +308,7 @@ export function ChatSessionRow({
   // binding is gone: the answer is still sitting in the conversation.
   const unread = attention?.unread ?? 0;
   const attached = attention?.attached ?? false;
+  const waiting = waitingLabel(session);
 
   const commitRename = () => {
     if (draft === null) return;
@@ -405,6 +406,11 @@ export function ChatSessionRow({
         )}
         {session.preview ? (
           <span className="chat-session-row-preview">{session.preview}</span>
+        ) : null}
+        {waiting ? (
+          <span className="chat-session-row-waiting" title="Waiting on you in this conversation">
+            {waiting}
+          </span>
         ) : null}
       </span>
       <span className="chat-session-row-meta">

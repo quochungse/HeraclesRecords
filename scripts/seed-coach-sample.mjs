@@ -55,8 +55,8 @@
 //     `<userData>/coach-sample.json`.
 //
 // Close the app first: it holds the database open and would not see the new
-// conversations until restarted anyway. The conversations are filed under the
-// Coach provider you have selected, since the sidebar lists one provider's.
+// conversations until restarted anyway. The conversations are started with the
+// Coach provider you have selected, and keep it; the list shows every provider's.
 // Nothing here is published to sync: the rows are written on this machine only.
 //
 // HERACLES_USER_DATA=/path/to/userData overrides where the database is.
@@ -1222,6 +1222,6 @@ if (PHASES.has("p3")) {
 database.closeDatabase();
 const width = Math.max(...made.map(([title]) => title.length));
 console.log(`
-Open the app → Coach. The conversations are filed under your "${provider}" provider:
+Open the app → Coach. The conversations were started with your "${provider}" provider:
 ${made.map(([title, note]) => `  ${title.padEnd(width)}  ${note}`).join("\n")}
 Remove it all with: npm run sample:coach -- --cleanup`);

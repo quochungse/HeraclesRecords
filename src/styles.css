@@ -17171,43 +17171,103 @@ tr.data-intervals-row-missing {
   cursor: default;
 }
 
-.chat-history-search {
+
+/* New chat and search in one box at the head of the list (UAT, A2): a
+   hairline box, New chat in the chat's accent ink, and search folded to an
+   icon at its end. Search takes the whole box while open, edged in the
+   accent. */
+.chat-history-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: stretch;
+  height: 34px;
+  overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  backdrop-filter: blur(12px) saturate(130%);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.chat-history-actions.is-searching {
+  border-color: var(--chat-signal-border);
+}
+
+.chat-history-new {
+  display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
   padding: 0 12px;
-  color: var(--text-muted);
-  box-shadow: var(--glass-inset);
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
 }
 
-.chat-history-search:focus-within {
-  border-color: var(--accent-glow);
+.chat-history-new:hover:not(:disabled) {
   background: var(--glass-bg-hover);
-  box-shadow:
-    var(--glass-inset),
-    0 0 0 3px var(--accent-soft);
 }
 
-.chat-history-search input {
+.chat-history-new:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.chat-history-new:focus-visible,
+.chat-history-actions-icon:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.chat-history-actions-divider {
+  width: 1px;
+  flex: none;
+  background: var(--glass-border);
+}
+
+.chat-history-actions-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.chat-history-actions-icon:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-history-search-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  color: var(--text-muted);
+}
+
+.chat-history-search-field input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
   color: var(--text-primary);
-  padding: 9px 0;
+  font: inherit;
   font-size: 13px;
 }
 
-.chat-history-search input:focus {
+.chat-history-search-field input:focus {
   outline: none;
 }
 
@@ -17353,6 +17413,41 @@ tr.data-intervals-row-missing {
   margin-right: 5px;
   color: var(--accent-strong);
   vertical-align: -1px;
+}
+
+/* What waits on the athlete in the conversation (R3). */
+.chat-session-row-waiting {
+  justify-self: start;
+  max-width: 100%;
+  margin-top: 3px;
+  padding: 1px 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In the conversation: what waits on the athlete, and a jump to it (R3). */
+.chat-waiting-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: center;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-accent) 18%, var(--menu-surface));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-session-row-preview {
@@ -17748,10 +17843,21 @@ tr.data-intervals-row-missing {
   gap: 10px;
 }
 
+.chat-settings-account-who {
+  display: grid;
+  gap: 2px;
+}
+
 .chat-settings-email {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 13px;
+  font-weight: 600;
   word-break: break-word;
+}
+
+.chat-settings-account-who small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .chat-signout-settings,
@@ -18809,6 +18915,39 @@ tr.data-intervals-row-missing {
   max-width: 480px;
 }
 
+/* Three intents, each a few ways in (R3). */
+.chat-intents {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 680px;
+}
+
+.chat-intent {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  text-align: left;
+}
+
+.chat-intent .chat-suggestion {
+  display: grid;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.chat-intent .chat-suggestion small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.chat-intent .chat-suggestion.is-plan {
+  border-color: color-mix(in srgb, var(--palette-accent) 45%, var(--glass-border));
+  color: var(--text-primary);
+}
+
 .chat-suggestion {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
@@ -19832,10 +19971,17 @@ tr.data-intervals-row-missing {
    line above the transcript, opening the sheet that changes it. */
 /* The open conversation's name, standing where the screen's title was (R1).
    A button, because pressing it renames the conversation. */
+/* The name takes what the controls leave, and is cut only when it must be:
+   both sides shrinking together cut "New chat" to "New c…". */
 .chat-header .chat-header-title {
   display: grid;
+  flex: 1 1 auto;
   gap: 1px;
   min-width: 0;
+}
+
+.chat-header .chat-header-end {
+  flex: none;
 }
 
 .chat-conversation-title,
@@ -19939,9 +20085,104 @@ tr.data-intervals-row-missing {
   z-index: 60;
 }
 
+/* A move between two sheets of one dialog swaps the sheet and keeps the
+   scrim where it is, rather than fading both in again. */
+.coach-sheet[data-swapped] .plan-generator-scrim,
+.coach-sheet[data-swapped] .plan-generator-sheet {
+  animation: none;
+}
+
 /* The generator's footer leads with its keep-for-chat box; this sheet has none. */
 .coach-sheet .plan-generator-sheet > footer {
   justify-content: flex-end;
+}
+
+/* "This conversation": the AI as it stands, one row (name, model and
+   effort, where the choice comes from), its state, and Change. */
+.coach-conversation-ai {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+.coach-conversation-ai > span:first-child {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coach-conversation-ai strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.coach-conversation-ai small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.coach-conversation-ai small.coach-conversation-ai-model {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* The composer's AI: one chip saying which AI answers, opening the sheet
+   that changes it. */
+.chat-ai-chip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.chat-ai-chip:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
+}
+
+.chat-ai-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.chat-ai-chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-ai-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ai-chip b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-ai-chip.is-blocked {
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 }
 
 /* Where a question asked from the Calendar or the Library goes: a new
@@ -22380,17 +22621,8 @@ tr.data-intervals-row-missing {
   box-shadow: var(--sidebar-overlay-shadow);
 }
 
-:root[data-theme="paper"] .chat-history-search {
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .chat-history-search:focus-within {
-  background: #ffffff;
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow:
-    var(--glass-inset),
-    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+:root[data-theme="paper"] .chat-history-actions {
+  background: var(--glass-bg-elevated);
 }
 
 :root[data-theme="paper"] .chat-session-row.is-active {

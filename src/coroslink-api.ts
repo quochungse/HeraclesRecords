@@ -578,7 +578,8 @@ export interface CorosLinkApi {
     sessionId: string,
     entries?: PersistedChatEntry[]
   ) => Promise<ChatContextInspection>;
-  listChatSessions: (provider: ChatProvider) => Promise<ChatSessionSummary[]>;
+  /** Every conversation, whichever AI answers it (Q1 of the Coach Workbench review). */
+  listChatSessions: () => Promise<ChatSessionSummary[]>;
   getChatSession: (sessionId: string) => Promise<PersistedChatEntry[]>;
   createChatSession: (provider: ChatProvider) => Promise<ChatSessionSummary>;
   saveChatSession: (

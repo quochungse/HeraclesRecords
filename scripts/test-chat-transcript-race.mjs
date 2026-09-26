@@ -51,6 +51,7 @@ const CHAT_SETTINGS = {
     hasApiKey: false,
     toolsEnabled: true
   },
+  openRouter: { model: "openrouter/auto", hasApiKey: false },
   sidebarOpen: true,
   visualizationsEnabled: true,
   customInstructions: ""

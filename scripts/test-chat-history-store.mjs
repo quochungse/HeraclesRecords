@@ -45,7 +45,7 @@ function createMemoryDatabase() {
   return {
     listSessions(provider) {
       return [...rows.values()]
-        .filter((row) => row.provider === provider)
+        .filter((row) => provider === undefined || row.provider === provider)
         .sort(
           (left, right) =>
             new Date(right.updated_at).getTime() -
@@ -1099,6 +1099,40 @@ assert.equal(restoredVisual[0].preview.sportType, 100);
     listChatSessions("claude-code", removedDb).find((row) => row.id === cardAfterWords.id).preview,
     "Here it is."
   );
+  // What waits on the athlete (R3): an unanswered question counts from the
+  // transcript; changes and briefs are counted by the caller from their rows.
+  const asking = createChatSession("claude-code", removedDb);
+  saveChatSession(
+    asking.id,
+    [
+      keptMessage,
+      {
+        kind: "coachPrompt",
+        prompt: {
+          promptId: "q",
+          question: "Which day?",
+          choices: [
+            { id: "a", label: "Saturday", response: "Saturday" },
+            { id: "b", label: "Sunday", response: "Sunday" }
+          ],
+          allowCustom: true
+        }
+      },
+      { kind: "scheduleChange", changeSetId: "set-1" },
+      { kind: "planBrief", artifactId: "brief-1" }
+    ],
+    removedDb,
+    { knownEntryCount: 0 }
+  );
+  const seen = [];
+  const counted = listChatSessions(undefined, removedDb, (anchors) => {
+    seen.push(anchors);
+    return { decisions: 2, briefs: 1 };
+  }).find((row) => row.id === asking.id);
+  assert.deepEqual(counted.waiting, { questions: 1, decisions: 2, briefs: 1 });
+  assert.deepEqual(seen.find((anchors) => anchors.changeSetIds.length), { changeSetIds: ["set-1"], briefIds: ["brief-1"] });
+  assert.ok(listChatSessions(undefined, removedDb).length >= 3, "without a provider, every conversation");
+
   // With nothing said at all, the card names it.
   const cardOnly = createChatSession("claude-code", removedDb);
   saveChatSession(cardOnly.id, [structuredClone(oneOffWorkoutEntry)], removedDb, { knownEntryCount: 0 });

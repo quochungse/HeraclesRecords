@@ -55,6 +55,11 @@ const COACH_PROVIDER_ORDER: ChatProvider[] = [
   "local"
 ];
 
+/** "plus" → "Plus", "prolite" stays readable: the claim is a lowercase slug. */
+function chatGptPlanLabel(plan: string): string {
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
+}
+
 export const COACH_PROVIDER_LABELS: Record<ChatProvider, string> = {
   chatgpt: "ChatGPT",
   "claude-code": "Claude subscription",
@@ -634,7 +639,21 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         <h3>ChatGPT account</h3>
         {authStatus?.signedIn ? (
           <div className="chat-settings-account">
-            <span className="chat-settings-email">Signed in</span>
+            {/* Which account is signed in (UAT), not only that one is. */}
+            <span className="chat-settings-account-who">
+              <strong className="chat-settings-email">
+                {authStatus.name ?? authStatus.email ?? "Signed in"}
+              </strong>
+              <small>
+                {[
+                  authStatus.name && authStatus.email ? authStatus.email : null,
+                  authStatus.plan ? `ChatGPT ${chatGptPlanLabel(authStatus.plan)}` : null,
+                  "Signed in"
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </small>
+            </span>
             <button
               type="button"
               className="chat-signout chat-signout-settings"

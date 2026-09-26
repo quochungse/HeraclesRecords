@@ -955,6 +955,11 @@ async function main() {
   assert.match((await harness("text", ".chat-header-chip")) ?? "", /Reads\s*Activities · Sleep · Zones/);
   await harness("click", ".chat-header-chip");
   await waitFor(() => harness("count", ".coach-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
+  // The sheet states the AI as it stands, not only a way to change it (UAT).
+  assert.match(
+    (await harness("text", ".coach-sheet .coach-conversation-ai")) ?? "",
+    /Claude subscription[\s\S]*High effort[\s\S]*Coach’s default[\s\S]*Connected[\s\S]*Change/
+  );
   await harness("click", ".coach-sheet li:nth-child(2) .plan-generator-source");
   await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
   assert.deepEqual(
@@ -1254,16 +1259,18 @@ async function main() {
   assert.equal(await harness("callCount", "sendChat"), 0, "and nothing is sent to fail in the main process");
   // The composer names the AI that answers here, not Coach's (R0.3): it used
   // to show Coach's settings while the turn went to the conversation's own.
-  assert.equal(
-    await page(`[...document.querySelectorAll("[title]")].some((node) => node.title === "Coach provider: OpenRouter")`),
-    true,
-    "the provider pill shows the conversation's AI"
-  );
-  // And changing it changes this conversation, not Coach's settings.
+  // One chip, not three pickers (UAT after R3), and it says the AI is not set up.
+  // The chip reads as the model (UAT); the provider is in its name and title.
+  assert.equal((await harness("text", ".chat-composer .chat-ai-chip")) ?? "", "some/model", "the chip shows the conversation's AI");
+  assert.match((await harness("attr", ".chat-composer .chat-ai-chip", "aria-label")) ?? "", /OpenRouter/);
+  assert.equal(await harness("exists", ".chat-composer .chat-ai-chip.is-blocked"), true);
+  assert.equal(await harness("exists", ".chat-composer .chat-provider-select"), false);
+  // It opens "AI for this conversation", and a change there is this conversation's.
   await harness("clearCalls");
-  await page(`document.querySelector('.chat-provider-select [role="combobox"], .chat-provider-select.app-select-trigger, [title="Coach provider: OpenRouter"]').click()`);
-  await waitFor(() => harness("exists", '[role="option"]'), "the provider menu opens");
-  await page(`[...document.querySelectorAll('[role="option"]')].find((node) => node.textContent.includes("Claude subscription")).click()`);
+  await harness("click", ".chat-composer .chat-ai-chip");
+  await waitFor(() => harness("exists", ".coach-sheet .plan-generator-provider-option"), "the AI sheet opens");
+  assert.equal(await harness("text", ".coach-sheet #plan-generator-ai-title"), "AI for this conversation");
+  await page(`[...document.querySelectorAll('.coach-sheet .plan-generator-provider-option')].find((node) => node.textContent.includes("Claude subscription")).click()`);
   await waitFor(() => harness("callCount", "setConversationSettings"), "the conversation's AI is written");
   const written = (await harness("calls", "setConversationSettings"))[0].args[0];
   assert.equal(written.runtime, undefined, "picking Coach's own AI clears the conversation's override");
@@ -1461,6 +1468,18 @@ async function main() {
   assert.equal(await harness("text", ".chat-conversation-title"), SESSION.title);
   assert.equal(await harness("exists", ".chat-conversation-settings"), false, "the Reads · AI strip is gone");
   assert.equal(await harness("count", ".chat-composer .chat-new-chat, .chat-composer-new-chat"), 0, "one New chat, in the list");
+  // New chat and search share one box at the head of the list (UAT, A2):
+  // search is an icon until pressed, then takes the box, and closes back.
+  assert.equal(await harness("exists", ".chat-history-actions .chat-new-chat-sidebar"), true);
+  assert.equal(await harness("exists", ".chat-history-search-field"), false, "search starts folded");
+  await harness("click", '.chat-history-actions [aria-label="Search chats"]');
+  await waitFor(() => harness("exists", ".chat-history-actions.is-searching input"), "the icon opens search in the box");
+  assert.equal(await harness("exists", ".chat-history-actions .chat-new-chat-sidebar"), false, "New chat gives way while searching");
+  await harness("setValue", ".chat-history-search-field input", "zzz");
+  await waitFor(async () => (await harness("count", ".chat-session-row")) === 0, "the list narrows");
+  assert.equal(await harness("click", '.chat-history-actions [aria-label="Close search"]'), true, "the close button is there");
+  await waitFor(() => harness("exists", ".chat-history-actions .chat-new-chat-sidebar"), "closing brings New chat back");
+  assert.ok((await harness("count", ".chat-session-row")) > 0, "and the whole list");
   // The input grows with its words up to six lines, then scrolls (UAT).
   const oneLine = await page(`document.querySelector(".chat-composer textarea").offsetHeight`);
   await harness("setValue", ".chat-composer textarea", "1\n2\n3");
@@ -1512,6 +1531,52 @@ async function main() {
   const sentWithRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.ok(sentWithRefs.some((entry) => entry.kind === "scheduleRefs"), "the week travels as the question's anchor");
   await waitFor(() => harness("exists", ".chat-row-user .chat-refs-row .chat-ref-chip"), "and is drawn inside the question");
+
+  // -------------------------------------------------------------------------
+  // R3: what waits on the athlete, Coach's settings in the app's Settings,
+  // the list whatever the AI, and a plan started from an empty conversation.
+  // -------------------------------------------------------------------------
+  const WAITING_PROMPT = {
+    kind: "coachPrompt",
+    prompt: {
+      promptId: "q-open",
+      question: "Long run on Saturday or Sunday?",
+      choices: [
+        { id: "choice-1", label: "Saturday", response: "Saturday" },
+        { id: "choice-2", label: "Sunday", response: "Sunday" }
+      ],
+      allowCustom: true
+    }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listChatSessions: [
+      { ...SESSION, waiting: { questions: 1, decisions: 0, briefs: 0 } },
+      { ...SESSION, id: "s2", title: "Recovery", provider: "openrouter", waiting: { questions: 0, decisions: 0, briefs: 0 } }
+    ],
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1], WAITING_PROMPT]
+  });
+  await waitFor(() => harness("exists", ".chat-waiting-bar"), "a question waiting is announced in the conversation");
+  assert.match(await harness("text", ".chat-waiting-bar"), /1 thing waiting on you/);
+  assert.equal(await harness("count", ".chat-session-row"), 2, "every conversation is listed, whichever AI answers it");
+  assert.equal(await harness("text", ".chat-session-row-waiting"), "Question", "and the row says what waits");
+  assert.equal(await harness("exists", ".chat-history-filters"), false, "the list has no All · Needs you filter (UAT)");
+  // The gear opens Coach's own settings as a dialog, not the app's Settings (UAT).
+  await harness("click", '.chat-header-icon[aria-label="Open settings"]');
+  await waitFor(() => harness("exists", ".chat-settings-modal .chat-settings-panel"), "Coach's settings open in their dialog");
+  await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
+  await waitFor(async () => !(await harness("exists", ".chat-settings-modal")), "and close");
+
+  // An empty conversation offers three intents; a plan starts on its brief.
+  await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: [] });
+  await waitFor(() => harness("exists", ".chat-intents"), "the empty conversation offers intents");
+  assert.deepEqual(
+    await page(`[...document.querySelectorAll(".chat-intent > .chat-creation-kicker")].map((node) => node.textContent)`),
+    ["Review", "Plan", "Adjust"]
+  );
+  await harness("click", ".chat-suggestion.is-plan");
+  await waitFor(() => harness("exists", "#coach-brief-title"), "Start a training plan opens the brief");
+  assert.equal(await harness("text", "#coach-brief-title"), "New plan");
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);

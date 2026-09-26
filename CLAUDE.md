@@ -871,9 +871,18 @@ Overview, Media, Data, and Settings are in the main bundle.
   unlisted local tool would fall back to that label.
 
   **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
-  P2.0 of docs/coach-plan-canvas.md). No row means everything shared and Coach's settings, and
-  `setConversationSettings` deletes the row when that is what is chosen, so only a difference is
-  stored. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
+  P2.0 of docs/coach-plan-canvas.md). **A conversation keeps the provider it was started with**
+  (Coach Workbench review, Q1): `chat_sessions.provider` is that provider, `getConversationSettings`
+  fills `runtime.provider` from it when the row states none, and Coach's default only picks the
+  provider of a *new* conversation. So the list is **not split by provider** any more
+  (`chat:listSessions` takes no argument and lists every conversation) — switching the AI used to
+  swap the whole list for another provider's. No row means everything shared, the conversation's
+  own provider and Coach's settings for it, and `setConversationSettings` deletes the row when
+  that is what is chosen (it drops a `runtime.provider` equal to the conversation's own), so only a
+  difference is stored; `requestRuntime` takes that provider as its base for the same reason.
+  **What waits on the athlete** is on every summary (`ChatSessionSummary.waiting`, derived, never
+  stored): unanswered questions from the transcript, open change-set lines and briefs not yet a
+  plan counted by `listAllChatSessions` from their rows. It drives the row's badge and the transcript's "N things waiting on you · Jump" bar. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
   and hands `streamChat` its `sources` and `runtime`, and `streamChat` turns withheld sources into
   a `runTools` reach (`conversationReach`) — withheld from every tool that reads them *and* from
   the snapshot, as the generator does — unless the run already brought a reach of its own. An
@@ -1083,8 +1092,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   drawn as a header line inside its bubble (`refsJoinQuestion`), the plan named once, with
   a way back to the creation in the Workbench. `test:ref-preview` holds the previews. One avatar per turn, none for the athlete. An ordinary turn shows
   its `runTrail` lines too (`StepRun.step === "turn"`); every local tool has a line there.
-  There is one New chat, at the head of the list, and a blank conversation is reused or,
-  when left, deleted — unless an analysis is attached to it.
+  There is one New chat, at the head of the list in one box with search (UAT, A2): "+ New
+  chat" in the ink and bold, icon included, and search folded to an icon at the box's end that takes
+  the whole box while open (× or Escape clears and folds it). Searching tolerates a summary
+  with no `preview` — it used to throw and take the whole screen down. The pinned group's
+  label reads in the ink. The Workbench index scrolls as one body under its header
+  (`.chat-plan-index-body`); each group's list used to sit straight in the clipping panel.
+  A blank conversation is reused or, when left, deleted — unless
+  an analysis is attached to it. The input grows with its words (`field-sizing: content`)
+  up to six lines and scrolls past that.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval
@@ -1139,9 +1155,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   stored chat entry — every transcript an athlete has spells them that way, and renaming
   either costs historical runs their attribution.
 
-  The pause and the monthly budget live in **Settings → Analyses**
-  (`ChatSettingsPanel`): they are feature-wide and the screen that used to host them is
-  gone, so without a home a paused world would have no Resume button.
+  The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
+  over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
+  compaction), which Coach's header gear and the sign-in gates open: they are feature-wide and
+  the screen that used to host them is gone, so without a home a paused world would have no
+  Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
+  because shown whole there it buried that page's content.
 
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9

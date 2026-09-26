@@ -796,8 +796,8 @@ const api = {
     entries?: PersistedChatEntry[]
   ): Promise<ChatContextInspection> =>
     ipcRenderer.invoke("chat:inspectContext", sessionId, entries),
-  listChatSessions: (provider: ChatProvider): Promise<ChatSessionSummary[]> =>
-    ipcRenderer.invoke("chat:listSessions", provider),
+  listChatSessions: (): Promise<ChatSessionSummary[]> =>
+    ipcRenderer.invoke("chat:listSessions"),
   getChatSession: (sessionId: string): Promise<PersistedChatEntry[]> =>
     ipcRenderer.invoke("chat:getSession", sessionId),
   createChatSession: (provider: ChatProvider): Promise<ChatSessionSummary> =>

@@ -22,10 +22,21 @@ database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "conversation-
 
 const everything = { activities: true, sleep: true, zones: true };
 
-// Until changed: everything shared, Coach's AI, and no row at all.
+// Until changed: everything shared, the provider it was started with, and no
+// row at all (Q1 of the Coach Workbench review: a conversation keeps its AI).
 const session = history.createChatSession("claude-code");
-assert.deepEqual(chat.getConversationSettings(session.id), { sessionId: session.id, sources: everything });
+assert.deepEqual(chat.getConversationSettings(session.id), {
+  sessionId: session.id,
+  sources: everything,
+  runtime: { provider: "claude-code" }
+});
 assert.equal(database.getChatConversationSettingsRow(session.id), undefined);
+// Its own provider goes without saying: stating it stores nothing.
+chat.setConversationSettings({ sessionId: session.id, sources: everything, runtime: { provider: "claude-code" } });
+assert.equal(database.getChatConversationSettingsRow(session.id), undefined, "no row for its own provider");
+// Every conversation is listed, whichever provider it keeps.
+history.createChatSession("openrouter");
+assert.equal(chat.listAllChatSessions().length, 2, "the list is not split by provider");
 
 // A source switched off and an AI chosen: kept for this conversation.
 const set = chat.setConversationSettings({
@@ -49,7 +60,7 @@ database.saveChatConversationSettingsRow(session.id, "{not json", JSON.stringify
 assert.deepEqual(chat.getConversationSettings(session.id), {
   sessionId: session.id,
   sources: everything,
-  runtime: { effort: "high" }
+  runtime: { effort: "high", provider: "claude-code" }
 });
 
 // Deleting the conversation takes its settings with it.

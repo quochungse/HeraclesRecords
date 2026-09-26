@@ -1895,6 +1895,13 @@ export interface ChatSessionSummary {
   messageCount: number;
   /** ISO timestamp the conversation was pinned, or null when unpinned. */
   pinnedAt: string | null;
+  /**
+   * What in the conversation waits on the athlete (Coach Workbench review,
+   * R3): questions Coach asked and nobody answered, calendar changes still to
+   * decide, briefs that have not become a plan. Derived on every read; never
+   * stored, so nothing about it travels.
+   */
+  waiting?: { questions: number; decisions: number; briefs: number };
 }
 
 /**
@@ -2293,6 +2300,10 @@ export interface ChatAuthStatus {
   signedIn: boolean;
   /** From the id_token, for display in the header when signed in. */
   email?: string;
+  /** The account's name, from the id_token, where it carries one. */
+  name?: string;
+  /** The ChatGPT plan ("plus", "pro", "team"…), from the id_token's auth claim. */
+  plan?: string;
   /** Access-token expiry (unix seconds), for debugging/telemetry only. */
   expiresAt?: number;
 }

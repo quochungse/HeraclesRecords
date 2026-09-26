@@ -1263,7 +1263,17 @@ export function setChatSessionCoachSummaryRow(
     .run(summary, through, id);
 }
 
-export function listChatSessionRows(provider: string): ChatSessionRow[] {
+/** A provider's conversations, or every conversation when it is absent. */
+export function listChatSessionRows(provider?: string): ChatSessionRow[] {
+  if (provider === undefined) {
+    return requireDatabase()
+      .prepare(
+        `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at
+         FROM chat_sessions
+         ORDER BY updated_at DESC`
+      )
+      .all() as ChatSessionRow[];
+  }
   return requireDatabase()
     .prepare(
       `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at

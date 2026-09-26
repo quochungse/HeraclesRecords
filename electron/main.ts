@@ -322,7 +322,7 @@ import {
   getChatAuthStatus,
   getChatSessionEntries,
   getChatSettings,
-  listChatSessionsForProvider,
+  listAllChatSessions,
   loginChat,
   logoutChat,
   saveChatSessionEntries,
@@ -1661,9 +1661,7 @@ function registerIpcHandlers(): void {
       inspectChatSessionContext(sessionId, entries)
   );
 
-  ipcMain.handle("chat:listSessions", (_event, provider: ChatProvider) =>
-    listChatSessionsForProvider(provider)
-  );
+  ipcMain.handle("chat:listSessions", () => listAllChatSessions());
 
   ipcMain.handle("chat:getSession", (_event, sessionId: string) =>
     getChatSessionEntries(sessionId)

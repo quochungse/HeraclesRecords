@@ -159,6 +159,11 @@ export function updatePlanOutline(artifactId: string, value: unknown): PlanBrief
   return savePlanOutline(artifactId, outline, "athlete");
 }
 
+/** A brief still waiting on the athlete: it exists and has not become a plan (R3). */
+export function briefWaiting(artifactId: string): boolean {
+  return Boolean(planBriefOf(artifactId)) && !hasVersions(artifactId);
+}
+
 /** Whether a brief may still have its outline drawn: it exists and has not become a plan. */
 export function briefForOutline(artifactId: string): PlanBrief {
   const brief = planBriefOf(artifactId);

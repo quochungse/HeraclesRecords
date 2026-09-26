@@ -67,10 +67,19 @@ export function runtimeFromSettings(settings: ChatSettings, provider: ChatProvid
  * sent only when it names one — `streamChat` reads `""` as a model id on the
  * Messages API — and an effort only where the provider takes one.
  */
-export function requestRuntime(runtime: GeneratorRuntime, settings: ChatSettings): AnalysisRuntime | undefined {
+export function requestRuntime(
+  runtime: GeneratorRuntime,
+  settings: ChatSettings,
+  /**
+   * The provider an absent one means. Coach's for a run; a conversation's own
+   * for a conversation (Coach Workbench review, Q1), since a conversation keeps
+   * the provider it was started with.
+   */
+  baseProvider: ChatSettings["provider"] = settings.provider
+): AnalysisRuntime | undefined {
   const coach = runtimeFromSettings(settings, runtime.provider);
   const override: AnalysisRuntime = {};
-  if (runtime.provider !== settings.provider) override.provider = runtime.provider;
+  if (runtime.provider !== baseProvider) override.provider = runtime.provider;
   if (runtime.provider !== "local" && runtime.model.trim() && runtime.model !== coach.model) override.model = runtime.model.trim();
   if (supportsReasoningEffort(runtime.provider) && runtime.effort !== coach.effort) override.effort = runtime.effort;
   return Object.keys(override).length ? override : undefined;
@@ -130,7 +139,7 @@ export function modelChipLabel(label: string): string {
 export function runtimeSummary(runtime: GeneratorRuntime, options: readonly ChatModelOption[]): string {
   const listed = options.find((option) => option.value === runtime.model);
   const model = runtime.provider === "local"
-    ? runtime.model || "Local model"
+    ? runtime.model.trim() || "No model chosen"
     : listed
       ? modelChipLabel(listed.label)
       : describeChatModel(runtime.model) || "Default model";

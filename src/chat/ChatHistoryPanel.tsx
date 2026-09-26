@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, PanelLeftClose, Pin, Plus, Search } from "lucide-react";
+import { PanelLeftClose, Pin, Plus, Search, X } from "lucide-react";
 import type {
   ChatSessionSummary,
   CoachAnalysisSessionAttention
@@ -40,7 +40,14 @@ export function ChatHistoryPanel({
   onDeleteSession: (sessionId: string) => void;
 }) {
   const [query, setQuery] = useState("");
-
+  /* Search folds to an icon at the end of the New chat box (UAT, A2) and
+     takes the whole box while it is open. */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searching = searchOpen || query.length > 0;
+  const closeSearch = () => {
+    setQuery("");
+    setSearchOpen(false);
+  };
   const filteredSessions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
@@ -63,21 +70,8 @@ export function ChatHistoryPanel({
   return (
     <div className="chat-history-panel">
       <div className="chat-history-toolbar">
-        {/* The one New chat on the screen (R1): the composer had a second. A
-            quiet button beside the heading, where a list's own action goes,
-            rather than a filled bar above the list. */}
         <div className="chat-history-header">
           <h2 className="chat-history-title">Conversations</h2>
-          <button
-            type="button"
-            className="chat-history-collapse-button chat-new-chat-sidebar"
-            onClick={onNewChat}
-            disabled={busy}
-            aria-label="New chat"
-            title="New chat"
-          >
-            <Plus size={16} aria-hidden="true" />
-          </button>
           <button
             type="button"
             className="chat-history-collapse-button"
@@ -90,16 +84,61 @@ export function ChatHistoryPanel({
             <PanelLeftClose size={16} aria-hidden="true" />
           </button>
         </div>
-        <label className="chat-history-search">
-          <Search size={14} aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search chats"
-            spellCheck={false}
-          />
-        </label>
+        {/* One box at the head of the list (UAT, A2): New chat, in the accent's
+            ink, and search folded to an icon at its end. */}
+        {searching ? (
+          <div className="chat-history-actions is-searching">
+            <label className="chat-history-search-field">
+              <Search size={14} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                autoFocus
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  event.stopPropagation();
+                  closeSearch();
+                }}
+                placeholder="Search chats"
+                aria-label="Search chats"
+                spellCheck={false}
+              />
+            </label>
+            <button
+              type="button"
+              className="chat-history-actions-icon"
+              onClick={closeSearch}
+              aria-label="Close search"
+              title="Close search"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <div className="chat-history-actions">
+            <button
+              type="button"
+              className="chat-history-new chat-new-chat-sidebar"
+              onClick={onNewChat}
+              disabled={busy}
+              aria-label="New chat"
+            >
+              <Plus size={15} aria-hidden="true" />
+              New chat
+            </button>
+            <span className="chat-history-actions-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="chat-history-actions-icon"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search chats"
+              title="Search chats"
+            >
+              <Search size={15} aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="chat-session-list">
@@ -149,11 +188,7 @@ export function ChatHistoryPanel({
         )}
       </div>
 
-      {busy ? (
-        <div className="chat-sidebar-busy" aria-hidden="true">
-          <Loader2 className="chat-spinner" size={16} />
-        </div>
-      ) : null}
+
     </div>
   );
 }

@@ -88,6 +88,30 @@ export function groupChatSessions(
   ].filter((group) => group.sessions.length > 0);
 }
 
+/**
+ * What waits on the athlete in a conversation, as its row says it (R3): the
+ * most pressing kind named, and how many things wait in all. Null when
+ * nothing does.
+ */
+export function waitingLabel(session: ChatSessionSummary): string | null {
+  const waiting = session.waiting;
+  if (!waiting) return null;
+  const total = waiting.questions + waiting.decisions + waiting.briefs;
+  if (!total) return null;
+  const lead =
+    waiting.decisions > 0
+      ? `${waiting.decisions} to decide`
+      : waiting.questions > 0
+        ? waiting.questions === 1
+          ? "Question"
+          : `${waiting.questions} questions`
+        : waiting.briefs === 1
+          ? "Brief"
+          : `${waiting.briefs} briefs`;
+  const rest = total - (waiting.decisions || waiting.questions || waiting.briefs);
+  return rest > 0 ? `${lead} +${rest}` : lead;
+}
+
 export function formatSessionRelativeTime(updatedAt: string): string {
   const updated = new Date(updatedAt);
   if (Number.isNaN(updated.getTime())) {
