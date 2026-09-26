@@ -106,6 +106,7 @@ function WeekStrip({ week }: { week: PlanReaderWeek }) {
  */
 export function CoachCreationCard({
   draft,
+  version,
   document,
   uploading,
   uploaded,
@@ -114,6 +115,8 @@ export function CoachCreationCard({
   onOpen
 }: {
   draft: PlanDraftPreview;
+  /** Which version of its creation this is; shown from the second on. */
+  version?: number;
   /** The plan the draft becomes; absent while it loads, or for a workout. */
   document?: TrainingPlanDocument;
   uploading: boolean;
@@ -152,6 +155,7 @@ export function CoachCreationCard({
         <div>
           <span className="chat-creation-kicker">
             {isWorkout ? "Workout" : "Training plan"}
+            {version && version > 1 ? ` · v${version}` : ""}
           </span>
           <h4>{draft.name}</h4>
           {showSummary ? (

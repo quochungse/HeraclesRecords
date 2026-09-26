@@ -59,7 +59,8 @@ thấy cùng một diff. Plan đã lưu vẫn nối với cuộc chat đã sinh 
     `corosProgram` và `idInPlan` khi version đến từ COROS, để "Update COROS plan" ghi lại
     đúng từng buổi;
   - `plan_json`: `CorosTrainingPlanDraft` như hiện nay, để build cũ vẫn lưu và sửa được;
-  - `preview_json`: preview **gọn**, không có `source` (Q5).
+  - `preview_json`: preview **đầy đủ**, có `source` như hiện nay. Chỉ entry trong transcript
+    là bản gọn (Q5).
 - **Tác giả của version**: `coach` (Coach viết hoặc sửa), `athlete` (người dùng sửa trong màn
   hình edit), `coros` (nhập về vì plan đã đổi trên COROS, D12). Quay về một bản cũ là tạo
   version mới mang nội dung bản cũ.
@@ -142,10 +143,16 @@ Từ đó, năm quy tắc:
 - **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi. Không cứu được build cũ
   hiện có (Q1–Q3 vẫn phải giữ), nhưng làm mọi thay đổi *sau* P0.1 an toàn hơn, và là đường để
   một ngày nào đó được nới Q1.
-- **Q5. Preview của version không mang `source`**, ở cả entry lẫn `preview_json`. Với plan 45
-  buổi, một preview có `source` nặng khoảng 50k ký tự; không có thì khoảng 12k. Build cũ vẫn
-  vẽ được card (H7) và vẫn lưu đúng, vì việc lưu đọc `plan_json`. Giữ `preview_json` gọn là
-  điều kiện, vì H7 điền `source` lại từ chính nó.
+- **Q5. Entry `planDraft` trong transcript không mang `source`; `preview_json` thì vẫn mang.**
+  Với plan 45 buổi, một preview có `source` nặng khoảng 50k ký tự; không có thì khoảng 12k, và
+  transcript là cột được gửi lại mỗi lần lưu. Card của build mới đọc bước tập từ document của
+  draft (`chat:planDraftDocument`), và `getChatSession` chỉ điền lại loại card (H7 với
+  `sources: false`), không điền `source`, nếu không lần lưu sau sẽ ghi chúng vào transcript.
+  `preview_json` **phải** giữ đầy đủ: bản 2 của tài liệu này viết rằng build cũ lưu từ
+  `plan_json`, nhưng "Save to COROS" của build cũ dựng plan từ `stored.preview`
+  (`coachDraftDocument`), nên một `preview_json` gọn làm build cũ ghi mọi buổi lên COROS mà
+  không có bước tập. Build cũ vẫn điền `source` vào transcript khi mở cuộc chat (H7) — transcript
+  do máy cũ lưu sẽ nặng như hiện nay, không sai.
 
 Hệ quả nhìn thấy được trên máy chạy build cũ: mỗi version hiện thành một card riêng (đúng như
 hiện nay, khi mỗi lần sửa ra một card mới), card không có cấu trúc step chi tiết, brief và
@@ -521,7 +528,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 
 | Bảng / cột | Tier | Nội dung |
 |---|---|---|
-| `chat_plan_drafts` + cột mới (P1.1) | `personal` (giữ) | `artifact_id`, `version`, `parent_draft_id`, `author` (`coach` \| `athlete` \| `coros`), `document_json`. Mỗi version một row. `plan_json` giữ nguyên hình dạng cho build cũ; `preview_json` gọn (Q5) |
+| `chat_plan_drafts` + cột mới (P1.1) | `personal` (giữ) | `artifact_id`, `version`, `parent_draft_id`, `author` (`coach` \| `athlete` \| `coros`), `document_json`. Mỗi version một row. `plan_json` và `preview_json` giữ nguyên hình dạng (đầy đủ) cho build cũ (Q5) |
 | `chat_plan_artifacts` (mới, P1.1) | `personal` | `artifact_id` PK, `session_id`, `kind` (plan/workout), `start_monday`, `race_day`, `refinements_json`, `brief_json` (P2), `outline_json` + `outline_version` (P2), `updated_at`. Chỉ những gì không suy ra được: không có tên, trạng thái hay id COROS (đọc từ version). Hai máy sửa brief cùng lúc thì bản sau thắng, như draft Library |
 | `chat_conversation_settings` (mới, P2.0) | `personal` | `session_id` PK, `sources_json`, `runtime_json`, `updated_at`. Bảng riêng, không thêm cột vào `chat_sessions`, để không đụng merger của bảng đó |
 | Setting `chat.coach.inlineSuggestions` (P1.9) | `preference` | `auto` \| `on` \| `off` |

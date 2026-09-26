@@ -70,6 +70,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanDraftPreview,
+  PlanArtifactVersion,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -979,6 +980,8 @@ const api = {
       scheduleDate,
       keepInLibrary
     ),
+  getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
+    ipcRenderer.invoke("chat:planArtifacts", draftIds),
   removePlanDraft: (draftId: string): Promise<void> =>
     ipcRenderer.invoke("chat:removePlanDraft", draftId),
   editWorkoutDraft: (

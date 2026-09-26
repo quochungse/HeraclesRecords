@@ -3122,6 +3122,27 @@ export interface PlanDraftPreview {
   editedAt?: number;
 }
 
+/**
+ * One version of a coach's creation, as the conversation lists them
+ * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own
+ * and a `planDraft` entry in the transcript with the same `draftId`; this is
+ * what groups them.
+ */
+export interface PlanArtifactVersion {
+  draftId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  version: number;
+  /** Who made this version: the coach, the athlete in an editor, or COROS (a change made in the Library). */
+  author: "coach" | "athlete" | "coros";
+  name: string;
+  createdAt: number;
+  parentDraftId?: string;
+  uploadedAt?: number;
+  /** Changed in place by a build before versions — on another machine, say. */
+  editedAt?: number;
+}
+
 export interface PlanWorkoutEntryInput {
   key: string;
   name: string;

@@ -34,6 +34,7 @@ import {
   savePlanDraftEdit,
   saveWorkoutDraftEdit,
   discardPlanDraft,
+  planArtifacts,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -167,6 +168,7 @@ import type {
   UploadPlanResult,
   PlanDraftPreview,
   PlanWorkoutEntryInput,
+  PlanArtifactVersion,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanGenerationResult,
@@ -2388,6 +2390,10 @@ export async function uploadTrainingPlanDraft(
     scheduleDate,
     keepInLibrary === true
   );
+}
+
+export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {
+  return planArtifacts(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
 }
 
 export function removePlanDraft(draftId: string): void {

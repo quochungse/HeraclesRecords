@@ -19819,6 +19819,10 @@ tr.data-intervals-row-missing {
   font-weight: 600;
 }
 
+.chat-version-note {
+  color: var(--text-muted);
+}
+
 .chat-asked-answer::before {
   margin-right: 6px;
   color: var(--text-muted);

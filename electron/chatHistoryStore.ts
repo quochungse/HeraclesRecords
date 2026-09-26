@@ -1157,15 +1157,21 @@ export function parseChatTranscriptJson(raw: string): PersistedChatEntry[] {
  * workout source. The separate Coach draft store retained that full preview,
  * so use it to restore structured cards without replacing chat-local upload
  * state or destination choices.
+ *
+ * `sources: false` restores only what kind of creation a card is. The
+ * conversation is opened that way since cards read their steps from the
+ * draft's document (docs/coach-plan-canvas.md, P1.1): put back into the
+ * entries, the steps would be written into the transcript on its next save.
  */
 export function restoreChatPlanDraftSources(
   entries: PersistedChatEntry[],
-  loadPreviewJson: (draftId: string) => string | undefined
+  loadPreviewJson: (draftId: string) => string | undefined,
+  { sources = true }: { sources?: boolean } = {}
 ): PersistedChatEntry[] {
   return entries.map((entry) => {
     if (
       entry.kind !== "planDraft" ||
-      entry.draft.entries.every((draftEntry) => draftEntry.source)
+      (sources && entry.draft.entries.every((draftEntry) => draftEntry.source))
     ) {
       return entry;
     }
@@ -1196,11 +1202,13 @@ export function restoreChatPlanDraftSources(
       draft: {
         ...entry.draft,
         artifactType: recovered.artifactType ?? entry.draft.artifactType,
-        entries: entry.draft.entries.map((draftEntry) => ({
-          ...draftEntry,
-          source:
-            draftEntry.source ?? recoveredByKey.get(draftEntry.key)?.source
-        }))
+        entries: sources
+          ? entry.draft.entries.map((draftEntry) => ({
+              ...draftEntry,
+              source:
+                draftEntry.source ?? recoveredByKey.get(draftEntry.key)?.source
+            }))
+          : entry.draft.entries
       }
     };
   });
@@ -1310,7 +1318,8 @@ export function getChatSession(
   if (database !== defaultDatabase) return entries;
   return restoreChatPlanDraftSources(
     entries,
-    (draftId) => getChatPlanDraft(draftId)?.previewJson
+    (draftId) => getChatPlanDraft(draftId)?.previewJson,
+    { sources: false }
   );
 }
 

@@ -339,6 +339,7 @@ import {
   uploadTrainingPlanDraft,
   editWorkoutDraft,
   removePlanDraft,
+  listPlanArtifactVersions,
   editPlanDraft,
   generateTrainingPlan,
   outlineTrainingPlan,
@@ -355,7 +356,6 @@ import {
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
 import {
-  hydratePlanDraftStoreFromDatabase,
   pruneDeleteRequestStore
 } from "./chatWorkoutTools";
 import {
@@ -788,7 +788,6 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
-  hydratePlanDraftStoreFromDatabase();
   pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
@@ -1864,6 +1863,9 @@ function registerIpcHandlers(): void {
       scheduleDate,
       keepInLibrary === true
     )
+  );
+  ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>
+    listPlanArtifactVersions(draftIds)
   );
   ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
     removePlanDraft(draftId)

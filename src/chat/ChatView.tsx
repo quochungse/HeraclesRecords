@@ -78,6 +78,7 @@ import type {
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
+  PlanArtifactVersion,
   PlanDraftPreview,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
@@ -105,6 +106,12 @@ import { CoachCreationModal } from "./CoachCreationModal";
 import { CreationActions } from "./CreationActions";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { creationStatus } from "./creationChoices";
+import {
+  creationVersions,
+  isLatestVersion,
+  supersededLine,
+  withDocumentSources
+} from "./creationVersions";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
@@ -1715,9 +1722,7 @@ export function ChatView({
   /** Whether the plan editor was opened from the popup, which it then reopens. */
   const reopenCreationAfterEditRef = useRef(false);
   const planDocumentKeys = timeline.flatMap((entry) =>
-    entry.kind === "planDraft" &&
-    entry.draft.artifactType !== "workout" &&
-    !entry.draft.removedAt
+    entry.kind === "planDraft" && !entry.draft.removedAt
       ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}`]
       : []
   );
@@ -1739,6 +1744,35 @@ export function ChatView({
         .catch(() => undefined);
     }
   }, [api, missingPlanDocuments]);
+  /**
+   * Every version of the creations in this conversation. Re-read whenever a
+   * card is added, edited or saved, which is when a version can appear.
+   */
+  const [artifactVersions, setArtifactVersions] = useState<PlanArtifactVersion[]>([]);
+  const artifactKey = timeline
+    .flatMap((entry) =>
+      entry.kind === "planDraft"
+        ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}:${entry.draft.uploadedAt ?? 0}`]
+        : []
+    )
+    .join(",");
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setArtifactVersions([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanArtifacts(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((versions) => {
+        if (live) setArtifactVersions(Array.isArray(versions) ? versions : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey]);
+  const versionIndex = creationVersions(artifactVersions);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
@@ -3685,12 +3719,22 @@ export function ChatView({
   const planDrafts = timeline.flatMap((entry) =>
     entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft] : []
   );
+  /** What the Creations list shows: each creation once, as its newest version. */
+  const listedCreations = planDrafts.filter((draft) =>
+    isLatestVersion(versionIndex, draft.draftId)
+  );
   const openCreation =
     planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
-  const editingWorkout =
+  /* The transcript's preview is light; the steps a card reviews or edits come
+     from the draft's document. */
+  const documentOf = (draft: PlanDraftPreview) =>
+    planDocuments[`${draft.draftId}:${draft.editedAt ?? 0}`];
+  const withSources = (draft: PlanDraftPreview) => withDocumentSources(draft, documentOf(draft));
+  const editingWorkoutDraft =
     editingWorkoutDraftId === null
       ? null
       : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
+  const editingWorkout = editingWorkoutDraft ? withSources(editingWorkoutDraft) : null;
   const openCreationKicker =
     openCreation === null
       ? ""
@@ -4310,7 +4354,7 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          {planDrafts.length > 0 ? (
+          {listedCreations.length > 0 ? (
             <button
               type="button"
               className="chat-creations-pill"
@@ -4327,7 +4371,7 @@ function AnalysisSilentChip({
                 <PanelRightOpen size={13} aria-hidden="true" />
               )}
               Creations
-              <span className="chat-creations-count">{planDrafts.length}</span>
+              <span className="chat-creations-count">{listedCreations.length}</span>
             </button>
           ) : null}
           {isChatGptProvider ? (
@@ -4455,6 +4499,25 @@ function AnalysisSilentChip({
                 return null;
               }
               const draft = entry.draft;
+              const versionInfo = versionIndex.get(draft.draftId);
+              // An older version folds to a line: the newest one below it is
+              // the card with buttons, and two full copies of one plan read as
+              // two plans.
+              if (versionInfo && !versionInfo.latest) {
+                return (
+                  <div
+                    key={`${draft.draftId}#${index}`}
+                    className="chat-row chat-row-assistant chat-asked-row chat-version-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">
+                      {draft.artifactType === "workout" ? "Workout" : "Plan"}
+                    </span>
+                    <span className="chat-asked-question">{draft.name}</span>
+                    <span className="chat-version-note">{supersededLine(versionInfo)}</span>
+                  </div>
+                );
+              }
               const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
               // One copy at every window width, and nothing measured: the
               // copy that used to live here was chosen by a width test, and
@@ -4471,6 +4534,7 @@ function AnalysisSilentChip({
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachCreationCard
                       draft={draft}
+                      version={versionInfo?.version}
                       document={planDocuments[documentKey] ?? undefined}
                       uploading={uploadingDraftId === draft.draftId}
                       uploaded={uploadedPlans[draft.draftId]}
@@ -4483,7 +4547,7 @@ function AnalysisSilentChip({
                         )
                       }
                       onEdit={
-                        api && (draft.artifactType !== "workout" || draft.entries[0]?.source)
+                        api && (draft.artifactType !== "workout" || documentOf(draft))
                           ? () => {
                               onError(null);
                               reopenCreationAfterEditRef.current = false;
@@ -4713,7 +4777,7 @@ function AnalysisSilentChip({
             onStop={handleStop}
           />
         </div>
-        {planPanelOpen && planDrafts.length > 0 ? (
+        {planPanelOpen && listedCreations.length > 0 ? (
           <aside
             id="chat-creations-panel"
             className="chat-plan-panel"
@@ -4731,7 +4795,7 @@ function AnalysisSilentChip({
               </div>
               <div className="chat-plan-list-header-end">
                 <strong className="chat-plan-list-count">
-                  {planDrafts.length}
+                  {listedCreations.length}
                 </strong>
                 <button
                   type="button"
@@ -4745,7 +4809,7 @@ function AnalysisSilentChip({
               </div>
             </header>
             <ol className="chat-plan-list">
-              {planDrafts.map((draft, index) => {
+              {listedCreations.map((draft, index) => {
                 const status = creationStatus(draft);
                 const isWorkout = draft.artifactType === "workout";
                 const primarySport = draft.entries[0]?.sport;
@@ -4830,11 +4894,8 @@ function AnalysisSilentChip({
         {openCreation ? (
           <CoachDraftPreviewCard
             key={openCreation.draftId}
-            draft={openCreation}
-            document={
-              planDocuments[`${openCreation.draftId}:${openCreation.editedAt ?? 0}`] ??
-              undefined
-            }
+            draft={withSources(openCreation)}
+            document={documentOf(openCreation) ?? undefined}
             uploading={uploadingDraftId === openCreation.draftId}
             uploaded={uploadedPlans[openCreation.draftId]}
             onUpload={(destination, scheduleDate, keepInLibrary) =>
@@ -4847,7 +4908,7 @@ function AnalysisSilentChip({
             }
             onReview={
               api &&
-              (openCreation.artifactType !== "workout" || openCreation.entries[0]?.source)
+              (openCreation.artifactType !== "workout" || documentOf(openCreation))
                 ? () => {
                     /* The card's modal steps aside for the editor — both
                        close on Escape, and the card sits above the editor's

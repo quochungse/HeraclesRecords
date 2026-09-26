@@ -369,8 +369,7 @@ async function main() {
               scheduleDate: "2099-10-02",
               saveToLibrary: false,
               workoutType: "recovery",
-              stepsSummary: "35 min easy",
-              source: workout
+              stepsSummary: "35 min easy"
             }
           ],
           conflicts: [],
@@ -378,6 +377,16 @@ async function main() {
         }
       }
     ],
+    // The transcript's preview is light (P1.1): the steps the builder edits
+    // come from the draft's document, so this is the only place they are.
+    getPlanDraftDocument: {
+      ...DOCUMENT,
+      id: "draft:workout-1",
+      name: "Recovery run",
+      weekCount: 1,
+      weekStages: [],
+      entries: [{ id: "entry:workout-1:recovery", weekIndex: 0, dayIndex: 4, sortOrder: 0, title: "Recovery run", workout }]
+    },
     uploadTrainingPlanDraft: {
       planName: "Recovery run",
       workoutsCreated: 1,
@@ -413,6 +422,38 @@ async function main() {
   );
   await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the card says where it went");
   assert.match(await harness("text", ".chat-creation-status"), /^On calendar /);
+
+  // -------------------------------------------------------------------------
+  // An older version folds to a line under the newest, which alone has buttons
+  // and alone is listed among the creations (P1.1)
+  // -------------------------------------------------------------------------
+  const PREVIEW_V2 = { ...PREVIEW, draftId: "plan-1-v2", editedAt: 5 };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      TRANSCRIPT[0],
+      TRANSCRIPT[1],
+      { kind: "planDraft", draft: PREVIEW },
+      { kind: "message", role: "assistant", content: "Moved the long run to Sunday." },
+      { kind: "planDraft", draft: PREVIEW_V2 }
+    ],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 },
+      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "athlete", createdAt: 2 }
+    ]
+  });
+  await waitFor(() => harness("exists", ".chat-version-row"), "the older version folds");
+  assert.equal(await page(`document.querySelectorAll(".chat-creation-card").length`), 1, "one card is drawn whole");
+  assert.match(
+    (await harness("text", ".chat-version-row")) ?? "",
+    /v1 · replaced by v2 from you/,
+    "and the line says what replaced it"
+  );
+  assert.match(
+    (await harness("text", ".chat-creation-card .chat-creation-kicker")) ?? "",
+    /Training plan · v2/,
+    "the card names its version"
+  );
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

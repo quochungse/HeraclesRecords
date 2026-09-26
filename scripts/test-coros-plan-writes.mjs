@@ -1176,7 +1176,11 @@ test("a coach's one-off workout is edited in place, keeping the day it was sugge
   assert.equal(next.entries[0].name, "Shorter recovery");
   assert.equal(next.entries[0].key, preview.entries[0].key, "the coach's key, not the builder's");
   assert.equal(next.entries[0].scheduleDate, "2099-08-05", "the day the coach suggested, not one the builder carried");
-  assert.equal(next.entries[0].source.steps[0].target_duration_seconds, 1500);
+  assert.equal("source" in next.entries[0], false, "the card is light; the steps are in the draft");
+  assert.equal(
+    chatWorkoutTools.planDraftDocument(preview.draftId).entries[0].workout.steps[0].target_duration_seconds,
+    1500
+  );
   assert.equal(next.name, "Shorter recovery");
 
   assert.throws(

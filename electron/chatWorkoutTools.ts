@@ -18,9 +18,11 @@ import {
 import {
   deleteChatPlanDraft,
   getChatPlanDraft,
-  listChatPlanDrafts,
+  listChatPlanDraftVersions,
   markChatPlanDraftUploaded,
-  saveChatPlanDraft
+  saveChatPlanDraft,
+  type ChatPlanDraftAuthor,
+  type StoredChatPlanDraftRecord
 } from "./database";
 import { savePlanToCoros } from "./trainingLibraryService";
 import {
@@ -35,6 +37,7 @@ import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
   DeleteWorkoutResult,
+  PlanArtifactVersion,
   PlanDraftPreview,
   PlanWorkoutEntryInput,
   TrainingPlanDestination,
@@ -66,6 +69,47 @@ interface StoredPlanDraft {
   preview: PlanDraftPreview;
   createdAt: number;
   uploadedAt?: number;
+  /** The creation this is a version of: its first version's draft id. */
+  artifactId: string;
+  version: number;
+  parentDraftId?: string;
+  author: ChatPlanDraftAuthor;
+  /**
+   * The plan as COROS last answered it, once it has been saved there
+   * (P1.6); otherwise the document is derived from `plan` whenever it is read.
+   */
+  document?: TrainingPlanDocument;
+}
+
+/**
+ * A version of a creation for the transcript: without each session's
+ * `source`. Carried in every version's card, a plan of 45 sessions put ~50k
+ * characters in the transcript per version (docs/coach-plan-canvas.md, Q5);
+ * the renderer reads the steps from the draft's document instead. The row's
+ * `preview_json` keeps them — a build from before versions saves a plan to
+ * COROS from that preview, and would write every session without its steps.
+ */
+function lightPreview(preview: PlanDraftPreview): PlanDraftPreview {
+  return {
+    ...preview,
+    entries: preview.entries.map(({ source: _source, ...entry }) => entry)
+  };
+}
+
+/** A plan's workout as the preview's `source` spells it. */
+function workoutSource(workout: PlanWorkoutEntry): PlanWorkoutEntryInput {
+  return {
+    key: workout.key,
+    name: workout.name,
+    ...(workout.sport ? { sport: workout.sport } : {}),
+    ...(workout.sport_options ? { sport_options: workout.sport_options } : {}),
+    ...(workout.description ? { description: workout.description } : {}),
+    ...(workout.steps ? { steps: workout.steps as PlanWorkoutEntryInput["steps"] } : {}),
+    ...(workout.distance_km !== undefined ? { distance_km: workout.distance_km } : {}),
+    ...(workout.schedule_date ? { schedule_date: workout.schedule_date } : {}),
+    ...(workout.sort_no !== undefined ? { sort_no: workout.sort_no } : {}),
+    ...(workout.save_to_library !== undefined ? { save_to_library: workout.save_to_library } : {})
+  };
 }
 
 interface StoredDeleteRequest {
@@ -114,8 +158,37 @@ function persistPlanDraft(stored: StoredPlanDraft): void {
     planJson: JSON.stringify(stored.plan),
     previewJson: JSON.stringify(stored.preview),
     createdAt: stored.createdAt,
-    uploadedAt: stored.uploadedAt
+    uploadedAt: stored.uploadedAt,
+    artifactId: stored.artifactId,
+    version: stored.version,
+    ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
+    author: stored.author,
+    documentJson: JSON.stringify(draftDocument(stored))
   });
+}
+
+function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
+  const preview = JSON.parse(row.previewJson) as PlanDraftPreview;
+  let document: TrainingPlanDocument | undefined;
+  if (row.documentJson && row.author === "coros") {
+    try {
+      document = JSON.parse(row.documentJson) as TrainingPlanDocument;
+    } catch {
+      document = undefined;
+    }
+  }
+  return {
+    draftId: row.draftId,
+    plan: JSON.parse(row.planJson) as CorosTrainingPlanDraft,
+    preview: { ...preview, uploadedAt: row.uploadedAt ?? preview.uploadedAt },
+    createdAt: row.createdAt,
+    uploadedAt: row.uploadedAt,
+    artifactId: row.artifactId ?? row.draftId,
+    version: row.version ?? 1,
+    ...(row.parentDraftId ? { parentDraftId: row.parentDraftId } : {}),
+    author: row.author ?? "coach",
+    ...(document ? { document } : {})
+  };
 }
 
 function loadStoredPlanDraft(draftId: string): StoredPlanDraft | undefined {
@@ -130,41 +203,11 @@ function loadStoredPlanDraft(draftId: string): StoredPlanDraft | undefined {
   }
 
   try {
-    const plan = JSON.parse(row.planJson) as CorosTrainingPlanDraft;
-    const preview = JSON.parse(row.previewJson) as PlanDraftPreview;
-    const stored: StoredPlanDraft = {
-      draftId: row.draftId,
-      plan,
-      preview: {
-        ...preview,
-        uploadedAt: row.uploadedAt ?? preview.uploadedAt
-      },
-      createdAt: row.createdAt,
-      uploadedAt: row.uploadedAt
-    };
+    const stored = storedFromRecord(row);
     draftStore.set(draftId, stored);
     return stored;
   } catch {
     return undefined;
-  }
-}
-
-export function hydratePlanDraftStoreFromDatabase(): void {
-  for (const row of listChatPlanDrafts()) {
-    if (draftStore.has(row.draftId)) {
-      continue;
-    }
-    try {
-      draftStore.set(row.draftId, {
-        draftId: row.draftId,
-        plan: JSON.parse(row.planJson) as CorosTrainingPlanDraft,
-        preview: JSON.parse(row.previewJson) as PlanDraftPreview,
-        createdAt: row.createdAt,
-        uploadedAt: row.uploadedAt
-      });
-    } catch {
-      // Skip corrupted rows.
-    }
   }
 }
 
@@ -779,7 +822,10 @@ async function handleDraftTrainingPlan(
     draftId,
     plan: resolvedDraft,
     preview,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    artifactId: draftId,
+    version: 1,
+    author: "coach"
   };
   if (planRequest) {
     generatedDrafts.set(draftId, stored);
@@ -790,10 +836,9 @@ async function handleDraftTrainingPlan(
       message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app shows it to the athlete week by week, to save, schedule or edit."
     });
   }
-  draftStore.set(draftId, stored);
   persistPlanDraft(stored);
 
-  onPlanDraft?.(preview);
+  onPlanDraft?.(lightPreview(preview));
 
   return JSON.stringify({
     ok: true,
@@ -1189,9 +1234,26 @@ function requirePlanDraft(draftId: string): StoredPlanDraft {
   return stored;
 }
 
+/**
+ * The plan a version is, as the library reads it: the one COROS answered once
+ * it has been saved there, otherwise built from the draft's own workouts —
+ * not from the preview, which no longer carries them.
+ */
+function draftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
+  return stored.document ?? coachDraftDocument(stored);
+}
+
 /** The coach's plan as the plan editor and a COROS save read it. */
 function coachDraftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
-  return trainingPlanFromCoachDraftPreview(stored.preview, {
+  const workouts = new Map(stored.plan.workouts.map((workout) => [workout.key, workout]));
+  const full: PlanDraftPreview = {
+    ...stored.preview,
+    entries: stored.preview.entries.map((entry) => {
+      const workout = workouts.get(entry.key);
+      return entry.source || !workout ? entry : { ...entry, source: workoutSource(workout) };
+    })
+  };
+  return trainingPlanFromCoachDraftPreview(full, {
     description: stored.plan.description,
     weekStages: stored.plan.weekStages,
     layout: stored.plan.layout
@@ -1230,9 +1292,48 @@ async function savePlanDraftAsCorosPlan(
   return result;
 }
 
-/** The plan behind a Coach card, for the editor "Edit plan first" opens. */
+/**
+ * Every version of the creations these drafts belong to. Read from the table,
+ * not the in-memory store, so a version written on another machine and synced
+ * in since is listed too.
+ */
+export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[] {
+  const artifacts = new Set<string>();
+  for (const draftId of draftIds) {
+    const row = getChatPlanDraft(draftId);
+    if (row) artifacts.add(row.artifactId ?? row.draftId);
+  }
+  return [...artifacts].flatMap((artifactId) =>
+    listChatPlanDraftVersions(artifactId).flatMap((row): PlanArtifactVersion[] => {
+      try {
+        const stored = storedFromRecord(row);
+        return [
+          {
+            draftId: stored.draftId,
+            artifactId: stored.artifactId,
+            version: stored.version,
+            author: stored.author,
+            name: stored.preview.name,
+            createdAt: stored.createdAt,
+            ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
+            ...(stored.uploadedAt ? { uploadedAt: stored.uploadedAt } : {}),
+            ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {})
+          }
+        ];
+      } catch {
+        return [];
+      }
+    })
+  );
+}
+
+/** A version's plan — a workout's too, as a plan of one session. */
 export function planDraftDocument(draftId: string): TrainingPlanDocument {
-  return coachDraftDocument(requirePlanDraft(draftId));
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) {
+    throw new Error("Training plan draft not found. Ask the coach to write the plan again.");
+  }
+  return draftDocument(stored);
 }
 
 /**
@@ -1318,7 +1419,7 @@ export async function savePlanDraftEdit(
   stored.plan = next;
   stored.preview = preview;
   persistPlanDraft(stored);
-  return preview;
+  return lightPreview(preview);
 }
 
 /**
@@ -1373,7 +1474,7 @@ export function saveWorkoutDraftEdit(
   stored.plan = next;
   stored.preview = preview;
   persistPlanDraft(stored);
-  return preview;
+  return lightPreview(preview);
 }
 
 /**
