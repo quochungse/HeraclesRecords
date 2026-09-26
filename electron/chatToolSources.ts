@@ -48,6 +48,9 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["upload_training_plan", null],
     ["revise_training_plan", null],
     ["get_plan_draft", "db"],
+    // The Library's cache and the stored matches; the plan itself is read from COROS.
+    ["list_training_plans", "db"],
+    ["get_training_plan", "coros"],
     // Writes a brief; reads nothing.
     ["request_plan_brief", null],
     ["request_coach_input", null]

@@ -766,7 +766,7 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
     `plan/update` trên bản chạy coi như cũng nguyên tử (một body cả plan), nên P3.3 ghi từng dòng,
     mỗi lần đọc lại `detail`.
 
-**P3.1 Coach đọc plan COROS** · M
+**P3.1 Coach đọc plan COROS** · M · *xong*
 - Tool `list_training_plans`: mỗi plan một dòng (tên, số tuần, môn, trạng thái lịch, nếu đang
   chạy thì tuần hiện tại và tỉ lệ hoàn thành), đọc từ `coros_plan_cache` và compliance đã lưu —
   không request nào. Tool `get_training_plan { plan_id, weeks? }`: tuần theo stage, mỗi buổi một
@@ -778,6 +778,15 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
 - Plan Coach đã tạo và đã lưu thì dòng của nó ghi `draft_id` để Coach sửa qua
   `revise_training_plan` thay vì qua change set.
 - Test: `test:chat-plan-tools` mới (fake COROS như `test:coros-plan-writes`), guards, sources.
+- **Đã làm** (`electron/chatPlanTools.ts`, đi cùng họ tool workout nên mọi provider và
+  `getClaudeCodeTools` — quyền `upcomingWorkouts` — đều nhận). Plan đang chạy gộp vào plan mẫu
+  (`calendar_plan_id` là id bản chạy, cặp mà P3.3 dùng để trỏ buổi); bản chạy đã gỡ không liệt kê;
+  plan lưu trữ chỉ khi `include_archived`. Cache trống (Library chưa mở trên máy này) hoặc `refresh`
+  thì đọc lại như Library (`getTrainingLibrarySnapshot`). `get_training_plan` đọc `detail` của bản
+  chạy, offline thì đọc cache và nói thế; plan dài hơn 8 tuần mặc định chỉ đưa 4 tuần quanh hiện tại.
+  `draft_id` chỉ có khi creation nằm trong chính cuộc chat này — sửa từ cuộc chat khác sẽ đặt card
+  version mới vào chỗ athlete không đọc. Phần đếm compliance chuyển sang `electron/planCompliance.ts`
+  để Library và Coach dùng một phép đếm.
 
 **P3.2 Card xoá workout lưu bền** · S — bước đầu của change set
 - Bảng `chat_schedule_changes` (§7) ra đời ở đây; một đề xuất xoá là một change set một dòng.

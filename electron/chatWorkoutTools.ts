@@ -41,6 +41,7 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
+import { CHAT_PLAN_TOOL_NAMES, getChatPlanTools, handleChatPlanTool, isChatPlanTool } from "./chatPlanTools";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
   PLAN_DAYS,
@@ -295,7 +296,8 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "get_plan_draft",
   "request_plan_brief",
   "list_scheduled_workouts",
-  "delete_workout"
+  "delete_workout",
+  ...CHAT_PLAN_TOOL_NAMES
 ] as const;
 
 export type ChatWorkoutToolName = (typeof CHAT_WORKOUT_TOOL_NAMES)[number];
@@ -475,7 +477,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       }
 
     },
-    PLAN_BRIEF_TOOL_DEFINITION
+    PLAN_BRIEF_TOOL_DEFINITION,
+    ...getChatPlanTools()
   ];
 }
 
@@ -501,8 +504,17 @@ export async function handleChatWorkoutTool(
      */
     planRequest?: TrainingPlanGenerationRequest;
     planArtifactId?: string;
+    /** False when the conversation has not shared the athlete's activities (P3.1). */
+    progress?: boolean;
   }
 ): Promise<string> {
+  if (isChatPlanTool(name)) {
+    return handleChatPlanTool(name, args, {
+      progress: options?.progress,
+      sessionId: options?.sessionId,
+      unitSystem: options?.unitSystem
+    });
+  }
   if (name === "draft_training_plan") {
     return handleDraftTrainingPlan(
       args,

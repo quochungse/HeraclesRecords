@@ -791,6 +791,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   `sections` list, trends and sleep take `days` and roll up by week past 14, and
   `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
   own totals and deltas so the model reads them rather than doing the arithmetic.
+  **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
+  from the Library's cache and the stored matches (no request unless the cache is empty), and
+  `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its
+  id is `calendar_plan_id`, the `planId` every calendar session of it carries. Progress comes
+  from activities, so a conversation withholding them gets the plan without it (the tools are not
+  in `toolReadsWithheldSource`; `executeChatTool` passes `progress`). The count is
+  `electron/planCompliance.ts`, which the Library's row reads too.
   `get_training_zones` answers with the account's own HR, pace and power tables, so a
   prescribed target is read off the athlete's thresholds rather than inferred from recent
   activities; the snapshot carries the thresholds themselves, the body metrics and the

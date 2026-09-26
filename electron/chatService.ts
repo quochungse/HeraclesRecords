@@ -2729,6 +2729,8 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "draft_workout",
   "draft_training_plan",
   "get_plan_draft",
+  "list_training_plans",
+  "get_training_plan",
   "request_coach_input"
 ]);
 
@@ -2799,7 +2801,9 @@ export function getClaudeCodeTools(
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
       tool.name === "list_scheduled_workouts" ||
-      tool.name === "delete_workout"
+      tool.name === "delete_workout" ||
+      tool.name === "list_training_plans" ||
+      tool.name === "get_training_plan"
     ) {
       return permissions.upcomingWorkouts;
     }
@@ -2899,6 +2903,7 @@ async function executeChatTool(
         });
       },
       allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
+      progress: run?.context?.activities !== false,
       unitSystem
     });
   }
@@ -3202,6 +3207,14 @@ export function withLiveToolInstructions(
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
+      ...(planTools.some((tool) => tool.name === "list_training_plans")
+        ? [
+            "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +
+              "list_training_plans and get_training_plan. A plan on the calendar is read as the calendar holds it: " +
+              "dates, and each session done, missed or ahead. A plan you made in this conversation is listed with " +
+              "its draft_id: change it with revise_training_plan, not by redrafting it."
+          ]
+        : []),
       ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
         ? [
             "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +
