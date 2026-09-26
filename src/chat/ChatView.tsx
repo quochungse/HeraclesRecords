@@ -89,6 +89,7 @@ import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { creationCalendar, localDayKey } from "./creationCalendar";
+import { refinementChips } from "./creationChoices";
 import {
   creationVersions,
   isLatestVersion,
@@ -2432,7 +2433,9 @@ export function ChatView({
 
   const sendMessage = async (
     trimmed: string,
-    answeredPrompt?: { promptId: string; choiceId: string }
+    answeredPrompt?: { promptId: string; choiceId: string },
+    /** What the question is about, when a chip says so rather than the composer. */
+    aboutRefs?: PlanRef[]
   ): Promise<boolean> => {
     if (!api || !trimmed || streaming || exportingLatestActivity) return false;
     if (isLatestActivityFileRequest(trimmed)) {
@@ -2496,7 +2499,7 @@ export function ChatView({
           }
         : entry
     );
-    const refs = originalPrompt ? [] : pendingRefs;
+    const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
@@ -2504,7 +2507,7 @@ export function ChatView({
           ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
           { kind: "message", role: "user", content: trimmed }
         ];
-    if (refs.length) setPendingRefs([]);
+    if (refs.length && !aboutRefs) setPendingRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -3849,6 +3852,26 @@ function AnalysisSilentChip({
                         )
                       }
                       onCoros={isOnCoros(versionInfo)}
+                      refinements={refinementChips(
+                        draft,
+                        versionInfo?.siblings.find((item) => item.draftId === draft.draftId)?.refinements
+                      )}
+                      onRefine={
+                        api && !streaming
+                          ? (text) =>
+                              void sendMessage(text, undefined, [
+                                {
+                                  artifactId: versionInfo?.artifactId ?? draft.draftId,
+                                  draftId: draft.draftId,
+                                  ...(versionInfo ? { version: versionInfo.version } : {}),
+                                  name: draft.name,
+                                  artifactType: draft.artifactType === "workout" ? "workout" : "plan",
+                                  scope: "plan",
+                                  label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
+                                }
+                              ])
+                          : undefined
+                      }
                       calendar={calendarOf(draft.draftId)}
                       onCalendar={api ? () => setCalendarFor(draft.draftId) : undefined}
                       onEdit={

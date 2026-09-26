@@ -3037,6 +3037,8 @@ function withLiveToolInstructions(
         "plan is offered first as one COROS plan (give it a description and, for a periodised " +
         "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
         "or schedules it from there — nothing you call writes to COROS. " +
+        "With a draft or a revision you may pass suggested_refinements: two to four follow-ups the athlete " +
+        "is likely to want next, each a few words, which appear as buttons under the card. " +
         "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
         "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
         "its next version instead of a second card. " +

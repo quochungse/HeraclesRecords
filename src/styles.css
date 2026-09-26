@@ -19982,6 +19982,38 @@ tr.data-intervals-row-missing {
   justify-self: start;
 }
 
+/* Follow-ups under a creation (P1.8): questions, drawn quieter than the
+   buttons that save it. */
+.chat-refine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-refine-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.chat-refine-chip:hover:not(:disabled) {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.chat-refine-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* Undo on the line an edit left: small, and after what it undoes. */
 .chat-plan-event-undo {
   padding: 2px 8px;

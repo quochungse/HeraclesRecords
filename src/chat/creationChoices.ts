@@ -236,3 +236,21 @@ export function artifactActions(
   }
   return { kind: "save", choices };
 }
+
+/**
+ * The follow-ups under a creation (P1.8): what Coach offered with this
+ * version, or a set that fits its kind when it offered none. A press sends
+ * the chip's own words as a question about the creation — not an edit, which
+ * is the editor's (D10).
+ */
+export function refinementChips(draft: PlanDraftPreview, offered?: readonly string[]): string[] {
+  if (offered && offered.length) return [...offered];
+  if (draft.artifactType === "workout") return ["Shorter", "Easier", "Harder"];
+  const sports = new Set(draft.entries.map((entry) => entry.sport ?? "run"));
+  return [
+    "Lighter",
+    "Fewer days",
+    ...(sports.has("run") ? ["Long run on Sunday"] : []),
+    ...(sports.has("strength") ? [] : ["More strength"])
+  ];
+}

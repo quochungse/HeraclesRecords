@@ -96,6 +96,8 @@ interface StoredPlanDraft {
   author: ChatPlanDraftAuthor;
   /** What this version changed, in the words of whoever made it. */
   changeSummary?: string;
+  /** Follow-ups Coach offered with this version, as chips (P1.8). */
+  refinements?: string[];
   /**
    * The plan with its COROS identity — the plan id and version, and each
    * session's `idInPlan` and untouched program — once the creation is on
@@ -105,6 +107,32 @@ interface StoredPlanDraft {
   document?: TrainingPlanDocument;
   /** `plan` as it was when `document` was written; see `draftDocument`. */
   documentPlanHash?: string;
+}
+
+/**
+ * Coach's follow-ups for a version (P1.8): two to four, each short enough to
+ * be a chip, none repeated. Anything else is left out rather than trimmed into
+ * something Coach did not say.
+ */
+export function refinementsFrom(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>();
+  const chips = value.flatMap((item) => {
+    const text = typeof item === "string" ? item.trim().replace(/\s+/g, " ") : "";
+    if (!text || text.length > 40 || seen.has(text.toLowerCase())) return [];
+    seen.add(text.toLowerCase());
+    return [text];
+  });
+  return chips.length >= 2 ? chips.slice(0, 4) : undefined;
+}
+
+function refinementsOf(json: string | undefined): string[] | undefined {
+  if (!json) return undefined;
+  try {
+    return refinementsFrom(JSON.parse(json));
+  } catch {
+    return undefined;
+  }
 }
 
 /** A fingerprint of a stored plan, to tell whether `document` still describes it. */
@@ -195,6 +223,7 @@ function persistPlanDraft(stored: StoredPlanDraft): void {
     ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
     author: stored.author,
     ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
+    ...(stored.refinements?.length ? { refinementsJson: JSON.stringify(stored.refinements) } : {}),
     documentJson: JSON.stringify({
       planHash: stored.document ? stored.documentPlanHash ?? planHash(stored.plan) : planHash(stored.plan),
       document: draftDocument(stored)
@@ -234,6 +263,7 @@ function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
     ...(row.parentDraftId ? { parentDraftId: row.parentDraftId } : {}),
     author: row.author ?? "coach",
     ...(row.changeSummary ? { changeSummary: row.changeSummary } : {}),
+    ...(refinementsOf(row.refinementsJson) ? { refinements: refinementsOf(row.refinementsJson) } : {}),
     ...(document ? { document } : {}),
     ...(documentPlanHash ? { documentPlanHash } : {})
   };
@@ -347,7 +377,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
         "For Strength and Hybrid Fitness, call search_coros_exercises first and pass its exact exercise IDs and names. " +
         "Returns a workout card where the athlete can choose Workout Library or Calendar and confirm.",
-      inputSchema: buildDraftWorkoutInputSchema()
+      inputSchema: withRefinements(buildDraftWorkoutInputSchema())
     },
     {
       name: "draft_training_plan",
@@ -369,7 +399,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "draft_id must be the newest version's; if it is not, the newest is returned to revise instead. " +
         "Sessions are named by their key. A single workout takes only replace_session (with the whole new workout) and rename. " +
         "The revised plan is checked like a new draft; a refusal lists every problem, and nothing is changed.",
-      inputSchema: buildRevisePlanInputSchema()
+      inputSchema: buildRevisePlanToolSchema()
     },
     {
       name: "get_plan_draft",
@@ -734,7 +764,8 @@ function handleDraftWorkout(
         ...workout,
         schedule_date: calendarDate,
         save_to_library: true
-      }]
+      }],
+      ...(args.suggested_refinements ? { suggested_refinements: args.suggested_refinements } : {})
     },
     onPlanDraft,
     allowUpcomingWorkouts,
@@ -947,8 +978,9 @@ async function handleDraftTrainingPlan(
   });
   if (!prepared.ok) return prepared.response;
 
+  const refinements = refinementsFrom(args.suggested_refinements);
   if (target?.ok) {
-    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft);
+    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft, refinements);
   }
 
   const draftId = crypto.randomUUID();
@@ -966,7 +998,8 @@ async function handleDraftTrainingPlan(
     createdAt: Date.now(),
     artifactId: draftId,
     version: 1,
-    author: "coach"
+    author: "coach",
+    ...(refinements ? { refinements } : {})
   };
   if (planRequest) {
     generatedDrafts.set(draftId, stored);
@@ -1108,7 +1141,8 @@ function storeRevision(
   prepared: Extract<PreparedDraft, { ok: true }>,
   unitSystem: UnitSystem,
   changeSummary: string,
-  onPlanDraft?: (preview: PlanDraftPreview) => void
+  onPlanDraft?: (preview: PlanDraftPreview) => void,
+  refinements?: string[]
 ): string {
   const artifactType = latest.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();
@@ -1129,7 +1163,8 @@ function storeRevision(
     version: latest.version + 1,
     parentDraftId: latest.draftId,
     author: "coach",
-    changeSummary
+    changeSummary,
+    ...(refinements ? { refinements } : {})
   };
   withCorosIdentityOf(stored, latest);
   persistPlanDraft(stored);
@@ -1245,7 +1280,14 @@ async function handleRevisePlan(
     retryTool: "revise_training_plan"
   });
   if (!prepared.ok) return prepared.response;
-  const answer = storeRevision(target.latest, prepared, unitSystem, summary.slice(0, 200), onPlanDraft);
+  const answer = storeRevision(
+    target.latest,
+    prepared,
+    unitSystem,
+    summary.slice(0, 200),
+    onPlanDraft,
+    refinementsFrom(args.suggested_refinements)
+  );
   if (!synced) return answer;
   // Said to the model, which named the version before COROS's: its changes
   // went onto what the athlete has on COROS now.
@@ -1371,12 +1413,30 @@ export async function syncPlanDraftFromCoros(
 }
 
 /** `draft_training_plan`'s schema, with the one field a rewrite adds. */
+/** The optional follow-ups field (P1.8), the same on every tool that makes a version. */
+const SUGGESTED_REFINEMENTS = {
+  type: "array",
+  minItems: 2,
+  maxItems: 4,
+  items: { type: "string", maxLength: 40 },
+  description:
+    "Optional: 2–4 short follow-ups the athlete might want next, each under 40 characters and in the athlete's words (e.g. \"Lighter week 3\", \"Long run on Sunday\"). Shown as buttons under the card."
+};
+
+function withRefinements(schema: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...schema,
+    properties: { ...((schema.properties ?? {}) as Record<string, unknown>), suggested_refinements: SUGGESTED_REFINEMENTS }
+  };
+}
+
 function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
   const properties = (schema.properties ?? {}) as Record<string, unknown>;
   return {
     ...schema,
     properties: {
       ...properties,
+      suggested_refinements: SUGGESTED_REFINEMENTS,
       revises: {
         type: "string",
         description:
@@ -1423,6 +1483,10 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
     },
     required: ["draft_id", "summary", "ops"]
   };
+}
+
+export function buildRevisePlanToolSchema(): Record<string, unknown> {
+  return withRefinements(buildRevisePlanInputSchema());
 }
 
 async function handleListScheduledWorkouts(
@@ -1997,7 +2061,8 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
             ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
             ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {}),
-            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {})
+            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {}),
+            ...(stored.refinements?.length ? { refinements: stored.refinements } : {})
           }
         ];
       } catch {

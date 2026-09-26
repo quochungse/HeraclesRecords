@@ -125,6 +125,8 @@ export function CoachCreationCard({
   onCoros = false,
   calendar,
   onCalendar,
+  refinements,
+  onRefine,
   onOpen
 }: {
   draft: PlanDraftPreview;
@@ -149,6 +151,10 @@ export function CoachCreationCard({
   calendar?: CreationCalendar;
   /** Opens the calendar dialog for this version. */
   onCalendar?: () => void;
+  /** The follow-ups offered under the card (P1.8). */
+  refinements?: readonly string[];
+  /** Sends a follow-up as a question about this creation; absent while Coach is answering. */
+  onRefine?: (text: string) => void;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -260,6 +266,21 @@ export function CoachCreationCard({
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
       />
+      {refinements?.length && !editing ? (
+        <div className="chat-refine" aria-label="Ask Coach to change it">
+          {refinements.map((text) => (
+            <button
+              key={text}
+              type="button"
+              className="chat-refine-chip"
+              disabled={!onRefine}
+              onClick={() => onRefine?.(text)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
     </article>
   );

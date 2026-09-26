@@ -467,6 +467,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 - Test: `test:chat-context-compaction` (mở `planRefs`), `test:chat-canvas-renderer`.
 
 **P1.8 Chip tinh chỉnh (D6)** · S
+- (Đã làm: cột `refinements_json` trên row của version, không phải field trên entry (Q1);
+  `refinementsFrom` bỏ chip trùng, quá 40 ký tự hoặc không phải chữ, và dưới hai chip thì coi như
+  không có, để bộ mặc định thay. Bộ mặc định theo môn: "Long run on Sunday" chỉ khi plan có chạy,
+  "More strength" chỉ khi chưa có sức mạnh. Bấm chip gửi đúng chữ của chip kèm `planRefs` tới cả
+  creation, qua tham số `aboutRefs` của `sendMessage`, không động tới chip đang chờ trong composer.)
 - `suggested_refinements` (2–4 chuỗi, mỗi chuỗi ≤ 40 ký tự) trên `draft_training_plan`,
   `draft_workout` và `revise_training_plan`, lưu trên artifact. Thiếu thì dùng bộ mặc định theo
   loại (plan: Lighter, Fewer days, Long run on Sunday, More strength; workout: Shorter, Easier,

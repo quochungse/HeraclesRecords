@@ -823,6 +823,26 @@ async function main() {
   await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "and the plan waits to be asked about");
 
   // -------------------------------------------------------------------------
+  // A follow-up under the card is a question about it (P1.8)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, refinements: ["Lighter week 3", "Add hills"] }
+    ]
+  });
+  await waitFor(
+    async () => (await harness("count", ".chat-creation-card .chat-refine-chip")) === 2,
+    "Coach's own follow-ups, under its card"
+  );
+  await harness("click", ".chat-creation-card .chat-refine-chip:first-child");
+  const refined = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
+  assert.match(refined.args[1].at(-1).content, /asking about the plan "Hanoi Half base" v1 \(draft_id plan-1\) — the whole of it\.[\s\S]*Lighter week 3$/);
+  const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(afterRefine.slice(-2).map((entry) => entry.kind), ["planRefs", "message"]);
+  assert.equal(afterRefine.at(-1).content, "Lighter week 3", "in the chip's own words");
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

@@ -509,6 +509,33 @@ test("a Coach plan's conversation is found from any of its versions (P1.7)", () 
   assert.equal(tools.chatSessionForDraft("nowhere"), undefined);
 });
 
+test("Coach's follow-ups are kept with the version they came with (P1.8)", async () => {
+  const offered = await draft("draft_training_plan", {
+    name: "Chips block",
+    suggested_refinements: ["Lighter week 3", "lighter week 3", "  Long run   on Sunday ", "x".repeat(41), 7],
+    workouts: [run("One run", 1800, { week: 1, day: "mon" })]
+  });
+  const [first] = tools.planArtifacts([offered.draftId]);
+  assert.deepEqual(first.refinements, ["Lighter week 3", "Long run on Sunday"], "repeats, overlong and non-text ones left out");
+  assert.equal("refinements" in offered, false, "not on the card: the transcript stays as it was");
+
+  const { response } = await revise({
+    draft_id: offered.draftId,
+    summary: "Rename",
+    ops: [{ op: "rename", name: "Chips block, two" }],
+    suggested_refinements: ["Only one"]
+  });
+  assert.equal(response.ok, true, JSON.stringify(response));
+  const [, second] = tools.planArtifacts([offered.draftId]);
+  assert.equal(second.refinements, undefined, "fewer than two is none — the defaults stand in");
+
+  const single = await draft("draft_workout", {
+    workout: run("Strides", 1200),
+    suggested_refinements: ["Shorter strides", "Add a warm-up"]
+  });
+  assert.deepEqual(tools.planArtifacts([single.draftId])[0].refinements, ["Shorter strides", "Add a warm-up"]);
+});
+
 test("removing a creation lets every version go", () => {
   const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
   assert.equal(ids.length, 4);

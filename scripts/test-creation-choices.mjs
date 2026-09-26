@@ -255,4 +255,17 @@ const ids = (choices) => ({
   assert.deepEqual(artifactActions(asSessions, { latest: true }, today), { kind: "saved", addToCalendar: false }, "sessions already on the calendar are not a plan");
 }
 
+// refinementChips (P1.8): Coach's own, or a set that fits the creation.
+{
+  const { refinementChips } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
+  );
+  const run = { ...entry("a"), sport: "run" };
+  const lift = { ...entry("b"), sport: "strength" };
+  assert.deepEqual(refinementChips(plan(run), ["Lighter week 3", "Add hills"]), ["Lighter week 3", "Add hills"]);
+  assert.deepEqual(refinementChips(plan(run)), ["Lighter", "Fewer days", "Long run on Sunday", "More strength"]);
+  assert.deepEqual(refinementChips(plan(lift)), ["Lighter", "Fewer days"], "no long run to move, and strength already");
+  assert.deepEqual(refinementChips({ ...plan(run), artifactType: "workout" }), ["Shorter", "Easier", "Harder"]);
+}
+
 console.log("test-creation-choices: ok");

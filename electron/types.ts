@@ -3252,6 +3252,8 @@ export interface PlanArtifactVersion {
   remotePlanId?: string;
   /** The version that followed the plan's deletion on COROS; it has no plan there. */
   detached?: boolean;
+  /** Follow-ups Coach offered with this version, as chips (P1.8). */
+  refinements?: string[];
 }
 
 export interface PlanWorkoutEntryInput {

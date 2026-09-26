@@ -521,7 +521,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   question for the model. The Library reader's ⋯ offers **Ask Coach about this plan** for a plan
   Coach wrote, opening the conversation it came from (`chat:findDraftSession`, by any version's
   draft id) — or, when that conversation is gone, a new one with no chip, since the drafts went
-  with it.
+  with it. **Under a creation, follow-ups** (P1.8): the chips Coach offered with that version
+  (`suggested_refinements`, kept in the row's `refinements_json`) or a set that fits its kind
+  (`refinementChips`); a press sends the chip's words as a question about the creation.
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with
