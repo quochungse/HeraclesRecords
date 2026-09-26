@@ -930,20 +930,49 @@ Còn lại, đã biết:
   plan đang chạy được đọc qua bản chạy. Hai id trùng nhau khi plan vừa lên lịch (đã thấy ở P3.0), nhưng
   có thể lệch sau khi buổi được thêm vào bản chạy từ plan đã sửa.
 
-**Test tay không cần AI** (`scripts/seed-coach-p3-sample.mjs`). Đóng app rồi chạy
-`npm run sample:coach-p3` (thêm `-- --live` để có dữ liệu COROS tạm; gỡ bằng `-- --cleanup`). Script
-ghi thẳng vào database của app ba cuộc chat, card dựng bằng chính các tool thật, dưới provider Coach
-đang chọn:
+**Test tay không cần AI** (`scripts/seed-coach-sample.mjs`, P0–P3). Đóng app rồi chạy
+`npm run sample:coach` (`-- --only p0,p2` để chỉ lấy vài phase; `npm run sample:coach-p3` là
+`--only p3`; `-- --live` để có dữ liệu COROS tạm; gỡ bằng `-- --cleanup`). Script ghi thẳng vào
+database của app các cuộc chat dưới provider Coach đang chọn; card dựng bằng chính các tool thật
+(`draft_training_plan`, `revise_training_plan`, `request_plan_brief`, `propose_schedule_changes`…) và
+bản sửa bằng chính hàm editor gọi, nên thứ được kiểm trong một lượt cũng được kiểm ở đây. Mọi tên bắt
+đầu bằng "Sample". `--cleanup` xoá cuộc chat cùng mọi row phía sau (draft, version, brief, outline,
+change set, cài đặt cuộc chat) và — khi đã đăng nhập — quét COROS theo tên ("Sample ·", "Sample own ·",
+"Sample plan"): plan (gỡ khỏi lịch trước), buổi trên lịch từ 60 ngày trước tới 300 ngày tới, workout
+thư viện. Quét theo tên nên không cần manifest: card bấm Save sau khi đã dọn vẫn được gỡ ở lần sau.
+Plan mà Coach thật viết từ brief mẫu do Coach đặt tên, nên không được nhận ra — tự xoá.
+- **P0 sample · cards, answers, saving** — plan one-shot có ngày (Put sessions on calendar / Save to
+  COROS as a plan), programme 6 tuần không ngày (Save to COROS / Add to calendar…, đọc theo tuần/ngày),
+  plan có buổi đã qua (không còn one-shot, không có Put sessions on calendar), workout có ngày tới
+  (Schedule for <ngày>, "Also keep in library", Edit), workout không ngày và workout ngày đã qua (Save
+  to Workout Library dẫn), hai câu hỏi đã trả lời (chọn và gõ tay → một dòng "Asked"), một card đã
+  Remove (không hiện, row đã xoá), một card đánh dấu đã lưu ("In library", ⋯ có Hide), một entry kind
+  lạ và một field lạ (không hiện, giữ qua mọi lần lưu).
+- **P1 sample · versions, edits, references** — plan bốn version (Coach, Coach revise, bạn sửa, Restore
+  v1 — dòng Restored có **Undo**, dòng Edited cũ thì không), workout sửa bằng editor thành v2, chip
+  "About" cho một tuần và một buổi của creation, card workout Coach tự gắn (P1.9), chip tinh chỉnh.
+  Script in `creationIndex` — đúng dòng Coach nhận mỗi lượt.
+- **P1 sample · stored oddities** — card từ trước khi có version (row không `artifact_id`), hai máy cùng
+  viết v2 (không mất bản nào; bản sau là mới nhất, bản của máy này "replaced by a later v2"), một version
+  build cũ sửa tại chỗ (`editedAt` mới hơn row: "Edited by you", Open thấy bản sửa).
+- **P1 sample · saved to COROS** (`--live`) — plan lưu lên COROS rồi revise: v2 mang danh tính COROS,
+  nút chính **Update COROS plan**; sửa plan trong app COROS rồi mở canvas để thấy bản `coros` về.
+- **P2 sample · brief (incomplete)** — brief thiếu ngày đua (still open), trường đánh dấu from chat/from
+  data; cuộc chat không chia sẻ sleep (⚙, "Reads: Activities · Zones").
+- **P2 sample · brief ready** — brief đủ: Draw the outline trên card.
+- **P2 sample · outline drawn** — outline vẽ rồi vẽ lại (bản đầu thu thành dòng): Adjust outline, Redraw
+  with a note, Write the sessions.
+- **P2 sample · plan written** — brief → outline → plan là một creation; brief và outline không sửa
+  được nữa. Outline và plan là của `trainingPlanSimulation.ts`. Chạy app bằng
+  `npm run dev:simulate-plan-ai` thì Draw the outline / Write the sessions cũng không tốn token.
 - **P3 sample · card states** — một set có mọi trạng thái dòng: đã áp, *out of date* kèm lý do, *failed*
   có **Try again**, *failed* không thử lại được (thay buổi đã thêm mà chưa xoá), *dismissed*, hai dòng
   còn mở (bấm thì đọc lịch, không thấy buổi, thành *out of date* — không ghi gì); một set do "bản mới
   hơn" ghi (op và status lạ: không nút, đếm riêng ở đầu card); card xoá kiểu cũ (chỉ hiện, không làm gì).
 - **P3 sample · analysis and asks** — lượt analysis (chip playbook + câu trả lời có attribution) kèm đề
   xuất của nó; chip "About" của tuần, của một hoạt động và của buổi trong plan Library.
-- **P3 sample · creations** — creation cho canvas, không lưu gì lên COROS: plan "Sample · Base to 10k"
-  ba version (v1 Coach, v2 Coach sửa qua `revise_training_plan`, v3 bạn sửa như plan editor lưu, kèm
-  dòng `planEvent`) và workout lẻ "Sample · Tempo 35". Nút Creations hiện 2; mở canvas để xem index,
-  tab Versions, Restore; card v3 ghi "Edited by you".
+- **P3 sample · creations** — plan "Sample · Three weeks to 10k" ba version và workout lẻ, cho canvas
+  (index, tab Versions, Restore).
 - **P3 sample · live changes** (`--live`) — trong một cửa sổ 3 tuần trống cách ít nhất 4 tuần: một plan
   lên lịch (T2 Easy 5k, T4 Tempo, T7 Long run, T3 tuần sau Easy 6k), bốn buổi riêng, một workout thư
   viện, tất cả tên "Sample …". Đề xuất 6 dòng: dời Long run (buổi plan) sang CN, thay Tempo (buổi plan),
@@ -953,7 +982,9 @@ Kiểm tra sau khi áp: Library → plan mẫu → Long run nằm CN và Tempo t
 plan** (compliance, badge lịch); màn Calendar thấy các buổi riêng đã dời/thay/thêm/bỏ; kéo một buổi của
 plan mẫu sang ngày khác rồi mở plan — vẫn thuộc plan; dời một buổi trước khi áp dòng của nó → dòng
 thành *out of date*. Đã chạy thử cả ba chế độ với một COROS giả trong container: mọi dòng live áp đúng
-(buổi plan giữ `idInPlan`, đổi `dayNo`/chương trình trong bản chạy), cleanup gỡ sạch.
+(buổi plan giữ `idInPlan`, đổi `dayNo`/chương trình trong bản chạy), plan P1 lưu lên rồi v2 mang
+`remoteId`, bấm Put sessions on calendar trên card P0 ghi bốn buổi, và cleanup gỡ sạch cả những thứ đó;
+mọi cuộc chat mẫu render trong harness không lỗi console.
 
 **Việc tồn đọng nên làm trước hoặc cùng P3** (từ các lần review): câu hỏi "Redraw the outline?"
 khi đổi nguồn của cuộc chat; analysis không thấy brief (gộp vào P3.4); phần đã ghi của một lần lưu
