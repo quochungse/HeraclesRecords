@@ -61,6 +61,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // A Coach creation's brief and outline (P2): what the athlete asked for,
   // which has no version of its own until the sessions are written.
   chat_plan_artifacts: "personal",
+  // Coach's proposals to the calendar (P3.2): personal, so one can be applied
+  // from the other machine; each line reads COROS again before it writes.
+  chat_schedule_changes: "personal",
   // One analysis, in one conversation, carrying its own trigger. Its
   // predecessors (coach_automations, coach_automation_bindings,
   // coach_automation_local_triggers, coach_automation_runs) are dropped by

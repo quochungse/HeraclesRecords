@@ -6,6 +6,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
   deleteChatConversationSettingsRow,
+  deleteChatScheduleChangesOf,
   deleteSettings,
   getChatConversationSettingsRow,
   getSetting,
@@ -28,12 +29,12 @@ import {
   getMcpServerCachedTools
 } from "./mcpClientManager";
 import { prefixToolName, splitToolName } from "./mcpToolNames";
+import { applyScheduleChange, dismissScheduleChange, readScheduleChanges } from "./chatScheduleChanges";
 import {
   getChatWorkoutTools,
   handleChatWorkoutTool,
   isChatWorkoutTool,
   uploadPlanDraftById,
-  confirmWorkoutDeleteById,
   deletePlanDraftsOf,
   planDraftDocument,
   savePlanDraftEdit,
@@ -196,9 +197,8 @@ import type {
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanOutlineRevision,
-  DeleteWorkoutResult,
-  UnitSystem,
-  WorkoutDeletePreview
+  ScheduleChangeSet,
+  UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import { pipelineWire } from "./chatContextCompaction";
@@ -628,6 +628,7 @@ export function deleteChatSessionById(id: string): void {
   deletePlanDraftsOf(draftIds);
   deletePlanBriefs(briefIds);
   deleteChatConversationSettingsRow(id);
+  deleteChatScheduleChangesOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1318,15 +1319,14 @@ export function createCollectorSink(
       return;
     }
 
-    if (kind === "workoutDelete") {
-      const preview = payload.preview as WorkoutDeletePreview | undefined;
-      if (!preview?.requestId) return;
+    if (kind === "scheduleChange") {
+      // An anchor (Q3); the change set is already its row (P3.2).
+      const changeSetId = (payload.changeSet as ScheduleChangeSet | undefined)?.changeSetId;
+      if (!changeSetId) return;
       upsertEntry(
         entries,
-        { kind: "workoutDelete", preview },
-        (candidate) =>
-          candidate.kind === "workoutDelete" &&
-          candidate.preview.requestId === preview.requestId
+        { kind: "scheduleChange", changeSetId },
+        (candidate) => candidate.kind === "scheduleChange" && candidate.changeSetId === changeSetId
       );
       return;
     }
@@ -1507,11 +1507,24 @@ export async function streamChat(
   } finally {
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
+    runCards.delete(requestId);
   }
 }
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
 const turnSessions = new Map<string, string>();
+
+/**
+ * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
+ * is watching may leave at most `ANALYSIS_CARD_LIMIT` — drafts and calendar
+ * proposals together — and the rest is said in words. Held in code, not only
+ * in the prompt, because a run is the one place nobody is there to stop a
+ * model that overdoes it. A pipeline step is read-only too, but asked for, so
+ * it is not counted.
+ */
+const runCards = new Map<string, Set<string>>();
+const ANALYSIS_CARD_LIMIT = 2;
+const CARD_TOOLS: ReadonlySet<string> = new Set(["draft_workout", "draft_training_plan", "propose_schedule_changes"]);
 
 /**
  * A conversation's sources as a turn's reach (P2.0): the tools that read a
@@ -2604,10 +2617,16 @@ export async function editPlanDraft(
   return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
-export async function confirmWorkoutDelete(
-  requestId: string
-): Promise<DeleteWorkoutResult> {
-  return confirmWorkoutDeleteById(requestId);
+export function getScheduleChanges(changeSetIds: unknown): ScheduleChangeSet[] {
+  return readScheduleChanges(Array.isArray(changeSetIds) ? changeSetIds.filter((id): id is string => typeof id === "string") : []);
+}
+
+export function applyScheduleChangeLine(changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> {
+  return applyScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
+}
+
+export function dismissScheduleChangeLine(changeSetId: string, lineId?: string): ScheduleChangeSet {
+  return dismissScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
 }
 
 function getAllChatTools(): CorosMcpTool[] {
@@ -2729,6 +2748,10 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "draft_workout",
   "draft_training_plan",
   "get_plan_draft",
+  "list_training_plans",
+  "get_training_plan",
+  // A proposal the athlete applies from its card; it writes nothing (P3.3).
+  "propose_schedule_changes",
   "request_coach_input"
 ]);
 
@@ -2799,7 +2822,10 @@ export function getClaudeCodeTools(
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
       tool.name === "list_scheduled_workouts" ||
-      tool.name === "delete_workout"
+      tool.name === "delete_workout" ||
+      tool.name === "propose_schedule_changes" ||
+      tool.name === "list_training_plans" ||
+      tool.name === "get_training_plan"
     ) {
       return permissions.upcomingWorkouts;
     }
@@ -2869,6 +2895,21 @@ async function executeChatTool(
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
+    const counted = toolPolicy === "read-only" && !generation;
+    const cards = counted ? runCards.get(requestId) ?? new Set<string>() : undefined;
+    if (cards && CARD_TOOLS.has(name) && cards.size >= ANALYSIS_CARD_LIMIT) {
+      return JSON.stringify({
+        ok: false,
+        error_code: "card_limit",
+        errors: [`An analysis leaves at most ${ANALYSIS_CARD_LIMIT} cards; this run has. Say the rest in words.`]
+      });
+    }
+    /* Counted by the card's own id, read and never changed. */
+    const leaveCard = (card: PlanDraftPreview | ScheduleChangeSet) => {
+      if (!cards) return;
+      cards.add("changeSetId" in card ? card.changeSetId : card.draftId);
+      runCards.set(requestId, cards);
+    };
     // A run that only reads may add a creation but not change one the athlete
     // is following: `revises` would make its plan the next version of theirs,
     // so here the draft is simply a new one.
@@ -2882,6 +2923,7 @@ async function executeChatTool(
       },
       sessionId: turnSessions.get(requestId),
       onPlanDraft: (preview: PlanDraftPreview) => {
+        leaveCard(preview);
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
           requestId,
@@ -2891,14 +2933,12 @@ async function executeChatTool(
       },
       planRequest: generation?.request,
       ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
-      onWorkoutDelete: (preview) => {
-        send("chat:streamInfo", {
-          requestId,
-          kind: "workoutDelete",
-          preview
-        });
+      onScheduleChange: (changeSet) => {
+        leaveCard(changeSet);
+        send("chat:streamInfo", { requestId, kind: "scheduleChange", changeSet });
       },
       allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
+      progress: run?.context?.activities !== false,
       unitSystem
     });
   }
@@ -2962,6 +3002,25 @@ async function executeChatTool(
     );
   }
   return reportingFailure(() => callMcpTool(name, args));
+}
+
+/**
+ * One tool call as a turn makes it, for suites: the run's card count (D4)
+ * lives here, and a suite driving it through a provider would be testing the
+ * provider. `end` lets the run go, as a finished turn does.
+ */
+export function callChatToolForTests(
+  name: string,
+  args: Record<string, unknown>,
+  { requestId, toolPolicy, sessionId }: { requestId: string; toolPolicy: ChatToolPolicy; sessionId?: string }
+): Promise<string> {
+  if (sessionId) turnSessions.set(requestId, sessionId);
+  return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
+}
+
+export function endRunForTests(requestId: string): void {
+  turnSessions.delete(requestId);
+  runCards.delete(requestId);
 }
 
 function findChatTool(name: string): CorosMcpTool | undefined {
@@ -3200,8 +3259,23 @@ export function withLiveToolInstructions(
         "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
         "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
         "its next version instead of a second card. " +
-        "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-        "The athlete confirms via the Delete from COROS button in chat.",
+        (planTools.some((tool) => tool.name === "delete_workout")
+          ? "Use list_scheduled_workouts + delete_workout to stage deletions. " +
+            "The athlete applies them from the card under your reply; nothing is deleted until they do. "
+          : "") +
+        (planTools.some((tool) => tool.name === "propose_schedule_changes")
+          ? "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
+            "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
+            "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way."
+          : ""),
+      ...(planTools.some((tool) => tool.name === "list_training_plans")
+        ? [
+            "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +
+              "list_training_plans and get_training_plan. A plan on the calendar is read as the calendar holds it: " +
+              "dates, and each session done, missed or ahead. A plan you made in this conversation is listed with " +
+              "its draft_id: change it with revise_training_plan, not by redrafting it."
+          ]
+        : []),
       ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
         ? [
             "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +

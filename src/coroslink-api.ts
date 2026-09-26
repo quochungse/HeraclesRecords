@@ -150,7 +150,7 @@ import type {
   UploadPlanResult,
   IntervalsStatus,
   IntervalsActivityWithStatus,
-  DeleteWorkoutResult,
+  ScheduleChangeSet,
   ManualActivityInput,
   ActivityDetailSummary,
   ActivityDetailSummarySync
@@ -707,7 +707,11 @@ export interface CorosLinkApi {
     unitSystem?: UnitSystem,
     replaceNewer?: boolean
   ) => Promise<PlanVersionSave>;
-  confirmWorkoutDelete: (requestId: string) => Promise<DeleteWorkoutResult>;
+  /** Coach's proposals to the calendar and the library, by the anchors' ids (P3.2). */
+  getScheduleChanges: (changeSetIds: string[]) => Promise<ScheduleChangeSet[]>;
+  /** Applies one line, or every proposed line; each is checked against COROS first. */
+  applyScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
+  dismissScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
   // ----- Sync -----
   chooseSyncFolder: () => Promise<string | null>;
   getSyncStatus: () => Promise<SyncStatus>;

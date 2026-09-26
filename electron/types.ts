@@ -2467,8 +2467,9 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
-      kind: "workoutDelete";
-      preview: WorkoutDeletePreview;
+      /** Coach proposed changes to the calendar, or a deletion, for the athlete to apply (P3.2–P3.3). */
+      kind: "scheduleChange";
+      changeSet: ScheduleChangeSet;
     }
   | {
       requestId: string;
@@ -3217,6 +3218,26 @@ export interface PlanRef {
   label: string;
 }
 
+/**
+ * What the athlete pointed at on the calendar or in a COROS plan when asking
+ * (P3.5): a day, a week, one scheduled session, an activity, or one session
+ * of any plan in the Library. Not a `PlanRef`: that names a Coach creation,
+ * and a build that reads one would drop a ref it cannot parse. Carried as a
+ * `scheduleRefs` anchor just before the question.
+ */
+export interface ScheduleRef {
+  scope: "day" | "week" | "session";
+  /** yyyyMMdd: the day, the week's Monday, or the session's day. Absent for a session of a plan not on the calendar. */
+  day?: string;
+  /** A session: the calendar's `planId` (a running copy or the athlete's own), or a COROS plan's id. */
+  planId?: string;
+  idInPlan?: string;
+  /** A finished activity rather than a planned session. */
+  activityId?: string;
+  /** What is pointed at, as it is read: "Sat 27 Sep · Long run". */
+  label: string;
+}
+
 /** Coach opened from elsewhere with something to talk about (P1.7). */
 export interface CoachOpenRequest {
   /** Text for the composer. */
@@ -3224,6 +3245,8 @@ export interface CoachOpenRequest {
   /** A Coach creation; its conversation is opened when it can be found. */
   draftId?: string;
   refs?: PlanRef[];
+  /** The calendar or a COROS plan: chips beside the composer of the conversation open (P3.5). */
+  scheduleRefs?: ScheduleRef[];
   /** AI Plan (P2.5): a new conversation that opens on a blank plan brief. */
   newPlan?: boolean;
 }
@@ -3807,6 +3830,72 @@ export interface DeleteWorkoutResult {
   message: string;
 }
 
+/**
+ * What Coach proposes to do to the calendar or the workout library, line by
+ * line, for the athlete to apply or dismiss (P3.2–P3.3 of
+ * docs/coach-plan-canvas.md). Kept in `chat_schedule_changes` (`personal`),
+ * so a proposal outlives a restart and can be applied from the other machine;
+ * the transcript holds only a `scheduleChange` anchor.
+ *
+ * Every line is checked against COROS again when it is applied, and one
+ * already applied is never written twice.
+ */
+export type ScheduleChangeOp = "move" | "replace" | "remove" | "add" | "deleteWorkout";
+export type ScheduleChangeStatus = "proposed" | "applied" | "failed" | "dismissed" | "stale";
+
+/** A session on the calendar as the proposal found it. */
+export interface ScheduleChangeSession {
+  /** The calendar's `planId`: a running plan's copy, or the athlete's own schedule. */
+  planId: string;
+  idInPlan: string;
+  /** yyyyMMdd. */
+  happenDay: string;
+  name: string;
+  planProgramId?: string;
+  programId?: string;
+  sportType?: number;
+}
+
+export interface ScheduleChangeLine {
+  lineId: string;
+  op: ScheduleChangeOp;
+  /** The line as the card states it. */
+  label: string;
+  /** The session a move, replace or remove acts on. */
+  session?: ScheduleChangeSession;
+  /** Where a move or an add lands (yyyyMMdd). */
+  toDay?: string;
+  /** What a replace or an add puts on the calendar. */
+  workout?: PlanWorkoutEntryInput;
+  /** A library workout a deletion removes. */
+  program?: { id: string; name: string };
+  status: ScheduleChangeStatus;
+  /** Why a line failed or went stale. */
+  reason?: string;
+  /**
+   * `false` on a failed line that must not be tried again: part of it landed
+   * (a replacement added, its original not removed), so a second try would
+   * write that part twice. Any other failed line may be tried again — each
+   * try reads COROS first, as the first did.
+   */
+  retry?: false;
+  /** When it was applied, failed, dismissed or found stale. */
+  settledAt?: string;
+}
+
+export interface ScheduleChangeSet {
+  changeSetId: string;
+  /** The conversation it was proposed in. */
+  sessionId?: string;
+  summary: string;
+  lines: ScheduleChangeLine[];
+  /** The units the workouts were written in; metric when absent. */
+  unitSystem?: UnitSystem;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A card from before change sets (P3.2): drawn, but its request died with the process that staged it. */
 export interface WorkoutDeletePreview {
   requestId: string;
   target: "scheduled" | "library" | "both";
@@ -3860,11 +3949,15 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "planEvent"; event: PlanEvent }
   | { kind: "planRefs"; refs: PlanRef[] }
+  /** An anchor: what on the calendar or in a COROS plan the next question is about (P3.5). */
+  | { kind: "scheduleRefs"; refs: ScheduleRef[] }
   /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
   | { kind: "planBrief"; artifactId: string }
   /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */
   | { kind: "planOutline"; artifactId: string; outlineVersion: number }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
+  /** An anchor (Q3): the change set itself is `chat_schedule_changes`' (P3.2). */
+  | { kind: "scheduleChange"; changeSetId: string }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }

@@ -3875,7 +3875,8 @@ let libraryProgramsCache:
   | { key: string; expiresAt: number; programs: Promise<Record<string, unknown>[]> }
   | undefined;
 
-function invalidateLibraryWorkoutPrograms(): void {
+/** The library list is read again on its next use — what a check before a write needs. */
+export function invalidateLibraryWorkoutPrograms(): void {
   libraryProgramsCache = undefined;
 }
 

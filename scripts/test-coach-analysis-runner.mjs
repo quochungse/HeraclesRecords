@@ -679,6 +679,68 @@ function addSession(world, id, entries = []) {
 }
 
 // ---------------------------------------------------------------------------
+// P3.4: a run sees the conversation's briefs and proposals, and files its own
+// ---------------------------------------------------------------------------
+
+{
+  resetAnalysisQueueForTests();
+  const brief = {
+    artifactId: "art-1",
+    sessionId: "s1",
+    request: {
+      goalKind: "race",
+      goal: "Hanoi Half",
+      race: { date: "2026-11-15", distance: "Half marathon" },
+      sports: ["run"],
+      difficulty: "custom",
+      startDate: "2026-08-24",
+      week: { mode: "auto" }
+    },
+    origins: {},
+    createdAt: "2026-08-20T00:00:00.000Z",
+    updatedAt: "2026-08-20T00:00:00.000Z"
+  };
+  const proposal = {
+    changeSetId: "sc-1",
+    sessionId: "s1",
+    summary: "Ease the week",
+    lines: [
+      { lineId: "l1", op: "move", label: 'Move "Long run" from Sat 22 Aug to Sun 23 Aug', status: "applied" },
+      { lineId: "l2", op: "remove", label: 'Remove "Strides" from Fri 21 Aug', status: "proposed" }
+    ],
+    createdAt: "2026-08-20T00:00:00.000Z",
+    updatedAt: "2026-08-20T00:00:00.000Z"
+  };
+  const asked = { briefs: [], changeSets: [] };
+  const world = createWorld({
+    getPlanBriefs: (ids) => {
+      asked.briefs.push(ids);
+      return ids.includes("art-1") ? [brief] : [];
+    },
+    getScheduleChanges: (ids) => {
+      asked.changeSets.push(ids);
+      return ids.includes("sc-1") ? [proposal] : [];
+    }
+  });
+  addAnalysis(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } });
+  addSession(world, "s1", [
+    { kind: "message", role: "user", content: "Plan my half" },
+    { kind: "planBrief", artifactId: "art-1" },
+    { kind: "message", role: "assistant", content: "Here is a brief." },
+    { kind: "scheduleChange", changeSetId: "sc-1" }
+  ]);
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "success", JSON.stringify(run));
+  const call = world.streamCalls[0];
+  assert.equal(call.options.sessionId, "s1", "what the run proposes is filed under its conversation");
+  assert.deepEqual(asked, { briefs: [["art-1"]], changeSets: [["sc-1"]] });
+  const sent = call.messages.at(-1).content;
+  assert.match(sent, /- Brief · brief_id art-1 · /, "the brief the athlete is filling in is in view");
+  assert.match(sent, /- Calendar proposal "Ease the week" · 1 applied · 1 not decided yet/, "and what became of the last proposal");
+}
+
+// ---------------------------------------------------------------------------
 // The happy path: options, persistence and attribution
 // ---------------------------------------------------------------------------
 

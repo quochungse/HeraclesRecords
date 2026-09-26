@@ -233,6 +233,15 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS chat_schedule_changes (
+      change_set_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      summary TEXT NOT NULL,
+      lines_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chat_plan_artifacts (
       artifact_id TEXT PRIMARY KEY,
       session_id TEXT,
@@ -522,6 +531,8 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_plan_drafts", "document_json", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "change_summary", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "refinements_json", "TEXT");
+  // The units a change set's workouts were written in (P3.3).
+  ensureColumn(db, "chat_schedule_changes", "unit_system", "TEXT");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
@@ -2947,6 +2958,17 @@ export function findChatSessionMentioning(draftIds: readonly string[]): string |
   return undefined;
 }
 
+/**
+ * Whether one conversation holds a card for any of these drafts — the same
+ * text search as `findChatSessionMentioning`, over one row rather than all.
+ */
+export function chatSessionMentionsDraft(sessionId: string, draftIds: readonly string[]): boolean {
+  const statement = requireDatabase().prepare(
+    `SELECT 1 FROM chat_sessions WHERE id = ? AND instr(messages_json, ?) > 0`
+  );
+  return draftIds.some((draftId) => Boolean(statement.get(sessionId, `"draftId":"${draftId}"`)));
+}
+
 export function listChatPlanDrafts(): StoredChatPlanDraftRecord[] {
   const rows = requireDatabase()
     .prepare(
@@ -3003,6 +3025,85 @@ export function saveChatConversationSettingsRow(
     )
     .run(sessionId, sourcesJson, runtimeJson, new Date().toISOString());
   notifySyncedRow("chat_conversation_settings", ["session_id"], [sessionId]);
+}
+
+interface ChatScheduleChangeRow {
+  change_set_id: string;
+  session_id: string | null;
+  summary: string;
+  unit_system: string | null;
+  lines_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A change set as stored; its lines are parsed by `chatScheduleChanges`. */
+export interface StoredChatScheduleChange {
+  changeSetId: string;
+  sessionId?: string;
+  summary: string;
+  unitSystem?: string;
+  linesJson: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function chatScheduleChangeRecord(row: ChatScheduleChangeRow): StoredChatScheduleChange {
+  return {
+    changeSetId: row.change_set_id,
+    ...(row.session_id ? { sessionId: row.session_id } : {}),
+    summary: row.summary,
+    ...(row.unit_system ? { unitSystem: row.unit_system } : {}),
+    linesJson: row.lines_json,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function getChatScheduleChanges(changeSetIds: readonly string[]): StoredChatScheduleChange[] {
+  if (!changeSetIds.length) return [];
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT * FROM chat_schedule_changes WHERE change_set_id IN (${changeSetIds.map(() => "?").join(", ")})`
+    )
+    .all(...changeSetIds) as ChatScheduleChangeRow[];
+  return rows.map(chatScheduleChangeRecord);
+}
+
+export function saveChatScheduleChange(record: StoredChatScheduleChange): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_schedule_changes (change_set_id, session_id, summary, unit_system, lines_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(change_set_id) DO UPDATE SET
+         session_id = excluded.session_id,
+         summary = excluded.summary,
+         unit_system = excluded.unit_system,
+         lines_json = excluded.lines_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(
+      record.changeSetId,
+      record.sessionId ?? null,
+      record.summary,
+      record.unitSystem ?? null,
+      record.linesJson,
+      record.createdAt,
+      record.updatedAt
+    );
+  notifySyncedRow("chat_schedule_changes", ["change_set_id"], [record.changeSetId]);
+}
+
+/** A conversation's change sets go with it. */
+export function deleteChatScheduleChangesOf(sessionId: string): void {
+  const database = requireDatabase();
+  const ids = database
+    .prepare("SELECT change_set_id FROM chat_schedule_changes WHERE session_id = ?")
+    .all(sessionId) as Array<{ change_set_id: string }>;
+  const drop = database.prepare("DELETE FROM chat_schedule_changes WHERE change_set_id = ?");
+  for (const { change_set_id: id } of ids) {
+    if (drop.run(id).changes > 0) notifySyncedDelete("chat_schedule_changes", id);
+  }
 }
 
 export function deleteChatConversationSettingsRow(sessionId: string): void {

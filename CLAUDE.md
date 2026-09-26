@@ -444,7 +444,16 @@ Overview, Media, Data, and Settings are in the main bundle.
   else).
   **The calendar is COROS's running copy of a plan** (`executeSubPlan`), which COROS keeps in step
   with the calendar both ways: moving a session on the calendar moves it in the copy, and editing
-  the copy moves the calendar. Two things COROS does without a word, which
+  the copy moves the calendar. **The app's own move is not COROS's**: `rescheduleScheduledWorkout` adds the
+  session to the athlete's own calendar and deletes the original, so a plan session moved that way
+  leaves the copy and its compliance with it (measured on the live account, 2026-09-26).
+  So **every move goes through `moveCalendarSession` (`electron/scheduleMoves.ts`)** — the Calendar's
+  drag (`trainingHub:rescheduleWorkout`) and Coach's change sets alike: a plan session moves, and has
+  its workout replaced (`replaceCalendarSession`), through `plan/update` on the running copy, which
+  keeps its `idInPlan`; only the athlete's own sessions take the add-then-delete. Whether a `planId`
+  is a running copy is asked of the cache and, when the cache has never seen it, of COROS — never
+  guessed. Removing a plan session with `schedule/update` status 3 takes it out of the copy too, so
+  a delete stays in step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
   `TrainingPlanCalendarDialog` states before anything is written: **it counts the plan from the
   Monday of the week the start day is in, and leaves off every session before the start** (a
   Wednesday start loses week 1's Monday and Tuesday), and **it never checks the calendar** (a day
@@ -786,6 +795,37 @@ Overview, Media, Data, and Settings are in the main bundle.
   `sections` list, trends and sleep take `days` and roll up by week past 14, and
   `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
   own totals and deltas so the model reads them rather than doing the arithmetic.
+  **Coach's proposals to the calendar and the library are change sets** (P3.2, `chatScheduleChanges.ts`):
+  rows of `chat_schedule_changes` (`personal`), a `scheduleChange` anchor in the transcript, and a
+  card (`CoachScheduleChangeCard`) whose lines are applied or dismissed one at a time or all at once
+  through `chat:applyScheduleChange` / `chat:dismissScheduleChange`. `delete_workout` stages one.
+  **Every line reads COROS again before it writes** — a session gone from its day or renamed goes
+  `stale` — **one line is one write, recorded as it lands** (one `schedule/update` is all or nothing),
+  and a line already applied is never written again. The delete card it replaced lived in a map in
+  memory, so a restart left a button that could only say "expired"; a `workoutDelete` entry from
+  then is drawn and can do nothing. **`propose_schedule_changes`** (P3.3) is Coach's way to rearrange
+  a week — move, replace, remove, add, up to twenty lines — checked in the turn (the session is on
+  that day, no day has passed, a workout passes `validatePlanDraft` and resolves its exercises) and
+  handed back whole on a refusal. It writes nothing, so it is on `READ_ONLY_ALLOWED_TOOLS`. The
+  outcome of every proposal rides in `creationIndex` on the next turn, read from the row, so Coach
+  knows what the athlete applied. **An analysis run leaves at most two cards** (drafts and proposals
+  together, `runCards` in `chatService.ts`, P3.4), held in code rather than only in the prompt; a
+  pipeline step is not counted, and a chat turn is held to the prompt's words as before. A run is
+  handed the conversation's `sessionId`, so what it proposes is filed under its conversation, and its
+  `creationIndex` carries the briefs and proposals too. `npm run test:schedule-changes`,
+  `test:schedule-change-renderer`.
+  **Ask Coach from the Calendar and the Library points rather than pastes** (P3.5): a
+  `CoachOpenRequest.scheduleRefs` puts chips beside the open conversation's composer, sent as a
+  `scheduleRefs` anchor (not a `PlanRef`, which names a Coach creation) that `toWireMessages` folds
+  into the question with the ids the read tools take. The Calendar's week and session asks used to
+  paste figures into a prompt; the Library reader's open session offers Ask Coach for any COROS plan.
+  **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
+  from the Library's cache and the stored matches (no request unless the cache is empty), and
+  `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its
+  id is `calendar_plan_id`, the `planId` every calendar session of it carries. Progress comes
+  from activities, so a conversation withholding them gets the plan without it (the tools are not
+  in `toolReadsWithheldSource`; `executeChatTool` passes `progress`). The count is
+  `electron/planCompliance.ts`, which the Library's row reads too.
   `get_training_zones` answers with the account's own HR, pace and power tables, so a
   prescribed target is read off the athlete's thresholds rather than inferred from recent
   activities; the snapshot carries the thresholds themselves, the body metrics and the

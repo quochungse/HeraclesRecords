@@ -188,6 +188,11 @@ assert.equal(
     "draft_training_plan",
     // Reads a creation back; the one that changes it is on the other side.
     "get_plan_draft",
+    // The athlete's COROS plans, read only (P3.1).
+    "list_training_plans",
+    "get_training_plan",
+    // A proposal the athlete applies; it writes nothing (P3.3).
+    "propose_schedule_changes",
     "request_coach_input"
   ]);
   // A brief is set out for the athlete to check and edit — nobody is there

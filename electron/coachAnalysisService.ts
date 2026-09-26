@@ -51,6 +51,8 @@ import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
+import { listPlanBriefs } from "./chatPlanBriefs";
+import { readScheduleChanges } from "./chatScheduleChanges";
 import { ANALYSIS_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
   AnalysisRuntime,
@@ -69,6 +71,8 @@ import type {
   CoachAnalysisUpdate,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanBrief,
+  ScheduleChangeSet,
   ConversationSettings,
   ProviderAuthVerdict
 } from "./types";
@@ -589,6 +593,14 @@ export interface CoachAnalysisRunnerDeps {
    */
   getPlanArtifacts?(draftIds: string[]): PlanArtifactVersion[];
   /**
+   * The briefs and calendar proposals the conversation anchors (P3.4), for
+   * the same index: an analysis that cannot see a brief the athlete is filling
+   * in, or which of its last proposals were applied, answers as if it could.
+   * Optional, like the versions.
+   */
+  getPlanBriefs?(artifactIds: string[]): PlanBrief[];
+  getScheduleChanges?(changeSetIds: string[]): ScheduleChangeSet[];
+  /**
    * The conversation's own settings (P2.0): its sources apply to the run, and
    * its AI stands wherever the analysis has not chosen its own. Optional, for
    * a suite with no database.
@@ -646,6 +658,8 @@ export interface CoachAnalysisRunnerDeps {
     options: {
       runtime?: CoachAnalysis["runtime"];
       toolPolicy: "read-only";
+      /** The conversation the run writes into; a proposal is filed under it (P3.4). */
+      sessionId?: string;
       roleInstructions?: string;
     }
   ): Promise<void>;
@@ -752,6 +766,20 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     getPlanArtifacts: (draftIds) => {
       try {
         return listPlanArtifactVersions(draftIds);
+      } catch {
+        return [];
+      }
+    },
+    getPlanBriefs: (artifactIds) => {
+      try {
+        return listPlanBriefs(artifactIds);
+      } catch {
+        return [];
+      }
+    },
+    getScheduleChanges: (changeSetIds) => {
+      try {
+        return readScheduleChanges(changeSetIds);
       } catch {
         return [];
       }
@@ -1522,11 +1550,19 @@ async function runOneBinding(
           session.entries.flatMap((entry) =>
             entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
           )
-        ) ?? []
+        ) ?? [],
+        resolved.getPlanBriefs?.([
+          ...new Set(session.entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+        ]) ?? [],
+        resolved.getScheduleChanges?.([
+          ...new Set(session.entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))
+        ]) ?? []
       ),
       {
         runtime,
         toolPolicy: "read-only",
+        // What a run proposes is filed under its conversation (P3.4).
+        sessionId: analysis.sessionId,
         ...(conversation ? { sources: conversation.sources } : {}),
         ...(analysis.role ? { roleInstructions: analysis.role } : {})
       }

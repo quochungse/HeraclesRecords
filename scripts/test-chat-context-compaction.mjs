@@ -899,4 +899,57 @@ assert.deepEqual(
   );
 }
 
+// P3.3: what became of each calendar proposal is said to the coach, from the row.
+{
+  const proposal = {
+    changeSetId: "sc-1",
+    summary: "Rest while ill",
+    lines: [
+      { lineId: "l1", op: "move", label: 'Move "Long run" from Sat 27 Sep to Sun 28 Sep', status: "applied" },
+      { lineId: "l2", op: "replace", label: 'Replace "Tempo" on Thu 25 Sep with "Easy 30"', status: "stale", reason: "It is now \"Hills\"." },
+      { lineId: "l3", op: "remove", label: 'Remove "Strides" from Fri 26 Sep', status: "dismissed" },
+      { lineId: "l4", op: "add", label: 'Add "Walk" on Mon 29 Sep', status: "proposed" }
+    ],
+    createdAt: "x",
+    updatedAt: "x"
+  };
+  const entries = [
+    { kind: "message", role: "user", content: "I am ill" },
+    { kind: "scheduleChange", changeSetId: "sc-1" },
+    { kind: "scheduleChange", changeSetId: "sc-gone" }
+  ];
+  const index = creationIndex(entries, [], [], [proposal]);
+  assert.match(index, /A calendar proposal is applied by the athlete, line by line, from its card\./);
+  assert.match(
+    index,
+    /- Calendar proposal "Rest while ill" · 1 applied · 1 out of date \(Replace "Tempo" on Thu 25 Sep with "Easy 30": It is now "Hills"\.\) · 1 dismissed · 1 not decided yet$/m
+  );
+  assert.equal(index.split("\n").length, 2, "a set the store no longer holds is not listed");
+  assert.equal(creationIndex(entries, [], [], []), null, "with nothing read, nothing is said");
+}
+
+// P3.5: the calendar or a COROS plan, pointed at, rides on the question with the ids the tools take.
+{
+  const wire = toWireMessages([
+    { kind: "message", role: "assistant", content: "Hi" },
+    {
+      kind: "scheduleRefs",
+      refs: [
+        { scope: "week", day: "20260921", label: "Week of 21–27 Sep" },
+        { scope: "session", day: "20260920", activityId: "act-9", label: "Sun 20 Sep · Long run" },
+        { scope: "session", planId: "T1", idInPlan: "4", label: "Tempo · Week 2 · Thu · Base block" }
+      ]
+    },
+    { kind: "message", role: "user", content: "Too much?" }
+  ]);
+  assert.equal(wire.length, 2, "no message of its own");
+  assert.equal(
+    wire[1].content,
+    "[The athlete is asking about the week Week of 21–27 Sep (from 20260921; read it with list_scheduled_workouts); " +
+      "and the activity Sun 20 Sep · Long run (activity_id act-9); " +
+      "and the session Tempo · Week 2 · Thu · Base block (plan_id T1, id_in_plan 4). " +
+      "Read what you need with list_scheduled_workouts, get_training_plan or get_activity_detail.]\n\nToo much?"
+  );
+}
+
 console.log("chat context compaction tests passed");

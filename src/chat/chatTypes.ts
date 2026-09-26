@@ -10,6 +10,7 @@ import type {
   PlanDraftPreview,
   PlanEvent,
   PlanRef,
+  ScheduleRef,
   WorkoutDeletePreview
 } from "../../electron/types";
 
@@ -56,9 +57,16 @@ export interface ChatCoachPromptEntry {
   prompt: CoachInputPrompt;
 }
 
+/** A delete card from before change sets: drawn, but nothing can be applied from it. */
 export interface ChatWorkoutDeleteEntry {
   kind: "workoutDelete";
   preview: WorkoutDeletePreview;
+}
+
+/** Coach's proposal to the calendar or the library (P3.2); an anchor, its set read from `chat:scheduleChanges`. */
+export interface ChatScheduleChangeEntry {
+  kind: "scheduleChange";
+  changeSetId: string;
 }
 
 export interface ChatActivityVisualEntry {
@@ -93,6 +101,12 @@ export interface ChatToolNoticeEntry {
 export interface ChatPlanRefsEntry {
   kind: "planRefs";
   refs: PlanRef[];
+}
+
+/** The calendar or a COROS plan, pointed at when asking (P3.5); an anchor before the question. */
+export interface ChatScheduleRefsEntry {
+  kind: "scheduleRefs";
+  refs: ScheduleRef[];
 }
 
 /** The athlete or COROS changed a coach's creation (P1.3); an anchor. */
@@ -134,9 +148,11 @@ export type ChatEntry = (
   | ChatPlanDraftEntry
   | ChatPlanEventEntry
   | ChatPlanRefsEntry
+  | ChatScheduleRefsEntry
   | ChatPlanBriefEntry
   | ChatPlanOutlineEntry
   | ChatWorkoutDeleteEntry
+  | ChatScheduleChangeEntry
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
   | ChatHrZoneEntry
@@ -302,9 +318,11 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   planDraft: ["draft"],
   planEvent: ["event"],
   planRefs: ["refs"],
+  scheduleRefs: ["refs"],
   planBrief: ["artifactId"],
   planOutline: ["artifactId", "outlineVersion"],
   workoutDelete: ["preview"],
+  scheduleChange: ["changeSetId"],
   activityVisual: ["preview"],
   activityHrTrend: ["preview"],
   fitnessTrend: ["preview"],
@@ -345,6 +363,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
   }
+  if (entry.kind === "scheduleRefs") {
+    return { kind: "scheduleRefs", refs: entry.refs };
+  }
   if (entry.kind === "planBrief") {
     return { kind: "planBrief", artifactId: entry.artifactId };
   }
@@ -353,6 +374,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
+  }
+  if (entry.kind === "scheduleChange") {
+    return { kind: "scheduleChange", changeSetId: entry.changeSetId };
   }
   if (entry.kind === "activityVisual") {
     return { kind: "activityVisual", preview: entry.preview };
@@ -420,6 +444,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
   }
+  if (entry.kind === "scheduleRefs") {
+    return { kind: "scheduleRefs", refs: entry.refs };
+  }
   if (entry.kind === "planBrief") {
     return { kind: "planBrief", artifactId: entry.artifactId };
   }
@@ -428,6 +455,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
+  }
+  if (entry.kind === "scheduleChange") {
+    return { kind: "scheduleChange", changeSetId: entry.changeSetId };
   }
   if (entry.kind === "activityVisual") {
     return { kind: "activityVisual", preview: entry.preview };

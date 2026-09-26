@@ -153,7 +153,7 @@ import type {
   UploadPlanResult,
   IntervalsStatus,
   IntervalsActivityWithStatus,
-  DeleteWorkoutResult,
+  ScheduleChangeSet,
   ManualActivityInput
 } from "./types";
 const api = {
@@ -1014,8 +1014,12 @@ const api = {
     replaceNewer?: boolean
   ): Promise<PlanVersionSave> =>
     ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem, replaceNewer),
-  confirmWorkoutDelete: (requestId: string): Promise<DeleteWorkoutResult> =>
-    ipcRenderer.invoke("chat:confirmWorkoutDelete", requestId),
+  getScheduleChanges: (changeSetIds: string[]): Promise<ScheduleChangeSet[]> =>
+    ipcRenderer.invoke("chat:scheduleChanges", changeSetIds),
+  applyScheduleChange: (changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> =>
+    ipcRenderer.invoke("chat:applyScheduleChange", changeSetId, lineId),
+  dismissScheduleChange: (changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> =>
+    ipcRenderer.invoke("chat:dismissScheduleChange", changeSetId, lineId),
   // ----- Sync -----
   chooseSyncFolder: (): Promise<string | null> =>
     ipcRenderer.invoke("sync:chooseFolder"),

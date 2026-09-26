@@ -845,6 +845,19 @@ export function TrainingLibraryView({
                 onFavorite={(plan) => void updatePlanMetadata(plan, { favorite: !plan.favorite })}
                 onArchive={(plan) => void updatePlanMetadata(plan, { archived: !plan.archived })}
                 onDelete={setPendingPlanDelete}
+                onAskCoachAboutSession={(plan, entry, label) =>
+                  onOpenCoach({
+                    scheduleRefs: [
+                      {
+                        scope: "session",
+                        planId: plan.remoteId,
+                        idInPlan: entry.idInPlan,
+                        ...(entry.happenDay ? { day: entry.happenDay } : {}),
+                        label
+                      }
+                    ]
+                  })
+                }
                 onAskCoach={
                   readingPlan.origin === "coach" && readingPlan.coach?.draftId
                     ? (plan) => {

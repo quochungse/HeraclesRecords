@@ -723,15 +723,216 @@ snapshot (chúng nằm trong dashboard, đi theo Activities); chưa chạy với
 **Ship P2 khi:** từ nút AI Plan tới plan trên lịch, mọi bước nằm trong một cuộc chat; nguồn dữ
 liệu tắt ở cuộc chat thì không lượt nào đọc được; dialog generator không còn.
 
-### P3 — Mở rộng
+### P3 — Coach làm việc trên lịch và plan COROS có sẵn
 
-- **Change set trên lịch đang có**: Coach đề xuất dời, thay, bỏ nhiều buổi; áp từng dòng hoặc
-  cả nhóm. Dời đã có (`schedule/update`, và `planOntoRunningCopy` cho bản chạy). **Cần probe**:
-  thay một buổi trên bản chạy mà không đổi plan mẫu. Card change set và card xoá workout lưu bền
-  trong bảng, sống qua restart.
-- Card gợi ý trong analysis tuần và review sau buổi tập.
-- `list_training_plans`, `get_training_plan`: Coach đọc plan COROS và tiến độ của plan đang chạy.
-- Tham chiếu từ Calendar (tuần, ngày) và từ Library reader tới một buổi cụ thể.
+Mục tiêu: Coach đọc được plan COROS và tiến độ của plan đang chạy, đề xuất thay đổi trên lịch
+(dời, thay, bỏ, thêm nhiều buổi một lúc) mà athlete áp từng dòng hoặc cả nhóm, và làm điều đó cả
+trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
+
+**Điều đã biết (đọc code và các probe đã chạy, 2026-09-26):**
+- COROS **không có thao tác "dời"**: `schedule/update` với `status 2` bị từ chối (17004,
+  `verify-calendar-api.mjs`). `rescheduleScheduledWorkout` thêm ở ngày mới rồi xoá ở ngày cũ, và
+  thêm vào **lịch riêng của athlete** (`maxIdInPlan` của lịch), không vào bản chạy của plan.
+- Một buổi trên lịch thuộc plan đang chạy mang `planId` = id **bản chạy** (`executeSubPlan`);
+  buổi lẻ mang id lịch của athlete. Compliance ghép theo `planId:idInPlan` đó.
+- Đã đo (`verify-coros-plan-api.mjs`): `plan/update` trên bản chạy **đưa được thay đổi lên lịch**
+  (thêm buổi); sửa plan mẫu **không** đụng bản chạy. `planOntoRunningCopy` dời, thêm, bỏ trên bản
+  chạy từ hôm nay trở đi (CLAUDE.md, 2026-09-25).
+- Chưa đo: xoá một buổi của plan đang chạy bằng `schedule/update status 3` (đường màn Calendar và
+  `delete_workout` đang dùng) làm gì với **bản chạy**; thay chương trình của một buổi (cùng
+  `idInPlan`) trên bản chạy có lên lịch không; `schedule/update` nhiều entity một lần có nguyên tử
+  không.
+- Card xoá workout (`workoutDelete`) chỉ sống trong RAM (`deleteRequestStore`): restart là mất, bấm
+  thì báo "expired".
+- `PlanRef` (P1.7) chỉ trỏ vào **creation của Coach** (`artifactId`, `draftId`); lịch và plan
+  COROS không phải creation.
+- Analysis read-only đã được `draft_workout`/`draft_training_plan` (card chờ athlete duyệt).
+
+**P3.0 Probe trên tài khoản thật** · S · *xong 2026-09-26*
+- Đo một lần trên tài khoản thật (plan tạm trong cửa sổ lịch trống cách một năm, dọn sạch sau khi
+  chạy); script probe không giữ trong repo. Mỗi câu trả lời chốt một quyết định của P3.3:
+  - **A. Xoá buổi của bản chạy bằng `schedule/update` status 3:** lịch mất buổi, **bản chạy cũng mất
+    entity đó**, một `plan/update` sau không đưa lại. → Xoá không làm lệch bản chạy; lệnh xoá của
+    màn Calendar và `delete_workout` giữ nguyên cho buổi của plan.
+  - **B. `plan/update` trên bản chạy thay chương trình một buổi:** lịch hiện bài mới, **`idInPlan`
+    giữ nguyên**, plan mẫu không đổi. → "Thay một buổi mà không đổi plan mẫu" đi qua bản chạy.
+  - **C. `plan/update` trên bản chạy đổi `dayNo`:** lịch dời theo, ngày cũ trống, **`idInPlan` giữ
+    nguyên**, vẫn thuộc bản chạy. → Dời buổi của plan đi qua bản chạy.
+  - **D. `rescheduleScheduledWorkout` trên buổi của bản chạy:** buổi mới thuộc **lịch riêng** của
+    athlete (plan khác, `idInPlan` mới) và **bản chạy mất buổi đó** — buổi tách khỏi plan, compliance
+    mất. → Cấm đường này cho buổi của plan; màn Calendar hiện dời mọi buổi bằng nó — sửa ở P3.3.
+  - **E. Một `schedule/update` hai entity, một hỏng:** `17004 Plan data is illegal.`, **không** buổi
+    nào được ghi — nguyên tử. → Change set ghi **mỗi dòng một request** để có kết quả từng dòng.
+    `plan/update` trên bản chạy coi như cũng nguyên tử (một body cả plan), nên P3.3 ghi từng dòng,
+    mỗi lần đọc lại `detail`.
+
+**P3.1 Coach đọc plan COROS** · M · *xong*
+- Tool `list_training_plans`: mỗi plan một dòng (tên, số tuần, môn, trạng thái lịch, nếu đang
+  chạy thì tuần hiện tại và tỉ lệ hoàn thành), đọc từ `coros_plan_cache` và compliance đã lưu —
+  không request nào. Tool `get_training_plan { plan_id, weeks? }`: tuần theo stage, mỗi buổi một
+  dòng (`idInPlan`, ngày, tên, môn, thời lượng, trạng thái done/missed/upcoming), đọc `detail` một
+  lần (như Library). Không đưa chương trình đầy đủ trừ buổi được hỏi (`sessions`).
+- Read-only được phép (`READ_ONLY_ALLOWED_TOOLS`), nguồn `coros` (`LOCAL_CHAT_TOOL_SOURCES`);
+  tiến độ đọc từ activity nên khi cuộc chat tắt Activities thì trả plan **không** kèm tiến độ
+  (`toolReadsWithheldSource` không giấu cả tool, chỉ bỏ phần đó).
+- Plan Coach đã tạo và đã lưu thì dòng của nó ghi `draft_id` để Coach sửa qua
+  `revise_training_plan` thay vì qua change set.
+- Test: `test:chat-plan-tools` mới (fake COROS như `test:coros-plan-writes`), guards, sources.
+- **Đã làm** (`electron/chatPlanTools.ts`, đi cùng họ tool workout nên mọi provider và
+  `getClaudeCodeTools` — quyền `upcomingWorkouts` — đều nhận). Plan đang chạy gộp vào plan mẫu
+  (`calendar_plan_id` là id bản chạy, cặp mà P3.3 dùng để trỏ buổi); bản chạy đã gỡ không liệt kê;
+  plan lưu trữ chỉ khi `include_archived`. Cache trống (Library chưa mở trên máy này) hoặc `refresh`
+  thì đọc lại như Library (`getTrainingLibrarySnapshot`). `get_training_plan` đọc `detail` của bản
+  chạy, offline thì đọc cache và nói thế; plan dài hơn 8 tuần mặc định chỉ đưa 4 tuần quanh hiện tại.
+  `draft_id` chỉ có khi creation nằm trong chính cuộc chat này — sửa từ cuộc chat khác sẽ đặt card
+  version mới vào chỗ athlete không đọc. Phần đếm compliance chuyển sang `electron/planCompliance.ts`
+  để Library và Coach dùng một phép đếm.
+
+**P3.2 Card xoá workout lưu bền** · S — bước đầu của change set · *xong*
+- Bảng `chat_schedule_changes` (§7) ra đời ở đây; một đề xuất xoá là một change set một dòng.
+  `delete_workout` ghi row thay vì `deleteRequestStore`; card neo bằng kind mới `scheduleChange
+  { changeSetId }`. Entry `workoutDelete` cũ vẫn đọc được (chỉ hiện, nút báo "Ask Coach again").
+- Test: `test:chat-workout-tools`, `test:chat-history-store` (neo mới), restart giữa chừng.
+- **Đã làm** (`electron/chatScheduleChanges.ts`, `CoachScheduleChangeCard`): `delete_workout` ghi một
+  change set — một dòng `remove` cho buổi trên lịch, một dòng `deleteWorkout` cho workout trong thư
+  viện, hoặc cả hai — và stream `scheduleChange { changeSet }`; transcript giữ neo. Mỗi dòng đọc lại
+  COROS trước khi ghi (ngày đó qua `schedule/query`; thư viện đọc lại, bỏ qua cache vài phút của nó):
+  buổi biến mất hoặc đổi tên thì *stale*, không ghi gì. Một dòng một lần ghi, lưu kết quả ngay; dòng
+  đã áp không ghi lại; bấm hai lần trong một process bị từ chối (`applying`). Dòng mang op mà build
+  này không biết được giữ nguyên qua mỗi lần lưu và không được áp. Card cũ `workoutDelete` chỉ hiện,
+  kèm câu "Ask Coach again"; `chat:confirmWorkoutDelete` và `deleteRequestStore` đã bỏ. Xoá cuộc chat
+  xoá change set của nó. Còn lại: hai máy áp cùng một set gần như cùng lúc thì máy sau thấy buổi đã
+  mất và ghi *stale* đè *applied* (row thắng theo last-writer-wins) — không ghi COROS hai lần, chỉ
+  sai chữ trên card.
+
+**P3.3 Change set trên lịch** · L · *xong*
+- Tool `propose_schedule_changes { summary, changes: [{ op: move | replace | remove | add,
+  target: { plan_id, id_in_plan, happen_day } , to_day?, workout? }] }`. Chỉ **đề xuất**: không
+  ghi gì lên COROS, nên được phép trong read-only (analysis). Mỗi dòng được kiểm tra ngay trong lượt
+  (buổi còn đó không, ngày không ở quá khứ, workout hợp lệ qua `validateWorkoutDraftShared`) và lỗi
+  trả lại cho model như các tool draft.
+- Card: danh sách dòng ("Dời Long run T7 → CN", "Thay Tempo 8 km bằng Easy 45′"), mỗi dòng có Áp /
+  Bỏ, và **Áp tất cả**. Trạng thái từng dòng lưu trong row: proposed / applied / failed (kèm lý do)
+  / dismissed / stale.
+- Áp một dòng: **đọc lại ngày đó** (`schedule/query`) trước; buổi đã đổi hoặc biến mất thì dòng
+  thành *stale*, không ghi. Buổi lẻ: `rescheduleScheduledWorkout` / `removeScheduledWorkout` /
+  `createAndScheduleWorkout`. Buổi của plan đang chạy: một `plan/update` trên **bản chạy** gom mọi
+  dòng (đường `planOntoRunningCopy`), chỉ từ hôm nay. Theo P3.0: dời và thay đi qua `plan/update`
+  trên **bản chạy**, mỗi dòng một lần ghi, đọc lại `detail` trước mỗi lần (E: một lần ghi là nguyên
+  tử, nên gom dòng thì mất kết quả từng dòng); xoá dùng `removeScheduledWorkout` (A: bản chạy cũng
+  bỏ buổi); **không bao giờ** `rescheduleScheduledWorkout` cho buổi của plan (D). Mỗi dòng ghi kết quả ngay khi xong (bài học lưu-từng-phần của review P0); khoá theo change
+  set như `savingArtifacts`.
+- Sửa kèm (P3.0 D): màn Calendar dời buổi của plan đang chạy qua bản chạy (`plan/update` đổi `dayNo`),
+  không qua `rescheduleScheduledWorkout`. Xoá giữ nguyên (P3.0 A).
+- Test: `test:schedule-changes` mới (fake COROS giữ lịch và bản chạy), renderer của card.
+- **Đã làm.** Tool `propose_schedule_changes` (trong họ tool workout; tối đa 20 dòng; `session { plan_id,
+  id_in_plan, date }`, `to_date`, `workout` dạng của `draft_workout`) kiểm từng dòng trong lượt — buổi
+  có trên ngày đó (đọc lịch một lần cho cả khoảng), không ngày nào đã qua, mỗi buổi một thay đổi, workout
+  qua `validatePlanDraft` và resolve bài tập — và trả mọi lỗi một lần. Áp: `electron/scheduleMoves.ts`
+  (`moveCalendarSession`, `replaceCalendarSession`) chọn đường theo `isRunningCopy` (cache, không có thì
+  hỏi COROS `plan/query`): buổi của plan → `plan/update` trên bản chạy, đọc `detail` lại mỗi dòng; buổi
+  riêng → dời bằng thêm-rồi-xoá, thay bằng thêm-trước-xoá-sau (hỏng giữa chừng thì còn hai buổi chứ không
+  mất buổi). Dòng `add` đã có buổi cùng tên trên ngày đó thì *stale* (máy kia đã áp). Change set nhớ
+  `unit_system` (cột qua `ensureColumn`). Màn Calendar kéo buổi của plan giờ đi qua bản chạy (P3.0 D).
+  `list_scheduled_workouts` ghi `in_plan` cho buổi của plan đang chạy. `creationIndex` mang trạng thái
+  từng đề xuất (đã áp, lỗi/stale kèm lý do, bỏ, chưa quyết) đọc lại từ row mỗi lượt. Review tự làm
+  phát hiện: P3.2 khai báo state `scheduleChanges` sau chỗ dùng đầu tiên — một cuộc chat có neo
+  `scheduleChange` làm ChatView văng (TDZ); đã sửa, `test:schedule-change-renderer` giữ nó.
+
+**P3.4 Card trong analysis** · M · *xong*
+- Analysis tuần và review sau buổi tập được phép gọi `propose_schedule_changes` và các tool draft
+  (đã có), trong giới hạn D4 (tối đa 2 card mỗi lần chạy, theo setting P1.9). Card nằm trong cuộc
+  chat của analysis như câu trả lời của nó; áp vẫn là của athlete.
+- Kèm theo: `coachAnalysisService` truyền brief vào `creationIndex` (lỗ hổng ghi ở review P2).
+- Test: `test:coach-analysis-runner`, `test:coach-analysis-guards`.
+- **Đã làm.** `propose_schedule_changes` nằm trong `READ_ONLY_ALLOWED_TOOLS` từ P3.3; analysis giờ
+  truyền `sessionId` của cuộc chat nên đề xuất được ghi dưới cuộc chat đó, và collector headless ghi
+  neo `scheduleChange` vào transcript. Giới hạn D4 được **giữ bằng code** cho lượt analysis
+  (`runCards`, `ANALYSIS_CARD_LIMIT = 2`: draft và đề xuất tính chung; card thứ ba bị trả
+  `card_limit` kèm lý do cho model), không chỉ bằng lời — lượt analysis là chỗ không có ai để cản một
+  model làm quá tay. Bước pipeline (cũng read-only nhưng do athlete yêu cầu) không bị đếm; lượt chat
+  vẫn theo lời trong prompt như P1.9. Quyết định: setting P1.9 không áp cho analysis — analysis vốn là
+  lời không ai hỏi, và nó đã có trần riêng. `creationIndex` của lượt analysis mang brief (lỗ hổng của
+  review P2) và trạng thái các đề xuất (deps `getPlanBriefs`, `getScheduleChanges`, tuỳ chọn như
+  `getPlanArtifacts`). Preset *Weekly review* và *Post-activity debrief* được dặn đề xuất thay đổi lịch
+  bằng tool thay vì chỉ nói; analysis đã tạo từ trước giữ playbook của nó.
+
+**P3.5 Hỏi về đúng chỗ, từ Calendar và Library** · M · *xong*
+- Kind neo mới `scheduleRefs { refs: [{ scope: day | week | session, day, plan_id?, id_in_plan?,
+  label }] }` — **không** mở rộng `PlanRef`, vì `parsePlanRef` đòi `artifactId`/`draftId` và một
+  build P1 sẽ không đọc được. `toWireMessages` gộp vào câu hỏi như `planRefs`.
+- Calendar: "Ask Coach" của ngày, tuần và buổi mở Coach với chip (thay chuỗi prompt hiện nay).
+  Library reader: "Ask Coach" trên một buổi của **mọi** plan COROS (không chỉ plan của Coach),
+  trỏ `plan_id` + `id_in_plan` để Coach đọc bằng `get_training_plan`.
+- Test: `test:chat-plan-card-renderer` (chip), `test:chat-context-compaction` (wire).
+- **Đã làm.** `ScheduleRef { scope, day?, planId?, idInPlan?, activityId?, label }` (camelCase như
+  mọi entry lưu), `CoachOpenRequest.scheduleRefs`. Chip nằm cạnh composer của **cuộc chat đang mở**
+  (lịch là của athlete, không của cuộc chat nào), tối đa 3, gửi thành neo `scheduleRefs` ngay trước
+  câu hỏi; `scheduleRefsNote` gộp vào câu hỏi kèm id mà tool đọc (`plan_id`, `id_in_plan`,
+  `activity_id`, ngày) và tên tool để đọc. Calendar: Ask Coach của tuần và của buổi/hoạt động trong
+  panel ngày giờ mở Coach với chip và một câu hỏi để athlete viết tiếp, thay cho đoạn prompt dán số
+  liệu (`describeDayForCoach` đã bỏ). Scope `day` có trong mô hình và trên wire, nhưng màn Calendar
+  chưa có nút hỏi riêng một ngày — hỏi buổi hoặc tuần đã phủ nó. Library reader: một buổi đang mở
+  của **mọi** plan COROS có id (`remoteId` + `idInPlan`) có nút Ask Coach. Test ở
+  `test:schedule-change-renderer` (chip, wire, neo; nút trong reader) và `test:chat-context-compaction`.
+
+**Thứ tự:** P3.0 → (P3.1 ∥ P3.2) → P3.3 → (P3.4 ∥ P3.5). Cỡ việc thô: P3.0 ≈ 1–2 ngày (tuỳ lịch
+chạy probe), P3.1 ≈ 3 ngày, P3.2 ≈ 2 ngày, P3.3 ≈ 1–1.5 tuần, P3.4 ≈ 3 ngày, P3.5 ≈ 4 ngày.
+
+**Ship P3 khi:** Coach trả lời "tuần này tôi bị ốm, sắp lại giúp" bằng một change set mà athlete
+áp được từng dòng; buổi của plan đang chạy vẫn thuộc plan sau khi dời; đề xuất sống qua restart và
+qua máy khác; áp hai lần không ghi hai lần.
+
+**Review tổng thể P3 (2026-09-26).** Sửa được:
+- Kéo một buổi **riêng** trên màn Calendar giờ phải hỏi `isRunningCopy`, và lịch riêng không bao giờ có
+  trong cache plan — mỗi lần kéo tốn một `plan/query` (request nặng nhất COROS có). `scheduleMoves`
+  nhớ các `planId` COROS đã nói không phải bản chạy trong suốt process.
+- Một dòng *failed* vì COROS vắng mặt một lúc thì mất luôn đề xuất. Giờ dòng failed có **Try again**
+  (chỉ khi được gọi đích danh, không qua Apply all), trừ khi một phần đã ghi (`retry: false` — thay
+  buổi riêng đã thêm bài mới mà không xoá được bài cũ; thử lại sẽ thêm lần nữa).
+- Chip lịch bị xoá khi Coach mount lần đầu từ màn Calendar: lần load cuộc chat đầu tiên reset những gì
+  thuộc về cuộc chat. Chip giờ chờ đến khi có cuộc chat mở.
+- Plan đã lưu trữ nhưng đang chạy trên lịch bị ẩn khỏi `list_training_plans`.
+- `test:chat-style-names` đỏ từ P2: class không có rule (`chat-outline-card`, `chat-outline-editor`,
+  `chat-outline-editor-stage`, `is-done` của trail) cộng hai class P3; đã thêm rule thật hoặc bỏ hook.
+- (Trong P3.3) state `scheduleChanges` khai báo sau chỗ dùng — cuộc chat có neo đề xuất văng khi vẽ.
+
+Test: 138 bộ không cần cửa sổ và 13 bộ renderer đều qua, trừ `test:library-renderer` ("got 8 of 24"),
+lỗi đã có từ trước P3. `npm run build` qua.
+
+**Review P3 lượt 2 (2026-09-26).** Sửa thêm:
+- `list_training_plans` tìm cuộc chat của mỗi plan Coach bằng cách quét **mọi** transcript
+  (`findChatSessionMentioning`, mỗi version một lần quét); giờ chỉ hỏi một row — cuộc chat đang hỏi
+  (`chatSessionMentionsDraft`).
+- `list_scheduled_workouts` parse cùng một plan trong cache cho mỗi buổi; giờ mỗi plan một lần mỗi lượt.
+- Dời buổi của plan tới trước tuần plan bắt đầu chỉ bị COROS/adapter từ chối lúc áp; giờ bị từ chối
+  ngay trong lượt đề xuất, kèm lý do cho model.
+- Prompt nhắc `delete_workout` và `propose_schedule_changes` cả khi lượt không được offer tool đó (Claude
+  Code tắt quyền lịch; analysis không có `delete_workout`); giờ chỉ nhắc tool có mặt.
+- Một dòng mang **status** do build mới hơn ghi bị đọc thành `proposed` và sẽ bị áp ở đây; giờ giữ
+  nguyên và không áp. `lines_json` không parse được thì set không bao giờ được ghi đè (trước đây Dismiss
+  sẽ ghi `[]` lên nó).
+- Card vẽ nút Apply cho dòng có op build này không biết (bấm không làm gì); giờ không có nút.
+- Hàng card đề xuất khoá React theo id **và** vị trí, và có `data-chat-entry-index` như các card khác.
+
+Còn lại, đã biết:
+- Chưa chạy trên tài khoản thật đường áp của P3.3 (dời/thay buổi của plan qua bản chạy, thêm/thay buổi
+  riêng); P3.0 mới đo từng thao tác COROS riêng lẻ.
+- Scope `day` của `scheduleRefs` chưa có nút riêng trên màn Calendar.
+- Hai máy áp cùng một change set gần như cùng lúc: không ghi COROS hai lần, nhưng máy sau có thể ghi
+  *stale* đè *applied* trên card.
+- Hai lần ghi vào cùng một bản chạy gần như cùng lúc (kéo trên Calendar và áp đề xuất) có thể mất một
+  thay đổi — mỗi lần đọc `detail` rồi ghi cả plan, không có khoá phiên bản.
+- Ref có scope mà build này không biết bị bỏ khi đọc (như `planRefs`).
+- `test:workout-builder-renderer` chập chờn ("the chevron holds its place… 281 then 279"), cũng đỏ
+  khoảng một nửa số lần ở commit trước P3 — không do P3.
+- Chip "Ask Coach" từ một buổi của plan trong Library mang `id_in_plan` của **plan mẫu**; khi đọc,
+  plan đang chạy được đọc qua bản chạy. Hai id trùng nhau khi plan vừa lên lịch (đã thấy ở P3.0), nhưng
+  có thể lệch sau khi buổi được thêm vào bản chạy từ plan đã sửa.
+
+**Việc tồn đọng nên làm trước hoặc cùng P3** (từ các lần review): câu hỏi "Redraw the outline?"
+khi đổi nguồn của cuộc chat; analysis không thấy brief (gộp vào P3.4); phần đã ghi của một lần lưu
+bị ngắt chỉ nhớ trong RAM (P3.3 có thể dùng cùng cơ chế lưu kết quả từng dòng).
 
 ## 6. IPC
 
@@ -753,6 +954,8 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat:send` + `ChatPipelineStep` | P2.2, P2.3 | Tham số thứ năm: lượt là một bước pipeline (`outline`, `sessions`), không phải câu hỏi |
 | `chat:planBriefs` | P2.1 | Đọc brief của các anchor `planBrief` |
 | `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Đã bỏ** |
+| `chat:scheduleChanges` | P3.2 | Đọc change set của các neo `scheduleChange` |
+| `chat:applyScheduleChange`, `chat:dismissScheduleChange` | P3.2–P3.3 | Áp / bỏ một dòng hoặc cả change set |
 
 ## 7. Dữ liệu và sync
 
@@ -762,7 +965,8 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat_plan_artifacts` (mới, P1.1) | `personal` | `artifact_id` PK, `session_id`, `kind` (plan/workout), `start_monday`, `race_day`, `refinements_json`, `brief_json` (P2), `outline_json` + `outline_version` (P2), `updated_at`. Chỉ những gì không suy ra được: không có tên, trạng thái hay id COROS (đọc từ version). Hai máy sửa brief cùng lúc thì bản sau thắng, như draft Library |
 | `chat_conversation_settings` (mới, P2.0) | `personal` | `session_id` PK, `sources_json`, `runtime_json`, `updated_at`. Bảng riêng, không thêm cột vào `chat_sessions`, để không đụng merger của bảng đó |
 | Setting `chat.coach.inlineSuggestions` (P1.9) | `preference` | `auto` \| `on` \| `off` |
-| Entry kind mới `planEvent`, `planRefs` (P1), `planBrief`, `planOutline` (P2) | trong `chat_sessions` | Chỉ là neo (Q3) |
+| `chat_schedule_changes` (mới, P3.2) | `personal` | `change_set_id` PK, `session_id`, `summary`, `lines_json` (mỗi dòng: `lineId`, `op`, `label`, `session`/`toDay`/`workout`/`program`, `status`, `reason`, `retry`, `settledAt`), `created_at`, `updated_at`; `unit_system` (P3.3, qua `ensureColumn`). Personal để áp được từ máy kia; áp hai lần an toàn vì mỗi dòng đọc lại lịch trước khi ghi |
+| Entry kind mới `planEvent`, `planRefs` (P1), `planBrief`, `planOutline` (P2), `scheduleChange`, `scheduleRefs` (P3) | trong `chat_sessions` | Chỉ là neo (Q3) |
 
 - Thêm bảng thì phân loại trong `syncPolicy.ts`, hoặc `test:sync-policy` fail.
 - Cột mới đi qua `ensureColumn`, không sửa khối `CREATE TABLE`.
@@ -811,7 +1015,10 @@ patch làm version nhiều hơn, nên Q5 là bắt buộc. Việc thu nhỏ bi�
 | Giới hạn 2 card chỉ nằm trong prompt (D4) | Model có thể vượt; theo dõi qua chi phí mỗi câu trả lời; công tắc tắt được |
 | Claude Code `maxTurns: 10` / `MAX_TOOL_ROUNDS = 10` | Patch và kiểm tra trong lượt dùng ít vòng hơn gửi lại cả plan; theo dõi `no-plan` sau P1 |
 | Provider không cache (OpenRouter, Local) | D4 tắt mặc định; câu chi phí trong Settings |
-| Thay một buổi trên bản chạy mà không đổi plan mẫu | **Probe** trước P3 |
+| Thay một buổi trên bản chạy mà không đổi plan mẫu | **Đã đo (P3.0 B, C):** thay chương trình và dời ngày qua `plan/update` trên bản chạy — lịch theo, `idInPlan` giữ, plan mẫu không đổi |
+| Xoá/dời buổi của plan đang chạy làm tách buổi khỏi plan (compliance mất) | **Xoá: không (P3.0 A)** — status 3 bỏ buổi khỏi cả bản chạy. **Dời: có (P3.0 D)** — `rescheduleScheduledWorkout` đưa buổi sang lịch riêng; sửa màn Calendar ở P3.3 |
+| Một change set ghi nhiều buổi trong một request | **P3.0 E: nguyên tử** — một dòng hỏng làm hỏng cả request; ghi mỗi dòng một request |
+| Change set áp hai lần từ hai máy | Mỗi dòng đọc lại lịch trước khi ghi; dòng đã khác thì *stale* |
 
 Mặc định nhỏ, đổi được khi review:
 - Ngưỡng one-shot 14 ngày tính từ buổi đầu tới buổi cuối (không phải từ hôm nay).
@@ -839,10 +1046,10 @@ P0.4, P0.5, P0.6, P0.7, P0.8         ▼        ▼
                                    P1.4 ──► P1.5 ──► P1.6 ──► P1.7 ──► P1.8
                                                           P1.9 (sau P0.7)
 P1.* ──► P2.0 ──► P2.1 ──► P2.2 ──► P2.3 ──► P2.4 ──► P2.5 ──► §10
-P2 ──► P3 (probe trước)
+P2 ──► P3.0 (probe) ──► P3.1 ∥ P3.2 ──► P3.3 ──► P3.4 ∥ P3.5
 ```
 
 Trong P0, các task độc lập với nhau trừ P0.3 dựa trên phần vẽ của P0.2. P0.1 là task duy nhất
 nên có trong một bản phát hành riêng trước P1.
 
-Tổng cỡ việc thô: P0 ≈ 1.5 tuần, P1 ≈ 3–4 tuần, P2 ≈ 3 tuần, P3 chưa ước lượng (còn chờ probe).
+Tổng cỡ việc thô: P0 ≈ 1.5 tuần, P1 ≈ 3–4 tuần, P2 ≈ 3 tuần, P3 ≈ 3–4 tuần sau probe.

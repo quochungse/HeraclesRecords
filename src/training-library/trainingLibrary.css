@@ -5690,6 +5690,12 @@ button.plan-generator-provider:focus-visible {
   white-space: nowrap;
 }
 
+/* Beside the pager: asking about the session is about the session on screen (P3.5). */
+.plan-session-ask {
+  flex: none;
+  margin-left: auto;
+}
+
 .plan-session-pager {
   display: flex;
   flex: none;

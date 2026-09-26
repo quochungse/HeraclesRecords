@@ -24,7 +24,8 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  ListChecks
+  ListChecks,
+  MessageCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -57,6 +58,8 @@ interface PlanSessionViewProps {
   api?: CorosLinkApi;
   /** Leaves the library for the activity this session became. */
   onOpenActivity?: (activityId: string) => void;
+  /** Opens Coach with this session beside the composer (P3.5); absent for a session COROS has no id for yet. */
+  onAskCoach?: () => void;
   /** Absent where the session is the whole of what is shown — a one-off workout. */
   onBack?: () => void;
   onStep: (direction: -1 | 1) => void;
@@ -103,7 +106,8 @@ export function PlanSessionView({
   api,
   onOpenActivity,
   onBack,
-  onStep
+  onStep,
+  onAskCoach
 }: PlanSessionViewProps) {
   const facts = session.entry;
   const workout = entry?.workout;
@@ -203,6 +207,11 @@ export function PlanSessionView({
         {onBack ? (
           <button type="button" className="ghost-button plan-session-back" onClick={onBack}>
             <ArrowLeft size={14} /> <span>{planName}</span>
+          </button>
+        ) : null}
+        {onAskCoach ? (
+          <button type="button" className="ghost-button plan-session-ask" onClick={onAskCoach}>
+            <MessageCircle size={14} aria-hidden="true" /> <span>Ask Coach</span>
           </button>
         ) : null}
         <div className="plan-session-pager">

@@ -133,7 +133,6 @@ import {
   scheduleLibraryWorkout,
   createAndScheduleWorkout,
   createLibraryWorkout,
-  rescheduleScheduledWorkout,
   removeScheduledWorkout,
   getWorkoutForEdit,
   previewWorkoutEdit,
@@ -350,20 +349,20 @@ import {
   findChatSessionForDraft,
   editPlanDraft,
   getPlanDraftDocument,
-  confirmWorkoutDelete
+  applyScheduleChangeLine,
+  dismissScheduleChangeLine,
+  getScheduleChanges
 } from "./chatService";
 import {
   compactChatSessionContext,
   inspectChatSessionContext
 } from "./chatContextService";
 import { buildBaseCoachInstructions } from "./chatCoachContext";
+import { moveCalendarSession } from "./scheduleMoves";
 import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
-import {
-  pruneDeleteRequestStore
-} from "./chatWorkoutTools";
 import {
   connectCorosMcp,
   disconnectCorosMcp,
@@ -794,7 +793,6 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
-  pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1924,8 +1922,13 @@ function registerIpcHandlers(): void {
     editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
 
-  ipcMain.handle("chat:confirmWorkoutDelete", (_event, requestId: string) =>
-    confirmWorkoutDelete(requestId)
+  // Coach's proposals to the calendar and the library (P3.2–P3.3).
+  ipcMain.handle("chat:scheduleChanges", (_event, changeSetIds: string[]) => getScheduleChanges(changeSetIds));
+  ipcMain.handle("chat:applyScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    applyScheduleChangeLine(changeSetId, lineId)
+  );
+  ipcMain.handle("chat:dismissScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    dismissScheduleChangeLine(changeSetId, lineId)
   );
 
   ipcMain.handle(
@@ -2202,7 +2205,9 @@ function registerIpcHandlers(): void {
         happenDay: string;
       },
       newHappenDay: string
-    ) => rescheduleScheduledWorkout(entry, newHappenDay)
+    ) =>
+      // A plan's session moves through its running copy, or it leaves the plan (P3.0 D).
+      moveCalendarSession(entry, newHappenDay)
   );
 
   ipcMain.handle(

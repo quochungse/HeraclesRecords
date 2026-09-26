@@ -20208,7 +20208,10 @@ tr.data-intervals-row-missing {
 
 /* A plan brief (P2.1): the generator's snapshot rows, each marked with where
    Coach took it from; a row with no mark is the default nobody has spoken to. */
-.chat-brief-card {
+/* The cards of Coach's steps and proposals hold their own positioned overlays. */
+.chat-brief-card,
+.chat-outline-card,
+.chat-change-card {
   position: relative;
 }
 
@@ -20525,6 +20528,16 @@ tr.data-intervals-row-missing {
 .chat-outline-editor-week {
   display: grid;
   gap: 2px;
+}
+
+/* A week with no stage still draws its edge, in the quiet line colour. */
+.chat-outline-editor {
+  --tl-stage: var(--glass-border);
+}
+
+/* The stage menu shares the row with the figures and may not push them out of it. */
+.chat-outline-editor-stage {
+  min-width: 0;
 }
 
 .chat-outline-editor-week strong {
@@ -21182,27 +21195,124 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
-.chat-delete-confirm {
+.chat-delete-expired {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Coach's proposals to the calendar and the library (P3.2–P3.3) */
+.chat-change-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-change-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
+}
+
+.chat-change-line-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chat-change-line-label {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-change-line-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-change-line[data-status="applied"] .chat-change-line-status {
+  color: var(--chat-signal-strong);
+}
+
+.chat-change-line[data-status="failed"] .chat-change-line-status {
+  color: var(--error-text);
+}
+
+.chat-change-line[data-status="stale"] .chat-change-line-status {
+  color: var(--warning-text);
+}
+
+.chat-change-line:is([data-status="dismissed"], [data-status="stale"]) .chat-change-line-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.chat-change-line-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.chat-change-apply,
+.chat-change-dismiss {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--error-text) 45%, transparent);
-  background: color-mix(in srgb, var(--error-text) 12%, transparent);
-  color: var(--error-text);
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-.chat-delete-confirm:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--error-text) 18%, transparent);
+.chat-change-apply {
+  border-color: var(--chat-signal-border);
+  color: var(--chat-signal-strong);
+  background: var(--chat-signal-soft);
 }
 
-.chat-delete-confirm:disabled {
+.chat-change-apply.is-destructive {
+  border-color: color-mix(in srgb, var(--error-text) 45%, transparent);
+  color: var(--error-text);
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+}
+
+.chat-change-apply:hover:not(:disabled),
+.chat-change-dismiss:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.chat-change-apply:disabled,
+.chat-change-dismiss:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.chat-change-apply:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-change-dismiss:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* COROS MCP connect control */

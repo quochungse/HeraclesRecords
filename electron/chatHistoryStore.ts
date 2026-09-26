@@ -29,6 +29,7 @@ import type {
   PlanDraftPreview,
   PlanEvent,
   PlanRef,
+  ScheduleRef,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   SaveChatSessionOptions,
@@ -174,6 +175,27 @@ function parseSource(value: unknown): PersistedChatSource | undefined {
 }
 
 const PLAN_REF_SCOPES = ["plan", "week", "session"] as const;
+
+/** A ref the calendar or the Library pointed at (P3.5); what this build does not read is kept. */
+function parseScheduleRef(value: unknown): ScheduleRef | null {
+  if (!isRecord(value)) return null;
+  const scope = value.scope === "day" || value.scope === "week" || value.scope === "session" ? value.scope : null;
+  const label = typeof value.label === "string" ? value.label : "";
+  if (!scope || !label) return null;
+  const text = (key: string) => (typeof value[key] === "string" && value[key] ? (value[key] as string) : undefined);
+  return keepUnknownKeys<ScheduleRef>(
+    {
+      scope,
+      ...(text("day") ? { day: text("day") } : {}),
+      ...(text("planId") ? { planId: text("planId") } : {}),
+      ...(text("idInPlan") ? { idInPlan: text("idInPlan") } : {}),
+      ...(text("activityId") ? { activityId: text("activityId") } : {}),
+      label
+    },
+    value,
+    ["scope", "day", "planId", "idInPlan", "activityId", "label"]
+  );
+}
 
 function parsePlanRef(value: unknown): PlanRef | null {
   if (
@@ -1098,10 +1120,12 @@ const KNOWN_ENTRY_KINDS = new Set([
   "planDraft",
   "planEvent",
   "planRefs",
+  "scheduleRefs",
   "planBrief",
   "planOutline",
   "coachPrompt",
   "workoutDelete",
+  "scheduleChange",
   "activityVisual",
   "activityHrTrend",
   "fitnessTrend",
@@ -1192,6 +1216,13 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
     return refs.length ? cardEntry({ kind: "planRefs", refs }, value, "refs") : null;
   }
 
+  if (value.kind === "scheduleRefs") {
+    const refs = Array.isArray(value.refs)
+      ? value.refs.map(parseScheduleRef).filter((ref): ref is ScheduleRef => ref !== null)
+      : [];
+    return refs.length ? cardEntry({ kind: "scheduleRefs", refs }, value, "refs") : null;
+  }
+
   if (value.kind === "planBrief") {
     // An anchor (Q3): the brief itself is its `chat_plan_artifacts` row.
     return typeof value.artifactId === "string" && value.artifactId
@@ -1222,6 +1253,13 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
   if (value.kind === "coachPrompt") {
     const prompt = parseCoachInputPrompt(value.prompt);
     return prompt ? cardEntry({ kind: "coachPrompt", prompt }, value, "prompt") : null;
+  }
+
+  if (value.kind === "scheduleChange") {
+    // An anchor (Q3): the change set itself is its `chat_schedule_changes` row (P3.2).
+    return typeof value.changeSetId === "string" && value.changeSetId
+      ? cardEntry({ kind: "scheduleChange", changeSetId: value.changeSetId }, value, "changeSetId")
+      : null;
   }
 
   if (value.kind === "workoutDelete") {
@@ -1640,6 +1678,8 @@ function logicalKey(entry: PersistedChatEntry): string | undefined {
       return `planDraft:${entry.draft.draftId}`;
     case "workoutDelete":
       return `workoutDelete:${entry.preview.requestId}`;
+    case "scheduleChange":
+      return `scheduleChange:${entry.changeSetId}`;
     case "activityVisual":
     case "activityHrTrend":
     case "fitnessTrend":

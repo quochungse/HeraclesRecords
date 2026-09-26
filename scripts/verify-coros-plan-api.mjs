@@ -286,7 +286,14 @@ try {
   } catch (error) {
     check(`cleanup failed: ${error?.message ?? error}`, false);
   } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    /* The scratch database holds a copy of the token, and Windows will not
+       delete a file SQLite still has open. */
+    try {
+      databaseModule.closeDatabase();
+      fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch (error) {
+      check(`remove ${scratch} by hand - it holds a copy of the COROS token (${error?.code ?? error})`, false);
+    }
   }
 }
 

@@ -20,7 +20,7 @@ export function CoachStepTrail({ run }: { run: StepRun }) {
           {run.notes.trail.map((item, index) => {
             const doing = index === last && item.kind !== "passed";
             return (
-              <li key={index} className={doing ? "is-doing" : "is-done"}>
+              <li key={index} className={doing ? "is-doing" : undefined}>
                 {doing ? <i aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
                 <span>
                   {doing ? item.doing : item.done}

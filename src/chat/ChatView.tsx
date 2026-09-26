@@ -32,7 +32,6 @@ import {
   Sparkles,
   Square,
   Terminal,
-  Trash2,
   User,
   X,
   Zap
@@ -79,7 +78,8 @@ import type {
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutDeletePreview,
-  DeleteWorkoutResult
+  ScheduleChangeSet,
+  ScheduleRef
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { sportTheme } from "../training-library/sportTheme";
@@ -94,6 +94,8 @@ import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
+import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
+import { scheduleChangeIds } from "./scheduleChangeModel";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
@@ -135,7 +137,6 @@ import {
   upsertFitnessTrendEntry,
   upsertHrZoneEntry,
   upsertPlanDraftEntry,
-  upsertWorkoutDeleteEntry,
   isChatVisualEntry,
   settleTurnEntries,
   type ChatEntry,
@@ -348,23 +349,23 @@ function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
 }
 
+/** One chip per thing pointed at. */
+function scheduleRefKey(ref: ScheduleRef): string {
+  return `${ref.scope}|${ref.day ?? ""}|${ref.planId ?? ""}|${ref.idInPlan ?? ""}|${ref.activityId ?? ""}`;
+}
+
 function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
   if (target === "scheduled") return "Calendar";
   if (target === "library") return "Library";
   return "Calendar and library";
 }
 
-function DeletePreviewCard({
-  preview,
-  deleting,
-  deleted,
-  onConfirm
-}: {
-  preview: WorkoutDeletePreview;
-  deleting: boolean;
-  deleted?: DeleteWorkoutResult;
-  onConfirm: () => void;
-}) {
+/**
+ * A delete card from before change sets (P3.2). Its request lived in the
+ * memory of the process that staged it, so nothing can be applied from it
+ * any more; it stays drawn because it is part of the conversation.
+ */
+function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
   return (
     <div className="chat-plan-card chat-delete-card">
       <div className="chat-plan-card-header">
@@ -389,25 +390,7 @@ function DeletePreviewCard({
           </div>
         ) : null}
       </dl>
-      {deleted ? (
-        <p className="chat-plan-success">{deleted.message}</p>
-      ) : (
-        <div className="chat-plan-actions">
-          <button
-            type="button"
-            className="chat-delete-confirm"
-            onClick={onConfirm}
-            disabled={deleting}
-          >
-            {deleting ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : (
-              <Trash2 size={14} aria-hidden="true" />
-            )}
-            Delete from COROS
-          </button>
-        </div>
-      )}
+      <p className="chat-delete-expired">This card is from an earlier version and can no longer delete anything. Ask Coach again.</p>
     </div>
   );
 }
@@ -919,6 +902,27 @@ export function ChatView({
       )
       .catch(() => undefined);
   }, [api, missingBriefs]);
+  /**
+   * The change sets behind the conversation's proposal cards (P3.2), by id.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
+  /** The line being applied (`"*"` for a whole set), by set. */
+  const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
+  const missingChangeSets = scheduleChangeIds(timeline)
+    .filter((changeSetId) => !(changeSetId in scheduleChanges))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingChangeSets) return;
+    const ids = missingChangeSets.split(",");
+    setScheduleChanges((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getScheduleChanges(ids)
+      .then((sets) =>
+        setScheduleChanges((current) => ({ ...current, ...Object.fromEntries(sets.map((set) => [set.changeSetId, set])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingChangeSets]);
   /** The anchor each outline's card is drawn at: its latest (P2.2). */
   const outlineAnchors = latestOutlineAnchors(timeline);
   /** The brief whose screen is open, and how its save is going. */
@@ -1014,12 +1018,6 @@ export function ChatView({
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
-  >({});
-  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(
-    null
-  );
-  const [deletedWorkouts, setDeletedWorkouts] = useState<
-    Record<string, DeleteWorkoutResult>
   >({});
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
@@ -1149,6 +1147,24 @@ export function ChatView({
   };
 
   /**
+   * The calendar or a COROS plan, pointed at from its screen and waiting
+   * beside the composer until the next question goes (P3.5). Sent as a
+   * `scheduleRefs` entry just before it.
+   */
+  const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
+  /**
+   * Chips asked for before any conversation is open — Coach mounting for the
+   * first time from the Calendar. Opening the first conversation resets what
+   * belongs to a conversation, so they wait here until one is open.
+   */
+  const scheduleRefsWaitingRef = useRef<ScheduleRef[] | null>(null);
+  useEffect(() => {
+    if (!activeSessionId || !scheduleRefsWaitingRef.current) return;
+    setPendingScheduleRefs(scheduleRefsWaitingRef.current);
+    scheduleRefsWaitingRef.current = null;
+  }, [activeSessionId]);
+
+  /**
    * Coach opened from the Library about a plan it wrote: the conversation that
    * wrote it, with the plan beside the composer. A conversation deleted since
    * took the plan's drafts with it, so a new one starts from the plan's name.
@@ -1157,6 +1173,15 @@ export function ChatView({
     if (!api) return;
     if (request.newPlan) {
       await startPlanConversation();
+      return;
+    }
+    // The calendar is the athlete's, not a conversation's: the chips join the one open.
+    if (request.scheduleRefs?.length) {
+      const refs = request.scheduleRefs.slice(0, 3);
+      if (activeSessionIdRef.current) setPendingScheduleRefs(refs);
+      else scheduleRefsWaitingRef.current = refs;
+      composerRef.current?.setDraft(request.prompt ?? "");
+      requestAnimationFrame(() => composerRef.current?.focus());
       return;
     }
     const sessionId = request.draftId
@@ -1209,8 +1234,8 @@ export function ChatView({
   const resetEphemeralChatState = () => {
     // A reference belongs to the conversation it was picked in.
     setPendingRefs([]);
+    setPendingScheduleRefs([]);
     setUploadedPlans({});
-    setDeletedWorkouts({});
     pendingCoachPromptsRef.current = [];
     resumedCoachPromptRef.current = null;
   };
@@ -1635,6 +1660,8 @@ export function ChatView({
       // cards read them through `planBriefs`, which is let go so they are
       // read again; a conversation's settings likewise (P2.0).
       if (change.tables.includes("chat_plan_artifacts")) setPlanBriefs({});
+      // A proposal applied or dismissed on the other machine (P3.2).
+      if (change.tables.includes("chat_schedule_changes")) setScheduleChanges({});
       if (change.tables.includes("chat_conversation_settings")) {
         setConversationSettingsVersion((value) => value + 1);
       }
@@ -2030,9 +2057,13 @@ export function ChatView({
                 : [...prev, { kind: "planOutline", artifactId: brief.artifactId, outlineVersion }]
             );
           }
-        } else if (payload.kind === "workoutDelete") {
+        } else if (payload.kind === "scheduleChange") {
+          const changeSet = payload.changeSet;
+          setScheduleChanges((current) => ({ ...current, [changeSet.changeSetId]: changeSet }));
           setTimeline((prev) =>
-            upsertWorkoutDeleteEntry(prev, payload.preview)
+            prev.some((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSet.changeSetId)
+              ? prev
+              : [...prev, { kind: "scheduleChange", changeSetId: changeSet.changeSetId }]
           );
         } else if (payload.kind === "activityVisual") {
           if (chatSettings.visualizationsEnabled) {
@@ -2727,14 +2758,18 @@ export function ChatView({
         : entry
     );
     const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
+    // A step and an answer to Coach's question are not about the calendar chips.
+    const scheduleRefs = originalPrompt || aboutRefs || pipeline ? [] : pendingScheduleRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
           ...answeredTimeline,
           ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
+          ...(scheduleRefs.length ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs }] : []),
           { kind: "message", role: "user", content: trimmed }
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
+    if (scheduleRefs.length) setPendingScheduleRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -2780,6 +2815,9 @@ export function ChatView({
       ...new Set(persisted.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
     ];
     const briefs = briefIds.length ? await api.getPlanBriefs(briefIds).catch(() => []) : [];
+    // Read now, not from state: a line applied on the other machine is what the coach should hear (P3.3).
+    const changeSetIds = scheduleChangeIds(persisted);
+    const changeSets = changeSetIds.length ? await api.getScheduleChanges(changeSetIds).catch(() => []) : [];
     if (activeRequestIdRef.current !== requestId) return true;
     const wireMessages = withCreationIndex(
       [
@@ -2788,7 +2826,8 @@ export function ChatView({
       ],
       persisted,
       Array.isArray(versions) ? versions : [],
-      Array.isArray(briefs) ? briefs : []
+      Array.isArray(briefs) ? briefs : [],
+      Array.isArray(changeSets) ? changeSets : []
     );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined, pipeline);
@@ -3078,20 +3117,27 @@ export function ChatView({
     }, 1800);
   };
 
-  const handleConfirmWorkoutDelete = async (requestId: string) => {
-    if (!api || deletingRequestId) return;
-    setDeletingRequestId(requestId);
+  const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
+    if (!api || applyingChange) return;
+    setApplyingChange({ changeSetId, lineId: lineId ?? "*" });
     onError(null);
     try {
-      const result = await api.confirmWorkoutDelete(requestId);
-      setDeletedWorkouts((prev) => ({ ...prev, [requestId]: result }));
-      onPlanUploaded?.();
+      const set = apply
+        ? await api.applyScheduleChange(changeSetId, lineId)
+        : await api.dismissScheduleChange(changeSetId, lineId);
+      setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+      if (apply) onPlanUploaded?.();
     } catch (caught) {
-      onError(
-        remoteErrorMessage(caught, "Failed to delete workout from COROS.")
-      );
+      onError(remoteErrorMessage(caught, apply ? "The change was not applied." : "The change was not dismissed."));
+      // What COROS did before the failure is in the row: read it again.
+      void api
+        .getScheduleChanges([changeSetId])
+        .then(([set]) => {
+          if (set) setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+        })
+        .catch(() => undefined);
     } finally {
-      setDeletingRequestId(null);
+      setApplyingChange(null);
     }
   };
 
@@ -4037,6 +4083,23 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "scheduleRefs") {
+              return (
+                <div
+                  key={`scheduleRefs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={scheduleRefKey(ref)} className="chat-ref-chip">
+                      {ref.label}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
             if (entry.kind === "planBrief") {
               const brief = planBriefs[entry.artifactId];
               if (!brief) return null;
@@ -4275,13 +4338,33 @@ function AnalysisSilentChip({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
-                    <DeletePreviewCard
-                      preview={entry.preview}
-                      deleting={deletingRequestId === entry.preview.requestId}
-                      deleted={deletedWorkouts[entry.preview.requestId]}
-                      onConfirm={() =>
-                        void handleConfirmWorkoutDelete(entry.preview.requestId)
-                      }
+                    <DeletePreviewCard preview={entry.preview} />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "scheduleChange") {
+              const changeSet = scheduleChanges[entry.changeSetId];
+              if (!changeSet) return null;
+              const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
+              return (
+                // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
+                <div
+                  key={`scheduleChange:${entry.changeSetId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachScheduleChangeCard
+                      changeSet={changeSet}
+                      busyLine={busyLine}
+                      disabled={Boolean(applyingChange) || streaming}
+                      onApply={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, true)}
+                      onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                     />
                   </div>
                 </div>
@@ -4457,6 +4540,28 @@ function AnalysisSilentChip({
         </div>
       </div>
 
+          {pendingScheduleRefs.length ? (
+            <div className="chat-refs-pending" aria-label="Asking about the calendar">
+              <span className="chat-asked-kicker">Asking about</span>
+              {pendingScheduleRefs.map((ref) => (
+                <span key={scheduleRefKey(ref)} className="chat-ref-chip">
+                  {ref.label}
+                  <button
+                    type="button"
+                    className="chat-ref-remove"
+                    aria-label={`Stop asking about ${ref.label}`}
+                    onClick={() =>
+                      setPendingScheduleRefs((current) =>
+                        current.filter((item) => scheduleRefKey(item) !== scheduleRefKey(ref))
+                      )
+                    }
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {pendingRefs.length ? (
             <div className="chat-refs-pending" aria-label="Asking about">
               <span className="chat-asked-kicker">Asking about</span>
