@@ -398,7 +398,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   must name all three scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
   is portalled there) and `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
   question it asks through the plan's `ConfirmDialog` sits outside both) — or the control draws as
-  the platform's grey button; and the editor's shortcuts listen on the window, gated on `layer`,
+  the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
+  reader's week cards and takes the library's **tokens** block as a fourth scope, but no control
+  rule, since it edits nothing; without the tokens its day wells drew as the browser's black
+  dashed border. And the editor's shortcuts listen on the window, gated on `layer`,
   because an undo remounts the focused session and a handler on the editor's element then hears
   nothing. Calendar actions are not in the editor (they need a saved plan); saving lands on the
   reader. A new plan opens **named** (`defaultPlanName`: "New
@@ -490,8 +493,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   every version is a card and a row of its own. The coach reads one back with `get_plan_draft` and
   changes one with `revise_training_plan` — operations, not the plan again — which writes the next
   version and folds the old card to a line; a read-only run may do neither of the writes
-  (docs/coach-plan-canvas.md, P1.1–P1.3). Drafts are deleted with their conversation; the
-  24-hour prune is gone.
+  (docs/coach-plan-canvas.md, P1.1–P1.3). **A creation is read in the canvas** (`CoachCanvas`,
+  lazy with the library's stylesheet), which replaced the Creations list and its popup: the
+  index of creations, or one open beside the conversation — a sheet over it below 1100px — with
+  the reader's ridge, week cards and session view, a version picker, a Versions tab whose lines
+  come from `electron/planDiff.ts` (node-free, shared with `restorePlanDraftVersion`'s
+  `planEvent`), and Restore, which writes the old content as a new version. Its buttons and the
+  card's come from one function, `artifactActions`. The composer is a container
+  (`chat-composer`), because the canvas narrows the conversation on a wide window too.
+  Drafts are deleted with their conversation; the 24-hour prune is gone.
   **The AI plan generator (`TrainingPlanGenerator`) is two turns of its own, not a chat message.**
   Four steps: Goal (a race — its day decides the length and ends the plan — a base, a comeback,
   hybrid, or "Something else" in the athlete's words; a length Coach may choose), Your week (days

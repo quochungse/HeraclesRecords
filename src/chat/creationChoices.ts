@@ -150,3 +150,31 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
     more: [...(allDated && !anyPast ? [PUT_ON_CALENDAR] : []), LIBRARY]
   };
 }
+
+/**
+ * What a creation offers where it is drawn, from one place for the card and
+ * the canvas alike (docs/coach-plan-canvas.md, P1.4, D9/D10):
+ *
+ * - `older`: a version something has replaced. It is read, not saved; the one
+ *   thing to do with it is make it the newest again (`restore`), which a
+ *   saved creation cannot do from here until P1.6.
+ * - `editing`: its editor is open. The editor is the one place a creation
+ *   is changed, so every other place leads back into it, and nothing is saved
+ *   to COROS from a version with changes still unsaved.
+ * - `save`: the newest version, with the ways to save it.
+ */
+export type ArtifactActions =
+  | { kind: "older"; restore: boolean }
+  | { kind: "editing" }
+  | { kind: "save"; choices: CreationChoices };
+
+export function artifactActions(
+  draft: PlanDraftPreview,
+  state: { latest: boolean; editing?: boolean; saved?: boolean },
+  today: string
+): ArtifactActions {
+  const saved = state.saved ?? Boolean(draft.uploadedAt || draft.uploadResult);
+  if (!state.latest) return { kind: "older", restore: !saved };
+  if (state.editing) return { kind: "editing" };
+  return { kind: "save", choices: planSaveChoices(draft, today) };
+}

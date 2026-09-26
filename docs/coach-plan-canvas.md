@@ -358,6 +358,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 - Test: `test:chat-context-compaction` (mục lục, mở `planEvent`), `test:coach-analysis-runner`.
 
 **P1.4 Canvas** · L
+- (Đã làm: `src/chat/CoachCanvas.tsx`, dựng trong khung `.chat-plan-panel` và nở rộng ở chế độ
+  artifact; `CoachCreationModal` và hai card preview cũ đã xoá cùng CSS của chúng. Khác bản viết:
+  khối token `--tl-*` của Library thêm `.chat-canvas` làm scope thứ tư — chỉ token, không rule
+  control; Restore có ngay ở P1.4 (`chat:restorePlanVersion`), bị từ chối trên artifact đã lưu
+  như revise; composer thành container query vì canvas làm cột chat hẹp cả ở cửa sổ rộng.)
 - Một pane trong `.chat-layout` thay `.chat-plan-panel` và `CoachCreationModal`. Hai chế độ:
   **mục lục** (mở từ nút Creations) và **artifact** (mở từ Open trên card, hoặc từ một dòng của
   mục lục).

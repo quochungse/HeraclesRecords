@@ -34,6 +34,21 @@ export interface CreationFigures {
 }
 
 /**
+ * A plan whose every session is dated, read as starting on the Monday of its
+ * first date, so a drawing names the days it will fall on. The date is only
+ * for the drawing: a plan has no start date of its own.
+ */
+export function datedForReading(document: TrainingPlanDocument): TrainingPlanDocument {
+  const dated = document.entries
+    .map((entry) => parsePlanDay(entry.workout.schedule_date))
+    .filter((date): date is Date => Boolean(date))
+    .sort((left, right) => left.valueOf() - right.valueOf());
+  return dated.length === document.entries.length && dated[0]
+    ? { ...document, startDate: formatPlanDay(mondayOf(dated[0]), true) }
+    : document;
+}
+
+/**
  * The card's figures, read off the plan document the draft becomes — the same
  * `readPlan` the Library's reader draws from, so a plan's weeks, days and
  * peak cannot say one thing here and another there.
@@ -43,15 +58,7 @@ export interface CreationFigures {
  * is only for the drawing: a plan has no start date of its own.
  */
 export function creationFigures(document: TrainingPlanDocument): CreationFigures {
-  const dated = document.entries
-    .map((entry) => parsePlanDay(entry.workout.schedule_date))
-    .filter((date): date is Date => Boolean(date))
-    .sort((left, right) => left.valueOf() - right.valueOf());
-  const drawn: TrainingPlanDocument =
-    dated.length === document.entries.length && dated[0]
-      ? { ...document, startDate: formatPlanDay(mondayOf(dated[0]), true) }
-      : document;
-  const weeks = readPlan(drawn).weeks;
+  const weeks = readPlan(datedForReading(document)).weeks;
   const busy = weeks.filter((week) => week.summary.workouts > 0);
   const counts = busy.map((week) => week.summary.workouts);
   const low = counts.length ? Math.min(...counts) : 0;

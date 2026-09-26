@@ -35,6 +35,7 @@ import {
   saveWorkoutDraftEdit,
   discardPlanDraft,
   planArtifacts,
+  restorePlanDraftVersion,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -169,6 +170,7 @@ import type {
   PlanDraftPreview,
   PlanWorkoutEntryInput,
   PlanArtifactVersion,
+  RestoredPlanVersion,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanGenerationResult,
@@ -2390,6 +2392,10 @@ export async function uploadTrainingPlanDraft(
     scheduleDate,
     keepInLibrary === true
   );
+}
+
+export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): RestoredPlanVersion {
+  return restorePlanDraftVersion(draftId, unitSystem);
 }
 
 export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {

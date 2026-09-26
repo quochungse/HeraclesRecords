@@ -6,10 +6,11 @@ import {
   Loader2,
   MoreHorizontal,
   PencilLine,
+  RotateCcw,
   TriangleAlert
 } from "lucide-react";
 import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
-import { planSaveChoices, type CreationAction } from "./creationChoices";
+import { artifactActions, type CreationAction } from "./creationChoices";
 
 function todayKey(): string {
   const now = new Date();
@@ -28,14 +29,18 @@ function ActionIcon({ action, busy }: { action: CreationAction; busy: boolean })
 /**
  * The buttons under a coach's plan or workout, wherever it is drawn: one that
  * leads, the ones beside it, and the rest behind ⋯. Which is which is
- * `planSaveChoices`, so the card in the conversation and the popup it opens
- * always offer the same presses (docs/coach-plan-canvas.md, P0.5).
+ * `artifactActions`, so the card in the conversation and the canvas it opens
+ * always offer the same presses (docs/coach-plan-canvas.md, P0.5, P1.4).
  */
 export function CreationActions({
   draft,
   uploading,
   onUpload,
-  onEdit
+  onEdit,
+  latest = true,
+  editing = false,
+  saved,
+  onRestore
 }: {
   draft: PlanDraftPreview;
   uploading: boolean;
@@ -45,9 +50,17 @@ export function CreationActions({
     keepInLibrary?: boolean
   ) => void;
   onEdit?: () => void;
+  /** False for a version something has replaced: it is read, not saved. */
+  latest?: boolean;
+  /** Its editor is open, so the way on is back into it. */
+  editing?: boolean;
+  /** Whether any version of the creation is saved, when the caller knows. */
+  saved?: boolean;
+  /** Makes this older version the newest again. */
+  onRestore?: () => void;
 }) {
   const today = todayKey();
-  const choices = planSaveChoices(draft, today);
+  const actions = artifactActions(draft, { latest, editing, saved }, today);
   const [showMore, setShowMore] = useState(false);
   /* A workout put on the calendar is otherwise not kept in the library. */
   const [keepInLibrary, setKeepInLibrary] = useState(false);
@@ -82,6 +95,51 @@ export function CreationActions({
     </button>
   );
 
+  if (actions.kind === "older") {
+    return (
+      <div className="chat-creation-actions">
+        <div className="chat-plan-actions">
+          {actions.restore && onRestore ? (
+            <button
+              type="button"
+              className="chat-plan-upload"
+              data-action="restore"
+              onClick={onRestore}
+              disabled={uploading}
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              Restore this version
+            </button>
+          ) : (
+            <p className="chat-plan-destination-summary">
+              {actions.restore
+                ? "An earlier version, to read."
+                : "An earlier version, to read. The newest one is saved to COROS."}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (actions.kind === "editing") {
+    return (
+      <div className="chat-creation-actions">
+        <div className="chat-plan-actions">
+          <button
+            type="button"
+            className="chat-plan-upload"
+            data-action="continueEditing"
+            onClick={onEdit}
+            disabled={!onEdit}
+          >
+            <PencilLine size={14} aria-hidden="true" />
+            Continue editing
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const choices = actions.choices;
   const calendarOffered = [choices.primary, ...choices.secondary].some(
     (action) => action.id === "putOnCalendar"
   );

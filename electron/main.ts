@@ -340,6 +340,7 @@ import {
   editWorkoutDraft,
   removePlanDraft,
   listPlanArtifactVersions,
+  restorePlanVersion,
   editPlanDraft,
   generateTrainingPlan,
   outlineTrainingPlan,
@@ -1866,6 +1867,9 @@ function registerIpcHandlers(): void {
   );
   ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>
     listPlanArtifactVersions(draftIds)
+  );
+  ipcMain.handle("chat:restorePlanVersion", (_event, draftId: string, unitSystem: UnitSystem) =>
+    restorePlanVersion(draftId, normalizeUnitSystem(unitSystem))
   );
   ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
     removePlanDraft(draftId)

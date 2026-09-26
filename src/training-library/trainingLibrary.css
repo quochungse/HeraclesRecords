@@ -33,10 +33,14 @@
  * `.tl-dialog-backdrop` carries them too: ConfirmDialog is also drawn by the
  * Calendar, portalled to <body>, where its scrim read `--tl-scrim` from nothing
  * and the question sat over an undimmed screen.
+ * `.chat-canvas` is Coach's canvas, which reads a creation with the reader's
+ * week cards: it takes the tokens and no control rule, since it edits nothing.
+ * Without them its day wells drew as the browser's black dashed border.
  */
 .training-library-view,
 .tl-plan-modal-backdrop,
-.tl-dialog-backdrop {
+.tl-dialog-backdrop,
+.chat-canvas {
   /*
    * Hairlines derive from the text colour rather than --glass-border, which is
    * a 0.1-alpha dark on the paper theme and disappears against a white panel.

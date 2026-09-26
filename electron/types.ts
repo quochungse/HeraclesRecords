@@ -3148,6 +3148,15 @@ export interface PlanEvent {
   at: number;
 }
 
+/** An older version made the newest again (P1.4): its card and what it changed. */
+export interface RestoredPlanVersion {
+  preview: PlanDraftPreview;
+  artifactId: string;
+  fromVersion: number;
+  toVersion: number;
+  changes: string[];
+}
+
 /**
  * One version of a coach's creation, as the conversation lists them
  * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own

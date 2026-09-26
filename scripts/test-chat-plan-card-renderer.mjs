@@ -255,22 +255,32 @@ async function main() {
   );
   assert.equal(await harness("exists", '.chat-creation-card [data-action="edit"]'), true);
 
-  // Open shows the popup, whose weeks come from the same document.
+  // Open shows the canvas beside the conversation (P1.4), read with the
+  // Library reader's own week cards, from the same document.
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-creation-modal"), "the popup opens");
-  const popupWeeks = await page(
-    `document.querySelector(".chat-creation-modal .chat-plan-overview-item strong")?.textContent`
-  );
-  assert.equal(popupWeeks, "3", "the popup no longer says 0 weeks for an undated plan");
+  await waitFor(() => harness("exists", ".chat-canvas.is-artifact .plan-week-card"), "the canvas opens on the plan");
+  assert.equal(await harness("count", ".chat-canvas .plan-week-card"), 3, "every week, an undated plan's too");
   assert.equal(
-    await harness("exists", ".chat-creation-modal fieldset"),
-    false,
-    "the destination fieldset is gone"
+    await page(`document.querySelector(".chat-canvas .chat-creation-figures dd")?.textContent`),
+    "3",
+    "the figures are the card's"
   );
+  assert.equal(
+    await harness("exists", '.chat-canvas-foot [data-action="saveAsPlan"]'),
+    await harness("exists", '.chat-creation-card [data-action="saveAsPlan"]'),
+    "and so are the buttons"
+  );
+  assert.equal(await harness("exists", ".chat-creation-card"), true, "the card stays whole while the canvas is open");
+  // A session opens inside the canvas, and Escape steps back out of it.
+  await harness("click", ".chat-canvas .plan-entry.is-openable");
+  await waitFor(() => harness("exists", ".chat-canvas .plan-session"), "a session opens in place");
+  await page(`document.querySelector(".chat-canvas .plan-session").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await waitFor(async () => !(await harness("exists", ".chat-canvas .plan-session")), "Escape steps back to the weeks");
+  assert.equal(await harness("exists", ".chat-canvas.is-artifact"), true, "without closing the canvas");
 
   // Removed before it is saved, the card's draft goes too (P0.8).
-  await harness("click", ".chat-creation-modal-remove");
-  await harness("click", ".chat-creation-modal-footer .chat-local-action.is-danger");
+  await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
+  await harness("click", ".chat-canvas-foot .chat-local-action.is-danger");
   await waitFor(() => harness("callCount", "removePlanDraft"), "the unsaved draft is let go");
   assert.deepEqual((await harness("calls", "removePlanDraft"))[0].args, ["plan-1"]);
   await waitFor(async () => !(await harness("exists", ".chat-creation-card")), "the card leaves the conversation");
@@ -428,7 +438,7 @@ async function main() {
   // and alone is listed among the creations (P1.1)
   // -------------------------------------------------------------------------
   const PREVIEW_V2 = { ...PREVIEW, draftId: "plan-1-v2", editedAt: 5 };
-  await harness("mount", "ChatView", {}, {
+  const VERSIONED = {
     ...BASE_SCRIPT,
     getChatSession: [
       TRANSCRIPT[0],
@@ -439,9 +449,17 @@ async function main() {
     ],
     getPlanArtifacts: [
       { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 },
-      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "athlete", createdAt: 2 }
-    ]
-  });
+      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "athlete", createdAt: 2, parentDraftId: "plan-1", changeSummary: "Long run to Sunday" }
+    ],
+    restorePlanVersion: {
+      preview: { ...PREVIEW, draftId: "plan-1-v3" },
+      artifactId: "plan-1",
+      fromVersion: 2,
+      toVersion: 3,
+      changes: ["Moved Long: week 1 Sun → week 1 Sat"]
+    }
+  };
+  await harness("mount", "ChatView", {}, VERSIONED);
   await waitFor(() => harness("exists", ".chat-version-row"), "the older version folds");
   assert.equal(await page(`document.querySelectorAll(".chat-creation-card").length`), 1, "one card is drawn whole");
   assert.match(
@@ -454,11 +472,37 @@ async function main() {
     /Training plan · v2/,
     "the card names its version"
   );
-  // Removed, a creation goes whole: the older version does not unfold in its place.
+  // The canvas lists every version, and an older one is read, not saved:
+  // its one button makes it the newest again (P1.4).
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-creation-modal"), "the newest version opens");
-  await harness("click", ".chat-creation-modal-remove");
-  await harness("click", ".chat-creation-modal-footer .chat-local-action.is-danger");
+  await waitFor(() => harness("exists", ".chat-canvas-bar"), "the canvas offers the versions");
+  await harness("click", '.chat-canvas-bar [role="radio"]:nth-child(2)');
+  await waitFor(() => harness("exists", ".chat-canvas-version"), "the versions are listed");
+  assert.equal(await harness("count", ".chat-canvas-version"), 2);
+  assert.match((await harness("text", ".chat-canvas-versions > li:first-child")) ?? "", /v2.*You.*Newest.*Long run to Sunday/s);
+  await harness("click", ".chat-canvas-versions > li:last-child .chat-canvas-version");
+  await waitFor(() => harness("exists", ".chat-canvas-older"), "the older version is shown");
+  assert.match((await harness("text", ".chat-canvas-older")) ?? "", /v1 · replaced by v2 from you/);
+  assert.equal(await harness("exists", '.chat-canvas-foot [data-action="saveAsPlan"]'), false, "with nothing to save");
+  await harness("click", '.chat-canvas-foot [data-action="restore"]');
+  await waitFor(() => harness("callCount", "restorePlanVersion"), "Restore asks for the version");
+  assert.equal((await harness("calls", "restorePlanVersion"))[0].args[0], "plan-1");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "and a line says where it happened");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Restored by you · Moved Long/);
+  const afterRestore = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterRestore.slice(-2).map((entry) => entry.kind),
+    ["planEvent", "planDraft"],
+    "the event, then the new version's card"
+  );
+
+  // Removed, a creation goes whole: the older version does not unfold in its place.
+  await harness("mount", "ChatView", {}, VERSIONED);
+  await waitFor(() => harness("exists", ".chat-version-row"), "the conversation is open again");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas-foot"), "the newest version opens");
+  await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
+  await harness("click", ".chat-canvas-foot .chat-local-action.is-danger");
   await waitFor(() => harness("callCount", "removePlanDraft"), "its drafts are let go");
   assert.deepEqual((await harness("calls", "removePlanDraft")).at(-1).args, ["plan-1-v2"]);
   await waitFor(

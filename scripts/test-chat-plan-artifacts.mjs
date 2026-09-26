@@ -438,9 +438,45 @@ test("get_plan_draft reads the newest version, whichever id it is given (P1.3)",
   assert.equal((await read({ draft_id: "nope" })).error_code, "draft_not_found");
 });
 
+test("planDiff states each change once, in reading order (P1.4)", async () => {
+  const { planDiff, changeCount } = await import(distUrl("planDiff.js"));
+  const [first, second] = tools.planArtifacts([block.draftId]);
+  const changes = planDiff(tools.planDraftDocument(first.draftId), tools.planDraftDocument(second.draftId));
+  assert.deepEqual(
+    changes.map((change) => change.text),
+    [
+      'Renamed to "Build block, shorter"',
+      "Tempo Thursday is now Short tempo",
+      "Added Easy Tuesday (week 2 Tue)",
+      "Moved Long Saturday: week 2 Sat → week 2 Sun",
+      "Removed Easy Monday (week 1 Mon)",
+      "Week 2: Not Set → Build"
+    ]
+  );
+  assert.equal(changeCount(changes), "6 changes");
+  const same = tools.planDraftDocument(first.draftId);
+  assert.deepEqual(planDiff(same, structuredClone(same)), [], "a copy is no change");
+});
+
+test("restoring an older version makes a new one with its content (P1.4)", () => {
+  const [first, second] = tools.planArtifacts([block.draftId]);
+  const restored = tools.restorePlanDraftVersion(first.draftId, "metric");
+  assert.equal(restored.toVersion, 4);
+  assert.equal(restored.fromVersion, 3);
+  assert.equal("source" in restored.preview.entries[0], false, "a light card");
+  const row = database.getChatPlanDraft(restored.preview.draftId);
+  assert.equal(row.author, "athlete");
+  assert.equal(row.parentDraftId, tools.planArtifacts([block.draftId])[2].draftId);
+  assert.equal(row.changeSummary, "Restored version 1");
+  assert.equal(tools.planDraftDocument(restored.preview.draftId).name, "Build block");
+  assert.ok(restored.changes.includes('Renamed to "Build block"'), restored.changes.join(" | "));
+  assert.throws(() => tools.restorePlanDraftVersion(restored.preview.draftId), /already the newest/);
+  assert.ok(second);
+});
+
 test("removing a creation lets every version go", () => {
   const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
-  assert.equal(ids.length, 3);
+  assert.equal(ids.length, 4);
   tools.discardPlanDraft(ids[ids.length - 1]);
   for (const id of ids) {
     assert.equal(database.getChatPlanDraft(id), undefined, `${id} is gone`);

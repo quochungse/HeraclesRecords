@@ -68,6 +68,7 @@ import type {
   TrainingPlanGenerationResult,
   PlanDraftPreview,
   PlanArtifactVersion,
+  RestoredPlanVersion,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -672,6 +673,8 @@ export interface CorosLinkApi {
   ) => Promise<UploadPlanResult>;
   /** Every version of the creations these drafts belong to (P1.1). */
   getPlanArtifacts: (draftIds: string[]) => Promise<PlanArtifactVersion[]>;
+  /** Makes an older version of a creation the newest again (P1.4). */
+  restorePlanVersion: (draftId: string, unitSystem: UnitSystem) => Promise<RestoredPlanVersion>;
   /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
   removePlanDraft: (draftId: string) => Promise<void>;
   /** Writes the athlete's edit of a coach's one-off workout back into its draft. */

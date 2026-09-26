@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS } = await import(
+const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS, artifactActions } = await import(
   pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
 );
 
@@ -160,6 +160,27 @@ const ids = (choices) => ({
   assert.equal(creationStatus(saved(workout(), "workoutLibrary")).label, "In library");
   assert.match(creationStatus(saved(workout("2026-10-02"), "calendar")).label, /^On calendar \S/);
   assert.equal(creationStatus(saved(plan(entry("a", "2026-10-02")), "calendar")).label, "On calendar");
+}
+
+// artifactActions (P1.4): the card and the canvas ask one function, and a
+// version something replaced, or one being edited, is never offered a save.
+{
+  const draft = plan(entry("a"), entry("b"));
+  const newest = artifactActions(draft, { latest: true }, today);
+  assert.equal(newest.kind, "save");
+  assert.deepEqual(newest.choices, planSaveChoices(draft, today), "the same choices the card has always had");
+  assert.deepEqual(artifactActions(draft, { latest: false }, today), { kind: "older", restore: true });
+  assert.deepEqual(
+    artifactActions(draft, { latest: false, saved: true }, today),
+    { kind: "older", restore: false },
+    "a saved creation's older version cannot be restored from here yet"
+  );
+  assert.deepEqual(
+    artifactActions({ ...draft, uploadedAt: 1 }, { latest: false }, today),
+    { kind: "older", restore: false },
+    "saved is read off the card when the caller does not say"
+  );
+  assert.deepEqual(artifactActions(draft, { latest: true, editing: true }, today), { kind: "editing" });
 }
 
 console.log("test-creation-choices: ok");

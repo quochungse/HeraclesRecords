@@ -33,6 +33,7 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
+import { planDiff } from "./planDiff";
 import {
   PLAN_DAYS,
   PLAN_REVISION_OPS,
@@ -46,6 +47,7 @@ import type {
   PlanArtifactVersion,
   PlanDraftPreview,
   PlanWorkoutEntryInput,
+  RestoredPlanVersion,
   TrainingPlanDestination,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
@@ -1844,6 +1846,51 @@ export function saveWorkoutDraftEdit(
   stored.preview = preview;
   persistPlanDraft(stored);
   return lightPreview(preview);
+}
+
+/**
+ * An older version made the newest again, by the athlete: a new version with
+ * the old one's content, so nothing in between is lost and the step can be
+ * undone the same way (docs/coach-plan-canvas.md, P1.4). Refused on a saved
+ * creation, for the reason a revision is.
+ */
+export function restorePlanDraftVersion(
+  draftId: string,
+  unitSystem: UnitSystem = "metric"
+): RestoredPlanVersion {
+  const older = loadStoredPlanDraft(draftId);
+  if (!older) throw new Error("That version is no longer here.");
+  const versions = versionsOf(older.artifactId);
+  const latest = versions[versions.length - 1] ?? older;
+  if (versions.some((version) => version.uploadedAt)) {
+    throw new Error("This is saved to COROS; an earlier version cannot be restored from here yet.");
+  }
+  if (latest.draftId === older.draftId) {
+    throw new Error("This is already the newest version.");
+  }
+  const artifactType = latest.preview.artifactType ?? "plan";
+  const restoredId = crypto.randomUUID();
+  const plan = structuredClone(older.plan);
+  const preview = buildPlanPreview(restoredId, plan, { unitSystem, artifactType });
+  const stored: StoredPlanDraft = {
+    draftId: restoredId,
+    plan,
+    preview,
+    createdAt: Math.max(Date.now(), latest.createdAt + 1),
+    artifactId: latest.artifactId,
+    version: latest.version + 1,
+    parentDraftId: latest.draftId,
+    author: "athlete",
+    changeSummary: `Restored version ${older.version}`
+  };
+  persistPlanDraft(stored);
+  return {
+    preview: lightPreview(preview),
+    artifactId: stored.artifactId,
+    fromVersion: latest.version,
+    toVersion: stored.version,
+    changes: planDiff(draftDocument(latest), draftDocument(stored)).map((change) => change.text)
+  };
 }
 
 /**
