@@ -781,6 +781,48 @@ async function main() {
   assert.equal(await harness("callCount", "uploadTrainingPlanDraft"), 0, "nothing saved until the day is picked");
 
   // -------------------------------------------------------------------------
+  // Asking about a week goes with the question, as a line above it (P1.7)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, BASE_SCRIPT);
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the plan card is drawn");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas .plan-week-ask"), "each week offers Ask Coach");
+  await harness("click", ".chat-canvas .plan-week-card:nth-child(2) .plan-week-ask");
+  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "the week waits beside the composer");
+  assert.match((await harness("text", ".chat-refs-pending .chat-ref-chip")) ?? "", /Hanoi Half base · Week 2/);
+  await harness("click", '.chat-canvas [data-action="askPlan"]');
+  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 2, "and the whole plan beside it");
+  await harness("click", ".chat-refs-pending .chat-ref-chip:last-of-type .chat-ref-remove");
+  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 1, "a chip can be taken off");
+  await harness("setValue", ".chat-composer textarea", "Is this week too much?");
+  await harness("click", ".chat-send");
+  const asked = await waitFor(
+    async () => (await harness("calls", "sendChat"))[0],
+    "the question is sent"
+  );
+  assert.match(asked.args[1].at(-1).content, /asking about the plan "Hanoi Half base" \(draft_id plan-1\) — Week 2/);
+  assert.match(asked.args[1].at(-1).content, /Is this week too much\?$/);
+  const afterAsk = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterAsk.slice(-2).map((entry) => entry.kind),
+    ["planRefs", "message"],
+    "the reference is kept just before the question"
+  );
+  assert.equal(await harness("exists", ".chat-refs-pending"), false, "and leaves the composer");
+  await waitFor(() => harness("exists", ".chat-refs-row"), "it reads as a line above the question");
+
+  // From the Library: the conversation the plan came from, with the plan beside the composer.
+  await harness("mount", "ChatView", {
+    pendingPrompt: {
+      draftId: "plan-1",
+      refs: [{ artifactId: "plan-1", draftId: "plan-1", name: "Hanoi Half base", artifactType: "plan", scope: "plan", label: "the whole plan" }]
+    }
+  }, { ...BASE_SCRIPT, findChatSessionForDraft: "s1" });
+  await waitFor(() => harness("callCount", "findChatSessionForDraft"), "the conversation is looked for");
+  assert.deepEqual((await harness("calls", "findChatSessionForDraft"))[0].args, ["plan-1"]);
+  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "and the plan waits to be asked about");
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

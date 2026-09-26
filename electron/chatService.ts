@@ -38,6 +38,7 @@ import {
   restorePlanDraftVersion,
   syncPlanDraftFromCoros,
   planCalendarStates,
+  chatSessionForDraft,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -2412,6 +2413,10 @@ export async function syncPlanFromCoros(
 
 export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
   return restorePlanDraftVersion(draftId, unitSystem);
+}
+
+export function findChatSessionForDraft(draftId: string): string | null {
+  return typeof draftId === "string" && draftId ? chatSessionForDraft(draftId) ?? null : null;
 }
 
 export function listPlanCalendarStates(draftIds: string[]): import("./types").PlanCalendarState[] {

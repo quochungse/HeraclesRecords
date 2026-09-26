@@ -497,6 +497,18 @@ test("restoring an older version makes a new one with its content (P1.4)", () =>
   assert.ok(second);
 });
 
+test("a Coach plan's conversation is found from any of its versions (P1.7)", () => {
+  const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
+  const session = history.createChatSession("claude-code");
+  history.saveChatSession(session.id, [
+    { kind: "message", role: "user", content: "Write me a block" },
+    { kind: "planDraft", draft: { ...block, entries: [] } }
+  ]);
+  assert.equal(tools.chatSessionForDraft(block.draftId), session.id, "by the draft its card carries");
+  assert.equal(tools.chatSessionForDraft(ids.at(-1)), session.id, "and by a later version's, the one a saved plan names");
+  assert.equal(tools.chatSessionForDraft("nowhere"), undefined);
+});
+
 test("removing a creation lets every version go", () => {
   const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
   assert.equal(ids.length, 4);

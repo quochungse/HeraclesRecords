@@ -223,4 +223,23 @@ function throughWindow(json, edit = (timeline) => timeline) {
   );
 }
 
+// planRefs (P1.7): a known kind, carried through all four rebuilds.
+{
+  const entry = {
+    kind: "planRefs",
+    refs: [
+      { artifactId: "d1", draftId: "d3", version: 3, name: "Base block", artifactType: "plan", scope: "week", weekIndex: 5, label: "Week 6", later: "kept" }
+    ]
+  };
+  const [parsed] = parseChatTranscriptJson(JSON.stringify([entry]));
+  assert.equal(parsed.kind, "planRefs");
+  assert.deepEqual(parsed.refs, entry.refs);
+  assert.deepEqual(toPersistedEntries(fromPersistedEntries([parsed]))[0].refs, entry.refs);
+  assert.equal(
+    parseChatTranscriptJson(JSON.stringify([{ kind: "planRefs", refs: [{ draftId: "x" }] }])).length,
+    0,
+    "a reference that says nothing is not restored"
+  );
+}
+
 console.log("test-chat-entry-passthrough: ok");

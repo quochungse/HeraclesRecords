@@ -988,6 +988,8 @@ const api = {
     ),
   getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
     ipcRenderer.invoke("chat:planArtifacts", draftIds),
+  findChatSessionForDraft: (draftId: string): Promise<string | null> =>
+    ipcRenderer.invoke("chat:findDraftSession", draftId),
   getPlanCalendarState: (draftIds: string[]): Promise<PlanCalendarState[]> =>
     ipcRenderer.invoke("chat:planCalendarState", draftIds),
   syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean): Promise<PlanCorosSync> =>

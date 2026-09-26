@@ -27,6 +27,7 @@ const {
   normalizeContextWindow,
   creationIndex,
   planEventNote,
+  planRefsNote,
   planTranscriptContext,
   summaryContextMessage,
   toWireMessages,
@@ -859,6 +860,43 @@ assert.deepEqual(
   const restored = planEventNote({ ...event.event, action: "restored", fromVersion: 3, toVersion: 4, changes: ["Long run back to Saturday"] });
   assert.match(restored, /restored an earlier version of the plan "Base block" \(v3 → v4\)\. Changes: Long run back to Saturday\./);
   assert.match(planEventNote({ ...event.event, action: "imported", author: "coros" }), /changed in the Training Library or on COROS/);
+}
+
+// ---------------------------------------------------------------------------
+// What the athlete pointed at rides on their question (P1.7)
+// ---------------------------------------------------------------------------
+{
+  const refs = {
+    kind: "planRefs",
+    refs: [
+      {
+        artifactId: "d1",
+        draftId: "d3",
+        version: 3,
+        name: "Base block",
+        artifactType: "plan",
+        scope: "session",
+        weekIndex: 5,
+        sessionKey: "long",
+        label: "Week 6 (Build) · Sun · Long run"
+      }
+    ]
+  };
+  const wire = toWireMessages([
+    { kind: "message", role: "user", content: "Write me a block" },
+    { kind: "message", role: "assistant", content: "Here it is" },
+    refs,
+    { kind: "message", role: "user", content: "Is this too long?" }
+  ]);
+  assert.deepEqual(wire.map((item) => item.role), ["user", "assistant", "user"], "no message of its own");
+  assert.equal(
+    wire[2].content,
+    '[The athlete is asking about the plan "Base block" v3 (draft_id d3) — Week 6 (Build) · Sun · Long run. Read it with get_plan_draft if you need more than this.]\n\nIs this too long?'
+  );
+  assert.match(
+    planRefsNote([{ ...refs.refs[0], scope: "plan", version: undefined, label: "the whole plan" }]),
+    /the plan "Base block" \(draft_id d3\) — the whole of it/
+  );
 }
 
 console.log("chat context compaction tests passed");

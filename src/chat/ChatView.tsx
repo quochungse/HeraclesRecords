@@ -34,6 +34,7 @@ import {
   Terminal,
   Trash2,
   User,
+  X,
   Zap
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -60,8 +61,10 @@ import type {
   McpServerStatus,
   PersistedChatEntry,
   PlanArtifactVersion,
+  CoachOpenRequest,
   PlanCalendarState,
   PlanDraftPreview,
+  PlanRef,
   PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionWritten,
@@ -296,8 +299,11 @@ interface ChatViewProps {
   onPlanUploaded?: () => void;
   /** Fires when a coach request is in progress (streaming or exporting). */
   onActivityChange?: (active: boolean) => void;
-  /** Text preloaded into the composer (e.g. "Ask Coach" from the calendar). */
-  pendingPrompt?: string | null;
+  /**
+   * Text preloaded into the composer (e.g. "Ask Coach" from the calendar), or
+   * a Coach plan to ask about in the conversation it came from (P1.7).
+   */
+  pendingPrompt?: string | CoachOpenRequest | null;
   onPendingPromptConsumed?: () => void;
   /**
    * True while the Coach view is the visible one. The panel stays mounted when
@@ -963,10 +969,14 @@ export function ChatView({
     if (!pendingPrompt || !composerRef.current) {
       return;
     }
-    composerRef.current?.setDraft(pendingPrompt);
     onPendingPromptConsumed?.();
-    // Focus after the coach panel becomes visible.
-    requestAnimationFrame(() => composerRef.current?.focus());
+    if (typeof pendingPrompt === "string") {
+      composerRef.current?.setDraft(pendingPrompt);
+      // Focus after the coach panel becomes visible.
+      requestAnimationFrame(() => composerRef.current?.focus());
+      return;
+    }
+    void openAsked(pendingPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pendingPrompt,
@@ -976,7 +986,46 @@ export function ChatView({
     chatSettings.provider
   ]);
 
+  /**
+   * What the athlete pointed at, waiting beside the composer until the next
+   * question goes (P1.7). Sent as a `planRefs` entry just before it.
+   */
+  const [pendingRefs, setPendingRefs] = useState<PlanRef[]>([]);
+  const refKey = (ref: PlanRef) =>
+    `${ref.draftId}|${ref.scope}|${ref.weekIndex ?? ""}|${ref.sessionKey ?? ""}`;
+  const addRef = (ref: PlanRef) => {
+    setPendingRefs((current) =>
+      current.some((item) => refKey(item) === refKey(ref)) ? current : [...current, ref].slice(-3)
+    );
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /**
+   * Coach opened from the Library about a plan it wrote: the conversation that
+   * wrote it, with the plan beside the composer. A conversation deleted since
+   * took the plan's drafts with it, so a new one starts from the plan's name.
+   */
+  const openAsked = async (request: CoachOpenRequest) => {
+    if (!api) return;
+    const sessionId = request.draftId
+      ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
+      : null;
+    if (sessionId) {
+      if (sessionId !== activeSessionIdRef.current) await loadSession(sessionId);
+      setPendingRefs(request.refs ?? []);
+    } else if (request.draftId) {
+      await handleNewChat();
+      setPendingRefs([]);
+      const name = request.refs?.[0]?.name;
+      if (name) composerRef.current?.setDraft(`About my plan "${name}": `);
+    }
+    if (request.prompt) composerRef.current?.setDraft(request.prompt);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
   const resetEphemeralChatState = () => {
+    // A reference belongs to the conversation it was picked in.
+    setPendingRefs([]);
     setUploadedPlans({});
     setDeletedWorkouts({});
     pendingCoachPromptsRef.current = [];
@@ -2447,12 +2496,15 @@ export function ChatView({
           }
         : entry
     );
+    const refs = originalPrompt ? [] : pendingRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
           ...answeredTimeline,
+          ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
           { kind: "message", role: "user", content: trimmed }
         ];
+    if (refs.length) setPendingRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -3671,6 +3723,24 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "planRefs") {
+              return (
+                <div
+                  key={`refs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={refKey(ref)} className="chat-ref-chip">
+                      {ref.name}
+                      {ref.scope === "plan" ? "" : ` · ${ref.label}`}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
             if (entry.kind === "planEvent") {
               // A line where it happened, as the coach reads it; the card
               // below it already shows what the creation is now.
@@ -3987,6 +4057,27 @@ function AnalysisSilentChip({
         </div>
       </div>
 
+          {pendingRefs.length ? (
+            <div className="chat-refs-pending" aria-label="Asking about">
+              <span className="chat-asked-kicker">Asking about</span>
+              {pendingRefs.map((ref) => (
+                <span key={refKey(ref)} className="chat-ref-chip">
+                  {ref.name}
+                  {ref.scope === "plan" ? "" : ` · ${ref.label}`}
+                  <button
+                    type="button"
+                    className="chat-ref-remove"
+                    aria-label={`Stop asking about ${ref.scope === "plan" ? ref.name : ref.label}`}
+                    onClick={() =>
+                      setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
+                    }
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           <ChatComposer
             ref={composerRef}
             providerControls={providerControls}
@@ -4036,6 +4127,7 @@ function AnalysisSilentChip({
               onViewInChat={(draftId) => handleScrollToPlanChat(draftId)}
               onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
               calendarOf={calendarOf}
+              onAsk={addRef}
             />
           </Suspense>
         ) : null}

@@ -5,7 +5,8 @@ import type {
   PersistedChatEntry,
   PlanArtifactVersion,
   PlanDraftPreview,
-  PlanEvent
+  PlanEvent,
+  PlanRef
 } from "./types";
 
 /**
@@ -167,6 +168,9 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
       if (entry.content.trim()) push({ role: entry.role, content: entry.content });
     } else if (entry.kind === "planEvent") {
       events.push(planEventNote(entry.event));
+    } else if (entry.kind === "planRefs") {
+      // Rides on the question it was attached to, which follows it.
+      events.push(planRefsNote(entry.refs));
     } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
@@ -180,6 +184,17 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
   }
   flushEvents();
   return wire;
+}
+
+/** What the athlete pointed at, as a line in front of their question. */
+export function planRefsNote(refs: readonly PlanRef[]): string {
+  const lines = refs.map((ref) => {
+    const what = ref.artifactType === "workout" ? "workout" : "plan";
+    const version = ref.version ? ` v${ref.version}` : "";
+    const where = ref.scope === "plan" ? "the whole of it" : ref.label;
+    return `the ${what} "${ref.name}"${version} (draft_id ${ref.draftId}) — ${where}`;
+  });
+  return `[The athlete is asking about ${lines.join("; and ")}. Read it with get_plan_draft if you need more than this.]`;
 }
 
 /** A `planEvent` as a line in front of the coach, where it happened. */

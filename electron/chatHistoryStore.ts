@@ -28,6 +28,7 @@ import type {
   PersistedChatSource,
   PlanDraftPreview,
   PlanEvent,
+  PlanRef,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   SaveChatSessionOptions,
@@ -170,6 +171,44 @@ function parseSource(value: unknown): PersistedChatSource | undefined {
     "mcpTools",
     "mcpError"
   ]);
+}
+
+const PLAN_REF_SCOPES = ["plan", "week", "session"] as const;
+
+function parsePlanRef(value: unknown): PlanRef | null {
+  if (
+    !isRecord(value) ||
+    typeof value.artifactId !== "string" ||
+    typeof value.draftId !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.label !== "string" ||
+    !(PLAN_REF_SCOPES as readonly unknown[]).includes(value.scope)
+  ) {
+    return null;
+  }
+  const version =
+    typeof value.version === "number" && Number.isInteger(value.version) && value.version > 0
+      ? value.version
+      : undefined;
+  const weekIndex =
+    typeof value.weekIndex === "number" && Number.isInteger(value.weekIndex) && value.weekIndex >= 0
+      ? value.weekIndex
+      : undefined;
+  return keepUnknownKeys<PlanRef>(
+    {
+      artifactId: value.artifactId,
+      draftId: value.draftId,
+      ...(version ? { version } : {}),
+      name: value.name,
+      artifactType: value.artifactType === "workout" ? "workout" : "plan",
+      scope: value.scope as PlanRef["scope"],
+      ...(weekIndex !== undefined ? { weekIndex } : {}),
+      ...(typeof value.sessionKey === "string" ? { sessionKey: value.sessionKey } : {}),
+      label: value.label
+    },
+    value,
+    ["artifactId", "draftId", "version", "name", "artifactType", "scope", "weekIndex", "sessionKey", "label"]
+  );
 }
 
 const PLAN_EVENT_ACTIONS = ["edited", "restored", "imported", "removedOnCoros"] as const;
@@ -1058,6 +1097,7 @@ const KNOWN_ENTRY_KINDS = new Set([
   "message",
   "planDraft",
   "planEvent",
+  "planRefs",
   "coachPrompt",
   "workoutDelete",
   "activityVisual",
@@ -1134,6 +1174,13 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
     return draft ? cardEntry({ kind: "planDraft", draft }, value, "draft") : null;
+  }
+
+  if (value.kind === "planRefs") {
+    const refs = Array.isArray(value.refs)
+      ? value.refs.map(parsePlanRef).filter((ref): ref is PlanRef => ref !== null)
+      : [];
+    return refs.length ? cardEntry({ kind: "planRefs", refs }, value, "refs") : null;
   }
 
   if (value.kind === "planEvent") {

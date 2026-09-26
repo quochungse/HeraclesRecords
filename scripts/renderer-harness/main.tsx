@@ -18,6 +18,7 @@
  * so this costs no new dependency — and because the bugs being chased are the
  * kind a real browser has: effects, event order, and a console nobody read.
  */
+import type { ComponentProps } from "react";
 import { StrictMode, useState, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
@@ -553,6 +554,8 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       // able to ask the second one.
       active={(options.active as boolean | undefined) ?? true}
       onActivityChange={spy("onActivityChange") as (active: boolean) => void}
+      pendingPrompt={options.pendingPrompt as ComponentProps<typeof ChatView>["pendingPrompt"]}
+      onPendingPromptConsumed={spy("onPendingPromptConsumed") as () => void}
     />
   ),
   AnalysisDetailView: (options) => (

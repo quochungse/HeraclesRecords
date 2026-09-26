@@ -12,6 +12,7 @@ import type {
   PlanArtifactVersion,
   PlanDraftPreview,
   PlanDraftSaveOptions,
+  PlanRef,
   TrainingPlanDestination,
   TrainingPlanDocument
 } from "../../electron/types";
@@ -65,6 +66,7 @@ export default function CoachCanvas({
   onViewInChat,
   onCalendar,
   calendarOf,
+  onAsk,
   planSportStyle
 }: {
   api?: CorosLinkApi;
@@ -97,6 +99,8 @@ export default function CoachCanvas({
   onCalendar?: (draftId: string) => void;
   /** Where a creation stands on the calendar, by any version's draft id. */
   calendarOf?: (draftId: string) => CreationCalendar | undefined;
+  /** Puts what the athlete pointed at beside the composer (P1.7). */
+  onAsk?: (ref: PlanRef) => void;
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
   const open = artifactId ? creationOf(artifactId, creations, versionIndex) : null;
@@ -126,6 +130,7 @@ export default function CoachCanvas({
           onViewInChat={onViewInChat}
           onCalendar={onCalendar}
           calendar={calendarOf?.(open.draftId)}
+          onAsk={onAsk}
         />
       ) : (
         <CreationIndex
@@ -262,7 +267,8 @@ function ArtifactView({
   onRemove,
   onViewInChat,
   onCalendar,
-  calendar
+  calendar,
+  onAsk
 }: {
   api?: CorosLinkApi;
   newest: PlanDraftPreview;
@@ -287,6 +293,7 @@ function ArtifactView({
   onViewInChat: (draftId: string) => void;
   onCalendar?: (draftId: string) => void;
   calendar?: CreationCalendar;
+  onAsk?: (ref: PlanRef) => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const info = versionIndex.get(newest.draftId);
@@ -339,6 +346,37 @@ function ArtifactView({
   const status = creationStatus(newest, onCoros);
   const title = shown.name || (isWorkout ? "Untitled workout" : "Untitled plan");
 
+  /**
+   * What the athlete points at, as a line the coach and the chip can read:
+   * the week with its dates when the plan has them, the day and the session.
+   */
+  const refTo = (scope: PlanRef["scope"], weekIndex?: number, entryId?: string): PlanRef => {
+    const session = entryId ? sessions.find((item) => item.entry.id === entryId) : undefined;
+    const week = session ? session.weekIndex : weekIndex;
+    const readWeek = week !== undefined ? reading?.weeks[week] : undefined;
+    const weekText = readWeek
+      ? `Week ${readWeek.weekIndex + 1}${readWeek.stage ? ` (${readWeek.stage})` : ""}`
+      : undefined;
+    const sessionEntry = entryId ? planDocument?.entries.find((entry) => entry.id === entryId) : undefined;
+    const label =
+      scope === "plan"
+        ? "the whole plan"
+        : scope === "week"
+          ? weekText ?? "a week"
+          : [weekText, session?.dayLabel, session?.entry.title].filter(Boolean).join(" · ");
+    return {
+      artifactId: info?.artifactId ?? newest.draftId,
+      draftId: shownId,
+      ...(shownInfo ? { version: shownInfo.version } : {}),
+      name: title,
+      artifactType: isWorkout ? "workout" : "plan",
+      scope,
+      ...(week !== undefined ? { weekIndex: week } : {}),
+      ...(sessionEntry ? { sessionKey: sessionEntry.workout.key || sessionEntry.id } : {}),
+      label
+    };
+  };
+
   const sessionView = (id: string) => {
     const index = sessions.findIndex((session) => session.entry.id === id);
     const session = sessions[index];
@@ -390,6 +428,17 @@ function ArtifactView({
         <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
           {calendar?.running && status.saved ? "On calendar" : status.label}
         </span>
+        {onAsk ? (
+          <button
+            type="button"
+            className="chat-plan-panel-chat-link"
+            data-action="askPlan"
+            onClick={() => onAsk(refTo("plan"))}
+            title="Ask Coach about this"
+          >
+            Ask Coach
+          </button>
+        ) : null}
         <button
           type="button"
           className="chat-plan-panel-chat-link"
@@ -447,7 +496,19 @@ function ArtifactView({
               <p className="chat-canvas-older">{supersededLine(shownInfo)}</p>
             ) : null}
             {openSession ? (
-              sessionView(openSession)
+              <>
+                {onAsk ? (
+                  <button
+                    type="button"
+                    className="chat-plan-panel-chat-link chat-canvas-ask-session"
+                    data-action="askSession"
+                    onClick={() => onAsk(refTo("session", undefined, openSession))}
+                  >
+                    Ask Coach about this session
+                  </button>
+                ) : null}
+                {sessionView(openSession)}
+              </>
             ) : isWorkout ? (
               sessions[0] ? (
                 sessionView(sessions[0].entry.id)
@@ -491,7 +552,12 @@ function ArtifactView({
                 ) : null}
                 <ol className="plan-reader-weeks" ref={weeksRef}>
                   {reading.weeks.map((week) => (
-                    <WeekCard key={week.weekIndex} week={week} onOpen={setOpenSession} />
+                    <WeekCard
+                      key={week.weekIndex}
+                      week={week}
+                      onOpen={setOpenSession}
+                      onAsk={onAsk ? () => onAsk(refTo("week", week.weekIndex)) : undefined}
+                    />
                   ))}
                 </ol>
               </>

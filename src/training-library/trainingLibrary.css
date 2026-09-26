@@ -5963,6 +5963,11 @@ button.plan-generator-provider:focus-visible {
   font-size: 11px;
 }
 
+/* Ask Coach on a week, in Coach's canvas: the fold button's quiet form. */
+.plan-week-ask {
+  margin-left: 4px;
+}
+
 .plan-week-fold-again:hover {
   color: var(--text-primary);
   background: var(--glass-bg);

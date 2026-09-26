@@ -3129,6 +3129,33 @@ export interface PlanDraftPreview {
 }
 
 /**
+ * What the athlete pointed at when asking (docs/coach-plan-canvas.md, P1.7):
+ * a creation, a week of it or one session. Carried as an anchor just before
+ * the question, so the coach is told what "this" is where it was asked.
+ */
+export interface PlanRef {
+  artifactId: string;
+  draftId: string;
+  version?: number;
+  name: string;
+  artifactType: "plan" | "workout";
+  scope: "plan" | "week" | "session";
+  weekIndex?: number;
+  sessionKey?: string;
+  /** What is pointed at, as it is read: "Week 6 (2–8 Nov) · Sun · Long run". */
+  label: string;
+}
+
+/** Coach opened from elsewhere with something to talk about (P1.7). */
+export interface CoachOpenRequest {
+  /** Text for the composer. */
+  prompt?: string;
+  /** A Coach creation; its conversation is opened when it can be found. */
+  draftId?: string;
+  refs?: PlanRef[];
+}
+
+/**
  * Something that happened to a coach's creation that the coach did not do —
  * the athlete edited it, restored an older version, or it changed on COROS
  * (docs/coach-plan-canvas.md, P1.3). An anchor in the transcript, at the
@@ -3757,6 +3784,7 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "planEvent"; event: PlanEvent }
+  | { kind: "planRefs"; refs: PlanRef[] }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

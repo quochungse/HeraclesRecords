@@ -9,6 +9,7 @@ import type {
   PersistedChatEntry,
   PlanDraftPreview,
   PlanEvent,
+  PlanRef,
   WorkoutDeletePreview
 } from "../../electron/types";
 
@@ -88,6 +89,12 @@ export interface ChatToolNoticeEntry {
   message: string;
 }
 
+/** What the athlete pointed at when asking (P1.7); an anchor before the question. */
+export interface ChatPlanRefsEntry {
+  kind: "planRefs";
+  refs: PlanRef[];
+}
+
 /** The athlete or COROS changed a coach's creation (P1.3); an anchor. */
 export interface ChatPlanEventEntry {
   kind: "planEvent";
@@ -109,6 +116,7 @@ export type ChatEntry = (
   | ChatCoachPromptEntry
   | ChatPlanDraftEntry
   | ChatPlanEventEntry
+  | ChatPlanRefsEntry
   | ChatWorkoutDeleteEntry
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
@@ -274,6 +282,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   coachPrompt: ["prompt"],
   planDraft: ["draft"],
   planEvent: ["event"],
+  planRefs: ["refs"],
   workoutDelete: ["preview"],
   activityVisual: ["preview"],
   activityHrTrend: ["preview"],
@@ -311,6 +320,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "planEvent") {
     return { kind: "planEvent", event: entry.event };
+  }
+  if (entry.kind === "planRefs") {
+    return { kind: "planRefs", refs: entry.refs };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
@@ -377,6 +389,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "planEvent") {
     return { kind: "planEvent", event: entry.event };
+  }
+  if (entry.kind === "planRefs") {
+    return { kind: "planRefs", refs: entry.refs };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };

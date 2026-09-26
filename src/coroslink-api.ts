@@ -686,6 +686,8 @@ export interface CorosLinkApi {
    * request.
    */
   syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) => Promise<PlanCorosSync>;
+  /** The conversation a Coach plan came from, by any of its versions' draft ids (P1.7). */
+  findChatSessionForDraft: (draftId: string) => Promise<string | null>;
   /** Where each Coach plan on COROS stands on the calendar, from this machine's cache (P1.6). */
   getPlanCalendarState: (draftIds: string[]) => Promise<PlanCalendarState[]>;
   /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */

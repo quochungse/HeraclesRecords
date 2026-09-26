@@ -515,6 +515,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   two modules must not import each other), and is saved first, once. The card says where it
   stands from `chat:planCalendarState` — the running copy in `coros_plan_cache` and the stored
   matches, no request — in the Library's own compliance words (`creationCalendar`).
+  **A question can point at what it is about** (P1.7): Ask Coach on the canvas — the plan, a
+  week (`WeekCard.onAsk`) or the session open — puts a chip by the composer, and sending it
+  writes a **`planRefs`** anchor just before the question, which `toWireMessages` folds into that
+  question for the model. The Library reader's ⋯ offers **Ask Coach about this plan** for a plan
+  Coach wrote, opening the conversation it came from (`chat:findDraftSession`, by any version's
+  draft id) — or, when that conversation is gone, a new one with no chip, since the drafts went
+  with it.
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with

@@ -343,6 +343,7 @@ import {
   restorePlanVersion,
   syncPlanFromCoros,
   listPlanCalendarStates,
+  findChatSessionForDraft,
   editPlanDraft,
   generateTrainingPlan,
   outlineTrainingPlan,
@@ -1871,6 +1872,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>
     listPlanArtifactVersions(draftIds)
   );
+  ipcMain.handle("chat:findDraftSession", (_event, draftId: string) => findChatSessionForDraft(draftId));
   ipcMain.handle("chat:planCalendarState", (_event, draftIds: string[]) =>
     listPlanCalendarStates(draftIds)
   );

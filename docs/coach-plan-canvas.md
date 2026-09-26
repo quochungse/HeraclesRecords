@@ -448,6 +448,14 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   COROS giả).
 
 **P1.7 Hỏi về đúng chỗ (tham chiếu)** · M
+- (Đã làm: `planRefs` là kind neo; mỗi `PlanRef` mang `label` đọc được, và `toWireMessages` gộp
+  nó vào câu hỏi đi ngay sau — như `planEvent` — để vai vẫn xen kẽ. Canvas có Ask Coach cho cả
+  plan, cho mỗi tuần (`WeekCard.onAsk`, prop tuỳ chọn) và cho buổi đang mở; tối đa ba chip, chip
+  thuộc về cuộc chat được chọn và bị xoá khi đổi cuộc chat. Library: ⋯ "Ask Coach about this
+  plan" với plan `origin: coach` — `chat:findDraftSession` tìm cuộc chat theo mọi version của
+  artifact (tìm chữ `"draftId":"…"` trong transcript); không thấy thì mở cuộc chat mới với tên
+  plan trong composer và không có chip, vì draft đã đi cùng cuộc chat bị xoá. `onOpenCoach` nhận
+  `string | CoachOpenRequest` thay vì đổi chữ ký hoàn toàn: Calendar vẫn truyền chuỗi.)
 - Chọn một tuần hoặc một buổi trong canvas → **Ask Coach** → composer nhận chip. Khi gửi, một
   entry kind mới `planRefs` (neo, Q3) đứng ngay trước message của người dùng. `toWireMessages` mở
   nó thành dòng "[Athlete refers to] <artifact> v3 · week 6 (2–8 Nov) · Sun · Long run 16 km".

@@ -18,6 +18,7 @@ import {
 import {
   deleteChatPlanDraft,
   findCachedRunningCorosPlan,
+  findChatSessionMentioning,
   getChatPlanDraft,
   getCorosPlanCache,
   listTrainingActivityMatches,
@@ -2035,6 +2036,17 @@ export function planCalendarStates(draftIds: readonly string[]): PlanCalendarSta
       }
     ];
   });
+}
+
+/**
+ * The conversation a Coach plan came from, found from the draft id its COROS
+ * plan names (P1.7) — which may be any version's, so every version is looked
+ * for. Undefined when no conversation holds it any more.
+ */
+export function chatSessionForDraft(draftId: string): string | undefined {
+  const row = getChatPlanDraft(draftId);
+  const ids = row ? versionsOf(row.artifactId ?? row.draftId).map((version) => version.draftId) : [];
+  return findChatSessionMentioning([...new Set([draftId, ...ids])].reverse());
 }
 
 /** A version's plan — a workout's too, as a plan of one session. */
