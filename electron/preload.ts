@@ -70,6 +70,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  ConversationSettings,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -780,8 +781,13 @@ const api = {
   sendChat: (
     requestId: string,
     messages: ChatMessage[],
-    unitSystem: UnitSystem
-  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem),
+    unitSystem: UnitSystem,
+    sessionId?: string
+  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId),
+  getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>
+    ipcRenderer.invoke("chat:conversationSettings", sessionId),
+  setConversationSettings: (settings: ConversationSettings): Promise<ConversationSettings> =>
+    ipcRenderer.invoke("chat:setConversationSettings", settings),
   cancelChat: (requestId: string): Promise<void> =>
     ipcRenderer.invoke("chat:cancel", requestId),
   compactChatContext: (

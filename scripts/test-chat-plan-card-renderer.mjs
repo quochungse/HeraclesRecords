@@ -40,6 +40,7 @@ const CHAT_SETTINGS = {
     }
   },
   local: { baseUrl: "http://localhost:11434/v1", model: "", hasApiKey: false, toolsEnabled: true },
+  openRouter: { model: "openrouter/auto", hasApiKey: false },
   sidebarOpen: true,
   visualizationsEnabled: true,
   customInstructions: ""
@@ -841,6 +842,34 @@ async function main() {
   const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.deepEqual(afterRefine.slice(-2).map((entry) => entry.kind), ["planRefs", "message"]);
   assert.equal(afterRefine.at(-1).content, "Lighter week 3", "in the chip's own words");
+
+  // -------------------------------------------------------------------------
+  // A conversation says what it reads and which AI answers, and turns take it (P2.0)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: true, zones: true } },
+    setConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
+  });
+  await waitFor(() => harness("exists", ".chat-conversation-settings"), "the conversation's line is drawn");
+  assert.match((await harness("text", ".chat-conversation-settings")) ?? "", /Reads: Activities · Sleep · Zones\s*AI: Coach's settings/);
+  await harness("click", ".chat-conversation-settings");
+  await waitFor(() => harness("count", ".coach-conversation-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
+  await harness("click", ".coach-conversation-sheet li:nth-child(2) .plan-generator-source");
+  await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
+  assert.deepEqual(
+    (await harness("calls", "setConversationSettings"))[0].args[0],
+    { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
+  );
+  await waitFor(
+    async () => /Reads: Activities · Zones/.test((await harness("text", ".chat-conversation-settings")) ?? ""),
+    "and the line says so"
+  );
+  await page(`[...document.querySelectorAll(".coach-conversation-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
+  await harness("setValue", ".chat-composer textarea", "How am I sleeping?");
+  await harness("click", ".chat-send");
+  const inConversation = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question goes");
+  assert.equal(inConversation.args[3], "s1", "with the conversation it was asked in, whose settings the turn takes");
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

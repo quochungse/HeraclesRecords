@@ -1195,4 +1195,22 @@ assert.equal(
   assert.equal(readChatSettingsFromStore(store, keyStores).inlineSuggestions, "auto", "an unknown value reads as automatic");
 }
 
+// A conversation's sources (P2.0): said as rules in the prompt, only for what is withheld.
+{
+  const { conversationWithheldLines } = await import(
+    `${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}-withheld`
+  );
+  assert.deepEqual(conversationWithheldLines(undefined), []);
+  assert.deepEqual(conversationWithheldLines({ activities: false, sleep: false, zones: false }), []);
+  const lines = conversationWithheldLines({ sleep: true, zones: true });
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /sleep or HRV in this conversation/);
+  assert.match(lines[1], /thresholds or zones in this conversation: prescribe by effort/);
+  assert.match(
+    buildCoachInstructions(undefined, undefined, { activities: true }),
+    /## What the athlete shares in this conversation\n- The athlete has not shared their training history/
+  );
+  assert.doesNotMatch(buildCoachInstructions(), /What the athlete shares in this conversation/);
+}
+
 console.log("chat service tests passed");

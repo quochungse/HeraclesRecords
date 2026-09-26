@@ -2637,6 +2637,17 @@ export interface TrainingPlanGenerationRequest {
 }
 
 /** The athlete's data a generation may read, each on or off. */
+/**
+ * What one conversation reads and which AI answers it (P2.0, D13/D14), for
+ * every turn in it — chat, and analyses running in it. `runtime` holds only
+ * what differs from Coach's settings; an analysis's own runtime wins over it.
+ */
+export interface ConversationSettings {
+  sessionId: string;
+  sources: TrainingPlanDataSources;
+  runtime?: AnalysisRuntime;
+}
+
 export interface TrainingPlanDataSources {
   /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
   activities: boolean;

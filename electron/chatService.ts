@@ -4,7 +4,14 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
-import { deleteSettings, getSetting, setSetting } from "./database";
+import {
+  deleteChatConversationSettingsRow,
+  deleteSettings,
+  getChatConversationSettingsRow,
+  getSetting,
+  saveChatConversationSettingsRow,
+  setSetting
+} from "./database";
 import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
@@ -510,6 +517,92 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
   return setChatSessionPinned(id, pinned);
 }
 
+/** A conversation's settings (P2.0): everything shared, and Coach's AI, until changed. */
+export function getConversationSettings(sessionId: string): import("./types").ConversationSettings {
+  const row = getChatConversationSettingsRow(sessionId);
+  let sources = { activities: true, sleep: true, zones: true };
+  let runtime: import("./types").AnalysisRuntime | undefined;
+  try {
+    const parsed = row?.sourcesJson ? (JSON.parse(row.sourcesJson) as Record<string, unknown>) : {};
+    sources = {
+      activities: parsed.activities !== false,
+      sleep: parsed.sleep !== false,
+      zones: parsed.zones !== false
+    };
+  } catch {
+    /* A row this build cannot read shares everything, as if there were none. */
+  }
+  try {
+    const parsed = row?.runtimeJson ? (JSON.parse(row.runtimeJson) as Record<string, unknown>) : undefined;
+    if (parsed) {
+      runtime = {
+        ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
+        ...(typeof parsed.model === "string" && parsed.model ? { model: parsed.model } : {}),
+        ...(isAnthropicEffortName(parsed.effort) ? { effort: parsed.effort } : {})
+      };
+      if (!Object.keys(runtime).length) runtime = undefined;
+    }
+  } catch {
+    runtime = undefined;
+  }
+  return { sessionId, sources, ...(runtime ? { runtime } : {}) };
+}
+
+export function setConversationSettings(
+  settings: import("./types").ConversationSettings
+): import("./types").ConversationSettings {
+  const sources = {
+    activities: settings.sources?.activities !== false,
+    sleep: settings.sources?.sleep !== false,
+    zones: settings.sources?.zones !== false
+  };
+  const everything = sources.activities && sources.sleep && sources.zones;
+  const runtime = settings.runtime && Object.keys(settings.runtime).length ? settings.runtime : undefined;
+  if (everything && !runtime) {
+    // Nothing that differs from Coach's settings: no row to keep in step.
+    deleteChatConversationSettingsRow(settings.sessionId);
+  } else {
+    saveChatConversationSettingsRow(
+      settings.sessionId,
+      everything ? null : JSON.stringify(sources),
+      runtime ? JSON.stringify(runtime) : null
+    );
+  }
+  return getConversationSettings(settings.sessionId);
+}
+
+/**
+ * A turn of the conversation, as the renderer sends it: with that
+ * conversation's sources and AI (P2.0, D13/D14).
+ */
+export async function streamConversationTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  sessionId?: string
+): Promise<void> {
+  let settings: import("./types").ConversationSettings | undefined;
+  try {
+    settings = sessionId ? getConversationSettings(sessionId) : undefined;
+  } catch {
+    settings = undefined;
+  }
+  return streamChat(sink, requestId, messages, {
+    unitSystem,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {}),
+    ...(settings ? { sources: settings.sources } : {})
+  });
+}
+
+function isChatProviderName(value: unknown): value is ChatProvider {
+  return value === "claude-code" || value === "claude-api" || value === "chatgpt" || value === "openrouter" || value === "local";
+}
+
+function isAnthropicEffortName(value: unknown): value is import("./types").AnthropicEffort {
+  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max";
+}
+
 export function deleteChatSessionById(id: string): void {
   // Read before the row goes: the transcript is the only record of which
   // drafts were this conversation's.
@@ -518,6 +611,7 @@ export function deleteChatSessionById(id: string): void {
   );
   deleteChatSession(id);
   deletePlanDraftsOf(draftIds);
+  deleteChatConversationSettingsRow(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1034,6 +1128,12 @@ export function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
 
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
+  /**
+   * What the conversation shares (P2.0). A source switched off is withheld
+   * from every tool that reads it and from the snapshot, and said in the
+   * prompt. Absent is everything, as before.
+   */
+  sources?: import("./types").TrainingPlanDataSources;
   /** Analysis runs override the saved provider/model/effort (decision 2). */
   runtime?: AnalysisRuntime;
   /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
@@ -1377,6 +1477,39 @@ export async function streamChat(
   requestId: string,
   messages: ChatMessage[],
   options: StreamChatOptions = {}
+): Promise<void> {
+  // A run that set its own reach (a plan generation) keeps it; otherwise the
+  // conversation's sources are this turn's, and only for this turn.
+  const reach = conversationReach(options.sources);
+  const ownsReach = Boolean(reach) && !runTools.has(requestId);
+  if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
+  try {
+    await streamChatTurn(sink, requestId, messages, options);
+  } finally {
+    if (ownsReach) runTools.delete(requestId);
+  }
+}
+
+/**
+ * A conversation's sources as a turn's reach (P2.0): the tools that read a
+ * withheld source are not offered, the snapshot leaves it out, and the prompt
+ * says so. Nothing when everything is shared.
+ */
+export function conversationReach(
+  sources: import("./types").TrainingPlanDataSources | undefined
+): Pick<RunTools, "allow" | "context"> | undefined {
+  if (!sources || (sources.activities && sources.sleep && sources.zones)) return undefined;
+  return {
+    allow: (name) => !toolReadsWithheldSource(name, sources),
+    context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true }
+  };
+}
+
+async function streamChatTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  options: StreamChatOptions
 ): Promise<void> {
   const unitSystem = normalizeUnitSystem(options.unitSystem);
   const toolPolicy: ChatToolPolicy =
@@ -3121,6 +3254,13 @@ interface TrainingContextScope {
   activities: boolean;
   /** The threshold anchors in the athlete profile. */
   zones: boolean;
+  /** Nights and HRV — no part of the snapshot, so this only says so in the prompt. */
+  sleep?: boolean;
+  /**
+   * Say what is withheld in the prompt: a conversation's settings do (P2.0);
+   * a plan generation says it in its own prompt already.
+   */
+  announce?: boolean;
 }
 
 async function buildTrainingContext(
@@ -3133,7 +3273,10 @@ async function buildTrainingContext(
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
     customInstructions,
-    roleInstructions
+    roleInstructions,
+    scope?.announce
+      ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
+      : undefined
   );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +

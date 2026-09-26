@@ -67,6 +67,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  ConversationSettings,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -560,8 +561,13 @@ export interface CorosLinkApi {
   sendChat: (
     requestId: string,
     messages: ChatMessage[],
-    unitSystem: UnitSystem
+    unitSystem: UnitSystem,
+    /** The conversation the turn is in, whose sources and AI it takes (P2.0). */
+    sessionId?: string
   ) => Promise<void>;
+  /** What one conversation reads and which AI answers it (P2.0). */
+  getConversationSettings: (sessionId: string) => Promise<ConversationSettings>;
+  setConversationSettings: (settings: ConversationSettings) => Promise<ConversationSettings>;
   cancelChat: (requestId: string) => Promise<void>;
   /**
    * Resolves what a turn in this conversation should send: the rolling summary

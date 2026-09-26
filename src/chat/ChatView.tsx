@@ -62,6 +62,7 @@ import type {
   PersistedChatEntry,
   PlanArtifactVersion,
   CoachOpenRequest,
+  ConversationSettings,
   PlanCalendarState,
   PlanDraftPreview,
   PlanRef,
@@ -90,6 +91,7 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import { refinementChips } from "./creationChoices";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
 import {
   creationVersions,
   isLatestVersion,
@@ -139,6 +141,7 @@ const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
+const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -313,6 +316,13 @@ interface ChatViewProps {
    */
   active?: boolean;
 }
+
+/** The sources a conversation can share, in the order its strip names them. */
+const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][] = [
+  ["activities", "Activities"],
+  ["sleep", "Sleep"],
+  ["zones", "Zones"]
+];
 
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
@@ -862,6 +872,41 @@ export function ChatView({
   };
   /** The version the calendar dialog is open for. */
   const [calendarFor, setCalendarFor] = useState<string | null>(null);
+  /**
+   * What this conversation reads and which AI answers it (P2.0), read when
+   * the conversation opens; a turn reads it again in the main process.
+   */
+  const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
+  const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
+  useEffect(() => {
+    setConversationSettingsState(null);
+    if (!api || !activeSessionId) return;
+    let live = true;
+    void api
+      .getConversationSettings(activeSessionId)
+      .then((settings) => {
+        if (live) setConversationSettingsState(settings);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, activeSessionId]);
+  const conversationSettingsWriteRef = useRef(0);
+  const updateConversationSettings = (next: ConversationSettings) => {
+    setConversationSettingsState(next);
+    // Only the last write's answer, and only for the conversation still open:
+    // two quick switches would otherwise settle on the first one's reply.
+    const write = ++conversationSettingsWriteRef.current;
+    void api
+      ?.setConversationSettings(next)
+      .then((saved) => {
+        if (write === conversationSettingsWriteRef.current && saved.sessionId === activeSessionIdRef.current) {
+          setConversationSettingsState(saved);
+        }
+      })
+      .catch(() => undefined);
+  };
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
@@ -2557,7 +2602,7 @@ export function ChatView({
       Array.isArray(versions) ? versions : []
     );
     try {
-      await api.sendChat(requestId, wireMessages, unitSystem);
+      await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined);
     } catch (caught) {
       activeRequestIdRef.current = null;
       setStreaming(false);
@@ -3624,6 +3669,34 @@ function AnalysisSilentChip({
       <div className="chat-layout">
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
+          {conversationSettings ? (
+            <button
+              type="button"
+              className="chat-conversation-settings"
+              data-action="conversationSettings"
+              onClick={() => setConversationSettingsOpen(true)}
+              title="What Coach reads here, and which AI answers"
+            >
+              <span>
+                Reads:{" "}
+                {SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
+                  .map(([, label]) => label)
+                  .join(" · ") || "nothing of yours"}
+              </span>
+              <span>
+                AI:{" "}
+                {conversationSettings.runtime
+                  ? [
+                      COACH_PROVIDER_LABELS[conversationSettings.runtime.provider ?? chatSettings.provider],
+                      conversationSettings.runtime.model,
+                      conversationSettings.runtime.effort
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Coach's settings"}
+              </span>
+            </button>
+          ) : null}
           <div className="chat-transcript" ref={scrollRef}>
         <div className="chat-thread">
           {timeline.length === 0 && !streaming ? (
@@ -4164,6 +4237,23 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      {conversationSettingsOpen && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachConversationSettings
+            portal
+            chatSettings={chatSettings}
+            conversation={conversationSettings}
+            readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
+            claudeStatus={claudeStatus}
+            onChange={updateConversationSettings}
+            onClose={() => setConversationSettingsOpen(false)}
+            onOpenCoachSettings={() => {
+              setConversationSettingsOpen(false);
+              setSettingsOpen(true);
+            }}
+          />
+        </Suspense>
+      ) : null}
       {api && calendarFor ? (
         <Suspense fallback={null}>
           <CoachCalendarDialog

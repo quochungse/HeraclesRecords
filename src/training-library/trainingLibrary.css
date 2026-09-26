@@ -36,11 +36,14 @@
  * `.chat-canvas` is Coach's canvas, which reads a creation with the reader's
  * week cards: it takes the tokens and no control rule, since it edits nothing.
  * Without them its day wells drew as the browser's black dashed border.
+ * `.coach-conversation-sheet` holds a conversation's settings (P2.0), drawn
+ * with the generator's sheet and portalled to <body>.
  */
 .training-library-view,
 .tl-plan-modal-backdrop,
 .tl-dialog-backdrop,
-.chat-canvas {
+.chat-canvas,
+.coach-conversation-sheet {
   /*
    * Hairlines derive from the text colour rather than --glass-border, which is
    * a 0.1-alpha dark on the paper theme and disappears against a white panel.
@@ -83,7 +86,7 @@
 }
 
 /* Highlighted text takes the accent, never the system blue. */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) ::selection {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) ::selection {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--accent) 38%, transparent);
 }
@@ -112,7 +115,7 @@
  * sits in, so the editor came out with no dashed day wells, no tile ground and
  * no rules at all.
  */
-:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
+:root:not([data-theme="paper"]) :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) {
   color-scheme: dark;
 
   --tl-ground: #16171b;
@@ -156,7 +159,7 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop) {
+:root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) {
   color-scheme: light;
 
   --tl-ground: #e6eaf1;
@@ -242,7 +245,7 @@
  * `.tl-search input:focus { outline: none }`, which is a `:focus` rule and so
  * covers every way the field can be focused.
  */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop)
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet)
   :is(button, input, select, textarea, [role="checkbox"]):not(.tl-search input, .plan-editor-search input):focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
@@ -253,14 +256,16 @@
  * `.primary-button` is a 44px marketing button. Both are quieted here to sit on
  * a hairline row without shouting.
  *
- * **Three scopes, because a library control is not always inside the library.**
+ * **Four scopes, because a library control is not always inside the library.**
  * The plan editor is portalled into `.tl-plan-modal-backdrop`, and the workout
  * modal it opens for a session portals to `body` — so the "Discard unsaved
  * changes?" asked over a session sat outside both, and its Keep editing drew as
  * the platform's grey button beside a 44px Discard. `.tl-dialog-backdrop` is
  * the dialog's own root, so a `tl-dialog` is styled wherever it is mounted.
+ * `.coach-conversation-sheet` is a fourth: Coach's per-conversation settings
+ * reuse the generator's sheets, portalled to `body` outside the library.
  */
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) :is(.primary-button, .ghost-button) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) :is(.primary-button, .ghost-button) {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -273,7 +278,7 @@
   cursor: pointer;
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .primary-button {
   border: 0;
   color: #fff;
   background: var(--accent-gradient);
@@ -287,7 +292,7 @@
     filter var(--dur-fast) var(--ease);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .primary-button:hover:not(:disabled) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.26),
     0 10px 26px color-mix(in srgb, var(--accent) 38%, transparent);
@@ -295,12 +300,12 @@
   transform: translateY(-1px);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .primary-button:active:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .primary-button:active:not(:disabled) {
   transform: translateY(0);
   filter: brightness(0.97);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .ghost-button {
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   background: var(--glass-bg);
@@ -313,7 +318,7 @@
     box-shadow var(--dur-fast) var(--tl-ease-out);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .ghost-button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--glass-border));
   color: var(--text-primary);
   background: var(--glass-bg-hover);
@@ -321,17 +326,17 @@
   transform: translateY(-1px);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .ghost-button.danger:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .ghost-button.danger:hover:not(:disabled) {
   color: var(--error-text);
   border-color: var(--error-border);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) :is(.primary-button, .ghost-button):disabled {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) :is(.primary-button, .ghost-button):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .icon-button {
   display: inline-flex;
   width: 30px;
   height: 30px;
@@ -346,16 +351,16 @@
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .icon-button:hover:not(:disabled) {
   color: var(--text-primary);
   background: var(--glass-bg-hover);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button.danger:hover:not(:disabled) {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .icon-button.danger:hover:not(:disabled) {
   color: var(--error-text);
 }
 
-:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop) .icon-button:disabled {
+:is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-conversation-sheet) .icon-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }

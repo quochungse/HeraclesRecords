@@ -27,9 +27,12 @@ interface GeneratorProviderPanelProps {
   readiness: Partial<Record<ChatProvider, boolean>>;
   claudeStatus: ClaudeCodeStatus | null;
   runtime: GeneratorRuntime;
-  keepForChat: boolean;
+  /** Keep the choice for Coach too; the question is not asked without it. */
+  keepForChat?: boolean;
   onChange: (runtime: GeneratorRuntime) => void;
-  onKeepForChatChange: (keep: boolean) => void;
+  onKeepForChatChange?: (keep: boolean) => void;
+  /** What the AI is chosen for: a generated plan, or one conversation (P2.0). */
+  subject?: "plan" | "conversation";
   onDone: () => void;
   onOpenCoach: () => void;
 }
@@ -49,7 +52,8 @@ export function GeneratorProviderPanel({
   onChange,
   onKeepForChatChange,
   onDone,
-  onOpenCoach
+  onOpenCoach,
+  subject = "plan"
 }: GeneratorProviderPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -75,8 +79,12 @@ export function GeneratorProviderPanel({
       >
         <header>
           <div>
-            <h3 id="plan-generator-ai-title">AI for this plan</h3>
-            <p>Which provider writes it, and how hard it thinks. Coach&rsquo;s own settings stay as they are unless you keep this for Coach too.</p>
+            <h3 id="plan-generator-ai-title">AI for this {subject}</h3>
+            <p>
+              {subject === "plan"
+                ? "Which provider writes it, and how hard it thinks. Coach’s own settings stay as they are unless you keep this for Coach too."
+                : "Which provider answers here, and how hard it thinks. Coach’s own settings stay as they are for every other conversation."}
+            </p>
           </div>
           <button type="button" className="icon-button" aria-label="Close AI settings" onClick={onDone}><X size={16} /></button>
         </header>
@@ -149,10 +157,12 @@ export function GeneratorProviderPanel({
         </div>
 
         <footer>
-          <label className="plan-generator-sheet-keep">
-            <input type="checkbox" checked={keepForChat} onChange={(event) => onKeepForChatChange(event.target.checked)} />
-            Keep this for Coach chat too
-          </label>
+          {onKeepForChatChange ? (
+            <label className="plan-generator-sheet-keep">
+              <input type="checkbox" checked={keepForChat === true} onChange={(event) => onKeepForChatChange(event.target.checked)} />
+              Keep this for Coach chat too
+            </label>
+          ) : null}
           <button type="button" className="primary-button" onClick={onDone}>Done</button>
         </footer>
       </div>

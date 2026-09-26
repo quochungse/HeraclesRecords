@@ -395,10 +395,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   sends a new session).
   Three rules the suites hold: a session's name keeps a readable width inside a day column, and
   the problems that block Save are listed at every width; **a rule that styles a library control
-  must name all three scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
-  is portalled there) and `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
-  question it asks through the plan's `ConfirmDialog` sits outside both) — or the control draws as
-  the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
+  must name all four scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
+  is portalled there), `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
+  question it asks through the plan's `ConfirmDialog` sits outside both) and
+  `.coach-conversation-sheet` (Coach's per-conversation settings reuse the generator's sheets,
+  portalled to `<body>`) — or the control draws as the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
   reader's week cards and takes the library's **tokens** block as a fourth scope, but no control
   rule, since it edits nothing; without the tokens its day wells drew as the browser's black
   dashed border. And the editor's shortcuts listen on the window, gated on `layer`,
@@ -806,6 +807,19 @@ Overview, Media, Data, and Settings are in the main bundle.
   recognised by its `server__` prefix). Every call travels as `kind: "mcp"` on the stream,
   which is why the badge once said "MCP" for a turn that only read the Training Hub API; an
   unlisted local tool would fall back to that label.
+
+  **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
+  P2.0 of docs/coach-plan-canvas.md). No row means everything shared and Coach's settings, and
+  `setConversationSettings` deletes the row when that is what is chosen, so only a difference is
+  stored. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
+  and hands `streamChat` its `sources` and `runtime`, and `streamChat` turns withheld sources into
+  a `runTools` reach (`conversationReach`) — withheld from every tool that reads them *and* from
+  the snapshot, as the generator does — unless the run already brought a reach of its own. An
+  analysis in the conversation takes its sources, and its runtime through `analysisRuntimeOver`:
+  a provider and a model are **one** choice, so the pair comes whole from whichever side made
+  it, the analysis first, and effort is taken the same way on its own — merged field by field,
+  a model picked for Claude went out to the conversation's OpenRouter. The row goes with the
+  conversation.
 
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`

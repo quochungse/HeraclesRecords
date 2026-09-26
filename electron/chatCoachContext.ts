@@ -26,13 +26,19 @@ import {
 export function buildCoachInstructions(
   customInstructions?: string,
   /** An analysis's role/remit, injected for that run only. */
-  roleInstructions?: string
+  roleInstructions?: string,
+  /** What the conversation does not share (P2.0); app-written, so rules rather than data. */
+  withheld?: Partial<Record<"activities" | "sleep" | "zones", boolean>>
 ): string {
   const base = buildBaseCoachInstructions();
   const custom = sanitizeDelimitedBlock(customInstructions);
   const role = sanitizeDelimitedBlock(roleInstructions);
 
   let text = base;
+  const withheldLines = conversationWithheldLines(withheld);
+  if (withheldLines.length) {
+    text += "\n\n## What the athlete shares in this conversation\n" + withheldLines.join("\n");
+  }
   if (custom) {
     text +=
       "\n\n## Athlete's custom instructions\n" +
@@ -58,6 +64,28 @@ export function buildCoachInstructions(
       "</analysis_role>";
   }
   return text;
+}
+
+/**
+ * The sources a conversation keeps from Coach, said as rules (P2.0). The tools
+ * that read them are withheld too, and the snapshot is cut to match; this is
+ * what stops Coach assuming what it cannot see.
+ */
+export function conversationWithheldLines(
+  withheld: Partial<Record<"activities" | "sleep" | "zones", boolean>> | undefined
+): string[] {
+  if (!withheld) return [];
+  return [
+    withheld.activities
+      ? "- The athlete has not shared their training history in this conversation: do not read or assume their activities, fitness, records or predictions."
+      : undefined,
+    withheld.sleep
+      ? "- The athlete has not shared their sleep or HRV in this conversation: do not read or assume them."
+      : undefined,
+    withheld.zones
+      ? "- The athlete has not shared their COROS thresholds or zones in this conversation: prescribe by effort (RPE) or a generic target, and say so."
+      : undefined
+  ].filter((line): line is string => Boolean(line));
 }
 
 // `automation_role` is the pre-rename tag and is still stripped. Nothing emits

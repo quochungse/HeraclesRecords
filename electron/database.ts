@@ -226,6 +226,13 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_provider_updated
       ON chat_sessions(provider, updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS chat_conversation_settings (
+      session_id TEXT PRIMARY KEY,
+      sources_json TEXT,
+      runtime_json TEXT,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chat_plan_drafts (
       draft_id TEXT PRIMARY KEY,
       plan_json TEXT NOT NULL,
@@ -2951,6 +2958,45 @@ export function markChatPlanDraftUploaded(
     )
     .run(uploadedAt, draftId);
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [draftId]);
+}
+
+/** A conversation's own settings (P2.0), as stored; absent is Coach's for everything. */
+export function getChatConversationSettingsRow(
+  sessionId: string
+): { sourcesJson?: string; runtimeJson?: string } | undefined {
+  const row = requireDatabase()
+    .prepare("SELECT sources_json, runtime_json FROM chat_conversation_settings WHERE session_id = ?")
+    .get(sessionId) as { sources_json: string | null; runtime_json: string | null } | undefined;
+  if (!row) return undefined;
+  return {
+    ...(row.sources_json ? { sourcesJson: row.sources_json } : {}),
+    ...(row.runtime_json ? { runtimeJson: row.runtime_json } : {})
+  };
+}
+
+export function saveChatConversationSettingsRow(
+  sessionId: string,
+  sourcesJson: string | null,
+  runtimeJson: string | null
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_conversation_settings (session_id, sources_json, runtime_json, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET
+         sources_json = excluded.sources_json,
+         runtime_json = excluded.runtime_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(sessionId, sourcesJson, runtimeJson, new Date().toISOString());
+  notifySyncedRow("chat_conversation_settings", ["session_id"], [sessionId]);
+}
+
+export function deleteChatConversationSettingsRow(sessionId: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM chat_conversation_settings WHERE session_id = ?")
+    .run(sessionId);
+  if (result.changes > 0) notifySyncedDelete("chat_conversation_settings", sessionId);
 }
 
 export function deleteChatPlanDraft(draftId: string): void {

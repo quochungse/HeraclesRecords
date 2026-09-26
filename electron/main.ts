@@ -331,7 +331,6 @@ import {
   saveChatSessionEntries,
   saveChatSettings,
   setChatSessionPinnedById,
-  streamChat,
   testClaudeCodeConnection,
   testAnthropicApiConnection,
   testLocalChatConnection,
@@ -343,6 +342,9 @@ import {
   restorePlanVersion,
   syncPlanFromCoros,
   listPlanCalendarStates,
+  streamConversationTurn,
+  getConversationSettings,
+  setConversationSettings,
   findChatSessionForDraft,
   editPlanDraft,
   generateTrainingPlan,
@@ -1594,10 +1596,20 @@ function registerIpcHandlers(): void {
   // Kicks off streaming; assistant text is pushed via chat:stream* events.
   ipcMain.handle(
     "chat:send",
-    (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem) =>
-      streamChat(createWindowSink(mainWindow), requestId, messages, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
+    (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem, sessionId?: string) =>
+      streamConversationTurn(
+        createWindowSink(mainWindow),
+        requestId,
+        messages,
+        normalizeUnitSystem(unitSystem),
+        typeof sessionId === "string" && sessionId ? sessionId : undefined
+      )
+  );
+  ipcMain.handle("chat:conversationSettings", (_event, sessionId: string) =>
+    getConversationSettings(sessionId)
+  );
+  ipcMain.handle("chat:setConversationSettings", (_event, settings: import("./types").ConversationSettings) =>
+    setConversationSettings(settings)
   );
 
   ipcMain.handle("chat:cancel", (_event, requestId: string) =>

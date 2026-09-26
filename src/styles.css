@@ -19930,6 +19930,43 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* What this conversation reads and which AI answers it (P2.0): one quiet
+   line above the transcript, opening the sheet that changes it. */
+.chat-conversation-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-self: center;
+  width: 100%;
+  max-width: 760px;
+  margin: 8px auto 0;
+  padding: 4px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-conversation-settings:hover {
+  color: var(--text-secondary);
+}
+
+/* The sheet's own layer sits inside this, over the whole window. */
+.coach-conversation-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+/* The generator's footer leads with its keep-for-chat box; this sheet has none. */
+.coach-conversation-sheet .plan-generator-sheet > footer {
+  justify-content: flex-end;
+}
+
 /* What the athlete pointed at (P1.7): chips above the composer while the
    question is written, and a line above the question once it is sent. */
 .chat-refs-pending,

@@ -500,6 +500,20 @@ hiện lại trong cuộc chat.
 ### P2 — Một pipeline
 
 **P2.0 Cài đặt theo cuộc chat (D13, D14)** · M
+- (Đã làm: `getConversationSettings` mặc định chia sẻ tất cả và không có row; `setConversationSettings`
+  xoá row khi mọi nguồn bật và không có runtime, nên chỉ phần khác Coach settings được giữ. Row
+  đọc hỏng thì coi như không có. `chat:send` mang `sessionId`, và `streamConversationTurn` đọc cài
+  đặt rồi gọi `streamChat` với `sources`/`runtime`; `streamChat` đăng ký một reach
+  (`conversationReach`) trong `runTools` trừ khi lượt đó đã có reach riêng (generator). Nguồn bị
+  tắt còn được nói thành luật trong prompt ("## What the athlete shares in this conversation",
+  `conversationWithheldLines`), vì một tool bị giấu không nói cho Coach biết vì sao nó thiếu.
+  Analysis: nguồn của cuộc chat áp dụng; runtime ghép bằng `analysisRuntimeOver` — provider và
+  model là **một** lựa chọn nên cặp đó lấy nguyên từ bên đã chọn (analysis trước), effort lấy
+  riêng theo cùng thứ tự; một model chọn cho Claude không bao giờ bị gửi tới OpenRouter của
+  cuộc chat. UI: dải `.chat-conversation-settings` trên
+  transcript mở `CoachConversationSettings` (lazy), dùng lại sheet và công tắc của generator,
+  portal ra `body` trong `.coach-conversation-sheet` — scope thứ tư của các rule control Library.
+  Row bị xoá cùng cuộc chat. Test riêng: `test:conversation-settings`.)
 - Bảng mới `chat_conversation_settings` (§7): nguồn dữ liệu (activities, sleep, zones) và
   runtime (provider, model, effort; chỉ phần khác Coach settings, như `planGeneratorRuntime.ts`
   đang làm).
