@@ -609,6 +609,14 @@ hiện lại trong cuộc chat.
 - Run trail (`runTrail.ts`) hiện trong skeleton của card khi lượt đang chạy.
 
 **P2.4 Lượt pipeline không mang theo cả lịch sử** · S
+- (Đã làm: là một hàm thuần `pipelineWire` trong `chatContextCompaction.ts` thay vì tuỳ chọn
+  `wire: "pipeline"` trên `streamChat`: hai bước (`streamOutlineStep`, `streamSessionsStep`) gọi nó
+  trên wire renderer gửi. Giữ 6 **tin nhắn** trước tin nhắn của bước (bắt đầu từ một tin nhắn user,
+  bỏ tóm tắt compaction), rồi prompt của bước, vốn đã mang brief và outline; tin nhắn cuối của
+  renderer — chữ athlete thấy và `creationIndex` — bị thay. System prompt và snapshot (theo nguồn
+  của cuộc chat) vẫn do `streamChat` thêm. Renderer không gọi `compactBeforeSend` trước một bước,
+  nên không tốn lời gọi tóm tắt. Test: case P2.4 trong `test:plan-outline`, và
+  `test:chat-plan-card-renderer` khẳng định không có `compactChatContext`.)
 - Lượt outline và lượt sessions gửi: system, snapshot (theo nguồn của cuộc chat), brief, outline
   và 6 lượt gần nhất. Không gửi cả transcript, và không tạo tóm tắt (tóm tắt chỉ có sau khi
   compaction đã chạy; tạo mới tốn thêm một lời gọi). Một tuỳ chọn `wire: "pipeline"` trên

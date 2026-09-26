@@ -973,6 +973,7 @@ async function main() {
   await page(`[...document.querySelectorAll(".chat-brief-card button")].find((b) => b.textContent.trim() === "Draw the outline").click()`);
   const drawn = await waitFor(async () => (await harness("calls", "sendChat"))[0], "Draw the outline sends a turn");
   assert.deepEqual(drawn.args[4], { step: "outline", artifactId: "brief-2" }, "the step travels beside the words");
+  assert.equal(await harness("callCount", "compactChatContext"), 0, "a step is not compacted first: it sends only its recent messages (P2.4)");
   assert.equal(drawn.args[1].at(-1).content.endsWith("Draw the outline"), true, "the words are what the athlete sees");
   await harness("emit", "onChatStreamStart", { requestId: drawn.args[0] });
   await harness("emit", "onChatStreamInfo", {

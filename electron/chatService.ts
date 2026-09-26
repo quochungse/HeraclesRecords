@@ -206,6 +206,7 @@ import type {
   WorkoutDeletePreview
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
+import { pipelineWire } from "./chatContextCompaction";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
@@ -2576,13 +2577,6 @@ function pipelineReach(
   };
 }
 
-/** The last user message of a wire transcript, carrying `content` instead. */
-function withLastUserContent(messages: ChatMessage[], content: string): ChatMessage[] {
-  const last = messages.map((message) => message.role).lastIndexOf("user");
-  if (last < 0) return [...messages, { role: "user", content }];
-  return messages.map((message, index) => (index === last ? { ...message, content } : message));
-}
-
 /**
  * "Draw the outline", as a turn of the conversation (P2.2). It is the
  * generator's outline turn with the brief as its request and the
@@ -2648,7 +2642,7 @@ async function streamOutlineStep(
     if (simulatePlanAi()) {
       await simulatedPlanTurn(sink, requestId, "outline", request, unitSystem, revision);
     } else {
-      await streamChat(sink, requestId, withLastUserContent(messages, trainingPlanOutlinePrompt(request, revision)), {
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanOutlinePrompt(request, revision)), {
         unitSystem,
         ...(sessionId ? { sessionId } : {}),
         toolPolicy: "read-only",
@@ -2699,7 +2693,7 @@ async function streamSessionsStep(
     if (simulatePlanAi()) {
       await simulatedPlanTurn(sink, requestId, "plan", request, unitSystem);
     } else {
-      await streamChat(sink, requestId, withLastUserContent(messages, trainingPlanGenerationPrompt(request)), {
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanGenerationPrompt(request)), {
         unitSystem,
         ...(sessionId ? { sessionId } : {}),
         toolPolicy: "read-only",

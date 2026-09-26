@@ -407,6 +407,38 @@ export function planTranscriptContext(
  * and it has to be obvious to the model that this is a compression of the
  * conversation rather than something the athlete just said.
  */
+/** How many messages before its own a pipeline step's turn carries (P2.4). */
+export const PIPELINE_RECENT_MESSAGES = 6;
+
+/**
+ * What a step of the plan pipeline sends (docs/coach-plan-canvas.md, P2.4):
+ * the last few messages before the step and the step's own prompt, which
+ * carries the brief and the outline. Not the whole conversation — a step's
+ * cost must not grow with how long the athlete has been talking — and not a
+ * summary either: a summary exists only once compaction has run, and making
+ * one for the step would cost a call of its own. The system prompt and the
+ * training snapshot are added by `streamChat` as for any turn.
+ *
+ * The step's message is the last user message of the wire the renderer
+ * sent; what it said there (the athlete's words, the creation index) is
+ * replaced by `prompt`. The kept messages start at a user message, which
+ * every provider wants first, and the summary a compacted conversation opens
+ * with is never among them.
+ */
+export function pipelineWire(
+  messages: readonly ChatMessage[],
+  prompt: string,
+  recent = PIPELINE_RECENT_MESSAGES
+): ChatMessage[] {
+  const last = messages.map((message) => message.role).lastIndexOf("user");
+  const before = (last < 0 ? messages : messages.slice(0, last)).filter(
+    (message) => !(message.role === "user" && message.content.startsWith("[Earlier in this conversation, summarised]"))
+  );
+  const kept = before.slice(Math.max(0, before.length - recent));
+  while (kept.length && kept[0]!.role !== "user") kept.shift();
+  return [...kept, { role: "user", content: prompt }];
+}
+
 export function summaryContextMessage(summary: string): ChatMessage {
   return {
     role: "user",

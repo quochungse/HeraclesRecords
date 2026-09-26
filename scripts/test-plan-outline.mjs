@@ -22,6 +22,8 @@
 //     artifact, dated from the brief's first Monday. From then on the brief
 //     and its outline are changed through the plan, and the sessions are not
 //     written twice.
+//   * A step's wire is its prompt and the six messages before it, never the
+//     whole conversation or its summary (P2.4).
 //
 // Usage:
 //   npm run test:plan-outline
@@ -393,6 +395,32 @@ test("the step's trail: reads, the hand-over, the check sent back, the check pas
     { kind: "call", tool: "propose_plan_outline" }
   );
   assert.equal(outline.notes.trail[0].done, "Handed the outline to the check", "each step hands over its own tool");
+});
+
+test("a step's wire: the last six messages and the step's prompt, no summary, no index (P2.4)", () => {
+  const history = [
+    compaction.summaryContextMessage("Long ago the athlete ran a marathon."),
+    ...Array.from({ length: 10 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" : "assistant",
+      content: `message ${index + 1}`
+    })),
+    { role: "user", content: "Draw the outline\n\n[What you have made in this conversation…]" }
+  ];
+  const wire = compaction.pipelineWire(history, "OUTLINE PROMPT");
+  assert.deepEqual(
+    wire.map((message) => message.content),
+    ["message 5", "message 6", "message 7", "message 8", "message 9", "message 10", "OUTLINE PROMPT"],
+    "a fixed tail, whatever the conversation's length"
+  );
+  assert.equal(wire[0].role, "user");
+  const odd = compaction.pipelineWire(history.slice(0, -2).concat([history.at(-1)]), "P");
+  assert.equal(odd[0].role, "user", "a tail that would open on Coach's answer starts at the next question");
+  assert.ok(odd.length <= compaction.PIPELINE_RECENT_MESSAGES + 1);
+  assert.deepEqual(
+    compaction.pipelineWire([compaction.summaryContextMessage("x"), { role: "user", content: "go" }], "P"),
+    [{ role: "user", content: "P" }],
+    "the summary a compacted conversation opens with is not carried"
+  );
 });
 
 /** An outline of `weeks` base weeks, five sessions and `hours` a week, with no key sessions. */

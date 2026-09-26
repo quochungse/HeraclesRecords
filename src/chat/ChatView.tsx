@@ -2702,10 +2702,11 @@ export function ChatView({
     // `tailStart` measured in one and sliced from the other would cut the
     // conversation at a boundary that does not exist in it.
     const persisted = toPersistedEntries(nextEntries);
-    const context = await compactBeforeSend(
-      activeSessionIdRef.current,
-      persisted
-    );
+    // A pipeline step carries only its recent messages (P2.4), so compacting
+    // before it would pay a summariser call for a summary it never sends.
+    const context = pipeline
+      ? null
+      : await compactBeforeSend(activeSessionIdRef.current, persisted);
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
