@@ -2206,7 +2206,7 @@ export function ChatView({
         await ensureActiveSession("chatgpt");
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "ChatGPT sign-in failed.");
+      onError(remoteErrorMessage(caught, "ChatGPT sign-in failed."));
     } finally {
       setSigningIn(false);
     }
@@ -2234,9 +2234,7 @@ export function ChatView({
       return status;
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Claude Code detection failed."
+        remoteErrorMessage(caught, "Claude Code detection failed.")
       );
       return null;
     } finally {
@@ -2304,9 +2302,7 @@ export function ChatView({
       }
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save Claude settings."
+        remoteErrorMessage(caught, "Could not save Claude settings.")
       );
     }
   };
@@ -2326,7 +2322,7 @@ export function ChatView({
       setTimeline([]);
       resetEphemeralChatState();
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not start a new chat.");
+      onError(remoteErrorMessage(caught, "Could not start a new chat."));
     }
   };
 
@@ -2373,7 +2369,7 @@ export function ChatView({
       );
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Could not rename chat."
+        remoteErrorMessage(caught, "Could not rename chat.")
       );
     }
   };
@@ -2397,7 +2393,7 @@ export function ChatView({
         }
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not delete chat.");
+      onError(remoteErrorMessage(caught, "Could not delete chat."));
     }
   };
 
@@ -2415,7 +2411,7 @@ export function ChatView({
         setClaudeStatus(status);
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Provider change failed.");
+      onError(remoteErrorMessage(caught, "Provider change failed."));
     }
   };
 
@@ -2433,9 +2429,7 @@ export function ChatView({
       setChatSettings(await api.saveChatSettings(nextSettings));
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the reasoning effort."
+        remoteErrorMessage(caught, "Could not save the reasoning effort.")
       );
     } finally {
       setSavingSettings(false);
@@ -2486,9 +2480,7 @@ export function ChatView({
       setChatSettings(saved);
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the selected model."
+        remoteErrorMessage(caught, "Could not save the selected model.")
       );
     } finally {
       setSavingSettings(false);
@@ -2612,9 +2604,7 @@ export function ChatView({
       }
     } catch (caught) {
       showToast(
-        caught instanceof Error
-          ? caught.message
-          : "Could not compact this conversation.",
+        remoteErrorMessage(caught, "Could not compact this conversation."),
         "error"
       );
     } finally {
@@ -2650,7 +2640,7 @@ export function ChatView({
       );
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Could not read the context.";
+        remoteErrorMessage(caught, "Could not read the context.");
       setContextInspection((current) =>
         current?.sessionId === sessionId ? { ...current, error: message } : current
       );
@@ -2953,9 +2943,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to save the workout or plan to COROS."
+        remoteErrorMessage(caught, "Failed to save the workout or plan to COROS.")
       );
     } finally {
       setUploadingDraftId(null);
@@ -3014,8 +3002,14 @@ export function ChatView({
    */
   const appendVersion = (
     written: PlanVersionWritten,
-    action: "edited" | "restored" | "imported" | "removedOnCoros"
+    action: "edited" | "restored" | "imported" | "removedOnCoros",
+    /** The conversation the write was asked from; a card never lands in another. */
+    sessionId: string | null = activeSessionIdRef.current
   ) => {
+    // An answer that arrives after the athlete moved to another conversation
+    // belongs to the one it was asked from, which is no longer on screen: the
+    // version is in the store, and the canvas lists it there.
+    if (!sessionId || activeSessionIdRef.current !== sessionId) return;
     const event: ChatEntry = {
       kind: "planEvent",
       event: {
@@ -3033,8 +3027,13 @@ export function ChatView({
       }
     };
     setTimeline((prev) => {
+      // Two asks can share one read against COROS (the canvas opening while
+      // an edit begins), and so one version: its card goes in once.
+      if (prev.some((entry) => entry.kind === "planDraft" && entry.draft.draftId === written.preview.draftId)) {
+        return prev;
+      }
       const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: written.preview }];
-      persistHistory(activeSessionIdRef.current, next, true);
+      persistHistory(sessionId, next, true);
       return next;
     });
   };
@@ -3089,9 +3088,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to delete workout from COROS."
+        remoteErrorMessage(caught, "Failed to delete workout from COROS.")
       );
     } finally {
       setDeletingRequestId(null);
@@ -3126,9 +3123,7 @@ export function ChatView({
       });
     } catch (caught) {
       const message =
-        caught instanceof Error
-          ? caught.message
-          : "Latest activity FIT export failed.";
+        remoteErrorMessage(caught, "Latest activity FIT export failed.");
       onError(message);
       setTimeline((prev) => {
         const next: ChatEntry[] = [
@@ -3200,12 +3195,15 @@ export function ChatView({
     // A plan on COROS is read against COROS first (D12): an edit made in the
     // Library comes in as the newest version, and the editor opens on that.
     let target = draftId;
+    const sessionId = activeSessionIdRef.current;
     if (api && isOnCoros(versionIndex.get(draftId))) {
       const sync = await api
         .syncPlanFromCoros(draftId, unitSystem)
         .catch((): PlanCorosSync => ({ kind: "current" }));
+      // Moved to another conversation while COROS answered: no editor opens there.
+      if (activeSessionIdRef.current !== sessionId) return;
       if (sync.kind !== "current") {
-        appendVersion(sync.written, sync.kind);
+        appendVersion(sync.written, sync.kind, sessionId);
         target = sync.written.preview.draftId;
       }
     }
@@ -3218,10 +3216,11 @@ export function ChatView({
   const openCreation = (draftId: string) => {
     setOpenCreationId(draftId);
     if (!api || !isOnCoros(versionIndex.get(draftId))) return;
+    const sessionId = activeSessionIdRef.current;
     void api
       .syncPlanFromCoros(draftId, unitSystem, true)
       .then((sync) => {
-        if (sync.kind !== "current") appendVersion(sync.written, sync.kind);
+        if (sync.kind !== "current") appendVersion(sync.written, sync.kind, sessionId);
       })
       .catch(() => undefined);
   };
@@ -3230,10 +3229,11 @@ export function ChatView({
   const handleRestoreVersion = async (draftId: string) => {
     if (!api) return;
     onError(null);
+    const sessionId = activeSessionIdRef.current;
     try {
-      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
+      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored", sessionId);
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not restore that version.");
+      onError(remoteErrorMessage(caught, "Could not restore that version."));
     }
   };
   const editingWorkoutDraft =

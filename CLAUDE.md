@@ -529,6 +529,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
   a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
   where an answer that overdoes it shows.
+  **A draft is read from its row every time, never from a copy held in memory**
+  (`loadStoredPlanDraft`): a row changes behind the process — another machine saves the creation
+  and the pull marks it uploaded — and a cached copy let this machine `plan/add` it a second time.
+  Saves are serialised per creation (`savingArtifacts`) and reads against COROS shared per
+  creation (`corosSyncsInFlight`); a version answered after the athlete moved to another
+  conversation is not appended there (`appendVersion` takes the conversation it was asked from).
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with

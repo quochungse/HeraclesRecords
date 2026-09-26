@@ -716,6 +716,44 @@ async function main() {
   await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "then the editor opens");
   await page(`document.querySelector('.tl-plan-modal [aria-label="Close"], .tl-plan-modal .plan-editor-close')?.click()`);
 
+  // Review of P1: an answer from COROS that lands after the athlete moved to
+  // another conversation does not put its card there, and one version shared
+  // by two asks is one card.
+  const OTHER = { ...SESSION, id: "s2", title: "Other chat" };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    listChatSessions: [SESSION, OTHER],
+    __byArg: {
+      getChatSession: {
+        '"s1"': [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+        '"s2"': [{ kind: "message", role: "user", content: "Something else" }]
+      }
+    },
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: "__pending"
+  });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the saved card is drawn");
+  await settle();
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "opening asks COROS");
+  await page(`[...document.querySelectorAll(".chat-session-row-title")].find((title) => title.textContent.includes("Other chat")).click()`);
+  await waitFor(
+    async () => /Something else/.test((await page(`document.querySelector(".chat-messages, .chat-timeline, main")?.textContent`)) ?? (await page(`document.body.textContent`))),
+    "the other conversation is open"
+  );
+  await harness("clearCalls");
+  await harness("resolvePending", "syncPlanFromCoros", IMPORTED);
+  await settle();
+  assert.equal(await harness("exists", ".chat-plan-event-row"), false, "no line for another conversation's creation here");
+  assert.equal(
+    (await harness("calls", "saveChatSession")).some((call) => JSON.stringify(call.args[1]).includes("plan-1-coros")),
+    false,
+    "and nothing of it saved into this one"
+  );
+
   // -------------------------------------------------------------------------
   // A Coach plan goes on the calendar from the conversation, and says so (P1.6)
   // -------------------------------------------------------------------------

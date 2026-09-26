@@ -497,6 +497,32 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 lượt; canvas thay modal; plan đã lưu vẫn cập nhật và lên lịch được từ Coach, và sửa ở Library
 hiện lại trong cuộc chat.
 
+**Review P1 (2026-09-26).** Đọc lại toàn bộ P1.1–P1.9; đã sửa:
+- **Draft đọc từ row, không từ bản giữ trong RAM.** `loadStoredPlanDraft` ưu tiên `draftStore`
+  (cache trong tiến trình), trong khi `versionsOf` đọc SQLite. Một row đổi sau lưng tiến trình —
+  máy kia lưu creation lên COROS và pull đánh dấu `uploaded_at` — thì máy này vẫn thấy "chưa lưu"
+  và cho `plan/add` lần nữa: **một plan trùng trên COROS**. Cache đã bỏ.
+- **Hai lần lưu bắt đầu cùng lúc** (bấm đúp, hoặc card và canvas) cùng qua kiểm tra "đã lưu" rồi
+  mỗi lần `plan/add` một plan; giờ có khoá đang-lưu theo creation (`savingArtifacts`).
+- **Hai lần đọc COROS cùng lúc** (mở canvas và bấm Edit) mỗi lần ghi một version "Changed in the
+  Library" giống nhau; giờ lời gọi thứ hai dùng chung kết quả lần đầu (`corosSyncsInFlight`), và
+  `appendVersion` không chèn một card hai lần.
+- **Card lạc cuộc chat.** `openCreation`/Edit đọc COROS bất đồng bộ; nếu người dùng chuyển cuộc
+  chat trong lúc chờ, version mới được chèn và lưu vào **cuộc chat đang mở**, không phải cuộc chat
+  của creation. `appendVersion` giờ nhận cuộc chat đã hỏi và bỏ qua khi nó không còn mở (version
+  vẫn nằm trong store); Edit không mở editor ở cuộc chat khác.
+- **Restore trên plan đã lên COROS** giữ `idInPlan` của version cũ; một buổi đã bị xoá khỏi COROS
+  ở version sau sẽ được gửi với id không còn tồn tại. Giờ nội dung cũ nhận định danh COROS từ
+  version mới nhất theo key, như một lần revise; buổi đã bị xoá quay lại là buổi mới.
+- Lỗi của các thao tác creation (lưu, sửa, khôi phục, lịch) hiện bằng lời của nó (`remoteErrorMessage`).
+
+Test mới: bốn case trong `test:coros-plan-writes`, một case trong `test:chat-plan-card-renderer`;
+cả năm fail trên code cũ.
+
+Còn lại, biết và chưa làm: revise dời hết buổi của tuần đầu làm plan có ngày bị đánh số tuần lại
+(week 1 tính từ Thứ Hai của buổi đầu tiên), `week_stages` khi đó lệch một tuần; chip tinh chỉnh
+bấm khi Coach đang chờ câu trả lời (`coachPrompt`) thì được coi là câu trả lời.
+
 ### P2 — Một pipeline
 
 **P2.0 Cài đặt theo cuộc chat (D13, D14)** · M
