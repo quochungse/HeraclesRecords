@@ -61,6 +61,7 @@ import type {
   PersistedChatEntry,
   PlanArtifactVersion,
   PlanDraftPreview,
+  PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionWritten,
   PlanDraftPreviewEntry,
@@ -86,6 +87,7 @@ import { CoachCreationCard } from "./CoachCreationCard";
 import {
   creationVersions,
   isLatestVersion,
+  isOnCoros,
   supersededLine,
   withDocumentSources
 } from "./creationVersions";
@@ -1716,6 +1718,8 @@ export function ChatView({
           setCurrentSource(sourceRef.current);
         } else if (payload.kind === "planDraft") {
           setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
+        } else if (payload.kind === "planEvent") {
+          setTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
         } else if (payload.kind === "workoutDelete") {
           setTimeline((prev) =>
             upsertWorkoutDeleteEntry(prev, payload.preview)
@@ -2655,9 +2659,9 @@ export function ChatView({
    * rather than handed the whole plan on every turn after (P1.3), and then
    * the new version's card, under which the one it replaced folds away.
    */
-  const appendAthleteVersion = (
+  const appendVersion = (
     written: PlanVersionWritten,
-    action: "edited" | "restored"
+    action: "edited" | "restored" | "imported" | "removedOnCoros"
   ) => {
     const event: ChatEntry = {
       kind: "planEvent",
@@ -2666,7 +2670,7 @@ export function ChatView({
         artifactId: written.artifactId,
         draftId: written.preview.draftId,
         action,
-        author: "athlete",
+        author: action === "imported" || action === "removedOnCoros" ? "coros" : "athlete",
         name: written.preview.name,
         artifactType: written.preview.artifactType === "workout" ? "workout" : "plan",
         fromVersion: written.fromVersion,
@@ -2685,7 +2689,7 @@ export function ChatView({
   const handlePlanDraftEdited = (written: PlanVersionWritten) => {
     setEditingPlanDraftId(null);
     setEditingWorkoutDraftId(null);
-    appendAthleteVersion(written, "edited");
+    appendVersion(written, "edited");
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -2831,13 +2835,42 @@ export function ChatView({
   };
   /* The one way into a creation's editor, from the card or the canvas. A
      workout's editor needs its steps, which only the document has. */
-  const openCreationEditor = (draftId: string) => {
+  const openCreationEditor = async (draftId: string) => {
     const draft = planDrafts.find((item) => item.draftId === draftId);
     if (!draft) return;
     if (draft.artifactType === "workout" && !documentOf(draft)) return;
     onError(null);
-    if (draft.artifactType === "workout") setEditingWorkoutDraftId(draftId);
-    else setEditingPlanDraftId(draftId);
+    if (draft.artifactType === "workout") {
+      setEditingWorkoutDraftId(draftId);
+      return;
+    }
+    // A plan on COROS is read against COROS first (D12): an edit made in the
+    // Library comes in as the newest version, and the editor opens on that.
+    let target = draftId;
+    if (api && isOnCoros(versionIndex.get(draftId))) {
+      const sync = await api
+        .syncPlanFromCoros(draftId, unitSystem)
+        .catch((): PlanCorosSync => ({ kind: "current" }));
+      if (sync.kind !== "current") {
+        appendVersion(sync.written, sync.kind);
+        target = sync.written.preview.draftId;
+      }
+    }
+    setEditingPlanDraftId(target);
+  };
+  /*
+   * Opening a creation on COROS in the canvas asks the plan cache whether
+   * COROS has moved on — no request — and brings a newer COROS version in.
+   */
+  const openCreation = (draftId: string) => {
+    setOpenCreationId(draftId);
+    if (!api || !isOnCoros(versionIndex.get(draftId))) return;
+    void api
+      .syncPlanFromCoros(draftId, unitSystem, true)
+      .then((sync) => {
+        if (sync.kind !== "current") appendVersion(sync.written, sync.kind);
+      })
+      .catch(() => undefined);
   };
   /* An older version made the newest again: a new card, and a line saying
      so where it happened, as an edit leaves one. */
@@ -2845,7 +2878,7 @@ export function ChatView({
     if (!api) return;
     onError(null);
     try {
-      appendAthleteVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
+      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : "Could not restore that version.");
     }
@@ -3711,14 +3744,14 @@ function AnalysisSilentChip({
                           options
                         )
                       }
-                      onCoros={versionInfo?.siblings.some((item) => item.remotePlanId) ?? false}
+                      onCoros={isOnCoros(versionInfo)}
                       onEdit={
                         api && (draft.artifactType !== "workout" || documentOf(draft))
-                          ? () => openCreationEditor(draft.draftId)
+                          ? () => void openCreationEditor(draft.draftId)
                           : undefined
                       }
                       onOpen={() => {
-                        setOpenCreationId(draft.draftId);
+                        openCreation(draft.draftId);
                       }}
                     />
                   </div>
@@ -3946,9 +3979,7 @@ function AnalysisSilentChip({
               uploadingDraftId={uploadingDraftId}
               editingDraftId={editingPlanDraftId ?? editingWorkoutDraftId}
               planSportStyle={planSportStyle}
-              onOpen={(draftId) => {
-                setOpenCreationId(draftId);
-              }}
+              onOpen={(draftId) => openCreation(draftId)}
               onBack={() => {
                 setOpenCreationId(null);
                 setPlanPanelOpen(true);
@@ -3960,7 +3991,7 @@ function AnalysisSilentChip({
               onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
                 void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
               }
-              onEdit={api ? (draftId) => openCreationEditor(draftId) : undefined}
+              onEdit={api ? (draftId) => void openCreationEditor(draftId) : undefined}
               onRestore={api ? (draftId) => void handleRestoreVersion(draftId) : undefined}
               onRemove={(draftId) => {
                 handleRemovePlanDraft(draftId);

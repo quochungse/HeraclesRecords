@@ -1205,6 +1205,104 @@ test("an update written over a change made on COROS replaces it (P1.6)", async (
   assert.equal(coros.to("/training/plan/update").at(-1).body.name, "Mine");
 });
 
+test("a change made on COROS comes back as the creation's newest version (P1.6, D12)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+
+  // Nothing changed there: one read of the detail, and nothing written.
+  const reads = coros.to("/training/plan/detail").length;
+  assert.deepEqual(await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId), { kind: "current" });
+  assert.equal(coros.to("/training/plan/detail").length, reads + 1, "one request when nothing changed");
+  assert.deepEqual(
+    await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true }),
+    { kind: "current" }
+  );
+  assert.equal(coros.to("/training/plan/detail").length, reads + 1, "and none from the cache");
+
+  // Renamed, and the long run moved, in the Library.
+  const inLibrary = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const long = inLibrary.entries.find((entry) => entry.workout.key === "long-sunday");
+  await library.savePlanToCoros({
+    plan: {
+      ...inLibrary,
+      name: "Coach block, as I run it",
+      entries: inLibrary.entries.map((entry) => (entry === long ? { ...entry, dayIndex: 5 } : entry))
+    },
+    unitSystem: "metric"
+  });
+
+  const synced = await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true });
+  assert.equal(synced.kind, "imported", "the cache says COROS moved on");
+  assert.deepEqual([synced.written.fromVersion, synced.written.toVersion], [1, 2]);
+  assert.ok(synced.written.changes.includes('Renamed to "Coach block, as I run it"'), synced.written.changes.join(" | "));
+  assert.ok(synced.written.changes.some((line) => /^Moved Long Sunday: week 2 Sun → week 2 Sat/.test(line)), synced.written.changes.join(" | "));
+  const row = databaseModule.getChatPlanDraft(synced.written.preview.draftId);
+  assert.equal(row.author, "coros");
+  assert.equal(row.changeSummary, "Changed in the Library");
+  const imported = chatWorkoutTools.planDraftDocument(synced.written.preview.draftId);
+  assert.deepEqual(
+    imported.entries.map((entry) => entry.workout.key).sort(),
+    ["easy-monday", "long-sunday"],
+    "sessions keep the coach's keys, so Coach can still name them"
+  );
+  assert.equal(imported.remoteVersion, 1, "and the version COROS is at now");
+  assert.ok(row.uploadedAt, "it is what COROS holds, so it is saved there");
+  assert.equal(synced.written.preview.uploadResult.planId, "coros:900", "and its card says which plan it is");
+  // The imported version is what COROS holds, so it counts as saved there.
+  assert.deepEqual(await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId), { kind: "current" });
+});
+
+test("Coach's change to a plan changed on COROS goes onto COROS's version (P1.6)", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(preview.draftId), name: "Renamed on COROS" },
+    unitSystem: "metric"
+  });
+  const cards = [];
+  const events = [];
+  const response = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      {
+        draft_id: preview.draftId,
+        summary: "Easy run longer",
+        ops: [{ op: "replace_session", key: "easy-monday", workout: coachRun("Easy Monday", 2700) }]
+      },
+      {
+        allowUpcomingWorkouts: false,
+        onPlanDraft: (card) => cards.push(card),
+        onPlanEvent: (event) => events.push(event)
+      }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(response.version, 3, "on top of the version COROS had");
+  assert.match(response.note, /changed on COROS/);
+  assert.deepEqual(events.map((event) => [event.action, event.author, event.toVersion]), [["imported", "coros", 2]]);
+  assert.equal(cards.length, 2, "COROS's version, then Coach's");
+  assert.equal(chatWorkoutTools.planDraftDocument(response.draft_id).name, "Renamed on COROS", "the rename is kept");
+});
+
+test("a plan deleted on COROS leaves a proposal, saved again as a new plan (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  await adapter.deleteNativeCorosPlan("900");
+  const synced = await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId);
+  assert.equal(synced.kind, "removedOnCoros");
+  const detached = synced.written.preview.draftId;
+  assert.equal(chatWorkoutTools.planDraftDocument(detached).remoteId, undefined, "no plan on COROS any more");
+  const listed = chatWorkoutTools.planArtifacts([preview.draftId]);
+  assert.equal(listed.at(-1).detached, true, "and the version list says so");
+  const saved = await chatWorkoutTools.uploadPlanDraftById(detached, "metric", "nativePlan");
+  assert.equal(saved.planId, "coros:901");
+  assert.equal(coros.to("/training/plan/add").length, 2, "a plan of its own again");
+  assert.equal(coros.to("/training/plan/update").length, 0);
+});
+
 test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

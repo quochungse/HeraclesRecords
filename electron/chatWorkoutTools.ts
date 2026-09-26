@@ -18,13 +18,15 @@ import {
 import {
   deleteChatPlanDraft,
   getChatPlanDraft,
+  getCorosPlanCache,
   listChatPlanDraftVersions,
   markChatPlanDraftUploaded,
   saveChatPlanDraft,
   type ChatPlanDraftAuthor,
   type StoredChatPlanDraftRecord
 } from "./database";
-import { savePlanToCoros } from "./trainingLibraryService";
+import { getNativeTrainingPlan, savePlanToCoros } from "./trainingLibraryService";
+import { isDeletedNativePlan, readNativeCorosPlanRaw } from "./corosTrainingPlanAdapter";
 import {
   COROS_WEEK_STAGES,
   formatPlanDay,
@@ -45,8 +47,10 @@ import type {
   CorosTrainingPlanDraftInput,
   DeleteWorkoutResult,
   PlanArtifactVersion,
+  PlanCorosSync,
   PlanDraftPreview,
   PlanDraftSaveOptions,
+  PlanEvent,
   PlanWorkoutEntryInput,
   PlanVersionConflict,
   PlanVersionSave,
@@ -445,6 +449,8 @@ export async function handleChatWorkoutTool(
   args: Record<string, unknown>,
   options?: {
     onPlanDraft?: (preview: PlanDraftPreview) => void;
+    /** A creation changed on COROS was read in before Coach changed it (P1.6). */
+    onPlanEvent?: (event: PlanEvent) => void;
     onWorkoutDelete?: (preview: WorkoutDeletePreview) => void;
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
@@ -464,14 +470,21 @@ export async function handleChatWorkoutTool(
       options?.allowUpcomingWorkouts !== false,
       options?.unitSystem ?? "metric",
       "plan",
-      options?.planRequest
+      options?.planRequest,
+      options?.onPlanEvent
     );
   }
   if (name === "get_plan_draft") {
     return handleGetPlanDraft(args);
   }
   if (name === "revise_training_plan") {
-    return handleRevisePlan(args, options?.onPlanDraft, options?.allowUpcomingWorkouts !== false, options?.unitSystem ?? "metric");
+    return handleRevisePlan(
+      args,
+      options?.onPlanDraft,
+      options?.allowUpcomingWorkouts !== false,
+      options?.unitSystem ?? "metric",
+      options?.onPlanEvent
+    );
   }
   if (name === "draft_workout") {
     return handleDraftWorkout(
@@ -910,12 +923,14 @@ async function handleDraftTrainingPlan(
   allowUpcomingWorkouts = true,
   unitSystem: UnitSystem = "metric",
   artifactType: "plan" | "workout" = "plan",
-  planRequest?: TrainingPlanGenerationRequest
+  planRequest?: TrainingPlanGenerationRequest,
+  onPlanEvent?: (event: PlanEvent) => void
 ): Promise<string> {
   /* A rewrite of a plan already drafted is a version of it, not a new card;
      asked before anything is checked, since a stale id is refused anyway. */
   const revises = !planRequest && artifactType === "plan" ? String(args.revises ?? "").trim() : "";
-  const target = revises ? revisionTarget(revises, "plan") : undefined;
+  const synced = revises ? await syncForRevision(revises, unitSystem, onPlanDraft, onPlanEvent) : undefined;
+  const target = revises ? revisionTarget(synced ?? revises, "plan") : undefined;
   if (target && !target.ok) return target.response;
 
   const prepared = await prepareDraft(args, {
@@ -989,7 +1004,10 @@ function withCorosIdentityOf(stored: StoredPlanDraft, base: StoredPlanDraft, edi
     base.plan.workouts.map((workout) => [workout.key, workoutSource(workout)])
   );
   stored.document = edited
-    ? { ...carryCorosIdentity(edited, baseDocument), entries: edited.entries }
+    ? // A document read from COROS is its own authority on the plan's version.
+      edited.remoteId === baseDocument.remoteId && (edited.remoteVersion ?? -1) > (baseDocument.remoteVersion ?? -1)
+      ? edited
+      : { ...carryCorosIdentity(edited, baseDocument), entries: edited.entries }
     : carryCorosIdentity(coachDraftDocument(stored), baseDocument, baseWorkouts);
   stored.documentPlanHash = planHash(stored.plan);
 }
@@ -1194,14 +1212,16 @@ async function handleRevisePlan(
   args: Record<string, unknown>,
   onPlanDraft: ((preview: PlanDraftPreview) => void) | undefined,
   allowUpcomingWorkouts: boolean,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  onPlanEvent?: (event: PlanEvent) => void
 ): Promise<string> {
   const draftId = String(args.draft_id ?? "").trim();
   const summary = String(args.summary ?? "").trim();
   if (!draftId || !summary) {
     return JSON.stringify({ ok: false, errors: ["draft_id, ops and summary are required."] });
   }
-  const target = revisionTarget(draftId);
+  const synced = await syncForRevision(draftId, unitSystem, onPlanDraft, onPlanEvent);
+  const target = revisionTarget(synced ?? draftId);
   if (!target.ok) return target.response;
   const artifactType = target.latest.preview.artifactType ?? "plan";
   const applied = applyPlanRevision(planAsDraftArgs(target.latest.plan), args.ops, artifactType);
@@ -1218,7 +1238,129 @@ async function handleRevisePlan(
     retryTool: "revise_training_plan"
   });
   if (!prepared.ok) return prepared.response;
-  return storeRevision(target.latest, prepared, unitSystem, summary.slice(0, 200), onPlanDraft);
+  const answer = storeRevision(target.latest, prepared, unitSystem, summary.slice(0, 200), onPlanDraft);
+  if (!synced) return answer;
+  // Said to the model, which named the version before COROS's: its changes
+  // went onto what the athlete has on COROS now.
+  return JSON.stringify({
+    ...JSON.parse(answer),
+    note: "The plan had changed on COROS since you last read it; that version was brought in first, and your changes were applied to it. Mention this."
+  });
+}
+
+/**
+ * Before Coach changes a creation on COROS, the creation is read against
+ * COROS (D12): a change made there becomes its newest version, shown to the
+ * athlete as a line and a card, and Coach's change goes on top of it. Answers
+ * the new version's id when there is one. A COROS that cannot be reached
+ * changes nothing here — the update is checked against COROS again when it is
+ * saved.
+ */
+async function syncForRevision(
+  draftId: string,
+  unitSystem: UnitSystem,
+  onPlanDraft?: (preview: PlanDraftPreview) => void,
+  onPlanEvent?: (event: PlanEvent) => void
+): Promise<string | undefined> {
+  let sync: PlanCorosSync;
+  try {
+    const named = loadStoredPlanDraft(draftId);
+    if (!named) return undefined;
+    const versions = versionsOf(named.artifactId);
+    if ((versions[versions.length - 1]?.draftId ?? named.draftId) !== named.draftId) return undefined;
+    sync = await syncPlanDraftFromCoros(draftId, unitSystem);
+  } catch {
+    return undefined;
+  }
+  if (sync.kind === "current") return undefined;
+  onPlanEvent?.(corosEvent(sync.kind === "imported" ? "imported" : "removedOnCoros", sync.written));
+  onPlanDraft?.(sync.written.preview);
+  return sync.written.preview.draftId;
+}
+
+/** The line a change found on COROS leaves in the conversation. */
+export function corosEvent(action: "imported" | "removedOnCoros", written: PlanVersionWritten): PlanEvent {
+  return {
+    eventId: crypto.randomUUID(),
+    artifactId: written.artifactId,
+    draftId: written.preview.draftId,
+    action,
+    author: "coros",
+    name: written.preview.name,
+    artifactType: written.preview.artifactType === "workout" ? "workout" : "plan",
+    fromVersion: written.fromVersion,
+    toVersion: written.toVersion,
+    ...(written.changes.length ? { changes: written.changes } : {}),
+    at: Date.now()
+  };
+}
+
+/**
+ * A creation on COROS read against COROS (P1.6, D12). Only when its newest
+ * version is the one saved there: a newer version not saved yet is a change
+ * the athlete has not sent, and it is checked against COROS when it is sent —
+ * bringing COROS's copy in on top of it here would put it out of sight.
+ *
+ * `cacheOnly` asks the plan cache instead, which costs nothing: what the
+ * canvas does on opening. Otherwise it is one request (the raw detail and its
+ * version), and a second only when COROS is newer, to read it as a plan.
+ */
+export async function syncPlanDraftFromCoros(
+  draftId: string,
+  unitSystem: UnitSystem = "metric",
+  { cacheOnly = false }: { cacheOnly?: boolean } = {}
+): Promise<PlanCorosSync> {
+  const named = loadStoredPlanDraft(draftId);
+  if (!named || named.preview.artifactType === "workout") return { kind: "current" };
+  const versions = versionsOf(named.artifactId);
+  const latest = versions[versions.length - 1] ?? named;
+  if (!latest.uploadedAt) return { kind: "current" };
+  const held = draftDocument(latest);
+  if (!held.remoteId) return { kind: "current" };
+  const heldVersion = held.remoteVersion ?? -1;
+
+  if (cacheOnly) {
+    const cached = getCorosPlanCache(held.remoteId);
+    if (!cached || (cached.remoteVersion ?? -1) <= heldVersion) return { kind: "current" };
+  }
+  const raw = await readNativeCorosPlanRaw(held.remoteId);
+  if (isDeletedNativePlan(raw)) {
+    return {
+      kind: "removedOnCoros",
+      written: writeVersion(latest, structuredClone(latest.plan), {
+        unitSystem,
+        conflicts: [],
+        author: "coros",
+        changeSummary: "Deleted on COROS",
+        edited: false,
+        detach: true
+      })
+    };
+  }
+  const remoteVersion = Number((raw as Record<string, unknown>).version);
+  if (!Number.isFinite(remoteVersion) || remoteVersion <= heldVersion) return { kind: "current" };
+
+  const imported = keyedAsSent(await getNativeTrainingPlan(held.remoteId), held);
+  const { next } = planFromDocument(imported, latest);
+  return {
+    kind: "imported",
+    written: writeVersion(latest, next, {
+      unitSystem,
+      conflicts: [],
+      author: "coros",
+      changeSummary: "Changed in the Library",
+      edited: false,
+      document: imported,
+      savedAs: {
+        planName: imported.name,
+        workoutsCreated: imported.entries.length,
+        workoutsScheduled: 0,
+        entries: [],
+        destination: "nativePlan",
+        planId: `coros:${held.remoteId}`
+      }
+    })
+  };
 }
 
 /** `draft_training_plan`'s schema, with the one field a rewrite adds. */
@@ -1847,7 +1989,8 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             ...(stored.uploadedAt ? { uploadedAt: stored.uploadedAt } : {}),
             ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
             ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
-            ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {})
+            ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {}),
+            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {})
           }
         ];
       } catch {
@@ -1867,11 +2010,10 @@ export function planDraftDocument(draftId: string): TrainingPlanDocument {
 }
 
 /**
- * The athlete's edit of a coach plan, written back into the coach's own draft
- * — not a plan draft of the library's, and not a new card. The draft keeps
- * its id, so the card, the coach's tools and a later save all read the edited
- * version, and `editedAt` is what puts that version in front of the coach on
- * its next turn.
+ * The athlete's edit of a coach plan, as the creation's next version (P1.5) —
+ * not a plan draft of the library's. The version it replaced is left as it
+ * was; `editedAt` on the new card, and the `planEvent` the renderer leaves,
+ * are what put it in front of the coach.
  *
  * Dates are kept where the coach gave them: a session is dated from the
  * Monday the coach's first dated session fell in, at the week and day the
@@ -1887,6 +2029,39 @@ export async function savePlanDraftEdit(
   const stored = requirePlanDraft(draftId);
   const newer = newerVersion(stored, replaceNewer);
   if (newer) return newer;
+  const { next, keyed, anchor } = planFromDocument(plan, stored);
+  const validation = validatePlanDraft(next, { todayDay: "00000000" });
+  if (!validation.ok) throw new Error(validation.errors.join(" "));
+
+  let conflicts: string[] = [];
+  if (anchor) {
+    try {
+      conflicts = await detectScheduleConflicts(next);
+    } catch {
+      /* The calendar is only consulted to warn; offline, the card says nothing. */
+    }
+  }
+  return writeVersion(stored, next, {
+    unitSystem,
+    conflicts,
+    author: "athlete",
+    // The editor's own document, sessions keyed as the plan now keys them:
+    // it knows which sessions were edited, and keeps the rest's programs.
+    document: { ...plan, entries: keyed }
+  });
+}
+
+/**
+ * A plan document as the draft's own plan holds it: dated from the Monday the
+ * coach's first dated session fell in, at the week and day each session is on
+ * now, or — for a plan the coach wrote undated — with the arrangement kept
+ * beside it as `layout`. Sessions are keyed by their workout's key, made
+ * unique; `keyed` is the document's sessions under those keys.
+ */
+function planFromDocument(
+  plan: TrainingPlanDocument,
+  stored: StoredPlanDraft
+): { next: CorosTrainingPlanDraft; keyed: TrainingPlanEntry[]; anchor?: Date } {
   const dates = stored.plan.workouts
     .map((workout) => parsePlanDay(workout.schedule_date))
     .filter((date): date is Date => Boolean(date))
@@ -1927,36 +2102,18 @@ export async function savePlanDraftEdit(
   const next: CorosTrainingPlanDraft = {
     name: plan.name.trim(),
     workouts,
-    ...(plan.description.trim() ? { description: plan.description.trim() } : {}),
+    ...(plan.description?.trim() ? { description: plan.description.trim() } : {}),
     ...(plan.weekStages.length ? { weekStages: plan.weekStages.map((stage) => ({ ...stage })) } : {}),
     ...(anchor ? {} : { layout })
   };
-  const validation = validatePlanDraft(next, { todayDay: "00000000" });
-  if (!validation.ok) throw new Error(validation.errors.join(" "));
-
-  let conflicts: string[] = [];
-  if (anchor) {
-    try {
-      conflicts = await detectScheduleConflicts(next);
-    } catch {
-      /* The calendar is only consulted to warn; offline, the card says nothing. */
-    }
-  }
-  return writeVersion(stored, next, {
-    unitSystem,
-    conflicts,
-    author: "athlete",
-    // The editor's own document, sessions keyed as the plan now keys them:
-    // it knows which sessions were edited, and keeps the rest's programs.
-    document: { ...plan, entries: keyed }
-  });
+  return { next, keyed, ...(anchor ? { anchor } : {}) };
 }
 
 /**
  * The athlete's version of a one-off workout the coach drafted, from the
  * builder. The key, the day the coach suggested and whether it goes to the
- * library stay the coach's; the workout itself is the athlete's. Same draft id,
- * so the card is replaced in place, and `editedAt` restates it to the coach.
+ * library stay the coach's; the workout itself is the athlete's. Written as
+ * the workout's next version (P1.5).
  */
 export function saveWorkoutDraftEdit(
   draftId: string,
@@ -2069,6 +2226,10 @@ function writeVersion(
     edited?: boolean;
     /** The editor's document, when the version was made in one. */
     document?: TrainingPlanDocument;
+    /** The plan was deleted on COROS: this version has no plan there. */
+    detach?: boolean;
+    /** The version is what COROS holds already — read from it — so it is saved there. */
+    savedAs?: UploadPlanResult;
   }
 ): PlanVersionWritten {
   const versions = versionsOf(base.artifactId);
@@ -2098,11 +2259,12 @@ function writeVersion(
     author: options.author,
     ...(options.changeSummary ? { changeSummary: options.changeSummary } : {})
   };
-  withCorosIdentityOf(stored, latest, options.document);
+  if (!options.detach) withCorosIdentityOf(stored, latest, options.document);
   persistPlanDraft(stored);
+  if (options.savedAs) markDraftSaved(stored, options.savedAs);
   return {
     kind: "written",
-    preview: lightPreview(preview),
+    preview: lightPreview(stored.preview),
     artifactId: stored.artifactId,
     fromVersion: latest.version,
     toVersion: stored.version,

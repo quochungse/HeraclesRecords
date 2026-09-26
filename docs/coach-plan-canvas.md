@@ -406,8 +406,15 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   kèm hash của `plan_json`; build cũ sửa `plan_json` tại chỗ thì document được dựng lại và giữ
   danh tính. Nút chính "Update COROS plan", ⋯ "Save as a new COROS plan"; xung đột version trên
   COROS hỏi Replace with my edit / Save as a new plan / Keep editing (`CorosConflictDialog`).
-  Workout đã lưu vẫn không sửa được: không có gì để cập nhật. Còn lại: P1.6b nhập bản mới hơn từ
-  COROS thành version, P1.6c lịch.)
+  Workout đã lưu vẫn không sửa được: không có gì để cập nhật.)
+- (P1.6b đã làm: `syncPlanDraftFromCoros` — chỉ khi version mới nhất là bản đã lưu, vì một
+  version chưa lưu là thay đổi người dùng chưa gửi và được kiểm lúc gửi. Một request (`detail`
+  thô, so `version`), request thứ hai chỉ khi COROS mới hơn; `cacheOnly` khi mở canvas không tốn
+  request. Bản nhập về là version `author: coros`, khoá buổi đổi về khoá cũ theo `idInPlan`, và
+  **được đánh dấu đã lưu** — nó chính là thứ COROS đang giữ. Plan bị xoá trên COROS: version
+  `detached` không còn danh tính, lần lưu sau là `plan/add`; `isOnCoros` đọc dấu mới nhất. Coach
+  sửa plan đã đổi trên COROS: bản COROS được nhập trước (một `planEvent` qua stream
+  `chat:streamInfo` kind `planEvent`, và card của nó), rồi thay đổi của Coach chồng lên.)
 - **Save to COROS**: `savePlanToCoros` với `document_json`, như Library. Version vừa lưu được
   đọc lại từ COROS (việc Library đã làm sau mỗi lần lưu) và `document_json` của nó được thay bằng
   bản đọc về, để mang `corosProgram` và `idInPlan`.

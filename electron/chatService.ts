@@ -36,6 +36,7 @@ import {
   discardPlanDraft,
   planArtifacts,
   restorePlanDraftVersion,
+  syncPlanDraftFromCoros,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -2400,6 +2401,14 @@ export async function uploadTrainingPlanDraft(
   );
 }
 
+export async function syncPlanFromCoros(
+  draftId: string,
+  unitSystem: UnitSystem,
+  cacheOnly = false
+): Promise<import("./types").PlanCorosSync> {
+  return syncPlanDraftFromCoros(draftId, normalizeUnitSystem(unitSystem), { cacheOnly: cacheOnly === true });
+}
+
 export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
   return restorePlanDraftVersion(draftId, unitSystem);
 }
@@ -2703,6 +2712,9 @@ async function executeChatTool(
     // so here the draft is simply a new one.
     const { revises: _revises, ...unrevised } = args;
     return handleChatWorkoutTool(name as ChatWorkoutToolName, toolPolicy === "interactive" ? args : unrevised, {
+      onPlanEvent: (event) => {
+        send("chat:streamInfo", { requestId, kind: "planEvent", event });
+      },
       onPlanDraft: (preview: PlanDraftPreview) => {
         generation?.drafts.push(preview);
         send("chat:streamInfo", {

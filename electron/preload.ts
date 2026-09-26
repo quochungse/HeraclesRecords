@@ -70,6 +70,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionSave,
   PlanVersionWritten,
@@ -986,6 +987,8 @@ const api = {
     ),
   getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
     ipcRenderer.invoke("chat:planArtifacts", draftIds),
+  syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean): Promise<PlanCorosSync> =>
+    ipcRenderer.invoke("chat:syncPlanFromCoros", draftId, unitSystem, cacheOnly),
   restorePlanVersion: (draftId: string, unitSystem: UnitSystem): Promise<PlanVersionWritten> =>
     ipcRenderer.invoke("chat:restorePlanVersion", draftId, unitSystem),
   removePlanDraft: (draftId: string): Promise<void> =>

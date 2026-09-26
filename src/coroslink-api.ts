@@ -67,6 +67,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionSave,
   PlanVersionWritten,
@@ -678,6 +679,12 @@ export interface CorosLinkApi {
   getPlanArtifacts: (draftIds: string[]) => Promise<PlanArtifactVersion[]>;
   /** Makes an older version of a creation the newest again (P1.4). */
   restorePlanVersion: (draftId: string, unitSystem: UnitSystem) => Promise<PlanVersionWritten>;
+  /**
+   * A creation on COROS read against COROS (P1.6): a change made there comes
+   * back as its newest version. `cacheOnly` asks the plan cache and costs no
+   * request.
+   */
+  syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) => Promise<PlanCorosSync>;
   /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
   removePlanDraft: (draftId: string) => Promise<void>;
   /**

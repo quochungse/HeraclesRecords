@@ -503,7 +503,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   `idInPlan`, and the untouched sessions' programs — so its primary button is **Update COROS
   plan** (`plan/update`, checked against the version it was made from, a conflict asked as the
   Library asks it). A saved one-off workout is not changed from the conversation: nothing on
-  COROS would be updated. **A creation is read in the canvas** (`CoachCanvas`,
+  COROS would be updated. **A change made on COROS comes back** (D12, `syncPlanDraftFromCoros`):
+  before an edit or a revision, and from the plan cache when the canvas opens, a creation whose
+  newest version is the saved one is read against COROS; a newer COROS copy becomes its newest
+  version (`author: coros`, saved, sessions re-keyed to the coach's keys by `idInPlan`) with a
+  `planEvent`, and a plan deleted there leaves a version with no COROS identity, saved next as a
+  new plan. An unsaved version is never synced over: it is checked when it is sent.
+  **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with
   the reader's ridge, week cards and session view, a version picker, a Versions tab whose lines

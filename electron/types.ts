@@ -2440,6 +2440,12 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
+      /** Something happened to a creation during the turn — it changed on COROS (P1.6). */
+      kind: "planEvent";
+      event: PlanEvent;
+    }
+  | {
+      requestId: string;
       kind: "workoutDelete";
       preview: WorkoutDeletePreview;
     }
@@ -3174,6 +3180,15 @@ export interface PlanVersionConflict {
 export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
 
 /**
+ * A creation on COROS read against COROS (P1.6, D12): unchanged there, or
+ * changed — then its COROS form is the creation's newest version — or
+ * deleted there, which leaves it a proposal to save again.
+ */
+export type PlanCorosSync =
+  | { kind: "current" }
+  | { kind: "imported" | "removedOnCoros"; written: PlanVersionWritten };
+
+/**
  * One version of a coach's creation, as the conversation lists them
  * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own
  * and a `planDraft` entry in the transcript with the same `draftId`; this is
@@ -3196,6 +3211,8 @@ export interface PlanArtifactVersion {
   changeSummary?: string;
   /** The COROS plan this version was saved as, `coros:<id>`. */
   remotePlanId?: string;
+  /** The version that followed the plan's deletion on COROS; it has no plan there. */
+  detached?: boolean;
 }
 
 export interface PlanWorkoutEntryInput {

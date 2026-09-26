@@ -63,6 +63,20 @@ export function creationVersions(
   return result;
 }
 
+/**
+ * Whether the creation is a COROS plan now (P1.6): some version was saved as
+ * one, and no later version records it deleted there. What makes a new
+ * version's save an update of that plan rather than a plan of its own.
+ */
+export function isOnCoros(info: CreationVersion | undefined): boolean {
+  let onCoros = false;
+  for (const version of info?.siblings ?? []) {
+    if (version.remotePlanId) onCoros = true;
+    if (version.detached) onCoros = false;
+  }
+  return onCoros;
+}
+
 /** A card with no version known yet — still loading, or never versioned — counts as its own newest. */
 export function isLatestVersion(index: ReadonlyMap<string, CreationVersion>, draftId: string): boolean {
   return index.get(draftId)?.latest ?? true;

@@ -28,7 +28,7 @@ import "../training-library/trainingLibrary.css";
 import { creationFigures, datedForReading } from "./CoachCreationCard";
 import { CreationActions } from "./CreationActions";
 import { creationStatus } from "./creationChoices";
-import { supersededLine, type CreationVersion } from "./creationVersions";
+import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
 
 /**
  * The canvas: where a coach's creations are read beside the conversation
@@ -121,9 +121,7 @@ export default function CoachCanvas({
       ) : (
         <CreationIndex
           creations={creations}
-          onCorosOf={(draftId) =>
-            versionIndex.get(draftId)?.siblings.some((item) => item.remotePlanId) ?? false
-          }
+          onCorosOf={(draftId) => isOnCoros(versionIndex.get(draftId))}
           onOpen={onOpen}
           onClose={onClose}
           planSportStyle={planSportStyle}
@@ -324,7 +322,7 @@ function ArtifactView({
   const saved = siblings.some((item) => item.uploadedAt) || Boolean(newest.uploadedAt || newest.uploadResult);
   // Hidden rather than removed once any version is saved: the plan on COROS
   // names the draft that became it.
-  const onCoros = siblings.some((item) => item.remotePlanId);
+  const onCoros = isOnCoros(info);
   const status = creationStatus(newest, onCoros);
   const title = shown.name || (isWorkout ? "Untitled workout" : "Untitled plan");
 

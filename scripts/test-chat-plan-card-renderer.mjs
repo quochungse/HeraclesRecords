@@ -661,6 +661,61 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
+  // A plan changed on COROS is read back when it is opened or edited (P1.6, D12)
+  // -------------------------------------------------------------------------
+  const IMPORTED = {
+    kind: "imported",
+    written: {
+      kind: "written",
+      preview: {
+        ...PREVIEW,
+        draftId: "plan-1-coros",
+        name: "Hanoi Half base, as I run it",
+        uploadedAt: 5,
+        uploadResult: { workoutsScheduled: 0, workoutsCreated: 9, destination: "nativePlan", planId: "coros:900" }
+      },
+      artifactId: "plan-1",
+      fromVersion: 1,
+      toVersion: 2,
+      changes: ['Renamed to "Hanoi Half base, as I run it"']
+    }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: IMPORTED
+  });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the saved card is drawn");
+  await settle();
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "opening asks whether COROS moved on");
+  assert.equal((await harness("calls", "syncPlanFromCoros"))[0].args[2], true, "of the cache, at no cost");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "and COROS's version comes in, with a line");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Changed in the Library · Renamed/);
+  assert.equal(await harness("exists", ".chat-plan-event-undo"), false, "not the athlete's to undo");
+  await waitFor(
+    async () => /Hanoi Half base, as I run it/.test((await harness("text", ".chat-creation-card h3, .chat-creation-card .chat-creation-title")) ?? (await page(`[...document.querySelectorAll(".chat-creation-card")].at(-1)?.textContent`)) ?? ""),
+    "COROS's version is the card"
+  );
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-creation-card")].at(-1).querySelector(".chat-creation-status")?.textContent`),
+    "On COROS",
+    "and it is saved there, with nothing to update"
+  );
+
+  await harness("setScript", { syncPlanFromCoros: { kind: "current" } });
+  await harness("clearCalls");
+  await harness("click", '.chat-creation-card [data-action="edit"]');
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "Edit reads COROS first");
+  assert.equal((await harness("calls", "syncPlanFromCoros"))[0].args[2], undefined, "for real, not the cache");
+  await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "then the editor opens");
+  await page(`document.querySelector('.tl-plan-modal [aria-label="Close"], .tl-plan-modal .plan-editor-close')?.click()`);
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
