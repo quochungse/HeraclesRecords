@@ -512,7 +512,7 @@ hiện lại trong cuộc chat.
   riêng theo cùng thứ tự; một model chọn cho Claude không bao giờ bị gửi tới OpenRouter của
   cuộc chat. UI: dải `.chat-conversation-settings` trên
   transcript mở `CoachConversationSettings` (lazy), dùng lại sheet và công tắc của generator,
-  portal ra `body` trong `.coach-conversation-sheet` — scope thứ tư của các rule control Library.
+  portal ra `body` trong `.coach-sheet` — scope thứ tư của các rule control Library.
   Row bị xoá cùng cuộc chat. Test riêng: `test:conversation-settings`.)
 - Bảng mới `chat_conversation_settings` (§7): nguồn dữ liệu (activities, sleep, zones) và
   runtime (provider, model, effort; chỉ phần khác Coach settings, như `planGeneratorRuntime.ts`
@@ -529,6 +529,23 @@ hiện lại trong cuộc chat.
   `test:coach-analysis-runner`, `test:sync-policy`.
 
 **P2.1 Brief** · L
+- (Đã làm: bảng `chat_plan_artifacts` (§7) ra đời ở đây, không phải ở P1.1 — P1.1 đặt chip lên row
+  version. Brief là `PlanBriefRequest` = request của generator trừ `sources`/`runtime`/`outline`
+  (của cuộc chat, hoặc tới sau), cộng `origins` (`chat`/`data`) cho từng trường Coach điền; trường
+  không có origin là mặc định của form. `electron/planBrief.ts` (không `node:`) giữ mặc định — bằng
+  đúng `DEFAULT_GENERATOR_FORM` —, `briefFromPrefill` (lấy được gì thì lấy, trường sai hình dạng
+  nêu trong `not_taken` thay vì hỏng cả brief; ngày bắt đầu dời về Thứ Hai) và schema tool.
+  `chatPlanBriefs.ts` lưu; gọi lại với `brief_id` là điền tiếp chính brief đó; brief đã có version
+  thì từ chối. Kết quả tool trả Coach những gì `generationRequestProblems` còn thấy thiếu, và bảo
+  Coach dừng. Lượt biết cuộc chat của nó qua `StreamChatOptions.sessionId` (`turnSessions`). Card
+  dùng lại dòng snapshot của generator (`briefRows` trong `src/chat/planBriefModel.ts`, cùng
+  `formFromBrief`/`briefFromForm`, round-trip không mất gì với các giá trị form biểu diễn được).
+  Màn hình edit là `CoachBriefEditor`: bước Goal và Your week của generator, cột bên là công tắc
+  nguồn **của cuộc chat**; lưu được cả khi còn thiếu, card liệt kê chỗ thiếu. Sửa một trường thì
+  trường đó mất nhãn "from chat"/"from data". `creationIndex` liệt kê brief tới khi có version. Hỏi
+  "Redraw the outline?" để sang P2.2, khi có outline. Channel đọc: `chat:planBriefs`.
+  `test:chat-entry-passthrough` và `test:chat-transcript-compat` dùng `planBrief` làm kind lạ; giờ
+  dùng `futureAnchor`. Test: `test:plan-brief`, case P2.1 trong `test:chat-plan-card-renderer`.)
 - Tool `request_plan_brief { prefill }`: Coach điền sẵn những gì đã biết (từ cuộc chat, từ dữ
   liệu), tạo artifact ở giai đoạn brief, và một entry kind mới `planBrief` (neo). Không có trong
   lượt read-only (analysis), giống `request_coach_input`.
@@ -603,6 +620,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat:syncPlanArtifact` | P1.6 | Đọc `detail`, nhập bản COROS mới hơn thành version |
 | `chat:conversationSettings`, `chat:setConversationSettings` | P2.0 | Nguồn dữ liệu và runtime của cuộc chat |
 | `chat:createPlanBrief`, `chat:updatePlanBrief`, `chat:updatePlanOutline` | P2 | Brief và outline không qua model |
+| `chat:planBriefs` | P2.1 | Đọc brief của các anchor `planBrief` |
 | `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Bỏ** |
 
 ## 7. Dữ liệu và sync

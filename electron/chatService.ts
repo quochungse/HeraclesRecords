@@ -59,6 +59,9 @@ import {
   toolReadsWithheldSource,
   trainingPlanOutlinePrompt
 } from "./trainingPlanGeneration";
+import { PLAN_BRIEF_TOOL } from "./planBrief";
+import { deletePlanBriefs, listPlanBriefs, updatePlanBrief } from "./chatPlanBriefs";
+import type { PlanBrief, PlanBriefRequest } from "./types";
 import {
   simulatePlanAi,
   simulatedDraftArgs,
@@ -590,6 +593,7 @@ export async function streamConversationTurn(
   }
   return streamChat(sink, requestId, messages, {
     unitSystem,
+    ...(sessionId ? { sessionId } : {}),
     ...(settings?.runtime ? { runtime: settings.runtime } : {}),
     ...(settings ? { sources: settings.sources } : {})
   });
@@ -606,11 +610,12 @@ function isAnthropicEffortName(value: unknown): value is import("./types").Anthr
 export function deleteChatSessionById(id: string): void {
   // Read before the row goes: the transcript is the only record of which
   // drafts were this conversation's.
-  const draftIds = getChatSession(id).flatMap((entry) =>
-    entry.kind === "planDraft" ? [entry.draft.draftId] : []
-  );
+  const entries = getChatSession(id);
+  const draftIds = entries.flatMap((entry) => (entry.kind === "planDraft" ? [entry.draft.draftId] : []));
+  const briefIds = entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : []));
   deleteChatSession(id);
   deletePlanDraftsOf(draftIds);
+  deletePlanBriefs(briefIds);
   deleteChatConversationSettingsRow(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
@@ -1134,6 +1139,8 @@ export interface StreamChatOptions {
    * prompt. Absent is everything, as before.
    */
   sources?: import("./types").TrainingPlanDataSources;
+  /** The conversation the turn is in: what a brief Coach sets out belongs to (P2.1). */
+  sessionId?: string;
   /** Analysis runs override the saved provider/model/effort (decision 2). */
   runtime?: AnalysisRuntime;
   /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
@@ -1483,12 +1490,17 @@ export async function streamChat(
   const reach = conversationReach(options.sources);
   const ownsReach = Boolean(reach) && !runTools.has(requestId);
   if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
+  if (options.sessionId) turnSessions.set(requestId, options.sessionId);
   try {
     await streamChatTurn(sink, requestId, messages, options);
   } finally {
     if (ownsReach) runTools.delete(requestId);
+    turnSessions.delete(requestId);
   }
 }
+
+/** The conversation each turn in flight belongs to, for the tools that file something under it. */
+const turnSessions = new Map<string, string>();
 
 /**
  * A conversation's sources as a turn's reach (P2.0): the tools that read a
@@ -2563,6 +2575,16 @@ export function listPlanCalendarStates(draftIds: string[]): import("./types").Pl
   return planCalendarStates(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
 }
 
+/** The briefs behind a conversation's `planBrief` anchors (P2.1). */
+export function listConversationPlanBriefs(artifactIds: string[]): PlanBrief[] {
+  return listPlanBriefs(Array.isArray(artifactIds) ? artifactIds.filter((id) => typeof id === "string") : []);
+}
+
+/** The athlete's edit of a brief, from its own screen. */
+export function editPlanBrief(artifactId: string, request: PlanBriefRequest): PlanBrief {
+  return updatePlanBrief(artifactId, request);
+}
+
 export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {
   return planArtifacts(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
 }
@@ -2797,6 +2819,7 @@ export function getClaudeCodeTools(
       tool.name === "draft_training_plan" ||
       tool.name === "revise_training_plan" ||
       tool.name === "get_plan_draft" ||
+      tool.name === PLAN_BRIEF_TOOL ||
       tool.name === "search_coros_exercises"
     );
   });
@@ -2865,6 +2888,10 @@ async function executeChatTool(
       onPlanEvent: (event) => {
         send("chat:streamInfo", { requestId, kind: "planEvent", event });
       },
+      onPlanBrief: (brief) => {
+        send("chat:streamInfo", { requestId, kind: "planBrief", brief });
+      },
+      sessionId: turnSessions.get(requestId),
       onPlanDraft: (preview: PlanDraftPreview) => {
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
@@ -3185,6 +3212,13 @@ export function withLiveToolInstructions(
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
+      ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
+        ? [
+            "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +
+              "already know and stop, rather than asking question after question. The athlete corrects the brief on " +
+              "its card and asks for the outline from there. Draft a plan of two weeks or less straight away."
+          ]
+        : []),
       ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
       "",
       "Supported workout capabilities (generated from the validator):",

@@ -19956,14 +19956,14 @@ tr.data-intervals-row-missing {
 }
 
 /* The sheet's own layer sits inside this, over the whole window. */
-.coach-conversation-sheet {
+.coach-sheet {
   position: fixed;
   inset: 0;
   z-index: 60;
 }
 
 /* The generator's footer leads with its keep-for-chat box; this sheet has none. */
-.coach-conversation-sheet .plan-generator-sheet > footer {
+.coach-sheet .plan-generator-sheet > footer {
   justify-content: flex-end;
 }
 
@@ -20204,6 +20204,77 @@ tr.data-intervals-row-missing {
   padding-left: 0;
   border-left: 0;
   color: var(--text-muted);
+}
+
+/* A plan brief (P2.1): the generator's snapshot rows, each marked with where
+   Coach took it from; a row with no mark is the default nobody has spoken to. */
+.chat-brief-card {
+  position: relative;
+}
+
+.chat-brief-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.chat-brief-rows > div {
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-brief-rows dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.chat-brief-rows dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.chat-brief-rows dd > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-brief-origin {
+  color: var(--chat-signal-strong);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.chat-brief-origin[data-origin="data"] {
+  color: var(--text-muted);
+}
+
+.chat-brief-reads {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-brief-open {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .chat-creation-steps {

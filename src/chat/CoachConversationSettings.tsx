@@ -29,7 +29,7 @@ import "../training-library/trainingLibrary.css";
 export default function CoachConversationSettings(props: SettingsProps & { portal?: boolean }) {
   const { portal, ...rest } = props;
   const sheet: ReactNode = (
-    <div className="coach-conversation-sheet">
+    <div className="coach-sheet">
       <ConversationSettingsSheet {...rest} />
     </div>
   );

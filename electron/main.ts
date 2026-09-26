@@ -345,6 +345,8 @@ import {
   streamConversationTurn,
   getConversationSettings,
   setConversationSettings,
+  listConversationPlanBriefs,
+  editPlanBrief,
   findChatSessionForDraft,
   editPlanDraft,
   generateTrainingPlan,
@@ -1604,6 +1606,11 @@ function registerIpcHandlers(): void {
         normalizeUnitSystem(unitSystem),
         typeof sessionId === "string" && sessionId ? sessionId : undefined
       )
+  );
+  ipcMain.handle("chat:planBriefs", (_event, artifactIds: string[]) => listConversationPlanBriefs(artifactIds));
+  ipcMain.handle(
+    "chat:updatePlanBrief",
+    (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
   );
   ipcMain.handle("chat:conversationSettings", (_event, sessionId: string) =>
     getConversationSettings(sessionId)

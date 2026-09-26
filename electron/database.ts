@@ -233,6 +233,19 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS chat_plan_artifacts (
+      artifact_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      kind TEXT NOT NULL,
+      start_monday TEXT,
+      race_day TEXT,
+      brief_json TEXT,
+      outline_json TEXT,
+      outline_version INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chat_plan_drafts (
       draft_id TEXT PRIMARY KEY,
       plan_json TEXT NOT NULL,
@@ -2997,6 +3010,108 @@ export function deleteChatConversationSettingsRow(sessionId: string): void {
     .prepare("DELETE FROM chat_conversation_settings WHERE session_id = ?")
     .run(sessionId);
   if (result.changes > 0) notifySyncedDelete("chat_conversation_settings", sessionId);
+}
+
+/**
+ * What a Coach creation holds before and beside its versions
+ * (docs/coach-plan-canvas.md §7, P2): its brief, its outline, and the dates
+ * they give it. Nothing that can be read off a version — its name, whether it
+ * is saved — is kept here.
+ */
+export interface ChatPlanArtifactRow {
+  artifactId: string;
+  sessionId?: string;
+  kind: "plan" | "workout";
+  startMonday?: string;
+  raceDay?: string;
+  briefJson?: string;
+  outlineJson?: string;
+  outlineVersion?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StoredChatPlanArtifactRow {
+  artifact_id: string;
+  session_id: string | null;
+  kind: string;
+  start_monday: string | null;
+  race_day: string | null;
+  brief_json: string | null;
+  outline_json: string | null;
+  outline_version: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function chatPlanArtifactFromRow(row: StoredChatPlanArtifactRow): ChatPlanArtifactRow {
+  return {
+    artifactId: row.artifact_id,
+    ...(row.session_id ? { sessionId: row.session_id } : {}),
+    kind: row.kind === "workout" ? "workout" : "plan",
+    ...(row.start_monday ? { startMonday: row.start_monday } : {}),
+    ...(row.race_day ? { raceDay: row.race_day } : {}),
+    ...(row.brief_json ? { briefJson: row.brief_json } : {}),
+    ...(row.outline_json ? { outlineJson: row.outline_json } : {}),
+    ...(typeof row.outline_version === "number" ? { outlineVersion: row.outline_version } : {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function getChatPlanArtifactRow(artifactId: string): ChatPlanArtifactRow | undefined {
+  const row = requireDatabase()
+    .prepare("SELECT * FROM chat_plan_artifacts WHERE artifact_id = ?")
+    .get(artifactId) as StoredChatPlanArtifactRow | undefined;
+  return row ? chatPlanArtifactFromRow(row) : undefined;
+}
+
+export function listChatPlanArtifactRows(artifactIds: readonly string[]): ChatPlanArtifactRow[] {
+  if (artifactIds.length === 0) return [];
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT * FROM chat_plan_artifacts WHERE artifact_id IN (${artifactIds.map(() => "?").join(", ")})`
+    )
+    .all(...artifactIds) as StoredChatPlanArtifactRow[];
+  return rows.map(chatPlanArtifactFromRow);
+}
+
+export function saveChatPlanArtifactRow(row: ChatPlanArtifactRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_plan_artifacts
+         (artifact_id, session_id, kind, start_monday, race_day, brief_json, outline_json, outline_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(artifact_id) DO UPDATE SET
+         session_id = excluded.session_id,
+         kind = excluded.kind,
+         start_monday = excluded.start_monday,
+         race_day = excluded.race_day,
+         brief_json = excluded.brief_json,
+         outline_json = excluded.outline_json,
+         outline_version = excluded.outline_version,
+         updated_at = excluded.updated_at`
+    )
+    .run(
+      row.artifactId,
+      row.sessionId ?? null,
+      row.kind,
+      row.startMonday ?? null,
+      row.raceDay ?? null,
+      row.briefJson ?? null,
+      row.outlineJson ?? null,
+      row.outlineVersion ?? null,
+      row.createdAt,
+      row.updatedAt
+    );
+  notifySyncedRow("chat_plan_artifacts", ["artifact_id"], [row.artifactId]);
+}
+
+export function deleteChatPlanArtifactRow(artifactId: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM chat_plan_artifacts WHERE artifact_id = ?")
+    .run(artifactId);
+  if (result.changes > 0) notifySyncedDelete("chat_plan_artifacts", artifactId);
 }
 
 export function deleteChatPlanDraft(draftId: string): void {

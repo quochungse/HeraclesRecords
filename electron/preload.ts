@@ -71,6 +71,8 @@ import type {
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
   ConversationSettings,
+  PlanBrief,
+  PlanBriefRequest,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -784,6 +786,9 @@ const api = {
     unitSystem: UnitSystem,
     sessionId?: string
   ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId),
+  getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
+  updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
   getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>
     ipcRenderer.invoke("chat:conversationSettings", sessionId),
   setConversationSettings: (settings: ConversationSettings): Promise<ConversationSettings> =>

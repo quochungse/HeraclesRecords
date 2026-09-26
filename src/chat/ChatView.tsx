@@ -61,6 +61,8 @@ import type {
   McpServerStatus,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanBrief,
+  PlanBriefRequest,
   CoachOpenRequest,
   ConversationSettings,
   PlanCalendarState,
@@ -89,6 +91,8 @@ import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
+import { CoachBriefCard } from "./CoachBriefCard";
+import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import { refinementChips } from "./creationChoices";
 import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
@@ -142,6 +146,7 @@ const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
 const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
+const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -872,6 +877,44 @@ export function ChatView({
   };
   /** The version the calendar dialog is open for. */
   const [calendarFor, setCalendarFor] = useState<string | null>(null);
+  /**
+   * The briefs behind the conversation's brief cards (P2.1), by artifact.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [planBriefs, setPlanBriefs] = useState<Record<string, PlanBrief | null>>({});
+  const missingBriefs = [
+    ...new Set(timeline.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ]
+    .filter((artifactId) => !(artifactId in planBriefs))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingBriefs) return;
+    const ids = missingBriefs.split(",");
+    setPlanBriefs((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getPlanBriefs(ids)
+      .then((briefs) =>
+        setPlanBriefs((current) => ({ ...current, ...Object.fromEntries(briefs.map((brief) => [brief.artifactId, brief])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingBriefs]);
+  /** The brief whose screen is open, and how its save is going. */
+  const [editingBriefId, setEditingBriefId] = useState<string | null>(null);
+  const [briefSave, setBriefSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
+  /** The earliest Monday a plan may start on, for reading a brief's dates. */
+  const briefMonday = firstPlanMonday();
+  const saveBrief = async (artifactId: string, request: PlanBriefRequest) => {
+    if (!api) return;
+    setBriefSave({ saving: true });
+    try {
+      const saved = await api.updatePlanBrief(artifactId, request);
+      setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      setBriefSave({ saving: false });
+      setEditingBriefId(null);
+    } catch (caught) {
+      setBriefSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+    }
+  };
   /**
    * What this conversation reads and which AI answers it (P2.0), read when
    * the conversation opens; a turn reads it again in the main process.
@@ -1849,6 +1892,15 @@ export function ChatView({
           setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
         } else if (payload.kind === "planEvent") {
           setTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
+        } else if (payload.kind === "planBrief") {
+          const brief = payload.brief;
+          setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+          // Filling in a brief already on screen changes its card, not the timeline.
+          setTimeline((prev) =>
+            prev.some((entry) => entry.kind === "planBrief" && entry.artifactId === brief.artifactId)
+              ? prev
+              : [...prev, { kind: "planBrief", artifactId: brief.artifactId }]
+          );
         } else if (payload.kind === "workoutDelete") {
           setTimeline((prev) =>
             upsertWorkoutDeleteEntry(prev, payload.preview)
@@ -2592,6 +2644,10 @@ export function ChatView({
     const versions = creationIds.length
       ? await api.getPlanArtifacts(creationIds).catch(() => artifactVersions)
       : [];
+    const briefIds = [
+      ...new Set(persisted.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+    ];
+    const briefs = briefIds.length ? await api.getPlanBriefs(briefIds).catch(() => []) : [];
     if (activeRequestIdRef.current !== requestId) return true;
     const wireMessages = withCreationIndex(
       [
@@ -2599,7 +2655,8 @@ export function ChatView({
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
       persisted,
-      Array.isArray(versions) ? versions : []
+      Array.isArray(versions) ? versions : [],
+      Array.isArray(briefs) ? briefs : []
     );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined);
@@ -3817,6 +3874,34 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "planBrief") {
+              const brief = planBriefs[entry.artifactId];
+              if (!brief) return null;
+              return (
+                <div
+                  key={`brief:${entry.artifactId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachBriefCard
+                      brief={brief}
+                      firstMonday={briefMonday}
+                      sources={conversationSettings?.sources}
+                      editing={editingBriefId === brief.artifactId}
+                      onEdit={() => {
+                        setBriefSave({ saving: false });
+                        setEditingBriefId(brief.artifactId);
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
             if (entry.kind === "planEvent") {
               // A line where it happened, as the coach reads it; the card
               // below it already shows what the creation is now.
@@ -4237,6 +4322,20 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      {editingBriefId && planBriefs[editingBriefId] && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            brief={planBriefs[editingBriefId]!}
+            firstMonday={briefMonday}
+            sources={conversationSettings.sources}
+            saving={briefSave.saving}
+            error={briefSave.error}
+            onSourcesChange={(sources) => updateConversationSettings({ ...conversationSettings, sources })}
+            onSave={(request) => void saveBrief(editingBriefId, request)}
+            onClose={() => setEditingBriefId(null)}
+          />
+        </Suspense>
+      ) : null}
       {conversationSettingsOpen && conversationSettings ? (
         <Suspense fallback={null}>
           <CoachConversationSettings

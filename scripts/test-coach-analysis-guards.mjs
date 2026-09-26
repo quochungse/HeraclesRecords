@@ -190,7 +190,9 @@ assert.equal(
     "get_plan_draft",
     "request_coach_input"
   ]);
-  const expectedBlocked = new Set(["delete_workout", "revise_training_plan"]);
+  // A brief is set out for the athlete to check and edit — nobody is there
+  // to during a run, so an analysis may not start one (P2.1).
+  const expectedBlocked = new Set(["delete_workout", "revise_training_plan", "request_plan_brief"]);
 
   for (const name of localToolNames) {
     const decided = expectedAllowed.has(name) || expectedBlocked.has(name);

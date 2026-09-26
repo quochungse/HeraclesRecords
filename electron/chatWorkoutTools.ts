@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { handleRequestPlanBrief } from "./chatPlanBriefs";
+import { PLAN_BRIEF_TOOL_DEFINITION } from "./planBrief";
 import {
   buildPlanPreview,
   formatScheduleDay,
@@ -54,6 +56,7 @@ import type {
   PlanCorosSync,
   PlanDraftPreview,
   PlanDraftSaveOptions,
+  PlanBrief,
   PlanEvent,
   PlanWorkoutEntryInput,
   PlanVersionConflict,
@@ -298,6 +301,7 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "draft_training_plan",
   "revise_training_plan",
   "get_plan_draft",
+  "request_plan_brief",
   "list_scheduled_workouts",
   "delete_workout"
 ] as const;
@@ -477,7 +481,9 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         },
         required: ["target"]
       }
-    }
+
+    },
+    PLAN_BRIEF_TOOL_DEFINITION
   ];
 }
 
@@ -488,6 +494,10 @@ export async function handleChatWorkoutTool(
     onPlanDraft?: (preview: PlanDraftPreview) => void;
     /** A creation changed on COROS was read in before Coach changed it (P1.6). */
     onPlanEvent?: (event: PlanEvent) => void;
+    /** Coach set out a brief (P2.1). */
+    onPlanBrief?: (brief: PlanBrief) => void;
+    /** The conversation the turn is in, which a brief belongs to. */
+    sessionId?: string;
     onWorkoutDelete?: (preview: WorkoutDeletePreview) => void;
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
@@ -510,6 +520,9 @@ export async function handleChatWorkoutTool(
       options?.planRequest,
       options?.onPlanEvent
     );
+  }
+  if (name === "request_plan_brief") {
+    return handleRequestPlanBrief(args, options?.sessionId, options?.onPlanBrief);
   }
   if (name === "get_plan_draft") {
     return handleGetPlanDraft(args);

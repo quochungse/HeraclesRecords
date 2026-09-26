@@ -45,6 +45,8 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["draft_training_plan", null],
     ["revise_training_plan", null],
     ["get_plan_draft", "db"],
+    // Writes a brief; reads nothing.
+    ["request_plan_brief", null],
     ["request_coach_input", null]
   ]);
 

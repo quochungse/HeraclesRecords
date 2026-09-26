@@ -398,8 +398,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   must name all four scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
   is portalled there), `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
   question it asks through the plan's `ConfirmDialog` sits outside both) and
-  `.coach-conversation-sheet` (Coach's per-conversation settings reuse the generator's sheets,
-  portalled to `<body>`) — or the control draws as the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
+  `.coach-sheet` (Coach's per-conversation settings and a plan brief's screen reuse the
+  generator's sheets, portalled to `<body>`) — or the control draws as the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
   reader's week cards and takes the library's **tokens** block as a fourth scope, but no control
   rule, since it edits nothing; without the tokens its day wells drew as the browser's black
   dashed border. And the editor's shortcuts listen on the window, gated on `layer`,
@@ -820,6 +820,16 @@ Overview, Media, Data, and Settings are in the main bundle.
   it, the analysis first, and effort is taken the same way on its own — merged field by field,
   a model picked for Claude went out to the conversation's OpenRouter. The row goes with the
   conversation.
+
+  **A plan longer than two weeks starts as a brief** (P2.1): `request_plan_brief` writes the
+  generator's request — less the conversation's sources and AI — to a `chat_plan_artifacts` row,
+  marking each field Coach filled `chat` or `data`, and the transcript gets only an anchor,
+  `{ kind: "planBrief", artifactId }`. The athlete edits it on `CoachBriefEditor`, which is the
+  generator's own Goal and Your week steps; a field they change loses its mark. The brief is the
+  artifact's first state: its versions, when the sessions are written, carry the same
+  `artifactId`, and a brief with a version is changed through the plan from then on. The tool is
+  interactive only (`test:coach-analysis-guards`), and it needs the turn's conversation, which is
+  why `StreamChatOptions` carries a `sessionId`.
 
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`

@@ -58,6 +58,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // What one conversation reads and which AI answers it (P2.0): the
   // athlete's choice about that conversation, so it follows it.
   chat_conversation_settings: "personal",
+  // A Coach creation's brief and outline (P2): what the athlete asked for,
+  // which has no version of its own until the sessions are written.
+  chat_plan_artifacts: "personal",
   // One analysis, in one conversation, carrying its own trigger. Its
   // predecessors (coach_automations, coach_automation_bindings,
   // coach_automation_local_triggers, coach_automation_runs) are dropped by

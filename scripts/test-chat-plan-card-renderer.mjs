@@ -854,8 +854,8 @@ async function main() {
   await waitFor(() => harness("exists", ".chat-conversation-settings"), "the conversation's line is drawn");
   assert.match((await harness("text", ".chat-conversation-settings")) ?? "", /Reads: Activities · Sleep · Zones\s*AI: Coach's settings/);
   await harness("click", ".chat-conversation-settings");
-  await waitFor(() => harness("count", ".coach-conversation-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
-  await harness("click", ".coach-conversation-sheet li:nth-child(2) .plan-generator-source");
+  await waitFor(() => harness("count", ".coach-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
+  await harness("click", ".coach-sheet li:nth-child(2) .plan-generator-source");
   await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
   assert.deepEqual(
     (await harness("calls", "setConversationSettings"))[0].args[0],
@@ -865,11 +865,72 @@ async function main() {
     async () => /Reads: Activities · Zones/.test((await harness("text", ".chat-conversation-settings")) ?? ""),
     "and the line says so"
   );
-  await page(`[...document.querySelectorAll(".coach-conversation-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
+  await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
   await harness("setValue", ".chat-composer textarea", "How am I sleeping?");
   await harness("click", ".chat-send");
   const inConversation = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question goes");
   assert.equal(inConversation.args[3], "s1", "with the conversation it was asked in, whose settings the turn takes");
+
+  // -------------------------------------------------------------------------
+  // A brief: read on its card, changed on its own screen, listed for Coach (P2.1)
+  // -------------------------------------------------------------------------
+  const BRIEF = {
+    artifactId: "brief-1",
+    sessionId: "s1",
+    request: {
+      goalKind: "race",
+      goal: "Hanoi Half",
+      race: { date: "2031-05-18", distance: "Half" },
+      sports: ["run"],
+      difficulty: "custom",
+      startDate: "2031-03-03",
+      week: { mode: "days", days: [{ kind: "rest" }, { kind: "train", minutes: 60 }, { kind: "train", minutes: 60 }, { kind: "rest" }, { kind: "train", minutes: 60 }, { kind: "long", minutes: 120 }, { kind: "train", minutes: 60 }] }
+    },
+    origins: { goal: "chat", level: "data" },
+    createdAt: "2026-09-26T06:00:00.000Z",
+    updatedAt: "2026-09-26T06:00:00.000Z"
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      { kind: "message", role: "user", content: "Plan me the Hanoi Half" },
+      { kind: "message", role: "assistant", content: "Here is what I have so far." },
+      { kind: "planBrief", artifactId: "brief-1" }
+    ],
+    getPlanBriefs: [BRIEF],
+    getConversationSettings: { sessionId: "s1", sources: { activities: false, sleep: true, zones: true } },
+    setConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: true, zones: true } },
+    updatePlanBrief: { ...BRIEF, request: { ...BRIEF.request, difficulty: "intermediate" }, origins: { goal: "chat" } }
+  });
+  await waitFor(() => harness("exists", ".chat-brief-card"), "the brief is drawn from its anchor");
+  const briefText = (await harness("text", ".chat-brief-card")) ?? "";
+  assert.match(briefText, /Plan brief[\s\S]*Hanoi Half/);
+  assert.match(briefText, /from chat/, "a field Coach took from the conversation says so");
+  assert.match(briefText, /from your data/, "and one it read from the data");
+  assert.match(briefText, /Coach reads Sleep & HRV · Training zones in this conversation/);
+  assert.match(
+    (await harness("text", ".chat-brief-open")) ?? "",
+    /can't judge your level without your recent activities/,
+    "From my data without the activities is still open"
+  );
+  await harness("click", ".chat-brief-card .chat-plan-review");
+  await waitFor(() => harness("exists", ".coach-sheet .plan-generator"), "Edit brief opens its own screen");
+  assert.equal(await harness("count", ".coach-sheet .plan-generator-source"), 3, "beside the conversation's switches");
+  await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim().startsWith("Intermediate")).click()`);
+  await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim() === "Save brief").click()`);
+  const savedBrief = await waitFor(async () => (await harness("calls", "updatePlanBrief"))[0], "the brief is saved");
+  assert.equal(savedBrief.args[0], "brief-1");
+  assert.equal(savedBrief.args[1].difficulty, "intermediate");
+  assert.equal(savedBrief.args[1].sources, undefined, "the conversation's sources stay the conversation's");
+  await waitFor(async () => !(await harness("exists", ".coach-sheet .plan-generator")), "and the screen closes");
+  await waitFor(
+    async () => !/from your data/.test((await harness("text", ".chat-brief-card")) ?? ""),
+    "the level is the athlete's now"
+  );
+  await harness("setValue", ".chat-composer textarea", "Looks right");
+  await harness("click", ".chat-send");
+  const withBrief = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the turn goes");
+  assert.match(withBrief.args[1].at(-1).content, /- Brief · brief_id brief-1 · race \(Half\) "Hanoi Half" on 2031-05-18/);
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

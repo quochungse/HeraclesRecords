@@ -68,6 +68,8 @@ import type {
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
   ConversationSettings,
+  PlanBrief,
+  PlanBriefRequest,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -566,6 +568,10 @@ export interface CorosLinkApi {
     sessionId?: string
   ) => Promise<void>;
   /** What one conversation reads and which AI answers it (P2.0). */
+  /** The briefs behind a conversation's brief cards (P2.1). */
+  getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;
+  /** The athlete's edit of a brief; a field changed loses its "from chat" or "from data". */
+  updatePlanBrief: (artifactId: string, request: PlanBriefRequest) => Promise<PlanBrief>;
   getConversationSettings: (sessionId: string) => Promise<ConversationSettings>;
   setConversationSettings: (settings: ConversationSettings) => Promise<ConversationSettings>;
   cancelChat: (requestId: string) => Promise<void>;

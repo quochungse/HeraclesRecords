@@ -101,6 +101,12 @@ export interface ChatPlanEventEntry {
   event: PlanEvent;
 }
 
+/** Coach set out a plan brief (P2.1); an anchor, its brief read from `chat:planBriefs`. */
+export interface ChatPlanBriefEntry {
+  kind: "planBrief";
+  artifactId: string;
+}
+
 /**
  * An entry a newer build wrote, of a kind this one cannot draw. It keeps its
  * place in the timeline and goes back to the store untouched, so this window's
@@ -117,6 +123,7 @@ export type ChatEntry = (
   | ChatPlanDraftEntry
   | ChatPlanEventEntry
   | ChatPlanRefsEntry
+  | ChatPlanBriefEntry
   | ChatWorkoutDeleteEntry
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
@@ -283,6 +290,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   planDraft: ["draft"],
   planEvent: ["event"],
   planRefs: ["refs"],
+  planBrief: ["artifactId"],
   workoutDelete: ["preview"],
   activityVisual: ["preview"],
   activityHrTrend: ["preview"],
@@ -323,6 +331,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "planBrief") {
+    return { kind: "planBrief", artifactId: entry.artifactId };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
@@ -392,6 +403,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "planBrief") {
+    return { kind: "planBrief", artifactId: entry.artifactId };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };

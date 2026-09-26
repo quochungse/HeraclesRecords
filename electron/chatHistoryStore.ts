@@ -1098,6 +1098,7 @@ const KNOWN_ENTRY_KINDS = new Set([
   "planDraft",
   "planEvent",
   "planRefs",
+  "planBrief",
   "coachPrompt",
   "workoutDelete",
   "activityVisual",
@@ -1181,6 +1182,13 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
       ? value.refs.map(parsePlanRef).filter((ref): ref is PlanRef => ref !== null)
       : [];
     return refs.length ? cardEntry({ kind: "planRefs", refs }, value, "refs") : null;
+  }
+
+  if (value.kind === "planBrief") {
+    // An anchor (Q3): the brief itself is its `chat_plan_artifacts` row.
+    return typeof value.artifactId === "string" && value.artifactId
+      ? cardEntry({ kind: "planBrief", artifactId: value.artifactId }, value, "artifactId")
+      : null;
   }
 
   if (value.kind === "planEvent") {

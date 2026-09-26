@@ -2455,6 +2455,12 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
+      /** Coach set out a plan brief for the athlete to check (P2.1). */
+      kind: "planBrief";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
       kind: "workoutDelete";
       preview: WorkoutDeletePreview;
     }
@@ -2636,7 +2642,6 @@ export interface TrainingPlanGenerationRequest {
   outline?: TrainingPlanOutline;
 }
 
-/** The athlete's data a generation may read, each on or off. */
 /**
  * What one conversation reads and which AI answers it (P2.0, D13/D14), for
  * every turn in it — chat, and analyses running in it. `runtime` holds only
@@ -2648,6 +2653,32 @@ export interface ConversationSettings {
   runtime?: AnalysisRuntime;
 }
 
+/**
+ * A plan brief (docs/coach-plan-canvas.md, P2.1): what the athlete wants a
+ * plan to be, before it has a shape — the generator's request without the
+ * parts the conversation owns (its sources and AI) or that come later (the
+ * outline).
+ */
+export type PlanBriefRequest = Omit<TrainingPlanGenerationRequest, "runtime" | "sources" | "outline">;
+
+/** A brief's fields as its card and Coach's tool name them. */
+export type PlanBriefField = "goal" | "dates" | "sports" | "level" | "week" | "constraints";
+
+/** Where Coach took a field from: what was said in the conversation, or the athlete's data. */
+export type PlanBriefOrigin = "chat" | "data";
+
+export interface PlanBrief {
+  /** The creation it opens: its versions, once written, carry this id. */
+  artifactId: string;
+  sessionId?: string;
+  request: PlanBriefRequest;
+  /** Fields Coach filled in, and from where; a field absent here is the form's default. */
+  origins: Partial<Record<PlanBriefField, PlanBriefOrigin>>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The athlete's data a generation may read, each on or off. */
 export interface TrainingPlanDataSources {
   /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
   activities: boolean;
@@ -3807,6 +3838,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "planEvent"; event: PlanEvent }
   | { kind: "planRefs"; refs: PlanRef[] }
+  /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
+  | { kind: "planBrief"; artifactId: string }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

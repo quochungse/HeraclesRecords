@@ -4,10 +4,12 @@ import type {
   CompactContextSettings,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanBrief,
   PlanDraftPreview,
   PlanEvent,
   PlanRef
 } from "./types";
+import { briefLine } from "./planBrief";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -248,7 +250,8 @@ const VERSION_AUTHORS: Record<PlanArtifactVersion["author"], string> = {
  */
 export function creationIndex(
   entries: PersistedChatEntry[],
-  versions: readonly PlanArtifactVersion[]
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = []
 ): string | null {
   const known = new Map(versions.map((version) => [version.draftId, version]));
   const creations = new Map<string, { draft: PlanDraftPreview; version?: PlanArtifactVersion }>();
@@ -265,7 +268,16 @@ export function creationIndex(
         : true);
     if (newer) creations.set(artifactId, { draft: entry.draft, version });
   }
-  if (creations.size === 0) return null;
+  // A brief is listed until it has a version: from then on the plan is the creation (P2.1).
+  const briefById = new Map(briefs.map((brief) => [brief.artifactId, brief]));
+  const briefLines = [
+    ...new Set(entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ].flatMap((artifactId) => {
+    const brief = briefById.get(artifactId);
+    if (!brief || creations.has(artifactId)) return [];
+    return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · no outline yet`];
+  });
+  if (creations.size === 0 && briefLines.length === 0) return null;
   const lines = [...creations.values()].map(({ draft, version }) => {
     const kind = draft.artifactType === "workout" ? "Workout" : "Plan";
     const made = version
@@ -276,8 +288,11 @@ export function creationIndex(
     return `- ${kind} "${draft.name}" · draft_id ${draft.draftId} · ${made}${edited}${shape} · ${creationState(draft)}`;
   });
   return [
-    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id.]",
-    ...lines
+    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id." +
+      (briefLines.length ? " Fill in a brief with request_plan_brief and its brief_id; the athlete edits it on its card." : "") +
+      "]",
+    ...lines,
+    ...briefLines
   ].join("\n");
 }
 
@@ -285,9 +300,10 @@ export function creationIndex(
 export function withCreationIndex(
   messages: ChatMessage[],
   entries: PersistedChatEntry[],
-  versions: readonly PlanArtifactVersion[]
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = []
 ): ChatMessage[] {
-  const note = creationIndex(entries, versions);
+  const note = creationIndex(entries, versions, briefs);
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {
