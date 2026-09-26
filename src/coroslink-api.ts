@@ -66,7 +66,12 @@ import type {
   TrainingPlanOutlineResult,
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
-  PlanDraftPreview,
+  PlanArtifactVersion,
+  PlanCalendarState,
+  PlanCorosSync,
+  PlanDraftSaveOptions,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -667,20 +672,46 @@ export interface CorosLinkApi {
     destination?: TrainingPlanDestination,
     scheduleDate?: string,
     /** A workout put on the calendar is also kept in the Workout Library. */
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    /** For a plan already on COROS: save a new one, or write over a change made there (P1.6). */
+    options?: PlanDraftSaveOptions
   ) => Promise<UploadPlanResult>;
+  /** Every version of the creations these drafts belong to (P1.1). */
+  getPlanArtifacts: (draftIds: string[]) => Promise<PlanArtifactVersion[]>;
+  /** Makes an older version of a creation the newest again (P1.4). */
+  restorePlanVersion: (draftId: string, unitSystem: UnitSystem) => Promise<PlanVersionWritten>;
+  /**
+   * A creation on COROS read against COROS (P1.6): a change made there comes
+   * back as its newest version. `cacheOnly` asks the plan cache and costs no
+   * request.
+   */
+  syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) => Promise<PlanCorosSync>;
+  /** The conversation a Coach plan came from, by any of its versions' draft ids (P1.7). */
+  findChatSessionForDraft: (draftId: string) => Promise<string | null>;
+  /** Where each Coach plan on COROS stands on the calendar, from this machine's cache (P1.6). */
+  getPlanCalendarState: (draftIds: string[]) => Promise<PlanCalendarState[]>;
   /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
   removePlanDraft: (draftId: string) => Promise<void>;
-  /** Writes the athlete's edit of a coach's one-off workout back into its draft. */
+  /**
+   * The athlete's edit of a coach's one-off workout, as the workout's next
+   * version (P1.5) — or, begun on a version since replaced, the newest one,
+   * unless `replaceNewer` says to write over it.
+   */
   editWorkoutDraft: (
     draftId: string,
     workout: PlanWorkoutEntryInput,
-    unitSystem?: UnitSystem
-  ) => Promise<PlanDraftPreview>;
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ) => Promise<PlanVersionSave>;
   /** The plan behind a Coach card, for the editor "Edit plan first" opens. */
   getPlanDraftDocument: (draftId: string) => Promise<TrainingPlanDocument>;
-  /** Writes the athlete's edit back into the coach's own draft; answers the card. */
-  editPlanDraft: (draftId: string, plan: TrainingPlanDocument, unitSystem?: UnitSystem) => Promise<PlanDraftPreview>;
+  /** The athlete's edit of a coach's plan as its next version; see `editWorkoutDraft`. */
+  editPlanDraft: (
+    draftId: string,
+    plan: TrainingPlanDocument,
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ) => Promise<PlanVersionSave>;
   confirmWorkoutDelete: (requestId: string) => Promise<DeleteWorkoutResult>;
   // ----- Sync -----
   chooseSyncFolder: () => Promise<string | null>;

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
+  CoachOpenRequest,
   ChatAuthStatus,
   ChatProvider,
   ChatSettings,
@@ -82,7 +83,7 @@ interface TrainingPlanGeneratorProps {
   onScheduled: (plan: TrainingPlanDocument) => void;
   /** Open plan: the generator closes and the reader opens on the saved plan. */
   onReadPlan: (plan: TrainingPlanDocument) => void;
-  onOpenCoach: (prompt?: string) => void;
+  onOpenCoach: (prompt?: string | CoachOpenRequest) => void;
 }
 
 /** A sign-in status nobody has asked for yet, one on its way, or its answer. */

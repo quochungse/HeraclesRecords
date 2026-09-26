@@ -5,6 +5,7 @@ import {
   createIdleWatchdog,
   getChatAuthStatus,
   getChatSettings,
+  listPlanArtifactVersions,
   streamChat
 } from "./chatService";
 import type { ChatStreamCollectorSink, ChatStreamSink } from "./chatService";
@@ -12,7 +13,7 @@ import {
   applyTranscriptContext,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits,
+  withCreationIndex,
   type ContextWindow,
   type StoredTranscriptSummary
 } from "./chatContextCompaction";
@@ -66,6 +67,7 @@ import type {
   CoachAnalysisSpend,
   CoachAnalysisUpdate,
   PersistedChatEntry,
+  PlanArtifactVersion,
   ProviderAuthVerdict
 } from "./types";
 
@@ -559,6 +561,12 @@ export interface CoachAnalysisRunnerDeps {
   ): CoachAnalysisRun | null;
   /** Undefined when the conversation no longer exists (2.4). */
   getSessionEntries(sessionId: string): PersistedChatEntry[] | undefined;
+  /**
+   * Every version of the creations these cards belong to, for the index the
+   * run is sent with (P1.3). Optional so a suite with no database can leave it
+   * out; the index then lists each card as its own creation.
+   */
+  getPlanArtifacts?(draftIds: string[]): PlanArtifactVersion[];
   /** 5.7: the conversation's rolling summary and what it covers. */
   getSessionSummary(sessionId: string): StoredTranscriptSummary;
   setSessionSummary(sessionId: string, summary: string, through: number): void;
@@ -704,6 +712,15 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       return getChatSession(sessionId);
     },
     getSessionSummary: (sessionId) => readSessionSummary(sessionId),
+    // Without the versions the index lists each card as its own creation,
+    // which is worse but not wrong — not a reason to fail the run.
+    getPlanArtifacts: (draftIds) => {
+      try {
+        return listPlanArtifactVersions(draftIds);
+      } catch {
+        return [];
+      }
+    },
     setSessionSummary: (sessionId, summary, through) => {
       writeSessionSummary(sessionId, summary, through);
     },
@@ -1453,15 +1470,20 @@ async function runOneBinding(
     const streaming = resolved.streamChat(
       sink,
       run.id,
-      withPlanEdits(
+      withCreationIndex(
         [
           ...(summary ? [summaryContextMessage(summary)] : []),
           ...toWireMessages(tail),
           { role: "user", content: playbook }
         ],
-        /* The whole transcript, as the chat passes it: an edited plan's card
-           can sit in the part the summary folded away. */
-        session.entries
+        /* The whole transcript, as the chat passes it: a creation's card can
+           sit in the part the summary folded away. */
+        session.entries,
+        resolved.getPlanArtifacts?.(
+          session.entries.flatMap((entry) =>
+            entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
+          )
+        ) ?? []
       ),
       {
         runtime,

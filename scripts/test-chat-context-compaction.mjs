@@ -25,11 +25,13 @@ const {
   buildRollingSummaryTurn,
   contextMessages,
   normalizeContextWindow,
+  creationIndex,
+  planEventNote,
+  planRefsNote,
   planTranscriptContext,
-  planEditNote,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits
+  withCreationIndex
 } = await import(
   `${distUrl("chatContextCompaction.js")}?cacheBust=${Date.now()}`
 );
@@ -758,7 +760,7 @@ assert.deepEqual(
 );
 
 // ---------------------------------------------------------------------------
-// A plan the athlete edited is stated to the coach; one it did not, is not
+// The coach is told what it has made, and what was done to it (P1.3)
 // ---------------------------------------------------------------------------
 {
   const planCard = (overrides = {}) => ({
@@ -767,7 +769,7 @@ assert.deepEqual(
       draftId: "d1",
       artifactType: "plan",
       name: "Base block",
-      summary: "2 workouts",
+      summary: "2 weeks · 2 sessions a week · Run",
       entries: [
         { key: "a", name: "Easy", scheduleDate: "2099-08-03", volume: "45 min", saveToLibrary: true, workoutType: "Easy", stepsSummary: "Z2" },
         { key: "b", name: "Long", scheduleDate: "2099-08-09", volume: "90 min", saveToLibrary: true, workoutType: "Long" }
@@ -784,26 +786,117 @@ assert.deepEqual(
     { kind: "message", role: "user", content: "Is Sunday too long?" }
   ];
 
-  assert.equal(planEditNote(conversation), null, "the coach wrote this version; there is nothing to tell it");
-  const untouched = toWireMessages(conversation);
-  assert.equal(withPlanEdits(untouched, conversation), untouched, "and the wire is left as it is");
-  assert.equal(untouched.length, 3, "the card itself never goes on the wire");
-
-  const edited = conversation.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5 }) : entry));
-  const note = planEditNote(edited);
-  assert.match(note, /edited a plan you drafted/);
-  assert.match(note, /Plan "Base block" \(draft_id d1, not saved yet\)/);
-  assert.match(note, /- 2099-08-03: Easy — 45 min · Z2/, "each session with its date and what it asks for");
-  const wire = withPlanEdits(toWireMessages(edited), edited);
-  assert.equal(wire.length, 3, "no message of its own, so roles still alternate");
-  assert.ok(wire[2].content.startsWith(note), "it rides in front of the latest question");
+  assert.equal(creationIndex(conversation.filter((entry) => entry.kind === "message"), []), null, "nothing made, nothing said");
+  const index = creationIndex(conversation, []);
+  assert.match(index, /newest version of each/);
+  assert.match(
+    index,
+    /- Plan "Base block" · draft_id d1 · v1 by you · 2 weeks · 2 sessions a week · Run · not saved/,
+    "a card the version list does not know is its own first version"
+  );
+  const wire = withCreationIndex(toWireMessages(conversation), conversation, []);
+  assert.equal(wire.length, 3, "the card never goes on the wire, and the index is no message of its own");
+  assert.ok(wire[2].content.startsWith(index), "it rides in front of the latest question");
   assert.ok(wire[2].content.endsWith("Is Sunday too long?"), "which is kept whole");
   assert.equal(wire[0].content, "Write me a block", "earlier turns are untouched");
 
-  const removed = edited.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5, removedAt: 6 }) : entry));
-  assert.equal(planEditNote(removed), null, "a card taken out of the conversation is not stated");
-  const saved = edited.map((entry) => (entry.kind === "planDraft" ? planCard({ editedAt: 5, uploadedAt: 7 }) : entry));
-  assert.match(planEditNote(saved), /draft_id d1, saved\)/, "a saved one still is — it is what went to COROS");
+  // Two versions of one creation: only the newest is listed, with who made it.
+  const v2 = planCard({ draftId: "d2", name: "Base block, Sunday long", editedAt: 9 });
+  const versioned = [...conversation, v2];
+  const versions = [
+    { draftId: "d1", artifactId: "d1", version: 1, author: "coach", name: "Base block", createdAt: 1 },
+    { draftId: "d2", artifactId: "d1", version: 2, author: "athlete", name: "Base block, Sunday long", createdAt: 2 }
+  ];
+  const listed = creationIndex(versioned, versions);
+  assert.doesNotMatch(listed, /draft_id d1/, "an older version is not listed");
+  assert.match(listed, /Plan "Base block, Sunday long" · draft_id d2 · v2 by the athlete · edited by the athlete/);
+
+  const saved = creationIndex(
+    [planCard({ uploadedAt: 7, uploadResult: { workoutsScheduled: 0, workoutsCreated: 2, destination: "nativePlan", planId: "P9" } })],
+    []
+  );
+  assert.match(saved, /saved to COROS as plan P9$/);
+  assert.match(
+    creationIndex([planCard({ artifactType: "workout", uploadedAt: 7, uploadResult: { workoutsScheduled: 1, workoutsCreated: 1, destination: "calendar" } })], []),
+    /- Workout "Base block" .* · on the calendar$/
+  );
+  assert.equal(creationIndex([planCard({ removedAt: 6 })], []), null, "a card taken out of the conversation is not listed");
+
+  // An edit is said once, where it happened, riding on the athlete's next message.
+  const event = {
+    kind: "planEvent",
+    event: {
+      eventId: "e1",
+      artifactId: "d1",
+      draftId: "d1",
+      action: "edited",
+      author: "athlete",
+      name: "Base block",
+      artifactType: "plan",
+      at: 8
+    }
+  };
+  const edited = [
+    conversation[0],
+    conversation[1],
+    conversation[2],
+    event,
+    { kind: "message", role: "user", content: "Is Sunday too long?" },
+    { kind: "message", role: "assistant", content: "No." }
+  ];
+  const editedWire = toWireMessages(edited);
+  assert.deepEqual(editedWire.map((item) => item.role), ["user", "assistant", "user", "assistant"], "roles still alternate");
+  assert.match(editedWire[2].content, /^\[The athlete edited the plan "Base block" in the editor\. Its newest version is draft_id d1; read it with get_plan_draft/);
+  assert.ok(editedWire[2].content.endsWith("Is Sunday too long?"));
+
+  // With nothing after it, it goes on the athlete's last message; after an
+  // answer with no question since, it stands as the athlete's turn.
+  const trailing = toWireMessages([conversation[0], event]);
+  assert.equal(trailing.length, 1);
+  assert.ok(trailing[0].content.startsWith("Write me a block\n\n[The athlete edited"));
+  const afterAnswer = toWireMessages([conversation[0], conversation[2], event]);
+  assert.deepEqual(afterAnswer.map((item) => item.role), ["user", "assistant", "user"]);
+
+  const restored = planEventNote({ ...event.event, action: "restored", fromVersion: 3, toVersion: 4, changes: ["Long run back to Saturday"] });
+  assert.match(restored, /restored an earlier version of the plan "Base block" \(v3 → v4\)\. Changes: Long run back to Saturday\./);
+  assert.match(planEventNote({ ...event.event, action: "imported", author: "coros" }), /changed in the Training Library or on COROS/);
+}
+
+// ---------------------------------------------------------------------------
+// What the athlete pointed at rides on their question (P1.7)
+// ---------------------------------------------------------------------------
+{
+  const refs = {
+    kind: "planRefs",
+    refs: [
+      {
+        artifactId: "d1",
+        draftId: "d3",
+        version: 3,
+        name: "Base block",
+        artifactType: "plan",
+        scope: "session",
+        weekIndex: 5,
+        sessionKey: "long",
+        label: "Week 6 (Build) · Sun · Long run"
+      }
+    ]
+  };
+  const wire = toWireMessages([
+    { kind: "message", role: "user", content: "Write me a block" },
+    { kind: "message", role: "assistant", content: "Here it is" },
+    refs,
+    { kind: "message", role: "user", content: "Is this too long?" }
+  ]);
+  assert.deepEqual(wire.map((item) => item.role), ["user", "assistant", "user"], "no message of its own");
+  assert.equal(
+    wire[2].content,
+    '[The athlete is asking about the plan "Base block" v3 (draft_id d3) — Week 6 (Build) · Sun · Long run. Read it with get_plan_draft if you need more than this.]\n\nIs this too long?'
+  );
+  assert.match(
+    planRefsNote([{ ...refs.refs[0], scope: "plan", version: undefined, label: "the whole plan" }]),
+    /the plan "Base block" \(draft_id d3\) — the whole of it/
+  );
 }
 
 console.log("chat context compaction tests passed");

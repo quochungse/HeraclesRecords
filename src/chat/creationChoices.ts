@@ -18,6 +18,9 @@
 import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
 
 export type CreationActionId =
+  | "addToCalendar"
+  | "updatePlan"
+  | "saveAsNewPlan"
   | "scheduleWorkout"
   | "pickWorkoutDate"
   | "saveToLibrary"
@@ -30,6 +33,8 @@ export interface CreationAction {
   destination: Extract<TrainingPlanDestination, "calendar" | "workoutLibrary" | "nativePlan">;
   /** `YYYY-MM-DD`, for a workout scheduled on the day the coach suggested. */
   date?: string;
+  /** A new COROS plan, though the creation is already one (P1.6). */
+  asNew?: boolean;
 }
 
 export interface CreationChoices {
@@ -98,7 +103,11 @@ export function isOneShotPlan(preview: PlanDraftPreview, today: string): boolean
  * whether the athlete has changed it before then. The creations list used to
  * say "Workout Library" of every workout, including one put on the calendar.
  */
-export function creationStatus(draft: PlanDraftPreview): { label: string; saved: boolean } {
+export function creationStatus(
+  draft: PlanDraftPreview,
+  /** Another version of it is a COROS plan, so this one is a change to that plan. */
+  onCoros = false
+): { label: string; saved: boolean } {
   if (draft.uploadResult || draft.uploadedAt) {
     const destination = draft.uploadResult?.destination;
     if (destination === "nativePlan") return { label: "On COROS", saved: true };
@@ -110,6 +119,7 @@ export function creationStatus(draft: PlanDraftPreview): { label: string; saved:
     }
     return { label: "Saved", saved: true };
   }
+  if (onCoros) return { label: "Changes not on COROS", saved: false };
   return { label: draft.editedAt ? "Edited by you" : "Proposal", saved: false };
 }
 
@@ -149,4 +159,98 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
     secondary: [],
     more: [...(allDated && !anyPast ? [PUT_ON_CALENDAR] : []), LIBRARY]
   };
+}
+
+/**
+ * What a creation offers where it is drawn, from one place for the card and
+ * the canvas alike (docs/coach-plan-canvas.md, P1.4, D9/D10):
+ *
+ * - `older`: a version something has replaced. It is read, not saved; the one
+ *   thing to do with it is make it the newest again (`restore`), which a
+ *   saved creation cannot do from here until P1.6.
+ * - `editing`: its editor is open. The editor is the one place a creation
+ *   is changed, so every other place leads back into it, and nothing is saved
+ *   to COROS from a version with changes still unsaved.
+ * - `save`: the newest version, with the ways to save it.
+ */
+export type ArtifactActions =
+  | { kind: "older"; restore: boolean }
+  | { kind: "editing" }
+  | { kind: "saved"; addToCalendar: boolean }
+  | { kind: "save"; choices: CreationChoices };
+
+/**
+ * The plan onto the COROS calendar as its running copy (P1.6), through the
+ * Library's dialog — which saves a plan not on COROS yet first. Not a way of
+ * saving: a plan is on the calendar only as a COROS plan.
+ */
+const ADD_TO_CALENDAR: CreationAction = {
+  id: "addToCalendar",
+  label: "Add to calendar…",
+  destination: "nativePlan"
+};
+
+/**
+ * `saved` is whether any version is saved; `onCoros`, whether one is a COROS
+ * plan (P1.6). A plan on COROS is changed by a new version that updates it,
+ * so its older versions can be restored and its newest one, once saved, can
+ * still be edited; a workout saved to the library or the calendar has nothing
+ * to update, so neither.
+ */
+export function artifactActions(
+  draft: PlanDraftPreview,
+  state: {
+    latest: boolean;
+    editing?: boolean;
+    saved?: boolean;
+    onCoros?: boolean;
+    /** COROS is running a copy of the plan on the calendar already. */
+    onCalendar?: boolean;
+  },
+  today: string
+): ArtifactActions {
+  const saved = state.saved ?? Boolean(draft.uploadedAt || draft.uploadResult);
+  const isPlan = draft.artifactType !== "workout";
+  if (!state.latest) return { kind: "older", restore: !saved || (isPlan && Boolean(state.onCoros)) };
+  if (state.editing) return { kind: "editing" };
+  if (draft.uploadedAt || draft.uploadResult) {
+    const asPlan = isPlan && (draft.uploadResult?.destination === "nativePlan" || Boolean(state.onCoros));
+    return { kind: "saved", addToCalendar: asPlan && !state.onCalendar };
+  }
+  if (isPlan && state.onCoros) {
+    return {
+      kind: "save",
+      choices: {
+        primary: { id: "updatePlan", label: "Update COROS plan", destination: "nativePlan" },
+        secondary: [],
+        more: [{ id: "saveAsNewPlan", label: "Save as a new COROS plan", destination: "nativePlan", asNew: true }]
+      }
+    };
+  }
+  const choices = planSaveChoices(draft, today);
+  // A programme can go on the calendar as a plan, saved first; a one-shot plan
+  // already leads with putting its sessions there, and a second calendar
+  // button beside that one would ask the same question two ways.
+  if (isPlan && choices.primary.id === "saveAsPlan") {
+    return { kind: "save", choices: { ...choices, secondary: [...choices.secondary, ADD_TO_CALENDAR] } };
+  }
+  return { kind: "save", choices };
+}
+
+/**
+ * The follow-ups under a creation (P1.8): what Coach offered with this
+ * version, or a set that fits its kind when it offered none. A press sends
+ * the chip's own words as a question about the creation — not an edit, which
+ * is the editor's (D10).
+ */
+export function refinementChips(draft: PlanDraftPreview, offered?: readonly string[]): string[] {
+  if (offered && offered.length) return [...offered];
+  if (draft.artifactType === "workout") return ["Shorter", "Easier", "Harder"];
+  const sports = new Set(draft.entries.map((entry) => entry.sport ?? "run"));
+  return [
+    "Lighter",
+    "Fewer days",
+    ...(sports.has("run") ? ["Long run on Sunday"] : []),
+    ...(sports.has("strength") ? [] : ["More strength"])
+  ];
 }

@@ -39,9 +39,6 @@ const KNOWN_UNSTYLED = new Set([
   "chat-bubble-tool-notice",
   "chat-local-field-key",
   "chat-view-login",
-  // A modifier beside `chat-plan-card`; only its `-kicker` child has a rule.
-  "chat-workout-card",
-  "chat-workout-entries",
   "is-pinned",
   "is-url"
 ]);

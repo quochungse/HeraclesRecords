@@ -12,18 +12,11 @@ import {
   type ReactNode
 } from "react";
 import {
-  BookOpen,
-  Bookmark,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CircleCheck,
   Cloud,
   Database,
   ExternalLink,
   FileDown,
   FileText,
-  Info,
   KeyRound,
   Loader2,
   LogOut,
@@ -40,8 +33,8 @@ import {
   Square,
   Terminal,
   Trash2,
-  TriangleAlert,
   User,
+  X,
   Zap
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -49,17 +42,6 @@ import remarkGfm from "remark-gfm";
 import type { CorosLinkApi } from "../coroslink-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import {
-  POUNDS_PER_KILOGRAM,
-  formatDistanceValue,
-  formatElevationValue,
-  formatPaceValue,
-  kilogramsToDisplayWeight,
-  kmhToDisplaySpeed,
-  speedUnit,
-  weightUnit,
-  type UnitSystem
-} from "../units/units";
 import type {
   AnthropicEffort,
   ChatAuthStatus,
@@ -78,19 +60,23 @@ import type {
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
+  PlanArtifactVersion,
+  CoachOpenRequest,
+  PlanCalendarState,
   PlanDraftPreview,
+  PlanRef,
+  PlanCorosSync,
+  PlanDraftSaveOptions,
+  PlanVersionWritten,
   PlanDraftPreviewEntry,
-  PlanWorkoutEntryInput,
   TrainingPlanDestination,
   TrainingPlanDocument,
   TrainingHubExportResult,
   UploadPlanResult,
-  WorkoutIntensityInput,
   WorkoutDeletePreview,
   DeleteWorkoutResult
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -101,15 +87,21 @@ import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
-import { CoachCreationModal } from "./CoachCreationModal";
-import { CreationActions } from "./CreationActions";
 import { CoachCreationCard } from "./CoachCreationCard";
-import { creationStatus } from "./creationChoices";
+import { creationCalendar, localDayKey } from "./creationCalendar";
+import { refinementChips } from "./creationChoices";
+import {
+  creationVersions,
+  isLatestVersion,
+  isOnCoros,
+  supersededLine,
+  withDocumentSources
+} from "./creationVersions";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits
+  withCreationIndex
 } from "../../electron/chatContextCompaction";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
@@ -144,6 +136,9 @@ import {
 const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
 /* "Edit" on a coach's one-off workout: the workout builder, loaded when used. */
 const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
+const CoachCanvas = lazy(() => import("./CoachCanvas"));
+const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
+const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -305,8 +300,11 @@ interface ChatViewProps {
   onPlanUploaded?: () => void;
   /** Fires when a coach request is in progress (streaming or exporting). */
   onActivityChange?: (active: boolean) => void;
-  /** Text preloaded into the composer (e.g. "Ask Coach" from the calendar). */
-  pendingPrompt?: string | null;
+  /**
+   * Text preloaded into the composer (e.g. "Ask Coach" from the calendar), or
+   * a Coach plan to ask about in the conversation it came from (P1.7).
+   */
+  pendingPrompt?: string | CoachOpenRequest | null;
   onPendingPromptConsumed?: () => void;
   /**
    * True while the Coach view is the visible one. The panel stays mounted when
@@ -316,939 +314,9 @@ interface ChatViewProps {
   active?: boolean;
 }
 
-function canonicalPlanDistanceMeters(source: PlanWorkoutEntryInput): number {
-  if (source.distance_km && source.distance_km > 0) {
-    return source.distance_km * 1_000;
-  }
-  let total = 0;
-  for (const step of source.steps ?? []) {
-    if ("repeat" in step) {
-      total += step.repeat * step.steps.reduce(
-        (sum, child) => sum + (child.target_distance_meters ?? 0),
-        0
-      );
-    } else {
-      total += step.target_distance_meters ?? 0;
-    }
-  }
-  return total;
-}
-
-function formatPlanSourceVolume(
-  source: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  const meters = canonicalPlanDistanceMeters(source);
-  if (meters <= 0) return undefined;
-  return formatDistanceValue(meters, unitSystem, {
-    swim: source.sport === "swim"
-  });
-}
-
-type PlanSourceNode = NonNullable<PlanWorkoutEntryInput["steps"]>[number];
-type PlanSourceRepeat = Extract<PlanSourceNode, { repeat: number }>;
-type PlanSourceStep = Exclude<PlanSourceNode, { repeat: number }>;
-
-function isPlanSourceRepeat(step: PlanSourceNode): step is PlanSourceRepeat {
-  return "repeat" in step;
-}
-
-function formatPlanDuration(seconds: number): string {
-  if (seconds < 90) return `${Math.round(seconds)} sec`;
-  const minutes = seconds / 60;
-  return Number.isInteger(minutes)
-    ? `${minutes} min`
-    : `${minutes.toFixed(1)} min`;
-}
-
-function formatPlanStepTarget(
-  step: PlanSourceStep,
-  sport: PlanWorkoutEntryInput["sport"],
-  unitSystem: UnitSystem
-): string {
-  if (step.target_distance_meters) {
-    return formatDistanceValue(step.target_distance_meters, unitSystem, {
-      swim: sport === "swim"
-    });
-  }
-  if (step.target_elevation_gain_meters) {
-    return `${formatElevationValue(step.target_elevation_gain_meters, unitSystem)} gain`;
-  }
-  if (step.target_duration_seconds) {
-    return formatPlanDuration(step.target_duration_seconds);
-  }
-  if (step.target_reps) return `${step.target_reps} reps`;
-  if (step.target_routes) {
-    return `${step.target_routes} ${step.target_routes === 1 ? "route" : "routes"}`;
-  }
-  if (step.target_hr_recovery_bpm) {
-    return `to ${step.target_hr_recovery_bpm} bpm`;
-  }
-  if (step.send_off_seconds) return `${formatPlanDuration(step.send_off_seconds)} send-off`;
-  if (step.target_load) return `${step.target_load} TL`;
-  return "Open";
-}
-
-function formatPlanSourceSteps(
-  source: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  const formatStep = (
-    step: NonNullable<PlanWorkoutEntryInput["steps"]>[number]
-  ): string => {
-    if (isPlanSourceRepeat(step)) {
-      return `${step.repeat}x (${step.steps.map((child) => formatStep(child)).join(", ")})`;
-    }
-    const target = formatPlanStepTarget(step, source.sport, unitSystem);
-    const intensity = step.intensity
-      ? formatPlanIntensity(step.intensity, unitSystem)
-      : step.pace
-        ? formatLegacyPlanPace(step.pace, unitSystem)
-        : undefined;
-    return `${step.kind ?? "training"} ${target}${intensity ? ` @ ${intensity}` : ""}`;
-  };
-  return source.steps?.length
-    ? source.steps.map(formatStep).join(" → ")
-    : undefined;
-}
-
-function isStrengthExerciseStep(step: PlanSourceStep): boolean {
-  return step.kind === "training" || step.kind === "interval";
-}
-
-function strengthStepTitle(step: PlanSourceStep): string {
-  if (step.exercise_name?.trim()) return step.exercise_name.trim();
-  if (step.name?.trim()) return step.name.trim();
-  if (step.kind === "warmup") return "Warm-up";
-  if (step.kind === "cooldown") return "Cooldown";
-  if (step.kind === "rest") return "Recovery";
-  return "Strength exercise";
-}
-
-function strengthStepMarker(step: PlanSourceStep, exerciseNumber?: number): string {
-  if (exerciseNumber !== undefined) return String(exerciseNumber);
-  if (step.kind === "warmup") return "W";
-  if (step.kind === "cooldown") return "C";
-  if (step.kind === "rest") return "R";
-  return "S";
-}
-
-function countStrengthExercises(steps: readonly PlanSourceNode[]): number {
-  return steps.reduce((count, step) => {
-    if (isPlanSourceRepeat(step)) {
-      return count + step.steps.filter(isStrengthExerciseStep).length;
-    }
-    return count + (isStrengthExerciseStep(step) ? 1 : 0);
-  }, 0);
-}
-
-function StrengthPlanStructure({
-  source,
-  unitSystem
-}: {
-  source: PlanWorkoutEntryInput;
-  unitSystem: UnitSystem;
-}) {
-  const steps = source.steps ?? [];
-  const exerciseCount = countStrengthExercises(steps);
-  let exerciseNumber = 0;
-
-  const renderStep = (step: PlanSourceStep, key: string) => {
-    const exercise = isStrengthExerciseStep(step);
-    const currentExerciseNumber = exercise ? ++exerciseNumber : undefined;
-    const intensity = step.intensity
-      ? formatPlanIntensity(step.intensity, unitSystem)
-      : undefined;
-    const setCount = step.sets && step.sets > 1 ? `${step.sets} sets` : undefined;
-    const setRest = step.sets && step.sets > 1 && step.rest_value !== undefined
-      ? `${formatPlanDuration(step.rest_value)} rest`
-      : undefined;
-
-    return (
-      <li
-        key={key}
-        className={`chat-plan-strength-step is-${step.kind ?? "training"}`}
-      >
-        <span className="chat-plan-strength-marker" aria-hidden="true">
-          {strengthStepMarker(step, currentExerciseNumber)}
-        </span>
-        <span className="chat-plan-strength-step-copy">
-          <strong>{strengthStepTitle(step)}</strong>
-        </span>
-        <span className="chat-plan-strength-prescription">
-          {setCount ? <span>{setCount}</span> : null}
-          <strong>{formatPlanStepTarget(step, source.sport, unitSystem)}</strong>
-          {intensity ? <span>{intensity}</span> : null}
-          {setRest ? <span>{setRest}</span> : null}
-        </span>
-      </li>
-    );
-  };
-
-  return (
-    <section
-      className="chat-plan-strength-structure"
-      aria-label={`${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"} in strength session structure`}
-    >
-      <header className="chat-plan-strength-header">
-        <strong>Session structure</strong>
-        <span>
-          {exerciseCount} {exerciseCount === 1 ? "exercise" : "exercises"}
-        </span>
-      </header>
-      <ol className="chat-plan-strength-steps">
-        {steps.map((step, index) => {
-          if (!isPlanSourceRepeat(step)) {
-            return renderStep(step, `step-${index}`);
-          }
-          return (
-            <li key={`repeat-${index}`} className="chat-plan-strength-repeat">
-              <div className="chat-plan-strength-repeat-header">
-                <strong>{step.name?.trim() || "Repeat block"}</strong>
-                <span>{step.repeat} rounds</span>
-              </div>
-              <ol>
-                {step.steps.map((child, childIndex) =>
-                  renderStep(child, `repeat-${index}-step-${childIndex}`)
-                )}
-              </ol>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
-function formatPlanPaceRange(
-  lowSecondsPerKm: number,
-  highSecondsPerKm: number,
-  unitSystem: UnitSystem
-): string {
-  const clock = (value: number) => formatPaceValue(value, unitSystem).split(" ")[0];
-  return `${clock(lowSecondsPerKm)}–${clock(highSecondsPerKm)}/${unitSystem === "imperial" ? "mi" : "km"}`;
-}
-
-function formatPlanIntensity(
-  intensity: WorkoutIntensityInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  if (intensity.type === "none") return undefined;
-  if (intensity.type === "pace" || intensity.type === "effortPace") {
-    return formatPlanPaceRange(
-      intensity.lowSecondsPerKm,
-      intensity.highSecondsPerKm,
-      unitSystem
-    );
-  }
-  if (intensity.type === "speed") {
-    const lowKmh = intensity.unit === "mph" ? intensity.low * 1.609344 : intensity.low;
-    const highKmh = intensity.unit === "mph" ? intensity.high * 1.609344 : intensity.high;
-    return `${kmhToDisplaySpeed(lowKmh, unitSystem).toFixed(1)}–${kmhToDisplaySpeed(highKmh, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
-  }
-  if (intensity.type === "weight") {
-    if (intensity.mode === "bodyweight") return "Bodyweight";
-    const kilograms = intensity.unit === "lb"
-      ? intensity.value / POUNDS_PER_KILOGRAM
-      : intensity.value;
-    return `${kilogramsToDisplayWeight(kilograms, unitSystem).toFixed(1)} ${weightUnit(unitSystem)}`;
-  }
-  if (intensity.type === "heartRate") {
-    return `${intensity.lowBpm}–${intensity.highBpm} bpm`;
-  }
-  if (intensity.type === "power") {
-    return `${intensity.lowWatts}–${intensity.highWatts} W`;
-  }
-  if (intensity.type === "cadence") {
-    return `${intensity.low}–${intensity.high} ${intensity.unit}`;
-  }
-  if (intensity.type === "swimStroke") return intensity.stroke;
-  if (intensity.type === "rpe") return `RPE ${intensity.value}`;
-  return undefined;
-}
-
-function formatLegacyPlanPace(
-  pace: string,
-  unitSystem: UnitSystem
-): string {
-  const match = pace.trim().match(/^(\d+):([0-5]\d)(?:-(\d+):([0-5]\d))?\/(km|mi)$/i);
-  if (!match) return pace;
-  const sourceFactor = match[5]?.toLowerCase() === "mi" ? 1 / 1.609344 : 1;
-  const low = (Number(match[1]) * 60 + Number(match[2])) * sourceFactor;
-  const high = match[3]
-    ? (Number(match[3]) * 60 + Number(match[4])) * sourceFactor
-    : low;
-  return formatPlanPaceRange(low, high, unitSystem);
-}
-
-const PLAN_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-function planDateFromSchedule(scheduleDate: string): Date | undefined {
-  const match = scheduleDate.match(PLAN_DATE_RE);
-  if (!match) return undefined;
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-}
-
-/** Calendar-badge parts for a scheduled date: weekday / day number / month. */
-function planDateParts(
-  scheduleDate?: string
-): { weekday: string; day: string; month: string } | undefined {
-  if (!scheduleDate) return undefined;
-  const date = planDateFromSchedule(scheduleDate);
-  if (!date) return undefined;
-  return {
-    weekday: new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date),
-    day: String(date.getDate()),
-    month: new Intl.DateTimeFormat(undefined, { month: "short" }).format(date)
-  };
-}
-
-/** One-line localized label, e.g. "Tue, Aug 4". Falls back to the raw value. */
-function formatPlanDateLabel(scheduleDate: string): string {
-  const date = planDateFromSchedule(scheduleDate);
-  if (!date) return scheduleDate;
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  }).format(date);
-}
-
-function planEntryScheduleDate(entry: PlanDraftPreviewEntry): string | undefined {
-  if (entry.scheduleDate) return entry.scheduleDate;
-  const sourceDate = entry.source?.schedule_date;
-  if (!sourceDate || !/^\d{8}$/.test(sourceDate)) return undefined;
-  return `${sourceDate.slice(0, 4)}-${sourceDate.slice(4, 6)}-${sourceDate.slice(6, 8)}`;
-}
-
-function localPlanDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function planWeekStart(date: Date): Date {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const daysSinceMonday = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - daysSinceMonday);
-  return start;
-}
-
-function formatPlanWeekRange(start: Date): string {
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-  const month = new Intl.DateTimeFormat(undefined, { month: "short" });
-  if (start.getMonth() === end.getMonth()) {
-    return `${month.format(start)} ${start.getDate()}-${end.getDate()}`;
-  }
-  return `${month.format(start)} ${start.getDate()}-${month.format(end)} ${end.getDate()}`;
-}
-
-interface PlanWeekGroup {
-  id: string;
-  label: string;
-  dateRange: string;
-  entries: PlanDraftPreviewEntry[];
-}
-
-/**
- * `weekOf` places an undated session in its week of the plan — read off the
- * document the draft becomes — so an undated plan reads as weeks rather than
- * as one "Unscheduled" pile.
- */
-function groupPlanEntriesByWeek(
-  entries: PlanDraftPreviewEntry[],
-  weekOf?: ReadonlyMap<string, number>
-): PlanWeekGroup[] {
-  const groups = new Map<string, { start: Date; entries: PlanDraftPreviewEntry[] }>();
-  const planWeeks = new Map<string, PlanDraftPreviewEntry[]>();
-  const unscheduled: PlanDraftPreviewEntry[] = [];
-  const sortedEntries = [...entries].sort((left, right) => {
-    const leftDate = planEntryScheduleDate(left) ?? "9999-99-99";
-    const rightDate = planEntryScheduleDate(right) ?? "9999-99-99";
-    return leftDate.localeCompare(rightDate);
-  });
-
-  for (const entry of sortedEntries) {
-    const scheduleDate = planEntryScheduleDate(entry);
-    const date = scheduleDate ? planDateFromSchedule(scheduleDate) : undefined;
-    if (!date) {
-      const week = weekOf?.get(entry.key);
-      if (week === undefined) {
-        unscheduled.push(entry);
-        continue;
-      }
-      const id = `week-${String(week).padStart(3, "0")}`;
-      const existing = planWeeks.get(id);
-      if (existing) existing.push(entry);
-      else planWeeks.set(id, [entry]);
-      continue;
-    }
-    const start = planWeekStart(date);
-    const id = localPlanDateKey(start);
-    const existing = groups.get(id);
-    if (existing) {
-      existing.entries.push(entry);
-    } else {
-      groups.set(id, { start, entries: [entry] });
-    }
-  }
-
-  const weeks = [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([id, group], index) => ({
-      id,
-      label: `Week ${index + 1}`,
-      dateRange: formatPlanWeekRange(group.start),
-      entries: group.entries
-    }));
-  for (const [id, grouped] of [...planWeeks.entries()].sort(([left], [right]) =>
-    left.localeCompare(right)
-  )) {
-    weeks.push({
-      id,
-      label: `Week ${Number(id.slice(5)) + 1}`,
-      dateRange: "Dated when it goes on the calendar",
-      entries: grouped
-    });
-  }
-  if (unscheduled.length > 0) {
-    weeks.push({
-      id: "unscheduled",
-      label: "Unscheduled",
-      dateRange: "No calendar date",
-      entries: unscheduled
-    });
-  }
-  return weeks;
-}
-
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
-}
-
-function WorkoutPreviewCard({
-  draft,
-  uploading,
-  uploaded,
-  onUpload
-}: {
-  draft: PlanDraftPreview;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (
-    destination: TrainingPlanDestination,
-    scheduleDate?: string,
-    keepInLibrary?: boolean
-  ) => void;
-}) {
-  const { unitSystem } = useUnitSystem();
-  const entry = draft.entries[0];
-  const scheduleDate = entry ? planEntryScheduleDate(entry) : undefined;
-  const uploadedDestination =
-    uploaded?.destination ?? draft.uploadResult?.destination;
-  const isUploaded = Boolean(uploaded || draft.uploadResult || draft.uploadedAt);
-  const calendarDateParts = planDateParts(scheduleDate);
-  const SportIcon = sportTheme(entry?.sport).icon;
-  const hasStrengthStructure = Boolean(
-    entry &&
-      (entry.sport === "strength" || entry.sport === "hyrox") &&
-      entry.source?.steps?.length
-  );
-  const volume = entry
-    ? (entry.source
-        ? formatPlanSourceVolume(entry.source, unitSystem)
-        : undefined) ?? entry.volume ?? "Not set"
-    : "Not set";
-  const steps = entry
-    ? (entry.source
-        ? formatPlanSourceSteps(entry.source, unitSystem)
-        : undefined) ?? entry.stepsSummary ?? "No structure provided"
-    : "No structure provided";
-
-  return (
-    <div className="chat-plan-card chat-workout-card">
-      <div className="chat-plan-card-header">
-        <div className="chat-plan-card-title">
-          <span className="chat-workout-card-kicker">One-off workout</span>
-          <h4>{draft.name}</h4>
-          <span className="chat-plan-card-summary">{draft.summary}</span>
-        </div>
-        {entry ? (
-          <span
-            className="chat-plan-sport-dot"
-            style={planSportStyle(entry.sport)}
-            title={formatWorkoutSport(entry.sport ?? "run")}
-          >
-            <SportIcon size={12} strokeWidth={2.2} aria-hidden="true" />
-          </span>
-        ) : null}
-      </div>
-      {entry ? (
-        <ul className="chat-plan-entries chat-workout-entries">
-          <li
-            className={`chat-plan-entry${hasStrengthStructure ? " is-strength" : ""}`}
-            style={planSportStyle(entry.sport)}
-          >
-            <span
-              className={`chat-plan-entry-date${calendarDateParts ? "" : " is-undated"}`}
-              title={scheduleDate ? `Suggested for ${scheduleDate}` : "No date suggested"}
-            >
-              {calendarDateParts ? (
-                <>
-                  <span className="chat-plan-entry-weekday">
-                    {calendarDateParts.weekday}
-                  </span>
-                  <span className="chat-plan-entry-day">
-                    {calendarDateParts.day}
-                  </span>
-                  <span className="chat-plan-entry-month">
-                    {calendarDateParts.month}
-                  </span>
-                </>
-              ) : (
-                <Bookmark size={14} aria-hidden="true" />
-              )}
-            </span>
-            <span className="chat-plan-entry-main">
-              <span className="chat-plan-entry-name">{entry.name}</span>
-              {hasStrengthStructure && entry.source ? (
-                <StrengthPlanStructure
-                  source={entry.source}
-                  unitSystem={unitSystem}
-                />
-              ) : (
-                <span className="chat-plan-entry-steps">{steps}</span>
-              )}
-            </span>
-            <span className="chat-plan-entry-meta">
-              {!hasStrengthStructure ? (
-                <span className="chat-plan-entry-volume">{volume}</span>
-              ) : null}
-              <span className="chat-plan-entry-tags">
-                <span className="chat-plan-entry-type">{entry.workoutType}</span>
-                <span className="chat-plan-entry-sport">
-                  <SportIcon size={11} strokeWidth={2.2} aria-hidden="true" />
-                  {formatWorkoutSport(entry.sport ?? "run")}
-                </span>
-              </span>
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <div className="chat-plan-empty-week">
-          <Bookmark size={16} aria-hidden="true" />
-          <span>This workout does not contain any steps yet.</span>
-        </div>
-      )}
-      {isUploaded ? (
-        <p className="chat-plan-success">
-          <CircleCheck size={15} aria-hidden="true" />
-          <span>
-            {uploadedDestination === "calendar" && scheduleDate
-              ? `Added to your COROS Calendar on ${formatPlanDateLabel(scheduleDate)}.`
-              : "Saved to your COROS Workout Library."}
-          </span>
-        </p>
-      ) : entry ? (
-        <CreationActions draft={draft} uploading={uploading} onUpload={onUpload} />
-      ) : null}
-    </div>
-  );
-}
-
-function PlanPreviewCard({
-  draft,
-  document,
-  uploading,
-  uploaded,
-  onUpload,
-  onReview
-}: {
-  draft: PlanDraftPreview;
-  document?: TrainingPlanDocument;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (destination: TrainingPlanDestination) => void;
-  onReview?: () => void;
-}) {
-  const { unitSystem } = useUnitSystem();
-  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
-  const weekTabsRef = useRef<HTMLDivElement>(null);
-  const uploadedResult =
-    uploaded ??
-    (draft.uploadResult
-      ? {
-          planName: draft.name,
-          workoutsCreated: draft.uploadResult.workoutsCreated,
-          workoutsScheduled: draft.uploadResult.workoutsScheduled,
-          entries: []
-        }
-      : undefined);
-  const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
-  const savedTo: TrainingPlanDestination =
-    uploadedResult?.destination ?? draft.uploadResult?.destination ?? "nativePlan";
-  const entryPrefix = `entry:${draft.draftId}:`;
-  const weekOf = document
-    ? new Map(
-        document.entries.map((entry) => [
-          entry.id.startsWith(entryPrefix) ? entry.id.slice(entryPrefix.length) : entry.id,
-          entry.weekIndex
-        ])
-      )
-    : undefined;
-  const planWeeks = groupPlanEntriesByWeek(draft.entries, weekOf);
-  const scheduledWeekCount = planWeeks.filter(
-    (week) => week.id !== "unscheduled"
-  ).length;
-  const selectedWeek =
-    planWeeks.find((week) => week.id === selectedWeekId) ?? planWeeks[0];
-  const selectedWeekIndex = selectedWeek
-    ? planWeeks.findIndex((week) => week.id === selectedWeek.id)
-    : -1;
-  const sports = [
-    ...new Set(draft.entries.map((entry) => formatWorkoutSport(entry.sport ?? "run")))
-  ];
-  const sportKinds = [...new Set(draft.entries.map((entry) => entry.sport))];
-  const startDate = draft.entries
-    .map(planEntryScheduleDate)
-    .filter((date): date is string => Boolean(date))
-    .sort()[0];
-  const destinationLabel: Record<TrainingPlanDestination, string> = {
-    workoutLibrary: "COROS Workout Library",
-    calendar: "COROS Calendar",
-    /* Where a card saved before plans went to COROS says it went. */
-    localPlan: "Heracles Records Training Library",
-    nativePlan: "your COROS plans",
-    localTemplate: "Local Heracles Records template",
-    nativePlanAndCalendar: "COROS plan + Calendar"
-  };
-
-  useEffect(() => {
-    setSelectedWeekId(null);
-  }, [draft.draftId]);
-
-  useEffect(() => {
-    const activeTab = weekTabsRef.current?.querySelector<HTMLElement>(
-      '[role="tab"][aria-selected="true"]'
-    );
-    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [selectedWeek?.id]);
-
-  const selectAdjacentWeek = (offset: number) => {
-    const nextWeek = planWeeks[selectedWeekIndex + offset];
-    if (nextWeek) setSelectedWeekId(nextWeek.id);
-  };
-
-  return (
-    <div className="chat-plan-card">
-      <div className="chat-plan-card-header">
-        <div className="chat-plan-card-title">
-          <h4>{draft.name}</h4>
-          <span className="chat-plan-card-summary">{draft.summary}</span>
-        </div>
-        {sportKinds.length > 0 ? (
-          <span
-            className="chat-plan-sports"
-            role="img"
-            aria-label={sports.join(", ")}
-          >
-            {sportKinds.slice(0, 4).map((sport, index) => {
-              const SportIcon = sportTheme(sport).icon;
-              return (
-                <span
-                  key={`${sport ?? "unknown"}-${index}`}
-                  className="chat-plan-sport-dot"
-                  style={planSportStyle(sport)}
-                  title={sport ? formatWorkoutSport(sport) : "Workout"}
-                >
-                  <SportIcon size={10} strokeWidth={2.2} aria-hidden="true" />
-                </span>
-              );
-            })}
-          </span>
-        ) : null}
-      </div>
-      <div className="chat-plan-overview" aria-label="Plan overview">
-        <div className="chat-plan-overview-item">
-          <span>Weeks</span>
-          <strong>{scheduledWeekCount}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Workouts</span>
-          <strong>{draft.entries.length}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Sports</span>
-          <strong title={sports.join(", ")}>{sports.join(", ")}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Starts</span>
-          <strong>{startDate ? formatPlanDateLabel(startDate) : "Not set"}</strong>
-        </div>
-      </div>
-      {selectedWeek ? (
-        <section
-          className="chat-plan-week"
-          aria-labelledby={`chat-plan-week-${draft.draftId}-${selectedWeek.id}`}
-        >
-          <div className="chat-plan-week-header">
-            <div>
-              <span>{selectedWeek.label}</span>
-              <h5 id={`chat-plan-week-${draft.draftId}-${selectedWeek.id}`}>
-                {selectedWeek.dateRange}
-              </h5>
-              <small>
-                {selectedWeek.entries.length}{" "}
-                {selectedWeek.entries.length === 1 ? "workout" : "workouts"}
-              </small>
-            </div>
-            {planWeeks.length > 1 ? (
-              <div className="chat-plan-week-stepper" aria-label="Change week">
-                <button
-                  type="button"
-                  onClick={() => selectAdjacentWeek(-1)}
-                  disabled={selectedWeekIndex <= 0}
-                  aria-label="Previous week"
-                  title="Previous week"
-                >
-                  <ChevronLeft size={15} aria-hidden="true" />
-                </button>
-                <span>{selectedWeekIndex + 1} of {planWeeks.length}</span>
-                <button
-                  type="button"
-                  onClick={() => selectAdjacentWeek(1)}
-                  disabled={selectedWeekIndex >= planWeeks.length - 1}
-                  aria-label="Next week"
-                  title="Next week"
-                >
-                  <ChevronRight size={15} aria-hidden="true" />
-                </button>
-              </div>
-            ) : null}
-          </div>
-          {planWeeks.length > 1 ? (
-            <div
-              ref={weekTabsRef}
-              className="chat-plan-week-tabs"
-              role="tablist"
-              aria-label="Plan weeks"
-            >
-              {planWeeks.map((week) => (
-                <button
-                  key={week.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={week.id === selectedWeek.id}
-                  className={week.id === selectedWeek.id ? "is-active" : ""}
-                  onClick={() => setSelectedWeekId(week.id)}
-                >
-                  <strong>{week.label}</strong>
-                  <span>{week.dateRange}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <ul className="chat-plan-entries">
-            {selectedWeek.entries.map((entry) => {
-              const SportIcon = sportTheme(entry.sport).icon;
-              const scheduleDate = planEntryScheduleDate(entry);
-              const dateParts = planDateParts(scheduleDate);
-              const hasStrengthStructure =
-                (entry.sport === "strength" || entry.sport === "hyrox") &&
-                Boolean(entry.source?.steps?.length);
-              const volume =
-                (entry.source
-                  ? formatPlanSourceVolume(entry.source, unitSystem)
-                  : undefined) ?? entry.volume ?? "Not set";
-              const steps =
-                (entry.source
-                  ? formatPlanSourceSteps(entry.source, unitSystem)
-                  : undefined) ?? entry.stepsSummary ?? "No structure provided";
-              return (
-                <li
-                  key={entry.key}
-                  className={`chat-plan-entry${hasStrengthStructure ? " is-strength" : ""}`}
-                  style={planSportStyle(entry.sport)}
-                >
-                  <span
-                    className={`chat-plan-entry-date${dateParts ? "" : " is-undated"}`}
-                    title={scheduleDate ?? "Saved to library only"}
-                  >
-                    {dateParts ? (
-                      <>
-                        <span className="chat-plan-entry-weekday">
-                          {dateParts.weekday}
-                        </span>
-                        <span className="chat-plan-entry-day">{dateParts.day}</span>
-                        <span className="chat-plan-entry-month">
-                          {dateParts.month}
-                        </span>
-                      </>
-                    ) : (
-                      <Bookmark size={14} aria-hidden="true" />
-                    )}
-                  </span>
-                  <span className="chat-plan-entry-main">
-                    <span className="chat-plan-entry-name">{entry.name}</span>
-                    {hasStrengthStructure && entry.source ? (
-                      <StrengthPlanStructure
-                        source={entry.source}
-                        unitSystem={unitSystem}
-                      />
-                    ) : (
-                      <span className="chat-plan-entry-steps">{steps}</span>
-                    )}
-                  </span>
-                  <span className="chat-plan-entry-meta">
-                    {!hasStrengthStructure ? (
-                      <span className="chat-plan-entry-volume">{volume}</span>
-                    ) : null}
-                    <span className="chat-plan-entry-tags">
-                      <span className="chat-plan-entry-type">
-                        {entry.workoutType}
-                      </span>
-                      <span className="chat-plan-entry-sport">
-                        <SportIcon size={11} strokeWidth={2.2} aria-hidden="true" />
-                        {formatWorkoutSport(entry.sport ?? "run")}
-                      </span>
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : (
-        <div className="chat-plan-empty-week">
-          <Bookmark size={16} aria-hidden="true" />
-          <span>This plan does not contain any workouts yet.</span>
-        </div>
-      )}
-      {draft.conflicts.length > 0 ? (
-        <details
-          className="chat-plan-issues"
-          data-tone="alert"
-          open={draft.conflicts.length <= 3}
-        >
-          <summary>
-            <span>
-              <TriangleAlert size={13} aria-hidden="true" />
-              <strong>
-                {draft.conflicts.length}{" "}
-                {draft.conflicts.length === 1
-                  ? "scheduling conflict"
-                  : "scheduling conflicts"}
-              </strong>
-            </span>
-            <small>Review before saving</small>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <ul className="chat-plan-warnings">
-            {draft.conflicts.map((item) => (
-              <li key={item}>
-                <TriangleAlert size={12} aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {draft.warnings.length > 0 ? (
-        <details
-          className="chat-plan-issues"
-          data-tone="note"
-          open={draft.warnings.length <= 3}
-        >
-          <summary>
-            <span>
-              <Info size={13} aria-hidden="true" />
-              <strong>
-                {draft.warnings.length}{" "}
-                {draft.warnings.length === 1 ? "plan note" : "plan notes"}
-              </strong>
-            </span>
-            <small>Additional plan details</small>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <ul className="chat-plan-notes">
-            {draft.warnings.map((item) => (
-              <li key={item}>
-                <Info size={12} aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {uploadedResult || isUploaded ? (
-        <p className="chat-plan-success">
-          <CircleCheck size={15} aria-hidden="true" />
-          <span>
-            {savedTo === "nativePlan"
-              ? `Saved to ${destinationLabel.nativePlan} as “${draft.name}”.`
-              : savedTo === "localPlan"
-              ? `Saved as a grouped plan in ${destinationLabel.localPlan}.`
-              : `Saved to ${destinationLabel[savedTo]}. ${
-                  uploadedResult?.workoutsScheduled ?? draft.uploadResult?.workoutsScheduled ?? 0
-                } scheduled, ${
-                  uploadedResult?.workoutsCreated ?? draft.uploadResult?.workoutsCreated ?? 0
-                } saved to library.`}
-          </span>
-        </p>
-      ) : (
-        <CreationActions
-          draft={draft}
-          uploading={uploading}
-          onUpload={onUpload}
-          onEdit={onReview}
-        />
-      )}
-    </div>
-  );
-}
-
-function CoachDraftPreviewCard({
-  draft,
-  uploading,
-  uploaded,
-  onUpload,
-  onReview,
-  document
-}: {
-  draft: PlanDraftPreview;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (
-    destination: TrainingPlanDestination,
-    scheduleDate?: string,
-    keepInLibrary?: boolean
-  ) => void;
-  onReview?: () => void;
-  document?: TrainingPlanDocument;
-}) {
-  if (draft.artifactType === "workout") {
-    return (
-      <WorkoutPreviewCard
-        draft={draft}
-        uploading={uploading}
-        uploaded={uploaded}
-        onUpload={onUpload}
-      />
-    );
-  }
-
-  return (
-    <PlanPreviewCard
-      draft={draft}
-      document={document}
-      uploading={uploading}
-      uploaded={uploaded}
-      onUpload={onUpload}
-      onReview={onReview}
-    />
-  );
 }
 
 function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
@@ -1688,9 +756,6 @@ export function ChatView({
   const [currentSource, setCurrentSource] = useState<SourceInfo | null>(null);
   const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
   const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
-  const [selectedPlanDraftId, setSelectedPlanDraftId] = useState<
-    string | null
-  >(null);
   /**
    * The Creations panel starts closed and opens itself when the coach makes
    * something new — the one moment there is news in it. Every other time it is
@@ -1704,6 +769,8 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /** An update COROS refused because the plan changed there meanwhile. */
+  const [corosConflict, setCorosConflict] = useState<{ draftId: string; name: string } | null>(null);
   /**
    * Each plan card's document, by draft and edit: the weeks and days the card
    * draws come from what the draft becomes, not from its dates. `null` is a
@@ -1712,12 +779,8 @@ export function ChatView({
   const [planDocuments, setPlanDocuments] = useState<
     Record<string, TrainingPlanDocument | null>
   >({});
-  /** Whether the plan editor was opened from the popup, which it then reopens. */
-  const reopenCreationAfterEditRef = useRef(false);
   const planDocumentKeys = timeline.flatMap((entry) =>
-    entry.kind === "planDraft" &&
-    entry.draft.artifactType !== "workout" &&
-    !entry.draft.removedAt
+    entry.kind === "planDraft" && !entry.draft.removedAt
       ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}`]
       : []
   );
@@ -1739,6 +802,66 @@ export function ChatView({
         .catch(() => undefined);
     }
   }, [api, missingPlanDocuments]);
+  /**
+   * Every version of the creations in this conversation. Re-read whenever a
+   * card is added, edited or saved, which is when a version can appear.
+   */
+  const [artifactVersions, setArtifactVersions] = useState<PlanArtifactVersion[]>([]);
+  const artifactKey = timeline
+    .flatMap((entry) =>
+      entry.kind === "planDraft"
+        ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}:${entry.draft.uploadedAt ?? 0}`]
+        : []
+    )
+    .join(",");
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setArtifactVersions([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanArtifacts(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((versions) => {
+        if (live) setArtifactVersions(Array.isArray(versions) ? versions : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey]);
+  const versionIndex = creationVersions(artifactVersions);
+  /**
+   * Where each creation on COROS stands on the calendar, from this machine's
+   * plan cache (P1.6). Read again when a card changes or a plan is added.
+   */
+  const [calendarStates, setCalendarStates] = useState<PlanCalendarState[]>([]);
+  const [calendarRead, setCalendarRead] = useState(0);
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setCalendarStates([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanCalendarState(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((states) => {
+        if (live) setCalendarStates(Array.isArray(states) ? states : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey, calendarRead]);
+  const calendarOf = (draftId: string) => {
+    const artifactId = versionIndex.get(draftId)?.artifactId ?? draftId;
+    return creationCalendar(
+      calendarStates.find((state) => state.artifactId === artifactId),
+      localDayKey()
+    );
+  };
+  /** The version the calendar dialog is open for. */
+  const [calendarFor, setCalendarFor] = useState<string | null>(null);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
@@ -1847,10 +970,14 @@ export function ChatView({
     if (!pendingPrompt || !composerRef.current) {
       return;
     }
-    composerRef.current?.setDraft(pendingPrompt);
     onPendingPromptConsumed?.();
-    // Focus after the coach panel becomes visible.
-    requestAnimationFrame(() => composerRef.current?.focus());
+    if (typeof pendingPrompt === "string") {
+      composerRef.current?.setDraft(pendingPrompt);
+      // Focus after the coach panel becomes visible.
+      requestAnimationFrame(() => composerRef.current?.focus());
+      return;
+    }
+    void openAsked(pendingPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pendingPrompt,
@@ -1860,7 +987,46 @@ export function ChatView({
     chatSettings.provider
   ]);
 
+  /**
+   * What the athlete pointed at, waiting beside the composer until the next
+   * question goes (P1.7). Sent as a `planRefs` entry just before it.
+   */
+  const [pendingRefs, setPendingRefs] = useState<PlanRef[]>([]);
+  const refKey = (ref: PlanRef) =>
+    `${ref.draftId}|${ref.scope}|${ref.weekIndex ?? ""}|${ref.sessionKey ?? ""}`;
+  const addRef = (ref: PlanRef) => {
+    setPendingRefs((current) =>
+      current.some((item) => refKey(item) === refKey(ref)) ? current : [...current, ref].slice(-3)
+    );
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /**
+   * Coach opened from the Library about a plan it wrote: the conversation that
+   * wrote it, with the plan beside the composer. A conversation deleted since
+   * took the plan's drafts with it, so a new one starts from the plan's name.
+   */
+  const openAsked = async (request: CoachOpenRequest) => {
+    if (!api) return;
+    const sessionId = request.draftId
+      ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
+      : null;
+    if (sessionId) {
+      if (sessionId !== activeSessionIdRef.current) await loadSession(sessionId);
+      setPendingRefs(request.refs ?? []);
+    } else if (request.draftId) {
+      await handleNewChat();
+      setPendingRefs([]);
+      const name = request.refs?.[0]?.name;
+      if (name) composerRef.current?.setDraft(`About my plan "${name}": `);
+    }
+    if (request.prompt) composerRef.current?.setDraft(request.prompt);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
   const resetEphemeralChatState = () => {
+    // A reference belongs to the conversation it was picked in.
+    setPendingRefs([]);
     setUploadedPlans({});
     setDeletedWorkouts({});
     pendingCoachPromptsRef.current = [];
@@ -2636,6 +1802,8 @@ export function ChatView({
           setCurrentSource(sourceRef.current);
         } else if (payload.kind === "planDraft") {
           setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
+        } else if (payload.kind === "planEvent") {
+          setTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
         } else if (payload.kind === "workoutDelete") {
           setTimeline((prev) =>
             upsertWorkoutDeleteEntry(prev, payload.preview)
@@ -3265,7 +2433,9 @@ export function ChatView({
 
   const sendMessage = async (
     trimmed: string,
-    answeredPrompt?: { promptId: string; choiceId: string }
+    answeredPrompt?: { promptId: string; choiceId: string },
+    /** What the question is about, when a chip says so rather than the composer. */
+    aboutRefs?: PlanRef[]
   ): Promise<boolean> => {
     if (!api || !trimmed || streaming || exportingLatestActivity) return false;
     if (isLatestActivityFileRequest(trimmed)) {
@@ -3329,12 +2499,15 @@ export function ChatView({
           }
         : entry
     );
+    const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
           ...answeredTimeline,
+          ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
           { kind: "message", role: "user", content: trimmed }
         ];
+    if (refs.length && !aboutRefs) setPendingRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -3365,12 +2538,23 @@ export function ChatView({
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
-    const wireMessages = withPlanEdits(
+    // Every version the conversation's cards belong to, read now rather than
+    // from state: the list on screen may still be on its way, and the index is
+    // what tells the coach which draft_id is the newest.
+    const creationIds = persisted.flatMap((entry) =>
+      entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
+    );
+    const versions = creationIds.length
+      ? await api.getPlanArtifacts(creationIds).catch(() => artifactVersions)
+      : [];
+    if (activeRequestIdRef.current !== requestId) return true;
+    const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
-      persisted
+      persisted,
+      Array.isArray(versions) ? versions : []
     );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem);
@@ -3426,10 +2610,12 @@ export function ChatView({
     draftId: string,
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
-  ) => {
-    if (!api || uploadingDraftId) return;
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
+  ): Promise<UploadPlanResult | undefined> => {
+    if (!api || uploadingDraftId) return undefined;
     setUploadingDraftId(draftId);
+    setCorosConflict(null);
     onError(null);
     try {
       const result = await api.uploadTrainingPlanDraft(
@@ -3437,8 +2623,15 @@ export function ChatView({
         unitSystem,
         destination,
         scheduleDate,
-        keepInLibrary
+        keepInLibrary,
+        options
       );
+      // The plan changed on COROS since this version was made: nothing was
+      // written, and the athlete says which one stands (P1.6).
+      if (result.conflict) {
+        setCorosConflict({ draftId, name: result.planName });
+        return result;
+      }
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
           if (!entry.date) return [];
@@ -3516,15 +2709,24 @@ export function ChatView({
    */
   const handleRemovePlanDraft = (draftId: string) => {
     setOpenCreationId((current) => (current === draftId ? null : current));
-    const removed = planDrafts.find((draft) => draft.draftId === draftId);
-    // Unsaved, the draft goes too; saved, it stays, because the plan on COROS
-    // names it. The card is marked either way.
-    if (api && removed && !removed.uploadedAt && !removed.uploadResult && !uploadedPlans[draftId]) {
+    // A creation is removed whole: every version's card, or the one before
+    // the newest would unfold in its place.
+    const versionIds = new Set([
+      draftId,
+      ...(versionIndex.get(draftId)?.siblings.map((version) => version.draftId) ?? [])
+    ]);
+    const removed = planDrafts.filter((draft) => versionIds.has(draft.draftId));
+    const saved = removed.some(
+      (draft) => draft.uploadedAt || draft.uploadResult || uploadedPlans[draft.draftId]
+    ) || (versionIndex.get(draftId)?.siblings.some((version) => version.uploadedAt) ?? false);
+    // Unsaved, the drafts go too; saved, they stay, because the plan on COROS
+    // names one. The cards are marked either way.
+    if (api && removed.length > 0 && !saved) {
       void api.removePlanDraft(draftId).catch(() => undefined);
     }
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === draftId
+        entry.kind === "planDraft" && versionIds.has(entry.draft.draftId) && !entry.draft.removedAt
           ? { ...entry, draft: { ...entry.draft, removedAt: Date.now() } }
           : entry
       );
@@ -3539,22 +2741,44 @@ export function ChatView({
    * the card's identity for sync is kept (`...entry.draft` first). `editedAt`
    * is what shows the coach this version on the next turn.
    */
-  const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
-    setEditingPlanDraftId(null);
-    setEditingWorkoutDraftId(null);
-    if (reopenCreationAfterEditRef.current) setOpenCreationId(preview.draftId);
+  /*
+   * A version the athlete made — an edit saved from the editor, or an older
+   * version restored — goes at the end of the conversation, where it was made:
+   * a line saying what happened, which is also how the coach is told once
+   * rather than handed the whole plan on every turn after (P1.3), and then
+   * the new version's card, under which the one it replaced folds away.
+   */
+  const appendVersion = (
+    written: PlanVersionWritten,
+    action: "edited" | "restored" | "imported" | "removedOnCoros"
+  ) => {
+    const event: ChatEntry = {
+      kind: "planEvent",
+      event: {
+        eventId: crypto.randomUUID(),
+        artifactId: written.artifactId,
+        draftId: written.preview.draftId,
+        action,
+        author: action === "imported" || action === "removedOnCoros" ? "coros" : "athlete",
+        name: written.preview.name,
+        artifactType: written.preview.artifactType === "workout" ? "workout" : "plan",
+        fromVersion: written.fromVersion,
+        toVersion: written.toVersion,
+        ...(written.changes.length ? { changes: written.changes } : {}),
+        at: Date.now()
+      }
+    };
     setTimeline((prev) => {
-      const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-          ? { ...entry, draft: { ...entry.draft, ...preview } }
-          : entry
-      );
+      const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: written.preview }];
       persistHistory(activeSessionIdRef.current, next, true);
       return next;
     });
-    showToast(
-      `${preview.artifactType === "workout" ? "Workout" : "Plan"} updated. The coach will see your version on its next reply.`
-    );
+  };
+
+  const handlePlanDraftEdited = (written: PlanVersionWritten) => {
+    setEditingPlanDraftId(null);
+    setEditingWorkoutDraftId(null);
+    appendVersion(written, "edited");
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -3685,18 +2909,74 @@ export function ChatView({
   const planDrafts = timeline.flatMap((entry) =>
     entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft] : []
   );
-  const openCreation =
-    planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
-  const editingWorkout =
+  /** What the Creations list shows: each creation once, as its newest version. */
+  const listedCreations = planDrafts.filter((draft) =>
+    isLatestVersion(versionIndex, draft.draftId)
+  );
+  /* The transcript's preview is light; the steps a card reviews or edits come
+     from the draft's document. */
+  const documentOf = (draft: PlanDraftPreview) =>
+    planDocuments[`${draft.draftId}:${draft.editedAt ?? 0}`];
+  const withSources = (draft: PlanDraftPreview) => withDocumentSources(draft, documentOf(draft));
+  const documentForDraft = (draftId: string) => {
+    const card = planDrafts.find((draft) => draft.draftId === draftId);
+    return card ? documentOf(card) : undefined;
+  };
+  /* The one way into a creation's editor, from the card or the canvas. A
+     workout's editor needs its steps, which only the document has. */
+  const openCreationEditor = async (draftId: string) => {
+    const draft = planDrafts.find((item) => item.draftId === draftId);
+    if (!draft) return;
+    if (draft.artifactType === "workout" && !documentOf(draft)) return;
+    onError(null);
+    if (draft.artifactType === "workout") {
+      setEditingWorkoutDraftId(draftId);
+      return;
+    }
+    // A plan on COROS is read against COROS first (D12): an edit made in the
+    // Library comes in as the newest version, and the editor opens on that.
+    let target = draftId;
+    if (api && isOnCoros(versionIndex.get(draftId))) {
+      const sync = await api
+        .syncPlanFromCoros(draftId, unitSystem)
+        .catch((): PlanCorosSync => ({ kind: "current" }));
+      if (sync.kind !== "current") {
+        appendVersion(sync.written, sync.kind);
+        target = sync.written.preview.draftId;
+      }
+    }
+    setEditingPlanDraftId(target);
+  };
+  /*
+   * Opening a creation on COROS in the canvas asks the plan cache whether
+   * COROS has moved on — no request — and brings a newer COROS version in.
+   */
+  const openCreation = (draftId: string) => {
+    setOpenCreationId(draftId);
+    if (!api || !isOnCoros(versionIndex.get(draftId))) return;
+    void api
+      .syncPlanFromCoros(draftId, unitSystem, true)
+      .then((sync) => {
+        if (sync.kind !== "current") appendVersion(sync.written, sync.kind);
+      })
+      .catch(() => undefined);
+  };
+  /* An older version made the newest again: a new card, and a line saying
+     so where it happened, as an edit leaves one. */
+  const handleRestoreVersion = async (draftId: string) => {
+    if (!api) return;
+    onError(null);
+    try {
+      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : "Could not restore that version.");
+    }
+  };
+  const editingWorkoutDraft =
     editingWorkoutDraftId === null
       ? null
       : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
-  const openCreationKicker =
-    openCreation === null
-      ? ""
-      : openCreation.artifactType === "workout"
-        ? "One-off workout"
-        : "Training plan";
+  const editingWorkout = editingWorkoutDraft ? withSources(editingWorkoutDraft) : null;
 
   /**
    * Opening the panel is reserved for news, so this has to tell a creation
@@ -3714,13 +2994,11 @@ export function ChatView({
       seenPlanDraftIdsRef.current = new Set(ids);
       setPlanPanelOpen(false);
       setOpenCreationId(null);
-      setSelectedPlanDraftId(ids.at(-1) ?? null);
       return;
     }
     const fresh = ids.filter((id) => !seenPlanDraftIdsRef.current.has(id));
     if (fresh.length === 0) return;
     for (const id of fresh) seenPlanDraftIdsRef.current.add(id);
-    setSelectedPlanDraftId(fresh[fresh.length - 1] ?? null);
     setPlanPanelOpen(true);
     // `planDrafts` is rebuilt on every render; the id list is what actually
     // changes, and re-running on the array identity would reopen the panel on
@@ -4310,7 +3588,7 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          {planDrafts.length > 0 ? (
+          {listedCreations.length > 0 ? (
             <button
               type="button"
               className="chat-creations-pill"
@@ -4327,7 +3605,7 @@ function AnalysisSilentChip({
                 <PanelRightOpen size={13} aria-hidden="true" />
               )}
               Creations
-              <span className="chat-creations-count">{planDrafts.length}</span>
+              <span className="chat-creations-count">{listedCreations.length}</span>
             </button>
           ) : null}
           {isChatGptProvider ? (
@@ -4448,6 +3726,75 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "planRefs") {
+              return (
+                <div
+                  key={`refs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={refKey(ref)} className="chat-ref-chip">
+                      {ref.name}
+                      {ref.scope === "plan" ? "" : ` · ${ref.label}`}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
+            if (entry.kind === "planEvent") {
+              // A line where it happened, as the coach reads it; the card
+              // below it already shows what the creation is now.
+              const event = entry.event;
+              const what = event.artifactType === "workout" ? "Workout" : "Plan";
+              // Undo is a restore of the version this one replaced, offered
+              // only while it is still the newest: after that, undoing it
+              // would also undo whatever came since.
+              const eventVersion = versionIndex.get(event.draftId);
+              const undoTo =
+                api &&
+                event.author === "athlete" &&
+                event.fromVersion &&
+                eventVersion?.latest &&
+                !eventVersion.siblings.some((version) => version.uploadedAt)
+                  ? eventVersion.siblings.filter((version) => version.version === event.fromVersion).at(-1)
+                      ?.draftId
+                  : undefined;
+              const verb =
+                event.action === "edited"
+                  ? "Edited by you"
+                  : event.action === "restored"
+                    ? "Restored by you"
+                    : event.action === "imported"
+                      ? "Changed in the Library"
+                      : "Deleted on COROS";
+              return (
+                <div
+                  key={`${event.eventId}#${index}`}
+                  className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">{what}</span>
+                  <span className="chat-asked-question">{event.name}</span>
+                  <span className="chat-version-note">
+                    {verb}
+                    {event.changes?.length ? ` · ${event.changes.join(" · ")}` : ""}
+                  </span>
+                  {undoTo ? (
+                    <button
+                      type="button"
+                      className="chat-local-action chat-plan-event-undo"
+                      onClick={() => void handleRestoreVersion(undoTo)}
+                    >
+                      Undo
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
+
             if (entry.kind === "planDraft") {
               // Removed by the athlete: the entry stays so the saved array
               // keeps its length, but nothing draws it.
@@ -4455,6 +3802,25 @@ function AnalysisSilentChip({
                 return null;
               }
               const draft = entry.draft;
+              const versionInfo = versionIndex.get(draft.draftId);
+              // An older version folds to a line: the newest one below it is
+              // the card with buttons, and two full copies of one plan read as
+              // two plans.
+              if (versionInfo && !versionInfo.latest) {
+                return (
+                  <div
+                    key={`${draft.draftId}#${index}`}
+                    className="chat-row chat-row-assistant chat-asked-row chat-version-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">
+                      {draft.artifactType === "workout" ? "Workout" : "Plan"}
+                    </span>
+                    <span className="chat-asked-question">{draft.name}</span>
+                    <span className="chat-version-note">{supersededLine(versionInfo)}</span>
+                  </div>
+                );
+              }
               const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
               // One copy at every window width, and nothing measured: the
               // copy that used to live here was chosen by a width test, and
@@ -4471,33 +3837,50 @@ function AnalysisSilentChip({
                   <div className="chat-bubble chat-bubble-plan">
                     <CoachCreationCard
                       draft={draft}
+                      version={versionInfo?.version}
+                      editing={draft.draftId === editingPlanDraftId || draft.draftId === editingWorkoutDraftId}
                       document={planDocuments[documentKey] ?? undefined}
                       uploading={uploadingDraftId === draft.draftId}
                       uploaded={uploadedPlans[draft.draftId]}
-                      onUpload={(destination, scheduleDate, keepInLibrary) =>
+                      onUpload={(destination, scheduleDate, keepInLibrary, options) =>
                         void handleUploadPlanDraft(
                           draft.draftId,
                           destination,
                           scheduleDate,
-                          keepInLibrary
+                          keepInLibrary,
+                          options
                         )
                       }
+                      onCoros={isOnCoros(versionInfo)}
+                      refinements={refinementChips(
+                        draft,
+                        versionInfo?.siblings.find((item) => item.draftId === draft.draftId)?.refinements
+                      )}
+                      onRefine={
+                        api && !streaming
+                          ? (text) =>
+                              void sendMessage(text, undefined, [
+                                {
+                                  artifactId: versionInfo?.artifactId ?? draft.draftId,
+                                  draftId: draft.draftId,
+                                  ...(versionInfo ? { version: versionInfo.version } : {}),
+                                  name: draft.name,
+                                  artifactType: draft.artifactType === "workout" ? "workout" : "plan",
+                                  scope: "plan",
+                                  label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
+                                }
+                              ])
+                          : undefined
+                      }
+                      calendar={calendarOf(draft.draftId)}
+                      onCalendar={api ? () => setCalendarFor(draft.draftId) : undefined}
                       onEdit={
-                        api && (draft.artifactType !== "workout" || draft.entries[0]?.source)
-                          ? () => {
-                              onError(null);
-                              reopenCreationAfterEditRef.current = false;
-                              if (draft.artifactType === "workout") {
-                                setEditingWorkoutDraftId(draft.draftId);
-                              } else {
-                                setEditingPlanDraftId(draft.draftId);
-                              }
-                            }
+                        api && (draft.artifactType !== "workout" || documentOf(draft))
+                          ? () => void openCreationEditor(draft.draftId)
                           : undefined
                       }
                       onOpen={() => {
-                        setSelectedPlanDraftId(draft.draftId);
-                        setOpenCreationId(draft.draftId);
+                        openCreation(draft.draftId);
                       }}
                     />
                   </div>
@@ -4697,6 +4080,27 @@ function AnalysisSilentChip({
         </div>
       </div>
 
+          {pendingRefs.length ? (
+            <div className="chat-refs-pending" aria-label="Asking about">
+              <span className="chat-asked-kicker">Asking about</span>
+              {pendingRefs.map((ref) => (
+                <span key={refKey(ref)} className="chat-ref-chip">
+                  {ref.name}
+                  {ref.scope === "plan" ? "" : ` · ${ref.label}`}
+                  <button
+                    type="button"
+                    className="chat-ref-remove"
+                    aria-label={`Stop asking about ${ref.scope === "plan" ? ref.name : ref.label}`}
+                    onClick={() =>
+                      setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
+                    }
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           <ChatComposer
             ref={composerRef}
             providerControls={providerControls}
@@ -4713,95 +4117,42 @@ function AnalysisSilentChip({
             onStop={handleStop}
           />
         </div>
-        {planPanelOpen && planDrafts.length > 0 ? (
-          <aside
-            id="chat-creations-panel"
-            className="chat-plan-panel"
-            aria-label="Coach creations"
-          >
-            <header className="chat-plan-list-header">
-              <div>
-                <span className="chat-plan-panel-icon">
-                  <BookOpen size={15} aria-hidden="true" />
-                </span>
-                <div>
-                  <strong>Coach creations</strong>
-                  <span>Plans and one-off workouts</span>
-                </div>
-              </div>
-              <div className="chat-plan-list-header-end">
-                <strong className="chat-plan-list-count">
-                  {planDrafts.length}
-                </strong>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Hide Coach creations"
-                  title="Hide Coach creations"
-                  onClick={() => setPlanPanelOpen(false)}
-                >
-                  <PanelRightClose size={16} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-            <ol className="chat-plan-list">
-              {planDrafts.map((draft, index) => {
-                const status = creationStatus(draft);
-                const isWorkout = draft.artifactType === "workout";
-                const primarySport = draft.entries[0]?.sport;
-                const SportIcon = sportTheme(primarySport).icon;
-                const selected = draft.draftId === selectedPlanDraftId;
-
-                return (
-                  <li key={draft.draftId}>
-                    <button
-                      type="button"
-                      className={`chat-plan-list-item${
-                        selected ? " is-selected" : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedPlanDraftId(draft.draftId);
-                        setOpenCreationId(draft.draftId);
-                      }}
-                      aria-haspopup="dialog"
-                      aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-                    >
-                      <span
-                        className="chat-plan-list-sport"
-                        style={planSportStyle(primarySport)}
-                      >
-                        <SportIcon
-                          size={15}
-                          strokeWidth={2}
-                          aria-hidden="true"
-                        />
-                      </span>
-                      <span className="chat-plan-list-copy">
-                        <span className="chat-plan-list-kicker">
-                          {isWorkout ? "One-off workout" : "Training plan"}
-                        </span>
-                        <strong>
-                          {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
-                        </strong>
-                        <span className="chat-plan-list-meta">
-                          {!isWorkout ? (
-                            <span>
-                              {draft.entries.length}{" "}
-                              {draft.entries.length === 1 ? "session" : "sessions"}
-                            </span>
-                          ) : null}
-                          <span data-status={status.saved ? "saved" : "draft"}>
-                            {status.label}
-                          </span>
-                        </span>
-                      </span>
-                      <ChevronRight size={15} aria-hidden="true" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </aside>
+        {(planPanelOpen || openCreationId) && listedCreations.length > 0 ? (
+          <Suspense fallback={null}>
+            <CoachCanvas
+              api={api}
+              artifactId={openCreationId}
+              creations={listedCreations}
+              cards={planDrafts}
+              versionIndex={versionIndex}
+              documentFor={documentForDraft}
+              uploadingDraftId={uploadingDraftId}
+              editingDraftId={editingPlanDraftId ?? editingWorkoutDraftId}
+              planSportStyle={planSportStyle}
+              onOpen={(draftId) => openCreation(draftId)}
+              onBack={() => {
+                setOpenCreationId(null);
+                setPlanPanelOpen(true);
+              }}
+              onClose={() => {
+                setOpenCreationId(null);
+                setPlanPanelOpen(false);
+              }}
+              onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
+                void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
+              }
+              onEdit={api ? (draftId) => void openCreationEditor(draftId) : undefined}
+              onRestore={api ? (draftId) => void handleRestoreVersion(draftId) : undefined}
+              onRemove={(draftId) => {
+                handleRemovePlanDraft(draftId);
+                setOpenCreationId(null);
+              }}
+              onViewInChat={(draftId) => handleScrollToPlanChat(draftId)}
+              onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
+              calendarOf={calendarOf}
+              onAsk={addRef}
+            />
+          </Suspense>
         ) : null}
       </div>
       <ChatSettingsModal {...settingsModalProps} />
@@ -4813,71 +4164,50 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
-      <CoachCreationModal
-        draft={openCreation}
-        kicker={openCreationKicker}
-        onClose={() => setOpenCreationId(null)}
-        onViewInChat={() => {
-          if (!openCreation) return;
-          setOpenCreationId(null);
-          handleScrollToPlanChat(openCreation.draftId);
-        }}
-        onRemove={() => {
-          if (!openCreation) return;
-          handleRemovePlanDraft(openCreation.draftId);
-        }}
-      >
-        {openCreation ? (
-          <CoachDraftPreviewCard
-            key={openCreation.draftId}
-            draft={openCreation}
-            document={
-              planDocuments[`${openCreation.draftId}:${openCreation.editedAt ?? 0}`] ??
-              undefined
-            }
-            uploading={uploadingDraftId === openCreation.draftId}
-            uploaded={uploadedPlans[openCreation.draftId]}
-            onUpload={(destination, scheduleDate, keepInLibrary) =>
-              void handleUploadPlanDraft(
-                openCreation.draftId,
-                destination,
-                scheduleDate,
-                keepInLibrary
-              )
-            }
-            onReview={
-              api &&
-              (openCreation.artifactType !== "workout" || openCreation.entries[0]?.source)
-                ? () => {
-                    /* The card's modal steps aside for the editor — both
-                       close on Escape, and the card sits above the editor's
-                       layer — and comes back when the editor closes. */
-                    onError(null);
-                    setOpenCreationId(null);
-                    reopenCreationAfterEditRef.current = true;
-                    if (openCreation.artifactType === "workout") {
-                      setEditingWorkoutDraftId(openCreation.draftId);
-                    } else {
-                      setEditingPlanDraftId(openCreation.draftId);
-                    }
-                  }
-                : undefined
-            }
+      {api && calendarFor ? (
+        <Suspense fallback={null}>
+          <CoachCalendarDialog
+            api={api}
+            draftId={calendarFor}
+            saved={Boolean(
+              planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadedAt ||
+                planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadResult ||
+                uploadedPlans[calendarFor]
+            )}
+            onSave={async () => {
+              const result = await handleUploadPlanDraft(calendarFor, "nativePlan");
+              return Boolean(result && !result.conflict);
+            }}
+            onClose={() => setCalendarFor(null)}
+            onAdded={() => {
+              setCalendarFor(null);
+              setCalendarRead((value) => value + 1);
+            }}
+            onError={onError}
           />
-        ) : null}
-      </CoachCreationModal>
+        </Suspense>
+      ) : null}
+      {corosConflict ? (
+        <Suspense fallback={null}>
+          <CorosConflictDialog
+            name={corosConflict.name}
+            onOverwrite={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { overwrite: true })
+            }
+            onSaveAsNew={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { asNew: true })
+            }
+            onCancel={() => setCorosConflict(null)}
+          />
+        </Suspense>
+      ) : null}
       {api && editingPlanDraftId ? (
         <Suspense fallback={null}>
           <CoachPlanEditor
             api={api}
             draftId={editingPlanDraftId}
             onSaved={handlePlanDraftEdited}
-            onClose={() => {
-              if (reopenCreationAfterEditRef.current) {
-                setOpenCreationId(editingPlanDraftId);
-              }
-              setEditingPlanDraftId(null);
-            }}
+            onClose={() => setEditingPlanDraftId(null)}
             onError={onError}
           />
         </Suspense>
@@ -4889,12 +4219,7 @@ function AnalysisSilentChip({
             draft={editingWorkout}
             workout={editingWorkout.entries[0].source}
             onSaved={handlePlanDraftEdited}
-            onClose={() => {
-              if (reopenCreationAfterEditRef.current) {
-                setOpenCreationId(editingWorkout.draftId);
-              }
-              setEditingWorkoutDraftId(null);
-            }}
+            onClose={() => setEditingWorkoutDraftId(null)}
             onError={onError}
           />
         </Suspense>

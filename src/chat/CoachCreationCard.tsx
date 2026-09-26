@@ -1,6 +1,7 @@
 import { CircleCheck, Maximize2 } from "lucide-react";
 import type {
   PlanDraftPreview,
+  PlanDraftSaveOptions,
   TrainingPlanDestination,
   TrainingPlanDocument,
   UploadPlanResult,
@@ -19,6 +20,7 @@ import {
 import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
+import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 
 export interface CreationFigures {
@@ -34,6 +36,21 @@ export interface CreationFigures {
 }
 
 /**
+ * A plan whose every session is dated, read as starting on the Monday of its
+ * first date, so a drawing names the days it will fall on. The date is only
+ * for the drawing: a plan has no start date of its own.
+ */
+export function datedForReading(document: TrainingPlanDocument): TrainingPlanDocument {
+  const dated = document.entries
+    .map((entry) => parsePlanDay(entry.workout.schedule_date))
+    .filter((date): date is Date => Boolean(date))
+    .sort((left, right) => left.valueOf() - right.valueOf());
+  return dated.length === document.entries.length && dated[0]
+    ? { ...document, startDate: formatPlanDay(mondayOf(dated[0]), true) }
+    : document;
+}
+
+/**
  * The card's figures, read off the plan document the draft becomes — the same
  * `readPlan` the Library's reader draws from, so a plan's weeks, days and
  * peak cannot say one thing here and another there.
@@ -43,15 +60,7 @@ export interface CreationFigures {
  * is only for the drawing: a plan has no start date of its own.
  */
 export function creationFigures(document: TrainingPlanDocument): CreationFigures {
-  const dated = document.entries
-    .map((entry) => parsePlanDay(entry.workout.schedule_date))
-    .filter((date): date is Date => Boolean(date))
-    .sort((left, right) => left.valueOf() - right.valueOf());
-  const drawn: TrainingPlanDocument =
-    dated.length === document.entries.length && dated[0]
-      ? { ...document, startDate: formatPlanDay(mondayOf(dated[0]), true) }
-      : document;
-  const weeks = readPlan(drawn).weeks;
+  const weeks = readPlan(datedForReading(document)).weeks;
   const busy = weeks.filter((week) => week.summary.workouts > 0);
   const counts = busy.map((week) => week.summary.workouts);
   const low = counts.length ? Math.min(...counts) : 0;
@@ -106,14 +115,23 @@ function WeekStrip({ week }: { week: PlanReaderWeek }) {
  */
 export function CoachCreationCard({
   draft,
+  version,
   document,
   uploading,
   uploaded,
   onUpload,
   onEdit,
+  editing = false,
+  onCoros = false,
+  calendar,
+  onCalendar,
+  refinements,
+  onRefine,
   onOpen
 }: {
   draft: PlanDraftPreview;
+  /** Which version of its creation this is; shown from the second on. */
+  version?: number;
   /** The plan the draft becomes; absent while it loads, or for a workout. */
   document?: TrainingPlanDocument;
   uploading: boolean;
@@ -121,9 +139,22 @@ export function CoachCreationCard({
   onUpload: (
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => void;
   onEdit?: () => void;
+  /** Its editor is open: the way on is back into it. */
+  editing?: boolean;
+  /** Another version of it is a COROS plan, which saving this one updates. */
+  onCoros?: boolean;
+  /** Where the plan stands on the calendar, when COROS is running it (P1.6). */
+  calendar?: CreationCalendar;
+  /** Opens the calendar dialog for this version. */
+  onCalendar?: () => void;
+  /** The follow-ups offered under the card (P1.8). */
+  refinements?: readonly string[];
+  /** Sends a follow-up as a question about this creation; absent while Coach is answering. */
+  onRefine?: (text: string) => void;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -137,7 +168,8 @@ export function CoachCreationCard({
             destination: uploaded.destination
           }
         }
-      : draft
+      : draft,
+    onCoros
   );
   const figures = !isWorkout && document ? creationFigures(document) : undefined;
   const entry = draft.entries[0];
@@ -152,6 +184,7 @@ export function CoachCreationCard({
         <div>
           <span className="chat-creation-kicker">
             {isWorkout ? "Workout" : "Training plan"}
+            {version && version > 1 ? ` · v${version}` : ""}
           </span>
           <h4>{draft.name}</h4>
           {showSummary ? (
@@ -160,7 +193,7 @@ export function CoachCreationCard({
         </div>
         <div className="chat-creation-head-aside">
           <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
-            {status.label}
+            {calendar?.running && status.saved ? "On calendar" : status.label}
           </span>
           <button
             type="button"
@@ -209,21 +242,45 @@ export function CoachCreationCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {status.label === "On COROS"
+            {calendar?.running && status.saved
+              ? `On your COROS calendar${calendar.line ? ` · ${calendar.line}` : ""}.`
+              : status.label === "On COROS"
               ? `Saved to your COROS plans as “${draft.name}”.`
               : status.label === "In library"
                 ? "Saved to your COROS Workout Library."
                 : `${status.label}.`}
           </span>
         </p>
-      ) : (
-        <CreationActions
-          draft={draft}
-          uploading={uploading}
-          onUpload={onUpload}
-          onEdit={onEdit}
-        />
-      )}
+      ) : null}
+      <CreationActions
+        draft={
+          status.saved && !draft.uploadResult && uploaded
+            ? { ...draft, uploadedAt: draft.uploadedAt ?? 1 }
+            : draft
+        }
+        uploading={uploading}
+        onUpload={onUpload}
+        onEdit={onEdit}
+        editing={editing}
+        onCoros={onCoros || (status.saved && status.label === "On COROS")}
+        onCalendar={onCalendar}
+        onCalendarNow={calendar?.running ?? false}
+      />
+      {refinements?.length && !editing ? (
+        <div className="chat-refine" aria-label="Ask Coach to change it">
+          {refinements.map((text) => (
+            <button
+              key={text}
+              type="button"
+              className="chat-refine-chip"
+              disabled={!onRefine}
+              onClick={() => onRefine?.(text)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
     </article>
   );

@@ -339,6 +339,11 @@ import {
   uploadTrainingPlanDraft,
   editWorkoutDraft,
   removePlanDraft,
+  listPlanArtifactVersions,
+  restorePlanVersion,
+  syncPlanFromCoros,
+  listPlanCalendarStates,
+  findChatSessionForDraft,
   editPlanDraft,
   generateTrainingPlan,
   outlineTrainingPlan,
@@ -355,7 +360,6 @@ import {
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
 import {
-  hydratePlanDraftStoreFromDatabase,
   pruneDeleteRequestStore
 } from "./chatWorkoutTools";
 import {
@@ -788,7 +792,6 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
-  hydratePlanDraftStoreFromDatabase();
   pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
@@ -1853,23 +1856,37 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:planDraftDocument", (_event, draftId: string) => getPlanDraftDocument(draftId));
   ipcMain.handle(
     "chat:editPlanDraft",
-    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem) =>
-      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem))
+    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
-  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean) =>
+  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean, options?: import("./types").PlanDraftSaveOptions) =>
     uploadTrainingPlanDraft(
       draftId,
       normalizeUnitSystem(unitSystem),
       destination,
       scheduleDate,
-      keepInLibrary === true
+      keepInLibrary === true,
+      options
     )
+  );
+  ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>
+    listPlanArtifactVersions(draftIds)
+  );
+  ipcMain.handle("chat:findDraftSession", (_event, draftId: string) => findChatSessionForDraft(draftId));
+  ipcMain.handle("chat:planCalendarState", (_event, draftIds: string[]) =>
+    listPlanCalendarStates(draftIds)
+  );
+  ipcMain.handle("chat:syncPlanFromCoros", (_event, draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) =>
+    syncPlanFromCoros(draftId, normalizeUnitSystem(unitSystem), cacheOnly === true)
+  );
+  ipcMain.handle("chat:restorePlanVersion", (_event, draftId: string, unitSystem: UnitSystem) =>
+    restorePlanVersion(draftId, normalizeUnitSystem(unitSystem))
   );
   ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
     removePlanDraft(draftId)
   );
-  ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem) =>
-    editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem))
+  ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+    editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
 
   ipcMain.handle("chat:confirmWorkoutDelete", (_event, requestId: string) =>

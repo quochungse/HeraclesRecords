@@ -1807,7 +1807,16 @@ export interface ChatSettings {
   customInstructions?: string;
   /** The rolling-summary window for chat and analyses alike. */
   compactContext: CompactContextSettings;
+  /**
+   * Whether Coach may attach a workout card it was not asked for, when it
+   * recommends a specific session (P1.9, D4). `auto` is on for the Claude
+   * providers, whose prompt cache makes the extra tool rounds cheap, and off
+   * for the rest.
+   */
+  inlineSuggestions?: InlineSuggestionsMode;
 }
+
+export type InlineSuggestionsMode = "auto" | "on" | "off";
 
 /**
  * What a compaction pass decided, as the renderer sees it.
@@ -2437,6 +2446,12 @@ export type ChatStreamInfo =
       requestId: string;
       kind: "planDraft";
       draft: PlanDraftPreview;
+    }
+  | {
+      requestId: string;
+      /** Something happened to a creation during the turn — it changed on COROS (P1.6). */
+      kind: "planEvent";
+      event: PlanEvent;
     }
   | {
       requestId: string;
@@ -3122,6 +3137,134 @@ export interface PlanDraftPreview {
   editedAt?: number;
 }
 
+/**
+ * What the athlete pointed at when asking (docs/coach-plan-canvas.md, P1.7):
+ * a creation, a week of it or one session. Carried as an anchor just before
+ * the question, so the coach is told what "this" is where it was asked.
+ */
+export interface PlanRef {
+  artifactId: string;
+  draftId: string;
+  version?: number;
+  name: string;
+  artifactType: "plan" | "workout";
+  scope: "plan" | "week" | "session";
+  weekIndex?: number;
+  sessionKey?: string;
+  /** What is pointed at, as it is read: "Week 6 (2–8 Nov) · Sun · Long run". */
+  label: string;
+}
+
+/** Coach opened from elsewhere with something to talk about (P1.7). */
+export interface CoachOpenRequest {
+  /** Text for the composer. */
+  prompt?: string;
+  /** A Coach creation; its conversation is opened when it can be found. */
+  draftId?: string;
+  refs?: PlanRef[];
+}
+
+/**
+ * Something that happened to a coach's creation that the coach did not do —
+ * the athlete edited it, restored an older version, or it changed on COROS
+ * (docs/coach-plan-canvas.md, P1.3). An anchor in the transcript, at the
+ * point it happened, so the coach is told once and in order rather than
+ * handed the whole plan again on every turn; what changed is in the table.
+ */
+export interface PlanEvent {
+  eventId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  /** The version the event left the creation at. */
+  draftId: string;
+  action: "edited" | "restored" | "imported" | "removedOnCoros";
+  author: "athlete" | "coros";
+  /** The creation's name when it happened. */
+  name: string;
+  artifactType: "plan" | "workout";
+  fromVersion?: number;
+  toVersion?: number;
+  /** What changed, a line each; absent where nothing measured it. */
+  changes?: string[];
+  /** Epoch milliseconds. */
+  at: number;
+}
+
+/**
+ * A version the athlete made — an edit saved from the editor (P1.5), or an
+ * older version restored (P1.4): its card, and what it changed against the
+ * version it replaced.
+ */
+export interface PlanVersionWritten {
+  kind: "written";
+  preview: PlanDraftPreview;
+  artifactId: string;
+  fromVersion: number;
+  toVersion: number;
+  changes: string[];
+}
+
+/**
+ * An edit begun on a version something has since replaced — Coach revised it,
+ * or it changed on another machine. Nothing was written; the athlete decides.
+ */
+export interface PlanVersionConflict {
+  kind: "conflict";
+  newest: { draftId: string; version: number; author: "coach" | "athlete" | "coros" };
+}
+
+export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
+
+/**
+ * A creation on COROS read against COROS (P1.6, D12): unchanged there, or
+ * changed — then its COROS form is the creation's newest version — or
+ * deleted there, which leaves it a proposal to save again.
+ */
+/**
+ * Where a Coach plan on COROS stands on the calendar (P1.6): COROS's running
+ * copy of it, as the plan cache holds it, and the matches of what was done
+ * against it — read from this machine, at no cost.
+ */
+export interface PlanCalendarState {
+  artifactId: string;
+  remotePlanId: string;
+  running?: TrainingPlanDocument;
+  matches: TrainingActivityMatch[];
+}
+
+export type PlanCorosSync =
+  | { kind: "current" }
+  | { kind: "imported" | "removedOnCoros"; written: PlanVersionWritten };
+
+/**
+ * One version of a coach's creation, as the conversation lists them
+ * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own
+ * and a `planDraft` entry in the transcript with the same `draftId`; this is
+ * what groups them.
+ */
+export interface PlanArtifactVersion {
+  draftId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  version: number;
+  /** Who made this version: the coach, the athlete in an editor, or COROS (a change made in the Library). */
+  author: "coach" | "athlete" | "coros";
+  name: string;
+  createdAt: number;
+  parentDraftId?: string;
+  uploadedAt?: number;
+  /** Changed in place by a build before versions — on another machine, say. */
+  editedAt?: number;
+  /** What this version changed, in its author's words. */
+  changeSummary?: string;
+  /** The COROS plan this version was saved as, `coros:<id>`. */
+  remotePlanId?: string;
+  /** The version that followed the plan's deletion on COROS; it has no plan there. */
+  detached?: boolean;
+  /** Follow-ups Coach offered with this version, as chips (P1.8). */
+  refinements?: string[];
+}
+
 export interface PlanWorkoutEntryInput {
   key: string;
   name: string;
@@ -3359,6 +3502,18 @@ export interface UploadPlanResult {
   /** The COROS plan it became, for a plan saved whole. */
   planId?: string;
   remoteWrites?: string[];
+  /**
+   * An update refused because the plan changed on COROS since this version
+   * was made (P1.6): nothing was written, and the athlete decides whether to
+   * write over it or save a new plan.
+   */
+  conflict?: { currentVersion?: number; expectedVersion: number };
+}
+
+/** How a plan version is saved to COROS (P1.6): over a plan that changed there, or as a new one. */
+export interface PlanDraftSaveOptions {
+  asNew?: boolean;
+  overwrite?: boolean;
 }
 
 export interface TrainingHubScheduledWorkoutEntry {
@@ -3639,6 +3794,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | PersistedChatOpaqueEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
+  | { kind: "planEvent"; event: PlanEvent }
+  | { kind: "planRefs"; refs: PlanRef[] }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

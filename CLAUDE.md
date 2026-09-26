@@ -398,7 +398,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   must name all three scopes** — `.training-library-view`, `.tl-plan-modal-backdrop` (the editor
   is portalled there) and `.tl-dialog-backdrop` (the builder portals to `<body>`, and the discard
   question it asks through the plan's `ConfirmDialog` sits outside both) — or the control draws as
-  the platform's grey button; and the editor's shortcuts listen on the window, gated on `layer`,
+  the platform's grey button. Coach's canvas (`CoachCanvas`, `.chat-canvas`) reads plans with the
+  reader's week cards and takes the library's **tokens** block as a fourth scope, but no control
+  rule, since it edits nothing; without the tokens its day wells drew as the browser's black
+  dashed border. And the editor's shortcuts listen on the window, gated on `layer`,
   because an undo remounts the focused session and a handler on the editor's element then hears
   nothing. Calendar actions are not in the editor (they need a saved plan); saving lands on the
   reader. A new plan opens **named** (`defaultPlanName`: "New
@@ -479,12 +482,61 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`chat_plan_drafts`), not a library draft, and not listed on the Plans tab. The card's Training
   Plan destination saves it to COROS as one plan (`origin: "coach"`, the coach's `description` as
   the overview, its `week_stages` as COROS's). **Edit plan first opens the plan editor over the
-  conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and saves back into the
-  coach's own draft through `chat:editPlanDraft` — same draft id, same card, dates kept from the
-  coach's first Monday, an undated plan's arrangement kept as `layout`. The edited card carries
-  `editedAt`, and `withPlanEdits` states that version to the coach in front of the athlete's next
-  question (in the chat and in analysis runs), because the coach otherwise advises about the
-  version it wrote. Drafts are deleted with their conversation; the 24-hour prune is gone.
+  conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and a save is the
+  creation's **next version**, by the athlete, through `chat:editPlanDraft` (a workout through
+  `chat:editWorkoutDraft` from `CoachWorkoutEditor`) — dates kept from the coach's first Monday,
+  an undated plan's arrangement kept as `layout`; the version it replaced is left as it was. A
+  save begun on a version since replaced answers `conflict` and writes nothing until the athlete
+  picks Replace with my edit / Keep the newer version / Keep editing (`NewerVersionDialog`,
+  `replaceNewer`). The new card carries `editedAt`, and the edit leaves a **`planEvent`** — with
+  an Undo while its version is the newest, which restores the one before — where it happened — an anchor kind, stated to
+  the coach once on the athlete's next message by `toWireMessages` — rather than the whole plan
+  restated on every turn. **Every turn, chat and analysis, carries `creationIndex`**
+  (`chatContextCompaction.ts`): a line per creation still in the conversation, its newest
+  version's draft id, who made it and whether it is saved, read from `chat:planArtifacts` because
+  every version is a card and a row of its own. The coach reads one back with `get_plan_draft` and
+  changes one with `revise_training_plan` — operations, not the plan again — which writes the next
+  version and folds the old card to a line; a read-only run may do neither of the writes
+  (docs/coach-plan-canvas.md, P1.1–P1.3). **A plan saved to COROS stays the conversation's to
+  change** (P1.6): the version keeps the plan as COROS read it back, keyed as the coach keyed it,
+  and a later version carries its COROS identity — the plan's id and version, each session's
+  `idInPlan`, and the untouched sessions' programs — so its primary button is **Update COROS
+  plan** (`plan/update`, checked against the version it was made from, a conflict asked as the
+  Library asks it). A saved one-off workout is not changed from the conversation: nothing on
+  COROS would be updated. **A change made on COROS comes back** (D12, `syncPlanDraftFromCoros`):
+  before an edit or a revision, and from the plan cache when the canvas opens, a creation whose
+  newest version is the saved one is read against COROS; a newer COROS copy becomes its newest
+  version (`author: coros`, saved, sessions re-keyed to the coach's keys by `idInPlan`) with a
+  `planEvent`, and a plan deleted there leaves a version with no COROS identity, saved next as a
+  new plan. An unsaved version is never synced over: it is checked when it is sent. **It goes on
+  the calendar from the conversation** through the Library's own `TrainingPlanCalendarDialog`
+  (`CoachCalendarDialog`): an unsaved version is previewed as `chat:<draftId>`, which
+  `previewPlanOnCalendar` reads through a reader the chat registers (`setChatPlanReader` — the
+  two modules must not import each other), and is saved first, once. The card says where it
+  stands from `chat:planCalendarState` — the running copy in `coros_plan_cache` and the stored
+  matches, no request — in the Library's own compliance words (`creationCalendar`).
+  **A question can point at what it is about** (P1.7): Ask Coach on the canvas — the plan, a
+  week (`WeekCard.onAsk`) or the session open — puts a chip by the composer, and sending it
+  writes a **`planRefs`** anchor just before the question, which `toWireMessages` folds into that
+  question for the model. The Library reader's ⋯ offers **Ask Coach about this plan** for a plan
+  Coach wrote, opening the conversation it came from (`chat:findDraftSession`, by any version's
+  draft id) — or, when that conversation is gone, a new one with no chip, since the drafts went
+  with it. **Under a creation, follow-ups** (P1.8): the chips Coach offered with that version
+  (`suggested_refinements`, kept in the row's `refinements_json`) or a set that fits its kind
+  (`refinementChips`); a press sends the chip's words as a question about the creation.
+  **Coach may attach up to two workout cards unasked** (P1.9, `chat.coach.inlineSuggestions`:
+  Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
+  a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
+  where an answer that overdoes it shows.
+  **A creation is read in the canvas** (`CoachCanvas`,
+  lazy with the library's stylesheet), which replaced the Creations list and its popup: the
+  index of creations, or one open beside the conversation — a sheet over it below 1100px — with
+  the reader's ridge, week cards and session view, a version picker, a Versions tab whose lines
+  come from `electron/planDiff.ts` (node-free, shared with `restorePlanDraftVersion`'s
+  `planEvent`), and Restore, which writes the old content as a new version. Its buttons and the
+  card's come from one function, `artifactActions`. The composer is a container
+  (`chat-composer`), because the canvas narrows the conversation on a wide window too.
+  Drafts are deleted with their conversation; the 24-hour prune is gone.
   **The AI plan generator (`TrainingPlanGenerator`) is two turns of its own, not a chat message.**
   Four steps: Goal (a race — its day decides the length and ends the plan — a base, a comeback,
   hybrid, or "Something else" in the athlete's words; a length Coach may choose), Your week (days

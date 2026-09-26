@@ -186,4 +186,60 @@ function throughWindow(json, edit = (timeline) => timeline) {
   assert.ok(saved[3].mrev > row[3].mrev, "and outranks the unanswered copy");
 }
 
+// A planEvent (P1.3) is a kind this build knows: parsed, not wrapped as
+// opaque, and carried through all four rebuilds with a field it does not know.
+{
+  const event = {
+    kind: "planEvent",
+    mid: "1-00000000000a",
+    mrev: "1-00000000000a",
+    event: {
+      eventId: "e1",
+      artifactId: "d1",
+      draftId: "d2",
+      action: "restored",
+      author: "athlete",
+      name: "Base block",
+      artifactType: "plan",
+      fromVersion: 3,
+      toVersion: 4,
+      changes: ["Long run back to Saturday"],
+      at: 12,
+      fromLaterBuild: "kept"
+    },
+    alsoLater: 1
+  };
+  const [parsed] = parseChatTranscriptJson(JSON.stringify([event]));
+  assert.equal(parsed.kind, "planEvent", "known, not opaque");
+  assert.deepEqual(parsed.event, event.event, "every field of the event, the unknown one too");
+  assert.equal(parsed.alsoLater, 1, "and the entry's own unknown field");
+  const back = toPersistedEntries(fromPersistedEntries([parsed]));
+  assert.deepEqual(back[0].event, event.event, "the renderer's round trip keeps it");
+  assert.equal(back[0].alsoLater, 1);
+  assert.equal(
+    parseChatTranscriptJson(JSON.stringify([{ kind: "planEvent", event: { eventId: "e2" } }])).length,
+    0,
+    "half an event is not restored"
+  );
+}
+
+// planRefs (P1.7): a known kind, carried through all four rebuilds.
+{
+  const entry = {
+    kind: "planRefs",
+    refs: [
+      { artifactId: "d1", draftId: "d3", version: 3, name: "Base block", artifactType: "plan", scope: "week", weekIndex: 5, label: "Week 6", later: "kept" }
+    ]
+  };
+  const [parsed] = parseChatTranscriptJson(JSON.stringify([entry]));
+  assert.equal(parsed.kind, "planRefs");
+  assert.deepEqual(parsed.refs, entry.refs);
+  assert.deepEqual(toPersistedEntries(fromPersistedEntries([parsed]))[0].refs, entry.refs);
+  assert.equal(
+    parseChatTranscriptJson(JSON.stringify([{ kind: "planRefs", refs: [{ draftId: "x" }] }])).length,
+    0,
+    "a reference that says nothing is not restored"
+  );
+}
+
 console.log("test-chat-entry-passthrough: ok");

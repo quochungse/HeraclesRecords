@@ -255,22 +255,32 @@ async function main() {
   );
   assert.equal(await harness("exists", '.chat-creation-card [data-action="edit"]'), true);
 
-  // Open shows the popup, whose weeks come from the same document.
+  // Open shows the canvas beside the conversation (P1.4), read with the
+  // Library reader's own week cards, from the same document.
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-creation-modal"), "the popup opens");
-  const popupWeeks = await page(
-    `document.querySelector(".chat-creation-modal .chat-plan-overview-item strong")?.textContent`
-  );
-  assert.equal(popupWeeks, "3", "the popup no longer says 0 weeks for an undated plan");
+  await waitFor(() => harness("exists", ".chat-canvas.is-artifact .plan-week-card"), "the canvas opens on the plan");
+  assert.equal(await harness("count", ".chat-canvas .plan-week-card"), 3, "every week, an undated plan's too");
   assert.equal(
-    await harness("exists", ".chat-creation-modal fieldset"),
-    false,
-    "the destination fieldset is gone"
+    await page(`document.querySelector(".chat-canvas .chat-creation-figures dd")?.textContent`),
+    "3",
+    "the figures are the card's"
   );
+  assert.equal(
+    await harness("exists", '.chat-canvas-foot [data-action="saveAsPlan"]'),
+    await harness("exists", '.chat-creation-card [data-action="saveAsPlan"]'),
+    "and so are the buttons"
+  );
+  assert.equal(await harness("exists", ".chat-creation-card"), true, "the card stays whole while the canvas is open");
+  // A session opens inside the canvas, and Escape steps back out of it.
+  await harness("click", ".chat-canvas .plan-entry.is-openable");
+  await waitFor(() => harness("exists", ".chat-canvas .plan-session"), "a session opens in place");
+  await page(`document.querySelector(".chat-canvas .plan-session").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await waitFor(async () => !(await harness("exists", ".chat-canvas .plan-session")), "Escape steps back to the weeks");
+  assert.equal(await harness("exists", ".chat-canvas.is-artifact"), true, "without closing the canvas");
 
   // Removed before it is saved, the card's draft goes too (P0.8).
-  await harness("click", ".chat-creation-modal-remove");
-  await harness("click", ".chat-creation-modal-footer .chat-local-action.is-danger");
+  await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
+  await harness("click", ".chat-canvas-foot .chat-local-action.is-danger");
   await waitFor(() => harness("callCount", "removePlanDraft"), "the unsaved draft is let go");
   assert.deepEqual((await harness("calls", "removePlanDraft"))[0].args, ["plan-1"]);
   await waitFor(async () => !(await harness("exists", ".chat-creation-card")), "the card leaves the conversation");
@@ -369,8 +379,7 @@ async function main() {
               scheduleDate: "2099-10-02",
               saveToLibrary: false,
               workoutType: "recovery",
-              stepsSummary: "35 min easy",
-              source: workout
+              stepsSummary: "35 min easy"
             }
           ],
           conflicts: [],
@@ -378,6 +387,16 @@ async function main() {
         }
       }
     ],
+    // The transcript's preview is light (P1.1): the steps the builder edits
+    // come from the draft's document, so this is the only place they are.
+    getPlanDraftDocument: {
+      ...DOCUMENT,
+      id: "draft:workout-1",
+      name: "Recovery run",
+      weekCount: 1,
+      weekStages: [],
+      entries: [{ id: "entry:workout-1:recovery", weekIndex: 0, dayIndex: 4, sortOrder: 0, title: "Recovery run", workout }]
+    },
     uploadTrainingPlanDraft: {
       planName: "Recovery run",
       workoutsCreated: 1,
@@ -407,12 +426,421 @@ async function main() {
     "the workout is saved"
   );
   assert.deepEqual(
-    upload.args.slice(2),
+    upload.args.slice(2, 5),
     ["calendar", "2099-10-02", true],
     "on its day, and kept in the library as asked"
   );
   await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the card says where it went");
   assert.match(await harness("text", ".chat-creation-status"), /^On calendar /);
+
+  // -------------------------------------------------------------------------
+  // An older version folds to a line under the newest, which alone has buttons
+  // and alone is listed among the creations (P1.1)
+  // -------------------------------------------------------------------------
+  const PREVIEW_V2 = { ...PREVIEW, draftId: "plan-1-v2", editedAt: 5 };
+  const VERSIONED = {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      TRANSCRIPT[0],
+      TRANSCRIPT[1],
+      { kind: "planDraft", draft: PREVIEW },
+      { kind: "message", role: "assistant", content: "Moved the long run to Sunday." },
+      { kind: "planDraft", draft: PREVIEW_V2 }
+    ],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 },
+      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "athlete", createdAt: 2, parentDraftId: "plan-1", changeSummary: "Long run to Sunday" }
+    ],
+    restorePlanVersion: {
+      preview: { ...PREVIEW, draftId: "plan-1-v3" },
+      artifactId: "plan-1",
+      fromVersion: 2,
+      toVersion: 3,
+      changes: ["Moved Long: week 1 Sun → week 1 Sat"]
+    }
+  };
+  await harness("mount", "ChatView", {}, VERSIONED);
+  await waitFor(() => harness("exists", ".chat-version-row"), "the older version folds");
+  assert.equal(await page(`document.querySelectorAll(".chat-creation-card").length`), 1, "one card is drawn whole");
+  assert.match(
+    (await harness("text", ".chat-version-row")) ?? "",
+    /v1 · replaced by v2 from you/,
+    "and the line says what replaced it"
+  );
+  assert.match(
+    (await harness("text", ".chat-creation-card .chat-creation-kicker")) ?? "",
+    /Training plan · v2/,
+    "the card names its version"
+  );
+  // The canvas lists every version, and an older one is read, not saved:
+  // its one button makes it the newest again (P1.4).
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas-bar"), "the canvas offers the versions");
+  await harness("click", '.chat-canvas-bar [role="radio"]:nth-child(2)');
+  await waitFor(() => harness("exists", ".chat-canvas-version"), "the versions are listed");
+  assert.equal(await harness("count", ".chat-canvas-version"), 2);
+  assert.match((await harness("text", ".chat-canvas-versions > li:first-child")) ?? "", /v2.*You.*Newest.*Long run to Sunday/s);
+  await harness("click", ".chat-canvas-versions > li:last-child .chat-canvas-version");
+  await waitFor(() => harness("exists", ".chat-canvas-older"), "the older version is shown");
+  assert.match((await harness("text", ".chat-canvas-older")) ?? "", /v1 · replaced by v2 from you/);
+  assert.equal(await harness("exists", '.chat-canvas-foot [data-action="saveAsPlan"]'), false, "with nothing to save");
+  await harness("click", '.chat-canvas-foot [data-action="restore"]');
+  await waitFor(() => harness("callCount", "restorePlanVersion"), "Restore asks for the version");
+  assert.equal((await harness("calls", "restorePlanVersion"))[0].args[0], "plan-1");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "and a line says where it happened");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Restored by you · Moved Long/);
+  const afterRestore = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterRestore.slice(-2).map((entry) => entry.kind),
+    ["planEvent", "planDraft"],
+    "the event, then the new version's card"
+  );
+
+  // Removed, a creation goes whole: the older version does not unfold in its place.
+  await harness("mount", "ChatView", {}, VERSIONED);
+  await waitFor(() => harness("exists", ".chat-version-row"), "the conversation is open again");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas-foot"), "the newest version opens");
+  await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
+  await harness("click", ".chat-canvas-foot .chat-local-action.is-danger");
+  await waitFor(() => harness("callCount", "removePlanDraft"), "its drafts are let go");
+  assert.deepEqual((await harness("calls", "removePlanDraft")).at(-1).args, ["plan-1-v2"]);
+  await waitFor(
+    async () => !(await harness("exists", ".chat-creation-card")) && !(await harness("exists", ".chat-version-row")),
+    "neither version is drawn"
+  );
+  const afterRemove = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterRemove.filter((entry) => entry.kind === "planDraft").map((entry) => Boolean(entry.draft.removedAt)),
+    [true, true],
+    "both cards are marked removed"
+  );
+
+  // -------------------------------------------------------------------------
+  // An edit saved from the editor is the next version; one begun on a version
+  // since replaced asks first (P1.5)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 }
+    ],
+    editPlanDraft: {
+      kind: "conflict",
+      newest: { draftId: "plan-1-coach", version: 2, author: "coach" }
+    }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="edit"]'), "the card offers Edit");
+  await harness("click", '.chat-creation-card [data-action="edit"]');
+  await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "the plan editor opens");
+  assert.equal(
+    await harness("exists", '.chat-creation-card [data-action="continueEditing"]'),
+    true,
+    "while it is open, the card's way on is back into it"
+  );
+  await harness("setValue", ".tl-plan-modal .plan-editor-name", "Hanoi Half base, mine");
+  await settle();
+  await page(`[...document.querySelectorAll(".tl-plan-modal button.primary-button")].find((button) => button.textContent.includes("Save changes")).click()`);
+  await waitFor(() => harness("callCount", "editPlanDraft"), "the edit is saved");
+  assert.deepEqual((await harness("calls", "editPlanDraft"))[0].args.slice(0, 1), ["plan-1"]);
+  assert.equal((await harness("calls", "editPlanDraft"))[0].args[3], false, "not over a newer version, unasked");
+  await waitFor(
+    async () => /changed while you were editing/.test((await page(`document.body.textContent`)) ?? ""),
+    "a newer version is found, and the athlete is asked"
+  );
+  await harness("setScript", {
+    editPlanDraft: {
+      kind: "written",
+      preview: { ...PREVIEW, draftId: "plan-1-v3", name: "Hanoi Half base, mine", editedAt: 9 },
+      artifactId: "plan-1",
+      fromVersion: 2,
+      toVersion: 3,
+      changes: ['Renamed to "Hanoi Half base, mine"']
+    },
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 },
+      { artifactId: "plan-1", draftId: "plan-1-coach", version: 2, author: "coach", createdAt: 2 },
+      { artifactId: "plan-1", draftId: "plan-1-v3", version: 3, author: "athlete", createdAt: 3 }
+    ],
+    restorePlanVersion: {
+      kind: "written",
+      preview: { ...PREVIEW, draftId: "plan-1-v4" },
+      artifactId: "plan-1",
+      fromVersion: 3,
+      toVersion: 4,
+      changes: ['Renamed to "Hanoi Half base"']
+    }
+  });
+  await page(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Replace with my edit").click()`);
+  await waitFor(async () => (await harness("callCount", "editPlanDraft")) === 2, "Replace saves again");
+  assert.equal((await harness("calls", "editPlanDraft"))[1].args[3], true, "this time over the newer version");
+  await waitFor(async () => !(await harness("exists", ".tl-plan-modal")), "the editor closes");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "the edit leaves a line where it was made");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Edited by you · Renamed to "Hanoi Half base, mine"/);
+  const afterEdit = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterEdit.slice(-2).map((entry) => [entry.kind, entry.event?.toVersion ?? entry.draft?.draftId]),
+    [["planEvent", 3], ["planDraft", "plan-1-v3"]],
+    "then the new version's card; the coach's card is left as it was"
+  );
+  assert.equal(
+    afterEdit.find((entry) => entry.kind === "planDraft" && entry.draft.draftId === "plan-1")?.draft.editedAt,
+    undefined,
+    "no edit is written into the coach's version"
+  );
+  // Undo restores the version the edit replaced, which is Coach's version 2.
+  await waitFor(() => harness("exists", ".chat-plan-event-undo"), "the line offers Undo");
+  await harness("click", ".chat-plan-event-undo");
+  await waitFor(() => harness("callCount", "restorePlanVersion"), "Undo restores");
+  assert.equal((await harness("calls", "restorePlanVersion"))[0].args[0], "plan-1-coach");
+  await waitFor(
+    async () => (await harness("count", ".chat-plan-event-row")) === 2,
+    "and says so on a line of its own"
+  );
+
+  // -------------------------------------------------------------------------
+  // A plan on COROS is changed by a version that updates it (P1.6)
+  // -------------------------------------------------------------------------
+  const SAVED_V1 = {
+    ...PREVIEW,
+    uploadedAt: 3,
+    uploadResult: { workoutsScheduled: 0, workoutsCreated: 9, destination: "nativePlan", planId: "coros:900" }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      TRANSCRIPT[0],
+      TRANSCRIPT[1],
+      { kind: "planDraft", draft: SAVED_V1 },
+      { kind: "planDraft", draft: { ...PREVIEW, draftId: "plan-1-v2" } }
+    ],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" },
+      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "coach", createdAt: 4, parentDraftId: "plan-1" }
+    ],
+    uploadTrainingPlanDraft: {
+      planName: PREVIEW.name,
+      workoutsCreated: 0,
+      workoutsScheduled: 0,
+      entries: [],
+      destination: "nativePlan",
+      planId: "coros:900",
+      conflict: { currentVersion: 3, expectedVersion: 2 }
+    }
+  });
+  await waitFor(
+    () => harness("exists", '.chat-creation-card [data-action="updatePlan"]'),
+    "the new version leads with updating the plan"
+  );
+  assert.match((await harness("text", ".chat-creation-card .chat-creation-status")) ?? "", /Changes not on COROS/);
+  assert.equal(await harness("exists", '.chat-creation-card [data-action="saveAsPlan"]'), false, "not a second plan");
+  await harness("click", '.chat-creation-card [data-action="updatePlan"]');
+  await waitFor(
+    async () => /This plan changed on COROS/.test((await page(`document.body.textContent`)) ?? ""),
+    "COROS changed meanwhile, so the athlete is asked"
+  );
+  await harness("setScript", {
+    uploadTrainingPlanDraft: {
+      planName: PREVIEW.name,
+      workoutsCreated: 9,
+      workoutsScheduled: 0,
+      entries: [],
+      destination: "nativePlan",
+      planId: "coros:900"
+    }
+  });
+  await page(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Replace with my edit").click()`);
+  await waitFor(async () => (await harness("callCount", "uploadTrainingPlanDraft")) === 2, "saved again");
+  assert.deepEqual((await harness("calls", "uploadTrainingPlanDraft"))[1].args.at(-1), { overwrite: true });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the version is on COROS");
+  assert.equal(
+    await harness("exists", '.chat-creation-card [data-action="edit"]'),
+    true,
+    "and it can still be changed, by a next version"
+  );
+
+  // -------------------------------------------------------------------------
+  // A plan changed on COROS is read back when it is opened or edited (P1.6, D12)
+  // -------------------------------------------------------------------------
+  const IMPORTED = {
+    kind: "imported",
+    written: {
+      kind: "written",
+      preview: {
+        ...PREVIEW,
+        draftId: "plan-1-coros",
+        name: "Hanoi Half base, as I run it",
+        uploadedAt: 5,
+        uploadResult: { workoutsScheduled: 0, workoutsCreated: 9, destination: "nativePlan", planId: "coros:900" }
+      },
+      artifactId: "plan-1",
+      fromVersion: 1,
+      toVersion: 2,
+      changes: ['Renamed to "Hanoi Half base, as I run it"']
+    }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: IMPORTED
+  });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the saved card is drawn");
+  await settle();
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "opening asks whether COROS moved on");
+  assert.equal((await harness("calls", "syncPlanFromCoros"))[0].args[2], true, "of the cache, at no cost");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "and COROS's version comes in, with a line");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Changed in the Library · Renamed/);
+  assert.equal(await harness("exists", ".chat-plan-event-undo"), false, "not the athlete's to undo");
+  await waitFor(
+    async () => /Hanoi Half base, as I run it/.test((await harness("text", ".chat-creation-card h3, .chat-creation-card .chat-creation-title")) ?? (await page(`[...document.querySelectorAll(".chat-creation-card")].at(-1)?.textContent`)) ?? ""),
+    "COROS's version is the card"
+  );
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-creation-card")].at(-1).querySelector(".chat-creation-status")?.textContent`),
+    "On COROS",
+    "and it is saved there, with nothing to update"
+  );
+
+  await harness("setScript", { syncPlanFromCoros: { kind: "current" } });
+  await harness("clearCalls");
+  await harness("click", '.chat-creation-card [data-action="edit"]');
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "Edit reads COROS first");
+  assert.equal((await harness("calls", "syncPlanFromCoros"))[0].args[2], undefined, "for real, not the cache");
+  await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "then the editor opens");
+  await page(`document.querySelector('.tl-plan-modal [aria-label="Close"], .tl-plan-modal .plan-editor-close')?.click()`);
+
+  // -------------------------------------------------------------------------
+  // A Coach plan goes on the calendar from the conversation, and says so (P1.6)
+  // -------------------------------------------------------------------------
+  const RUNNING = {
+    ...DOCUMENT,
+    id: "coros:905",
+    remoteId: "905",
+    calendar: "running",
+    sourcePlanId: "900",
+    startDate: "2099-01-05",
+    entries: DOCUMENT.entries.map((entry, index) => ({ ...entry, idInPlan: String(index + 1) }))
+  };
+  const SAVED_ONLY = {
+    ...BASE_SCRIPT,
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: { kind: "current" },
+    getPlanCalendarState: [
+      {
+        artifactId: "plan-1",
+        remotePlanId: "coros:900",
+        running: RUNNING,
+        matches: [{ schedulePlanId: "905", scheduleIdInPlan: "1", status: "upcoming" }]
+      }
+    ]
+  };
+  await harness("mount", "ChatView", {}, SAVED_ONLY);
+  await waitFor(
+    async () => (await harness("text", ".chat-creation-card .chat-creation-status")) === "On calendar",
+    "a plan COROS is running reads as on the calendar"
+  );
+  assert.match((await harness("text", ".chat-creation-card .chat-plan-success")) ?? "", /On your COROS calendar · Starts .* · 1 session ahead\./);
+  assert.equal(await harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), false, "and is not offered again");
+
+  // Saved, not running: added from the card, through the Library's dialog.
+  await harness("mount", "ChatView", {}, {
+    ...SAVED_ONLY,
+    getPlanCalendarState: [{ artifactId: "plan-1", remotePlanId: "coros:900", matches: [] }],
+    getPlanDraftDocument: { ...DOCUMENT, id: "coros:900", remoteId: "900" },
+    previewTrainingPlanCalendar: {
+      planId: "coros:900",
+      startDay: "20990105",
+      anchorDay: "20990105",
+      entries: [],
+      blockers: []
+    }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), "a saved plan offers the calendar");
+  await harness("click", '.chat-creation-card [data-action="addToCalendar"]');
+  await waitFor(() => harness("callCount", "previewTrainingPlanCalendar"), "the dialog reads what COROS will do");
+  assert.equal((await harness("calls", "previewTrainingPlanCalendar"))[0].args[0], "coros:900");
+
+  // Not saved: the dialog reads it through the chat, and saves it first.
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    previewTrainingPlanCalendar: { planId: "chat:plan-1", startDay: "20990105", anchorDay: "20990105", entries: [], blockers: [] }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), "a programme offers the calendar too");
+  await harness("click", '.chat-creation-card [data-action="addToCalendar"]');
+  await waitFor(() => harness("callCount", "previewTrainingPlanCalendar"), "read before it is saved");
+  assert.equal((await harness("calls", "previewTrainingPlanCalendar"))[0].args[0], "chat:plan-1");
+  assert.equal(await harness("callCount", "uploadTrainingPlanDraft"), 0, "nothing saved until the day is picked");
+
+  // -------------------------------------------------------------------------
+  // Asking about a week goes with the question, as a line above it (P1.7)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, BASE_SCRIPT);
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the plan card is drawn");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas .plan-week-ask"), "each week offers Ask Coach");
+  await harness("click", ".chat-canvas .plan-week-card:nth-child(2) .plan-week-ask");
+  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "the week waits beside the composer");
+  assert.match((await harness("text", ".chat-refs-pending .chat-ref-chip")) ?? "", /Hanoi Half base · Week 2/);
+  await harness("click", '.chat-canvas [data-action="askPlan"]');
+  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 2, "and the whole plan beside it");
+  await harness("click", ".chat-refs-pending .chat-ref-chip:last-of-type .chat-ref-remove");
+  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 1, "a chip can be taken off");
+  await harness("setValue", ".chat-composer textarea", "Is this week too much?");
+  await harness("click", ".chat-send");
+  const asked = await waitFor(
+    async () => (await harness("calls", "sendChat"))[0],
+    "the question is sent"
+  );
+  assert.match(asked.args[1].at(-1).content, /asking about the plan "Hanoi Half base" \(draft_id plan-1\) — Week 2/);
+  assert.match(asked.args[1].at(-1).content, /Is this week too much\?$/);
+  const afterAsk = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterAsk.slice(-2).map((entry) => entry.kind),
+    ["planRefs", "message"],
+    "the reference is kept just before the question"
+  );
+  assert.equal(await harness("exists", ".chat-refs-pending"), false, "and leaves the composer");
+  await waitFor(() => harness("exists", ".chat-refs-row"), "it reads as a line above the question");
+
+  // From the Library: the conversation the plan came from, with the plan beside the composer.
+  await harness("mount", "ChatView", {
+    pendingPrompt: {
+      draftId: "plan-1",
+      refs: [{ artifactId: "plan-1", draftId: "plan-1", name: "Hanoi Half base", artifactType: "plan", scope: "plan", label: "the whole plan" }]
+    }
+  }, { ...BASE_SCRIPT, findChatSessionForDraft: "s1" });
+  await waitFor(() => harness("callCount", "findChatSessionForDraft"), "the conversation is looked for");
+  assert.deepEqual((await harness("calls", "findChatSessionForDraft"))[0].args, ["plan-1"]);
+  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "and the plan waits to be asked about");
+
+  // -------------------------------------------------------------------------
+  // A follow-up under the card is a question about it (P1.8)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, refinements: ["Lighter week 3", "Add hills"] }
+    ]
+  });
+  await waitFor(
+    async () => (await harness("count", ".chat-creation-card .chat-refine-chip")) === 2,
+    "Coach's own follow-ups, under its card"
+  );
+  await harness("click", ".chat-creation-card .chat-refine-chip:first-child");
+  const refined = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
+  assert.match(refined.args[1].at(-1).content, /asking about the plan "Hanoi Half base" v1 \(draft_id plan-1\) — the whole of it\.[\s\S]*Lighter week 3$/);
+  const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(afterRefine.slice(-2).map((entry) => entry.kind), ["planRefs", "message"]);
+  assert.equal(afterRefine.at(-1).content, "Lighter week 3", "in the chip's own words");
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

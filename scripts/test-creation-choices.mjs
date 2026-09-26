@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS } = await import(
+const { planSaveChoices, isOneShotPlan, ONE_SHOT_DAYS, artifactActions } = await import(
   pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
 );
 
@@ -160,6 +160,112 @@ const ids = (choices) => ({
   assert.equal(creationStatus(saved(workout(), "workoutLibrary")).label, "In library");
   assert.match(creationStatus(saved(workout("2026-10-02"), "calendar")).label, /^On calendar \S/);
   assert.equal(creationStatus(saved(plan(entry("a", "2026-10-02")), "calendar")).label, "On calendar");
+}
+
+// artifactActions (P1.4): the card and the canvas ask one function, and a
+// version something replaced, or one being edited, is never offered a save.
+{
+  const draft = plan(entry("a"), entry("b"));
+  const newest = artifactActions(draft, { latest: true }, today);
+  assert.equal(newest.kind, "save");
+  const base = planSaveChoices(draft, today);
+  assert.deepEqual(
+    { ...newest.choices, secondary: newest.choices.secondary.filter((action) => action.id !== "addToCalendar") },
+    base,
+    "the same ways to save the card has always had, and the calendar beside them"
+  );
+  assert.deepEqual(artifactActions(draft, { latest: false }, today), { kind: "older", restore: true });
+  assert.deepEqual(
+    artifactActions(draft, { latest: false, saved: true }, today),
+    { kind: "older", restore: false },
+    "a saved creation's older version cannot be restored from here yet"
+  );
+  assert.deepEqual(
+    artifactActions({ ...draft, uploadedAt: 1 }, { latest: false }, today),
+    { kind: "older", restore: false },
+    "saved is read off the card when the caller does not say"
+  );
+  assert.deepEqual(artifactActions(draft, { latest: true, editing: true }, today), { kind: "editing" });
+
+  // A plan on COROS (P1.6): its next version updates that plan, its older
+  // versions can be restored, and once saved it can still be edited.
+  const change = artifactActions(draft, { latest: true, onCoros: true }, today);
+  assert.equal(change.kind, "save");
+  assert.equal(change.choices.primary.id, "updatePlan");
+  assert.deepEqual(change.choices.more.map((action) => [action.id, action.asNew]), [["saveAsNewPlan", true]]);
+  assert.deepEqual(artifactActions(draft, { latest: false, saved: true, onCoros: true }, today), { kind: "older", restore: true });
+  assert.deepEqual(
+    artifactActions({ ...draft, uploadedAt: 1 }, { latest: true, onCoros: true }, today),
+    { kind: "saved", addToCalendar: true }
+  );
+  const oneOff = { ...draft, artifactType: "workout" };
+  assert.deepEqual(
+    artifactActions(oneOff, { latest: false, saved: true, onCoros: true }, today),
+    { kind: "older", restore: false },
+    "a saved workout has nothing to update"
+  );
+}
+
+// creationCalendar (P1.6): the week of the running copy today falls in, and
+// what was done against it — the Library's own compliance, so no 0% for a plan
+// with nothing settled yet.
+{
+  const { creationCalendar, localDayKey } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "chat", "creationCalendar.ts")).href
+  );
+  assert.match(localDayKey(new Date(2026, 8, 5, 23, 30)), /^2026-09-05$/, "the local day, not UTC's");
+  assert.deepEqual(creationCalendar(undefined, "2026-09-30"), { running: false });
+  const running = {
+    remoteId: "R1",
+    calendar: "running",
+    startDate: "2026-09-21",
+    weekCount: 4,
+    entries: [{ idInPlan: "1" }, { idInPlan: "2" }, { idInPlan: "3" }]
+  };
+  const match = (id, status) => ({ schedulePlanId: "R1", scheduleIdInPlan: id, status });
+  const state = (matches) => ({ artifactId: "a", remotePlanId: "coros:900", running, matches });
+  assert.deepEqual(
+    creationCalendar(state([match("1", "completed"), match("2", "missed"), match("3", "upcoming")]), "2026-09-30"),
+    { running: true, line: "Week 2 of 4 · 1 done · 1 missed · 1 ahead" }
+  );
+  assert.deepEqual(
+    creationCalendar(state([match("1", "upcoming")]), "2026-09-21"),
+    { running: true, line: "Week 1 of 4 · 1 session ahead" },
+    "nothing settled: sessions ahead, never 0%"
+  );
+  assert.match(creationCalendar(state([]), "2026-09-14").line, /^Starts /, "before it starts");
+  assert.equal(creationCalendar(state([]), "2026-12-30").line, "Week 4 of 4", "not past its last week");
+}
+
+// A proposal that is a programme can also go on the calendar, saved first;
+// a one-shot plan leads with its sessions and is not offered it twice.
+{
+  const programme = plan(entry("a"), entry("b"));
+  const offered = artifactActions(programme, { latest: true }, today);
+  assert.deepEqual(offered.choices.secondary.map((action) => action.id), ["addToCalendar"]);
+  const oneShot = plan(entry("a", "2026-09-28"), entry("b", "2026-09-30"));
+  assert.equal(
+    artifactActions(oneShot, { latest: true }, today).choices.secondary.some((action) => action.id === "addToCalendar"),
+    false
+  );
+  const saved = { ...programme, uploadedAt: 1, uploadResult: { workoutsScheduled: 0, workoutsCreated: 2, destination: "nativePlan" } };
+  assert.deepEqual(artifactActions(saved, { latest: true }, today), { kind: "saved", addToCalendar: true });
+  assert.deepEqual(artifactActions(saved, { latest: true, onCalendar: true }, today), { kind: "saved", addToCalendar: false });
+  const asSessions = { ...programme, uploadedAt: 1, uploadResult: { workoutsScheduled: 2, workoutsCreated: 2, destination: "calendar" } };
+  assert.deepEqual(artifactActions(asSessions, { latest: true }, today), { kind: "saved", addToCalendar: false }, "sessions already on the calendar are not a plan");
+}
+
+// refinementChips (P1.8): Coach's own, or a set that fits the creation.
+{
+  const { refinementChips } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
+  );
+  const run = { ...entry("a"), sport: "run" };
+  const lift = { ...entry("b"), sport: "strength" };
+  assert.deepEqual(refinementChips(plan(run), ["Lighter week 3", "Add hills"]), ["Lighter week 3", "Add hills"]);
+  assert.deepEqual(refinementChips(plan(run)), ["Lighter", "Fewer days", "Long run on Sunday", "More strength"]);
+  assert.deepEqual(refinementChips(plan(lift)), ["Lighter", "Fewer days"], "no long run to move, and strength already");
+  assert.deepEqual(refinementChips({ ...plan(run), artifactType: "workout" }), ["Shorter", "Easier", "Harder"]);
 }
 
 console.log("test-creation-choices: ok");

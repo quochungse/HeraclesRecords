@@ -1,4 +1,5 @@
-import type { AnthropicEffort, ChatProvider, ChatSettings } from "./types";
+import type {
+  InlineSuggestionsMode, AnthropicEffort, ChatProvider, ChatSettings } from "./types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "./types";
 import { normalizeContextWindow } from "./chatContextCompaction";
 import {
@@ -39,10 +40,25 @@ export const CHAT_SETTINGS_KEYS = {
   sidebarOpen: "chat.sidebar.open",
   visualizationsEnabled: "chat.visualizations.enabled",
   customInstructions: "chat.customInstructions",
+  inlineSuggestions: "chat.coach.inlineSuggestions",
   compactContextEnabled: "chat.compactContext.enabled",
   compactContextLimit: "chat.compactContext.limit",
   compactContextKeep: "chat.compactContext.keep"
 } as const;
+
+function inlineSuggestionsMode(value: unknown): InlineSuggestionsMode {
+  return value === "on" || value === "off" ? value : "auto";
+}
+
+/** Whether a turn by `provider` may attach workout cards it was not asked for (P1.9). */
+export function inlineSuggestionsEnabled(
+  mode: InlineSuggestionsMode | undefined,
+  provider: ChatProvider
+): boolean {
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  return provider === "claude-code" || provider === "claude-api";
+}
 
 export interface ChatSettingsStore {
   get(key: string): string | undefined;
@@ -133,6 +149,7 @@ export function readChatSettingsFromStore(
       store.get(CHAT_SETTINGS_KEYS.visualizationsEnabled) === "true",
     customInstructions:
       store.get(CHAT_SETTINGS_KEYS.customInstructions) || undefined,
+    inlineSuggestions: inlineSuggestionsMode(store.get(CHAT_SETTINGS_KEYS.inlineSuggestions)),
     compactContext: {
       // Defaults on. A conversation nobody compacts grows without bound, and
       // the athlete who would notice the bill is the one least likely to go
@@ -263,6 +280,9 @@ export function saveChatSettingsToStore(
       CHAT_SETTINGS_KEYS.sidebarOpen,
       settings.sidebarOpen ? "true" : "false"
     );
+  }
+  if (settings.inlineSuggestions !== undefined) {
+    store.set(CHAT_SETTINGS_KEYS.inlineSuggestions, inlineSuggestionsMode(settings.inlineSuggestions));
   }
   if (typeof settings.visualizationsEnabled === "boolean") {
     store.set(

@@ -57,7 +57,8 @@ interface PlanSessionViewProps {
   api?: CorosLinkApi;
   /** Leaves the library for the activity this session became. */
   onOpenActivity?: (activityId: string) => void;
-  onBack: () => void;
+  /** Absent where the session is the whole of what is shown — a one-off workout. */
+  onBack?: () => void;
   onStep: (direction: -1 | 1) => void;
 }
 
@@ -197,10 +198,13 @@ export function PlanSessionView({
 
   return (
     <div className="plan-session" aria-label={`${facts.title}, ${where.join(", ")}`}>
+      {onBack || position.of > 1 ? (
       <header className="plan-reader-head plan-session-head">
-        <button type="button" className="ghost-button plan-session-back" onClick={onBack}>
-          <ArrowLeft size={14} /> <span>{planName}</span>
-        </button>
+        {onBack ? (
+          <button type="button" className="ghost-button plan-session-back" onClick={onBack}>
+            <ArrowLeft size={14} /> <span>{planName}</span>
+          </button>
+        ) : null}
         <div className="plan-session-pager">
           <span aria-live="polite">
             Session {position.index + 1} of {position.of}
@@ -225,6 +229,7 @@ export function PlanSessionView({
           </button>
         </div>
       </header>
+      ) : null}
 
       {draft ? (
         <WorkoutReadOnlyBody

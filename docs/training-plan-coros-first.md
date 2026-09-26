@@ -165,7 +165,9 @@ hay item nào khác. Chỉ khi được save nó mới thành một plan COROS.
   Coach cũng được phép truyền `description` và `week_stages` trong `draft_training_plan`.
 - **Coach thấy bản đã sửa.** Coach không có tool sửa draft; `draft_training_plan` luôn tạo
   draft mới, nên nếu không được báo thì coach sẽ dựng lại từ bản nó nhớ và bỏ mất phần người dùng
-  đã sửa. `withPlanEdits` (`chatContextCompaction.ts`) đặt bản đã sửa lên trước câu hỏi mới nhất
+  đã sửa. (Đã thay ở P1.3 của [coach-plan-canvas.md](coach-plan-canvas.md): mục lục
+  `creationIndex`, `planEvent` và `get_plan_draft`. Phần dưới là thiết kế cũ.)
+  `withPlanEdits` (`chatContextCompaction.ts`) đặt bản đã sửa lên trước câu hỏi mới nhất
   của người dùng — không thành một message riêng, để vai user/assistant vẫn xen kẽ — cả ở chat
   lẫn lượt analysis, và đọc toàn bộ transcript chứ không chỉ phần đuôi chưa bị tóm tắt.
 - **Bỏ hạn 24 giờ** của chat plan draft (`prunePlanDraftStore` xoá draft chưa upload sau

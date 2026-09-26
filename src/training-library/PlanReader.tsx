@@ -32,6 +32,7 @@ import {
   FilePen,
   Heart,
   LoaderCircle,
+  MessageCircle,
   Pencil,
   Trash2,
   X
@@ -107,6 +108,8 @@ interface PlanReaderProps {
   onFavorite?: (plan: TrainingPlanDocument) => void;
   onArchive?: (plan: TrainingPlanDocument) => void;
   onDelete?: (plan: TrainingPlanDocument) => void;
+  /** Opens the conversation the plan came from, to ask about it (P1.7). */
+  onAskCoach?: (plan: TrainingPlanDocument) => void;
   /** A kept session's activity, opened on the screen for its sport. */
   onOpenActivity?: (activityId: string) => void;
 }
@@ -134,6 +137,7 @@ export function PlanReader({
   onFavorite,
   onArchive,
   onDelete,
+  onAskCoach,
   onOpenActivity
 }: PlanReaderProps) {
   const { unitSystem } = useUnitSystem();
@@ -383,6 +387,9 @@ export function PlanReader({
     : [];
   const planItems: PlanMenuItem[] = [
     ...editItems,
+    ...(onAskCoach
+      ? [{ label: "Ask Coach about this plan", icon: MessageCircle, onSelect: () => onAskCoach(plan) }]
+      : []),
     ...calendarItems,
     ...(onDuplicate
       ? [
@@ -646,7 +653,8 @@ export function WeekCard({
   todayKey = "",
   foldable = false,
   onFold,
-  onOpen
+  onOpen,
+  onAsk
 }: {
   week: PlanReaderWeek;
   current?: boolean;
@@ -654,6 +662,8 @@ export function WeekCard({
   foldable?: boolean;
   onFold?: () => void;
   onOpen?: (entryId: string) => void;
+  /** Ask Coach about this week — offered where a conversation can take the question. */
+  onAsk?: () => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const hasAny = week.days.some((day) => day.entries.length);
@@ -677,6 +687,11 @@ export function WeekCard({
             onClick={onFold}
           >
             Fold
+          </button>
+        ) : null}
+        {onAsk ? (
+          <button type="button" className="plan-week-fold-again plan-week-ask" onClick={onAsk}>
+            Ask Coach
           </button>
         ) : null}
       </header>

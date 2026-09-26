@@ -27,6 +27,8 @@ import type {
   PersistedChatMessageEntry,
   PersistedChatSource,
   PlanDraftPreview,
+  PlanEvent,
+  PlanRef,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   SaveChatSessionOptions,
@@ -169,6 +171,97 @@ function parseSource(value: unknown): PersistedChatSource | undefined {
     "mcpTools",
     "mcpError"
   ]);
+}
+
+const PLAN_REF_SCOPES = ["plan", "week", "session"] as const;
+
+function parsePlanRef(value: unknown): PlanRef | null {
+  if (
+    !isRecord(value) ||
+    typeof value.artifactId !== "string" ||
+    typeof value.draftId !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.label !== "string" ||
+    !(PLAN_REF_SCOPES as readonly unknown[]).includes(value.scope)
+  ) {
+    return null;
+  }
+  const version =
+    typeof value.version === "number" && Number.isInteger(value.version) && value.version > 0
+      ? value.version
+      : undefined;
+  const weekIndex =
+    typeof value.weekIndex === "number" && Number.isInteger(value.weekIndex) && value.weekIndex >= 0
+      ? value.weekIndex
+      : undefined;
+  return keepUnknownKeys<PlanRef>(
+    {
+      artifactId: value.artifactId,
+      draftId: value.draftId,
+      ...(version ? { version } : {}),
+      name: value.name,
+      artifactType: value.artifactType === "workout" ? "workout" : "plan",
+      scope: value.scope as PlanRef["scope"],
+      ...(weekIndex !== undefined ? { weekIndex } : {}),
+      ...(typeof value.sessionKey === "string" ? { sessionKey: value.sessionKey } : {}),
+      label: value.label
+    },
+    value,
+    ["artifactId", "draftId", "version", "name", "artifactType", "scope", "weekIndex", "sessionKey", "label"]
+  );
+}
+
+const PLAN_EVENT_ACTIONS = ["edited", "restored", "imported", "removedOnCoros"] as const;
+
+function parsePlanEvent(value: unknown): PlanEvent | null {
+  if (
+    !isRecord(value) ||
+    typeof value.eventId !== "string" ||
+    typeof value.artifactId !== "string" ||
+    typeof value.draftId !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.at !== "number" ||
+    !Number.isFinite(value.at) ||
+    !(PLAN_EVENT_ACTIONS as readonly unknown[]).includes(value.action)
+  ) {
+    return null;
+  }
+  const version = (raw: unknown) =>
+    typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : undefined;
+  const fromVersion = version(value.fromVersion);
+  const toVersion = version(value.toVersion);
+  const changes = Array.isArray(value.changes)
+    ? value.changes.filter((line): line is string => typeof line === "string")
+    : undefined;
+  return keepUnknownKeys<PlanEvent>(
+    {
+      eventId: value.eventId,
+      artifactId: value.artifactId,
+      draftId: value.draftId,
+      action: value.action as PlanEvent["action"],
+      author: value.author === "coros" ? "coros" : "athlete",
+      name: value.name,
+      artifactType: value.artifactType === "workout" ? "workout" : "plan",
+      ...(fromVersion ? { fromVersion } : {}),
+      ...(toVersion ? { toVersion } : {}),
+      ...(changes ? { changes } : {}),
+      at: value.at
+    },
+    value,
+    [
+      "eventId",
+      "artifactId",
+      "draftId",
+      "action",
+      "author",
+      "name",
+      "artifactType",
+      "fromVersion",
+      "toVersion",
+      "changes",
+      "at"
+    ]
+  );
 }
 
 function parseCoachInputPrompt(value: unknown): CoachInputPrompt | null {
@@ -1003,6 +1096,8 @@ const ENTRY_META_KEYS = ["kind", "mid", "mrev"] as const;
 const KNOWN_ENTRY_KINDS = new Set([
   "message",
   "planDraft",
+  "planEvent",
+  "planRefs",
   "coachPrompt",
   "workoutDelete",
   "activityVisual",
@@ -1081,6 +1176,18 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
     return draft ? cardEntry({ kind: "planDraft", draft }, value, "draft") : null;
   }
 
+  if (value.kind === "planRefs") {
+    const refs = Array.isArray(value.refs)
+      ? value.refs.map(parsePlanRef).filter((ref): ref is PlanRef => ref !== null)
+      : [];
+    return refs.length ? cardEntry({ kind: "planRefs", refs }, value, "refs") : null;
+  }
+
+  if (value.kind === "planEvent") {
+    const event = parsePlanEvent(value.event);
+    return event ? cardEntry({ kind: "planEvent", event }, value, "event") : null;
+  }
+
   if (value.kind === "coachPrompt") {
     const prompt = parseCoachInputPrompt(value.prompt);
     return prompt ? cardEntry({ kind: "coachPrompt", prompt }, value, "prompt") : null;
@@ -1157,15 +1264,21 @@ export function parseChatTranscriptJson(raw: string): PersistedChatEntry[] {
  * workout source. The separate Coach draft store retained that full preview,
  * so use it to restore structured cards without replacing chat-local upload
  * state or destination choices.
+ *
+ * `sources: false` restores only what kind of creation a card is. The
+ * conversation is opened that way since cards read their steps from the
+ * draft's document (docs/coach-plan-canvas.md, P1.1): put back into the
+ * entries, the steps would be written into the transcript on its next save.
  */
 export function restoreChatPlanDraftSources(
   entries: PersistedChatEntry[],
-  loadPreviewJson: (draftId: string) => string | undefined
+  loadPreviewJson: (draftId: string) => string | undefined,
+  { sources = true }: { sources?: boolean } = {}
 ): PersistedChatEntry[] {
   return entries.map((entry) => {
     if (
       entry.kind !== "planDraft" ||
-      entry.draft.entries.every((draftEntry) => draftEntry.source)
+      (sources && entry.draft.entries.every((draftEntry) => draftEntry.source))
     ) {
       return entry;
     }
@@ -1196,11 +1309,13 @@ export function restoreChatPlanDraftSources(
       draft: {
         ...entry.draft,
         artifactType: recovered.artifactType ?? entry.draft.artifactType,
-        entries: entry.draft.entries.map((draftEntry) => ({
-          ...draftEntry,
-          source:
-            draftEntry.source ?? recoveredByKey.get(draftEntry.key)?.source
-        }))
+        entries: sources
+          ? entry.draft.entries.map((draftEntry) => ({
+              ...draftEntry,
+              source:
+                draftEntry.source ?? recoveredByKey.get(draftEntry.key)?.source
+            }))
+          : entry.draft.entries
       }
     };
   });
@@ -1310,7 +1425,8 @@ export function getChatSession(
   if (database !== defaultDatabase) return entries;
   return restoreChatPlanDraftSources(
     entries,
-    (draftId) => getChatPlanDraft(draftId)?.previewJson
+    (draftId) => getChatPlanDraft(draftId)?.previewJson,
+    { sources: false }
   );
 }
 

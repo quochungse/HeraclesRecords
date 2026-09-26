@@ -59,7 +59,8 @@ thấy cùng một diff. Plan đã lưu vẫn nối với cuộc chat đã sinh 
     `corosProgram` và `idInPlan` khi version đến từ COROS, để "Update COROS plan" ghi lại
     đúng từng buổi;
   - `plan_json`: `CorosTrainingPlanDraft` như hiện nay, để build cũ vẫn lưu và sửa được;
-  - `preview_json`: preview **gọn**, không có `source` (Q5).
+  - `preview_json`: preview **đầy đủ**, có `source` như hiện nay. Chỉ entry trong transcript
+    là bản gọn (Q5).
 - **Tác giả của version**: `coach` (Coach viết hoặc sửa), `athlete` (người dùng sửa trong màn
   hình edit), `coros` (nhập về vì plan đã đổi trên COROS, D12). Quay về một bản cũ là tạo
   version mới mang nội dung bản cũ.
@@ -142,10 +143,16 @@ Từ đó, năm quy tắc:
 - **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi. Không cứu được build cũ
   hiện có (Q1–Q3 vẫn phải giữ), nhưng làm mọi thay đổi *sau* P0.1 an toàn hơn, và là đường để
   một ngày nào đó được nới Q1.
-- **Q5. Preview của version không mang `source`**, ở cả entry lẫn `preview_json`. Với plan 45
-  buổi, một preview có `source` nặng khoảng 50k ký tự; không có thì khoảng 12k. Build cũ vẫn
-  vẽ được card (H7) và vẫn lưu đúng, vì việc lưu đọc `plan_json`. Giữ `preview_json` gọn là
-  điều kiện, vì H7 điền `source` lại từ chính nó.
+- **Q5. Entry `planDraft` trong transcript không mang `source`; `preview_json` thì vẫn mang.**
+  Với plan 45 buổi, một preview có `source` nặng khoảng 50k ký tự; không có thì khoảng 12k, và
+  transcript là cột được gửi lại mỗi lần lưu. Card của build mới đọc bước tập từ document của
+  draft (`chat:planDraftDocument`), và `getChatSession` chỉ điền lại loại card (H7 với
+  `sources: false`), không điền `source`, nếu không lần lưu sau sẽ ghi chúng vào transcript.
+  `preview_json` **phải** giữ đầy đủ: bản 2 của tài liệu này viết rằng build cũ lưu từ
+  `plan_json`, nhưng "Save to COROS" của build cũ dựng plan từ `stored.preview`
+  (`coachDraftDocument`), nên một `preview_json` gọn làm build cũ ghi mọi buổi lên COROS mà
+  không có bước tập. Build cũ vẫn điền `source` vào transcript khi mở cuộc chat (H7) — transcript
+  do máy cũ lưu sẽ nặng như hiện nay, không sai.
 
 Hệ quả nhìn thấy được trên máy chạy build cũ: mỗi version hiện thành một card riêng (đúng như
 hiện nay, khi mỗi lần sửa ra một card mới), card không có cấu trúc step chi tiết, brief và
@@ -303,7 +310,10 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   `test:sync-policy`.
 
 **P1.2 Coach sửa bằng patch (D11)** · L
-- Tool mới `revise_training_plan { draft_id, base_version, ops[], summary, suggested_refinements? }`.
+- Tool mới `revise_training_plan { draft_id, ops[], summary, suggested_refinements? }`.
+  (Đã làm: không có `base_version` — mỗi version có `draft_id` riêng, nên `draft_id` chính là
+  bản gốc của thao tác; `summary` lưu ở cột `change_summary`. Thao tác áp trong
+  `electron/planRevision.ts`, thuần. `suggested_refinements` đến ở P1.8.)
   Các thao tác: `move_session {key, week, day}`, `replace_session {key, workout}`,
   `remove_session {key}`, `add_session {week, day, workout}`, `set_week_stage {week, stage}`,
   `rename {name}`, `set_description {description}`. `day` là tên thứ như P0.7. Workout lẻ dùng
@@ -311,16 +321,22 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 - Áp thao tác lên `document_json` của version mới nhất, rồi kiểm tra như `draft_training_plan`
   (`validatePlanDraft`, và `generatedPlanProblems` khi plan bị buộc theo outline). Hỏng thì trả
   lý do ngay trong lượt.
-- `base_version` khác version mới nhất (người dùng vừa sửa, hoặc vừa nhập bản từ COROS): từ
-  chối, kèm tóm tắt bản mới nhất; model đọc lại bằng `get_plan_draft`.
-- Plan đã lưu: trước khi áp thao tác, đồng bộ với COROS theo P1.6.
+- `draft_id` không phải version mới nhất (người dùng vừa sửa, hoặc vừa nhập bản từ COROS): từ
+  chối, kèm `draft_id` và danh sách buổi của bản mới nhất; model đọc thêm bằng `get_plan_draft`.
+- Plan đã lưu: trước khi áp thao tác, đồng bộ với COROS theo P1.6. Cho tới P1.6, sửa một
+  artifact đã lưu bị **từ chối** (`draft_saved`), để một version mới không thành plan COROS thứ
+  hai.
+- Remove một artifact chưa lưu xoá **mọi** version và đánh dấu mọi card của nó, nếu không bản
+  trước bản mới nhất sẽ bung ra lại.
 - Thành công: ghi row version mới (`author: coach`), thêm một entry `planDraft` mới vào
   transcript (id mới, preview gọn), trả về tóm tắt, diff và kết quả kiểm tra.
 - `draft_training_plan` nhận `revises: <draft_id>` cho trường hợp viết lại gần hết; kết quả cũng
   là version mới của cùng artifact.
 - **Không** nằm trong `READ_ONLY_ALLOWED_TOOLS`: analysis chạy ngầm và lượt pipeline chỉ được
   tạo artifact mới, không được sửa artifact có sẵn, để bản người dùng đang theo dõi không bị đổi
-  sau lưng họ. Nguồn `null` trong `LOCAL_CHAT_TOOL_SOURCES`, như `draft_training_plan`.
+  sau lưng họ. Vì cùng lý do, `executeChatTool` bỏ `revises` khỏi `draft_training_plan` ở mọi
+  lượt không phải `interactive`. Nguồn `null` trong `LOCAL_CHAT_TOOL_SOURCES`, như
+  `draft_training_plan`.
 - Test: `test:chat-workout-tools` (từng thao tác, xung đột version, kiểm tra),
   `test:coach-analysis-guards`, `test:chat-tool-sources`, schema < 20 kB.
 
@@ -332,12 +348,21 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   Restore, hoặc nhập bản từ COROS (D12). Mang `artifactId`, `from`, `to` và dòng diff dạng chữ.
   `toWireMessages` mở nó thành một dòng "[Athlete edited …]" hoặc "[Changed in Library …]"
   **tại vị trí đó** trong lịch sử, thay vì chép lại cả plan vào mọi lượt.
+- (Đã làm: mục lục là `creationIndex`/`withCreationIndex`; renderer đọc version ngay trước khi
+  gửi, analysis qua dep `getPlanArtifacts`. Lần sửa trong editor đã sinh `planEvent` ngay từ
+  P1.3, còn trong một lượt `planEvent` đi kèm message kế tiếp của người dùng, không thành message
+  riêng, để vai vẫn xen kẽ.)
 - Bỏ `withPlanEdits`/`planEditNote`, cả trong chat lẫn `coachAnalysisService`. Draft cũ có
   `editedAt` mà không có `planEvent` hiện trong mục lục là "edited by athlete"; model đọc chi
   tiết bằng `get_plan_draft`.
 - Test: `test:chat-context-compaction` (mục lục, mở `planEvent`), `test:coach-analysis-runner`.
 
 **P1.4 Canvas** · L
+- (Đã làm: `src/chat/CoachCanvas.tsx`, dựng trong khung `.chat-plan-panel` và nở rộng ở chế độ
+  artifact; `CoachCreationModal` và hai card preview cũ đã xoá cùng CSS của chúng. Khác bản viết:
+  khối token `--tl-*` của Library thêm `.chat-canvas` làm scope thứ tư — chỉ token, không rule
+  control; Restore có ngay ở P1.4 (`chat:restorePlanVersion`), bị từ chối trên artifact đã lưu
+  như revise; composer thành container query vì canvas làm cột chat hẹp cả ở cửa sổ rộng.)
 - Một pane trong `.chat-layout` thay `.chat-plan-panel` và `CoachCreationModal`. Hai chế độ:
   **mục lục** (mở từ nút Creations) và **artifact** (mở từ Open trên card, hoặc từ một dòng của
   mục lục).
@@ -355,6 +380,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   có rAF.
 
 **P1.5 Màn hình edit và khoá sửa (D10)** · M
+- (Đã làm: `savePlanDraftEdit`/`saveWorkoutDraftEdit` trả `PlanVersionSave` — `written` với
+  diff so với bản bị thay, hoặc `conflict` khi bản đã mở không còn là mới nhất; `writeVersion`
+  dùng chung với Restore. `NewerVersionDialog` hỏi ba lựa chọn. Card và canvas hiện Continue
+  editing khi editor của nó đang mở. Undo trên dòng `planEvent` chỉ có khi version nó để lại vẫn
+  là mới nhất và chưa lưu. Toast bỏ; nút lưu là "Save changes".)
 - Edit của plan mở `PlanEditor` phủ lên Coach (tổng quát hoá `CoachPlanEditor`), nạp
   `document_json` của version mới nhất. Save tạo version mới (`author: athlete`) và một
   `planEvent`, **thay** bước "Save to the card" rồi quay lại modal lưu lần hai. Toast "Plan
@@ -368,6 +398,32 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   xung đột).
 
 **P1.6 Card sống sau khi lưu, và luôn theo COROS (D5, D12)** · L
+- (P1.6a đã làm: bản đọc lại sau khi lưu là `document_json` của version, khoá buổi đổi về khoá
+  của Coach (`keyedAsSent`: theo `idInPlan`, rồi theo thứ tự). Version mới của plan đã lưu mang
+  danh tính COROS (`carryCorosIdentity`): `remoteId`/`remoteVersion`, `idInPlan` theo khoá, và
+  `corosProgram` chỉ cho buổi có workout không đổi — "không đổi" so với `plan_json` của bản gốc,
+  cùng dạng, vì workout đọc lại từ COROS không bao giờ bằng bản đã viết. `document_json` giữ
+  kèm hash của `plan_json`; build cũ sửa `plan_json` tại chỗ thì document được dựng lại và giữ
+  danh tính. Nút chính "Update COROS plan", ⋯ "Save as a new COROS plan"; xung đột version trên
+  COROS hỏi Replace with my edit / Save as a new plan / Keep editing (`CorosConflictDialog`).
+  Workout đã lưu vẫn không sửa được: không có gì để cập nhật.)
+- (P1.6b đã làm: `syncPlanDraftFromCoros` — chỉ khi version mới nhất là bản đã lưu, vì một
+  version chưa lưu là thay đổi người dùng chưa gửi và được kiểm lúc gửi. Một request (`detail`
+  thô, so `version`), request thứ hai chỉ khi COROS mới hơn; `cacheOnly` khi mở canvas không tốn
+  request. Bản nhập về là version `author: coros`, khoá buổi đổi về khoá cũ theo `idInPlan`, và
+  **được đánh dấu đã lưu** — nó chính là thứ COROS đang giữ. Plan bị xoá trên COROS: version
+  `detached` không còn danh tính, lần lưu sau là `plan/add`; `isOnCoros` đọc dấu mới nhất. Coach
+  sửa plan đã đổi trên COROS: bản COROS được nhập trước (một `planEvent` qua stream
+  `chat:streamInfo` kind `planEvent`, và card của nó), rồi thay đổi của Coach chồng lên.)
+- (P1.6c đã làm: "Add to calendar…" dùng `TrainingPlanCalendarDialog` qua `CoachCalendarDialog`;
+  bản chưa lưu đưa vào preview dưới id `chat:<draftId>` — `previewPlanOnCalendar` đọc nó qua
+  `setChatPlanReader`, chatWorkoutTools đăng ký, để hai module không import nhau — và
+  `saveFirst` lưu đúng một lần. Nút có trên plan đã lưu chưa chạy trên lịch, và là lựa chọn phụ
+  của một programme chưa lưu; plan one-shot không có, vì đã dẫn bằng "Put sessions on
+  calendar". Trạng thái lấy từ `chat:planCalendarState` — bản chạy trong `coros_plan_cache` và
+  các match đã lưu, không tốn request — qua `creationCalendar`: "On calendar", "Week n of N" hoặc
+  "Starts …", và `describeCompliance` của Library (không bao giờ 0%). Chưa làm: "Remove from
+  calendar" và "Open in Library" — thuộc P1.7.)
 - **Save to COROS**: `savePlanToCoros` với `document_json`, như Library. Version vừa lưu được
   đọc lại từ COROS (việc Library đã làm sau mỗi lần lưu) và `document_json` của nó được thay bằng
   bản đọc về, để mang `corosProgram` và `idInPlan`.
@@ -392,6 +448,14 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   COROS giả).
 
 **P1.7 Hỏi về đúng chỗ (tham chiếu)** · M
+- (Đã làm: `planRefs` là kind neo; mỗi `PlanRef` mang `label` đọc được, và `toWireMessages` gộp
+  nó vào câu hỏi đi ngay sau — như `planEvent` — để vai vẫn xen kẽ. Canvas có Ask Coach cho cả
+  plan, cho mỗi tuần (`WeekCard.onAsk`, prop tuỳ chọn) và cho buổi đang mở; tối đa ba chip, chip
+  thuộc về cuộc chat được chọn và bị xoá khi đổi cuộc chat. Library: ⋯ "Ask Coach about this
+  plan" với plan `origin: coach` — `chat:findDraftSession` tìm cuộc chat theo mọi version của
+  artifact (tìm chữ `"draftId":"…"` trong transcript); không thấy thì mở cuộc chat mới với tên
+  plan trong composer và không có chip, vì draft đã đi cùng cuộc chat bị xoá. `onOpenCoach` nhận
+  `string | CoachOpenRequest` thay vì đổi chữ ký hoàn toàn: Calendar vẫn truyền chuỗi.)
 - Chọn một tuần hoặc một buổi trong canvas → **Ask Coach** → composer nhận chip. Khi gửi, một
   entry kind mới `planRefs` (neo, Q3) đứng ngay trước message của người dùng. `toWireMessages` mở
   nó thành dòng "[Athlete refers to] <artifact> v3 · week 6 (2–8 Nov) · Sun · Long run 16 km".
@@ -403,6 +467,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 - Test: `test:chat-context-compaction` (mở `planRefs`), `test:chat-canvas-renderer`.
 
 **P1.8 Chip tinh chỉnh (D6)** · S
+- (Đã làm: cột `refinements_json` trên row của version, không phải field trên entry (Q1);
+  `refinementsFrom` bỏ chip trùng, quá 40 ký tự hoặc không phải chữ, và dưới hai chip thì coi như
+  không có, để bộ mặc định thay. Bộ mặc định theo môn: "Long run on Sunday" chỉ khi plan có chạy,
+  "More strength" chỉ khi chưa có sức mạnh. Bấm chip gửi đúng chữ của chip kèm `planRefs` tới cả
+  creation, qua tham số `aboutRefs` của `sendMessage`, không động tới chip đang chờ trong composer.)
 - `suggested_refinements` (2–4 chuỗi, mỗi chuỗi ≤ 40 ký tự) trên `draft_training_plan`,
   `draft_workout` và `revise_training_plan`, lưu trên artifact. Thiếu thì dùng bộ mặc định theo
   loại (plan: Lighter, Fewer days, Long run on Sunday, More strength; workout: Shorter, Easier,
@@ -411,6 +480,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   chỉnh sửa, nên không vi phạm D10.
 
 **P1.9 Card không được yêu cầu (D4)** · S
+- (Đã làm: `chat.coach.inlineSuggestions`, `preference`; `inlineSuggestionsEnabled` quyết theo
+  provider của **nhánh gọi**, không theo provider trong Settings — một analysis có thể chạy bằng
+  provider khác. Đoạn prompt nằm trong `chatCoachContext.ts` (`INLINE_SUGGESTIONS_GUIDE`,
+  `inlineSuggestionsSection`), module thuần mà `test:chat-service` import được, và chỉ thêm khi
+  lượt có `draft_workout`. Settings → Workout suggestions là một `OptionGroup` Automatic/On/Off.)
 - Setting mới `chat.coach.inlineSuggestions`: `auto` | `on` | `off`, mặc định `auto` (bật với
   `claude-code`/`claude-api`, tắt với provider khác). Phân loại `preference` trong
   `syncPolicy.ts`. Nằm ở Settings → Coach, kèm câu về chi phí khi provider không có cache.
@@ -521,7 +595,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 
 | Bảng / cột | Tier | Nội dung |
 |---|---|---|
-| `chat_plan_drafts` + cột mới (P1.1) | `personal` (giữ) | `artifact_id`, `version`, `parent_draft_id`, `author` (`coach` \| `athlete` \| `coros`), `document_json`. Mỗi version một row. `plan_json` giữ nguyên hình dạng cho build cũ; `preview_json` gọn (Q5) |
+| `chat_plan_drafts` + cột mới (P1.1) | `personal` (giữ) | `artifact_id`, `version`, `parent_draft_id`, `author` (`coach` \| `athlete` \| `coros`), `document_json`. Mỗi version một row. `plan_json` và `preview_json` giữ nguyên hình dạng (đầy đủ) cho build cũ (Q5) |
 | `chat_plan_artifacts` (mới, P1.1) | `personal` | `artifact_id` PK, `session_id`, `kind` (plan/workout), `start_monday`, `race_day`, `refinements_json`, `brief_json` (P2), `outline_json` + `outline_version` (P2), `updated_at`. Chỉ những gì không suy ra được: không có tên, trạng thái hay id COROS (đọc từ version). Hai máy sửa brief cùng lúc thì bản sau thắng, như draft Library |
 | `chat_conversation_settings` (mới, P2.0) | `personal` | `session_id` PK, `sources_json`, `runtime_json`, `updated_at`. Bảng riêng, không thêm cột vào `chat_sessions`, để không đụng merger của bảng đó |
 | Setting `chat.coach.inlineSuggestions` (P1.9) | `preference` | `auto` \| `on` \| `off` |

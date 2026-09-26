@@ -42,6 +42,7 @@ import {
   useState,
 } from "react";
 import type {
+  CoachOpenRequest,
   CombinedDownloadProgress,
   CombinedDownloadProgressEvent,
   DownloadJob,
@@ -370,7 +371,7 @@ export default function App() {
     () => new Set(),
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
-  const [coachPrefill, setCoachPrefill] = useState<string | null>(null);
+  const [coachPrefill, setCoachPrefill] = useState<string | CoachOpenRequest | null>(null);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const [activeMediaTab, setActiveMediaTab] = useSelectionPreference(
     MEDIA_TAB_PREFERENCE,

@@ -48,7 +48,9 @@ const {
   formatCoachDashboard,
   formatPersonalRecords,
   formatRecentActivityMix,
-  formatUpcomingWorkoutSport
+  formatUpcomingWorkoutSport,
+  INLINE_SUGGESTIONS_GUIDE,
+  inlineSuggestionsSection
 } = await import(`${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}`);
 
 // --- Personal records and the athlete's own thresholds reach the snapshot ---
@@ -1161,5 +1163,36 @@ assert.equal(
   readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext.enabled,
   false
 );
+
+// Unasked workout cards (P1.9, D4): said in the prompt when the setting is on
+// for the turn's provider, and only when the turn can make one.
+{
+  const { inlineSuggestionsEnabled } = await import(
+    `${distUrl("chatSettingsStore.js")}?cacheBust=${Date.now()}-inline`
+  );
+  assert.equal(inlineSuggestionsEnabled(undefined, "claude-code"), true, "auto is on for Claude Code");
+  assert.equal(inlineSuggestionsEnabled("auto", "claude-api"), true, "and for the Claude API");
+  assert.equal(inlineSuggestionsEnabled("auto", "openrouter"), false, "and off for the rest");
+  assert.equal(inlineSuggestionsEnabled("auto", "local"), false);
+  assert.equal(inlineSuggestionsEnabled("on", "local"), true, "on is on everywhere");
+  assert.equal(inlineSuggestionsEnabled("off", "claude-code"), false, "off is off everywhere");
+
+  assert.deepEqual(inlineSuggestionsSection(true, ["draft_workout", "draft_training_plan"]), ["", INLINE_SUGGESTIONS_GUIDE]);
+  assert.deepEqual(inlineSuggestionsSection(false, ["draft_workout"]), [], "only when it is on");
+  assert.deepEqual(inlineSuggestionsSection(true, ["draft_training_plan"]), [], "and only with the tool to do it");
+  assert.match(INLINE_SUGGESTIONS_GUIDE, /At most two such cards in one answer/);
+  assert.match(INLINE_SUGGESTIONS_GUIDE, /more than two options belong in one plan/);
+
+  const values = new Map();
+  const store = { get: (key) => values.get(key), set: (key, value) => values.set(key, value), delete: (key) => values.delete(key) };
+  const keys = { get: () => undefined, set: () => undefined, delete: () => undefined, hasApiKey: () => false };
+  const keyStores = { anthropic: keys, openRouter: keys, local: keys };
+  assert.equal(readChatSettingsFromStore(store, keyStores).inlineSuggestions, "auto", "automatic until chosen");
+  saveChatSettingsToStore(store, keyStores, { ...readChatSettingsFromStore(store, keyStores), inlineSuggestions: "off" });
+  assert.equal(values.get("chat.coach.inlineSuggestions"), "off");
+  assert.equal(readChatSettingsFromStore(store, keyStores).inlineSuggestions, "off");
+  values.set("chat.coach.inlineSuggestions", "sometimes");
+  assert.equal(readChatSettingsFromStore(store, keyStores).inlineSuggestions, "auto", "an unknown value reads as automatic");
+}
 
 console.log("chat service tests passed");

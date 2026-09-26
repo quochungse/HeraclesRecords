@@ -34,6 +34,11 @@ import {
   savePlanDraftEdit,
   saveWorkoutDraftEdit,
   discardPlanDraft,
+  planArtifacts,
+  restorePlanDraftVersion,
+  syncPlanDraftFromCoros,
+  planCalendarStates,
+  chatSessionForDraft,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -115,6 +120,7 @@ import {
 } from "./claudeCodeProvider";
 import {
   CHAT_SETTINGS_KEYS,
+  inlineSuggestionsEnabled,
   readChatSettingsFromStore,
   saveChatSettingsToStore,
   type ChatApiKeyStore,
@@ -122,6 +128,7 @@ import {
   type ChatSettingsStore
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
+import { inlineSuggestionsSection } from "./chatCoachContext";
 import {
   createChatSession,
   deleteChatSession,
@@ -167,6 +174,9 @@ import type {
   UploadPlanResult,
   PlanDraftPreview,
   PlanWorkoutEntryInput,
+  PlanArtifactVersion,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanGenerationResult,
@@ -1481,7 +1491,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-code") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1584,7 +1595,8 @@ export async function streamChat(
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "openrouter") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1673,7 +1685,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-api") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1762,7 +1775,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "local") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1850,8 +1864,9 @@ export async function streamChat(
     // leaning on the brief snapshot in `instructions`.
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
-      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy))
-    );
+      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
+      );
 
     send("chat:streamStart", { requestId });
     send("chat:streamInfo", {
@@ -2379,15 +2394,44 @@ export async function uploadTrainingPlanDraft(
   unitSystem: UnitSystem = "metric",
   destination: import("./types").TrainingPlanDestination = "workoutLibrary",
   scheduleDate?: string,
-  keepInLibrary = false
+  keepInLibrary = false,
+  options?: import("./types").PlanDraftSaveOptions
 ): Promise<UploadPlanResult> {
   return uploadPlanDraftById(
     draftId,
     normalizeUnitSystem(unitSystem),
     destination,
     scheduleDate,
-    keepInLibrary === true
+    keepInLibrary === true,
+    {
+      ...(options?.asNew === true ? { asNew: true } : {}),
+      ...(options?.overwrite === true ? { overwrite: true } : {})
+    }
   );
+}
+
+export async function syncPlanFromCoros(
+  draftId: string,
+  unitSystem: UnitSystem,
+  cacheOnly = false
+): Promise<import("./types").PlanCorosSync> {
+  return syncPlanDraftFromCoros(draftId, normalizeUnitSystem(unitSystem), { cacheOnly: cacheOnly === true });
+}
+
+export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
+  return restorePlanDraftVersion(draftId, unitSystem);
+}
+
+export function findChatSessionForDraft(draftId: string): string | null {
+  return typeof draftId === "string" && draftId ? chatSessionForDraft(draftId) ?? null : null;
+}
+
+export function listPlanCalendarStates(draftIds: string[]): import("./types").PlanCalendarState[] {
+  return planCalendarStates(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
+}
+
+export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {
+  return planArtifacts(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
 }
 
 export function removePlanDraft(draftId: string): void {
@@ -2397,9 +2441,10 @@ export function removePlanDraft(draftId: string): void {
 export function editWorkoutDraft(
   draftId: string,
   workout: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem = "metric"
-): PlanDraftPreview {
-  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem));
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): PlanVersionSave {
+  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
 export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
@@ -2409,9 +2454,10 @@ export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
 export async function editPlanDraft(
   draftId: string,
   plan: TrainingPlanDocument,
-  unitSystem: UnitSystem = "metric"
-): Promise<PlanDraftPreview> {
-  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem));
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): Promise<PlanVersionSave> {
+  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
 export async function confirmWorkoutDelete(
@@ -2523,7 +2569,10 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
  *
  * Drafting stays allowed because it is already non-destructive — the draft
  * tools return a preview and the real write only happens from the athlete's
- * confirmation card.
+ * confirmation card. Revising is not: `revise_training_plan` would change a
+ * card the athlete is following behind their back, so it stays off this list,
+ * and `executeChatTool` drops `draft_training_plan`'s `revises` for the same
+ * reason.
  */
 const READ_ONLY_ALLOWED_TOOLS = new Set([
   "list_recent_activities",
@@ -2535,6 +2584,7 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "search_coros_exercises",
   "draft_workout",
   "draft_training_plan",
+  "get_plan_draft",
   "request_coach_input"
 ]);
 
@@ -2612,6 +2662,8 @@ export function getClaudeCodeTools(
     return (
       tool.name === "draft_workout" ||
       tool.name === "draft_training_plan" ||
+      tool.name === "revise_training_plan" ||
+      tool.name === "get_plan_draft" ||
       tool.name === "search_coros_exercises"
     );
   });
@@ -2672,7 +2724,14 @@ async function executeChatTool(
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
-    return handleChatWorkoutTool(name as ChatWorkoutToolName, args, {
+    // A run that only reads may add a creation but not change one the athlete
+    // is following: `revises` would make its plan the next version of theirs,
+    // so here the draft is simply a new one.
+    const { revises: _revises, ...unrevised } = args;
+    return handleChatWorkoutTool(name as ChatWorkoutToolName, toolPolicy === "interactive" ? args : unrevised, {
+      onPlanEvent: (event) => {
+        send("chat:streamInfo", { requestId, kind: "planEvent", event });
+      },
       onPlanDraft: (preview: PlanDraftPreview) => {
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
@@ -2883,9 +2942,10 @@ function buildChatFunctionTools(tools: CorosMcpTool[] = getAllChatTools()): Reco
   }));
 }
 
-function withLiveToolInstructions(
+export function withLiveToolInstructions(
   instructions: string,
-  tools: CorosMcpTool[]
+  tools: CorosMcpTool[],
+  { inlineSuggestions = false }: { inlineSuggestions?: boolean } = {}
 ): string {
   if (tools.length === 0) {
     return instructions;
@@ -2985,8 +3045,14 @@ function withLiveToolInstructions(
         "plan is offered first as one COROS plan (give it a description and, for a periodised " +
         "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
         "or schedules it from there — nothing you call writes to COROS. " +
+        "With a draft or a revision you may pass suggested_refinements: two to four follow-ups the athlete " +
+        "is likely to want next, each a few words, which appear as buttons under the card. " +
+        "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
+        "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
+        "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
+      ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
       "",
       "Supported workout capabilities (generated from the validator):",
       buildCoachSportCapabilityGuide(),

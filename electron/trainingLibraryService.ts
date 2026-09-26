@@ -819,7 +819,11 @@ export async function previewPlanOnCalendar(
   startDay: string
 ): Promise<TrainingPlanCalendarPreview> {
   if (!/^\d{8}$/.test(startDay)) throw new Error("Choose a start day.");
-  const plan = planId.startsWith("draft:") ? draftPlan(planId) : await getNativeTrainingPlan(remoteIdOf(planId));
+  const plan = planId.startsWith("draft:")
+    ? draftPlan(planId)
+    : planId.startsWith("chat:")
+      ? chatPlan(planId)
+      : await getNativeTrainingPlan(remoteIdOf(planId));
   const start = parsePlanDay(startDay)!;
   const anchor = mondayOf(start);
   const lastDay = new Date(anchor);
@@ -866,6 +870,21 @@ function draftPlan(draftId: string): TrainingPlanDocument {
   const draft = getTrainingPlanDraft(draftId);
   if (!draft) throw new Error("That draft is no longer in your library.");
   return draft.plan;
+}
+
+/**
+ * How a Coach creation, `chat:<draftId>`, is read for a calendar preview
+ * before it is saved (P1.6). Registered by the chat's tools rather than
+ * imported, since those import this module to save.
+ */
+let chatPlanReader: ((draftId: string) => TrainingPlanDocument) | undefined;
+export function setChatPlanReader(reader: (draftId: string) => TrainingPlanDocument): void {
+  chatPlanReader = reader;
+}
+
+function chatPlan(planId: string): TrainingPlanDocument {
+  if (!chatPlanReader) throw new Error("That Coach plan is not available here.");
+  return chatPlanReader(planId.slice("chat:".length));
 }
 
 /** `executeSubPlan`: the plan goes on the calendar as COROS's running copy of it, answered read in full. */

@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
+  CoachOpenRequest,
   TrainingActivityMatch,
   TrainingHubStatus,
   TrainingLibrarySnapshot,
@@ -86,7 +87,8 @@ interface TrainingLibraryViewProps {
   api: CorosLinkApi;
   status: TrainingHubStatus | null;
   onOpenTraining: () => void;
-  onOpenCoach: (prompt?: string) => void;
+  /** Coach, with a prompt — or a Coach plan to ask about in its own conversation (P1.7). */
+  onOpenCoach: (prompt?: string | CoachOpenRequest) => void;
   onMessage: (message: string) => void;
   onError: (message: string | null) => void;
   /** Raised after a write to the COROS calendar, so surfaces outside this view
@@ -903,6 +905,26 @@ export function TrainingLibraryView({
                 onFavorite={(plan) => void updatePlanMetadata(plan, { favorite: !plan.favorite })}
                 onArchive={(plan) => void updatePlanMetadata(plan, { archived: !plan.archived })}
                 onDelete={setPendingPlanDelete}
+                onAskCoach={
+                  readingPlan.origin === "coach" && readingPlan.coach?.draftId
+                    ? (plan) => {
+                        const draftId = plan.coach?.draftId ?? "";
+                        onOpenCoach({
+                          draftId,
+                          refs: [
+                            {
+                              artifactId: draftId,
+                              draftId,
+                              name: plan.name,
+                              artifactType: "plan",
+                              scope: "plan",
+                              label: "the whole plan"
+                            }
+                          ]
+                        });
+                      }
+                    : undefined
+                }
                 onCalendar={(plan, action) => setCalendarChange({ plan, action })}
                 onContinueDraft={readingDraft ? () => resumePlanDraft(readingDraft) : undefined}
                 onClearDraft={readingDraft ? () => setPendingDraftDiscard(readingDraft) : undefined}
