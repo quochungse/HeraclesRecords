@@ -170,7 +170,8 @@ import type {
   PlanDraftPreview,
   PlanWorkoutEntryInput,
   PlanArtifactVersion,
-  RestoredPlanVersion,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanGenerationResult,
@@ -2394,7 +2395,7 @@ export async function uploadTrainingPlanDraft(
   );
 }
 
-export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): RestoredPlanVersion {
+export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
   return restorePlanDraftVersion(draftId, unitSystem);
 }
 
@@ -2409,9 +2410,10 @@ export function removePlanDraft(draftId: string): void {
 export function editWorkoutDraft(
   draftId: string,
   workout: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem = "metric"
-): PlanDraftPreview {
-  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem));
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): PlanVersionSave {
+  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
 export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
@@ -2421,9 +2423,10 @@ export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
 export async function editPlanDraft(
   draftId: string,
   plan: TrainingPlanDocument,
-  unitSystem: UnitSystem = "metric"
-): Promise<PlanDraftPreview> {
-  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem));
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): Promise<PlanVersionSave> {
+  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
 export async function confirmWorkoutDelete(

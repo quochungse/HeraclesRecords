@@ -61,6 +61,7 @@ import type {
   PersistedChatEntry,
   PlanArtifactVersion,
   PlanDraftPreview,
+  PlanVersionWritten,
   PlanDraftPreviewEntry,
   TrainingPlanDestination,
   TrainingPlanDocument,
@@ -2634,39 +2635,44 @@ export function ChatView({
    * the card's identity for sync is kept (`...entry.draft` first). `editedAt`
    * is what shows the coach this version on the next turn.
    */
-  const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
-    setEditingPlanDraftId(null);
-    setEditingWorkoutDraftId(null);
-    // The coach is told where it happened, once, rather than handed the whole
-    // plan again on every turn after (P1.3).
+  /*
+   * A version the athlete made — an edit saved from the editor, or an older
+   * version restored — goes at the end of the conversation, where it was made:
+   * a line saying what happened, which is also how the coach is told once
+   * rather than handed the whole plan on every turn after (P1.3), and then
+   * the new version's card, under which the one it replaced folds away.
+   */
+  const appendAthleteVersion = (
+    written: PlanVersionWritten,
+    action: "edited" | "restored"
+  ) => {
     const event: ChatEntry = {
       kind: "planEvent",
       event: {
         eventId: crypto.randomUUID(),
-        artifactId: versionIndex.get(preview.draftId)?.artifactId ?? preview.draftId,
-        draftId: preview.draftId,
-        action: "edited",
+        artifactId: written.artifactId,
+        draftId: written.preview.draftId,
+        action,
         author: "athlete",
-        name: preview.name,
-        artifactType: preview.artifactType === "workout" ? "workout" : "plan",
+        name: written.preview.name,
+        artifactType: written.preview.artifactType === "workout" ? "workout" : "plan",
+        fromVersion: written.fromVersion,
+        toVersion: written.toVersion,
+        ...(written.changes.length ? { changes: written.changes } : {}),
         at: Date.now()
       }
     };
     setTimeline((prev) => {
-      const next = [
-        ...prev.map((entry): ChatEntry =>
-          entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-            ? { ...entry, draft: { ...entry.draft, ...preview } }
-            : entry
-        ),
-        event
-      ];
+      const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: written.preview }];
       persistHistory(activeSessionIdRef.current, next, true);
       return next;
     });
-    showToast(
-      `${preview.artifactType === "workout" ? "Workout" : "Plan"} updated. The coach will see your version on its next reply.`
-    );
+  };
+
+  const handlePlanDraftEdited = (written: PlanVersionWritten) => {
+    setEditingPlanDraftId(null);
+    setEditingWorkoutDraftId(null);
+    appendAthleteVersion(written, "edited");
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -2826,28 +2832,7 @@ export function ChatView({
     if (!api) return;
     onError(null);
     try {
-      const restored = await api.restorePlanVersion(draftId, unitSystem);
-      const event: ChatEntry = {
-        kind: "planEvent",
-        event: {
-          eventId: crypto.randomUUID(),
-          artifactId: restored.artifactId,
-          draftId: restored.preview.draftId,
-          action: "restored",
-          author: "athlete",
-          name: restored.preview.name,
-          artifactType: restored.preview.artifactType === "workout" ? "workout" : "plan",
-          fromVersion: restored.fromVersion,
-          toVersion: restored.toVersion,
-          ...(restored.changes.length ? { changes: restored.changes } : {}),
-          at: Date.now()
-        }
-      };
-      setTimeline((prev) => {
-        const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: restored.preview }];
-        persistHistory(activeSessionIdRef.current, next, true);
-        return next;
-      });
+      appendAthleteVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : "Could not restore that version.");
     }
@@ -3611,6 +3596,19 @@ function AnalysisSilentChip({
               // below it already shows what the creation is now.
               const event = entry.event;
               const what = event.artifactType === "workout" ? "Workout" : "Plan";
+              // Undo is a restore of the version this one replaced, offered
+              // only while it is still the newest: after that, undoing it
+              // would also undo whatever came since.
+              const eventVersion = versionIndex.get(event.draftId);
+              const undoTo =
+                api &&
+                event.author === "athlete" &&
+                event.fromVersion &&
+                eventVersion?.latest &&
+                !eventVersion.siblings.some((version) => version.uploadedAt)
+                  ? eventVersion.siblings.filter((version) => version.version === event.fromVersion).at(-1)
+                      ?.draftId
+                  : undefined;
               const verb =
                 event.action === "edited"
                   ? "Edited by you"
@@ -3631,6 +3629,15 @@ function AnalysisSilentChip({
                     {verb}
                     {event.changes?.length ? ` · ${event.changes.join(" · ")}` : ""}
                   </span>
+                  {undoTo ? (
+                    <button
+                      type="button"
+                      className="chat-local-action chat-plan-event-undo"
+                      onClick={() => void handleRestoreVersion(undoTo)}
+                    >
+                      Undo
+                    </button>
+                  ) : null}
                 </div>
               );
             }
@@ -3678,6 +3685,7 @@ function AnalysisSilentChip({
                     <CoachCreationCard
                       draft={draft}
                       version={versionInfo?.version}
+                      editing={draft.draftId === editingPlanDraftId || draft.draftId === editingWorkoutDraftId}
                       document={planDocuments[documentKey] ?? undefined}
                       uploading={uploadingDraftId === draft.draftId}
                       uploaded={uploadedPlans[draft.draftId]}

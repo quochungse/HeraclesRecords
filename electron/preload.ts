@@ -69,9 +69,9 @@ import type {
   TrainingPlanOutlineResult,
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
-  PlanDraftPreview,
   PlanArtifactVersion,
-  RestoredPlanVersion,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -983,24 +983,26 @@ const api = {
     ),
   getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
     ipcRenderer.invoke("chat:planArtifacts", draftIds),
-  restorePlanVersion: (draftId: string, unitSystem: UnitSystem): Promise<RestoredPlanVersion> =>
+  restorePlanVersion: (draftId: string, unitSystem: UnitSystem): Promise<PlanVersionWritten> =>
     ipcRenderer.invoke("chat:restorePlanVersion", draftId, unitSystem),
   removePlanDraft: (draftId: string): Promise<void> =>
     ipcRenderer.invoke("chat:removePlanDraft", draftId),
   editWorkoutDraft: (
     draftId: string,
     workout: PlanWorkoutEntryInput,
-    unitSystem?: UnitSystem
-  ): Promise<PlanDraftPreview> =>
-    ipcRenderer.invoke("chat:editWorkoutDraft", draftId, workout, unitSystem),
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ): Promise<PlanVersionSave> =>
+    ipcRenderer.invoke("chat:editWorkoutDraft", draftId, workout, unitSystem, replaceNewer),
   getPlanDraftDocument: (draftId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("chat:planDraftDocument", draftId),
   editPlanDraft: (
     draftId: string,
     plan: TrainingPlanDocument,
-    unitSystem?: UnitSystem
-  ): Promise<PlanDraftPreview> =>
-    ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem),
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ): Promise<PlanVersionSave> =>
+    ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem, replaceNewer),
   confirmWorkoutDelete: (requestId: string): Promise<DeleteWorkoutResult> =>
     ipcRenderer.invoke("chat:confirmWorkoutDelete", requestId),
   // ----- Sync -----

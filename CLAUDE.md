@@ -482,10 +482,14 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`chat_plan_drafts`), not a library draft, and not listed on the Plans tab. The card's Training
   Plan destination saves it to COROS as one plan (`origin: "coach"`, the coach's `description` as
   the overview, its `week_stages` as COROS's). **Edit plan first opens the plan editor over the
-  conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and saves back into the
-  coach's own draft through `chat:editPlanDraft` — same draft id, same card, dates kept from the
-  coach's first Monday, an undated plan's arrangement kept as `layout`. The edited card carries
-  `editedAt`, and the edit leaves a **`planEvent`** where it happened — an anchor kind, stated to
+  conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and a save is the
+  creation's **next version**, by the athlete, through `chat:editPlanDraft` (a workout through
+  `chat:editWorkoutDraft` from `CoachWorkoutEditor`) — dates kept from the coach's first Monday,
+  an undated plan's arrangement kept as `layout`; the version it replaced is left as it was. A
+  save begun on a version since replaced answers `conflict` and writes nothing until the athlete
+  picks Replace with my edit / Keep the newer version / Keep editing (`NewerVersionDialog`,
+  `replaceNewer`). The new card carries `editedAt`, and the edit leaves a **`planEvent`** — with
+  an Undo while its version is the newest, which restores the one before — where it happened — an anchor kind, stated to
   the coach once on the athlete's next message by `toWireMessages` — rather than the whole plan
   restated on every turn. **Every turn, chat and analysis, carries `creationIndex`**
   (`chatContextCompaction.ts`): a line per creation still in the conversation, its newest

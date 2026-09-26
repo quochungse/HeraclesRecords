@@ -112,11 +112,32 @@ test("the document has every step, for a plan and for a workout", () => {
   assert.equal(single.entries[0].workout.steps[0].target_duration_seconds, 2100);
 });
 
-test("an edit hands back a light card and keeps the steps in the row", () => {
-  const edited = tools.saveWorkoutDraftEdit(workout.draftId, run("Recovery run", 2400), "metric");
+test("an edit is the next version, by the athlete; a light card, the steps in the row", () => {
+  const written = tools.saveWorkoutDraftEdit(workout.draftId, run("Recovery run", 2400), "metric");
+  assert.equal(written.kind, "written");
+  const edited = written.preview;
   assert.equal("source" in edited.entries[0], false);
-  const stored = JSON.parse(database.getChatPlanDraft(workout.draftId).previewJson);
+  const row = database.getChatPlanDraft(edited.draftId);
+  assert.equal(row.version, 2);
+  assert.equal(row.author, "athlete");
+  assert.equal(row.parentDraftId, workout.draftId);
+  assert.ok(edited.editedAt);
+  const stored = JSON.parse(row.previewJson);
   assert.equal(stored.entries[0].source.steps[0].target_duration_seconds, 2400);
+  assert.deepEqual(written.changes, ["Changed Recovery run"]);
+});
+
+test("an edit begun on a version since replaced asks, and writes only when told (P1.5)", () => {
+  // The editor was opened on version 1; version 2 is the athlete's edit above.
+  const stale = tools.saveWorkoutDraftEdit(workout.draftId, run("Recovery run", 1200), "metric");
+  assert.equal(stale.kind, "conflict");
+  assert.equal(stale.newest.version, 2);
+  assert.equal(stale.newest.author, "athlete");
+  assert.equal(tools.planArtifacts([workout.draftId]).length, 2, "nothing written");
+  const replaced = tools.saveWorkoutDraftEdit(workout.draftId, run("Recovery run", 1200), "metric", true);
+  assert.equal(replaced.kind, "written");
+  assert.deepEqual([replaced.fromVersion, replaced.toVersion], [2, 3], "written on top of the newest");
+  assert.equal(database.getChatPlanDraft(replaced.preview.draftId).parentDraftId, stale.newest.draftId);
 });
 
 test("opening a conversation restores a card's kind but not its steps", () => {
@@ -169,12 +190,13 @@ test("versions group by creation, and the newest is the one with buttons", () =>
     [[plan.draftId, 1], ["plan-v2", 2]],
     "asked by one version, every version of its creation comes back, oldest first"
   );
-  assert.equal(listed.filter((item) => item.artifactId === workout.draftId).length, 1);
+  // The workout has the athlete's two edits from above.
+  assert.equal(listed.filter((item) => item.artifactId === workout.draftId).length, 3);
 
   const index = versions.creationVersions(listed);
   assert.equal(versions.isLatestVersion(index, plan.draftId), false);
   assert.equal(versions.isLatestVersion(index, "plan-v2"), true);
-  assert.equal(versions.isLatestVersion(index, workout.draftId), true);
+  assert.equal(versions.isLatestVersion(index, workout.draftId), false, "its first version is replaced");
   assert.equal(versions.isLatestVersion(index, "never-listed"), true, "a card not yet known counts as newest");
   assert.equal(versions.supersededLine(index.get(plan.draftId)), "v1 · replaced by v2 from you");
 });

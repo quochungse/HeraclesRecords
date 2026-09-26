@@ -119,6 +119,7 @@ export function CoachCreationCard({
   uploaded,
   onUpload,
   onEdit,
+  editing = false,
   onOpen
 }: {
   draft: PlanDraftPreview;
@@ -134,6 +135,8 @@ export function CoachCreationCard({
     keepInLibrary?: boolean
   ) => void;
   onEdit?: () => void;
+  /** Its editor is open: the way on is back into it. */
+  editing?: boolean;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -233,6 +236,7 @@ export function CoachCreationCard({
           uploading={uploading}
           onUpload={onUpload}
           onEdit={onEdit}
+          editing={editing}
         />
       )}
 

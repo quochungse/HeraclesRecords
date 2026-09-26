@@ -1093,7 +1093,7 @@ test("a coach plan is saved to COROS as one plan, with its overview and stages",
   );
 });
 
-test("an edit in Coach rewrites the coach's draft, and the card keeps its id", async () => {
+test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);
   const opened = chatWorkoutTools.planDraftDocument(preview.draftId);
@@ -1107,9 +1107,13 @@ test("an edit in Coach rewrites the coach's draft, and the card keeps its id", a
   edited.entries[0].dayIndex = 2;
   edited.entries[1].title = "Longer Sunday";
   edited.entries.push({ ...structuredClone(edited.entries[0]), id: "added", weekIndex: 1, dayIndex: 1, sortOrder: 9 });
-  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
-  assert.equal(next.draftId, preview.draftId, "the same card, not a new one");
-  assert.ok(next.editedAt, "marked edited, which is what shows it to the coach");
+  const written = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  assert.equal(written.kind, "written");
+  assert.deepEqual([written.fromVersion, written.toVersion], [1, 2]);
+  const next = written.preview;
+  assert.notEqual(next.draftId, preview.draftId, "a version of its own, beside the coach's");
+  assert.ok(next.editedAt, "marked edited, which is what the card and Coach's index read");
+  assert.ok(written.changes.includes("Easy Monday is now Longer Sunday") || written.changes.some((line) => /Longer Sunday/.test(line)), written.changes.join(" | "));
   assert.deepEqual(
     next.entries.map((entry) => [entry.name, entry.scheduleDate]),
     [
@@ -1121,11 +1125,16 @@ test("an edit in Coach rewrites the coach's draft, and the card keeps its id", a
   );
   assert.equal(new Set(next.entries.map((entry) => entry.key)).size, 3, "a copied session gets a key of its own");
 
-  const reopened = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const reopened = chatWorkoutTools.planDraftDocument(next.draftId);
   assert.deepEqual(
     reopened.entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
     [["Easy Monday", 0, 2], ["Easy Monday", 1, 1], ["Longer Sunday", 1, 6]],
     "opening it again shows the edit"
+  );
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(preview.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+    [[0, 0], [1, 6]],
+    "and the coach's version is still the coach's"
   );
 });
 
@@ -1140,16 +1149,16 @@ test("an undated coach plan keeps the weeks and days the athlete gave it", async
   const edited = structuredClone(opened);
   edited.entries[2].weekIndex = 1;
   edited.entries[2].dayIndex = 5;
-  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  const next = (await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited)).preview;
   assert.ok(next.entries.every((entry) => !entry.scheduleDate), "no date is invented");
   assert.deepEqual(
-    chatWorkoutTools.planDraftDocument(preview.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+    chatWorkoutTools.planDraftDocument(next.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
     [[0, 0], [0, 1], [1, 5]],
     "and the arrangement survives, where the list would have put Three back on Wednesday"
   );
 });
 
-test("a coach's one-off workout is edited in place, keeping the day it was suggested for", async () => {
+test("a coach's one-off workout is edited as its next version, keeping the day it was suggested for", async () => {
   fakeCoros();
   let preview;
   const response = JSON.parse(
@@ -1168,8 +1177,8 @@ test("a coach's one-off workout is edited in place, keeping the day it was sugge
     schedule_date: "20991231",
     save_to_library: true
   };
-  const next = chatWorkoutTools.saveWorkoutDraftEdit(preview.draftId, edited);
-  assert.equal(next.draftId, preview.draftId, "the same card");
+  const next = chatWorkoutTools.saveWorkoutDraftEdit(preview.draftId, edited).preview;
+  assert.notEqual(next.draftId, preview.draftId, "the next version");
   assert.equal(next.artifactType, "workout");
   assert.ok(next.editedAt, "marked edited, so the coach is told");
   assert.equal(next.entries.length, 1);
@@ -1178,7 +1187,7 @@ test("a coach's one-off workout is edited in place, keeping the day it was sugge
   assert.equal(next.entries[0].scheduleDate, "2099-08-05", "the day the coach suggested, not one the builder carried");
   assert.equal("source" in next.entries[0], false, "the card is light; the steps are in the draft");
   assert.equal(
-    chatWorkoutTools.planDraftDocument(preview.draftId).entries[0].workout.steps[0].target_duration_seconds,
+    chatWorkoutTools.planDraftDocument(next.draftId).entries[0].workout.steps[0].target_duration_seconds,
     1500
   );
   assert.equal(next.name, "Shorter recovery");

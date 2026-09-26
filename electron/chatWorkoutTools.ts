@@ -47,7 +47,9 @@ import type {
   PlanArtifactVersion,
   PlanDraftPreview,
   PlanWorkoutEntryInput,
-  RestoredPlanVersion,
+  PlanVersionConflict,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanDestination,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
@@ -1722,12 +1724,15 @@ export function planDraftDocument(draftId: string): TrainingPlanDocument {
 export async function savePlanDraftEdit(
   draftId: string,
   plan: TrainingPlanDocument,
-  unitSystem: UnitSystem = "metric"
-): Promise<PlanDraftPreview> {
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): Promise<PlanVersionSave> {
   const stored = requirePlanDraft(draftId);
   if (stored.uploadedAt) {
     throw new Error("This plan has already been saved, so the Coach card can no longer be edited.");
   }
+  const newer = newerVersion(stored, replaceNewer);
+  if (newer) return newer;
   const dates = stored.plan.workouts
     .map((workout) => parsePlanDay(workout.schedule_date))
     .filter((date): date is Date => Boolean(date))
@@ -1781,16 +1786,7 @@ export async function savePlanDraftEdit(
       /* The calendar is only consulted to warn; offline, the card says nothing. */
     }
   }
-  const preview = buildPlanPreview(draftId, next, {
-    scheduleConflicts: conflicts,
-    unitSystem,
-    artifactType: "plan"
-  });
-  preview.editedAt = Date.now();
-  stored.plan = next;
-  stored.preview = preview;
-  persistPlanDraft(stored);
-  return lightPreview(preview);
+  return writeVersion(stored, next, { unitSystem, conflicts, author: "athlete" });
 }
 
 /**
@@ -1802,8 +1798,9 @@ export async function savePlanDraftEdit(
 export function saveWorkoutDraftEdit(
   draftId: string,
   workout: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem = "metric"
-): PlanDraftPreview {
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): PlanVersionSave {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
     throw new Error("Workout draft not found. Ask the coach to write it again.");
@@ -1814,6 +1811,8 @@ export function saveWorkoutDraftEdit(
   if (stored.uploadedAt) {
     throw new Error("This workout has already been saved, so the Coach card can no longer be edited.");
   }
+  const newer = newerVersion(stored, replaceNewer);
+  if (newer) return newer;
   const original = stored.plan.workouts[0];
   if (!original) throw new Error("This workout draft holds no workout.");
   const {
@@ -1840,12 +1839,7 @@ export function saveWorkoutDraftEdit(
   };
   const validation = validatePlanDraft(next, { todayDay: "00000000" });
   if (!validation.ok) throw new Error(validation.errors.join(" "));
-  const preview = buildPlanPreview(draftId, next, { unitSystem, artifactType: "workout" });
-  preview.editedAt = Date.now();
-  stored.plan = next;
-  stored.preview = preview;
-  persistPlanDraft(stored);
-  return lightPreview(preview);
+  return writeVersion(stored, next, { unitSystem, conflicts: [], author: "athlete" });
 }
 
 /**
@@ -1857,34 +1851,88 @@ export function saveWorkoutDraftEdit(
 export function restorePlanDraftVersion(
   draftId: string,
   unitSystem: UnitSystem = "metric"
-): RestoredPlanVersion {
+): PlanVersionWritten {
   const older = loadStoredPlanDraft(draftId);
   if (!older) throw new Error("That version is no longer here.");
   const versions = versionsOf(older.artifactId);
   const latest = versions[versions.length - 1] ?? older;
-  if (versions.some((version) => version.uploadedAt)) {
-    throw new Error("This is saved to COROS; an earlier version cannot be restored from here yet.");
-  }
   if (latest.draftId === older.draftId) {
     throw new Error("This is already the newest version.");
   }
-  const artifactType = latest.preview.artifactType ?? "plan";
-  const restoredId = crypto.randomUUID();
-  const plan = structuredClone(older.plan);
-  const preview = buildPlanPreview(restoredId, plan, { unitSystem, artifactType });
+  return writeVersion(latest, structuredClone(older.plan), {
+    unitSystem,
+    conflicts: [],
+    author: "athlete",
+    changeSummary: `Restored version ${older.version}`,
+    // Written on top of the newest, whatever the athlete had open.
+    edited: false
+  });
+}
+
+/**
+ * The newest version, when it is not `base` and the athlete has not chosen to
+ * replace it: an edit begun on a version Coach has since revised would
+ * otherwise drop that revision without anyone deciding to.
+ */
+function newerVersion(base: StoredPlanDraft, replaceNewer: boolean): PlanVersionConflict | undefined {
+  if (replaceNewer) return undefined;
+  const versions = versionsOf(base.artifactId);
+  const latest = versions[versions.length - 1];
+  if (!latest || latest.draftId === base.draftId) return undefined;
+  return {
+    kind: "conflict",
+    newest: { draftId: latest.draftId, version: latest.version, author: latest.author }
+  };
+}
+
+/**
+ * The next version of `base`'s creation, with `plan` as its content. Always
+ * written on top of the newest — which is `base` unless the athlete chose to
+ * replace a newer one — so versions stay a line and "what changed" is read
+ * against what the new one replaced.
+ */
+function writeVersion(
+  base: StoredPlanDraft,
+  plan: CorosTrainingPlanDraft,
+  options: {
+    unitSystem: UnitSystem;
+    conflicts: string[];
+    author: ChatPlanDraftAuthor;
+    changeSummary?: string;
+    /** Marks the card as the athlete's edit; a restore is not one. */
+    edited?: boolean;
+  }
+): PlanVersionWritten {
+  const versions = versionsOf(base.artifactId);
+  if (versions.some((version) => version.uploadedAt) || base.uploadedAt) {
+    throw new Error("This is already saved to COROS, so the Coach card can no longer be changed from here.");
+  }
+  const latest = versions[versions.length - 1] ?? base;
+  const artifactType = base.preview.artifactType ?? "plan";
+  const draftId = crypto.randomUUID();
+  const preview = buildPlanPreview(draftId, plan, {
+    scheduleConflicts: options.conflicts,
+    unitSystem: options.unitSystem,
+    artifactType
+  });
+  preview.conflicts = options.conflicts;
+  // An existing field, and what the card's status and Coach's index read as
+  // "edited by the athlete".
+  if (options.edited !== false) preview.editedAt = Date.now();
   const stored: StoredPlanDraft = {
-    draftId: restoredId,
+    draftId,
     plan,
     preview,
     createdAt: Math.max(Date.now(), latest.createdAt + 1),
     artifactId: latest.artifactId,
     version: latest.version + 1,
     parentDraftId: latest.draftId,
-    author: "athlete",
-    changeSummary: `Restored version ${older.version}`
+    author: options.author,
+    ...(options.changeSummary ? { changeSummary: options.changeSummary } : {})
   };
   persistPlanDraft(stored);
   return {
+    kind: "written",
     preview: lightPreview(preview),
     artifactId: stored.artifactId,
     fromVersion: latest.version,

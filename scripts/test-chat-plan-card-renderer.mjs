@@ -517,6 +517,89 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
+  // An edit saved from the editor is the next version; one begun on a version
+  // since replaced asks first (P1.5)
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 }
+    ],
+    editPlanDraft: {
+      kind: "conflict",
+      newest: { draftId: "plan-1-coach", version: 2, author: "coach" }
+    }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="edit"]'), "the card offers Edit");
+  await harness("click", '.chat-creation-card [data-action="edit"]');
+  await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "the plan editor opens");
+  assert.equal(
+    await harness("exists", '.chat-creation-card [data-action="continueEditing"]'),
+    true,
+    "while it is open, the card's way on is back into it"
+  );
+  await harness("setValue", ".tl-plan-modal .plan-editor-name", "Hanoi Half base, mine");
+  await settle();
+  await page(`[...document.querySelectorAll(".tl-plan-modal button.primary-button")].find((button) => button.textContent.includes("Save changes")).click()`);
+  await waitFor(() => harness("callCount", "editPlanDraft"), "the edit is saved");
+  assert.deepEqual((await harness("calls", "editPlanDraft"))[0].args.slice(0, 1), ["plan-1"]);
+  assert.equal((await harness("calls", "editPlanDraft"))[0].args[3], false, "not over a newer version, unasked");
+  await waitFor(
+    async () => /changed while you were editing/.test((await page(`document.body.textContent`)) ?? ""),
+    "a newer version is found, and the athlete is asked"
+  );
+  await harness("setScript", {
+    editPlanDraft: {
+      kind: "written",
+      preview: { ...PREVIEW, draftId: "plan-1-v3", name: "Hanoi Half base, mine", editedAt: 9 },
+      artifactId: "plan-1",
+      fromVersion: 2,
+      toVersion: 3,
+      changes: ['Renamed to "Hanoi Half base, mine"']
+    },
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1 },
+      { artifactId: "plan-1", draftId: "plan-1-coach", version: 2, author: "coach", createdAt: 2 },
+      { artifactId: "plan-1", draftId: "plan-1-v3", version: 3, author: "athlete", createdAt: 3 }
+    ],
+    restorePlanVersion: {
+      kind: "written",
+      preview: { ...PREVIEW, draftId: "plan-1-v4" },
+      artifactId: "plan-1",
+      fromVersion: 3,
+      toVersion: 4,
+      changes: ['Renamed to "Hanoi Half base"']
+    }
+  });
+  await page(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Replace with my edit").click()`);
+  await waitFor(async () => (await harness("callCount", "editPlanDraft")) === 2, "Replace saves again");
+  assert.equal((await harness("calls", "editPlanDraft"))[1].args[3], true, "this time over the newer version");
+  await waitFor(async () => !(await harness("exists", ".tl-plan-modal")), "the editor closes");
+  await waitFor(() => harness("exists", ".chat-plan-event-row"), "the edit leaves a line where it was made");
+  assert.match((await harness("text", ".chat-plan-event-row")) ?? "", /Edited by you · Renamed to "Hanoi Half base, mine"/);
+  const afterEdit = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterEdit.slice(-2).map((entry) => [entry.kind, entry.event?.toVersion ?? entry.draft?.draftId]),
+    [["planEvent", 3], ["planDraft", "plan-1-v3"]],
+    "then the new version's card; the coach's card is left as it was"
+  );
+  assert.equal(
+    afterEdit.find((entry) => entry.kind === "planDraft" && entry.draft.draftId === "plan-1")?.draft.editedAt,
+    undefined,
+    "no edit is written into the coach's version"
+  );
+  // Undo restores the version the edit replaced, which is Coach's version 2.
+  await waitFor(() => harness("exists", ".chat-plan-event-undo"), "the line offers Undo");
+  await harness("click", ".chat-plan-event-undo");
+  await waitFor(() => harness("callCount", "restorePlanVersion"), "Undo restores");
+  assert.equal((await harness("calls", "restorePlanVersion"))[0].args[0], "plan-1-coach");
+  await waitFor(
+    async () => (await harness("count", ".chat-plan-event-row")) === 2,
+    "and says so on a line of its own"
+  );
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

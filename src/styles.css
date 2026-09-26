@@ -19930,6 +19930,12 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
+/* Undo on the line an edit left: small, and after what it undoes. */
+.chat-plan-event-undo {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .chat-asked-answer::before {
   margin-right: 6px;
   color: var(--text-muted);

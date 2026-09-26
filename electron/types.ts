@@ -3148,14 +3148,30 @@ export interface PlanEvent {
   at: number;
 }
 
-/** An older version made the newest again (P1.4): its card and what it changed. */
-export interface RestoredPlanVersion {
+/**
+ * A version the athlete made — an edit saved from the editor (P1.5), or an
+ * older version restored (P1.4): its card, and what it changed against the
+ * version it replaced.
+ */
+export interface PlanVersionWritten {
+  kind: "written";
   preview: PlanDraftPreview;
   artifactId: string;
   fromVersion: number;
   toVersion: number;
   changes: string[];
 }
+
+/**
+ * An edit begun on a version something has since replaced — Coach revised it,
+ * or it changed on another machine. Nothing was written; the athlete decides.
+ */
+export interface PlanVersionConflict {
+  kind: "conflict";
+  newest: { draftId: string; version: number; author: "coach" | "athlete" | "coros" };
+}
+
+export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
 
 /**
  * One version of a coach's creation, as the conversation lists them

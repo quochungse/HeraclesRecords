@@ -1853,8 +1853,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:planDraftDocument", (_event, draftId: string) => getPlanDraftDocument(draftId));
   ipcMain.handle(
     "chat:editPlanDraft",
-    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem) =>
-      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem))
+    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
   ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean) =>
     uploadTrainingPlanDraft(
@@ -1874,8 +1874,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
     removePlanDraft(draftId)
   );
-  ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem) =>
-    editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem))
+  ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+    editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
 
   ipcMain.handle("chat:confirmWorkoutDelete", (_event, requestId: string) =>

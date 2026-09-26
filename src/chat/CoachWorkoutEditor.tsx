@@ -1,14 +1,22 @@
-import type { PlanDraftPreview, PlanWorkoutEntryInput, TrainingPlanEntry } from "../../electron/types";
+import { useState } from "react";
+import type {
+  PlanDraftPreview,
+  PlanVersionConflict,
+  PlanVersionWritten,
+  PlanWorkoutEntryInput,
+  TrainingPlanEntry
+} from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
+import { NewerVersionDialog } from "./NewerVersionDialog";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import "../training-library/trainingLibrary.css";
 
 /**
  * A coach's one-off workout, opened in the builder every other workout is
- * written in, and saved back into the coach's own draft — same draft, same
- * card (docs/coach-plan-canvas.md, P0.4). Loaded only when it is used, with the
+ * written in, and saved as the workout's next version
+ * (docs/coach-plan-canvas.md, P0.4, P1.5). Loaded only when it is used, with the
  * library's stylesheet the builder's dialog is drawn by.
  */
 export default function CoachWorkoutEditor({
@@ -23,11 +31,31 @@ export default function CoachWorkoutEditor({
   draft: PlanDraftPreview;
   /** The workout as the coach wrote it, steps and all. */
   workout: PlanWorkoutEntryInput;
-  onSaved: (preview: PlanDraftPreview) => void;
+  onSaved: (written: PlanVersionWritten) => void;
   onClose: () => void;
   onError: (message: string | null) => void;
 }) {
   const { unitSystem } = useUnitSystem();
+  const [conflict, setConflict] = useState<{
+    workout: PlanWorkoutEntryInput;
+    newest: PlanVersionConflict["newest"];
+  } | null>(null);
+  const save = (edited: PlanWorkoutEntryInput, replaceNewer = false) => {
+    onError(null);
+    void api
+      .editWorkoutDraft(draft.draftId, edited, unitSystem, replaceNewer)
+      .then((result) => {
+        if (result.kind === "conflict") {
+          setConflict({ workout: edited, newest: result.newest });
+          return;
+        }
+        setConflict(null);
+        onSaved(result);
+      })
+      .catch((caught: unknown) =>
+        onError(caught instanceof Error ? caught.message : "Could not save the workout.")
+      );
+  };
   const entry: TrainingPlanEntry = {
     id: `entry:${draft.draftId}:${workout.key}`,
     weekIndex: 0,
@@ -38,6 +66,7 @@ export default function CoachWorkoutEditor({
   };
 
   return (
+    <>
     <WorkoutBuilderModal
       api={api}
       source={{ kind: "plan", entry }}
@@ -54,16 +83,18 @@ export default function CoachWorkoutEditor({
         />
       )}
       onClose={onClose}
-      onSavedToPlan={(edited) => {
-        onError(null);
-        void api
-          .editWorkoutDraft(draft.draftId, edited, unitSystem)
-          .then(onSaved)
-          .catch((caught: unknown) =>
-            onError(caught instanceof Error ? caught.message : "Could not save the workout.")
-          );
-      }}
+      onSavedToPlan={(edited) => save(edited)}
       onError={onError}
     />
+    {conflict ? (
+      <NewerVersionDialog
+        what="workout"
+        newest={conflict.newest}
+        onReplace={() => save(conflict.workout, true)}
+        onKeepNewer={onClose}
+        onKeepEditing={() => setConflict(null)}
+      />
+    ) : null}
+    </>
   );
 }

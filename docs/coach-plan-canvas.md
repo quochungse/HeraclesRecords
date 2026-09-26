@@ -380,6 +380,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   có rAF.
 
 **P1.5 Màn hình edit và khoá sửa (D10)** · M
+- (Đã làm: `savePlanDraftEdit`/`saveWorkoutDraftEdit` trả `PlanVersionSave` — `written` với
+  diff so với bản bị thay, hoặc `conflict` khi bản đã mở không còn là mới nhất; `writeVersion`
+  dùng chung với Restore. `NewerVersionDialog` hỏi ba lựa chọn. Card và canvas hiện Continue
+  editing khi editor của nó đang mở. Undo trên dòng `planEvent` chỉ có khi version nó để lại vẫn
+  là mới nhất và chưa lưu. Toast bỏ; nút lưu là "Save changes".)
 - Edit của plan mở `PlanEditor` phủ lên Coach (tổng quát hoá `CoachPlanEditor`), nạp
   `document_json` của version mới nhất. Save tạo version mới (`author: athlete`) và một
   `planEvent`, **thay** bước "Save to the card" rồi quay lại modal lưu lần hai. Toast "Plan
