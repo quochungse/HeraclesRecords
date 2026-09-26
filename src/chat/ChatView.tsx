@@ -896,6 +896,13 @@ export function ChatView({
       )
       .catch(() => undefined);
   }, [api, missingBriefs]);
+  /**
+   * The change sets behind the conversation's proposal cards (P3.2), by id.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
+  /** The line being applied (`"*"` for a whole set), by set. */
+  const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
   const missingChangeSets = scheduleChangeIds(timeline)
     .filter((changeSetId) => !(changeSetId in scheduleChanges))
     .join(",");
@@ -1006,13 +1013,6 @@ export function ChatView({
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
-  /**
-   * The change sets behind the conversation's proposal cards (P3.2), by id.
-   * `null` is a read that found nothing, kept so it is not asked again.
-   */
-  const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
-  /** The line being applied (`"*"` for a whole set), by set. */
-  const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -2777,6 +2777,9 @@ export function ChatView({
       ...new Set(persisted.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
     ];
     const briefs = briefIds.length ? await api.getPlanBriefs(briefIds).catch(() => []) : [];
+    // Read now, not from state: a line applied on the other machine is what the coach should hear (P3.3).
+    const changeSetIds = scheduleChangeIds(persisted);
+    const changeSets = changeSetIds.length ? await api.getScheduleChanges(changeSetIds).catch(() => []) : [];
     if (activeRequestIdRef.current !== requestId) return true;
     const wireMessages = withCreationIndex(
       [
@@ -2785,7 +2788,8 @@ export function ChatView({
       ],
       persisted,
       Array.isArray(versions) ? versions : [],
-      Array.isArray(briefs) ? briefs : []
+      Array.isArray(briefs) ? briefs : [],
+      Array.isArray(changeSets) ? changeSets : []
     );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined, pipeline);

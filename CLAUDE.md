@@ -447,9 +447,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   the copy moves the calendar. **The app's own move is not COROS's**: `rescheduleScheduledWorkout` adds the
   session to the athlete's own calendar and deletes the original, so a plan session moved that way
   leaves the copy and its compliance with it (measured on the live account, 2026-09-26).
-  A plan session moves through `plan/update` on the running copy, which keeps its `idInPlan`;
-  removing one with `schedule/update` status 3 takes it out of the copy too, so a delete stays in
-  step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
+  So **every move goes through `moveCalendarSession` (`electron/scheduleMoves.ts`)** — the Calendar's
+  drag (`trainingHub:rescheduleWorkout`) and Coach's change sets alike: a plan session moves, and has
+  its workout replaced (`replaceCalendarSession`), through `plan/update` on the running copy, which
+  keeps its `idInPlan`; only the athlete's own sessions take the add-then-delete. Whether a `planId`
+  is a running copy is asked of the cache and, when the cache has never seen it, of COROS — never
+  guessed. Removing a plan session with `schedule/update` status 3 takes it out of the copy too, so
+  a delete stays in step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
   `TrainingPlanCalendarDialog` states before anything is written: **it counts the plan from the
   Monday of the week the start day is in, and leaves off every session before the start** (a
   Wednesday start loses week 1's Monday and Tuesday), and **it never checks the calendar** (a day
@@ -799,7 +803,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   `stale` — **one line is one write, recorded as it lands** (one `schedule/update` is all or nothing),
   and a line already applied is never written again. The delete card it replaced lived in a map in
   memory, so a restart left a button that could only say "expired"; a `workoutDelete` entry from
-  then is drawn and can do nothing. `npm run test:schedule-changes`.
+  then is drawn and can do nothing. **`propose_schedule_changes`** (P3.3) is Coach's way to rearrange
+  a week — move, replace, remove, add, up to twenty lines — checked in the turn (the session is on
+  that day, no day has passed, a workout passes `validatePlanDraft` and resolves its exercises) and
+  handed back whole on a refusal. It writes nothing, so it is on `READ_ONLY_ALLOWED_TOOLS`. The
+  outcome of every proposal rides in `creationIndex` on the next turn, read from the row, so Coach
+  knows what the athlete applied. `npm run test:schedule-changes`, `test:schedule-change-renderer`.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and
   `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its

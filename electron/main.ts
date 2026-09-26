@@ -133,7 +133,6 @@ import {
   scheduleLibraryWorkout,
   createAndScheduleWorkout,
   createLibraryWorkout,
-  rescheduleScheduledWorkout,
   removeScheduledWorkout,
   getWorkoutForEdit,
   previewWorkoutEdit,
@@ -359,6 +358,7 @@ import {
   inspectChatSessionContext
 } from "./chatContextService";
 import { buildBaseCoachInstructions } from "./chatCoachContext";
+import { moveCalendarSession } from "./scheduleMoves";
 import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
@@ -2205,7 +2205,9 @@ function registerIpcHandlers(): void {
         happenDay: string;
       },
       newHappenDay: string
-    ) => rescheduleScheduledWorkout(entry, newHappenDay)
+    ) =>
+      // A plan's session moves through its running copy, or it leaves the plan (P3.0 D).
+      moveCalendarSession(entry, newHappenDay)
   );
 
   ipcMain.handle(

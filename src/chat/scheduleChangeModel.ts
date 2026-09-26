@@ -4,7 +4,12 @@
  * part a test can reach.
  */
 import type { ChatEntry } from "./chatTypes";
-import type { ScheduleChangeLine, ScheduleChangeSet, ScheduleChangeStatus } from "../../electron/types";
+import type {
+  PersistedChatEntry,
+  ScheduleChangeLine,
+  ScheduleChangeSet,
+  ScheduleChangeStatus
+} from "../../electron/types";
 
 export function proposedLines(set: ScheduleChangeSet): ScheduleChangeLine[] {
   return set.lines.filter((line) => line.status === "proposed");
@@ -41,6 +46,6 @@ export function changeSetHead(set: ScheduleChangeSet): string {
 }
 
 /** The change sets a transcript anchors, once each, in order. */
-export function scheduleChangeIds(entries: readonly ChatEntry[]): string[] {
+export function scheduleChangeIds(entries: readonly (ChatEntry | PersistedChatEntry)[]): string[] {
   return [...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))];
 }

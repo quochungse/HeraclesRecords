@@ -3860,6 +3860,8 @@ export interface ScheduleChangeSet {
   sessionId?: string;
   summary: string;
   lines: ScheduleChangeLine[];
+  /** The units the workouts were written in; metric when absent. */
+  unitSystem?: UnitSystem;
   createdAt: string;
   updatedAt: string;
 }

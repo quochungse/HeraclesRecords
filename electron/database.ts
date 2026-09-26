@@ -531,6 +531,8 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_plan_drafts", "document_json", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "change_summary", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "refinements_json", "TEXT");
+  // The units a change set's workouts were written in (P3.3).
+  ensureColumn(db, "chat_schedule_changes", "unit_system", "TEXT");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
@@ -3018,6 +3020,7 @@ interface ChatScheduleChangeRow {
   change_set_id: string;
   session_id: string | null;
   summary: string;
+  unit_system: string | null;
   lines_json: string;
   created_at: string;
   updated_at: string;
@@ -3028,6 +3031,7 @@ export interface StoredChatScheduleChange {
   changeSetId: string;
   sessionId?: string;
   summary: string;
+  unitSystem?: string;
   linesJson: string;
   createdAt: string;
   updatedAt: string;
@@ -3038,6 +3042,7 @@ function chatScheduleChangeRecord(row: ChatScheduleChangeRow): StoredChatSchedul
     changeSetId: row.change_set_id,
     ...(row.session_id ? { sessionId: row.session_id } : {}),
     summary: row.summary,
+    ...(row.unit_system ? { unitSystem: row.unit_system } : {}),
     linesJson: row.lines_json,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -3057,11 +3062,12 @@ export function getChatScheduleChanges(changeSetIds: readonly string[]): StoredC
 export function saveChatScheduleChange(record: StoredChatScheduleChange): void {
   requireDatabase()
     .prepare(
-      `INSERT INTO chat_schedule_changes (change_set_id, session_id, summary, lines_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO chat_schedule_changes (change_set_id, session_id, summary, unit_system, lines_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(change_set_id) DO UPDATE SET
          session_id = excluded.session_id,
          summary = excluded.summary,
+         unit_system = excluded.unit_system,
          lines_json = excluded.lines_json,
          updated_at = excluded.updated_at`
     )
@@ -3069,6 +3075,7 @@ export function saveChatScheduleChange(record: StoredChatScheduleChange): void {
       record.changeSetId,
       record.sessionId ?? null,
       record.summary,
+      record.unitSystem ?? null,
       record.linesJson,
       record.createdAt,
       record.updatedAt

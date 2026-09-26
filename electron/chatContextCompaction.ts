@@ -7,7 +7,8 @@ import type {
   PlanBrief,
   PlanDraftPreview,
   PlanEvent,
-  PlanRef
+  PlanRef,
+  ScheduleChangeSet
 } from "./types";
 import { briefLine, outlineLine } from "./planBrief";
 
@@ -251,7 +252,8 @@ const VERSION_AUTHORS: Record<PlanArtifactVersion["author"], string> = {
 export function creationIndex(
   entries: PersistedChatEntry[],
   versions: readonly PlanArtifactVersion[],
-  briefs: readonly PlanBrief[] = []
+  briefs: readonly PlanBrief[] = [],
+  changeSets: readonly ScheduleChangeSet[] = []
 ): string | null {
   const known = new Map(versions.map((version) => [version.draftId, version]));
   const creations = new Map<string, { draft: PlanDraftPreview; version?: PlanArtifactVersion }>();
@@ -278,7 +280,16 @@ export function creationIndex(
     const shape = brief.outline ? outlineLine(brief.outline) : "no outline yet";
     return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · ${shape}`];
   });
-  if (creations.size === 0 && briefLines.length === 0) return null;
+  // What became of each calendar proposal (P3.3): the card is where the athlete
+  // applied it, and the coach would otherwise think it still pending — or done.
+  const setById = new Map(changeSets.map((set) => [set.changeSetId, set]));
+  const changeLines = [
+    ...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))
+  ].flatMap((changeSetId) => {
+    const set = setById.get(changeSetId);
+    return set ? [`- Calendar proposal "${set.summary}" · ${changeSetState(set)}`] : [];
+  });
+  if (creations.size === 0 && briefLines.length === 0 && changeLines.length === 0) return null;
   const lines = [...creations.values()].map(({ draft, version }) => {
     const kind = draft.artifactType === "workout" ? "Workout" : "Plan";
     const made = version
@@ -291,10 +302,28 @@ export function creationIndex(
   return [
     "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id." +
       (briefLines.length ? " Fill in a brief with request_plan_brief and its brief_id; the athlete edits it on its card." : "") +
+      (changeLines.length ? " A calendar proposal is applied by the athlete, line by line, from its card." : "") +
       "]",
     ...lines,
-    ...briefLines
+    ...briefLines,
+    ...changeLines
   ].join("\n");
+}
+
+/** How a proposal's lines stand: `2 applied · 1 out of date ("…") · 1 not decided`. */
+function changeSetState(set: ScheduleChangeSet): string {
+  const parts: string[] = [];
+  const of = (status: ScheduleChangeSet["lines"][number]["status"]) => set.lines.filter((line) => line.status === status);
+  if (of("applied").length) parts.push(`${of("applied").length} applied`);
+  for (const [status, word] of [["failed", "failed"], ["stale", "out of date"]] as const) {
+    const lines = of(status);
+    if (lines.length) {
+      parts.push(`${lines.length} ${word} (${lines.map((line) => `${line.label}: ${line.reason ?? "no reason given"}`).join("; ")})`);
+    }
+  }
+  if (of("dismissed").length) parts.push(`${of("dismissed").length} dismissed`);
+  if (of("proposed").length) parts.push(`${of("proposed").length} not decided yet`);
+  return parts.join(" · ");
 }
 
 /** The wire with `creationIndex` put in front of the latest user message. */
@@ -302,9 +331,10 @@ export function withCreationIndex(
   messages: ChatMessage[],
   entries: PersistedChatEntry[],
   versions: readonly PlanArtifactVersion[],
-  briefs: readonly PlanBrief[] = []
+  briefs: readonly PlanBrief[] = [],
+  changeSets: readonly ScheduleChangeSet[] = []
 ): ChatMessage[] {
-  const note = creationIndex(entries, versions, briefs);
+  const note = creationIndex(entries, versions, briefs, changeSets);
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {

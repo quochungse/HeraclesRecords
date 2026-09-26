@@ -805,7 +805,7 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   mất và ghi *stale* đè *applied* (row thắng theo last-writer-wins) — không ghi COROS hai lần, chỉ
   sai chữ trên card.
 
-**P3.3 Change set trên lịch** · L
+**P3.3 Change set trên lịch** · L · *xong*
 - Tool `propose_schedule_changes { summary, changes: [{ op: move | replace | remove | add,
   target: { plan_id, id_in_plan, happen_day } , to_day?, workout? }] }`. Chỉ **đề xuất**: không
   ghi gì lên COROS, nên được phép trong read-only (analysis). Mỗi dòng được kiểm tra ngay trong lượt
@@ -825,6 +825,19 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
 - Sửa kèm (P3.0 D): màn Calendar dời buổi của plan đang chạy qua bản chạy (`plan/update` đổi `dayNo`),
   không qua `rescheduleScheduledWorkout`. Xoá giữ nguyên (P3.0 A).
 - Test: `test:schedule-changes` mới (fake COROS giữ lịch và bản chạy), renderer của card.
+- **Đã làm.** Tool `propose_schedule_changes` (trong họ tool workout; tối đa 20 dòng; `session { plan_id,
+  id_in_plan, date }`, `to_date`, `workout` dạng của `draft_workout`) kiểm từng dòng trong lượt — buổi
+  có trên ngày đó (đọc lịch một lần cho cả khoảng), không ngày nào đã qua, mỗi buổi một thay đổi, workout
+  qua `validatePlanDraft` và resolve bài tập — và trả mọi lỗi một lần. Áp: `electron/scheduleMoves.ts`
+  (`moveCalendarSession`, `replaceCalendarSession`) chọn đường theo `isRunningCopy` (cache, không có thì
+  hỏi COROS `plan/query`): buổi của plan → `plan/update` trên bản chạy, đọc `detail` lại mỗi dòng; buổi
+  riêng → dời bằng thêm-rồi-xoá, thay bằng thêm-trước-xoá-sau (hỏng giữa chừng thì còn hai buổi chứ không
+  mất buổi). Dòng `add` đã có buổi cùng tên trên ngày đó thì *stale* (máy kia đã áp). Change set nhớ
+  `unit_system` (cột qua `ensureColumn`). Màn Calendar kéo buổi của plan giờ đi qua bản chạy (P3.0 D).
+  `list_scheduled_workouts` ghi `in_plan` cho buổi của plan đang chạy. `creationIndex` mang trạng thái
+  từng đề xuất (đã áp, lỗi/stale kèm lý do, bỏ, chưa quyết) đọc lại từ row mỗi lượt. Review tự làm
+  phát hiện: P3.2 khai báo state `scheduleChanges` sau chỗ dùng đầu tiên — một cuộc chat có neo
+  `scheduleChange` làm ChatView văng (TDZ); đã sửa, `test:schedule-change-renderer` giữ nó.
 
 **P3.4 Card trong analysis** · M
 - Analysis tuần và review sau buổi tập được phép gọi `propose_schedule_changes` và các tool draft

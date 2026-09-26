@@ -289,6 +289,7 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "request_plan_brief",
   "list_scheduled_workouts",
   "delete_workout",
+  "propose_schedule_changes",
   ...CHAT_PLAN_TOOL_NAMES
 ] as const;
 
@@ -469,6 +470,51 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       }
 
     },
+    {
+      name: "propose_schedule_changes",
+      description:
+        "Propose changes to the athlete's calendar for them to apply: move a session to another day, replace its workout, " +
+        "remove it, or add a new one — several at once, e.g. to rearrange a week. Nothing is written: the athlete applies " +
+        "each line, or all of them, from the card under your reply. Name sessions by plan_id, id_in_plan and date from " +
+        "list_scheduled_workouts (or calendar_plan_id from get_training_plan). A session of a plan on the calendar stays " +
+        "in its plan when moved or replaced. Every line is checked now; a refusal lists every problem and nothing is kept.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "What the changes are for, in a few words (the card's title)." },
+          changes: {
+            type: "array",
+            minItems: 1,
+            maxItems: MAX_SCHEDULE_CHANGES,
+            items: {
+              type: "object",
+              properties: {
+                op: { type: "string", enum: ["move", "replace", "remove", "add"] },
+                session: {
+                  type: "object",
+                  description: "The session a move, replace or remove acts on.",
+                  properties: {
+                    plan_id: { type: "string" },
+                    id_in_plan: { type: "string" },
+                    date: { type: "string", description: "YYYYMMDD, the day it is on now." }
+                  },
+                  required: ["plan_id", "id_in_plan", "date"]
+                },
+                to_date: { type: "string", description: "YYYYMMDD: where a move goes, or the day an add lands on." },
+                workout: {
+                  type: "object",
+                  description:
+                    "For replace and add: one workout in draft_workout's workout shape (name, sport, steps …). " +
+                    "Strength and Hybrid Fitness need exact COROS exercise ids from search_coros_exercises."
+                }
+              },
+              required: ["op"]
+            }
+          }
+        },
+        required: ["summary", "changes"]
+      }
+    },
     PLAN_BRIEF_TOOL_DEFINITION,
     ...getChatPlanTools()
   ];
@@ -548,6 +594,9 @@ export async function handleChatWorkoutTool(
   }
   if (name === "list_scheduled_workouts") {
     return handleListScheduledWorkouts(args, options?.unitSystem ?? "metric");
+  }
+  if (name === "propose_schedule_changes") {
+    return handleProposeScheduleChanges(args, options?.sessionId, options?.unitSystem ?? "metric", options?.onScheduleChange);
   }
   return handleDeleteWorkout(args, options?.sessionId, options?.onScheduleChange);
 }
@@ -1588,11 +1637,18 @@ async function handleListScheduledWorkouts(
         : undefined,
       plan_id: entry.planId,
       id_in_plan: entry.idInPlan,
+      // A session of a plan running on the calendar, as the Library last read it (P3.3).
+      ...(runningPlanName(entry.planId) ? { in_plan: runningPlanName(entry.planId) } : {}),
       plan_program_id: entry.planProgramId,
       program_id: entry.programId,
       sort_no: entry.sortNo
     }))
   });
+}
+
+function runningPlanName(planId: string): string | undefined {
+  const plan = getCorosPlanCache(planId);
+  return plan?.calendar === "running" ? plan.name : undefined;
 }
 
 function formatScheduledVolume(
@@ -1709,6 +1765,203 @@ function formatDisplayScheduleDate(value?: string): string | undefined {
   const normalized = value.replace(/-/g, "");
   if (!/^\d{8}$/.test(normalized)) return value;
   return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}`;
+}
+
+const MAX_SCHEDULE_CHANGES = 20;
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/** `Sat 27 Sep`, as a card line reads. */
+function cardDay(day: string): string {
+  const date = parsePlanDay(day);
+  return date ? `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}` : day;
+}
+
+function normalizedDay(value: unknown): string | undefined {
+  const day = typeof value === "string" ? value.replace(/-/g, "").trim() : "";
+  return /^\d{8}$/.test(day) && parsePlanDay(day) ? day : undefined;
+}
+
+/**
+ * Coach's proposal to rearrange the calendar (P3.3): checked line by line now
+ * — the session is there, no day has passed, a workout is one COROS takes —
+ * and kept as a change set for the athlete to apply. The checks are handed
+ * back to the model as the draft tools hand theirs, every problem at once.
+ */
+async function handleProposeScheduleChanges(
+  args: Record<string, unknown>,
+  sessionId: string | undefined,
+  unitSystem: UnitSystem,
+  onScheduleChange?: (changeSet: ScheduleChangeSet) => void
+): Promise<string> {
+  const summary = String(args.summary ?? "").trim();
+  const raw = Array.isArray(args.changes) ? args.changes : [];
+  const refuse = (errors: string[]) =>
+    JSON.stringify({
+      ok: false,
+      errors,
+      action: "Fix every problem listed and call propose_schedule_changes again with all the changes. Nothing was kept."
+    });
+  if (!summary) return refuse(["summary is required."]);
+  if (!raw.length) return refuse(["changes needs at least one change."]);
+  if (raw.length > MAX_SCHEDULE_CHANGES) return refuse([`At most ${MAX_SCHEDULE_CHANGES} changes at once.`]);
+
+  const today = formatScheduleDay(new Date());
+  const errors: string[] = [];
+  const changes = raw.map((item) => (item && typeof item === "object" ? (item as Record<string, unknown>) : {}));
+
+  // The calendar is read once, over every day a change names.
+  const sessionDays = changes.flatMap((change) => {
+    const day = normalizedDay((change.session as Record<string, unknown> | undefined)?.date);
+    return day ? [day] : [];
+  });
+  let calendar: Awaited<ReturnType<typeof listScheduledWorkoutEntries>> = [];
+  if (sessionDays.length) {
+    const sorted = [...sessionDays].sort();
+    try {
+      calendar = await listScheduledWorkoutEntries(sorted[0], sorted[sorted.length - 1]);
+    } catch (caught) {
+      return JSON.stringify({
+        ok: false,
+        errors: [`The calendar could not be read: ${caught instanceof Error ? caught.message : String(caught)}`]
+      });
+    }
+  }
+
+  const seen = new Set<string>();
+  const lines: NewScheduleChangeLine[] = [];
+  for (const [index, change] of changes.entries()) {
+    const at = `changes[${index}]`;
+    const op = String(change.op ?? "");
+    if (!["move", "replace", "remove", "add"].includes(op)) {
+      errors.push(`${at}: op must be move, replace, remove or add.`);
+      continue;
+    }
+
+    let entry: (typeof calendar)[number] | undefined;
+    let sessionKey: string | undefined;
+    if (op !== "add") {
+      const ref = (change.session ?? {}) as Record<string, unknown>;
+      const planId = String(ref.plan_id ?? "").trim();
+      const idInPlan = String(ref.id_in_plan ?? "").trim();
+      const day = normalizedDay(ref.date);
+      if (!planId || !idInPlan || !day) {
+        errors.push(`${at}: session needs plan_id, id_in_plan and date (YYYYMMDD).`);
+        continue;
+      }
+      entry = calendar.find((candidate) => candidate.planId === planId && candidate.idInPlan === idInPlan && candidate.happenDay === day);
+      if (!entry) {
+        errors.push(`${at}: no session #${idInPlan} of plan ${planId} on ${day}. Read it with list_scheduled_workouts.`);
+        continue;
+      }
+      if (day < today) {
+        errors.push(`${at}: "${entry.name}" was on ${day}, which has passed.`);
+        continue;
+      }
+      sessionKey = `${planId}:${idInPlan}`;
+      if (seen.has(sessionKey)) {
+        errors.push(`${at}: "${entry.name}" is already changed by another line; one change per session.`);
+        continue;
+      }
+    }
+
+    let toDay: string | undefined;
+    if (op === "move" || op === "add") {
+      toDay = normalizedDay(change.to_date);
+      if (!toDay) {
+        errors.push(`${at}: to_date (YYYYMMDD) is required for ${op}.`);
+        continue;
+      }
+      if (toDay < today) {
+        errors.push(`${at}: ${toDay} has passed; COROS takes no workout before today.`);
+        continue;
+      }
+      if (op === "move" && toDay === entry!.happenDay) {
+        errors.push(`${at}: "${entry!.name}" is already on ${toDay}.`);
+        continue;
+      }
+    }
+
+    let workout: PlanWorkoutEntryInput | undefined;
+    if (op === "replace" || op === "add") {
+      const checked = await checkedWorkout(change.workout, toDay ?? entry!.happenDay);
+      if (!checked.ok) {
+        errors.push(...checked.errors.map((error) => `${at}: ${error}`));
+        continue;
+      }
+      workout = checked.workout;
+    }
+
+    if (sessionKey) seen.add(sessionKey);
+    const plan = entry ? getCorosPlanCache(entry.planId) : undefined;
+    const inPlan = plan?.calendar === "running" ? ` (${plan.name})` : "";
+    const session = entry
+      ? {
+          planId: entry.planId,
+          idInPlan: entry.idInPlan,
+          happenDay: entry.happenDay,
+          name: entry.name,
+          ...(entry.planProgramId ? { planProgramId: entry.planProgramId } : {}),
+          ...(entry.programId ? { programId: entry.programId } : {}),
+          ...(entry.sportType !== undefined ? { sportType: entry.sportType } : {})
+        }
+      : undefined;
+    if (op === "move") {
+      lines.push({ op, label: `Move "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)} to ${cardDay(toDay!)}`, session, toDay });
+    } else if (op === "replace") {
+      lines.push({ op, label: `Replace "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)} with "${workout!.name}"`, session, workout });
+    } else if (op === "remove") {
+      lines.push({ op, label: `Remove "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)}`, session });
+    } else {
+      lines.push({ op: "add", label: `Add "${workout!.name}" on ${cardDay(toDay!)}`, toDay, workout });
+    }
+  }
+  if (errors.length) return refuse(errors.slice(0, 20));
+
+  const changeSet = createScheduleChangeSet({
+    ...(sessionId ? { sessionId } : {}),
+    summary,
+    lines,
+    unitSystem
+  });
+  onScheduleChange?.(changeSet);
+  return JSON.stringify({
+    ok: true,
+    change_set_id: changeSet.changeSetId,
+    lines: changeSet.lines.map((line) => line.label),
+    message:
+      "Proposed to the athlete: the card under your reply lets them apply each change or all of them. " +
+      "Nothing has changed on the calendar yet; do not say it has."
+  });
+}
+
+/** One workout checked as draft_workout checks it, with its exercises resolved to COROS's ids. */
+async function checkedWorkout(
+  value: unknown,
+  day: string
+): Promise<{ ok: true; workout: PlanWorkoutEntryInput } | { ok: false; errors: string[] }> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, errors: ["workout is required for replace and add."] };
+  }
+  const input = value as Record<string, unknown>;
+  const draft = toPlanDraft({
+    name: String(input.name ?? "").trim() || "Workout",
+    workouts: [{ ...input, key: "w1", schedule_date: day, save_to_library: false }]
+  });
+  const validation = validatePlanDraft(draft, { todayDay: formatScheduleDay(new Date()) });
+  if (!validation.ok) return { ok: false, errors: validation.errors };
+  const resolution = await resolveTrainingPlanExercises(draft);
+  if (resolution.issues.length) {
+    return {
+      ok: false,
+      errors: resolution.issues.map(
+        (issue) =>
+          `${issue.message}${issue.candidates.length ? ` Candidates: ${issue.candidates.join("; ")}.` : " Call search_coros_exercises."}`
+      )
+    };
+  }
+  const { schedule_date: _day, key: _key, ...workout } = workoutSource(resolution.draft.workouts[0]!);
+  return { ok: true, workout: { ...workout, key: "w1" } };
 }
 
 /** The lines a deletion comes to, each naming what it acts on as COROS holds it now. */

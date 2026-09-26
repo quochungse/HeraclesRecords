@@ -41,6 +41,7 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["list_scheduled_workouts", "coros"],
     ["search_coros_exercises", "coros"],
     ["delete_workout", "coros"],
+    ["propose_schedule_changes", "coros"],
     ["draft_workout", null],
     ["draft_training_plan", null],
     // Removed in P0.7 (it never wrote anything); stored answers still name it,

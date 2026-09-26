@@ -2737,6 +2737,8 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "get_plan_draft",
   "list_training_plans",
   "get_training_plan",
+  // A proposal the athlete applies from its card; it writes nothing (P3.3).
+  "propose_schedule_changes",
   "request_coach_input"
 ]);
 
@@ -2808,6 +2810,7 @@ export function getClaudeCodeTools(
     if (
       tool.name === "list_scheduled_workouts" ||
       tool.name === "delete_workout" ||
+      tool.name === "propose_schedule_changes" ||
       tool.name === "list_training_plans" ||
       tool.name === "get_training_plan"
     ) {
@@ -3208,7 +3211,10 @@ export function withLiveToolInstructions(
         "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-        "The athlete applies them from the card under your reply; nothing is deleted until they do.",
+        "The athlete applies them from the card under your reply; nothing is deleted until they do. " +
+        "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
+        "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
+        "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way.",
       ...(planTools.some((tool) => tool.name === "list_training_plans")
         ? [
             "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +

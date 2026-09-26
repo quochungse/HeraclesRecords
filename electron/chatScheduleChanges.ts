@@ -34,6 +34,13 @@ import {
   listScheduledWorkoutEntries,
   removeScheduledWorkout
 } from "./trainingHubService";
+import { formatScheduleDay } from "./corosWorkoutBuilder";
+import {
+  defaultScheduleMoveDeps,
+  moveCalendarSession,
+  replaceCalendarSession,
+  type ScheduleMoveDeps
+} from "./scheduleMoves";
 import type {
   PlanWorkoutEntryInput,
   ScheduleChangeLine,
@@ -41,7 +48,8 @@ import type {
   ScheduleChangeSession,
   ScheduleChangeSet,
   ScheduleChangeStatus,
-  TrainingHubScheduledWorkoutEntry
+  TrainingHubScheduledWorkoutEntry,
+  UnitSystem
 } from "./types";
 
 const OPS: readonly ScheduleChangeOp[] = ["move", "replace", "remove", "add", "deleteWorkout"];
@@ -119,6 +127,7 @@ function fromRecord(record: StoredChatScheduleChange): ScheduleChangeSet {
     changeSetId: record.changeSetId,
     ...(record.sessionId ? { sessionId: record.sessionId } : {}),
     summary: record.summary,
+    ...(record.unitSystem === "imperial" ? { unitSystem: "imperial" as const } : {}),
     lines: (Array.isArray(lines) ? lines : []).flatMap((line) => {
       const parsed = parseLine(line);
       return parsed ? [parsed] : [];
@@ -134,6 +143,7 @@ function save(set: ScheduleChangeSet): ScheduleChangeSet {
     changeSetId: next.changeSetId,
     ...(next.sessionId ? { sessionId: next.sessionId } : {}),
     summary: next.summary,
+    ...(next.unitSystem === "imperial" ? { unitSystem: "imperial" } : {}),
     linesJson: JSON.stringify(next.lines),
     createdAt: next.createdAt,
     updatedAt: next.updatedAt
@@ -159,12 +169,14 @@ export function createScheduleChangeSet(input: {
   sessionId?: string;
   summary: string;
   lines: NewScheduleChangeLine[];
+  unitSystem?: UnitSystem;
 }): ScheduleChangeSet {
   const now = new Date().toISOString();
   return save({
     changeSetId: `sc-${crypto.randomUUID()}`,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     summary: input.summary,
+    ...(input.unitSystem === "imperial" ? { unitSystem: "imperial" } : {}),
     lines: input.lines.map((line, index) => ({ ...line, lineId: `l${index + 1}`, status: "proposed" })),
     createdAt: now,
     updatedAt: now
@@ -179,6 +191,10 @@ export function createScheduleChangeSet(input: {
 const applying = new Set<string>();
 
 export interface ScheduleChangeDeps {
+  /** How a session is moved or replaced, so that a plan's stays in its plan. */
+  moves: ScheduleMoveDeps;
+  /** yyyyMMdd, local. */
+  today: () => string;
   listScheduledWorkoutEntries: typeof listScheduledWorkoutEntries;
   removeScheduledWorkout: typeof removeScheduledWorkout;
   listLibraryWorkouts: typeof listLibraryWorkouts;
@@ -188,6 +204,8 @@ export interface ScheduleChangeDeps {
 }
 
 const defaultDeps: ScheduleChangeDeps = {
+  moves: defaultScheduleMoveDeps,
+  today: () => formatScheduleDay(new Date()),
   listScheduledWorkoutEntries,
   removeScheduledWorkout,
   listLibraryWorkouts,
@@ -218,7 +236,7 @@ export async function applyScheduleChange(
       set = requireSet(changeSetId);
       const line = set.lines.find((candidate) => candidate.lineId === target.lineId);
       if (!line || line.status !== "proposed" || !OPS.includes(line.op)) continue;
-      const outcome = await applyLine(line, deps);
+      const outcome = await applyLine(line, deps, set.unitSystem ?? "metric");
       set = save({
         ...set,
         lines: set.lines.map((candidate) =>
@@ -254,13 +272,23 @@ export function dismissScheduleChange(changeSetId: string, lineId?: string): Sch
   });
 }
 
-async function applyLine(line: ScheduleChangeLine, deps: ScheduleChangeDeps): Promise<LineOutcome> {
+async function applyLine(
+  line: ScheduleChangeLine,
+  deps: ScheduleChangeDeps,
+  unitSystem: UnitSystem
+): Promise<LineOutcome> {
   try {
     switch (line.op) {
       case "remove":
         return await applyRemove(line, deps);
       case "deleteWorkout":
         return await applyDeleteWorkout(line, deps);
+      case "move":
+        return await applyMove(line, deps);
+      case "replace":
+        return await applyReplace(line, deps, unitSystem);
+      case "add":
+        return await applyAdd(line, deps, unitSystem);
       default:
         return { status: "failed", reason: "This build cannot apply that change." };
     }
@@ -302,6 +330,64 @@ async function applyRemove(line: ScheduleChangeLine, deps: ScheduleChangeDeps): 
     planProgramId: found.entry.planProgramId,
     ...(Number.isFinite(pbVersion) && pbVersion > 0 ? { pbVersion } : {})
   });
+  return { status: "applied" };
+}
+
+/** A day gone by the time the line is applied: COROS refuses one, and the proposal was about the days ahead. */
+function pastDay(day: string, deps: ScheduleChangeDeps): string | undefined {
+  return day < deps.today() ? `${dashed(day)} has passed.` : undefined;
+}
+
+async function applyMove(line: ScheduleChangeLine, deps: ScheduleChangeDeps): Promise<LineOutcome> {
+  if (!line.session || !line.toDay) return { status: "failed", reason: "The proposal does not say which session or where to." };
+  const passed = pastDay(line.session.happenDay, deps) ?? pastDay(line.toDay, deps);
+  if (passed) return { status: "stale", reason: passed };
+  const found = await currentSession(line.session, deps);
+  if ("stale" in found) return { status: "stale", reason: found.stale };
+  await moveCalendarSession(
+    { planId: found.entry.planId, idInPlan: found.entry.idInPlan, planProgramId: found.entry.planProgramId, happenDay: found.entry.happenDay },
+    line.toDay,
+    deps.moves
+  );
+  return { status: "applied" };
+}
+
+async function applyReplace(line: ScheduleChangeLine, deps: ScheduleChangeDeps, unitSystem: UnitSystem): Promise<LineOutcome> {
+  if (!line.session || !line.workout) return { status: "failed", reason: "The proposal does not say which session or what with." };
+  const passed = pastDay(line.session.happenDay, deps);
+  if (passed) return { status: "stale", reason: passed };
+  const found = await currentSession(line.session, deps);
+  if ("stale" in found) return { status: "stale", reason: found.stale };
+  const pbVersion = Number(found.entry.rawProgram?.pbVersion);
+  await replaceCalendarSession(
+    {
+      planId: found.entry.planId,
+      idInPlan: found.entry.idInPlan,
+      planProgramId: found.entry.planProgramId,
+      happenDay: found.entry.happenDay,
+      ...(Number.isFinite(pbVersion) && pbVersion > 0 ? { pbVersion } : {})
+    },
+    line.workout,
+    unitSystem,
+    deps.moves
+  );
+  return { status: "applied" };
+}
+
+/**
+ * A new session of the athlete's own. Nothing identifies it before it exists,
+ * so a line applied on the other machine meanwhile is recognised by its name
+ * already being on that day.
+ */
+async function applyAdd(line: ScheduleChangeLine, deps: ScheduleChangeDeps, unitSystem: UnitSystem): Promise<LineOutcome> {
+  if (!line.toDay || !line.workout) return { status: "failed", reason: "The proposal does not say what or where." };
+  const passed = pastDay(line.toDay, deps);
+  if (passed) return { status: "stale", reason: passed };
+  const onDay = await deps.listScheduledWorkoutEntries(line.toDay, line.toDay);
+  if (onDay.some((entry) => entry.name === line.workout!.name)) {
+    return { status: "stale", reason: `"${line.workout.name}" is already on the calendar on ${dashed(line.toDay)}.` };
+  }
+  await deps.moves.createAndScheduleWorkout({ ...line.workout, save_to_library: false }, line.toDay, unitSystem, false);
   return { status: "applied" };
 }
 
