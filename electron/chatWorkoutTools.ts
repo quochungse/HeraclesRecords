@@ -508,6 +508,12 @@ export async function handleChatWorkoutTool(
      * rather than written to `chat_plan_drafts` (see `generatedPlanDraft`).
      */
     planRequest?: TrainingPlanGenerationRequest;
+    /**
+     * Set when the generation is a step of a conversation's plan pipeline
+     * (P2.3): the accepted draft is kept after all, as the first version of
+     * that brief's artifact, rather than only in memory.
+     */
+    planArtifactId?: string;
   }
 ): Promise<string> {
   if (name === "draft_training_plan") {
@@ -518,7 +524,8 @@ export async function handleChatWorkoutTool(
       options?.unitSystem ?? "metric",
       "plan",
       options?.planRequest,
-      options?.onPlanEvent
+      options?.onPlanEvent,
+      options?.planArtifactId
     );
   }
   if (name === "request_plan_brief") {
@@ -975,7 +982,8 @@ async function handleDraftTrainingPlan(
   unitSystem: UnitSystem = "metric",
   artifactType: "plan" | "workout" = "plan",
   planRequest?: TrainingPlanGenerationRequest,
-  onPlanEvent?: (event: PlanEvent) => void
+  onPlanEvent?: (event: PlanEvent) => void,
+  planArtifactId?: string
 ): Promise<string> {
   /* A rewrite of a plan already drafted is a version of it, not a new card;
      asked before anything is checked, since a stale id is refused anyway. */
@@ -1014,6 +1022,23 @@ async function handleDraftTrainingPlan(
     author: "coach",
     ...(refinements ? { refinements } : {})
   };
+  if (planRequest && planArtifactId) {
+    // The sessions step (P2.3): version 1 of the brief's artifact. The step
+    // starts only on a brief with no version, so one already here is this
+    // turn's own earlier hand-over, and a second accepted draft replaces it.
+    const earlier = versionsOf(planArtifactId).at(-1);
+    stored.draftId = earlier?.draftId ?? draftId;
+    stored.preview = { ...preview, draftId: stored.draftId };
+    stored.artifactId = planArtifactId;
+    persistPlanDraft(stored);
+    onPlanDraft?.(lightPreview(stored.preview));
+    return JSON.stringify({
+      ok: true,
+      draft_id: stored.draftId,
+      message:
+        "Plan accepted and shown to the athlete as a card, week by week, to read, edit, save or put on the calendar. Reply with a two-sentence summary of it and nothing else; do not list the sessions."
+    });
+  }
   if (planRequest) {
     generatedDrafts.set(draftId, stored);
     onPlanDraft?.(preview);

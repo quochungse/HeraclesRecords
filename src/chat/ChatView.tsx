@@ -95,6 +95,8 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachOutlineCard } from "./CoachOutlineCard";
+import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
+import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems } from "./planBriefModel";
 import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
@@ -753,6 +755,13 @@ export function ChatView({
     Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
+  /** A pipeline step's turn while it runs, and its trail (P2.3). */
+  const [stepRun, setStepRun] = useState<StepRun | null>(null);
+  const advanceStep = (requestId: string, event: Parameters<typeof stepRunEvent>[1]) =>
+    setStepRun((current) => (current?.requestId === requestId ? stepRunEvent(current, event) : current));
+  useEffect(() => {
+    if (!streaming) setStepRun(null);
+  }, [streaming]);
   /** A summariser turn is running ahead of the athlete's own. */
   const [compacting, setCompacting] = useState(false);
   /** Read by Stop, which fires from a handler the state has not reached. */
@@ -1905,6 +1914,7 @@ export function ChatView({
         }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setActiveTool(null);
+        advanceStep(payload.requestId, { kind: "text", delta: payload.delta });
         streamedTextRef.current += payload.delta;
         setStreamingText((prev) => prev + payload.delta);
       }),
@@ -1913,6 +1923,15 @@ export function ChatView({
         // analysis's transcript is reloaded from disk when its run ends.
         if (payload.requestId === liveAnalysisRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
+        if (payload.kind === "context" && payload.snapshotIncluded) {
+          advanceStep(payload.requestId, { kind: "snapshot" });
+        } else if (payload.kind === "thinking") {
+          advanceStep(payload.requestId, { kind: "thinking", delta: payload.delta });
+        } else if (payload.kind === "mcp" && payload.status === "call") {
+          advanceStep(payload.requestId, { kind: "call", tool: payload.tool });
+        } else if (payload.kind === "planDraft" || payload.kind === "planOutline") {
+          advanceStep(payload.requestId, { kind: "passed" });
+        }
         if (payload.kind === "context") {
           sourceRef.current = {
             snapshotIncluded: payload.snapshotIncluded,
@@ -2662,6 +2681,7 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    setStepRun(pipeline ? { requestId, step: pipeline.step, notes: EMPTY_NOTES, attempts: 0 } : null);
     turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
@@ -2740,6 +2760,12 @@ export function ChatView({
       artifactId,
       ...(note?.trim() ? { note: note.trim() } : {})
     });
+
+  /** "Write the sessions" to the brief's outline, as a turn of the conversation (P2.3). */
+  const writeSessions = (artifactId: string) =>
+    sendMessage("Write the sessions", undefined, [], { step: "sessions", artifactId });
+  /** Whether a brief's sessions are written: it has a version, and is a plan from then on. */
+  const briefIsPlan = (artifactId: string) => artifactVersions.some((version) => version.artifactId === artifactId);
 
   const handleCoachPromptChoice = async (
     prompt: CoachInputPrompt,
@@ -3688,6 +3714,7 @@ function AnalysisSilentChip({
         <Sparkles size={16} aria-hidden="true" />
       </div>
       <div className="chat-bubble chat-bubble-streaming">
+        {stepRun && stepRun.requestId === activeRequestIdRef.current ? <CoachStepTrail run={stepRun} /> : null}
         {streamingText ? (
           <>
             {thinkingText ? (
@@ -3954,10 +3981,14 @@ function AnalysisSilentChip({
                       firstMonday={briefMonday}
                       sources={conversationSettings?.sources}
                       editing={editingBriefId === brief.artifactId}
-                      onEdit={() => {
-                        setBriefSave({ saving: false });
-                        setEditingBriefId(brief.artifactId);
-                      }}
+                      onEdit={
+                        briefIsPlan(brief.artifactId)
+                          ? undefined
+                          : () => {
+                              setBriefSave({ saving: false });
+                              setEditingBriefId(brief.artifactId);
+                            }
+                      }
                       onDrawOutline={
                         brief.outline || briefOpenProblems(brief.request, conversationSettings?.sources).length
                           ? undefined
@@ -4002,6 +4033,8 @@ function AnalysisSilentChip({
                       brief={outlined}
                       busy={streaming}
                       editing={editingOutlineId === brief.artifactId}
+                      written={briefIsPlan(brief.artifactId)}
+                      onWriteSessions={() => void writeSessions(brief.artifactId)}
                       onAdjust={() => {
                         setOutlineSave({ saving: false });
                         setEditingOutlineId(brief.artifactId);

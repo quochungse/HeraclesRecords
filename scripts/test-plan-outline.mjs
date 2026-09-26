@@ -1,5 +1,5 @@
-// A brief's outline in the conversation (docs/coach-plan-canvas.md, P2.2).
-// What the suite holds down:
+// A brief's outline and its sessions in the conversation
+// (docs/coach-plan-canvas.md, P2.2–P2.3). What the suite holds down:
 //
 //   * "Draw the outline" is a turn of the conversation: the brief is its
 //     request, the outline tool is checked inside the turn, and an accepted
@@ -16,6 +16,12 @@
 //   * The transcript holds only the anchor, which survives a save and the
 //     renderer's round trip; the card is drawn at an artifact's latest anchor.
 //   * Coach's index says what outline a brief has, and who made it.
+//   * "Write the sessions" is a turn too, bound to the outline: the check
+//     hands a draft that breaks it back inside the turn, and the one it
+//     accepts is written to `chat_plan_drafts` as version 1 of the brief's
+//     artifact, dated from the brief's first Monday. From then on the brief
+//     and its outline are changed through the plan, and the sessions are not
+//     written twice.
 //
 // Usage:
 //   npm run test:plan-outline
@@ -44,6 +50,8 @@ const compaction = await import(distUrl("chatContextCompaction.js"));
 const generation = await import(distUrl("trainingPlanGeneration.js"));
 const model = await import(pathToFileURL(path.join(repoRoot, "src/chat/planOutlineModel.ts")).href);
 const chatTypes = await import(pathToFileURL(path.join(repoRoot, "src/chat/chatTypes.ts")).href);
+const stepRun = await import(pathToFileURL(path.join(repoRoot, "src/chat/stepRun.ts")).href);
+const runTrail = await import(pathToFileURL(path.join(repoRoot, "src/training-library/runTrail.ts")).href);
 
 database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "plan-outline-")));
 
@@ -269,6 +277,122 @@ test("Coach's index says what outline a brief has, and who made it", () => {
     ]);
   assert.match(withOutline("coach", 1), /· outline v1: 6 weeks, 5 h a week$/);
   assert.match(withOutline("athlete", 3), /· outline v3: 6 weeks, 5 h a week, adjusted by the athlete$/);
+});
+
+// ---------------------------------------------------------------------------
+// P2.3: the sessions, written to the outline as the brief's first version
+// ---------------------------------------------------------------------------
+
+/** A brief with an outline Coach drew, as the card shows it before Write the sessions. */
+async function outlinedBrief(sessionId) {
+  const artifactId = readyBrief(sessionId);
+  await chat.streamConversationTurn(
+    recordingSink().sink,
+    `req-outline-${artifactId}`,
+    [{ role: "user", content: "Draw the outline" }],
+    "metric",
+    sessionId,
+    { step: "outline", artifactId }
+  );
+  assert.ok(briefs.planBriefOf(artifactId).outline, "the fixture has its outline");
+  return artifactId;
+}
+
+test("Write the sessions: the plan is the brief's first version, checked against the outline", async () => {
+  const session = history.createChatSession("claude-code");
+  const artifactId = await outlinedBrief(session.id);
+  const { events, sink } = recordingSink();
+  await chat.streamConversationTurn(
+    sink,
+    "req-sessions-1",
+    [{ role: "user", content: "Write the sessions" }],
+    "metric",
+    session.id,
+    { step: "sessions", artifactId }
+  );
+  assert.equal(events.find((event) => event.channel === "chat:streamDone")?.payload.finishReason, "stop");
+  const handOvers = events.filter(
+    (event) => event.channel === "chat:streamInfo" && event.payload.tool === "draft_training_plan"
+  );
+  assert.ok(handOvers.length >= 2, "the simulated first draft is a session short, and the check sent it back");
+  const cards = events.filter((event) => event.channel === "chat:streamInfo" && event.payload.kind === "planDraft");
+  assert.equal(cards.length, 1, "one card, for the draft the check accepted");
+
+  const versions = database.listChatPlanDraftVersions(artifactId);
+  assert.equal(versions.length, 1, "written to chat_plan_drafts, not held in memory");
+  assert.equal(versions[0].version, 1);
+  assert.equal(versions[0].author, "coach");
+  assert.equal(versions[0].draftId, cards[0].payload.draft.draftId);
+  const plan = JSON.parse(versions[0].planJson);
+  const outline = briefs.planBriefOf(artifactId).outline.outline;
+  assert.equal(plan.weekStages?.length ?? outline.weeks.length, outline.weeks.length, "a stage a week, the outline's");
+  const monday = briefs.planBriefOf(artifactId).request.startDate.replace(/-/g, "");
+  assert.ok(plan.workouts.length >= outline.weeks.length, "sessions in every week");
+  assert.ok(
+    plan.workouts.every((workout) => workout.schedule_date >= monday),
+    "dated from the brief's first Monday, so the canvas and the calendar read real days"
+  );
+
+  const index = compaction.creationIndex(
+    [{ kind: "planBrief", artifactId }, { kind: "planDraft", draft: cards[0].payload.draft }],
+    chat.listPlanArtifactVersions([cards[0].payload.draft.draftId]),
+    [briefs.planBriefOf(artifactId)]
+  );
+  assert.match(index, /- Plan "/, "Coach's index lists the plan");
+  assert.doesNotMatch(index, /- Brief ·/, "and no longer the brief it came from");
+});
+
+test("the sessions wait for an outline, and a written plan is changed through the plan", async () => {
+  const session = history.createChatSession("claude-code");
+  const bare = readyBrief(session.id);
+  const send = (requestId, step, artifactId) =>
+    chat.streamConversationTurn(recordingSink().sink, requestId, [{ role: "user", content: "go" }], "metric", session.id, {
+      step,
+      artifactId
+    });
+  await assert.rejects(send("req-no-outline", "sessions", bare), /Draw the outline first/);
+
+  const artifactId = await outlinedBrief(session.id);
+  await send("req-sessions-once", "sessions", artifactId);
+  await assert.rejects(send("req-sessions-twice", "sessions", artifactId), /become a plan/);
+  await assert.rejects(send("req-redraw-after", "outline", artifactId), /become a plan/);
+  assert.equal(database.listChatPlanDraftVersions(artifactId).length, 1);
+});
+
+test("an outline that no longer fits its brief is fixed before the sessions are written", async () => {
+  const session = history.createChatSession("claude-code");
+  const artifactId = await outlinedBrief(session.id);
+  const current = briefs.planBriefOf(artifactId);
+  briefs.updatePlanBrief(artifactId, { ...current.request, weeks: 8 });
+  await assert.rejects(
+    chat.streamConversationTurn(recordingSink().sink, "req-stale", [], "metric", session.id, { step: "sessions", artifactId }),
+    /no longer fits the brief: The outline has 6 weeks; the plan runs 8 weeks/
+  );
+});
+
+test("the step's trail: reads, the hand-over, the check sent back, the check passed", () => {
+  let run = { requestId: "r", step: "sessions", notes: runTrail.EMPTY_NOTES, attempts: 0 };
+  run = stepRun.stepRunEvent(run, { kind: "snapshot" });
+  run = stepRun.stepRunEvent(run, { kind: "call", tool: "get_training_zones" });
+  run = stepRun.stepRunEvent(run, { kind: "thinking", delta: "**Weighing the long run**\nLonger each week." });
+  run = stepRun.stepRunEvent(run, { kind: "call", tool: "draft_training_plan" });
+  run = stepRun.stepRunEvent(run, { kind: "call", tool: "draft_training_plan" });
+  run = stepRun.stepRunEvent(run, { kind: "passed" });
+  assert.equal(run.attempts, 2);
+  assert.deepEqual(run.notes.trail.map((item) => item.done), [
+    "Read your training snapshot",
+    "Read your training zones",
+    "Weighing the long run",
+    "Handed the sessions to the check",
+    "The check sent it back",
+    "Fixed the sessions",
+    "Every week passed the check"
+  ]);
+  const outline = stepRun.stepRunEvent(
+    { requestId: "r", step: "outline", notes: runTrail.EMPTY_NOTES, attempts: 0 },
+    { kind: "call", tool: "propose_plan_outline" }
+  );
+  assert.equal(outline.notes.trail[0].done, "Handed the outline to the check", "each step hands over its own tool");
 });
 
 /** An outline of `weeks` base weeks, five sessions and `hours` a week, with no key sessions. */

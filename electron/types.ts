@@ -2706,7 +2706,8 @@ export interface PlanBriefOutline {
  * renderer shows the step's words; the main process sends the step's prompt.
  */
 export interface ChatPipelineStep {
-  step: "outline";
+  /** Draw (or redraw) the brief's outline (P2.2), or write its sessions to it (P2.3). */
+  step: "outline" | "sessions";
   artifactId: string;
   /** A redraw: what the athlete wants changed in the outline there is. */
   note?: string;

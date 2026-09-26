@@ -62,6 +62,7 @@ import {
 import { PLAN_BRIEF_TOOL } from "./planBrief";
 import {
   briefForOutline,
+  briefForSessions,
   deletePlanBriefs,
   listPlanBriefs,
   savePlanOutline,
@@ -601,6 +602,9 @@ export async function streamConversationTurn(
   }
   if (pipeline?.step === "outline") {
     return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+  }
+  if (pipeline?.step === "sessions") {
+    return streamSessionsStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
   }
   return streamChat(sink, requestId, messages, {
     unitSystem,
@@ -2387,7 +2391,12 @@ async function simulatedPlanTurn(
  */
 const planGenerations = new Map<
   string,
-  { request: TrainingPlanGenerationRequest; drafts: PlanDraftPreview[] }
+  {
+    request: TrainingPlanGenerationRequest;
+    drafts: PlanDraftPreview[];
+    /** The brief whose sessions these are, when the run is a conversation's sessions step (P2.3). */
+    artifactId?: string;
+  }
 >();
 
 /**
@@ -2548,11 +2557,19 @@ const PIPELINE_WITHHELD_TOOLS = new Set([
   PLAN_BRIEF_TOOL
 ]);
 
-/** The pipeline step's reach: the conversation's sources, and none of the writing tools. */
-function pipelineReach(sources: import("./types").TrainingPlanDataSources): Pick<RunTools, "allow" | "context"> {
+/** What the sessions step withholds: every writing tool but the one it writes the plan with. */
+const SESSIONS_STEP_WITHHELD_TOOLS = new Set(
+  [...PIPELINE_WITHHELD_TOOLS].filter((name) => name !== "draft_training_plan")
+);
+
+/** The pipeline step's reach: the conversation's sources, and none of the writing tools it has no use for. */
+function pipelineReach(
+  sources: import("./types").TrainingPlanDataSources,
+  withheld: ReadonlySet<string> = PIPELINE_WITHHELD_TOOLS
+): Pick<RunTools, "allow" | "context"> {
   const everything = sources.activities && sources.sleep && sources.zones;
   return {
-    allow: (name) => !PIPELINE_WITHHELD_TOOLS.has(name) && !toolReadsWithheldSource(name, sources),
+    allow: (name) => !withheld.has(name) && !toolReadsWithheldSource(name, sources),
     ...(everything
       ? {}
       : { context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true } })
@@ -2639,6 +2656,58 @@ async function streamOutlineStep(
       });
     }
   } finally {
+    runTools.delete(requestId);
+  }
+}
+
+/**
+ * "Write the sessions", as a turn of the conversation (P2.3). The generator's
+ * sessions turn, bound to the outline the brief holds: read-only, checked
+ * inside the turn by `generatedPlanProblems` against the brief, its week and
+ * the outline — each week's count, its hours and its stage. What it accepts
+ * is not held in memory as the generator's drafts are but written to
+ * `chat_plan_drafts` as version 1 of the brief's own artifact, so the brief,
+ * the outline and the plan are one creation from here on.
+ */
+async function streamSessionsStep(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForSessions(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    outline: brief.outline.outline,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) throw new Error(invalid.message);
+  const outlineProblems = planOutlineProblems(brief.outline.outline, request);
+  if (outlineProblems.length) {
+    throw new Error(`The outline no longer fits the brief: ${outlineProblems[0]} Adjust or redraw it first.`);
+  }
+
+  planGenerations.set(requestId, { request, drafts: [], artifactId: brief.artifactId });
+  runTools.set(requestId, { extra: [], ...pipelineReach(sources, SESSIONS_STEP_WITHHELD_TOOLS) });
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(sink, requestId, "plan", request, unitSystem);
+    } else {
+      await streamChat(sink, requestId, withLastUserContent(messages, trainingPlanGenerationPrompt(request)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
+    }
+  } finally {
+    planGenerations.delete(requestId);
     runTools.delete(requestId);
   }
 }
@@ -3020,6 +3089,7 @@ async function executeChatTool(
         });
       },
       planRequest: generation?.request,
+      ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
       onWorkoutDelete: (preview) => {
         send("chat:streamInfo", {
           requestId,

@@ -1053,6 +1053,38 @@ async function main() {
   assert.equal(await harness("count", ".chat-outline-card"), 1, "one card, at the latest anchor");
   assert.match((await harness("text", ".chat-outline-card")) ?? "", /Outline · v3/);
 
+  // Write the sessions (P2.3): a turn whose trail shows in the running bubble,
+  // and after which the brief and its outline are changed through the plan.
+  await harness("clearCalls");
+  await page(`[...document.querySelectorAll(".chat-outline-card button")].find((b) => b.textContent.trim() === "Write the sessions").click()`);
+  const sessions = await waitFor(async () => (await harness("calls", "sendChat"))[0], "Write the sessions sends a turn");
+  assert.deepEqual(sessions.args[4], { step: "sessions", artifactId: "brief-2" });
+  assert.equal(sessions.args[1].at(-1).content.endsWith("Write the sessions"), true);
+  await harness("emit", "onChatStreamStart", { requestId: sessions.args[0] });
+  await harness("emit", "onChatStreamInfo", { requestId: sessions.args[0], kind: "mcp", tool: "get_training_zones", status: "call" });
+  await harness("emit", "onChatStreamInfo", { requestId: sessions.args[0], kind: "mcp", tool: "draft_training_plan", status: "call" });
+  await waitFor(
+    async () => /Writing the sessions[\s\S]*Read your training zones[\s\S]*Handing the sessions to the check/.test((await harness("text", ".chat-step-trail")) ?? ""),
+    "the running bubble shows what Coach has done, the latest still under way"
+  );
+  const WRITTEN = { ...PREVIEW, draftId: "brief-2-v1" };
+  await harness("setScript", {
+    getPlanArtifacts: [{ artifactId: "brief-2", draftId: "brief-2-v1", version: 1, author: "coach", createdAt: 1 }]
+  });
+  await harness("emit", "onChatStreamInfo", { requestId: sessions.args[0], kind: "planDraft", draft: WRITTEN });
+  await harness("emit", "onChatStreamDone", { requestId: sessions.args[0], fullText: "Written.", finishReason: "stop" });
+  await waitFor(async () => !(await harness("exists", ".chat-step-trail")), "the trail goes with the turn");
+  await waitFor(() => harness("exists", ".chat-creation-card[data-draft-id='brief-2-v1'], .chat-creation-card"), "the plan's card lands");
+  await waitFor(
+    async () => /sessions are written to this outline/.test((await harness("text", ".chat-outline-card")) ?? ""),
+    "the outline hands over to the plan"
+  );
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-outline-card button, .chat-brief-card button")].some((b) => /Adjust outline|Redraw|Write the sessions|Edit brief/.test(b.textContent))`),
+    false,
+    "and neither the brief nor the outline offers a change the main process would refuse"
+  );
+
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------

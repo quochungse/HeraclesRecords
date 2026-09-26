@@ -574,8 +574,7 @@ hiện lại trong cuộc chat.
   đổi bằng redraw. Kiểm tra bằng `planOutlineProblems`, và `chat:updatePlanOutline` từ chối đúng
   những câu đó. Card brief có nút chính **Draw the outline** khi chưa có outline và brief đủ; sửa
   brief khi đã có outline thì hỏi "Redraw the outline?" (vẽ mới, không phải revision). `creationIndex`
-  ghi "outline vN: 12 weeks, 4–6 h a week[, adjusted by the athlete]". **Chưa làm:** nút **Write
-  the sessions** (P2.3), và câu hỏi khi đổi nguồn của cuộc chat dưới một outline đã vẽ (generator
+  ghi "outline vN: 12 weeks, 4–6 h a week[, adjusted by the athlete]". **Chưa làm:** câu hỏi khi đổi nguồn của cuộc chat dưới một outline đã vẽ (generator
   có hỏi). Test: `test:plan-outline` (chạy lượt thật dưới `HERACLES_SIMULATE_PLAN_AI`), case P2.2
   trong `test:chat-plan-card-renderer`.)
 - Draw the outline gửi một lượt (message thấy được: "Draw the outline") với `planRequest` lấy từ
@@ -588,6 +587,21 @@ hiện lại trong cuộc chat.
   tại chỗ bằng `planOutlineProblems`, **không gọi model**. Mỗi lần lưu là một version outline.
 
 **P2.3 Sessions** · M
+- (Đã làm: **Write the sessions** là nút chính của card outline, gửi `ChatPipelineStep { step:
+  "sessions" }` qua `chat:send`. `streamSessionsStep` dựng request từ brief + nguồn/AI của cuộc chat
+  + `outline` của brief, chạy read-only với `trainingPlanGenerationPrompt`; `runTools` giữ lại mọi
+  tool viết trừ `draft_training_plan`. Lượt đăng ký `planGenerations` với `artifactId` của brief,
+  nên draft vẫn bị `generatedPlanProblems` kiểm tra trong lượt, nhưng draft được chấp nhận được
+  **ghi vào `chat_plan_drafts`** làm version 1 của artifact đó (`planArtifactId` trong
+  `handleDraftTrainingPlan`); được chấp nhận lần hai trong cùng lượt thì ghi đè cùng draft id. Từ
+  chối trước khi stream: chưa có outline, brief đã thành plan, hoặc outline không còn khớp brief
+  (sửa brief sau khi vẽ). Plan có `schedule_date` từ Thứ Hai đầu của brief, nên canvas vẽ ngày thật
+  và `CoachCalendarDialog` mở đúng Thứ Hai đó (nó đã mở theo buổi đầu tiên của plan có ngày);
+  `start_monday`/`race_day` vẫn nằm trên row artifact từ P2.1. Khi đã có version: card outline thôi
+  hiện nút và nói "change the plan from its card", card brief bỏ Edit brief; `creationIndex` liệt kê
+  plan thay cho brief. Run trail: `CoachStepTrail` trong bubble của lượt đang chạy (cả outline và
+  sessions), gấp từ stream bằng `stepRunEvent` (`src/chat/stepRun.ts`, dùng lại `runTrail.ts`).
+  Test: case P2.3 trong `test:plan-outline` và `test:chat-plan-card-renderer`.)
 - Write the sessions gửi một lượt **read-only**, bị buộc theo outline đã chấp nhận
   (`generatedPlanProblems`, như generator). Draft ghi vào `chat_plan_drafts` làm version 1 của
   artifact (D2), không còn `generatedDrafts` chỉ trong RAM. Artifact mang Thứ Hai bắt đầu và ngày
@@ -641,7 +655,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat:syncPlanArtifact` | P1.6 | Đọc `detail`, nhập bản COROS mới hơn thành version |
 | `chat:conversationSettings`, `chat:setConversationSettings` | P2.0 | Nguồn dữ liệu và runtime của cuộc chat |
 | `chat:createPlanBrief`, `chat:updatePlanBrief`, `chat:updatePlanOutline` | P2 | Brief và outline không qua model |
-| `chat:send` + `ChatPipelineStep` | P2.2 | Tham số thứ năm: lượt là một bước pipeline (outline), không phải câu hỏi |
+| `chat:send` + `ChatPipelineStep` | P2.2, P2.3 | Tham số thứ năm: lượt là một bước pipeline (`outline`, `sessions`), không phải câu hỏi |
 | `chat:planBriefs` | P2.1 | Đọc brief của các anchor `planBrief` |
 | `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Bỏ** |
 

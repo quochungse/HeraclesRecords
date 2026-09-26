@@ -843,6 +843,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`CoachOutlineEditor`) asks no model and writes no anchor: `chat:updatePlanOutline` refuses
   exactly what `planOutlineProblems` hands Coach. `test:plan-outline` runs the real turn under
   `HERACLES_SIMULATE_PLAN_AI`.
+  **"Write the sessions" is the generator's sessions turn bound to that outline** (P2.3,
+  `step: "sessions"`): read-only, `draft_training_plan` its only writing tool, checked in the turn
+  by `generatedPlanProblems`. Unlike the generator's, the accepted draft is **not** held in memory:
+  `planGenerations` carries the brief's `artifactId`, and `handleDraftTrainingPlan` writes it to
+  `chat_plan_drafts` as that artifact's version 1, so brief, outline and plan are one creation.
+  From then on the brief and outline refuse changes and their cards say so. While a step runs,
+  its bubble draws `CoachStepTrail`, folded from the stream by `stepRunEvent` over `runTrail.ts`.
 
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`

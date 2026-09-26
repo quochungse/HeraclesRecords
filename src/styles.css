@@ -20439,6 +20439,54 @@ tr.data-intervals-row-missing {
   outline-offset: 2px;
 }
 
+/* A pipeline step while its turn runs (P2.3): the card it is making, as a
+   line per thing Coach did, the latest still marked as under way. */
+.chat-step-trail {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+.chat-step-trail ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-step-trail li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-step-trail li.is-doing {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-step-trail li > i {
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--chat-signal);
+}
+
+.chat-step-trail-tail {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* Adjust outline: the athlete's figures for each week, in the generator's sheet. */
 .chat-outline-editor-body {
   display: grid;

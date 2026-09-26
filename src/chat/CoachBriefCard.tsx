@@ -93,9 +93,11 @@ export function CoachBriefCard({
               Draw the outline
             </button>
           ) : null}
-          <button type="button" className="chat-plan-review" disabled={!onEdit} onClick={onEdit}>
-            {editing ? "Continue editing" : "Edit brief"}
-          </button>
+          {onEdit ? (
+            <button type="button" className="chat-plan-review" onClick={onEdit}>
+              {editing ? "Continue editing" : "Edit brief"}
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

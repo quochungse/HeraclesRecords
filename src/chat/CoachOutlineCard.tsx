@@ -31,6 +31,8 @@ export function CoachOutlineCard({
   brief,
   busy = false,
   editing = false,
+  written = false,
+  onWriteSessions,
   onAdjust,
   onRedraw
 }: {
@@ -39,6 +41,9 @@ export function CoachOutlineCard({
   busy?: boolean;
   /** Its Adjust screen is open: the way on is back into it. */
   editing?: boolean;
+  /** The sessions are written (P2.3): the plan is changed from its own card from here on. */
+  written?: boolean;
+  onWriteSessions?: () => void;
   onAdjust?: () => void;
   onRedraw?: (note: string) => void;
 }) {
@@ -156,49 +161,64 @@ export function CoachOutlineCard({
         </ul>
       ) : null}
 
-      <div className="chat-creation-actions">
-        <div className="chat-plan-actions">
-          <button type="button" className="chat-plan-review" disabled={!onAdjust} onClick={onAdjust}>
-            {editing ? "Continue adjusting" : "Adjust outline"}
-          </button>
-          <button
-            type="button"
-            className="chat-plan-review"
-            aria-expanded={noteOpen}
-            disabled={!onRedraw || busy}
-            onClick={() => setNoteOpen((open) => !open)}
-          >
-            <RotateCw size={13} aria-hidden="true" /> Redraw with a note
-          </button>
-        </div>
-        {noteOpen ? (
-          <form
-            className="chat-outline-redraw"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submitNote();
-            }}
-          >
-            <input
-              value={note}
-              maxLength={400}
-              autoFocus
-              placeholder="What to change — e.g. “a lighter week 5, I’m travelling”"
-              aria-label="What to change in the outline"
-              onChange={(event) => setNote(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.stopPropagation();
-                  setNoteOpen(false);
-                }
-              }}
-            />
-            <button type="submit" className="chat-plan-upload" disabled={busy || !note.trim()}>
-              Redraw
+      {written ? (
+        <p className="chat-brief-reads">The sessions are written to this outline — change the plan from its card.</p>
+      ) : (
+        <div className="chat-creation-actions">
+          <div className="chat-plan-actions">
+            {onWriteSessions ? (
+              <button
+                type="button"
+                className="chat-plan-upload"
+                disabled={busy || problems.length > 0}
+                title={problems.length ? "Adjust or redraw the outline so it fits the brief first" : undefined}
+                onClick={onWriteSessions}
+              >
+                Write the sessions
+              </button>
+            ) : null}
+            <button type="button" className="chat-plan-review" disabled={!onAdjust} onClick={onAdjust}>
+              {editing ? "Continue adjusting" : "Adjust outline"}
             </button>
-          </form>
-        ) : null}
-      </div>
+            <button
+              type="button"
+              className="chat-plan-review"
+              aria-expanded={noteOpen}
+              disabled={!onRedraw || busy}
+              onClick={() => setNoteOpen((open) => !open)}
+            >
+              <RotateCw size={13} aria-hidden="true" /> Redraw with a note
+            </button>
+          </div>
+          {noteOpen ? (
+            <form
+              className="chat-outline-redraw"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitNote();
+              }}
+            >
+              <input
+                value={note}
+                maxLength={400}
+                autoFocus
+                placeholder="What to change — e.g. “a lighter week 5, I’m travelling”"
+                aria-label="What to change in the outline"
+                onChange={(event) => setNote(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    setNoteOpen(false);
+                  }
+                }}
+              />
+              <button type="submit" className="chat-plan-upload" disabled={busy || !note.trim()}>
+                Redraw
+              </button>
+            </form>
+          ) : null}
+        </div>
+      )}
     </article>
   );
 }

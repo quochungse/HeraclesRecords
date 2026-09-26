@@ -152,6 +152,13 @@ export function briefForOutline(artifactId: string): PlanBrief {
   return brief;
 }
 
+/** A brief whose sessions may be written: it has an outline and has not become a plan (P2.3). */
+export function briefForSessions(artifactId: string): PlanBrief & { outline: PlanBriefOutline } {
+  const brief = briefForOutline(artifactId);
+  if (!brief.outline) throw new Error("Draw the outline first: the sessions are written to it.");
+  return brief as PlanBrief & { outline: PlanBriefOutline };
+}
+
 export function deletePlanBriefs(artifactIds: readonly string[]): void {
   for (const artifactId of artifactIds) deleteChatPlanArtifactRow(artifactId);
 }

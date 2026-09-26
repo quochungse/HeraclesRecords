@@ -1613,9 +1613,9 @@ function registerIpcHandlers(): void {
         messages,
         normalizeUnitSystem(unitSystem),
         typeof sessionId === "string" && sessionId ? sessionId : undefined,
-        pipeline?.step === "outline" && typeof pipeline.artifactId === "string"
+        (pipeline?.step === "outline" || pipeline?.step === "sessions") && typeof pipeline.artifactId === "string"
           ? {
-              step: "outline",
+              step: pipeline.step,
               artifactId: pipeline.artifactId,
               ...(typeof pipeline.note === "string" && pipeline.note.trim() ? { note: pipeline.note.trim() } : {})
             }
