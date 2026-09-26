@@ -120,6 +120,7 @@ import {
 } from "./claudeCodeProvider";
 import {
   CHAT_SETTINGS_KEYS,
+  inlineSuggestionsEnabled,
   readChatSettingsFromStore,
   saveChatSettingsToStore,
   type ChatApiKeyStore,
@@ -127,6 +128,7 @@ import {
   type ChatSettingsStore
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
+import { inlineSuggestionsSection } from "./chatCoachContext";
 import {
   createChatSession,
   deleteChatSession,
@@ -1489,7 +1491,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-code") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1592,7 +1595,8 @@ export async function streamChat(
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "openrouter") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1681,7 +1685,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-api") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1770,7 +1775,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "local") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1858,8 +1864,9 @@ export async function streamChat(
     // leaning on the brief snapshot in `instructions`.
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
-      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy))
-    );
+      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
+      );
 
     send("chat:streamStart", { requestId });
     send("chat:streamInfo", {
@@ -2935,9 +2942,10 @@ function buildChatFunctionTools(tools: CorosMcpTool[] = getAllChatTools()): Reco
   }));
 }
 
-function withLiveToolInstructions(
+export function withLiveToolInstructions(
   instructions: string,
-  tools: CorosMcpTool[]
+  tools: CorosMcpTool[],
+  { inlineSuggestions = false }: { inlineSuggestions?: boolean } = {}
 ): string {
   if (tools.length === 0) {
     return instructions;
@@ -3044,6 +3052,7 @@ function withLiveToolInstructions(
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
+      ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
       "",
       "Supported workout capabilities (generated from the validator):",
       buildCoachSportCapabilityGuide(),

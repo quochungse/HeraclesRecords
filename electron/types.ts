@@ -1807,7 +1807,16 @@ export interface ChatSettings {
   customInstructions?: string;
   /** The rolling-summary window for chat and analyses alike. */
   compactContext: CompactContextSettings;
+  /**
+   * Whether Coach may attach a workout card it was not asked for, when it
+   * recommends a specific session (P1.9, D4). `auto` is on for the Claude
+   * providers, whose prompt cache makes the extra tool rounds cheap, and off
+   * for the rest.
+   */
+  inlineSuggestions?: InlineSuggestionsMode;
 }
+
+export type InlineSuggestionsMode = "auto" | "on" | "off";
 
 /**
  * What a compaction pass decided, as the renderer sees it.

@@ -131,6 +131,26 @@ export function buildBaseCoachInstructions(): string {
  * which kinds, targets and intensities a sport actually accepts. Keep it in
  * step with `WORKOUT_SPORT_CAPABILITIES`, which is also what the validator reads.
  */
+/**
+ * Said when Coach may attach workout cards nobody asked for (P1.9, D4). A
+ * limit in words only: the cost of each answer is shown under it, which is
+ * where an answer that overdoes it would be seen.
+ */
+export const INLINE_SUGGESTIONS_GUIDE =
+  "When you recommend a specific session the athlete could do — today's run, a strength session for this week — " +
+  "you may attach it with draft_workout even though they did not ask for a workout, so it can be saved in one press. " +
+  "At most two such cards in one answer; more than two options belong in one plan, drafted with draft_training_plan " +
+  "only when the athlete asks for a plan. Do not attach a card to a general answer.";
+
+/**
+ * The lines the tool guide gains when unasked workout cards are on for the
+ * turn — and only when the turn can make one, since a promise of a tool it was
+ * not given would be something Coach could not keep.
+ */
+export function inlineSuggestionsSection(enabled: boolean, toolNames: readonly string[]): string[] {
+  return enabled && toolNames.includes("draft_workout") ? ["", INLINE_SUGGESTIONS_GUIDE] : [];
+}
+
 export function buildCoachSportCapabilityGuide(): string {
   return WORKOUT_SPORTS.map((sport) => {
     const capability = WORKOUT_SPORT_CAPABILITIES[sport];

@@ -480,6 +480,11 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   chỉnh sửa, nên không vi phạm D10.
 
 **P1.9 Card không được yêu cầu (D4)** · S
+- (Đã làm: `chat.coach.inlineSuggestions`, `preference`; `inlineSuggestionsEnabled` quyết theo
+  provider của **nhánh gọi**, không theo provider trong Settings — một analysis có thể chạy bằng
+  provider khác. Đoạn prompt nằm trong `chatCoachContext.ts` (`INLINE_SUGGESTIONS_GUIDE`,
+  `inlineSuggestionsSection`), module thuần mà `test:chat-service` import được, và chỉ thêm khi
+  lượt có `draft_workout`. Settings → Workout suggestions là một `OptionGroup` Automatic/On/Off.)
 - Setting mới `chat.coach.inlineSuggestions`: `auto` | `on` | `off`, mặc định `auto` (bật với
   `claude-code`/`claude-api`, tắt với provider khác). Phân loại `preference` trong
   `syncPolicy.ts`. Nằm ở Settings → Coach, kèm câu về chi phí khi provider không có cache.

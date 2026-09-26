@@ -524,6 +524,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   with it. **Under a creation, follow-ups** (P1.8): the chips Coach offered with that version
   (`suggested_refinements`, kept in the row's `refinements_json`) or a set that fits its kind
   (`refinementChips`); a press sends the chip's words as a question about the creation.
+  **Coach may attach up to two workout cards unasked** (P1.9, `chat.coach.inlineSuggestions`:
+  Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
+  a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
+  where an answer that overdoes it shows.
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with
