@@ -444,7 +444,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   else).
   **The calendar is COROS's running copy of a plan** (`executeSubPlan`), which COROS keeps in step
   with the calendar both ways: moving a session on the calendar moves it in the copy, and editing
-  the copy moves the calendar. Two things COROS does without a word, which
+  the copy moves the calendar. **The app's own move is not COROS's**: `rescheduleScheduledWorkout` adds the
+  session to the athlete's own calendar and deletes the original, so a plan session moved that way
+  leaves the copy and its compliance with it (measured on the live account, 2026-09-26).
+  A plan session moves through `plan/update` on the running copy, which keeps its `idInPlan`;
+  removing one with `schedule/update` status 3 takes it out of the copy too, so a delete stays in
+  step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
   `TrainingPlanCalendarDialog` states before anything is written: **it counts the plan from the
   Monday of the week the start day is in, and leaves off every session before the start** (a
   Wednesday start loses week 1's Monday and Tuesday), and **it never checks the calendar** (a day

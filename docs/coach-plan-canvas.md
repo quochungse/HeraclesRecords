@@ -748,21 +748,23 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   COROS không phải creation.
 - Analysis read-only đã được `draft_workout`/`draft_training_plan` (card chờ athlete duyệt).
 
-**P3.0 Probe trên tài khoản thật** · S · *làm trước, cần athlete chạy*
-- Mở rộng `verify-coros-plan-api.mjs` bằng cờ `--p3` (cùng cửa sổ lịch trống ≥ 1 năm, dọn trong
-  `finally`, không đụng dữ liệu có sẵn). Mỗi probe trả lời một quyết định:
-  - **A.** Xoá một buổi của bản chạy bằng `schedule/update status 3`: bản chạy (`plan/detail`) còn
-    entity đó không? Một `plan/update` sau đó có làm nó quay lại lịch không? → quyết định lệnh bỏ
-    buổi của plan đi đường nào, và màn Calendar hiện có đang làm lệch bản chạy không.
-  - **B.** `plan/update` trên bản chạy đổi **chương trình** của một buổi (giữ `idInPlan`, `dayNo`):
-    lịch có đổi theo, plan mẫu có giữ nguyên không → "thay một buổi mà không đổi plan mẫu".
-  - **C.** `plan/update` trên bản chạy đổi `dayNo` của một buổi: `idInPlan` trên lịch có giữ nguyên
-    không (compliance và kết quả đã ghép không mất).
-  - **D.** `rescheduleScheduledWorkout` trên một buổi của bản chạy: buổi mới mang `planId` nào;
-    bản chạy còn entity cũ không → nếu tách khỏi plan thì cấm đường này cho buổi của plan.
-  - **E.** `schedule/update` với hai entity, một hỏng: cái kia có được ghi không (nguyên tử hay
-    từng phần) → cách ghi kết quả từng dòng của change set.
-- Kết quả ghi vào §9 và vào header của script; mỗi probe là một `check()` có tên.
+**P3.0 Probe trên tài khoản thật** · S · *xong 2026-09-26*
+- Đo một lần trên tài khoản thật (plan tạm trong cửa sổ lịch trống cách một năm, dọn sạch sau khi
+  chạy); script probe không giữ trong repo. Mỗi câu trả lời chốt một quyết định của P3.3:
+  - **A. Xoá buổi của bản chạy bằng `schedule/update` status 3:** lịch mất buổi, **bản chạy cũng mất
+    entity đó**, một `plan/update` sau không đưa lại. → Xoá không làm lệch bản chạy; lệnh xoá của
+    màn Calendar và `delete_workout` giữ nguyên cho buổi của plan.
+  - **B. `plan/update` trên bản chạy thay chương trình một buổi:** lịch hiện bài mới, **`idInPlan`
+    giữ nguyên**, plan mẫu không đổi. → "Thay một buổi mà không đổi plan mẫu" đi qua bản chạy.
+  - **C. `plan/update` trên bản chạy đổi `dayNo`:** lịch dời theo, ngày cũ trống, **`idInPlan` giữ
+    nguyên**, vẫn thuộc bản chạy. → Dời buổi của plan đi qua bản chạy.
+  - **D. `rescheduleScheduledWorkout` trên buổi của bản chạy:** buổi mới thuộc **lịch riêng** của
+    athlete (plan khác, `idInPlan` mới) và **bản chạy mất buổi đó** — buổi tách khỏi plan, compliance
+    mất. → Cấm đường này cho buổi của plan; màn Calendar hiện dời mọi buổi bằng nó — sửa ở P3.3.
+  - **E. Một `schedule/update` hai entity, một hỏng:** `17004 Plan data is illegal.`, **không** buổi
+    nào được ghi — nguyên tử. → Change set ghi **mỗi dòng một request** để có kết quả từng dòng.
+    `plan/update` trên bản chạy coi như cũng nguyên tử (một body cả plan), nên P3.3 ghi từng dòng,
+    mỗi lần đọc lại `detail`.
 
 **P3.1 Coach đọc plan COROS** · M
 - Tool `list_training_plans`: mỗi plan một dòng (tên, số tuần, môn, trạng thái lịch, nếu đang
@@ -795,10 +797,13 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
 - Áp một dòng: **đọc lại ngày đó** (`schedule/query`) trước; buổi đã đổi hoặc biến mất thì dòng
   thành *stale*, không ghi. Buổi lẻ: `rescheduleScheduledWorkout` / `removeScheduledWorkout` /
   `createAndScheduleWorkout`. Buổi của plan đang chạy: một `plan/update` trên **bản chạy** gom mọi
-  dòng của cùng bản chạy (đường `planOntoRunningCopy`), chỉ từ hôm nay — cụ thể theo kết quả P3.0
-  A–D. Mỗi dòng ghi kết quả ngay khi xong (bài học lưu-từng-phần của review P0); khoá theo change
+  dòng (đường `planOntoRunningCopy`), chỉ từ hôm nay. Theo P3.0: dời và thay đi qua `plan/update`
+  trên **bản chạy**, mỗi dòng một lần ghi, đọc lại `detail` trước mỗi lần (E: một lần ghi là nguyên
+  tử, nên gom dòng thì mất kết quả từng dòng); xoá dùng `removeScheduledWorkout` (A: bản chạy cũng
+  bỏ buổi); **không bao giờ** `rescheduleScheduledWorkout` cho buổi của plan (D). Mỗi dòng ghi kết quả ngay khi xong (bài học lưu-từng-phần của review P0); khoá theo change
   set như `savingArtifacts`.
-- Sửa kèm, tuỳ P3.0 A/D: màn Calendar xoá hoặc dời buổi của plan đang chạy qua bản chạy.
+- Sửa kèm (P3.0 D): màn Calendar dời buổi của plan đang chạy qua bản chạy (`plan/update` đổi `dayNo`),
+  không qua `rescheduleScheduledWorkout`. Xoá giữ nguyên (P3.0 A).
 - Test: `test:schedule-changes` mới (fake COROS giữ lịch và bản chạy), renderer của card.
 
 **P3.4 Card trong analysis** · M
@@ -909,8 +914,9 @@ patch làm version nhiều hơn, nên Q5 là bắt buộc. Việc thu nhỏ bi�
 | Giới hạn 2 card chỉ nằm trong prompt (D4) | Model có thể vượt; theo dõi qua chi phí mỗi câu trả lời; công tắc tắt được |
 | Claude Code `maxTurns: 10` / `MAX_TOOL_ROUNDS = 10` | Patch và kiểm tra trong lượt dùng ít vòng hơn gửi lại cả plan; theo dõi `no-plan` sau P1 |
 | Provider không cache (OpenRouter, Local) | D4 tắt mặc định; câu chi phí trong Settings |
-| Thay một buổi trên bản chạy mà không đổi plan mẫu | Một phần đã đo (sửa plan mẫu không đụng bản chạy; thêm buổi vào bản chạy lên lịch); thay chương trình và dời buổi: **P3.0 B, C** |
-| Xoá/dời buổi của plan đang chạy làm tách buổi khỏi plan (compliance mất) | **P3.0 A, D**; nếu đúng thì sửa cả màn Calendar ở P3.3 |
+| Thay một buổi trên bản chạy mà không đổi plan mẫu | **Đã đo (P3.0 B, C):** thay chương trình và dời ngày qua `plan/update` trên bản chạy — lịch theo, `idInPlan` giữ, plan mẫu không đổi |
+| Xoá/dời buổi của plan đang chạy làm tách buổi khỏi plan (compliance mất) | **Xoá: không (P3.0 A)** — status 3 bỏ buổi khỏi cả bản chạy. **Dời: có (P3.0 D)** — `rescheduleScheduledWorkout` đưa buổi sang lịch riêng; sửa màn Calendar ở P3.3 |
+| Một change set ghi nhiều buổi trong một request | **P3.0 E: nguyên tử** — một dòng hỏng làm hỏng cả request; ghi mỗi dòng một request |
 | Change set áp hai lần từ hai máy | Mỗi dòng đọc lại lịch trước khi ghi; dòng đã khác thì *stale* |
 
 Mặc định nhỏ, đổi được khi review:
