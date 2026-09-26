@@ -1159,7 +1159,14 @@ function parseEntry(value: unknown): PersistedChatEntry | null {
     return opaqueEntry(value, value);
   }
   const parsed = parseEntryShape(value);
-  return parsed ? withMergeMeta(parsed, value) : null;
+  if (parsed) return withMergeMeta(parsed, value);
+  // A kind this build knows, in a shape it cannot read: a newer build's
+  // (a field that became optional there, as the analysis marker's `bindingId`
+  // did here) or an older one's. Dropping it would take it out of the row on
+  // this machine's next save; kept verbatim, it is drawn as nothing and goes
+  // back to the store untouched, as an unknown kind does (Q4). An entry with
+  // no kind at all is not anyone's card, and is still dropped.
+  return typeof value.kind === "string" ? opaqueEntry(value, value) : null;
 }
 
 /** A card kind whose payload sits under one key. */

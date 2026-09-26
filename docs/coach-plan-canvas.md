@@ -140,7 +140,9 @@ Từ đó, năm quy tắc:
   outline, dòng diff, tham chiếu của một câu hỏi) là một entry kind mới, chỉ mang id trỏ vào
   bảng và vài chữ để đọc. Build cũ bỏ entry đó khi đọc, nhưng nhờ H1 nó vẫn sống ở máy mới và
   trên vault; máy cũ chỉ mất phần hiển thị, không mất dữ liệu.
-- **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi. Không cứu được build cũ
+- **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi — và từ review P0, cả một kind
+  đã biết nhưng không đọc được (thiếu field bắt buộc, sai kiểu): nó thành opaque, không hiện gì,
+  và về lại store y nguyên, thay vì bị lần lưu sau xoá khỏi row. Không cứu được build cũ
   hiện có (Q1–Q3 vẫn phải giữ), nhưng làm mọi thay đổi *sau* P0.1 an toàn hơn, và là đường để
   một ngày nào đó được nới Q1.
 - **Q5. Entry `planDraft` trong transcript không mang `source`; `preview_json` thì vẫn mang.**
@@ -288,6 +290,25 @@ Không kind mới, không bảng mới. P0.1 nên ở một bản phát hành c�
 **Ship P0 khi:** card hiện đúng một bản dưới câu trả lời ở mọi độ rộng; câu hỏi đã trả lời còn
 thấy được; workout sửa được trước khi lưu; generator lên lịch đúng Thứ Hai đã chọn; tool result
 không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run build` sạch.
+
+**Review P0 (2026-09-26).** Đọc lại toàn bộ P0.1–P0.8; đã sửa:
+- **Entry của một kind đã biết mà không đọc được bị bỏ**, nên lần lưu sau xoá nó khỏi row trên máy
+  này — trái với Q4. Đó có thể là hình dạng của một build mới hơn (một field trở thành tuỳ chọn, như
+  `bindingId` của marker analysis từng làm ở đây). Giờ nó được giữ nguyên dạng opaque: không hiện,
+  không gửi cho model, về lại store y nguyên. Entry không có `kind` vẫn bị bỏ. Bốn test từng khẳng
+  định "bị bỏ" nay khẳng định "không hiện dở, và không mất".
+- **Lưu từng buổi lên COROS bị ngắt giữa chừng** ("Put sessions on calendar", "Save to Workout
+  Library"): các buổi trước đã nằm trên COROS nhưng card vẫn "chưa lưu", và bấm lại ghi trùng chúng.
+  Giờ `uploadTrainingPlan` ném `PartialUploadError` kèm những buổi đã ghi; lỗi nói rõ buổi nào đã
+  lên, và lần bấm lại chỉ ghi phần còn thiếu (giữ trong RAM của lần chạy app này).
+- `upload_training_plan` (bỏ ở P0.7) được liệt kê lại trong `LOCAL_CHAT_TOOL_SOURCES` như tên cũ,
+  để câu trả lời cũ đã gọi nó không bị gắn nhãn "MCP".
+
+Test mới: case lưu bị ngắt trong `test:coros-plan-writes` (fail trên code cũ); kiểm tra nhãn tool cũ
+trong `test:chat-tool-sources`.
+
+Còn lại, biết và chưa làm: phần đã ghi của một lần lưu bị ngắt chỉ được nhớ trong lần chạy app đó —
+khởi động lại rồi bấm lưu sẽ ghi lại mọi buổi (lỗi lúc trước đã nói buổi nào đã lên).
 
 ### P1 — Vòng lặp chỉnh sửa
 

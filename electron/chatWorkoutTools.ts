@@ -15,7 +15,8 @@ import {
   listScheduledWorkoutEntries,
   resolveTrainingPlanExercises,
   searchWorkoutExercises,
-  uploadTrainingPlan
+  uploadTrainingPlan,
+  PartialUploadError
 } from "./trainingHubService";
 import {
   deleteChatPlanDraft,
@@ -199,6 +200,12 @@ interface DeleteWorkoutParams {
  * a plan. Keyed by creation, since every version of one saves the same plan.
  */
 const savingArtifacts = new Set<string>();
+
+/** What a save COROS stopped part-way through had already written, by draft. */
+const partialWrites = new Map<
+  string,
+  { entries: UploadPlanResult["entries"]; workoutsCreated: number; workoutsScheduled: number }
+>();
 const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
@@ -1888,7 +1895,39 @@ async function saveDraftTo(
       );
     }
   }
-  const uploaded = await uploadTrainingPlan(input, unitSystem);
+  // Sessions an earlier attempt wrote before COROS stopped are not written
+  // again: that attempt told the athlete they were there, and a retry adds
+  // only the rest. Held for this run of the app; the message said what landed.
+  const earlier = partialWrites.get(stored.draftId);
+  const remaining = earlier
+    ? { ...input, workouts: input.workouts.filter((workout) => !earlier.entries.some((entry) => entry.key === workout.key)) }
+    : input;
+  let uploaded: UploadPlanResult;
+  try {
+    uploaded = await uploadTrainingPlan(remaining, unitSystem);
+  } catch (cause) {
+    if (!(cause instanceof PartialUploadError)) throw cause;
+    const held = {
+      entries: [...(earlier?.entries ?? []), ...cause.written],
+      workoutsCreated: (earlier?.workoutsCreated ?? 0) + cause.workoutsCreated,
+      workoutsScheduled: (earlier?.workoutsScheduled ?? 0) + cause.workoutsScheduled
+    };
+    partialWrites.set(stored.draftId, held);
+    const names = cause.written.map((entry) => `"${entry.name}"`).join(", ");
+    throw new Error(
+      `COROS stopped part-way: ${names} ${cause.written.length === 1 ? "was" : "were"} saved and stay${cause.written.length === 1 ? "s" : ""} there; ` +
+        `the rest were not (${cause.message}). Saving again adds only the rest.`
+    );
+  }
+  if (earlier) {
+    uploaded = {
+      ...uploaded,
+      entries: [...earlier.entries, ...uploaded.entries],
+      workoutsCreated: earlier.workoutsCreated + uploaded.workoutsCreated,
+      workoutsScheduled: earlier.workoutsScheduled + uploaded.workoutsScheduled
+    };
+    partialWrites.delete(stored.draftId);
+  }
   const result: UploadPlanResult = {
     ...uploaded,
     destination,

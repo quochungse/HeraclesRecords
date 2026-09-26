@@ -238,7 +238,11 @@ test("the transcript holds only the anchor, through a save and the renderer", ()
   const back = chatTypes.toPersistedEntries(chatTypes.fromPersistedEntries(read));
   assert.equal(back[1].kind, "planBrief");
   assert.equal(back[1].artifactId, "a-1");
-  assert.equal(history.parseChatTranscriptJson(JSON.stringify([{ kind: "planBrief" }])).length, 0, "no id, no anchor");
+  assert.equal(
+    history.parseChatTranscriptJson(JSON.stringify([{ kind: "planBrief" }]))[0].kind,
+    "opaque",
+    "no id, no anchor — carried as it was rather than dropped"
+  );
 });
 
 test("Coach's index lists a brief until it has a version", () => {

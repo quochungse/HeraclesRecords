@@ -36,7 +36,7 @@ for (const name of localTools) {
   assert.ok(!name.includes("__"), `${name} would read as an MCP server's tool`);
 }
 // Nothing listed that no longer exists, except renamed tools old transcripts carry.
-const legacy = new Set(["get_hr_zone_summary"]);
+const legacy = new Set(["get_hr_zone_summary", "upload_training_plan"]);
 for (const name of LOCAL_CHAT_TOOL_SOURCES.keys()) {
   assert.ok(
     localTools.includes(name) || legacy.has(name),
@@ -75,6 +75,7 @@ assert.deepEqual(groupChatToolsBySource([]), []);
 // Names from older transcripts: the renamed zone tool is still a COROS read,
 // and an unknown name keeps the MCP label every tool used to wear.
 assert.equal(chatToolSource("get_hr_zone_summary"), "coros");
+assert.equal(chatToolSource("upload_training_plan"), null, "a removed tool that read nothing stays off the badge");
 assert.equal(chatToolSource("queryActivities"), "mcp");
 // A Map, not an object literal: no prototype key can pass for a local tool.
 assert.equal(chatToolSource("constructor"), "mcp");

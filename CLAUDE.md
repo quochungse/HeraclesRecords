@@ -529,6 +529,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
   a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
   where an answer that overdoes it shows.
+  **An upload COROS stops part-way through is not retried whole** (`PartialUploadError` from
+  `uploadTrainingPlan`, which writes one session per request): the error names the sessions that
+  landed, and a second press writes only the rest.
   **A draft is read from its row every time, never from a copy held in memory**
   (`loadStoredPlanDraft`): a row changes behind the process — another machine saves the creation
   and the pull marks it uploaded — and a cached copy let this machine `plan/add` it a second time.
@@ -864,7 +867,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   lose.** Since P0.1 of [docs/coach-plan-canvas.md](docs/coach-plan-canvas.md), every parser
   passes the keys it does not handle through (`keepUnknownKeys`), a kind it does not know
   travels as `{ kind: "opaque", raw }` and is unwrapped back to `raw` on its way to SQLite,
-  and the renderer carries both (`ChatOpaqueEntry`, `extra`). So a field still has to be
+  and the renderer carries both (`ChatOpaqueEntry`, `extra`). So does a kind this build *knows*
+  in a shape it cannot read — a required field missing, say: dropping it would take it out of
+  the row on the next save, and it may be a newer build's shape; only an entry with no `kind`
+  at all is dropped. So a field still has to be
   listed to be *read* — the paragraph above stands for a field this build uses — but no
   longer to *survive*. That protects nothing written against a build from before it: an
   older build drops an unknown field and can win the merge with its copy

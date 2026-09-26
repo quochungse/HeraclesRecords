@@ -217,9 +217,9 @@ function throughWindow(json, edit = (timeline) => timeline) {
   assert.deepEqual(back[0].event, event.event, "the renderer's round trip keeps it");
   assert.equal(back[0].alsoLater, 1);
   assert.equal(
-    parseChatTranscriptJson(JSON.stringify([{ kind: "planEvent", event: { eventId: "e2" } }])).length,
-    0,
-    "half an event is not restored"
+    parseChatTranscriptJson(JSON.stringify([{ kind: "planEvent", event: { eventId: "e2" } }]))[0].kind,
+    "opaque",
+    "half an event is not restored as one, and not dropped either"
   );
 }
 
@@ -236,9 +236,9 @@ function throughWindow(json, edit = (timeline) => timeline) {
   assert.deepEqual(parsed.refs, entry.refs);
   assert.deepEqual(toPersistedEntries(fromPersistedEntries([parsed]))[0].refs, entry.refs);
   assert.equal(
-    parseChatTranscriptJson(JSON.stringify([{ kind: "planRefs", refs: [{ draftId: "x" }] }])).length,
-    0,
-    "a reference that says nothing is not restored"
+    parseChatTranscriptJson(JSON.stringify([{ kind: "planRefs", refs: [{ draftId: "x" }] }]))[0].kind,
+    "opaque",
+    "a reference that says nothing is not restored as one, and not dropped either"
   );
 }
 

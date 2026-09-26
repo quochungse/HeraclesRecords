@@ -1384,6 +1384,45 @@ test("two reads against COROS begun together bring its change back once", async 
   assert.equal(databaseModule.listChatPlanDraftVersions(artifact).length, 2, "the saved one and COROS's change, nothing twice");
 });
 
+test("sessions put on the calendar before COROS stopped are not written again", async () => {
+  let failNext = false;
+  const coros = stubCoros({
+    "/training/program/calculate": () =>
+      ok({ planDuration: 1800, planDistance: 500000, planTrainingLoad: 40, planSets: 3, exerciseBarChart: [] }),
+    "/training/schedule/query": () => ok({ entities: [], programs: [] }),
+    "/training/schedule/update": () => {
+      if (failNext) {
+        failNext = false;
+        return { apiCode: "A1", message: "Service exceptions", result: "1001" };
+      }
+      return ok();
+    },
+    "/account/query": ok({}),
+    "coros-traininghub-v2": ok({})
+  });
+  const preview = await coachDraft(datedBlock);
+  // The first session lands, then COROS refuses the second.
+  const original = globalThis.fetch;
+  let scheduled = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/training/schedule/update") && ++scheduled === 2) failNext = true;
+    return original(url, init);
+  };
+  await assert.rejects(
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar"),
+    /COROS stopped part-way: "Easy Monday" was saved and stays there; the rest were not .*Saving again adds only the rest/
+  );
+  assert.equal(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, undefined, "not saved as a whole");
+  const writes = coros.to("/training/schedule/update").length;
+
+  const done = await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar");
+  assert.equal(coros.to("/training/schedule/update").length, writes + 1, "only the session that did not land");
+  assert.equal(done.workoutsScheduled, 2, "and the result counts both");
+  assert.deepEqual(done.entries.map((entry) => entry.name), ["Easy Monday", "Long Sunday"]);
+  assert.ok(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, "now it is saved");
+  globalThis.fetch = original;
+});
+
 test("two saves of one creation begun together write one plan", async () => {
   const coros = fakeCoros();
   const preview = await coachDraft(datedBlock);

@@ -257,9 +257,9 @@ test("the transcript holds only the anchor, through a save and the renderer", ()
     [["a-1", 1], ["a-1", 2]]
   );
   assert.equal(
-    history.parseChatTranscriptJson(JSON.stringify([{ kind: "planOutline", artifactId: "a-1" }])).length,
-    0,
-    "no version, no anchor"
+    history.parseChatTranscriptJson(JSON.stringify([{ kind: "planOutline", artifactId: "a-1" }]))[0].kind,
+    "opaque",
+    "no version, no anchor — carried as it was rather than dropped"
   );
   assert.deepEqual([...model.latestOutlineAnchors(back)], [["a-1", 4]], "the card is drawn at the latest anchor");
 });
