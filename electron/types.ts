@@ -2467,8 +2467,9 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
-      kind: "workoutDelete";
-      preview: WorkoutDeletePreview;
+      /** Coach proposed changes to the calendar, or a deletion, for the athlete to apply (P3.2–P3.3). */
+      kind: "scheduleChange";
+      changeSet: ScheduleChangeSet;
     }
   | {
       requestId: string;
@@ -3807,6 +3808,63 @@ export interface DeleteWorkoutResult {
   message: string;
 }
 
+/**
+ * What Coach proposes to do to the calendar or the workout library, line by
+ * line, for the athlete to apply or dismiss (P3.2–P3.3 of
+ * docs/coach-plan-canvas.md). Kept in `chat_schedule_changes` (`personal`),
+ * so a proposal outlives a restart and can be applied from the other machine;
+ * the transcript holds only a `scheduleChange` anchor.
+ *
+ * Every line is checked against COROS again when it is applied, and one
+ * already applied is never written twice.
+ */
+export type ScheduleChangeOp = "move" | "replace" | "remove" | "add" | "deleteWorkout";
+export type ScheduleChangeStatus = "proposed" | "applied" | "failed" | "dismissed" | "stale";
+
+/** A session on the calendar as the proposal found it. */
+export interface ScheduleChangeSession {
+  /** The calendar's `planId`: a running plan's copy, or the athlete's own schedule. */
+  planId: string;
+  idInPlan: string;
+  /** yyyyMMdd. */
+  happenDay: string;
+  name: string;
+  planProgramId?: string;
+  programId?: string;
+  sportType?: number;
+}
+
+export interface ScheduleChangeLine {
+  lineId: string;
+  op: ScheduleChangeOp;
+  /** The line as the card states it. */
+  label: string;
+  /** The session a move, replace or remove acts on. */
+  session?: ScheduleChangeSession;
+  /** Where a move or an add lands (yyyyMMdd). */
+  toDay?: string;
+  /** What a replace or an add puts on the calendar. */
+  workout?: PlanWorkoutEntryInput;
+  /** A library workout a deletion removes. */
+  program?: { id: string; name: string };
+  status: ScheduleChangeStatus;
+  /** Why a line failed or went stale. */
+  reason?: string;
+  /** When it was applied, failed, dismissed or found stale. */
+  settledAt?: string;
+}
+
+export interface ScheduleChangeSet {
+  changeSetId: string;
+  /** The conversation it was proposed in. */
+  sessionId?: string;
+  summary: string;
+  lines: ScheduleChangeLine[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A card from before change sets (P3.2): drawn, but its request died with the process that staged it. */
 export interface WorkoutDeletePreview {
   requestId: string;
   target: "scheduled" | "library" | "both";
@@ -3865,6 +3923,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */
   | { kind: "planOutline"; artifactId: string; outlineVersion: number }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
+  /** An anchor (Q3): the change set itself is `chat_schedule_changes`' (P3.2). */
+  | { kind: "scheduleChange"; changeSetId: string }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }

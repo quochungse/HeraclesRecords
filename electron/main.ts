@@ -350,7 +350,9 @@ import {
   findChatSessionForDraft,
   editPlanDraft,
   getPlanDraftDocument,
-  confirmWorkoutDelete
+  applyScheduleChangeLine,
+  dismissScheduleChangeLine,
+  getScheduleChanges
 } from "./chatService";
 import {
   compactChatSessionContext,
@@ -361,9 +363,6 @@ import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
-import {
-  pruneDeleteRequestStore
-} from "./chatWorkoutTools";
 import {
   connectCorosMcp,
   disconnectCorosMcp,
@@ -794,7 +793,6 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
-  pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1924,8 +1922,13 @@ function registerIpcHandlers(): void {
     editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
 
-  ipcMain.handle("chat:confirmWorkoutDelete", (_event, requestId: string) =>
-    confirmWorkoutDelete(requestId)
+  // Coach's proposals to the calendar and the library (P3.2–P3.3).
+  ipcMain.handle("chat:scheduleChanges", (_event, changeSetIds: string[]) => getScheduleChanges(changeSetIds));
+  ipcMain.handle("chat:applyScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    applyScheduleChangeLine(changeSetId, lineId)
+  );
+  ipcMain.handle("chat:dismissScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    dismissScheduleChangeLine(changeSetId, lineId)
   );
 
   ipcMain.handle(

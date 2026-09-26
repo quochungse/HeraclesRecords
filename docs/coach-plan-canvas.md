@@ -788,11 +788,22 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   version mới vào chỗ athlete không đọc. Phần đếm compliance chuyển sang `electron/planCompliance.ts`
   để Library và Coach dùng một phép đếm.
 
-**P3.2 Card xoá workout lưu bền** · S — bước đầu của change set
+**P3.2 Card xoá workout lưu bền** · S — bước đầu của change set · *xong*
 - Bảng `chat_schedule_changes` (§7) ra đời ở đây; một đề xuất xoá là một change set một dòng.
   `delete_workout` ghi row thay vì `deleteRequestStore`; card neo bằng kind mới `scheduleChange
   { changeSetId }`. Entry `workoutDelete` cũ vẫn đọc được (chỉ hiện, nút báo "Ask Coach again").
 - Test: `test:chat-workout-tools`, `test:chat-history-store` (neo mới), restart giữa chừng.
+- **Đã làm** (`electron/chatScheduleChanges.ts`, `CoachScheduleChangeCard`): `delete_workout` ghi một
+  change set — một dòng `remove` cho buổi trên lịch, một dòng `deleteWorkout` cho workout trong thư
+  viện, hoặc cả hai — và stream `scheduleChange { changeSet }`; transcript giữ neo. Mỗi dòng đọc lại
+  COROS trước khi ghi (ngày đó qua `schedule/query`; thư viện đọc lại, bỏ qua cache vài phút của nó):
+  buổi biến mất hoặc đổi tên thì *stale*, không ghi gì. Một dòng một lần ghi, lưu kết quả ngay; dòng
+  đã áp không ghi lại; bấm hai lần trong một process bị từ chối (`applying`). Dòng mang op mà build
+  này không biết được giữ nguyên qua mỗi lần lưu và không được áp. Card cũ `workoutDelete` chỉ hiện,
+  kèm câu "Ask Coach again"; `chat:confirmWorkoutDelete` và `deleteRequestStore` đã bỏ. Xoá cuộc chat
+  xoá change set của nó. Còn lại: hai máy áp cùng một set gần như cùng lúc thì máy sau thấy buổi đã
+  mất và ghi *stale* đè *applied* (row thắng theo last-writer-wins) — không ghi COROS hai lần, chỉ
+  sai chữ trên card.
 
 **P3.3 Change set trên lịch** · L
 - Tool `propose_schedule_changes { summary, changes: [{ op: move | replace | remove | add,

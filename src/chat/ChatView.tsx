@@ -32,7 +32,6 @@ import {
   Sparkles,
   Square,
   Terminal,
-  Trash2,
   User,
   X,
   Zap
@@ -79,7 +78,7 @@ import type {
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutDeletePreview,
-  DeleteWorkoutResult
+  ScheduleChangeSet
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { sportTheme } from "../training-library/sportTheme";
@@ -94,6 +93,8 @@ import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
+import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
+import { scheduleChangeIds } from "./scheduleChangeModel";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
@@ -135,7 +136,6 @@ import {
   upsertFitnessTrendEntry,
   upsertHrZoneEntry,
   upsertPlanDraftEntry,
-  upsertWorkoutDeleteEntry,
   isChatVisualEntry,
   settleTurnEntries,
   type ChatEntry,
@@ -354,17 +354,12 @@ function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
   return "Calendar and library";
 }
 
-function DeletePreviewCard({
-  preview,
-  deleting,
-  deleted,
-  onConfirm
-}: {
-  preview: WorkoutDeletePreview;
-  deleting: boolean;
-  deleted?: DeleteWorkoutResult;
-  onConfirm: () => void;
-}) {
+/**
+ * A delete card from before change sets (P3.2). Its request lived in the
+ * memory of the process that staged it, so nothing can be applied from it
+ * any more; it stays drawn because it is part of the conversation.
+ */
+function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
   return (
     <div className="chat-plan-card chat-delete-card">
       <div className="chat-plan-card-header">
@@ -389,25 +384,7 @@ function DeletePreviewCard({
           </div>
         ) : null}
       </dl>
-      {deleted ? (
-        <p className="chat-plan-success">{deleted.message}</p>
-      ) : (
-        <div className="chat-plan-actions">
-          <button
-            type="button"
-            className="chat-delete-confirm"
-            onClick={onConfirm}
-            disabled={deleting}
-          >
-            {deleting ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : (
-              <Trash2 size={14} aria-hidden="true" />
-            )}
-            Delete from COROS
-          </button>
-        </div>
-      )}
+      <p className="chat-delete-expired">This card is from an earlier version and can no longer delete anything. Ask Coach again.</p>
     </div>
   );
 }
@@ -919,6 +896,20 @@ export function ChatView({
       )
       .catch(() => undefined);
   }, [api, missingBriefs]);
+  const missingChangeSets = scheduleChangeIds(timeline)
+    .filter((changeSetId) => !(changeSetId in scheduleChanges))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingChangeSets) return;
+    const ids = missingChangeSets.split(",");
+    setScheduleChanges((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getScheduleChanges(ids)
+      .then((sets) =>
+        setScheduleChanges((current) => ({ ...current, ...Object.fromEntries(sets.map((set) => [set.changeSetId, set])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingChangeSets]);
   /** The anchor each outline's card is drawn at: its latest (P2.2). */
   const outlineAnchors = latestOutlineAnchors(timeline);
   /** The brief whose screen is open, and how its save is going. */
@@ -1015,12 +1006,13 @@ export function ChatView({
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
-  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(
-    null
-  );
-  const [deletedWorkouts, setDeletedWorkouts] = useState<
-    Record<string, DeleteWorkoutResult>
-  >({});
+  /**
+   * The change sets behind the conversation's proposal cards (P3.2), by id.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
+  /** The line being applied (`"*"` for a whole set), by set. */
+  const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -1210,7 +1202,6 @@ export function ChatView({
     // A reference belongs to the conversation it was picked in.
     setPendingRefs([]);
     setUploadedPlans({});
-    setDeletedWorkouts({});
     pendingCoachPromptsRef.current = [];
     resumedCoachPromptRef.current = null;
   };
@@ -1635,6 +1626,8 @@ export function ChatView({
       // cards read them through `planBriefs`, which is let go so they are
       // read again; a conversation's settings likewise (P2.0).
       if (change.tables.includes("chat_plan_artifacts")) setPlanBriefs({});
+      // A proposal applied or dismissed on the other machine (P3.2).
+      if (change.tables.includes("chat_schedule_changes")) setScheduleChanges({});
       if (change.tables.includes("chat_conversation_settings")) {
         setConversationSettingsVersion((value) => value + 1);
       }
@@ -2030,9 +2023,13 @@ export function ChatView({
                 : [...prev, { kind: "planOutline", artifactId: brief.artifactId, outlineVersion }]
             );
           }
-        } else if (payload.kind === "workoutDelete") {
+        } else if (payload.kind === "scheduleChange") {
+          const changeSet = payload.changeSet;
+          setScheduleChanges((current) => ({ ...current, [changeSet.changeSetId]: changeSet }));
           setTimeline((prev) =>
-            upsertWorkoutDeleteEntry(prev, payload.preview)
+            prev.some((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSet.changeSetId)
+              ? prev
+              : [...prev, { kind: "scheduleChange", changeSetId: changeSet.changeSetId }]
           );
         } else if (payload.kind === "activityVisual") {
           if (chatSettings.visualizationsEnabled) {
@@ -3078,20 +3075,27 @@ export function ChatView({
     }, 1800);
   };
 
-  const handleConfirmWorkoutDelete = async (requestId: string) => {
-    if (!api || deletingRequestId) return;
-    setDeletingRequestId(requestId);
+  const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
+    if (!api || applyingChange) return;
+    setApplyingChange({ changeSetId, lineId: lineId ?? "*" });
     onError(null);
     try {
-      const result = await api.confirmWorkoutDelete(requestId);
-      setDeletedWorkouts((prev) => ({ ...prev, [requestId]: result }));
-      onPlanUploaded?.();
+      const set = apply
+        ? await api.applyScheduleChange(changeSetId, lineId)
+        : await api.dismissScheduleChange(changeSetId, lineId);
+      setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+      if (apply) onPlanUploaded?.();
     } catch (caught) {
-      onError(
-        remoteErrorMessage(caught, "Failed to delete workout from COROS.")
-      );
+      onError(remoteErrorMessage(caught, apply ? "The change was not applied." : "The change was not dismissed."));
+      // What COROS did before the failure is in the row: read it again.
+      void api
+        .getScheduleChanges([changeSetId])
+        .then(([set]) => {
+          if (set) setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+        })
+        .catch(() => undefined);
     } finally {
-      setDeletingRequestId(null);
+      setApplyingChange(null);
     }
   };
 
@@ -4275,13 +4279,28 @@ function AnalysisSilentChip({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
-                    <DeletePreviewCard
-                      preview={entry.preview}
-                      deleting={deletingRequestId === entry.preview.requestId}
-                      deleted={deletedWorkouts[entry.preview.requestId]}
-                      onConfirm={() =>
-                        void handleConfirmWorkoutDelete(entry.preview.requestId)
-                      }
+                    <DeletePreviewCard preview={entry.preview} />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "scheduleChange") {
+              const changeSet = scheduleChanges[entry.changeSetId];
+              if (!changeSet) return null;
+              const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
+              return (
+                <div key={`scheduleChange:${entry.changeSetId}`} className="chat-row chat-row-assistant">
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachScheduleChangeCard
+                      changeSet={changeSet}
+                      busyLine={busyLine}
+                      disabled={Boolean(applyingChange) || streaming}
+                      onApply={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, true)}
+                      onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                     />
                   </div>
                 </div>

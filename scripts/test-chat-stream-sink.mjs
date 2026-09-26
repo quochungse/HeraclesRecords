@@ -189,8 +189,8 @@ runStream(upserts, [
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: [] } }],
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: ["x"] } }],
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d2", entries: [] } }],
-  ["chat:streamInfo", { kind: "workoutDelete", preview: { requestId: "w1", name: "a" } }],
-  ["chat:streamInfo", { kind: "workoutDelete", preview: { requestId: "w1", name: "b" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1", summary: "a" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1", summary: "b" } }],
   ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1", n: 1 } }],
   ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1", n: 2 } }],
   ["chat:streamInfo", { kind: "hrZoneSummary", preview: { previewId: "z1", n: 1 } }],
@@ -200,11 +200,11 @@ runStream(upserts, [
 const upserted = upserts.entries();
 assert.deepEqual(
   upserted.map((entry) => entry.kind),
-  ["planDraft", "planDraft", "workoutDelete", "activityVisual", "hrZoneSummary"]
+  ["planDraft", "planDraft", "scheduleChange", "activityVisual", "hrZoneSummary"]
 );
 assert.deepEqual(upserted[0].draft.entries, ["x"], "same draftId replaced in place");
 assert.equal(upserted[1].draft.draftId, "d2", "a different id appends");
-assert.equal(upserted[2].preview.name, "b");
+assert.deepEqual(upserted[2], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
 assert.equal(upserted[3].preview.n, 2);
 assert.equal(upserted[4].preview.n, 2);
 // A coachPrompt re-emitted under the same id collapses to one entry too.

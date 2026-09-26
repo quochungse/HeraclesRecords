@@ -1102,6 +1102,7 @@ const KNOWN_ENTRY_KINDS = new Set([
   "planOutline",
   "coachPrompt",
   "workoutDelete",
+  "scheduleChange",
   "activityVisual",
   "activityHrTrend",
   "fitnessTrend",
@@ -1222,6 +1223,13 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
   if (value.kind === "coachPrompt") {
     const prompt = parseCoachInputPrompt(value.prompt);
     return prompt ? cardEntry({ kind: "coachPrompt", prompt }, value, "prompt") : null;
+  }
+
+  if (value.kind === "scheduleChange") {
+    // An anchor (Q3): the change set itself is its `chat_schedule_changes` row (P3.2).
+    return typeof value.changeSetId === "string" && value.changeSetId
+      ? cardEntry({ kind: "scheduleChange", changeSetId: value.changeSetId }, value, "changeSetId")
+      : null;
   }
 
   if (value.kind === "workoutDelete") {
@@ -1640,6 +1648,8 @@ function logicalKey(entry: PersistedChatEntry): string | undefined {
       return `planDraft:${entry.draft.draftId}`;
     case "workoutDelete":
       return `workoutDelete:${entry.preview.requestId}`;
+    case "scheduleChange":
+      return `scheduleChange:${entry.changeSetId}`;
     case "activityVisual":
     case "activityHrTrend":
     case "fitnessTrend":

@@ -9,7 +9,8 @@ import {
   type PlanWorkoutEntry
 } from "./corosWorkoutBuilder";
 import {
-  deleteWorkout,
+  listLibraryWorkouts,
+  invalidateLibraryWorkoutPrograms,
   formatScheduledExercisesForChat,
   getTrainingHubStatus,
   listScheduledWorkoutEntries,
@@ -41,6 +42,7 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
+import { createScheduleChangeSet, type NewScheduleChangeLine } from "./chatScheduleChanges";
 import { CHAT_PLAN_TOOL_NAMES, getChatPlanTools, handleChatPlanTool, isChatPlanTool } from "./chatPlanTools";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
@@ -52,7 +54,6 @@ import {
 import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
-  DeleteWorkoutResult,
   PlanArtifactVersion,
   PlanCalendarState,
   PlanCorosSync,
@@ -70,7 +71,7 @@ import type {
   TrainingPlanGenerationRequest,
   TrainingPlanWeekStage,
   UploadPlanResult,
-  WorkoutDeletePreview,
+  ScheduleChangeSet,
   UnitSystem
 } from "./types";
 import {
@@ -176,14 +177,6 @@ function workoutSource(workout: PlanWorkoutEntry): PlanWorkoutEntryInput {
   };
 }
 
-interface StoredDeleteRequest {
-  requestId: string;
-  params: DeleteWorkoutParams;
-  preview: WorkoutDeletePreview;
-  createdAt: number;
-  executedAt?: number;
-}
-
 interface DeleteWorkoutParams {
   target: "scheduled" | "library" | "both";
   schedule_date?: string;
@@ -207,7 +200,6 @@ const partialWrites = new Map<
   string,
   { entries: UploadPlanResult["entries"]; workoutsCreated: number; workoutsScheduled: number }
 >();
-const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
   saveChatPlanDraft({
@@ -442,8 +434,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
     {
       name: "delete_workout",
       description:
-        "Stage a workout deletion for the athlete to confirm. " +
-        "Shows a Delete from COROS button in chat — never deletes directly. " +
+        "Stage a workout deletion for the athlete to apply. " +
+        "Shows a card with a Remove or Delete button under your reply — never deletes directly. " +
         "For calendar: provide schedule_date + workout_name, or plan_id + id_in_plan. " +
         "For library: provide program_id or workout_name with target library/both.",
       inputSchema: {
@@ -493,7 +485,8 @@ export async function handleChatWorkoutTool(
     onPlanBrief?: (brief: PlanBrief) => void;
     /** The conversation the turn is in, which a brief belongs to. */
     sessionId?: string;
-    onWorkoutDelete?: (preview: WorkoutDeletePreview) => void;
+    /** Coach staged a change to the calendar or the library (P3.2). */
+    onScheduleChange?: (changeSet: ScheduleChangeSet) => void;
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
     /**
@@ -556,7 +549,7 @@ export async function handleChatWorkoutTool(
   if (name === "list_scheduled_workouts") {
     return handleListScheduledWorkouts(args, options?.unitSystem ?? "metric");
   }
-  return handleDeleteWorkout(args, options?.onWorkoutDelete);
+  return handleDeleteWorkout(args, options?.sessionId, options?.onScheduleChange);
 }
 
 function allowedStringList<T extends string>(
@@ -1616,37 +1609,33 @@ function formatScheduledVolume(
   return formatDistanceValue(amount * (swim ? 1 : 1_000), unitSystem, { swim });
 }
 
+/**
+ * A deletion Coach stages is a change set of its own (P3.2): a line for the
+ * calendar session, a line for the library workout, or both — kept in
+ * `chat_schedule_changes`, so the card outlives a restart and is applied from
+ * either machine, each line checked against COROS again first.
+ */
 async function handleDeleteWorkout(
   args: Record<string, unknown>,
-  onWorkoutDelete?: (preview: WorkoutDeletePreview) => void
+  sessionId: string | undefined,
+  onScheduleChange?: (changeSet: ScheduleChangeSet) => void
 ): Promise<string> {
-  let params: DeleteWorkoutParams;
   try {
-    params = parseDeleteWorkoutParams(args);
-  } catch (caught) {
-    return JSON.stringify({
-      ok: false,
-      error: caught instanceof Error ? caught.message : String(caught)
+    const params = parseDeleteWorkoutParams(args);
+    const lines = await deleteLines(params);
+    const changeSet = createScheduleChangeSet({
+      ...(sessionId ? { sessionId } : {}),
+      summary: lines.length === 1 ? lines[0].label : "Delete a workout",
+      lines
     });
-  }
-
-  try {
-    const preview = await buildWorkoutDeletePreview(params);
-    deleteRequestStore.set(preview.requestId, {
-      requestId: preview.requestId,
-      params,
-      preview,
-      createdAt: Date.now()
-    });
-    onWorkoutDelete?.(preview);
-
+    onScheduleChange?.(changeSet);
     return JSON.stringify({
       ok: true,
-      request_id: preview.requestId,
-      preview,
+      change_set_id: changeSet.changeSetId,
+      lines: changeSet.lines.map((line) => line.label),
       message:
-        "Delete request staged. Tell the athlete to review the confirmation card " +
-        "and click Delete from COROS when ready. Do not claim the workout was removed until they confirm."
+        "Staged for the athlete: the card under your reply has an Apply button. " +
+        "Nothing is deleted until they apply it; do not say it was removed."
     });
   } catch (caught) {
     return JSON.stringify({
@@ -1722,46 +1711,14 @@ function formatDisplayScheduleDate(value?: string): string | undefined {
   return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}`;
 }
 
-function buildDeleteSummary(params: DeleteWorkoutParams): string {
-  const parts: string[] = [];
-  const name = params.workout_name;
-  const date = formatDisplayScheduleDate(params.schedule_date);
+/** The lines a deletion comes to, each naming what it acts on as COROS holds it now. */
+async function deleteLines(params: DeleteWorkoutParams): Promise<NewScheduleChangeLine[]> {
+  const lines: NewScheduleChangeLine[] = [];
+  let scheduledName: string | undefined;
 
   if (params.target === "scheduled" || params.target === "both") {
-    if (name && date) {
-      parts.push(`Remove "${name}" from your calendar on ${date}`);
-    } else if (params.plan_id && params.id_in_plan) {
-      parts.push("Remove the scheduled workout from your calendar");
-    } else {
-      parts.push("Remove from calendar");
-    }
-  }
-
-  if (params.target === "library" || params.target === "both") {
-    if (name) {
-      parts.push(`Delete "${name}" from your workout library`);
-    } else if (params.program_id) {
-      parts.push("Delete the workout from your library");
-    } else {
-      parts.push("Delete from workout library");
-    }
-  }
-
-  return parts.join(". ");
-}
-
-async function buildWorkoutDeletePreview(
-  params: DeleteWorkoutParams
-): Promise<WorkoutDeletePreview> {
-  let workoutName = params.workout_name;
-  let scheduleDate = params.schedule_date;
-  let programId = params.program_id;
-
-  if (params.target === "scheduled" || params.target === "both") {
-    let scheduleEntry:
-      | Awaited<ReturnType<typeof listScheduledWorkoutEntries>>[number]
-      | undefined;
-
+    let scheduleEntry: Awaited<ReturnType<typeof listScheduledWorkoutEntries>>[number] | undefined;
+    const scheduleDate = params.schedule_date;
     if (params.plan_id && params.id_in_plan) {
       const entries = scheduleDate
         ? await listScheduledWorkoutEntries(scheduleDate, scheduleDate)
@@ -1770,68 +1727,62 @@ async function buildWorkoutDeletePreview(
             formatScheduleDay(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000))
           );
       scheduleEntry = entries.find(
-        (entry) =>
-          entry.planId === params.plan_id &&
-          entry.idInPlan === params.id_in_plan
+        (entry) => entry.planId === params.plan_id && entry.idInPlan === params.id_in_plan
       );
-    } else if (scheduleDate && workoutName) {
-      const entries = await listScheduledWorkoutEntries(
-        scheduleDate,
-        scheduleDate
-      );
-      const matches = entries.filter((entry) => entry.name === workoutName);
+    } else if (scheduleDate && params.workout_name) {
+      const entries = await listScheduledWorkoutEntries(scheduleDate, scheduleDate);
+      const matches = entries.filter((entry) => entry.name === params.workout_name);
       if (matches.length > 1) {
         throw new Error(
-          `Multiple scheduled workouts named "${workoutName}" on ${scheduleDate}. ` +
+          `Multiple scheduled workouts named "${params.workout_name}" on ${scheduleDate}. ` +
             "Use plan_id and id_in_plan to disambiguate."
         );
       }
       scheduleEntry = matches[0];
     }
-
     if (!scheduleEntry) {
       throw new Error("Scheduled workout not found on COROS calendar.");
     }
-
-    workoutName = workoutName ?? scheduleEntry.name;
-    scheduleDate = scheduleEntry.happenDay;
-    programId = programId ?? scheduleEntry.programId;
+    scheduledName = scheduleEntry.name;
+    lines.push({
+      op: "remove",
+      label: `Remove "${scheduleEntry.name}" from the calendar on ${formatDisplayScheduleDate(scheduleEntry.happenDay)}`,
+      session: {
+        planId: scheduleEntry.planId,
+        idInPlan: scheduleEntry.idInPlan,
+        happenDay: scheduleEntry.happenDay,
+        name: scheduleEntry.name,
+        ...(scheduleEntry.planProgramId ? { planProgramId: scheduleEntry.planProgramId } : {}),
+        ...(scheduleEntry.programId ? { programId: scheduleEntry.programId } : {}),
+        ...(scheduleEntry.sportType !== undefined ? { sportType: scheduleEntry.sportType } : {})
+      }
+    });
   }
 
-  const requestId = crypto.randomUUID();
-  const enriched: DeleteWorkoutParams = {
-    ...params,
-    workout_name: workoutName,
-    schedule_date: scheduleDate,
-    program_id: programId
-  };
-
-  return {
-    requestId,
-    target: params.target,
-    workoutName,
-    scheduleDate: formatDisplayScheduleDate(scheduleDate),
-    programId,
-    summary: buildDeleteSummary(enriched)
-  };
-}
-
-export async function confirmWorkoutDeleteById(
-  requestId: string
-): Promise<DeleteWorkoutResult> {
-  const stored = deleteRequestStore.get(requestId);
-  if (!stored) {
-    // Delete requests live in memory only, so a card from before a restart
-    // reaches here. Nothing was deleted, and the coach can stage it again.
-    throw new Error("This delete request has expired, and nothing was deleted. Ask Coach again.");
+  if (params.target === "library" || params.target === "both") {
+    // Read afresh: the list is cached for minutes, and a workout saved since is what Coach may name.
+    invalidateLibraryWorkoutPrograms();
+    const library = await listLibraryWorkouts();
+    const name = params.workout_name ?? scheduledName;
+    let found = params.program_id ? library.find((workout) => workout.id === params.program_id) : undefined;
+    if (!found && name) {
+      const named = library.filter((workout) => workout.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (named.length > 1) {
+        throw new Error(`Several library workouts are named "${name}". Pass program_id to say which.`);
+      }
+      found = named[0];
+    }
+    if (found) {
+      lines.push({
+        op: "deleteWorkout",
+        label: `Delete "${found.name}" from the workout library`,
+        program: { id: found.id, name: found.name }
+      });
+    } else if (params.target === "library") {
+      throw new Error("Library workout not found.");
+    }
   }
-  if (stored.executedAt) {
-    throw new Error("This workout was already deleted.");
-  }
-
-  const result = await deleteWorkout(stored.params);
-  stored.executedAt = Date.now();
-  return result;
+  return lines;
 }
 
 /** The sessions a calendar save would put on a day before `today` (both `yyyyMMdd`). */
@@ -2522,14 +2473,4 @@ export function discardPlanDraft(draftId: string): void {
  */
 export function deletePlanDraftsOf(draftIds: readonly string[]): void {
   for (const draftId of draftIds) deleteChatPlanDraft(draftId);
-}
-
-/** Remove delete requests older than 24 hours */
-export function pruneDeleteRequestStore(): void {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  for (const [id, request] of deleteRequestStore) {
-    if (request.createdAt < cutoff) {
-      deleteRequestStore.delete(id);
-    }
-  }
 }

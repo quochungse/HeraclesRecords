@@ -6,6 +6,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
   deleteChatConversationSettingsRow,
+  deleteChatScheduleChangesOf,
   deleteSettings,
   getChatConversationSettingsRow,
   getSetting,
@@ -28,12 +29,12 @@ import {
   getMcpServerCachedTools
 } from "./mcpClientManager";
 import { prefixToolName, splitToolName } from "./mcpToolNames";
+import { applyScheduleChange, dismissScheduleChange, readScheduleChanges } from "./chatScheduleChanges";
 import {
   getChatWorkoutTools,
   handleChatWorkoutTool,
   isChatWorkoutTool,
   uploadPlanDraftById,
-  confirmWorkoutDeleteById,
   deletePlanDraftsOf,
   planDraftDocument,
   savePlanDraftEdit,
@@ -196,9 +197,8 @@ import type {
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
   TrainingPlanOutlineRevision,
-  DeleteWorkoutResult,
-  UnitSystem,
-  WorkoutDeletePreview
+  ScheduleChangeSet,
+  UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
 import { pipelineWire } from "./chatContextCompaction";
@@ -628,6 +628,7 @@ export function deleteChatSessionById(id: string): void {
   deletePlanDraftsOf(draftIds);
   deletePlanBriefs(briefIds);
   deleteChatConversationSettingsRow(id);
+  deleteChatScheduleChangesOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1318,15 +1319,14 @@ export function createCollectorSink(
       return;
     }
 
-    if (kind === "workoutDelete") {
-      const preview = payload.preview as WorkoutDeletePreview | undefined;
-      if (!preview?.requestId) return;
+    if (kind === "scheduleChange") {
+      // An anchor (Q3); the change set is already its row (P3.2).
+      const changeSetId = (payload.changeSet as ScheduleChangeSet | undefined)?.changeSetId;
+      if (!changeSetId) return;
       upsertEntry(
         entries,
-        { kind: "workoutDelete", preview },
-        (candidate) =>
-          candidate.kind === "workoutDelete" &&
-          candidate.preview.requestId === preview.requestId
+        { kind: "scheduleChange", changeSetId },
+        (candidate) => candidate.kind === "scheduleChange" && candidate.changeSetId === changeSetId
       );
       return;
     }
@@ -2604,10 +2604,16 @@ export async function editPlanDraft(
   return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
-export async function confirmWorkoutDelete(
-  requestId: string
-): Promise<DeleteWorkoutResult> {
-  return confirmWorkoutDeleteById(requestId);
+export function getScheduleChanges(changeSetIds: unknown): ScheduleChangeSet[] {
+  return readScheduleChanges(Array.isArray(changeSetIds) ? changeSetIds.filter((id): id is string => typeof id === "string") : []);
+}
+
+export function applyScheduleChangeLine(changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> {
+  return applyScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
+}
+
+export function dismissScheduleChangeLine(changeSetId: string, lineId?: string): ScheduleChangeSet {
+  return dismissScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
 }
 
 function getAllChatTools(): CorosMcpTool[] {
@@ -2895,12 +2901,8 @@ async function executeChatTool(
       },
       planRequest: generation?.request,
       ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
-      onWorkoutDelete: (preview) => {
-        send("chat:streamInfo", {
-          requestId,
-          kind: "workoutDelete",
-          preview
-        });
+      onScheduleChange: (changeSet) => {
+        send("chat:streamInfo", { requestId, kind: "scheduleChange", changeSet });
       },
       allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
       progress: run?.context?.activities !== false,
@@ -3206,7 +3208,7 @@ export function withLiveToolInstructions(
         "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
         "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-        "The athlete confirms via the Delete from COROS button in chat.",
+        "The athlete applies them from the card under your reply; nothing is deleted until they do.",
       ...(planTools.some((tool) => tool.name === "list_training_plans")
         ? [
             "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +

@@ -145,6 +145,7 @@
     "test:plan-editor-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-plan-editor-renderer.mjs",
     "test:coros-official-plan": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-coros-official-plan.mjs",
     "test:chat-plan-tools": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-chat-plan-tools.mjs",
+    "test:schedule-changes": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-schedule-changes.mjs",
     "test:coros-plan-writes": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-coros-plan-writes.mjs",
     "test:plan-reader": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-plan-reader.mjs",
     "test:library-migrations": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-library-migrations.mjs",

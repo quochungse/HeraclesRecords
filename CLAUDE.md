@@ -791,6 +791,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   `sections` list, trends and sleep take `days` and roll up by week past 14, and
   `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
   own totals and deltas so the model reads them rather than doing the arithmetic.
+  **Coach's proposals to the calendar and the library are change sets** (P3.2, `chatScheduleChanges.ts`):
+  rows of `chat_schedule_changes` (`personal`), a `scheduleChange` anchor in the transcript, and a
+  card (`CoachScheduleChangeCard`) whose lines are applied or dismissed one at a time or all at once
+  through `chat:applyScheduleChange` / `chat:dismissScheduleChange`. `delete_workout` stages one.
+  **Every line reads COROS again before it writes** — a session gone from its day or renamed goes
+  `stale` — **one line is one write, recorded as it lands** (one `schedule/update` is all or nothing),
+  and a line already applied is never written again. The delete card it replaced lived in a map in
+  memory, so a restart left a button that could only say "expired"; a `workoutDelete` entry from
+  then is drawn and can do nothing. `npm run test:schedule-changes`.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and
   `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its

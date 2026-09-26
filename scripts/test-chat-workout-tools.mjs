@@ -341,15 +341,4 @@ assert.equal(mixedUploadInput.workouts[3].steps[0].target_type, "reps");
   );
 }
 
-// A delete card from before a restart says what happened and what to do.
-{
-  const { confirmWorkoutDeleteById } = await import(
-    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-delete`
-  );
-  await assert.rejects(
-    confirmWorkoutDeleteById("from-before-a-restart"),
-    /expired, and nothing was deleted\. Ask Coach again\./
-  );
-}
-
 console.log("test-chat-workout-tools: ok");
