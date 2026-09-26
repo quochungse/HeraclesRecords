@@ -36,6 +36,7 @@ import { planCompliance, type PlanCompliance } from "./planCompliance";
 import {
   COROS_WEEK_STAGES,
   formatPlanDay,
+  mondayOf,
   parsePlanDay,
   planEntryMetrics,
   sportMixOf,
@@ -305,7 +306,7 @@ async function getTrainingPlan(args: Record<string, unknown>, options: ChatPlanT
     const stage = COROS_WEEK_STAGES.find((item) => item.value === weekStageOf(plan!, week - 1));
     const sessions = (byWeek.get(week - 1) ?? [])
       .sort((a, b) => a.dayIndex - b.dayIndex || a.sortOrder - b.sortOrder)
-      .map((entry) => sessionLine(entry, unitSystem, statusOf));
+      .map((entry) => sessionLine(entry, unitSystem, statusOf, start));
     return {
       week,
       ...(stage && stage.value !== 0 ? { stage: stage.label } : {}),
@@ -315,7 +316,7 @@ async function getTrainingPlan(args: Record<string, unknown>, options: ChatPlanT
   });
   const whole = plan.entries
     .filter((entry) => entry.idInPlan && wanted.has(entry.idInPlan))
-    .map((entry) => wholeSession(entry, unitSystem));
+    .map((entry) => wholeSession(entry, unitSystem, start));
 
   return JSON.stringify({
     ok: true,
@@ -397,9 +398,10 @@ const STATUS_WORDS: Record<TrainingActivityMatch["status"], string> = {
 function sessionLine(
   entry: TrainingPlanEntry,
   unitSystem: UnitSystem,
-  statusOf: ReadonlyMap<string, TrainingActivityMatch["status"]>
+  statusOf: ReadonlyMap<string, TrainingActivityMatch["status"]>,
+  firstMonday?: Date
 ): string {
-  const date = dashedDay(entry.happenDay);
+  const date = sessionDate(entry, firstMonday);
   const day = date ? `${DAY_NAMES[entry.dayIndex]} ${date}` : DAY_NAMES[entry.dayIndex];
   const status = entry.idInPlan ? statusOf.get(entry.idInPlan) : undefined;
   return [
@@ -425,18 +427,31 @@ function volume(entry: TrainingPlanEntry, unitSystem: UnitSystem): string | unde
   return parts.length ? parts.join(" / ") : undefined;
 }
 
-function wholeSession(entry: TrainingPlanEntry, unitSystem: UnitSystem) {
+function wholeSession(entry: TrainingPlanEntry, unitSystem: UnitSystem, firstMonday?: Date) {
   const workout = entry.workout;
   const steps = formatEntryStepsSummary(workout as PlanWorkoutEntry, unitSystem);
   return {
     id_in_plan: entry.idInPlan!,
     name: entry.title || workout.name,
     sport: workout.sport ?? "run",
-    ...(dashedDay(entry.happenDay) ? { date: dashedDay(entry.happenDay) } : {}),
+    ...(sessionDate(entry, firstMonday) ? { date: sessionDate(entry, firstMonday) } : {}),
     ...(workout.description ? { description: workout.description } : {}),
     ...(steps ? { steps } : {}),
     ...(workout.steps ? { workout_steps: workout.steps } : {})
   };
+}
+
+/**
+ * The day a session of a plan on the calendar falls on: COROS's own
+ * `happenDay` where the copy carries one, else counted from the week the run
+ * starts in, as COROS counts `dayNo`.
+ */
+function sessionDate(entry: TrainingPlanEntry, firstMonday: Date | undefined): string | undefined {
+  const stated = dashedDay(entry.happenDay);
+  if (stated || !firstMonday) return stated;
+  const date = mondayOf(firstMonday);
+  date.setDate(date.getDate() + entry.weekIndex * 7 + entry.dayIndex);
+  return formatPlanDay(date, true);
 }
 
 function dashedDay(value: string | undefined): string | undefined {

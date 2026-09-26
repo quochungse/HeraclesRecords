@@ -930,6 +930,27 @@ Còn lại, đã biết:
   plan đang chạy được đọc qua bản chạy. Hai id trùng nhau khi plan vừa lên lịch (đã thấy ở P3.0), nhưng
   có thể lệch sau khi buổi được thêm vào bản chạy từ plan đã sửa.
 
+**Test tay không cần AI** (`scripts/seed-coach-p3-sample.mjs`). Đóng app rồi chạy
+`npm run sample:coach-p3` (thêm `-- --live` để có dữ liệu COROS tạm; gỡ bằng `-- --cleanup`). Script
+ghi thẳng vào database của app ba cuộc chat, card dựng bằng chính các tool thật, dưới provider Coach
+đang chọn:
+- **P3 sample · card states** — một set có mọi trạng thái dòng: đã áp, *out of date* kèm lý do, *failed*
+  có **Try again**, *failed* không thử lại được (thay buổi đã thêm mà chưa xoá), *dismissed*, hai dòng
+  còn mở (bấm thì đọc lịch, không thấy buổi, thành *out of date* — không ghi gì); một set do "bản mới
+  hơn" ghi (op và status lạ: không nút, đếm riêng ở đầu card); card xoá kiểu cũ (chỉ hiện, không làm gì).
+- **P3 sample · analysis and asks** — lượt analysis (chip playbook + câu trả lời có attribution) kèm đề
+  xuất của nó; chip "About" của tuần, của một hoạt động và của buổi trong plan Library.
+- **P3 sample · live changes** (`--live`) — trong một cửa sổ 3 tuần trống cách ít nhất 4 tuần: một plan
+  lên lịch (T2 Easy 5k, T4 Tempo, T7 Long run, T3 tuần sau Easy 6k), bốn buổi riêng, một workout thư
+  viện, tất cả tên "Sample …". Đề xuất 6 dòng: dời Long run (buổi plan) sang CN, thay Tempo (buổi plan),
+  dời Hills (buổi riêng), thay Strides (buổi riêng), bỏ Recovery, thêm Shakeout; và card xoá Intervals
+  khỏi lịch lẫn thư viện. Script in ra `list_training_plans` và `get_training_plan` như Coach đọc.
+Kiểm tra sau khi áp: Library → plan mẫu → Long run nằm CN và Tempo thành "Easy 30" mà **vẫn thuộc
+plan** (compliance, badge lịch); màn Calendar thấy các buổi riêng đã dời/thay/thêm/bỏ; kéo một buổi của
+plan mẫu sang ngày khác rồi mở plan — vẫn thuộc plan; dời một buổi trước khi áp dòng của nó → dòng
+thành *out of date*. Đã chạy thử cả ba chế độ với một COROS giả trong container: mọi dòng live áp đúng
+(buổi plan giữ `idInPlan`, đổi `dayNo`/chương trình trong bản chạy), cleanup gỡ sạch.
+
 **Việc tồn đọng nên làm trước hoặc cùng P3** (từ các lần review): câu hỏi "Redraw the outline?"
 khi đổi nguồn của cuộc chat; analysis không thấy brief (gộp vào P3.4); phần đã ghi của một lần lưu
 bị ngắt chỉ nhớ trong RAM (P3.3 có thể dùng cùng cơ chế lưu kết quả từng dòng).

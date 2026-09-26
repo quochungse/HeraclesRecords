@@ -85,6 +85,7 @@ npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + 
 npm run body-shapes:fetch # regenerates src/calendar/bodyShapes.ts from react-native-body-highlighter (MIT). Same rule as fonts: the output is committed, the package is not a dependency, and a build never runs this.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs binaries:prepare and build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
+npm run sample:coach-p3  # app closed: writes sample Coach conversations covering every P3 card state into the app's database (-- --live adds temporary COROS data to apply against; -- --cleanup removes it all)
 npm start                # build, then run the packaged-style app
 ```
 
