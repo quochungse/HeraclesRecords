@@ -193,24 +193,6 @@ interface DeleteWorkoutParams {
 }
 
 const draftStore = new Map<string, StoredPlanDraft>();
-/**
- * Drafts written during a plan generation. Never persisted: `chat_plan_drafts`
- * is `personal` tier and a draft there lives as long as the conversation card
- * that holds it — a generation has no conversation, so every one it wrote used
- * to stay in that table for good and travel to every machine on the vault.
- */
-const generatedDrafts = new Map<string, StoredPlanDraft>();
-
-/** A draft the plan generator's run accepted, for it to build the plan from. */
-export function generatedPlanDraft(draftId: string): { plan: CorosTrainingPlanDraft; preview: PlanDraftPreview } | undefined {
-  const stored = generatedDrafts.get(draftId);
-  return stored ? { plan: stored.plan, preview: stored.preview } : undefined;
-}
-
-/** Lets go of a finished generation's drafts. */
-export function forgetGeneratedPlanDrafts(draftIds: readonly string[]): void {
-  for (const draftId of draftIds) generatedDrafts.delete(draftId);
-}
 const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
@@ -502,17 +484,12 @@ export async function handleChatWorkoutTool(
     allowUpcomingWorkouts?: boolean;
     unitSystem?: UnitSystem;
     /**
-     * Set while the plan generator runs: a draft is checked against what the
-     * athlete asked for and handed back to the model when it departs from it,
-     * and one that passes is kept in memory for the generator to collect
-     * rather than written to `chat_plan_drafts` (see `generatedPlanDraft`).
+     * Set while a conversation's sessions step runs (P2.3): a draft is checked
+     * against the brief and its outline and handed back to the model when it
+     * departs from them, and one that passes is written as the first version
+     * of the brief's artifact, `planArtifactId`.
      */
     planRequest?: TrainingPlanGenerationRequest;
-    /**
-     * Set when the generation is a step of a conversation's plan pipeline
-     * (P2.3): the accepted draft is kept after all, as the first version of
-     * that brief's artifact, rather than only in memory.
-     */
     planArtifactId?: string;
   }
 ): Promise<string> {
@@ -1022,14 +999,24 @@ async function handleDraftTrainingPlan(
     author: "coach",
     ...(refinements ? { refinements } : {})
   };
-  if (planRequest && planArtifactId) {
+  if (planRequest) {
     // The sessions step (P2.3): version 1 of the brief's artifact. The step
     // starts only on a brief with no version, so one already here is this
     // turn's own earlier hand-over, and a second accepted draft replaces it.
-    const earlier = versionsOf(planArtifactId).at(-1);
+    // The outline the athlete accepted states each week's stage.
+    const artifactId = planArtifactId ?? draftId;
+    const earlier = versionsOf(artifactId).at(-1);
     stored.draftId = earlier?.draftId ?? draftId;
     stored.preview = { ...preview, draftId: stored.draftId };
-    stored.artifactId = planArtifactId;
+    stored.artifactId = artifactId;
+    if (planRequest.outline) {
+      stored.plan = {
+        ...stored.plan,
+        weekStages: planRequest.outline.weeks.flatMap((week, weekIndex) =>
+          week.stage > 0 ? [{ weekIndex, stage: week.stage }] : []
+        )
+      };
+    }
     persistPlanDraft(stored);
     onPlanDraft?.(lightPreview(stored.preview));
     return JSON.stringify({
@@ -1037,15 +1024,6 @@ async function handleDraftTrainingPlan(
       draft_id: stored.draftId,
       message:
         "Plan accepted and shown to the athlete as a card, week by week, to read, edit, save or put on the calendar. Reply with a two-sentence summary of it and nothing else; do not list the sessions."
-    });
-  }
-  if (planRequest) {
-    generatedDrafts.set(draftId, stored);
-    onPlanDraft?.(preview);
-    return JSON.stringify({
-      ok: true,
-      draft_id: draftId,
-      message: "Plan accepted. Reply with a two-sentence summary of it and nothing else; the app shows it to the athlete week by week, to save, schedule or edit."
     });
   }
   persistPlanDraft(stored);

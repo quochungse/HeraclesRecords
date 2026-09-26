@@ -152,39 +152,23 @@ hay item nào khác. Chỉ khi được save nó mới thành một plan COROS.
 - **"Edit plan first" mở một màn hình sửa riêng ngay trong Coach** (`CoachPlanEditor`), không
   chuyển sang Plans Library và không tạo plan local. Nó dùng lại `PlanEditor`, vốn được portal ra
   `<body>` (`.tl-plan-modal-backdrop`) nên mount được từ Coach mà không cần route Library.
-- **Save trong màn hình đó cập nhật lại chính plan của coach**, không tạo draft Library nào:
-  ghi vào row `chat_plan_drafts` của nó, và thay entry `planDraft` trong transcript bằng bản mới
-  (`chatTypes.ts` đã thay theo index). Card trong chat hiện bản đã sửa. Đẩy lên COROS vẫn là nút
-  **Save to COROS** riêng trên card.
-- **Hướng chuyển ngược**: document → draft của coach (`savePlanDraftEdit` trong
-  `chatWorkoutTools.ts`), không đổi schema của `chat_plan_drafts`: `CorosTrainingPlanDraft` có
-  thêm `description`, `weekStages` và `layout` (tuỳ chọn), rồi preview dựng lại bằng
-  `buildPlanPreview`. Ngày được giữ theo Thứ Hai của buổi có ngày đầu tiên
-  mà coach viết; plan coach viết không có ngày thì vẫn không có ngày, và vị trí tuần/ngày người
-  dùng xếp được giữ trong `layout`. Entry transcript chỉ thêm `editedAt` (đã sửa đủ bốn chỗ).
-  Coach cũng được phép truyền `description` và `week_stages` trong `draft_training_plan`.
-- **Coach thấy bản đã sửa.** Coach không có tool sửa draft; `draft_training_plan` luôn tạo
-  draft mới, nên nếu không được báo thì coach sẽ dựng lại từ bản nó nhớ và bỏ mất phần người dùng
-  đã sửa. (Đã thay ở P1.3 của [coach-plan-canvas.md](coach-plan-canvas.md): mục lục
-  `creationIndex`, `planEvent` và `get_plan_draft`. Phần dưới là thiết kế cũ.)
-  `withPlanEdits` (`chatContextCompaction.ts`) đặt bản đã sửa lên trước câu hỏi mới nhất
-  của người dùng — không thành một message riêng, để vai user/assistant vẫn xen kẽ — cả ở chat
-  lẫn lượt analysis, và đọc toàn bộ transcript chứ không chỉ phần đuôi chưa bị tóm tắt.
-- **Bỏ hạn 24 giờ** của chat plan draft (`prunePlanDraftStore` xoá draft chưa upload sau
-  24 giờ, và card khi đó báo "expired, ask the coach to regenerate"). Draft sống cùng cuộc
-  chat: xoá cuộc chat thì xoá mọi draft của nó (`deleteChatSessionById` đọc transcript trước
-  khi xoá row, rồi gọi `deletePlanDraftsOf`).
-- Xoá hai đích lưu local (`localPlan`, `localTemplate`). Mở lại `nativePlan` qua luồng trên.
-  Workout Library và Calendar giữ nguyên.
-- `TrainingPlanGenerator` (tạo plan bằng coach ngay trong Library) đi qua bốn bước — Goal,
-  Your week, Outline, Sessions — và **giữ kết quả thành một library draft** (`training_plan_drafts`)
-  ngay khi plan về, trước khi người dùng quyết gì, nên đóng dialog ở bước cuối không mất gì.
-  Outline là một lượt riêng (`trainingLibrary:outlinePlan`, tool `propose_plan_outline` chỉ lượt
-  đó có); lượt viết session (`trainingLibrary:generatePlan`) bị buộc theo outline đã chấp nhận —
-  số tuần, số buổi từng tuần, giờ, stage. Cả hai read-only, tuần tính từ Thứ Hai, tool kiểm tra
-  theo request ngay trong lượt, draft của lượt generate không bao giờ vào `chat_plan_drafts`;
-  nguồn dữ liệu người dùng tắt bị giữ lại khỏi cả tool lẫn snapshot — quy tắc ở
-  `electron/trainingPlanGeneration.ts`.
+- **Save trong màn hình đó là version kế tiếp của creation**, do người dùng viết
+  (`chat:editPlanDraft`); version cũ giữ nguyên, và một `planEvent` ghi lại chỗ sửa trong cuộc chat
+  (P1.3–P1.5 của [coach-plan-canvas.md](coach-plan-canvas.md)). Plan đã lưu lên COROS vẫn là của
+  cuộc chat: version sau mang định danh COROS và nút chính là **Update COROS plan**; bản đổi trên
+  COROS quay về thành version mới (D12, P1.6).
+- **Coach thấy mình đã làm gì** qua `creationIndex` mỗi lượt, đọc lại bằng `get_plan_draft` và
+  sửa bằng `revise_training_plan` (thao tác, không viết lại cả plan). `withPlanEdits` đã bỏ.
+- **Draft sống cùng cuộc chat**: xoá cuộc chat thì xoá mọi version, brief và cài đặt của nó; hạn
+  24 giờ đã bỏ.
+- Xoá hai đích lưu local (`localPlan`, `localTemplate`). Workout Library và Calendar giữ nguyên.
+- **AI Plan mở Coach** (P2.5): nút ở Library tạo một cuộc chat "New plan" với một brief trống, và
+  plan đi qua các bước của cuộc chat — brief, outline, sessions — thay cho dialog
+  `TrainingPlanGenerator` cũ, vốn giữ kết quả thành library draft. Plan viết ra là version 1 của
+  creation trong cuộc chat (`chat_plan_drafts`), không phải library draft; nó lên COROS và lịch từ
+  card như mọi plan của coach. Library draft do generator cũ để lại vẫn là draft Library bình
+  thường. Các luật (tuần từ Thứ Hai, kiểm tra trong lượt, nguồn bị tắt giữ khỏi tool và snapshot)
+  vẫn ở `electron/trainingPlanGeneration.ts`.
 
 ## 8. Migration (chạy một lần khi mở DB)
 

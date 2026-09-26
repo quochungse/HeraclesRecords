@@ -20,13 +20,11 @@ import type {
   AnthropicEffort,
   ChatProvider,
   CorosMcpTool,
-  PlanDraftPreview,
   PlanWorkoutEntryInput,
   RunWorkoutCreateStep,
   RunWorkoutStepInput,
   TrainingPlanDayKind,
   TrainingPlanDifficulty,
-  TrainingPlanDocument,
   TrainingPlanGenerationDay,
   TrainingPlanGenerationRequest,
   TrainingPlanGoalKind,
@@ -40,11 +38,8 @@ import type {
 } from "./types";
 import {
   COROS_WEEK_STAGES,
-  createTrainingPlan,
   formatPlanDay,
-  parsePlanDay,
-  placeDatedWorkouts,
-  sportMixOf
+  parsePlanDay
 } from "./trainingPlanDomain";
 import { WORKOUT_SPORTS, formatWorkoutSport } from "./workoutCapabilities";
 
@@ -562,26 +557,11 @@ const GOAL_BRIEF: Record<Exclude<TrainingPlanGoalKind, "race" | "other">, string
   hybrid: "Strength and hybrid fitness (HYROX, gym and engine): strength sessions and conditioning together, balanced so neither buries the other."
 };
 
-const GOAL_KIND_NAME: Record<TrainingPlanGoalKind, string> = {
-  race: "a race",
-  base: "building a base",
-  return: "coming back after a break",
-  hybrid: "strength and hybrid fitness",
-  other: "my own goal"
-};
-
 const LEVEL_BRIEF: Record<TrainingPlanDifficulty, string> = {
   beginner: "Beginner — new to structured training: conservative volume, simple sessions, plenty of easy work.",
   intermediate: "Intermediate — trains consistently: a normal progression.",
   advanced: "Advanced — a strong, high-volume base: harder sessions and more volume are fine.",
   custom: "Judge my level from my recent training and recovery, and say what you concluded in the description."
-};
-
-const LEVEL_NAME: Record<TrainingPlanDifficulty, string> = {
-  beginner: "Beginner",
-  intermediate: "Intermediate",
-  advanced: "Advanced",
-  custom: "judge it from my training"
 };
 
 function sportList(request: TrainingPlanGenerationRequest): string {
@@ -713,49 +693,6 @@ export function trainingPlanGenerationPrompt(request: TrainingPlanGenerationRequ
     "",
     "Call draft_training_plan once with the whole plan. If it is refused, fix every problem it lists and call it again with the whole plan. When it is accepted, reply with a two-sentence summary and nothing else. Nothing is saved or scheduled from here: the app shows me the plan week by week, and I save, schedule or edit it."
   ].join("\n");
-}
-
-/**
- * The same request as a message to the Coach, for "Continue in Coach": a
- * question the athlete sends and the coach may answer with questions of its
- * own, not the tool contract a generation runs under.
- */
-export function trainingPlanCoachHandoff(request: TrainingPlanGenerationRequest): string {
-  const span = generatedPlanSpan(request);
-  const goal = request.goal.trim();
-  const lines = ["Help me build a training plan."];
-  if (request.goalKind === "race") {
-    lines.push(`Goal: a race${request.race?.distance ? ` (${request.race.distance})` : ""}${goal ? ` — ${goal}` : ""} on ${request.race?.date}.`);
-  } else {
-    lines.push(`Goal: ${request.goalKind === "other" ? goal : `${GOAL_KIND_NAME[request.goalKind]}${goal ? ` — ${goal}` : ""}`}`);
-  }
-  lines.push(`Sports: ${sportList(request)}`, `Level: ${LEVEL_NAME[request.difficulty]}`);
-  lines.push(
-    span?.weeks && request.goalKind !== "race"
-      ? `${plural(span.weeks, "week")} from Monday ${span.first}.`
-      : request.goalKind === "race"
-        ? `Starting Monday ${span?.first}.`
-        : `Starting Monday ${span?.first}; you choose how long.`
-  );
-  const week = request.week;
-  if (week.mode === "days") {
-    const described = week.days
-      .map((day, index) =>
-        day.kind === "rest" ? undefined : `${PLAN_WEEKDAYS[index]} ${day.kind === "long" ? "long, " : day.kind === "flex" ? "optional, " : ""}up to ${day.minutes} min`
-      )
-      .filter(Boolean);
-    lines.push(`My week: ${described.join("; ")}.`);
-  } else {
-    const parts = [
-      week.sessionsPerWeek !== undefined ? `${plural(week.sessionsPerWeek, "session")} a week` : undefined,
-      week.hours ? (week.hours.max !== undefined ? `${week.hours.min}–${week.hours.max} h a week` : `${week.hours.min}+ h a week`) : undefined,
-      week.blockedDayIndexes.length ? `never on ${week.blockedDayIndexes.map((day) => PLAN_WEEKDAYS[day]).join(", ")}` : undefined
-    ].filter(Boolean);
-    lines.push(`You decide my week${parts.length ? ` (${parts.join(", ")})` : ""}.`);
-  }
-  if (request.constraints?.trim()) lines.push(`Constraints: ${request.constraints.trim()}`);
-  lines.push("Draft it as a plan I can review and save to COROS.");
-  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -981,66 +918,4 @@ export function trainingPlanOutlinePrompt(request: TrainingPlanGenerationRequest
     `Call ${PLAN_OUTLINE_TOOL} once with the whole outline. If it is refused, fix every problem it lists and call it again. When it is accepted, reply with one sentence and nothing else.`
   );
   return lines.join("\n");
-}
-
-/**
- * A finished generation as a plan document, for the plan editor.
- *
- * The overview is the coach's own `description` — not the card's summary
- * ("32 workouts · 32 scheduled"), not its warnings, and not the athlete's
- * constraints, all of which used to be written into the plan's overview on
- * COROS. The coach's `week_stages` become COROS's stages. Nothing links the
- * plan back to the draft it came from: a generation's draft is discarded when
- * the run ends.
- */
-export function trainingPlanFromDraftPreview(
-  preview: PlanDraftPreview,
-  request: TrainingPlanGenerationRequest,
-  extras: { description?: string; weekStages?: TrainingPlanDocument["weekStages"] } = {}
-): TrainingPlanDocument {
-  const requestProblem = generationRequestProblems(request)[0];
-  if (requestProblem) throw new Error(requestProblem.message);
-  if (!preview.name.trim()) throw new Error("Training Coach returned a plan without a name.");
-  const incomplete = preview.entries.find((entry) => !entry.source);
-  if (incomplete) throw new Error(`Generated workout "${incomplete.name}" is missing its structured definition.`);
-
-  const workouts = preview.entries.map((entry) => ({
-    ...entry.source!,
-    name: entry.name,
-    schedule_date: entry.source!.schedule_date ?? entry.scheduleDate
-  }));
-  const problems = generatedPlanProblems(workouts, request);
-  if (problems.length) {
-    throw new Error(problems.length === 1 ? problems[0] : `${problems[0]} (and ${problems.length - 1} more)`);
-  }
-
-  const document = createTrainingPlan(preview.name.trim());
-  document.description = extras.description?.trim() || request.goal.trim();
-  document.origin = "coach";
-  document.entries = placeDatedWorkouts(
-    preview.entries.map((entry, index) => ({
-      key: entry.key,
-      name: entry.name,
-      source: entry.source!,
-      date: workouts[index].schedule_date
-    })),
-    preview.draftId,
-    parsePlanDay(request.startDate)
-  );
-  const lastDate = workouts.reduce<Date | undefined>((latest, workout) => {
-    const date = parsePlanDay(workout.schedule_date);
-    return date && (!latest || date > latest) ? date : latest;
-  }, undefined);
-  document.weekCount = requestedPlanWeeks(request)
-    ?? (lastDate ? Math.floor(daysFrom(parsePlanDay(request.startDate)!, lastDate) / 7) + 1 : 1);
-  /* An outline the athlete accepted states the stages; the coach's own
-     week_stages stand in only where there was none. */
-  const stages = request.outline
-    ? request.outline.weeks.flatMap((week, weekIndex) => (week.stage > 0 ? [{ weekIndex, stage: week.stage }] : []))
-    : extras.weekStages ?? [];
-  document.weekStages = stages.filter(
-    (stage) => stage.stage > 0 && stage.weekIndex >= 0 && stage.weekIndex < document.weekCount
-  );
-  document.sportMix = sportMixOf(document.entries);
-  return document;
 }

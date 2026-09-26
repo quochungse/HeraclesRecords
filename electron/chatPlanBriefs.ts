@@ -86,6 +86,16 @@ function hasVersions(artifactId: string): boolean {
 }
 
 /**
+ * A brief nobody has said anything about yet (P2.5): the generator form's
+ * defaults, starting on the next Monday, with no field marked. It is what
+ * AI Plan opens a new conversation on — no model is asked, so it costs
+ * nothing, and the athlete fills it in on its own screen or asks Coach to.
+ */
+export function createBlankPlanBrief(sessionId: string, today = new Date()): PlanBrief {
+  return writeBrief(crypto.randomUUID(), defaultPlanBriefRequest(firstPlanMonday(today)), {}, sessionId);
+}
+
+/**
  * The athlete's edit of a brief. The request arrives from the brief's own
  * screen, so it is taken whole; a field it changed loses its "from chat" or
  * "from data", since it is the athlete's now.

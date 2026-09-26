@@ -97,7 +97,7 @@ import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
-import { briefOpenProblems } from "./planBriefModel";
+import { briefOpenProblems, briefTitle } from "./planBriefModel";
 import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
@@ -157,6 +157,9 @@ const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
 const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
 const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
 const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
+
+/** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
+const NEW_PLAN_TITLE = "New plan";
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -929,6 +932,17 @@ export function ChatView({
       const before = planBriefs[artifactId];
       const saved = await api.updatePlanBrief(artifactId, request);
       setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      // A conversation AI Plan opened is named after the goal once it has one (P2.5).
+      const sessionId = activeSessionIdRef.current;
+      const title = sessions.find((session) => session.id === sessionId)?.title;
+      if (sessionId && title === NEW_PLAN_TITLE && saved.request.goal.trim()) {
+        void api
+          .renameChatSession(sessionId, briefTitle(saved.request))
+          .then((summary) => {
+            if (summary) setSessions((current) => current.map((session) => (session.id === summary.id ? summary : session)));
+          })
+          .catch(() => undefined);
+      }
       setBriefSave({ saving: false });
       setEditingBriefId(null);
       // The outline was drawn from the brief as it was (P2.2): ask, as the
@@ -1138,6 +1152,10 @@ export function ChatView({
    */
   const openAsked = async (request: CoachOpenRequest) => {
     if (!api) return;
+    if (request.newPlan) {
+      await startPlanConversation();
+      return;
+    }
     const sessionId = request.draftId
       ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
       : null;
@@ -1152,6 +1170,32 @@ export function ChatView({
     }
     if (request.prompt) composerRef.current?.setDraft(request.prompt);
     requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /**
+   * AI Plan (P2.5): a new conversation named "New plan" that opens on a blank
+   * brief — the generator's defaults, no model asked. It takes Coach's
+   * settings, as any new conversation does, and is named after the goal once
+   * the brief has one.
+   */
+  const startPlanConversation = async () => {
+    if (!api || streaming || exportingLatestActivity) return;
+    onError(null);
+    try {
+      const created = await api.createChatSession(chatSettings.provider);
+      const brief = await api.createPlanBrief(created.id);
+      const titled = (await api.renameChatSession(created.id, NEW_PLAN_TITLE).catch(() => null)) ?? created;
+      setSessions((current) => [titled, ...current]);
+      setActiveSessionId(created.id);
+      persistedBaseRef.current = 0;
+      resetEphemeralChatState();
+      setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+      const entries: ChatEntry[] = [{ kind: "planBrief", artifactId: brief.artifactId }];
+      setTimeline(entries);
+      persistHistory(created.id, entries, true);
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : "Could not start a plan.");
+    }
   };
 
   const resetEphemeralChatState = () => {

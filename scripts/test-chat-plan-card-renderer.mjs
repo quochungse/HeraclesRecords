@@ -1087,6 +1087,34 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
+  // AI Plan opens Coach on a blank brief in a new conversation (P2.5)
+  // -------------------------------------------------------------------------
+  const BLANK = { ...BASE_BRIEF, artifactId: "brief-new", sessionId: "s-new", request: { ...BASE_BRIEF.request, goalKind: "race", goal: "", race: { date: "" }, weeks: undefined, difficulty: "custom" } };
+  await harness("mount", "ChatView", { pendingPrompt: { newPlan: true } }, {
+    ...BASE_SCRIPT,
+    getConversationSettings: ALL_SOURCES,
+    createChatSession: { id: "s-new", provider: "claude-code", title: "New chat", updatedAt: new Date().toISOString() },
+    createPlanBrief: BLANK,
+    renameChatSession: { id: "s-new", provider: "claude-code", title: "New plan", updatedAt: new Date().toISOString() },
+    saveChatSession: { id: "s-new", provider: "claude-code", title: "New plan", updatedAt: new Date().toISOString() }
+  });
+  const planBrief = await waitFor(async () => (await harness("calls", "createPlanBrief"))[0], "a blank brief is made, with no model asked");
+  assert.equal(planBrief.args[0], "s-new", "in the new conversation");
+  assert.deepEqual((await harness("calls", "renameChatSession"))[0]?.args, ["s-new", "New plan"]);
+  await waitFor(() => harness("exists", `.chat-brief-card[data-artifact-id="brief-new"]`), "the brief's card is the conversation's first entry");
+  const savedNew = await waitFor(
+    async () => (await harness("calls", "saveChatSession")).find((call) => call.args[0] === "s-new"),
+    "and the anchor is saved at once"
+  );
+  assert.deepEqual(savedNew.args[1].map((entry) => entry.kind), ["planBrief"]);
+  assert.equal(await harness("callCount", "sendChat"), 0, "nothing is sent to a model");
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-brief-card button")].some((b) => b.textContent.trim() === "Draw the outline")`),
+    false,
+    "a blank brief still misses race day, so the outline waits"
+  );
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

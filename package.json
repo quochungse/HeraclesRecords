@@ -150,7 +150,6 @@
     "test:training-library-surface": "node scripts/test-training-library-surface.mjs",
     "test:prompt-dialog-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-prompt-dialog-renderer.mjs",
     "test:plan-generator-model": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-plan-generator-model.mjs",
-    "test:plan-generator-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-plan-generator-renderer.mjs",
     "test:library-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-library-renderer.mjs",
     "test:exercise-picker": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-exercise-picker.mjs",
     "test:workout-builder-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-workout-builder-renderer.mjs",

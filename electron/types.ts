@@ -2761,21 +2761,6 @@ export interface TrainingPlanOutlineRevision {
   note: string;
 }
 
-export type TrainingPlanOutlineResult =
-  | { ok: true; outline: TrainingPlanOutline }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-outline"; message: string };
-
-/**
- * How a generation ended. The stream carries its progress; this carries its
- * outcome, so the generator does not have to rebuild it from stream events.
- * `plan` is a new plan document, not yet saved anywhere.
- */
-export type TrainingPlanGenerationResult =
-  | { ok: true; plan: TrainingPlanDocument }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-plan"; message: string };
-
 /**
  * What a plan is doing on the COROS calendar. A plan put there becomes an
  * *instance* — a copy COROS makes, dated from the Monday of its start week —
@@ -3239,6 +3224,8 @@ export interface CoachOpenRequest {
   /** A Coach creation; its conversation is opened when it can be found. */
   draftId?: string;
   refs?: PlanRef[];
+  /** AI Plan (P2.5): a new conversation that opens on a blank plan brief. */
+  newPlan?: boolean;
 }
 
 /**

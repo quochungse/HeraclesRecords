@@ -623,6 +623,23 @@ hiện lại trong cuộc chat.
   `streamChat`.
 
 **P2.5 AI Plan mở Coach (D1)** · M
+- (Đã làm: nút AI Plan của Library gọi `onOpenCoach({ newPlan: true })`; `CoachOpenRequest.newPlan`
+  làm Coach tạo cuộc chat mới, đặt tên "New plan", gọi `chat:createPlanBrief` (`createBlankPlanBrief`:
+  mặc định của form, Thứ Hai kế tiếp, không trường nào có nhãn, không gọi model) và lưu ngay neo
+  `planBrief` làm entry đầu tiên. Cuộc chat không có row cài đặt, tức theo Coach settings. Khi brief
+  được lưu với một mục tiêu và cuộc chat vẫn tên "New plan", nó được đổi tên theo `briefTitle`. Đã
+  bỏ `TrainingPlanGenerator`, `GeneratorOutlineStep`, `GeneratorRun`, hai channel
+  `trainingLibrary:generatePlan`/`outlinePlan`, `generateTrainingPlan`/`outlineTrainingPlan`,
+  `generatedDrafts` (draft chỉ trong RAM), `trainingPlanFromDraftPreview` và
+  `trainingPlanCoachHandoff`, cùng ~90 rule CSS chỉ các màn đó dùng. `GeneratorGoalStep`,
+  `GeneratorWeekStep`, `GeneratorProviderPanel`, `planGeneratorModel.ts` và `runTrail.ts` ở lại vì
+  brief, cài đặt cuộc chat và trail dùng chúng. Stage của plan viết theo outline lấy từ outline
+  (trước đây `trainingPlanFromDraftPreview` làm việc này), trong `handleDraftTrainingPlan`.
+  Simulation chạy qua hai bước của cuộc chat. `test:plan-generator-renderer` bị bỏ: brief và outline
+  có renderer riêng trong `test:chat-plan-card-renderer`, có thêm case P2.5.
+  `test:training-plan-generation` kiểm tra hai bước thay cho hai lượt cũ; `test:training-plan-simulation`
+  chạy qua `streamConversationTurn`. Analysis vẫn chưa thấy brief trong `creationIndex` của nó
+  (chỉ creation có version) — `coachAnalysisService` không truyền brief.)
 - Nút AI Plan tạo một cuộc chat mới (tên "New plan" cho tới khi brief có mục tiêu), cài đặt của
   cuộc chat lấy từ Coach settings, và card brief với giá trị mặc định (`chat:createPlanBrief`,
   không gọi model, không tốn gì), rồi chuyển sang Coach.
@@ -665,7 +682,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat:createPlanBrief`, `chat:updatePlanBrief`, `chat:updatePlanOutline` | P2 | Brief và outline không qua model |
 | `chat:send` + `ChatPipelineStep` | P2.2, P2.3 | Tham số thứ năm: lượt là một bước pipeline (`outline`, `sessions`), không phải câu hỏi |
 | `chat:planBriefs` | P2.1 | Đọc brief của các anchor `planBrief` |
-| `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Bỏ** |
+| `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Đã bỏ** |
 
 ## 7. Dữ liệu và sync
 
@@ -734,13 +751,13 @@ Mặc định nhỏ, đổi được khi review:
 
 ## 10. Tài liệu phải sửa
 
-- [training-plan-coros-first.md](training-plan-coros-first.md) §7: plan của AI Plan nằm trong
+- (Đã sửa) [training-plan-coros-first.md](training-plan-coros-first.md) §7: plan của AI Plan nằm trong
   cuộc chat (D2); "Edit plan first" và "Save to the card" được thay bằng version; plan đã lưu
   theo COROS (D12); hết đoạn generator giữ library draft. Sửa khi P2 xong.
 - `CLAUDE.md`, mục Training Library (đoạn "A Coach plan stays in the conversation" và "The AI
   plan generator") và mục Coach (thêm H1–H7 và Q1–Q5 của §4 cạnh đoạn "A transcript entry is
   rebuilt field by field in four places").
-- [coach-analysis.md](coach-analysis.md): analysis đọc mục lục artifact thay `withPlanEdits`,
+- (Đã sửa) [coach-analysis.md](coach-analysis.md): analysis đọc mục lục artifact thay `withPlanEdits`,
   theo nguồn dữ liệu của cuộc chat, và không `revise` artifact có sẵn.
 
 ## 11. Thứ tự và phụ thuộc

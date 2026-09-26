@@ -163,8 +163,6 @@ import type {
   SaveChatSessionOptions,
   StrengthHistoryRequest,
   TrainingHubStatus,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineRevision,
   UnitSystem,
   WorkoutSport
 } from "./types";
@@ -348,10 +346,9 @@ import {
   listConversationPlanBriefs,
   editPlanBrief,
   adjustPlanOutline,
+  createPlanBriefForSession,
   findChatSessionForDraft,
   editPlanDraft,
-  generateTrainingPlan,
-  outlineTrainingPlan,
   getPlanDraftDocument,
   confirmWorkoutDelete
 } from "./chatService";
@@ -1627,6 +1624,7 @@ function registerIpcHandlers(): void {
     "chat:updatePlanBrief",
     (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
   );
+  ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string) => createPlanBriefForSession(sessionId));
   ipcMain.handle("chat:updatePlanOutline", (_event, artifactId: string, outline: unknown) =>
     adjustPlanOutline(artifactId, outline)
   );
@@ -2081,29 +2079,7 @@ function registerIpcHandlers(): void {
     updateTrainingPlanMetadata(id, patch)
   );
   ipcMain.handle("trainingLibrary:savePlan", (_event, request) => savePlanToCoros(request));
-  // Streams its progress on the chat:stream* channels; stopped with chat:cancel.
-  ipcMain.handle(
-    "trainingLibrary:generatePlan",
-    (_event, requestId: string, request: TrainingPlanGenerationRequest, unitSystem?: UnitSystem) =>
-      generateTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
-  );
-  // The plan's shape before its sessions; the same streams, the same cancel.
-  ipcMain.handle(
-    "trainingLibrary:outlinePlan",
-    (
-      _event,
-      requestId: string,
-      request: TrainingPlanGenerationRequest,
-      unitSystem?: UnitSystem,
-      revision?: TrainingPlanOutlineRevision
-    ) =>
-      outlineTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem),
-        ...(revision ? { revision } : {})
-      })
-  );
+
   ipcMain.handle("trainingLibrary:duplicatePlan", (_event, planId: string) =>
     duplicatePlanOnCoros(planId)
   );

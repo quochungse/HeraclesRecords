@@ -273,6 +273,22 @@ with them — the rest is still owed and rides along with the next trigger. That
 is the guard doing its job rather than a regression, but it is a real change
 in what an athlete sees after a week away.
 
+### What an analysis knows about the conversation's plans
+
+An analysis run reads a conversation's creations the way a chat turn does
+(docs/coach-plan-canvas.md): `withCreationIndex` puts a line per creation — its
+newest version's draft id, who made it, whether it is saved — before the
+playbook, built from the **whole** transcript, since a card can sit in the part
+the summary folded away. `withPlanEdits`, which restated every edited plan on
+every turn, is gone. The run reads with the conversation's sources
+(`chat_conversation_settings`), so a source the athlete withheld there is
+withheld from the analysis too. It runs read-only: it may draft a new creation,
+which lands as a card, but never `revise_training_plan` or the `revises` of a
+draft — a run the athlete is not watching must not make its plan the next
+version of theirs (`executeChatTool` strips `revises` outside an interactive
+turn). A plan brief is not in an analysis's index: the service passes the
+versions only.
+
 ---
 
 ## Renderer

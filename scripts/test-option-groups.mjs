@@ -90,15 +90,11 @@ const EXEMPT = [
     marker: "plan-generator-provider-option",
     why: "Each provider row carries whether it is connected here, and one that is not stays pickable so the panel can say what it needs — a chip holds neither the status nor the reason."
   },
-  {
-    file: "src/training-library/GeneratorOutlineStep.tsx",
-    marker: "plan-generator-outline-bar",
-    why: "A chart of the outline's weeks, each bar as tall as its hours and in its stage's hue: picking one shows that week. The arrangement is the control, as a month of days is."
-  },
+
   {
     file: "src/chat/CoachOutlineCard.tsx",
     marker: "chat-outline-bar",
-    why: "The same chart as the generator's outline step, on the outline's card in the conversation (P2.2): a bar a week, and picking one shows that week."
+    why: "A chart of the outline's weeks on its card in the conversation (P2.2), each bar as tall as its hours and in its stage's hue: picking one shows that week. The arrangement is the control, as a month of days is."
   },
   {
     file: "src/chat/analyses/AnalysisCreate.tsx",

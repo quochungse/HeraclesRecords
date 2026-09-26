@@ -65,10 +65,6 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineResult,
-  TrainingPlanOutlineRevision,
-  TrainingPlanGenerationResult,
   PlanArtifactVersion,
   ConversationSettings,
   PlanBrief,
@@ -422,19 +418,6 @@ const api = {
     ipcRenderer.invoke("trainingLibrary:updatePlanMetadata", id, patch),
   saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest): Promise<TrainingPlanSaveResult> =>
     ipcRenderer.invoke("trainingLibrary:savePlan", request),
-  generateTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem
-  ): Promise<TrainingPlanGenerationResult> =>
-    ipcRenderer.invoke("trainingLibrary:generatePlan", requestId, request, unitSystem),
-  outlineTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem,
-    revision?: TrainingPlanOutlineRevision
-  ): Promise<TrainingPlanOutlineResult> =>
-    ipcRenderer.invoke("trainingLibrary:outlinePlan", requestId, request, unitSystem, revision),
   duplicateTrainingPlan: (planId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("trainingLibrary:duplicatePlan", planId),
   deleteTrainingPlan: (
@@ -792,6 +775,7 @@ const api = {
   getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
+  createPlanBrief: (sessionId: string): Promise<PlanBrief> => ipcRenderer.invoke("chat:createPlanBrief", sessionId),
   updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanOutline", artifactId, outline),
   getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>
