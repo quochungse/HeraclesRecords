@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 import type { ScheduleChangeLine, ScheduleChangeSet } from "../../electron/types";
-import { changeSetHead, lineStatusLabel, proposedLines } from "./scheduleChangeModel";
+import { canApply, changeSetHead, lineStatusLabel, proposedLines } from "./scheduleChangeModel";
 
 /**
  * Coach's proposal to the calendar or the workout library, under the answer
@@ -95,7 +95,7 @@ function ChangeLine({
           </span>
         ) : null}
       </div>
-      {line.status === "failed" && line.retry !== false && onApply ? (
+      {line.status === "failed" && line.retry !== false && canApply(line) && onApply ? (
         <div className="chat-change-line-actions">
           <button type="button" className="chat-change-dismiss" disabled={disabled} onClick={onApply}>
             {busy ? <Loader2 className="chat-spinner" size={12} aria-hidden="true" /> : null}
@@ -103,7 +103,7 @@ function ChangeLine({
           </button>
         </div>
       ) : null}
-      {line.status === "proposed" && (onApply || onDismiss) ? (
+      {line.status === "proposed" && canApply(line) && (onApply || onDismiss) ? (
         <div className="chat-change-line-actions">
           {onApply ? (
             <button

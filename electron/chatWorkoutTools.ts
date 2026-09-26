@@ -1595,6 +1595,7 @@ async function handleListScheduledWorkouts(
   args: Record<string, unknown>,
   unitSystem: UnitSystem
 ): Promise<string> {
+  const planNames = runningPlanNames();
   const today = formatScheduleDay(new Date());
   const startDate = String(args.start_date ?? args.startDate ?? today)
     .replace(/-/g, "")
@@ -1638,7 +1639,7 @@ async function handleListScheduledWorkouts(
       plan_id: entry.planId,
       id_in_plan: entry.idInPlan,
       // A session of a plan running on the calendar, as the Library last read it (P3.3).
-      ...(runningPlanName(entry.planId) ? { in_plan: runningPlanName(entry.planId) } : {}),
+      ...(planNames(entry.planId) ? { in_plan: planNames(entry.planId) } : {}),
       plan_program_id: entry.planProgramId,
       program_id: entry.programId,
       sort_no: entry.sortNo
@@ -1646,9 +1647,16 @@ async function handleListScheduledWorkouts(
   });
 }
 
-function runningPlanName(planId: string): string | undefined {
-  const plan = getCorosPlanCache(planId);
-  return plan?.calendar === "running" ? plan.name : undefined;
+/** A running plan's name by calendar `planId`, each plan read from the cache once per call. */
+function runningPlanNames(): (planId: string) => string | undefined {
+  const names = new Map<string, string | undefined>();
+  return (planId) => {
+    if (!names.has(planId)) {
+      const plan = getCorosPlanCache(planId);
+      names.set(planId, plan?.calendar === "running" ? plan.name : undefined);
+    }
+    return names.get(planId);
+  };
 }
 
 function formatScheduledVolume(
@@ -1878,6 +1886,13 @@ async function handleProposeScheduleChanges(
       }
       if (op === "move" && toDay === entry!.happenDay) {
         errors.push(`${at}: "${entry!.name}" is already on ${toDay}.`);
+        continue;
+      }
+      // A plan's session moves inside its running copy, which counts from its first Monday.
+      const copy = op === "move" ? getCorosPlanCache(entry!.planId) : undefined;
+      const firstMonday = copy?.calendar === "running" ? copy.startDate?.replace(/-/g, "") : undefined;
+      if (firstMonday && toDay < firstMonday) {
+        errors.push(`${at}: "${entry!.name}" is a session of "${copy!.name}", which starts on ${firstMonday}; it cannot move before that.`);
         continue;
       }
     }

@@ -20,8 +20,8 @@
  * tools, which would take the plan away as well).
  */
 import {
+  chatSessionMentionsDraft,
   findCachedRunningCorosPlan,
-  findChatSessionMentioning,
   getChatPlanDraft,
   getCorosPlanCache,
   getTrainingPlanMetadata,
@@ -242,9 +242,9 @@ function coachDraft(
   if (!row) return { made_by: "you, in a conversation since deleted" };
   const versions = listChatPlanDraftVersions(row.artifactId ?? row.draftId);
   const newest = versions[versions.length - 1] ?? row;
-  /* A card names its draft id in the transcript; any version's will do. */
-  const where = findChatSessionMentioning(versions.map((version) => version.draftId).reverse());
-  if (options.sessionId && where === options.sessionId) {
+  /* A card names its draft id in the transcript; any version's will do. Only
+     this conversation's row is searched — the list asks once per Coach plan. */
+  if (options.sessionId && chatSessionMentionsDraft(options.sessionId, versions.map((version) => version.draftId))) {
     return { made_by: "you, in this conversation", draft_id: newest.draftId };
   }
   return { made_by: "you, in another conversation" };

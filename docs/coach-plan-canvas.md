@@ -900,6 +900,21 @@ qua máy khác; áp hai lần không ghi hai lần.
 Test: 138 bộ không cần cửa sổ và 13 bộ renderer đều qua, trừ `test:library-renderer` ("got 8 of 24"),
 lỗi đã có từ trước P3. `npm run build` qua.
 
+**Review P3 lượt 2 (2026-09-26).** Sửa thêm:
+- `list_training_plans` tìm cuộc chat của mỗi plan Coach bằng cách quét **mọi** transcript
+  (`findChatSessionMentioning`, mỗi version một lần quét); giờ chỉ hỏi một row — cuộc chat đang hỏi
+  (`chatSessionMentionsDraft`).
+- `list_scheduled_workouts` parse cùng một plan trong cache cho mỗi buổi; giờ mỗi plan một lần mỗi lượt.
+- Dời buổi của plan tới trước tuần plan bắt đầu chỉ bị COROS/adapter từ chối lúc áp; giờ bị từ chối
+  ngay trong lượt đề xuất, kèm lý do cho model.
+- Prompt nhắc `delete_workout` và `propose_schedule_changes` cả khi lượt không được offer tool đó (Claude
+  Code tắt quyền lịch; analysis không có `delete_workout`); giờ chỉ nhắc tool có mặt.
+- Một dòng mang **status** do build mới hơn ghi bị đọc thành `proposed` và sẽ bị áp ở đây; giờ giữ
+  nguyên và không áp. `lines_json` không parse được thì set không bao giờ được ghi đè (trước đây Dismiss
+  sẽ ghi `[]` lên nó).
+- Card vẽ nút Apply cho dòng có op build này không biết (bấm không làm gì); giờ không có nút.
+- Hàng card đề xuất khoá React theo id **và** vị trí, và có `data-chat-entry-index` như các card khác.
+
 Còn lại, đã biết:
 - Chưa chạy trên tài khoản thật đường áp của P3.3 (dời/thay buổi của plan qua bản chạy, thêm/thay buổi
   riêng); P3.0 mới đo từng thao tác COROS riêng lẻ.
@@ -909,6 +924,11 @@ Còn lại, đã biết:
 - Hai lần ghi vào cùng một bản chạy gần như cùng lúc (kéo trên Calendar và áp đề xuất) có thể mất một
   thay đổi — mỗi lần đọc `detail` rồi ghi cả plan, không có khoá phiên bản.
 - Ref có scope mà build này không biết bị bỏ khi đọc (như `planRefs`).
+- `test:workout-builder-renderer` chập chờn ("the chevron holds its place… 281 then 279"), cũng đỏ
+  khoảng một nửa số lần ở commit trước P3 — không do P3.
+- Chip "Ask Coach" từ một buổi của plan trong Library mang `id_in_plan` của **plan mẫu**; khi đọc,
+  plan đang chạy được đọc qua bản chạy. Hai id trùng nhau khi plan vừa lên lịch (đã thấy ở P3.0), nhưng
+  có thể lệch sau khi buổi được thêm vào bản chạy từ plan đã sửa.
 
 **Việc tồn đọng nên làm trước hoặc cùng P3** (từ các lần review): câu hỏi "Redraw the outline?"
 khi đổi nguồn của cuộc chat; analysis không thấy brief (gộp vào P3.4); phần đã ghi của một lần lưu

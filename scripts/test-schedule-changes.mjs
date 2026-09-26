@@ -424,6 +424,26 @@ test("a line this build cannot read is kept through a save, and left alone", asy
   assert.equal(applied.lines[1].status, "proposed", "an op this build does not know is not applied here");
 });
 
+test("a status a newer build wrote is not read as proposed, and lines this build cannot parse are never overwritten", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 61, happenDay: tomorrow, name: "Hills" });
+  const set = changes.createScheduleChangeSet({
+    summary: "Newer",
+    lines: [{ op: "remove", label: "Remove Hills", session: { planId: OWN_SCHEDULE, idInPlan: "61", happenDay: tomorrow, name: "Hills" } }]
+  });
+  const record = databaseModule.getChatScheduleChanges([set.changeSetId])[0];
+  const lines = JSON.parse(record.linesJson);
+  lines[0].status = "queued";
+  databaseModule.saveChatScheduleChange({ ...record, linesJson: JSON.stringify(lines) });
+  const applied = await changes.applyScheduleChange(set.changeSetId);
+  assert.equal(applied.lines[0].status, "queued", "kept as it is");
+  assert.equal(coros.removals().length, 0, "and not applied here");
+
+  databaseModule.saveChatScheduleChange({ ...record, linesJson: "{not json" });
+  assert.throws(() => changes.dismissScheduleChange(set.changeSetId), /newer version of the app/);
+  assert.equal(databaseModule.getChatScheduleChanges([set.changeSetId])[0].linesJson, "{not json", "the row is left as it was");
+});
+
 test("the transcript keeps an anchor, and the conversation takes its proposals with it", async () => {
   const coros = fakeCoros();
   coros.put({ idInPlan: 19, happenDay: tomorrow, name: "Easy 30" });
@@ -570,6 +590,34 @@ test("a plan's session is moved through its running copy and stays in its plan (
     [["1", 0], ["2", 3], ["3", 6]],
     "same idInPlan, one day later, the rest as they were"
   );
+});
+
+test("a plan's session cannot be proposed to move before its plan starts", async () => {
+  const coros = fakeCoros();
+  // A run starting the week after next, so a day before it is still ahead.
+  const start = dayOf(planMonday, 7);
+  coros.runningCopy("R6", start, [["1", 2, "Tempo"]]);
+  databaseModule.saveCorosPlanCache({
+    id: "coros:R6",
+    remoteId: "R6",
+    name: "Base block",
+    description: "",
+    weekCount: 1,
+    weekStages: [],
+    entries: [],
+    sportMix: ["run"],
+    calendar: "running",
+    startDate: `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(6)}`,
+    tags: [],
+    favorite: false,
+    archived: false,
+    updatedAt: "2026-09-26T00:00:00.000Z"
+  });
+  const { result } = await propose([
+    { op: "move", session: { plan_id: "R6", id_in_plan: "1", date: dayOf(start, 2) }, to_date: dayOf(planMonday, 1) }
+  ]);
+  assert.equal(result.ok, false);
+  assert.match(result.errors[0], /is a session of "Base block", which starts on \d{8}; it cannot move before that/);
 });
 
 test("a plan's session replaced keeps its place in the plan (P3.0 B)", async () => {

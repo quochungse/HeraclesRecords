@@ -4349,7 +4349,12 @@ function AnalysisSilentChip({
               if (!changeSet) return null;
               const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
               return (
-                <div key={`scheduleChange:${entry.changeSetId}`} className="chat-row chat-row-assistant">
+                // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
+                <div
+                  key={`scheduleChange:${entry.changeSetId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
                   <div className="chat-avatar chat-avatar-assistant">
                     <Sparkles size={16} aria-hidden="true" />
                   </div>

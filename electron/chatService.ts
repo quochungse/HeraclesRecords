@@ -3259,11 +3259,15 @@ export function withLiveToolInstructions(
         "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
         "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
         "its next version instead of a second card. " +
-        "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-        "The athlete applies them from the card under your reply; nothing is deleted until they do. " +
-        "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
-        "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
-        "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way.",
+        (planTools.some((tool) => tool.name === "delete_workout")
+          ? "Use list_scheduled_workouts + delete_workout to stage deletions. " +
+            "The athlete applies them from the card under your reply; nothing is deleted until they do. "
+          : "") +
+        (planTools.some((tool) => tool.name === "propose_schedule_changes")
+          ? "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
+            "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
+            "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way."
+          : ""),
       ...(planTools.some((tool) => tool.name === "list_training_plans")
         ? [
             "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +

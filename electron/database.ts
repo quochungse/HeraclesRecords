@@ -2958,6 +2958,17 @@ export function findChatSessionMentioning(draftIds: readonly string[]): string |
   return undefined;
 }
 
+/**
+ * Whether one conversation holds a card for any of these drafts — the same
+ * text search as `findChatSessionMentioning`, over one row rather than all.
+ */
+export function chatSessionMentionsDraft(sessionId: string, draftIds: readonly string[]): boolean {
+  const statement = requireDatabase().prepare(
+    `SELECT 1 FROM chat_sessions WHERE id = ? AND instr(messages_json, ?) > 0`
+  );
+  return draftIds.some((draftId) => Boolean(statement.get(sessionId, `"draftId":"${draftId}"`)));
+}
+
 export function listChatPlanDrafts(): StoredChatPlanDraftRecord[] {
   const rows = requireDatabase()
     .prepare(

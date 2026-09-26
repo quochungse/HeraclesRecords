@@ -54,7 +54,6 @@ import type {
 } from "./types";
 
 const OPS: readonly ScheduleChangeOp[] = ["move", "replace", "remove", "add", "deleteWorkout"];
-const STATUSES: readonly ScheduleChangeStatus[] = ["proposed", "applied", "failed", "dismissed", "stale"];
 
 // ---------------------------------------------------------------------------
 // Reading and writing the row
@@ -95,9 +94,13 @@ function parseLine(value: unknown): ScheduleChangeLine | undefined {
   const lineId = text(value.lineId);
   if (!lineId) return undefined;
   const op = OPS.includes(value.op as ScheduleChangeOp) ? (value.op as ScheduleChangeOp) : undefined;
-  const status = STATUSES.includes(value.status as ScheduleChangeStatus)
-    ? (value.status as ScheduleChangeStatus)
-    : "proposed";
+  /* A status a newer build wrote is kept as it is: read as "proposed" it would be applied here. */
+  const status =
+    value.status === undefined
+      ? "proposed"
+      : typeof value.status === "string"
+        ? (value.status as ScheduleChangeStatus)
+        : "failed";
   if (!op) return { ...(value as unknown as ScheduleChangeLine), lineId, status };
   const session = parseSession(value.session);
   return {
@@ -118,12 +121,17 @@ function parseLine(value: unknown): ScheduleChangeLine | undefined {
   } as ScheduleChangeLine;
 }
 
+/** Sets whose lines this build could not parse: never written back, or the lines would be lost. */
+const unreadable = new Set<string>();
+
 function fromRecord(record: StoredChatScheduleChange): ScheduleChangeSet {
   let lines: unknown;
   try {
     lines = JSON.parse(record.linesJson);
+    unreadable.delete(record.changeSetId);
   } catch {
     lines = [];
+    unreadable.add(record.changeSetId);
   }
   return {
     changeSetId: record.changeSetId,
@@ -140,6 +148,7 @@ function fromRecord(record: StoredChatScheduleChange): ScheduleChangeSet {
 }
 
 function save(set: ScheduleChangeSet): ScheduleChangeSet {
+  if (unreadable.has(set.changeSetId)) throw new Error("This proposal was written by a newer version of the app; update to change it here.");
   const next = { ...set, updatedAt: new Date().toISOString() };
   saveChatScheduleChange({
     changeSetId: next.changeSetId,
@@ -413,11 +422,4 @@ async function applyDeleteWorkout(line: ScheduleChangeLine, deps: ScheduleChange
 
 export function dashed(day: string): string {
   return /^\d{8}$/.test(day) ? `${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6)}` : day;
-}
-
-/** What a set comes to, for the model's tool result and the card's head. */
-export function scheduleChangeCounts(set: ScheduleChangeSet): Record<ScheduleChangeStatus, number> {
-  const counts: Record<ScheduleChangeStatus, number> = { proposed: 0, applied: 0, failed: 0, dismissed: 0, stale: 0 };
-  for (const line of set.lines) counts[line.status] += 1;
-  return counts;
 }
