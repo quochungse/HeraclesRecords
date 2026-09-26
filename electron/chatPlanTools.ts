@@ -203,7 +203,7 @@ async function listTrainingPlans(args: Record<string, unknown>, options: ChatPla
 function runningLine(running: TrainingPlanDocument, today: Date): string {
   const start = parsePlanDay(running.startDate);
   if (!start) return "yes";
-  const week = Math.floor((dayNumber(today) - dayNumber(start)) / 7) + 1;
+  const week = planWeekOn(start, today);
   const since = `since ${formatPlanDay(start, true)}`;
   if (week < 1) return `yes, starting ${formatPlanDay(start, true)}`;
   if (week > running.weekCount) return `yes, ${since}; its last week has passed`;
@@ -287,7 +287,7 @@ async function getTrainingPlan(args: Record<string, unknown>, options: ChatPlanT
       .map((match) => [match.scheduleIdInPlan, match.status])
   );
   const start = onCalendar ? parsePlanDay(plan.startDate) : undefined;
-  const currentWeek = start ? Math.floor((dayNumber(today) - dayNumber(start)) / 7) + 1 : undefined;
+  const currentWeek = start ? planWeekOn(start, today) : undefined;
   const weeks = chosenWeeks(args.weeks, plan.weekCount, currentWeek);
   const wanted = new Set(
     (Array.isArray(args.sessions) ? args.sessions : []).slice(0, MAX_WHOLE_SESSIONS).map((id) => String(id ?? "").trim())
@@ -457,6 +457,15 @@ function sessionDate(entry: TrainingPlanEntry, firstMonday: Date | undefined): s
 function dashedDay(value: string | undefined): string | undefined {
   const date = parsePlanDay(value);
   return date ? formatPlanDay(date, true) : undefined;
+}
+
+/**
+ * The week of a running plan a day falls in, 1 first. COROS counts a run from
+ * the Monday of the week its start day is in, so a Wednesday start's week 2
+ * begins on the following Monday, not a week after the Wednesday.
+ */
+function planWeekOn(start: Date, day: Date): number {
+  return Math.floor((dayNumber(day) - dayNumber(mondayOf(start))) / 7) + 1;
 }
 
 function dayNumber(date: Date): number {

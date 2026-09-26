@@ -186,7 +186,10 @@ export function handleRequestPlanBrief(
   today = new Date()
 ): string {
   const briefId = typeof args.brief_id === "string" ? args.brief_id.trim() : "";
-  const existing = briefId ? planBriefOf(briefId) : undefined;
+  const found = briefId ? planBriefOf(briefId) : undefined;
+  // A brief belongs to its conversation: changing one from another would
+  // rewrite a card the athlete is not reading.
+  const existing = found && (!sessionId || !found.sessionId || found.sessionId === sessionId) ? found : undefined;
   if (briefId && !existing) {
     return JSON.stringify({ ok: false, error: `No brief ${briefId} in this conversation. Leave brief_id out to set out a new one.` });
   }

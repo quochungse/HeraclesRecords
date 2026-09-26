@@ -2034,8 +2034,8 @@ async function streamChatTurn(
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
       toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
-        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
-      );
+      { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
+    );
 
     send("chat:streamStart", { requestId });
     send("chat:streamInfo", {
@@ -2710,12 +2710,8 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
 };
 
 /**
- * Section 6, decision 3: an auto run may draft and propose, never write.
- * `delete_workout` is the write surface today (a plan or workout is only ever
- * written from the card); any future write tool must be added here as well.
- */
-/**
- * Section 6's read-only set, as an **allowlist**.
+ * Section 6, decision 3: an auto run may draft and propose, never write — and
+ * this is its read-only set, as an **allowlist**.
  *
  * It was a blocklist of the two known write tools, and that cannot deliver what
  * 6 promises — *"Blocked: `upload_training_plan`, `delete_workout`, and any

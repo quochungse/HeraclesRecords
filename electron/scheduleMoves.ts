@@ -70,10 +70,12 @@ export const defaultScheduleMoveDeps: ScheduleMoveDeps = {
 export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = defaultScheduleMoveDeps): Promise<boolean> {
   const cached = getCorosPlanCache(planId);
   if (cached) return cached.calendar === "running";
-  if (notRunning.has(planId)) return false;
+  const until = notRunning.get(planId);
+  if (until !== undefined && until > Date.now()) return false;
   const listed = await deps.listNativeCorosPlans();
   const running = listed.some((plan) => plan.remoteId === planId && plan.executeStatus === 1);
-  if (!running) notRunning.add(planId);
+  if (running) notRunning.delete(planId);
+  else notRunning.set(planId, Date.now() + NOT_RUNNING_TTL_MS);
   return running;
 }
 
@@ -81,10 +83,13 @@ export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = def
  * Calendar `planId`s COROS has said are not a running plan — in practice the
  * athlete's own schedule, whose id never changes. `plan/query` is the heaviest
  * thing COROS serves, and without this every drag of one of the athlete's own
- * sessions paid for it. An id is never reused for a plan, so the answer holds
- * for the life of the process.
+ * sessions paid for it. The answer is held for minutes, not for the process:
+ * a plan put on the calendar from the COROS app can show on the calendar
+ * before the plan list carries it, and a "no" held for good would detach every
+ * session of it dragged for the rest of the launch.
  */
-const notRunning = new Set<string>();
+const notRunning = new Map<string, number>();
+const NOT_RUNNING_TTL_MS = 10 * 60_000;
 
 /** The day a running copy counts `dayNo` from: the Monday of its start day's week. */
 function copyAnchor(raw: Record<string, unknown>): Date {

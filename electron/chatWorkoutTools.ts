@@ -1818,10 +1818,12 @@ async function handleProposeScheduleChanges(
   const errors: string[] = [];
   const changes = raw.map((item) => (item && typeof item === "object" ? (item as Record<string, unknown>) : {}));
 
-  // The calendar is read once, over every day a change names.
+  // The calendar is read once, over every day a change names: a session's
+  // day, and the day an addition lands on.
   const sessionDays = changes.flatMap((change) => {
     const day = normalizedDay((change.session as Record<string, unknown> | undefined)?.date);
-    return day ? [day] : [];
+    const addDay = change.op === "add" ? normalizedDay(change.to_date) : undefined;
+    return [day, addDay].filter((item): item is string => Boolean(item));
   });
   let calendar: Awaited<ReturnType<typeof listScheduledWorkoutEntries>> = [];
   if (sessionDays.length) {
@@ -1928,7 +1930,10 @@ async function handleProposeScheduleChanges(
     } else if (op === "remove") {
       lines.push({ op, label: `Remove "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)}`, session });
     } else {
-      lines.push({ op: "add", label: `Add "${workout!.name}" on ${cardDay(toDay!)}`, toDay, workout });
+      // How many sessions of this name the day holds already, so applying can
+      // tell the line landing elsewhere from an ordinary double day.
+      const sameName = calendar.filter((item) => item.happenDay === toDay && item.name === workout!.name).length;
+      lines.push({ op: "add", label: `Add "${workout!.name}" on ${cardDay(toDay!)}`, toDay, workout, sameNameOnDay: sameName });
     }
   }
   if (errors.length) return refuse(errors.slice(0, 20));
@@ -2440,7 +2445,7 @@ export function planCalendarStates(draftIds: readonly string[]): PlanCalendarSta
 export function chatSessionForDraft(draftId: string): string | undefined {
   const row = getChatPlanDraft(draftId);
   const ids = row ? versionsOf(row.artifactId ?? row.draftId).map((version) => version.draftId) : [];
-  return findChatSessionMentioning([...new Set([draftId, ...ids])].reverse());
+  return findChatSessionMentioning([...new Set([draftId, ...ids])]);
 }
 
 /** A version's plan — a workout's too, as a plan of one session. */
@@ -2608,8 +2613,9 @@ export function saveWorkoutDraftEdit(
 /**
  * An older version made the newest again, by the athlete: a new version with
  * the old one's content, so nothing in between is lost and the step can be
- * undone the same way (docs/coach-plan-canvas.md, P1.4). Refused on a saved
- * creation, for the reason a revision is.
+ * undone the same way (docs/coach-plan-canvas.md, P1.4). A saved plan's
+ * restore carries its COROS identity like any version (P1.6); a saved
+ * workout's is refused by `writeVersion`.
  */
 export function restorePlanDraftVersion(
   draftId: string,

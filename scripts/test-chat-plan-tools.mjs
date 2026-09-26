@@ -319,6 +319,18 @@ test("an unknown plan is refused with where to find one", async () => {
   assert.match(result.errors[0], /list_training_plans/);
 });
 
+test("a run that starts mid-week counts its weeks from that week's Monday, as COROS does", async () => {
+  stubCoros();
+  const wednesday = addDays(lastMonday, 2); // 2027-01-13
+  databaseModule.saveCorosPlanCache(
+    plan("W1", { name: "Midweek start", entries: [], calendar: "running", startDate: dashed(wednesday) })
+  );
+  // The Monday after: COROS's week 2, five days after the start.
+  const { plans } = await call("list_training_plans", {}, { today: addDays(lastMonday, 7) });
+  assert.match(plans.find((line) => line.plan_id === "W1").on_calendar, /week 2 of 2 this week/);
+  databaseModule.deleteCorosPlanCache("W1");
+});
+
 test("an empty cache is filled the way the Library fills it, and says so when COROS is away", async () => {
   databaseModule.replaceCorosPlanCache([]);
   const calls = stubCoros();

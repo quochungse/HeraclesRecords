@@ -1215,6 +1215,7 @@ export function ChatView({
     }
     onError(null);
     try {
+      await flushPendingSave();
       const created = await api.createChatSession(chatSettings.provider);
       const brief = await api.createPlanBrief(created.id);
       const titled = (await api.renameChatSession(created.id, NEW_PLAN_TITLE).catch(() => null)) ?? created;
@@ -2346,6 +2347,8 @@ export function ChatView({
     if (!api || streaming || exportingLatestActivity) return;
     onError(null);
     try {
+      // The conversation being left may still owe its row a save; see loadSession.
+      await flushPendingSave();
       const created = await api.createChatSession(chatSettings.provider);
       setSessions((current) => [created, ...current]);
       setActiveSessionId(created.id);

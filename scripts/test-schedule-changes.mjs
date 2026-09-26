@@ -673,6 +673,15 @@ test("an addition applied on the other machine meanwhile is not added again", as
   assert.equal(coros.state.entities.length, 1);
 });
 
+test("an addition to a day that already holds a session of the same name is a double day, not a duplicate", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 41, happenDay: daysFromNow(2), name: "Shakeout" });
+  const { staged } = await propose([{ op: "add", to_date: daysFromNow(2), workout: easyRun("Shakeout") }]);
+  const set = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(set.lines[0].status, "applied", set.lines[0].reason);
+  assert.equal(coros.state.entities.length, 2, "the second Shakeout is added beside the first");
+});
+
 test("the Calendar's drag moves a plan's session through its copy, and the athlete's own by add-then-remove", async () => {
   const coros = fakeCoros();
   coros.runningCopy("R5", planMonday, [["1", 0, "Easy"]]);

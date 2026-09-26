@@ -2943,19 +2943,21 @@ export function listChatPlanDraftVersions(artifactId: string): StoredChatPlanDra
 }
 
 /**
- * The conversation holding any of these drafts' cards, the most recent first
- * (P1.7). A card carries its draft id in the transcript, so this is a text
- * search, bounded by the ids being quoted.
+ * The most recently updated conversation holding a card for any of these
+ * drafts (P1.7). A card carries its draft id in the transcript, so this is a
+ * text search, bounded by the ids being quoted — one pass over the table for
+ * every id, rather than one per id.
  */
 export function findChatSessionMentioning(draftIds: readonly string[]): string | undefined {
-  const statement = requireDatabase().prepare(
-    `SELECT id FROM chat_sessions WHERE instr(messages_json, ?) > 0 ORDER BY updated_at DESC LIMIT 1`
-  );
-  for (const draftId of draftIds) {
-    const row = statement.get(`"draftId":"${draftId}"`) as { id: string } | undefined;
-    if (row) return row.id;
-  }
-  return undefined;
+  if (!draftIds.length) return undefined;
+  const row = requireDatabase()
+    .prepare(
+      `SELECT id FROM chat_sessions
+       WHERE ${draftIds.map(() => "instr(messages_json, ?) > 0").join(" OR ")}
+       ORDER BY updated_at DESC LIMIT 1`
+    )
+    .get(...draftIds.map((draftId) => `"draftId":"${draftId}"`)) as { id: string } | undefined;
+  return row?.id;
 }
 
 /**

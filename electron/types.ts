@@ -3869,6 +3869,12 @@ export interface ScheduleChangeLine {
   workout?: PlanWorkoutEntryInput;
   /** A library workout a deletion removes. */
   program?: { id: string; name: string };
+  /**
+   * For an add: sessions of the workout's name already on that day when it
+   * was proposed. One more than that means the line landed meanwhile (from
+   * the other machine); absent on a line from before this was kept, read as 0.
+   */
+  sameNameOnDay?: number;
   status: ScheduleChangeStatus;
   /** Why a line failed or went stale. */
   reason?: string;

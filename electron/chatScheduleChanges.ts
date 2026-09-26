@@ -115,6 +115,7 @@ function parseLine(value: unknown): ScheduleChangeLine | undefined {
       ? { program: { id: text(value.program.id)!, name: text(value.program.name) ?? "" } }
       : {}),
     status,
+    ...(typeof value.sameNameOnDay === "number" ? { sameNameOnDay: value.sameNameOnDay } : {}),
     ...(text(value.reason) ? { reason: text(value.reason) } : {}),
     ...(value.retry === false ? { retry: false } : {}),
     ...(text(value.settledAt) ? { settledAt: text(value.settledAt) } : {})
@@ -396,15 +397,17 @@ async function applyReplace(line: ScheduleChangeLine, deps: ScheduleChangeDeps, 
 
 /**
  * A new session of the athlete's own. Nothing identifies it before it exists,
- * so a line applied on the other machine meanwhile is recognised by its name
- * already being on that day.
+ * so a line applied on the other machine meanwhile is recognised by one more
+ * session of its name on that day than there was when it was proposed — not
+ * by the name alone, which would refuse a double day of "Easy Run".
  */
 async function applyAdd(line: ScheduleChangeLine, deps: ScheduleChangeDeps, unitSystem: UnitSystem): Promise<LineOutcome> {
   if (!line.toDay || !line.workout) return { status: "failed", reason: "The proposal does not say what or where." };
   const passed = pastDay(line.toDay, deps);
   if (passed) return { status: "stale", reason: passed };
   const onDay = await deps.listScheduledWorkoutEntries(line.toDay, line.toDay);
-  if (onDay.some((entry) => entry.name === line.workout!.name)) {
+  const sameName = onDay.filter((entry) => entry.name === line.workout!.name).length;
+  if (sameName > (line.sameNameOnDay ?? 0)) {
     return { status: "stale", reason: `"${line.workout.name}" is already on the calendar on ${dashed(line.toDay)}.` };
   }
   await deps.moves.createAndScheduleWorkout({ ...line.workout, save_to_library: false }, line.toDay, unitSystem, false);
