@@ -808,7 +808,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   that day, no day has passed, a workout passes `validatePlanDraft` and resolves its exercises) and
   handed back whole on a refusal. It writes nothing, so it is on `READ_ONLY_ALLOWED_TOOLS`. The
   outcome of every proposal rides in `creationIndex` on the next turn, read from the row, so Coach
-  knows what the athlete applied. `npm run test:schedule-changes`, `test:schedule-change-renderer`.
+  knows what the athlete applied. **An analysis run leaves at most two cards** (drafts and proposals
+  together, `runCards` in `chatService.ts`, P3.4), held in code rather than only in the prompt; a
+  pipeline step is not counted, and a chat turn is held to the prompt's words as before. A run is
+  handed the conversation's `sessionId`, so what it proposes is filed under its conversation, and its
+  `creationIndex` carries the briefs and proposals too. `npm run test:schedule-changes`,
+  `test:schedule-change-renderer`.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and
   `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its

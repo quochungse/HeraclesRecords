@@ -620,6 +620,36 @@ test("a set proposed in imperial units is applied in them", async () => {
   assert.equal(changes.readScheduleChanges([imperial.changeSetId])[0].unitSystem, "imperial");
 });
 
+// --- P3.4: an analysis leaves at most two cards ------------------------------------
+
+test("an analysis run leaves at most two cards, and says why the third is refused", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 41, happenDay: tomorrow, name: "A" });
+  coros.put({ idInPlan: 42, happenDay: tomorrow, name: "B" });
+  coros.put({ idInPlan: 43, happenDay: tomorrow, name: "C" });
+  const service = await import(distUrl("chatService.js"));
+  const removal = (id) => ({ summary: `Remove ${id}`, changes: [{ op: "remove", session: { plan_id: OWN_SCHEDULE, id_in_plan: id, date: tomorrow } }] });
+  const run = { requestId: "run-1", toolPolicy: "read-only", sessionId: "conv-a" };
+  const answers = [];
+  for (const id of ["41", "42", "43"]) {
+    answers.push(JSON.parse(await service.callChatToolForTests("propose_schedule_changes", removal(id), run)));
+  }
+  assert.deepEqual(answers.map((answer) => answer.ok), [true, true, false]);
+  assert.equal(answers[2].error_code, "card_limit");
+  assert.match(answers[2].errors[0], /at most 2 cards/);
+  assert.equal(changes.readScheduleChanges([answers[0].change_set_id])[0].sessionId, "conv-a", "filed under the run's conversation");
+  service.endRunForTests("run-1");
+  const next = JSON.parse(await service.callChatToolForTests("propose_schedule_changes", removal("43"), { ...run, requestId: "run-2" }));
+  assert.equal(next.ok, true, "the next run starts its own count");
+  const chat = { requestId: "turn-1", toolPolicy: "interactive" };
+  for (const id of ["41", "42", "43"]) {
+    const answer = JSON.parse(await service.callChatToolForTests("propose_schedule_changes", removal(id), chat));
+    assert.equal(answer.ok, true, "a chat turn is held to the prompt's words, not this count");
+  }
+  service.endRunForTests("run-2");
+  service.endRunForTests("turn-1");
+});
+
 let failed = 0;
 for (const [name, runCase] of cases) {
   try {

@@ -1507,11 +1507,24 @@ export async function streamChat(
   } finally {
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
+    runCards.delete(requestId);
   }
 }
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
 const turnSessions = new Map<string, string>();
+
+/**
+ * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
+ * is watching may leave at most `ANALYSIS_CARD_LIMIT` — drafts and calendar
+ * proposals together — and the rest is said in words. Held in code, not only
+ * in the prompt, because a run is the one place nobody is there to stop a
+ * model that overdoes it. A pipeline step is read-only too, but asked for, so
+ * it is not counted.
+ */
+const runCards = new Map<string, Set<string>>();
+const ANALYSIS_CARD_LIMIT = 2;
+const CARD_TOOLS: ReadonlySet<string> = new Set(["draft_workout", "draft_training_plan", "propose_schedule_changes"]);
 
 /**
  * A conversation's sources as a turn's reach (P2.0): the tools that read a
@@ -2882,6 +2895,21 @@ async function executeChatTool(
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
+    const counted = toolPolicy === "read-only" && !generation;
+    const cards = counted ? runCards.get(requestId) ?? new Set<string>() : undefined;
+    if (cards && CARD_TOOLS.has(name) && cards.size >= ANALYSIS_CARD_LIMIT) {
+      return JSON.stringify({
+        ok: false,
+        error_code: "card_limit",
+        errors: [`An analysis leaves at most ${ANALYSIS_CARD_LIMIT} cards; this run has. Say the rest in words.`]
+      });
+    }
+    /* Counted by the card's own id, read and never changed. */
+    const leaveCard = (card: PlanDraftPreview | ScheduleChangeSet) => {
+      if (!cards) return;
+      cards.add("changeSetId" in card ? card.changeSetId : card.draftId);
+      runCards.set(requestId, cards);
+    };
     // A run that only reads may add a creation but not change one the athlete
     // is following: `revises` would make its plan the next version of theirs,
     // so here the draft is simply a new one.
@@ -2895,6 +2923,7 @@ async function executeChatTool(
       },
       sessionId: turnSessions.get(requestId),
       onPlanDraft: (preview: PlanDraftPreview) => {
+        leaveCard(preview);
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
           requestId,
@@ -2905,6 +2934,7 @@ async function executeChatTool(
       planRequest: generation?.request,
       ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
       onScheduleChange: (changeSet) => {
+        leaveCard(changeSet);
         send("chat:streamInfo", { requestId, kind: "scheduleChange", changeSet });
       },
       allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
@@ -2972,6 +3002,25 @@ async function executeChatTool(
     );
   }
   return reportingFailure(() => callMcpTool(name, args));
+}
+
+/**
+ * One tool call as a turn makes it, for suites: the run's card count (D4)
+ * lives here, and a suite driving it through a provider would be testing the
+ * provider. `end` lets the run go, as a finished turn does.
+ */
+export function callChatToolForTests(
+  name: string,
+  args: Record<string, unknown>,
+  { requestId, toolPolicy, sessionId }: { requestId: string; toolPolicy: ChatToolPolicy; sessionId?: string }
+): Promise<string> {
+  if (sessionId) turnSessions.set(requestId, sessionId);
+  return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
+}
+
+export function endRunForTests(requestId: string): void {
+  turnSessions.delete(requestId);
+  runCards.delete(requestId);
 }
 
 function findChatTool(name: string): CorosMcpTool | undefined {

@@ -839,12 +839,23 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   phát hiện: P3.2 khai báo state `scheduleChanges` sau chỗ dùng đầu tiên — một cuộc chat có neo
   `scheduleChange` làm ChatView văng (TDZ); đã sửa, `test:schedule-change-renderer` giữ nó.
 
-**P3.4 Card trong analysis** · M
+**P3.4 Card trong analysis** · M · *xong*
 - Analysis tuần và review sau buổi tập được phép gọi `propose_schedule_changes` và các tool draft
   (đã có), trong giới hạn D4 (tối đa 2 card mỗi lần chạy, theo setting P1.9). Card nằm trong cuộc
   chat của analysis như câu trả lời của nó; áp vẫn là của athlete.
 - Kèm theo: `coachAnalysisService` truyền brief vào `creationIndex` (lỗ hổng ghi ở review P2).
 - Test: `test:coach-analysis-runner`, `test:coach-analysis-guards`.
+- **Đã làm.** `propose_schedule_changes` nằm trong `READ_ONLY_ALLOWED_TOOLS` từ P3.3; analysis giờ
+  truyền `sessionId` của cuộc chat nên đề xuất được ghi dưới cuộc chat đó, và collector headless ghi
+  neo `scheduleChange` vào transcript. Giới hạn D4 được **giữ bằng code** cho lượt analysis
+  (`runCards`, `ANALYSIS_CARD_LIMIT = 2`: draft và đề xuất tính chung; card thứ ba bị trả
+  `card_limit` kèm lý do cho model), không chỉ bằng lời — lượt analysis là chỗ không có ai để cản một
+  model làm quá tay. Bước pipeline (cũng read-only nhưng do athlete yêu cầu) không bị đếm; lượt chat
+  vẫn theo lời trong prompt như P1.9. Quyết định: setting P1.9 không áp cho analysis — analysis vốn là
+  lời không ai hỏi, và nó đã có trần riêng. `creationIndex` của lượt analysis mang brief (lỗ hổng của
+  review P2) và trạng thái các đề xuất (deps `getPlanBriefs`, `getScheduleChanges`, tuỳ chọn như
+  `getPlanArtifacts`). Preset *Weekly review* và *Post-activity debrief* được dặn đề xuất thay đổi lịch
+  bằng tool thay vì chỉ nói; analysis đã tạo từ trước giữ playbook của nó.
 
 **P3.5 Hỏi về đúng chỗ, từ Calendar và Library** · M
 - Kind neo mới `scheduleRefs { refs: [{ scope: day | week | session, day, plan_id?, id_in_plan?,
