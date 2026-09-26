@@ -39,10 +39,18 @@ export function lineStatusLabel(line: ScheduleChangeLine): string {
   return STATUS_LABEL[line.status];
 }
 
-/** The card's one line under its title: what is still to decide, else how it ended. */
+/**
+ * The card's one line under its title: what is still to decide, else how it
+ * ended. A line a newer build wrote — an op or a status this one does not
+ * know — is counted as that, not as something to decide here.
+ */
 export function changeSetHead(set: ScheduleChangeSet): string {
   const counts = { proposed: 0, applied: 0, failed: 0, dismissed: 0, stale: 0 };
-  for (const line of set.lines) if (line.status in counts) counts[line.status] += 1;
+  let newer = 0;
+  for (const line of set.lines) {
+    if (!canApply(line) || !(line.status in counts)) newer += 1;
+    else counts[line.status] += 1;
+  }
   const total = set.lines.length;
   if (counts.proposed === total) return total === 1 ? "Not applied yet" : `${total} changes, none applied yet`;
   const parts: string[] = [];
@@ -51,6 +59,7 @@ export function changeSetHead(set: ScheduleChangeSet): string {
   if (counts.failed) parts.push(`${counts.failed} failed`);
   if (counts.stale) parts.push(`${counts.stale} out of date`);
   if (counts.dismissed) parts.push(`${counts.dismissed} dismissed`);
+  if (newer) parts.push(`${newer} from a newer version of the app`);
   return parts.join(" · ");
 }
 

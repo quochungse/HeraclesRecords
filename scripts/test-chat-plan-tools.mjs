@@ -271,6 +271,23 @@ test("without the athlete's activities one plan carries no done or missed", asyn
   assert.match(result.progress_withheld, /not shared/);
 });
 
+test("a running copy whose sessions carry no date is dated from the week it starts in", async () => {
+  stubCoros();
+  databaseModule.saveCorosPlanCache(
+    plan("R2", {
+      name: "Undated copy",
+      entries: templateEntries,
+      calendar: "running",
+      startDate: dashed(lastMonday),
+      sourcePlanId: "T2"
+    })
+  );
+  const result = await call("get_training_plan", { plan_id: "R2", sessions: ["4"] }, { today, progress: false });
+  assert.equal(result.week_list[0].sessions[1], "#2 · Thu 2027-01-14 · Tempo · run · 50 min");
+  assert.equal(result.workouts[0].date, "2027-01-23");
+  databaseModule.deleteCorosPlanCache("R2");
+});
+
 test("a plan not on the calendar is named by week and day; a long one shows its first weeks", async () => {
   stubCoros();
   const result = await call("get_training_plan", { plan_id: "L1" }, { today });

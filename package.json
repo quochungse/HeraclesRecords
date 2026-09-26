@@ -160,6 +160,8 @@
     "test:training-plan-simulation": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-training-plan-simulation.mjs",
     "test:training-library": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-training-library.mjs && node scripts/test-coros-workout-builder.mjs && node scripts/test-workout-intensity-codec.mjs",
     "verify:coach-workout-api": "npm run build:electron && node scripts/verify-coach-workout-api.mjs",
+    "sample:coach": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/seed-coach-sample.mjs",
+    "sample:coach-p3": "npm run sample:coach -- --only p3",
     "verify:coros-plan-api": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/verify-coros-plan-api.mjs",
     "test:training-hub-write": "npm run build:electron && node scripts/test-training-hub-write.mjs",
     "test:coros-login": "npm run build:electron && node scripts/test-coros-login.mjs",
