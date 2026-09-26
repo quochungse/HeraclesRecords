@@ -18,6 +18,8 @@
 import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
 
 export type CreationActionId =
+  | "updatePlan"
+  | "saveAsNewPlan"
   | "scheduleWorkout"
   | "pickWorkoutDate"
   | "saveToLibrary"
@@ -30,6 +32,8 @@ export interface CreationAction {
   destination: Extract<TrainingPlanDestination, "calendar" | "workoutLibrary" | "nativePlan">;
   /** `YYYY-MM-DD`, for a workout scheduled on the day the coach suggested. */
   date?: string;
+  /** A new COROS plan, though the creation is already one (P1.6). */
+  asNew?: boolean;
 }
 
 export interface CreationChoices {
@@ -98,7 +102,11 @@ export function isOneShotPlan(preview: PlanDraftPreview, today: string): boolean
  * whether the athlete has changed it before then. The creations list used to
  * say "Workout Library" of every workout, including one put on the calendar.
  */
-export function creationStatus(draft: PlanDraftPreview): { label: string; saved: boolean } {
+export function creationStatus(
+  draft: PlanDraftPreview,
+  /** Another version of it is a COROS plan, so this one is a change to that plan. */
+  onCoros = false
+): { label: string; saved: boolean } {
   if (draft.uploadResult || draft.uploadedAt) {
     const destination = draft.uploadResult?.destination;
     if (destination === "nativePlan") return { label: "On COROS", saved: true };
@@ -110,6 +118,7 @@ export function creationStatus(draft: PlanDraftPreview): { label: string; saved:
     }
     return { label: "Saved", saved: true };
   }
+  if (onCoros) return { label: "Changes not on COROS", saved: false };
   return { label: draft.editedAt ? "Edited by you" : "Proposal", saved: false };
 }
 
@@ -166,15 +175,35 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
 export type ArtifactActions =
   | { kind: "older"; restore: boolean }
   | { kind: "editing" }
+  | { kind: "saved" }
   | { kind: "save"; choices: CreationChoices };
 
+/**
+ * `saved` is whether any version is saved; `onCoros`, whether one is a COROS
+ * plan (P1.6). A plan on COROS is changed by a new version that updates it,
+ * so its older versions can be restored and its newest one, once saved, can
+ * still be edited; a workout saved to the library or the calendar has nothing
+ * to update, so neither.
+ */
 export function artifactActions(
   draft: PlanDraftPreview,
-  state: { latest: boolean; editing?: boolean; saved?: boolean },
+  state: { latest: boolean; editing?: boolean; saved?: boolean; onCoros?: boolean },
   today: string
 ): ArtifactActions {
   const saved = state.saved ?? Boolean(draft.uploadedAt || draft.uploadResult);
-  if (!state.latest) return { kind: "older", restore: !saved };
+  const isPlan = draft.artifactType !== "workout";
+  if (!state.latest) return { kind: "older", restore: !saved || (isPlan && Boolean(state.onCoros)) };
   if (state.editing) return { kind: "editing" };
+  if (draft.uploadedAt || draft.uploadResult) return { kind: "saved" };
+  if (isPlan && state.onCoros) {
+    return {
+      kind: "save",
+      choices: {
+        primary: { id: "updatePlan", label: "Update COROS plan", destination: "nativePlan" },
+        secondary: [],
+        more: [{ id: "saveAsNewPlan", label: "Save as a new COROS plan", destination: "nativePlan", asNew: true }]
+      }
+    };
+  }
   return { kind: "save", choices: planSaveChoices(draft, today) };
 }

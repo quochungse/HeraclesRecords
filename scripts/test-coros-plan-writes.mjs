@@ -1086,11 +1086,123 @@ test("a coach plan is saved to COROS as one plan, with its overview and stages",
     /already uploaded/,
     "saved once"
   );
-  await assert.rejects(
-    chatWorkoutTools.savePlanDraftEdit(preview.draftId, chatWorkoutTools.planDraftDocument(preview.draftId)),
-    /already been saved/,
-    "and a saved card is no longer edited"
+  const edit = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, chatWorkoutTools.planDraftDocument(preview.draftId));
+  assert.equal(edit.kind, "written", "a saved plan is edited into its next version (P1.6)");
+  assert.ok(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, "and the saved one stays saved");
+});
+
+test("a coach plan on COROS is changed by a version that updates it (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+
+  // The saved version keeps the plan as COROS read it back, keyed as the coach keyed it.
+  const saved = chatWorkoutTools.planDraftDocument(preview.draftId);
+  assert.equal(saved.remoteId, "900");
+  assert.deepEqual(saved.entries.map((entry) => entry.workout.key).sort(), ["easy-monday", "long-sunday"]);
+  assert.ok(saved.entries.every((entry) => entry.idInPlan && entry.corosProgram), "each session's COROS identity");
+
+  // Coach moves the long run and rewrites the easy one.
+  const revised = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      {
+        draft_id: preview.draftId,
+        summary: "Long run to Saturday, easy run longer",
+        ops: [
+          { op: "move_session", key: "long-sunday", schedule_date: "20990815" },
+          { op: "replace_session", key: "easy-monday", workout: coachRun("Easy Monday", 2400) }
+        ]
+      },
+      { allowUpcomingWorkouts: false }
+    )
   );
+  assert.equal(revised.ok, true, JSON.stringify(revised));
+  const next = chatWorkoutTools.planDraftDocument(revised.draft_id);
+  assert.equal(next.remoteId, "900", "the new version is a change to that plan");
+  const byKey = new Map(next.entries.map((entry) => [entry.workout.key, entry]));
+  const savedByKey = new Map(saved.entries.map((entry) => [entry.workout.key, entry]));
+  assert.equal(byKey.get("long-sunday").idInPlan, savedByKey.get("long-sunday").idInPlan);
+  assert.deepEqual(byKey.get("long-sunday").corosProgram, savedByKey.get("long-sunday").corosProgram, "moved, not rewritten");
+  assert.equal(byKey.get("easy-monday").idInPlan, savedByKey.get("easy-monday").idInPlan, "updated in place");
+  assert.equal(byKey.get("easy-monday").corosProgram, undefined, "its workout is written afresh");
+
+  const updated = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan");
+  assert.equal(coros.to("/training/plan/add").length, 1, "no second plan");
+  assert.equal(coros.to("/training/plan/update").length, 1, "the plan is updated");
+  assert.equal(updated.planId, "coros:900");
+  assert.deepEqual(updated.remoteWrites, ["Update plan Coach block"]);
+  const [update] = coros.to("/training/plan/update");
+  assert.deepEqual(
+    update.body.entities.map((entity) => entity.dayNo).sort((a, b) => a - b),
+    [0, 12],
+    "Saturday of week 2 is day 12"
+  );
+
+  // Changed on COROS meanwhile: the next update is refused until the athlete says.
+  const again = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: revised.draft_id, summary: "Rename", ops: [{ op: "rename", name: "Coach block, two" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(again.ok, true, JSON.stringify(again));
+  const elsewhere = await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(revised.draft_id), name: "Renamed in the COROS app" },
+    unitSystem: "metric"
+  });
+  assert.equal(elsewhere.ok, true);
+  const refused = await chatWorkoutTools.uploadPlanDraftById(again.draft_id, "metric", "nativePlan");
+  assert.ok(refused.conflict, "a conflict, not a write");
+  assert.equal(coros.to("/training/plan/update").length, 2, "only the change made elsewhere was written");
+  assert.equal(databaseModule.getChatPlanDraft(again.draft_id).uploadedAt, undefined, "and the version is not saved");
+
+  const asNew = await chatWorkoutTools.uploadPlanDraftById(again.draft_id, "metric", "nativePlan", undefined, false, { asNew: true });
+  assert.equal(asNew.planId, "coros:901", "saved as a plan of its own");
+  assert.equal(coros.to("/training/plan/add").length, 2);
+
+  // And a saved one-off workout is still not changed from the conversation.
+  let workout;
+  JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "draft_workout",
+      { workout: coachRun("Shakeout", 900), calendar_date: "20990805" },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { workout = drafted; } }
+    )
+  );
+  databaseModule.markChatPlanDraftUploaded(workout.draftId, Date.now());
+  const workoutRevision = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: workout.draftId, summary: "Longer", ops: [{ op: "replace_session", workout: coachRun("Shakeout", 1200) }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(workoutRevision.error_code, "draft_saved");
+});
+
+test("an update written over a change made on COROS replaces it (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const revised = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: preview.draftId, summary: "Rename", ops: [{ op: "rename", name: "Mine" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(preview.draftId), name: "Theirs" },
+    unitSystem: "metric"
+  });
+  const refused = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan");
+  assert.ok(refused.conflict);
+  const written = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan", undefined, false, { overwrite: true });
+  assert.equal(written.conflict, undefined);
+  assert.equal(written.planId, "coros:900");
+  assert.equal(coros.to("/training/plan/update").at(-1).body.name, "Mine");
 });
 
 test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {

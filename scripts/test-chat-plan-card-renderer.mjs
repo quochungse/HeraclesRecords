@@ -426,7 +426,7 @@ async function main() {
     "the workout is saved"
   );
   assert.deepEqual(
-    upload.args.slice(2),
+    upload.args.slice(2, 5),
     ["calendar", "2099-10-02", true],
     "on its day, and kept in the library as asked"
   );
@@ -597,6 +597,67 @@ async function main() {
   await waitFor(
     async () => (await harness("count", ".chat-plan-event-row")) === 2,
     "and says so on a line of its own"
+  );
+
+  // -------------------------------------------------------------------------
+  // A plan on COROS is changed by a version that updates it (P1.6)
+  // -------------------------------------------------------------------------
+  const SAVED_V1 = {
+    ...PREVIEW,
+    uploadedAt: 3,
+    uploadResult: { workoutsScheduled: 0, workoutsCreated: 9, destination: "nativePlan", planId: "coros:900" }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      TRANSCRIPT[0],
+      TRANSCRIPT[1],
+      { kind: "planDraft", draft: SAVED_V1 },
+      { kind: "planDraft", draft: { ...PREVIEW, draftId: "plan-1-v2" } }
+    ],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" },
+      { artifactId: "plan-1", draftId: "plan-1-v2", version: 2, author: "coach", createdAt: 4, parentDraftId: "plan-1" }
+    ],
+    uploadTrainingPlanDraft: {
+      planName: PREVIEW.name,
+      workoutsCreated: 0,
+      workoutsScheduled: 0,
+      entries: [],
+      destination: "nativePlan",
+      planId: "coros:900",
+      conflict: { currentVersion: 3, expectedVersion: 2 }
+    }
+  });
+  await waitFor(
+    () => harness("exists", '.chat-creation-card [data-action="updatePlan"]'),
+    "the new version leads with updating the plan"
+  );
+  assert.match((await harness("text", ".chat-creation-card .chat-creation-status")) ?? "", /Changes not on COROS/);
+  assert.equal(await harness("exists", '.chat-creation-card [data-action="saveAsPlan"]'), false, "not a second plan");
+  await harness("click", '.chat-creation-card [data-action="updatePlan"]');
+  await waitFor(
+    async () => /This plan changed on COROS/.test((await page(`document.body.textContent`)) ?? ""),
+    "COROS changed meanwhile, so the athlete is asked"
+  );
+  await harness("setScript", {
+    uploadTrainingPlanDraft: {
+      planName: PREVIEW.name,
+      workoutsCreated: 9,
+      workoutsScheduled: 0,
+      entries: [],
+      destination: "nativePlan",
+      planId: "coros:900"
+    }
+  });
+  await page(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Replace with my edit").click()`);
+  await waitFor(async () => (await harness("callCount", "uploadTrainingPlanDraft")) === 2, "saved again");
+  assert.deepEqual((await harness("calls", "uploadTrainingPlanDraft"))[1].args.at(-1), { overwrite: true });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-plan-success"), "the version is on COROS");
+  assert.equal(
+    await harness("exists", '.chat-creation-card [data-action="edit"]'),
+    true,
+    "and it can still be changed, by a next version"
   );
 
   // -------------------------------------------------------------------------

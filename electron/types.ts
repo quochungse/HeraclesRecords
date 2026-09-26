@@ -3194,6 +3194,8 @@ export interface PlanArtifactVersion {
   editedAt?: number;
   /** What this version changed, in its author's words. */
   changeSummary?: string;
+  /** The COROS plan this version was saved as, `coros:<id>`. */
+  remotePlanId?: string;
 }
 
 export interface PlanWorkoutEntryInput {
@@ -3433,6 +3435,18 @@ export interface UploadPlanResult {
   /** The COROS plan it became, for a plan saved whole. */
   planId?: string;
   remoteWrites?: string[];
+  /**
+   * An update refused because the plan changed on COROS since this version
+   * was made (P1.6): nothing was written, and the athlete decides whether to
+   * write over it or save a new plan.
+   */
+  conflict?: { currentVersion?: number; expectedVersion: number };
+}
+
+/** How a plan version is saved to COROS (P1.6): over a plan that changed there, or as a new one. */
+export interface PlanDraftSaveOptions {
+  asNew?: boolean;
+  overwrite?: boolean;
 }
 
 export interface TrainingHubScheduledWorkoutEntry {

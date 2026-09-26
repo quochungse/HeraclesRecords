@@ -1,6 +1,7 @@
 import { CircleCheck, Maximize2 } from "lucide-react";
 import type {
   PlanDraftPreview,
+  PlanDraftSaveOptions,
   TrainingPlanDestination,
   TrainingPlanDocument,
   UploadPlanResult,
@@ -120,6 +121,7 @@ export function CoachCreationCard({
   onUpload,
   onEdit,
   editing = false,
+  onCoros = false,
   onOpen
 }: {
   draft: PlanDraftPreview;
@@ -132,11 +134,14 @@ export function CoachCreationCard({
   onUpload: (
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => void;
   onEdit?: () => void;
   /** Its editor is open: the way on is back into it. */
   editing?: boolean;
+  /** Another version of it is a COROS plan, which saving this one updates. */
+  onCoros?: boolean;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -150,7 +155,8 @@ export function CoachCreationCard({
             destination: uploaded.destination
           }
         }
-      : draft
+      : draft,
+    onCoros
   );
   const figures = !isWorkout && document ? creationFigures(document) : undefined;
   const entry = draft.entries[0];
@@ -230,15 +236,19 @@ export function CoachCreationCard({
                 : `${status.label}.`}
           </span>
         </p>
-      ) : (
-        <CreationActions
-          draft={draft}
-          uploading={uploading}
-          onUpload={onUpload}
-          onEdit={onEdit}
-          editing={editing}
-        />
-      )}
+      ) : null}
+      <CreationActions
+        draft={
+          status.saved && !draft.uploadResult && uploaded
+            ? { ...draft, uploadedAt: draft.uploadedAt ?? 1 }
+            : draft
+        }
+        uploading={uploading}
+        onUpload={onUpload}
+        onEdit={onEdit}
+        editing={editing}
+        onCoros={onCoros || (status.saved && status.label === "On COROS")}
+      />
 
     </article>
   );

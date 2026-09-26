@@ -9,7 +9,7 @@
  * imports: the renderer imports it directly, like `activityMetrics.ts`.
  */
 import { COROS_WEEK_STAGES } from "./trainingPlanDomain";
-import type { TrainingPlanDocument, TrainingPlanEntry } from "./types";
+import type { PlanWorkoutEntryInput, TrainingPlanDocument, TrainingPlanEntry } from "./types";
 
 export type PlanChangeKind =
   | "renamed"
@@ -54,16 +54,29 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** The workout as a session holds it, without what only places it. */
-function content(entry: TrainingPlanEntry): string {
+/** A workout, without what only places it. */
+function workoutContent(workout: PlanWorkoutEntryInput): string {
   const {
     key: _key,
     schedule_date: _date,
     sort_no: _sortNo,
     save_to_library: _library,
-    ...workout
-  } = entry.workout;
-  return canonical(workout);
+    ...rest
+  } = workout;
+  return canonical(rest);
+}
+
+function content(entry: TrainingPlanEntry): string {
+  return workoutContent(entry.workout);
+}
+
+/**
+ * Whether two workouts are the same, wherever each is placed. Both must be
+ * in one form: a workout read back from a COROS program is rebuilt from it,
+ * and never equals the one it was written from.
+ */
+export function sameWorkoutInput(left: PlanWorkoutEntryInput, right: PlanWorkoutEntryInput): boolean {
+  return workoutContent(left) === workoutContent(right);
 }
 
 function stageLabel(value: number | undefined): string {

@@ -2384,14 +2384,19 @@ export async function uploadTrainingPlanDraft(
   unitSystem: UnitSystem = "metric",
   destination: import("./types").TrainingPlanDestination = "workoutLibrary",
   scheduleDate?: string,
-  keepInLibrary = false
+  keepInLibrary = false,
+  options?: import("./types").PlanDraftSaveOptions
 ): Promise<UploadPlanResult> {
   return uploadPlanDraftById(
     draftId,
     normalizeUnitSystem(unitSystem),
     destination,
     scheduleDate,
-    keepInLibrary === true
+    keepInLibrary === true,
+    {
+      ...(options?.asNew === true ? { asNew: true } : {}),
+      ...(options?.overwrite === true ? { overwrite: true } : {})
+    }
   );
 }
 

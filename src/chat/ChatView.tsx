@@ -61,6 +61,7 @@ import type {
   PersistedChatEntry,
   PlanArtifactVersion,
   PlanDraftPreview,
+  PlanDraftSaveOptions,
   PlanVersionWritten,
   PlanDraftPreviewEntry,
   TrainingPlanDestination,
@@ -128,6 +129,7 @@ const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
 /* "Edit" on a coach's one-off workout: the workout builder, loaded when used. */
 const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
+const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -755,6 +757,8 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /** An update COROS refused because the plan changed there meanwhile. */
+  const [corosConflict, setCorosConflict] = useState<{ draftId: string; name: string } | null>(null);
   /**
    * Each plan card's document, by draft and edit: the weeks and days the card
    * draws come from what the draft becomes, not from its dates. `null` is a
@@ -2513,10 +2517,12 @@ export function ChatView({
     draftId: string,
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => {
     if (!api || uploadingDraftId) return;
     setUploadingDraftId(draftId);
+    setCorosConflict(null);
     onError(null);
     try {
       const result = await api.uploadTrainingPlanDraft(
@@ -2524,8 +2530,15 @@ export function ChatView({
         unitSystem,
         destination,
         scheduleDate,
-        keepInLibrary
+        keepInLibrary,
+        options
       );
+      // The plan changed on COROS since this version was made: nothing was
+      // written, and the athlete says which one stands (P1.6).
+      if (result.conflict) {
+        setCorosConflict({ draftId, name: result.planName });
+        return;
+      }
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
           if (!entry.date) return [];
@@ -3689,14 +3702,16 @@ function AnalysisSilentChip({
                       document={planDocuments[documentKey] ?? undefined}
                       uploading={uploadingDraftId === draft.draftId}
                       uploaded={uploadedPlans[draft.draftId]}
-                      onUpload={(destination, scheduleDate, keepInLibrary) =>
+                      onUpload={(destination, scheduleDate, keepInLibrary, options) =>
                         void handleUploadPlanDraft(
                           draft.draftId,
                           destination,
                           scheduleDate,
-                          keepInLibrary
+                          keepInLibrary,
+                          options
                         )
                       }
+                      onCoros={versionInfo?.siblings.some((item) => item.remotePlanId) ?? false}
                       onEdit={
                         api && (draft.artifactType !== "workout" || documentOf(draft))
                           ? () => openCreationEditor(draft.draftId)
@@ -3942,8 +3957,8 @@ function AnalysisSilentChip({
                 setOpenCreationId(null);
                 setPlanPanelOpen(false);
               }}
-              onUpload={(draftId, destination, scheduleDate, keepInLibrary) =>
-                void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary)
+              onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
+                void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
               }
               onEdit={api ? (draftId) => openCreationEditor(draftId) : undefined}
               onRestore={api ? (draftId) => void handleRestoreVersion(draftId) : undefined}
@@ -3965,6 +3980,20 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      {corosConflict ? (
+        <Suspense fallback={null}>
+          <CorosConflictDialog
+            name={corosConflict.name}
+            onOverwrite={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { overwrite: true })
+            }
+            onSaveAsNew={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { asNew: true })
+            }
+            onCancel={() => setCorosConflict(null)}
+          />
+        </Suspense>
+      ) : null}
       {api && editingPlanDraftId ? (
         <Suspense fallback={null}>
           <CoachPlanEditor

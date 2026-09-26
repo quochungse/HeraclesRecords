@@ -67,6 +67,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  PlanDraftSaveOptions,
   PlanVersionSave,
   PlanVersionWritten,
   TrainingPlanCalendarPreview,
@@ -669,7 +670,9 @@ export interface CorosLinkApi {
     destination?: TrainingPlanDestination,
     scheduleDate?: string,
     /** A workout put on the calendar is also kept in the Workout Library. */
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    /** For a plan already on COROS: save a new one, or write over a change made there (P1.6). */
+    options?: PlanDraftSaveOptions
   ) => Promise<UploadPlanResult>;
   /** Every version of the creations these drafts belong to (P1.1). */
   getPlanArtifacts: (draftIds: string[]) => Promise<PlanArtifactVersion[]>;

@@ -398,6 +398,16 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   xung đột).
 
 **P1.6 Card sống sau khi lưu, và luôn theo COROS (D5, D12)** · L
+- (P1.6a đã làm: bản đọc lại sau khi lưu là `document_json` của version, khoá buổi đổi về khoá
+  của Coach (`keyedAsSent`: theo `idInPlan`, rồi theo thứ tự). Version mới của plan đã lưu mang
+  danh tính COROS (`carryCorosIdentity`): `remoteId`/`remoteVersion`, `idInPlan` theo khoá, và
+  `corosProgram` chỉ cho buổi có workout không đổi — "không đổi" so với `plan_json` của bản gốc,
+  cùng dạng, vì workout đọc lại từ COROS không bao giờ bằng bản đã viết. `document_json` giữ
+  kèm hash của `plan_json`; build cũ sửa `plan_json` tại chỗ thì document được dựng lại và giữ
+  danh tính. Nút chính "Update COROS plan", ⋯ "Save as a new COROS plan"; xung đột version trên
+  COROS hỏi Replace with my edit / Save as a new plan / Keep editing (`CorosConflictDialog`).
+  Workout đã lưu vẫn không sửa được: không có gì để cập nhật. Còn lại: P1.6b nhập bản mới hơn từ
+  COROS thành version, P1.6c lịch.)
 - **Save to COROS**: `savePlanToCoros` với `document_json`, như Library. Version vừa lưu được
   đọc lại từ COROS (việc Library đã làm sau mỗi lần lưu) và `document_json` của nó được thay bằng
   bản đọc về, để mang `corosProgram` và `idInPlan`.

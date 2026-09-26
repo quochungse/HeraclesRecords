@@ -421,7 +421,7 @@ test("a rewrite through draft_training_plan's revises is a version too", async (
   assert.equal(database.getChatPlanDraft(card.draftId).changeSummary, "Rewritten by Coach.");
 });
 
-test("a saved creation is not revised from the conversation yet", async () => {
+test("a saved plan is revised into a new version, which is not saved (P1.6)", async () => {
   const saved = await draft("draft_training_plan", {
     name: "Saved block",
     workouts: [run("One run", 1800, { week: 1, day: "mon" })]
@@ -432,8 +432,9 @@ test("a saved creation is not revised from the conversation yet", async () => {
     summary: "Rename",
     ops: [{ op: "rename", name: "Renamed" }]
   });
-  assert.equal(response.ok, false);
-  assert.equal(response.error_code, "draft_saved");
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(database.getChatPlanDraft(response.draft_id).uploadedAt, undefined);
+  assert.ok(database.getChatPlanDraft(saved.draftId).uploadedAt, "the saved version stays saved");
 });
 
 test("get_plan_draft reads the newest version, whichever id it is given (P1.3)", async () => {

@@ -181,6 +181,21 @@ const ids = (choices) => ({
     "saved is read off the card when the caller does not say"
   );
   assert.deepEqual(artifactActions(draft, { latest: true, editing: true }, today), { kind: "editing" });
+
+  // A plan on COROS (P1.6): its next version updates that plan, its older
+  // versions can be restored, and once saved it can still be edited.
+  const change = artifactActions(draft, { latest: true, onCoros: true }, today);
+  assert.equal(change.kind, "save");
+  assert.equal(change.choices.primary.id, "updatePlan");
+  assert.deepEqual(change.choices.more.map((action) => [action.id, action.asNew]), [["saveAsNewPlan", true]]);
+  assert.deepEqual(artifactActions(draft, { latest: false, saved: true, onCoros: true }, today), { kind: "older", restore: true });
+  assert.deepEqual(artifactActions({ ...draft, uploadedAt: 1 }, { latest: true, onCoros: true }, today), { kind: "saved" });
+  const oneOff = { ...draft, artifactType: "workout" };
+  assert.deepEqual(
+    artifactActions(oneOff, { latest: false, saved: true, onCoros: true }, today),
+    { kind: "older", restore: false },
+    "a saved workout has nothing to update"
+  );
 }
 
 console.log("test-creation-choices: ok");

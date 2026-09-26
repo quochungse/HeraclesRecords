@@ -9,7 +9,11 @@ import {
   RotateCcw,
   TriangleAlert
 } from "lucide-react";
-import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
+import type {
+  PlanDraftPreview,
+  PlanDraftSaveOptions,
+  TrainingPlanDestination
+} from "../../electron/types";
 import { artifactActions, type CreationAction } from "./creationChoices";
 
 function todayKey(): string {
@@ -40,6 +44,7 @@ export function CreationActions({
   latest = true,
   editing = false,
   saved,
+  onCoros = false,
   onRestore
 }: {
   draft: PlanDraftPreview;
@@ -47,9 +52,12 @@ export function CreationActions({
   onUpload: (
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => void;
   onEdit?: () => void;
+  /** Another version of it is a COROS plan, which saving this one updates. */
+  onCoros?: boolean;
   /** False for a version something has replaced: it is read, not saved. */
   latest?: boolean;
   /** Its editor is open, so the way on is back into it. */
@@ -60,7 +68,7 @@ export function CreationActions({
   onRestore?: () => void;
 }) {
   const today = todayKey();
-  const actions = artifactActions(draft, { latest, editing, saved }, today);
+  const actions = artifactActions(draft, { latest, editing, saved, onCoros }, today);
   const [showMore, setShowMore] = useState(false);
   /* A workout put on the calendar is otherwise not kept in the library. */
   const [keepInLibrary, setKeepInLibrary] = useState(false);
@@ -77,7 +85,8 @@ export function CreationActions({
     onUpload(
       action.destination,
       action.date,
-      isWorkout && action.destination === "calendar" ? keepInLibrary : undefined
+      isWorkout && action.destination === "calendar" ? keepInLibrary : undefined,
+      action.asNew ? { asNew: true } : undefined
     );
   };
 
@@ -120,6 +129,26 @@ export function CreationActions({
         </div>
       </div>
     );
+  }
+  if (actions.kind === "saved") {
+    // Saved: what it became is said above; a plan on COROS changes through a
+    // new version, which is what Edit makes.
+    return onEdit && onCoros ? (
+      <div className="chat-creation-actions">
+        <div className="chat-plan-actions">
+          <button
+            type="button"
+            className="chat-plan-review"
+            data-action="edit"
+            onClick={onEdit}
+            disabled={uploading}
+          >
+            <PencilLine size={14} aria-hidden="true" />
+            Edit
+          </button>
+        </div>
+      </div>
+    ) : null;
   }
   if (actions.kind === "editing") {
     return (

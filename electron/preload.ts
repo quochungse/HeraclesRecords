@@ -70,6 +70,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  PlanDraftSaveOptions,
   PlanVersionSave,
   PlanVersionWritten,
   TrainingPlanCalendarPreview,
@@ -971,7 +972,8 @@ const api = {
     unitSystem: UnitSystem,
     destination?: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ): Promise<UploadPlanResult> =>
     ipcRenderer.invoke(
       "chat:uploadPlanDraft",
@@ -979,7 +981,8 @@ const api = {
       unitSystem,
       destination,
       scheduleDate,
-      keepInLibrary
+      keepInLibrary,
+      options
     ),
   getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
     ipcRenderer.invoke("chat:planArtifacts", draftIds),

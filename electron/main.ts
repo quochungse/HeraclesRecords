@@ -1856,13 +1856,14 @@ function registerIpcHandlers(): void {
     (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
       editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
-  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean) =>
+  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean, options?: import("./types").PlanDraftSaveOptions) =>
     uploadTrainingPlanDraft(
       draftId,
       normalizeUnitSystem(unitSystem),
       destination,
       scheduleDate,
-      keepInLibrary === true
+      keepInLibrary === true,
+      options
     )
   );
   ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>

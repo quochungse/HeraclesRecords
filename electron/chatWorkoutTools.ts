@@ -33,7 +33,7 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
-import { planDiff } from "./planDiff";
+import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
   PLAN_DAYS,
   PLAN_REVISION_OPS,
@@ -46,12 +46,14 @@ import type {
   DeleteWorkoutResult,
   PlanArtifactVersion,
   PlanDraftPreview,
+  PlanDraftSaveOptions,
   PlanWorkoutEntryInput,
   PlanVersionConflict,
   PlanVersionSave,
   PlanVersionWritten,
   TrainingPlanDestination,
   TrainingPlanDocument,
+  TrainingPlanEntry,
   TrainingPlanGenerationRequest,
   TrainingPlanWeekStage,
   UploadPlanResult,
@@ -87,10 +89,19 @@ interface StoredPlanDraft {
   /** What this version changed, in the words of whoever made it. */
   changeSummary?: string;
   /**
-   * The plan as COROS last answered it, once it has been saved there
-   * (P1.6); otherwise the document is derived from `plan` whenever it is read.
+   * The plan with its COROS identity — the plan id and version, and each
+   * session's `idInPlan` and untouched program — once the creation is on
+   * COROS (P1.6). Otherwise the document is derived from `plan` whenever it
+   * is read.
    */
   document?: TrainingPlanDocument;
+  /** `plan` as it was when `document` was written; see `draftDocument`. */
+  documentPlanHash?: string;
+}
+
+/** A fingerprint of a stored plan, to tell whether `document` still describes it. */
+function planHash(plan: CorosTrainingPlanDraft): string {
+  return crypto.createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 16);
 }
 
 /**
@@ -176,16 +187,30 @@ function persistPlanDraft(stored: StoredPlanDraft): void {
     ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
     author: stored.author,
     ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
-    documentJson: JSON.stringify(draftDocument(stored))
+    documentJson: JSON.stringify({
+      planHash: stored.document ? stored.documentPlanHash ?? planHash(stored.plan) : planHash(stored.plan),
+      document: draftDocument(stored)
+    })
   });
 }
 
 function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
   const preview = JSON.parse(row.previewJson) as PlanDraftPreview;
+  // Kept only when it carries a COROS identity: a document derived from the
+  // plan is derived again on every read, which is what lets an older build's
+  // in-place edit of `plan_json` show.
   let document: TrainingPlanDocument | undefined;
-  if (row.documentJson && row.author === "coros") {
+  let documentPlanHash: string | undefined;
+  if (row.documentJson) {
     try {
-      document = JSON.parse(row.documentJson) as TrainingPlanDocument;
+      const parsed = JSON.parse(row.documentJson) as
+        | { planHash?: string; document?: TrainingPlanDocument }
+        | TrainingPlanDocument;
+      const candidate = "document" in parsed && parsed.document ? parsed.document : (parsed as TrainingPlanDocument);
+      if (candidate?.remoteId || row.author === "coros") {
+        document = candidate;
+        documentPlanHash = "planHash" in parsed ? parsed.planHash : undefined;
+      }
     } catch {
       document = undefined;
     }
@@ -201,7 +226,8 @@ function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
     ...(row.parentDraftId ? { parentDraftId: row.parentDraftId } : {}),
     author: row.author ?? "coach",
     ...(row.changeSummary ? { changeSummary: row.changeSummary } : {}),
-    ...(document ? { document } : {})
+    ...(document ? { document } : {}),
+    ...(documentPlanHash ? { documentPlanHash } : {})
   };
 }
 
@@ -952,6 +978,22 @@ async function handleDraftTrainingPlan(
   });
 }
 
+/**
+ * A new version of a creation on COROS keeps the plan's identity, so saving it
+ * updates that plan. Nothing is done for one that is not there.
+ */
+function withCorosIdentityOf(stored: StoredPlanDraft, base: StoredPlanDraft, edited?: TrainingPlanDocument): void {
+  const baseDocument = draftDocument(base);
+  if (!baseDocument.remoteId) return;
+  const baseWorkouts = new Map<string, PlanWorkoutEntryInput>(
+    base.plan.workouts.map((workout) => [workout.key, workoutSource(workout)])
+  );
+  stored.document = edited
+    ? { ...carryCorosIdentity(edited, baseDocument), entries: edited.entries }
+    : carryCorosIdentity(coachDraftDocument(stored), baseDocument, baseWorkouts);
+  stored.documentPlanHash = planHash(stored.plan);
+}
+
 /** The versions of a creation, oldest first, as the renderer orders them. */
 function versionsOf(artifactId: string): StoredPlanDraft[] {
   return listChatPlanDraftVersions(artifactId).flatMap((row) => {
@@ -1006,12 +1048,14 @@ function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
   }
   const versions = versionsOf(named.artifactId);
   const latest = versions[versions.length - 1] ?? named;
-  if (versions.some((version) => version.uploadedAt) || named.uploadedAt) {
+  // A plan on COROS is revised into a version that updates it (P1.6); a
+  // workout saved to the library or the calendar has nothing to update, so a
+  // change to it would be a second workout.
+  if (named.preview.artifactType === "workout" && versions.some((version) => version.uploadedAt)) {
     return refuse({
       error_code: "draft_saved",
       errors: [
-        "This is already saved to COROS, and changing it from the conversation is not available yet. " +
-          "Tell the athlete what to change in the Training Library, or draft a new one if they want it."
+        "This workout is already saved to COROS. Draft a new one with draft_workout if the athlete wants a different session."
       ]
     });
   }
@@ -1062,6 +1106,7 @@ function storeRevision(
     author: "coach",
     changeSummary
   };
+  withCorosIdentityOf(stored, latest);
   persistPlanDraft(stored);
   onPlanDraft?.(lightPreview(preview));
   return JSON.stringify({
@@ -1529,7 +1574,8 @@ export async function uploadPlanDraftById(
   unitSystem: UnitSystem = "metric",
   destination: TrainingPlanDestination = "workoutLibrary",
   scheduleDate?: string,
-  keepInLibrary = false
+  keepInLibrary = false,
+  options: PlanDraftSaveOptions = {}
 ): Promise<UploadPlanResult> {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) {
@@ -1542,7 +1588,7 @@ export async function uploadPlanDraftById(
   }
 
   if (destination === "nativePlan") {
-    return savePlanDraftAsCorosPlan(stored, unitSystem);
+    return savePlanDraftAsCorosPlan(stored, unitSystem, options);
   }
   if (destination !== "workoutLibrary" && destination !== "calendar") {
     throw new Error("Save the plan to COROS as a plan, as individual workouts, or on the calendar.");
@@ -1607,12 +1653,99 @@ function requirePlanDraft(draftId: string): StoredPlanDraft {
 }
 
 /**
- * The plan a version is, as the library reads it: the one COROS answered once
- * it has been saved there, otherwise built from the draft's own workouts —
- * not from the preview, which no longer carries them.
+ * The plan a version is, as the library reads it: the one with its COROS
+ * identity once the creation is on COROS, otherwise built from the draft's
+ * own workouts. A document whose plan has changed since it was written — an
+ * older build edits `plan_json` in place and knows nothing of the document —
+ * is built again from the plan and given back its COROS identity, so the edit
+ * shows and an update still finds the plan and its sessions.
  */
 function draftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
-  return stored.document ?? coachDraftDocument(stored);
+  if (!stored.document) return coachDraftDocument(stored);
+  if (!stored.documentPlanHash || stored.documentPlanHash === planHash(stored.plan)) {
+    return stored.document;
+  }
+  return carryCorosIdentity(coachDraftDocument(stored), stored.document);
+}
+
+/**
+ * `next` with `base`'s COROS identity: the plan's id, version and calendar
+ * state, and — session by session, matched by key — its `idInPlan`, and its
+ * program exactly as COROS sent it where the workout is unchanged. A session
+ * that is new, or whose workout changed, is built afresh on the next save;
+ * one that kept its `idInPlan` is updated in place rather than replaced, which
+ * is what keeps its history on a calendar running the plan.
+ *
+ * "Unchanged" is asked of `baseWorkouts`, the workouts as the base version's
+ * own plan holds them — the form `next` is written in. Without them nothing
+ * counts as unchanged, since `base`'s workouts are rebuilt from COROS's
+ * programs, and every session is written afresh: correct, only not byte for
+ * byte.
+ */
+function carryCorosIdentity(
+  next: TrainingPlanDocument,
+  base: TrainingPlanDocument,
+  baseWorkouts?: ReadonlyMap<string, PlanWorkoutEntryInput>
+): TrainingPlanDocument {
+  if (!base.remoteId) return next;
+  const byKey = new Map(base.entries.map((entry) => [entry.workout.key || entry.id, entry]));
+  return {
+    ...next,
+    id: base.id,
+    remoteId: base.remoteId,
+    ...(base.remoteVersion !== undefined ? { remoteVersion: base.remoteVersion } : {}),
+    calendar: base.calendar,
+    ...(base.startDate ? { startDate: base.startDate } : {}),
+    ...(base.runningInstanceId ? { runningInstanceId: base.runningInstanceId } : {}),
+    ...(base.sourcePlanId ? { sourcePlanId: base.sourcePlanId } : {}),
+    entries: next.entries.map((entry) => {
+      const was = byKey.get(entry.workout.key || entry.id);
+      if (!was?.idInPlan) return entry;
+      const { corosProgram: _program, ...rest } = entry;
+      const before = baseWorkouts?.get(entry.workout.key || entry.id);
+      return {
+        ...rest,
+        idInPlan: was.idInPlan,
+        ...(was.corosProgram && before && sameWorkoutInput(before, entry.workout)
+          ? { corosProgram: was.corosProgram }
+          : {})
+      };
+    })
+  };
+}
+
+/**
+ * The plan as COROS read it back after a save, keyed as it was sent. COROS
+ * names each session `coros:<plan>:<idInPlan>`; the version's own plan names
+ * them by the coach's keys, and every later revision and diff matches
+ * sessions by those. A session COROS already knew is matched by its
+ * `idInPlan`, and the rest in the order they fall in the plan — the save
+ * checked the counts agree.
+ */
+function keyedAsSent(readBack: TrainingPlanDocument, sent: TrainingPlanDocument): TrainingPlanDocument {
+  const order = (left: TrainingPlanEntry, right: TrainingPlanEntry) =>
+    left.weekIndex - right.weekIndex || left.dayIndex - right.dayIndex || left.sortOrder - right.sortOrder;
+  const sentById = new Map(sent.entries.filter((entry) => entry.idInPlan).map((entry) => [entry.idInPlan!, entry]));
+  const unmatchedSent = [...sent.entries].filter((entry) => !entry.idInPlan).sort(order);
+  const keyOf = new Map<string, string>();
+  const rest: TrainingPlanEntry[] = [];
+  for (const entry of [...readBack.entries].sort(order)) {
+    const known = entry.idInPlan ? sentById.get(entry.idInPlan) : undefined;
+    if (known) keyOf.set(entry.id, known.workout.key || known.id);
+    else rest.push(entry);
+  }
+  rest.forEach((entry, index) => {
+    const match = unmatchedSent[index];
+    if (match) keyOf.set(entry.id, match.workout.key || match.id);
+  });
+  return {
+    ...readBack,
+    coach: sent.coach ?? readBack.coach,
+    entries: readBack.entries.map((entry) => {
+      const key = keyOf.get(entry.id);
+      return key ? { ...entry, workout: { ...entry.workout, key } } : entry;
+    })
+  };
 }
 
 /** The coach's plan as the plan editor and a COROS save read it. */
@@ -1639,18 +1772,39 @@ function coachDraftDocument(stored: StoredPlanDraft): TrainingPlanDocument {
  */
 async function savePlanDraftAsCorosPlan(
   stored: StoredPlanDraft,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  options: PlanDraftSaveOptions = {}
 ): Promise<UploadPlanResult> {
   if (stored.preview.artifactType === "workout") {
     throw new Error("A single workout is saved to the library or the calendar, not as a plan.");
   }
+  // A version of a creation already on COROS carries the plan's identity, so
+  // this is an update of that plan (D5) unless the athlete asked for a new
+  // one — checked against the version it was made from, as the Library's
+  // saves are.
+  const sent = draftDocument(stored);
+  const updating = Boolean(sent.remoteId) && !options.asNew;
   const saved = await savePlanToCoros({
-    plan: coachDraftDocument(stored),
+    plan: sent,
     unitSystem,
     origin: "coach",
-    coach: { draftId: stored.draftId }
+    coach: { draftId: stored.draftId },
+    ...(options.asNew ? { asNew: true } : {}),
+    ...(updating && sent.remoteVersion !== undefined ? { expectedVersion: sent.remoteVersion } : {}),
+    ...(options.overwrite ? { overwrite: true } : {})
   });
-  if (!saved.ok) throw new Error("COROS did not take the plan. Try again.");
+  if (!saved.ok) {
+    return {
+      planName: sent.name,
+      workoutsCreated: 0,
+      workoutsScheduled: 0,
+      entries: [],
+      destination: "nativePlan",
+      ...(sent.remoteId ? { planId: `coros:${sent.remoteId}` } : {}),
+      conflict: saved.conflict
+    };
+  }
+  const updated = updating && saved.plan.remoteId === sent.remoteId;
   const result: UploadPlanResult = {
     planName: saved.plan.name,
     workoutsCreated: saved.plan.entries.length,
@@ -1658,8 +1812,10 @@ async function savePlanDraftAsCorosPlan(
     entries: [],
     destination: "nativePlan",
     planId: saved.plan.id,
-    remoteWrites: [`Create plan ${saved.plan.name}`]
+    remoteWrites: [`${updated ? "Update" : "Create"} plan ${saved.plan.name}`]
   };
+  stored.document = keyedAsSent(saved.plan, sent);
+  stored.documentPlanHash = planHash(stored.plan);
   markDraftSaved(stored, result);
   return result;
 }
@@ -1690,7 +1846,8 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
             ...(stored.uploadedAt ? { uploadedAt: stored.uploadedAt } : {}),
             ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
-            ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {})
+            ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
+            ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {})
           }
         ];
       } catch {
@@ -1728,9 +1885,6 @@ export async function savePlanDraftEdit(
   replaceNewer = false
 ): Promise<PlanVersionSave> {
   const stored = requirePlanDraft(draftId);
-  if (stored.uploadedAt) {
-    throw new Error("This plan has already been saved, so the Coach card can no longer be edited.");
-  }
   const newer = newerVersion(stored, replaceNewer);
   if (newer) return newer;
   const dates = stored.plan.workouts
@@ -1742,6 +1896,7 @@ export async function savePlanDraftEdit(
   const keys = new Set<string>();
   const layout: NonNullable<CorosTrainingPlanDraft["layout"]> = {};
 
+  const keyed: TrainingPlanEntry[] = [];
   const workouts = [...plan.entries]
     .sort(
       (left, right) =>
@@ -1753,6 +1908,7 @@ export async function savePlanDraftEdit(
       let key = (entry.workout.key || entry.id).trim();
       while (keys.has(key)) key = `${key}-${index + 1}`;
       keys.add(key);
+      keyed.push({ ...entry, workout: { ...entry.workout, key } });
       const day = anchor ? new Date(anchor) : undefined;
       day?.setDate(day.getDate() + entry.weekIndex * 7 + entry.dayIndex);
       if (!day) layout[key] = { weekIndex: entry.weekIndex, dayIndex: entry.dayIndex };
@@ -1786,7 +1942,14 @@ export async function savePlanDraftEdit(
       /* The calendar is only consulted to warn; offline, the card says nothing. */
     }
   }
-  return writeVersion(stored, next, { unitSystem, conflicts, author: "athlete" });
+  return writeVersion(stored, next, {
+    unitSystem,
+    conflicts,
+    author: "athlete",
+    // The editor's own document, sessions keyed as the plan now keys them:
+    // it knows which sessions were edited, and keeps the rest's programs.
+    document: { ...plan, entries: keyed }
+  });
 }
 
 /**
@@ -1808,7 +1971,7 @@ export function saveWorkoutDraftEdit(
   if (stored.preview.artifactType !== "workout") {
     throw new Error("This is a plan, not a single workout.");
   }
-  if (stored.uploadedAt) {
+  if (versionsOf(stored.artifactId).some((version) => version.uploadedAt) || stored.uploadedAt) {
     throw new Error("This workout has already been saved, so the Coach card can no longer be edited.");
   }
   const newer = newerVersion(stored, replaceNewer);
@@ -1865,7 +2028,10 @@ export function restorePlanDraftVersion(
     author: "athlete",
     changeSummary: `Restored version ${older.version}`,
     // Written on top of the newest, whatever the athlete had open.
-    edited: false
+    edited: false,
+    // Its sessions as that version had them, with whatever COROS identity
+    // they carried; the plan's own identity is the newest's.
+    ...(older.document ? { document: draftDocument(older) } : {})
   });
 }
 
@@ -1901,13 +2067,15 @@ function writeVersion(
     changeSummary?: string;
     /** Marks the card as the athlete's edit; a restore is not one. */
     edited?: boolean;
+    /** The editor's document, when the version was made in one. */
+    document?: TrainingPlanDocument;
   }
 ): PlanVersionWritten {
   const versions = versionsOf(base.artifactId);
-  if (versions.some((version) => version.uploadedAt) || base.uploadedAt) {
-    throw new Error("This is already saved to COROS, so the Coach card can no longer be changed from here.");
-  }
   const latest = versions[versions.length - 1] ?? base;
+  if ((base.preview.artifactType ?? "plan") === "workout" && versions.some((version) => version.uploadedAt)) {
+    throw new Error("This workout is already saved to COROS, so the Coach card can no longer be changed from here.");
+  }
   const artifactType = base.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();
   const preview = buildPlanPreview(draftId, plan, {
@@ -1930,6 +2098,7 @@ function writeVersion(
     author: options.author,
     ...(options.changeSummary ? { changeSummary: options.changeSummary } : {})
   };
+  withCorosIdentityOf(stored, latest, options.document);
   persistPlanDraft(stored);
   return {
     kind: "written",

@@ -497,7 +497,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   every version is a card and a row of its own. The coach reads one back with `get_plan_draft` and
   changes one with `revise_training_plan` — operations, not the plan again — which writes the next
   version and folds the old card to a line; a read-only run may do neither of the writes
-  (docs/coach-plan-canvas.md, P1.1–P1.3). **A creation is read in the canvas** (`CoachCanvas`,
+  (docs/coach-plan-canvas.md, P1.1–P1.3). **A plan saved to COROS stays the conversation's to
+  change** (P1.6): the version keeps the plan as COROS read it back, keyed as the coach keyed it,
+  and a later version carries its COROS identity — the plan's id and version, each session's
+  `idInPlan`, and the untouched sessions' programs — so its primary button is **Update COROS
+  plan** (`plan/update`, checked against the version it was made from, a conflict asked as the
+  Library asks it). A saved one-off workout is not changed from the conversation: nothing on
+  COROS would be updated. **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with
   the reader's ridge, week cards and session view, a version picker, a Versions tab whose lines

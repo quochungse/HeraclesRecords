@@ -11,6 +11,7 @@ import {
 import type {
   PlanArtifactVersion,
   PlanDraftPreview,
+  PlanDraftSaveOptions,
   TrainingPlanDestination,
   TrainingPlanDocument
 } from "../../electron/types";
@@ -82,7 +83,8 @@ export default function CoachCanvas({
     draftId: string,
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => void;
   onEdit?: (draftId: string) => void;
   onRestore?: (draftId: string) => void;
@@ -119,6 +121,9 @@ export default function CoachCanvas({
       ) : (
         <CreationIndex
           creations={creations}
+          onCorosOf={(draftId) =>
+            versionIndex.get(draftId)?.siblings.some((item) => item.remotePlanId) ?? false
+          }
           onOpen={onOpen}
           onClose={onClose}
           planSportStyle={planSportStyle}
@@ -148,11 +153,13 @@ function creationOf(
 
 function CreationIndex({
   creations,
+  onCorosOf,
   onOpen,
   onClose,
   planSportStyle
 }: {
   creations: PlanDraftPreview[];
+  onCorosOf: (draftId: string) => boolean;
   onOpen: (draftId: string) => void;
   onClose: () => void;
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
@@ -184,7 +191,7 @@ function CreationIndex({
       </header>
       <ol className="chat-plan-list">
         {creations.map((draft, index) => {
-          const status = creationStatus(draft);
+          const status = creationStatus(draft, onCorosOf(draft.draftId));
           const isWorkout = draft.artifactType === "workout";
           const primarySport = draft.entries[0]?.sport;
           const SportIcon = sportTheme(primarySport).icon;
@@ -262,7 +269,8 @@ function ArtifactView({
     draftId: string,
     destination: TrainingPlanDestination,
     scheduleDate?: string,
-    keepInLibrary?: boolean
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ) => void;
   onEdit?: (draftId: string) => void;
   onRestore?: (draftId: string) => void;
@@ -314,7 +322,10 @@ function ArtifactView({
   const figures = planDocument && !isWorkout ? creationFigures(planDocument) : undefined;
   const sessions = reading ? planSessions(reading) : [];
   const saved = siblings.some((item) => item.uploadedAt) || Boolean(newest.uploadedAt || newest.uploadResult);
-  const status = creationStatus(newest);
+  // Hidden rather than removed once any version is saved: the plan on COROS
+  // names the draft that became it.
+  const onCoros = siblings.some((item) => item.remotePlanId);
+  const status = creationStatus(newest, onCoros);
   const title = shown.name || (isWorkout ? "Untitled workout" : "Untitled plan");
 
   const sessionView = (id: string) => {
@@ -508,9 +519,10 @@ function ArtifactView({
               latest={latest}
               editing={editing}
               saved={saved}
-              onUpload={(destination, scheduleDate, keepInLibrary) =>
-                onUpload(shown.draftId, destination, scheduleDate, keepInLibrary)
+              onUpload={(destination, scheduleDate, keepInLibrary, options) =>
+                onUpload(shown.draftId, destination, scheduleDate, keepInLibrary, options)
               }
+              onCoros={onCoros}
               onEdit={onEdit && (latest || editing) ? () => onEdit(newest.draftId) : undefined}
               onRestore={onRestore ? () => onRestore(shown.draftId) : undefined}
             />
