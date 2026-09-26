@@ -414,6 +414,30 @@ test("a saved creation is not revised from the conversation yet", async () => {
   assert.equal(response.error_code, "draft_saved");
 });
 
+test("get_plan_draft reads the newest version, whichever id it is given (P1.3)", async () => {
+  const read = async (args) =>
+    JSON.parse(await tools.handleChatWorkoutTool("get_plan_draft", args, { allowUpcomingWorkouts: false }));
+  const newest = await read({ draft_id: block.draftId });
+  assert.equal(newest.ok, true, JSON.stringify(newest));
+  assert.equal(newest.version, 3, "asked by version 1's id, it answers with the newest");
+  assert.equal(newest.newest, undefined);
+  assert.equal(newest.made_by, "you");
+  assert.equal(newest.change, "Rewritten by Coach.");
+  assert.deepEqual(newest.sessions.map((line) => line.split(" — ")[0]), ["only-run · week 1 wed · run · Only run"]);
+  assert.equal(newest.workouts, undefined, "whole workouts only when asked");
+
+  const older = await read({ draft_id: block.draftId, version: 2, sessions: ["tempo-thursday"] });
+  assert.equal(older.version, 2);
+  assert.deepEqual(older.newest.version, 3, "an older version says which is newest");
+  assert.deepEqual(older.week_stages, [{ week: 1, stage: "base" }, { week: 2, stage: "build" }]);
+  assert.equal(older.workouts.length, 1);
+  assert.equal(older.workouts[0].steps[0].target_duration_seconds, 2100, "a named session comes whole");
+
+  const missing = await read({ draft_id: block.draftId, version: 9 });
+  assert.equal(missing.error_code, "version_not_found");
+  assert.equal((await read({ draft_id: "nope" })).error_code, "draft_not_found");
+});
+
 test("removing a creation lets every version go", () => {
   const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
   assert.equal(ids.length, 3);

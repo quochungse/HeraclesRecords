@@ -116,7 +116,7 @@ import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits
+  withCreationIndex
 } from "../../electron/chatContextCompaction";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
@@ -3399,12 +3399,23 @@ export function ChatView({
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
-    const wireMessages = withPlanEdits(
+    // Every version the conversation's cards belong to, read now rather than
+    // from state: the list on screen may still be on its way, and the index is
+    // what tells the coach which draft_id is the newest.
+    const creationIds = persisted.flatMap((entry) =>
+      entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
+    );
+    const versions = creationIds.length
+      ? await api.getPlanArtifacts(creationIds).catch(() => artifactVersions)
+      : [];
+    if (activeRequestIdRef.current !== requestId) return true;
+    const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
-      persisted
+      persisted,
+      Array.isArray(versions) ? versions : []
     );
     try {
       await api.sendChat(requestId, wireMessages, unitSystem);
@@ -3586,12 +3597,30 @@ export function ChatView({
     setEditingPlanDraftId(null);
     setEditingWorkoutDraftId(null);
     if (reopenCreationAfterEditRef.current) setOpenCreationId(preview.draftId);
+    // The coach is told where it happened, once, rather than handed the whole
+    // plan again on every turn after (P1.3).
+    const event: ChatEntry = {
+      kind: "planEvent",
+      event: {
+        eventId: crypto.randomUUID(),
+        artifactId: versionIndex.get(preview.draftId)?.artifactId ?? preview.draftId,
+        draftId: preview.draftId,
+        action: "edited",
+        author: "athlete",
+        name: preview.name,
+        artifactType: preview.artifactType === "workout" ? "workout" : "plan",
+        at: Date.now()
+      }
+    };
     setTimeline((prev) => {
-      const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-          ? { ...entry, draft: { ...entry.draft, ...preview } }
-          : entry
-      );
+      const next = [
+        ...prev.map((entry): ChatEntry =>
+          entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
+            ? { ...entry, draft: { ...entry.draft, ...preview } }
+            : entry
+        ),
+        event
+      ];
       persistHistory(activeSessionIdRef.current, next, true);
       return next;
     });
@@ -4498,6 +4527,35 @@ function AnalysisSilentChip({
                     />
                   </div>
                 </ChatRow>
+              );
+            }
+
+            if (entry.kind === "planEvent") {
+              // A line where it happened, as the coach reads it; the card
+              // below it already shows what the creation is now.
+              const event = entry.event;
+              const what = event.artifactType === "workout" ? "Workout" : "Plan";
+              const verb =
+                event.action === "edited"
+                  ? "Edited by you"
+                  : event.action === "restored"
+                    ? "Restored by you"
+                    : event.action === "imported"
+                      ? "Changed in the Library"
+                      : "Deleted on COROS";
+              return (
+                <div
+                  key={`${event.eventId}#${index}`}
+                  className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">{what}</span>
+                  <span className="chat-asked-question">{event.name}</span>
+                  <span className="chat-version-note">
+                    {verb}
+                    {event.changes?.length ? ` · ${event.changes.join(" · ")}` : ""}
+                  </span>
+                </div>
               );
             }
 

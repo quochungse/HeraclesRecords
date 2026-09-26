@@ -169,8 +169,8 @@ assert.equal(
     ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
   ];
   // Twelve: `upload_training_plan`, which never wrote anything, was removed,
-  // and `revise_training_plan` was added.
-  assert.ok(localToolNames.length >= 12, "the tool-name scrape has drifted");
+  // and `revise_training_plan` and `get_plan_draft` were added.
+  assert.ok(localToolNames.length >= 13, "the tool-name scrape has drifted");
 
   // 6's own lists: nine reads plus `request_coach_input`, which is reachable
   // and answers "no athlete is available"; the writes are refused. Revising
@@ -186,6 +186,8 @@ assert.equal(
     "search_coros_exercises",
     "draft_workout",
     "draft_training_plan",
+    // Reads a creation back; the one that changes it is on the other side.
+    "get_plan_draft",
     "request_coach_input"
   ]);
   const expectedBlocked = new Set(["delete_workout", "revise_training_plan"]);

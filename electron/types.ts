@@ -3123,6 +3123,32 @@ export interface PlanDraftPreview {
 }
 
 /**
+ * Something that happened to a coach's creation that the coach did not do —
+ * the athlete edited it, restored an older version, or it changed on COROS
+ * (docs/coach-plan-canvas.md, P1.3). An anchor in the transcript, at the
+ * point it happened, so the coach is told once and in order rather than
+ * handed the whole plan again on every turn; what changed is in the table.
+ */
+export interface PlanEvent {
+  eventId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  /** The version the event left the creation at. */
+  draftId: string;
+  action: "edited" | "restored" | "imported" | "removedOnCoros";
+  author: "athlete" | "coros";
+  /** The creation's name when it happened. */
+  name: string;
+  artifactType: "plan" | "workout";
+  fromVersion?: number;
+  toVersion?: number;
+  /** What changed, a line each; absent where nothing measured it. */
+  changes?: string[];
+  /** Epoch milliseconds. */
+  at: number;
+}
+
+/**
  * One version of a coach's creation, as the conversation lists them
  * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own
  * and a `planDraft` entry in the transcript with the same `draftId`; this is
@@ -3662,6 +3688,7 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | PersistedChatOpaqueEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
+  | { kind: "planEvent"; event: PlanEvent }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

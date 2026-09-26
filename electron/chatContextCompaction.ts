@@ -2,7 +2,10 @@ import type {
   ChatMessage,
   ChatTokenUsage,
   CompactContextSettings,
-  PersistedChatEntry
+  PersistedChatEntry,
+  PlanArtifactVersion,
+  PlanDraftPreview,
+  PlanEvent
 } from "./types";
 
 /**
@@ -128,64 +131,148 @@ export function normalizeContextWindow(
  *
  * A `coachPrompt` is the exception and is expanded rather than dropped: the
  * question and the athlete's answer to it are a turn of the conversation, and
- * a coach that cannot see what it asked (or what it was told) re-asks.
+ * a coach that cannot see what it asked (or what it was told) re-asks. So is a
+ * `planEvent`: it is the one thing about a creation the coach did not write.
  */
 export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
-  return entries.flatMap((entry): ChatMessage[] => {
-    if (entry.kind === "message") {
-      return entry.content.trim()
-        ? [{ role: entry.role, content: entry.content }]
-        : [];
+  const wire: ChatMessage[] = [];
+  // What the athlete or COROS did to a creation, where it happened: the card
+  // itself is dropped like every card, and this is the part of it the coach
+  // did not write. It rides on the athlete's next message rather than being
+  // one of its own, so the roles still alternate; with nothing after it, on
+  // the athlete's last one.
+  let events: string[] = [];
+  const flushEvents = () => {
+    if (!events.length) return;
+    const note = events.join("\n\n");
+    events = [];
+    const last = wire[wire.length - 1];
+    if (last?.role === "user") {
+      wire[wire.length - 1] = { ...last, content: `${last.content}\n\n${note}` };
+    } else {
+      wire.push({ role: "user", content: note });
     }
-    if (entry.kind === "coachPrompt") {
+  };
+  const push = (message: ChatMessage) => {
+    if (events.length && message.role === "user") {
+      message = { ...message, content: `${events.join("\n\n")}\n\n${message.content}` };
+      events = [];
+    } else {
+      flushEvents();
+    }
+    wire.push(message);
+  };
+  for (const entry of entries) {
+    if (entry.kind === "message") {
+      if (entry.content.trim()) push({ role: entry.role, content: entry.content });
+    } else if (entry.kind === "planEvent") {
+      events.push(planEventNote(entry.event));
+    } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
         .join("\n");
-      const question: ChatMessage = {
+      push({
         role: "assistant",
         content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices}`
-      };
-      return entry.prompt.answer
-        ? [question, { role: "user", content: entry.prompt.answer }]
-        : [question];
+      });
+      if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
     }
-    return [];
-  });
+  }
+  flushEvents();
+  return wire;
 }
+
+/** A `planEvent` as a line in front of the coach, where it happened. */
+export function planEventNote(event: PlanEvent): string {
+  const what = event.artifactType === "workout" ? "workout" : "plan";
+  const versions =
+    event.fromVersion && event.toVersion ? ` (v${event.fromVersion} → v${event.toVersion})` : "";
+  const lead =
+    event.action === "edited"
+      ? `[The athlete edited the ${what} "${event.name}"${versions} in the editor.`
+      : event.action === "restored"
+        ? `[The athlete restored an earlier version of the ${what} "${event.name}"${versions}.`
+        : event.action === "imported"
+          ? `[The ${what} "${event.name}" was changed in the Training Library or on COROS${versions}.`
+          : `[The ${what} "${event.name}" was deleted on COROS; its card is a proposal again.`;
+  const changes = event.changes?.length ? ` Changes: ${event.changes.join("; ")}.` : "";
+  return (
+    `${lead}${changes} Its newest version is draft_id ${event.draftId}; ` +
+    "read it with get_plan_draft before building on it.]"
+  );
+}
+
+/** How the index states where a creation went. */
+function creationState(draft: PlanDraftPreview): string {
+  const destination = draft.uploadResult?.destination;
+  if (!draft.uploadedAt && !destination) return "not saved";
+  if (destination === "calendar") return "on the calendar";
+  if (destination === "workoutLibrary") return "in the Workout Library";
+  if (destination === "nativePlan" || destination === "nativePlanAndCalendar") {
+    return draft.uploadResult?.planId ? `saved to COROS as plan ${draft.uploadResult.planId}` : "saved to COROS";
+  }
+  return "saved";
+}
+
+const VERSION_AUTHORS: Record<PlanArtifactVersion["author"], string> = {
+  coach: "you",
+  athlete: "the athlete",
+  coros: "a change in the Library"
+};
 
 /**
- * What the athlete changed on a plan the coach drafted.
+ * Every creation still in the conversation, a line each, as it stands now
+ * (docs/coach-plan-canvas.md, P1.3). The cards are dropped from the wire like
+ * every other card, so without this the coach cannot name the plan it wrote
+ * three turns ago — not its draft id, not whether it was saved, not whether
+ * the athlete has since changed it. It costs about thirty tokens a creation;
+ * the detail is one `get_plan_draft` away.
  *
- * The plan card is dropped from the wire like every other card, on the theory
- * that the coach already narrated it — which stops being true the moment the
- * athlete edits the plan in the editor: the version on the card is then one
- * the coach has never seen, and it would go on advising about its own. So an
- * edited draft is stated, whole, on every turn after the edit; each edit
- * rewrites the draft in place, so there is only ever one version to state.
+ * `versions` groups the cards: every version is a card of its own, and only
+ * the newest is listed. A card the list does not know is its own creation.
  */
-export function planEditNote(entries: PersistedChatEntry[]): string | null {
-  const edited = entries.flatMap((entry) =>
-    entry.kind === "planDraft" && entry.draft.editedAt && !entry.draft.removedAt ? [entry.draft] : []
-  );
-  if (!edited.length) return null;
-  const plans = edited.map((draft) => {
-    const sessions = draft.entries.map((item, index) => {
-      const when = item.scheduleDate ?? `session ${index + 1}`;
-      const facts = [item.volume, item.stepsSummary].filter(Boolean).join(" · ");
-      return `- ${when}: ${item.name}${facts ? ` — ${facts}` : ""}`;
-    });
-    const state = draft.uploadedAt ? "saved" : "not saved yet";
-    return [`Plan "${draft.name}" (draft_id ${draft.draftId}, ${state}):`, ...sessions].join("\n");
+export function creationIndex(
+  entries: PersistedChatEntry[],
+  versions: readonly PlanArtifactVersion[]
+): string | null {
+  const known = new Map(versions.map((version) => [version.draftId, version]));
+  const creations = new Map<string, { draft: PlanDraftPreview; version?: PlanArtifactVersion }>();
+  for (const entry of entries) {
+    if (entry.kind !== "planDraft" || entry.draft.removedAt) continue;
+    const version = known.get(entry.draft.draftId);
+    const artifactId = version?.artifactId ?? entry.draft.draftId;
+    const current = creations.get(artifactId);
+    const newer =
+      !current ||
+      (version && current.version
+        ? version.version > current.version.version ||
+          (version.version === current.version.version && version.createdAt > current.version.createdAt)
+        : true);
+    if (newer) creations.set(artifactId, { draft: entry.draft, version });
+  }
+  if (creations.size === 0) return null;
+  const lines = [...creations.values()].map(({ draft, version }) => {
+    const kind = draft.artifactType === "workout" ? "Workout" : "Plan";
+    const made = version
+      ? `v${version.version} by ${VERSION_AUTHORS[version.author]}`
+      : "v1 by you";
+    const edited = draft.editedAt ? " · edited by the athlete" : "";
+    const shape = draft.summary ? ` · ${draft.summary}` : "";
+    return `- ${kind} "${draft.name}" · draft_id ${draft.draftId} · ${made}${edited}${shape} · ${creationState(draft)}`;
   });
   return [
-    "[The athlete edited a plan you drafted, in the plan editor. The card now holds this version; build on it rather than on the one you wrote.]",
-    ...plans
-  ].join("\n\n");
+    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id.]",
+    ...lines
+  ].join("\n");
 }
 
-/** The wire with `planEditNote` put in front of the latest user message. */
-export function withPlanEdits(messages: ChatMessage[], entries: PersistedChatEntry[]): ChatMessage[] {
-  const note = planEditNote(entries);
+/** The wire with `creationIndex` put in front of the latest user message. */
+export function withCreationIndex(
+  messages: ChatMessage[],
+  entries: PersistedChatEntry[],
+  versions: readonly PlanArtifactVersion[]
+): ChatMessage[] {
+  const note = creationIndex(entries, versions);
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {

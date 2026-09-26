@@ -482,9 +482,16 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation** (`CoachPlanEditor`, lazy with the library's stylesheet) and saves back into the
   coach's own draft through `chat:editPlanDraft` — same draft id, same card, dates kept from the
   coach's first Monday, an undated plan's arrangement kept as `layout`. The edited card carries
-  `editedAt`, and `withPlanEdits` states that version to the coach in front of the athlete's next
-  question (in the chat and in analysis runs), because the coach otherwise advises about the
-  version it wrote. Drafts are deleted with their conversation; the 24-hour prune is gone.
+  `editedAt`, and the edit leaves a **`planEvent`** where it happened — an anchor kind, stated to
+  the coach once on the athlete's next message by `toWireMessages` — rather than the whole plan
+  restated on every turn. **Every turn, chat and analysis, carries `creationIndex`**
+  (`chatContextCompaction.ts`): a line per creation still in the conversation, its newest
+  version's draft id, who made it and whether it is saved, read from `chat:planArtifacts` because
+  every version is a card and a row of its own. The coach reads one back with `get_plan_draft` and
+  changes one with `revise_training_plan` — operations, not the plan again — which writes the next
+  version and folds the old card to a line; a read-only run may do neither of the writes
+  (docs/coach-plan-canvas.md, P1.1–P1.3). Drafts are deleted with their conversation; the
+  24-hour prune is gone.
   **The AI plan generator (`TrainingPlanGenerator`) is two turns of its own, not a chat message.**
   Four steps: Goal (a race — its day decides the length and ends the plan — a base, a comeback,
   hybrid, or "Something else" in the athlete's words; a length Coach may choose), Your week (days

@@ -226,6 +226,7 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "draft_workout",
   "draft_training_plan",
   "revise_training_plan",
+  "get_plan_draft",
   "list_scheduled_workouts",
   "delete_workout"
 ] as const;
@@ -330,6 +331,27 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       inputSchema: buildRevisePlanInputSchema()
     },
     {
+      name: "get_plan_draft",
+      description:
+        "Read a plan or workout drafted in this conversation as it stands now — its newest version, whoever made it — " +
+        "or an earlier version: every session by key, with its week and day or date, sport, volume and steps in brief. " +
+        "Pass sessions (keys) for those sessions' whole workouts, before replacing one.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          draft_id: { type: "string", description: "Any version's draft_id." },
+          version: { type: "integer", minimum: 1, description: "An earlier version; omit for the newest." },
+          sessions: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 10,
+            description: "Keys of sessions to return whole."
+          }
+        },
+        required: ["draft_id"]
+      }
+    },
+    {
       name: "list_scheduled_workouts",
       description:
         "List workouts on the COROS training calendar for a date range. " +
@@ -414,6 +436,9 @@ export async function handleChatWorkoutTool(
       "plan",
       options?.planRequest
     );
+  }
+  if (name === "get_plan_draft") {
+    return handleGetPlanDraft(args);
   }
   if (name === "revise_training_plan") {
     return handleRevisePlan(args, options?.onPlanDraft, options?.allowUpcomingWorkouts !== false, options?.unitSystem ?? "metric");
@@ -1048,6 +1073,71 @@ function storeRevision(
     message:
       `Version ${stored.version} is shown under your reply in place of version ${latest.version}. ` +
       "Say what changed and why in a sentence or two; do not list the sessions."
+  });
+}
+
+/**
+ * A creation as the coach reads it back: the newest version unless an older
+ * one is asked for, since the athlete may have changed it since the coach
+ * last looked. Steps in brief for every session, whole for the ones named.
+ */
+function handleGetPlanDraft(args: Record<string, unknown>): string {
+  const draftId = String(args.draft_id ?? "").trim();
+  const named = draftId ? loadStoredPlanDraft(draftId) : undefined;
+  if (!named) {
+    return JSON.stringify({
+      ok: false,
+      error_code: "draft_not_found",
+      errors: [`No draft ${draftId} in this conversation.`]
+    });
+  }
+  const versions = versionsOf(named.artifactId);
+  const newest = versions[versions.length - 1] ?? named;
+  const asked = Number(args.version);
+  const chosen = Number.isInteger(asked)
+    ? [...versions].reverse().find((version) => version.version === asked)
+    : newest;
+  if (!chosen) {
+    return JSON.stringify({
+      ok: false,
+      error_code: "version_not_found",
+      errors: [`There is no version ${asked}; the newest is version ${newest.version}.`]
+    });
+  }
+  const plan = chosen.plan;
+  const byKey = new Map(chosen.preview.entries.map((entry) => [entry.key, entry]));
+  const wanted = new Set(
+    (Array.isArray(args.sessions) ? args.sessions : []).map((key) => String(key ?? "").trim())
+  );
+  const whole = plan.workouts.filter((workout) => wanted.has(workout.key));
+  return JSON.stringify({
+    ok: true,
+    draft_id: chosen.draftId,
+    version: chosen.version,
+    ...(chosen.draftId !== newest.draftId
+      ? { newest: { draft_id: newest.draftId, version: newest.version } }
+      : {}),
+    made_by: chosen.author === "coach" ? "you" : chosen.author === "athlete" ? "the athlete" : "a change in the Library",
+    ...(chosen.preview.editedAt ? { edited_by_athlete: true } : {}),
+    ...(chosen.changeSummary ? { change: chosen.changeSummary } : {}),
+    type: chosen.preview.artifactType ?? "plan",
+    name: plan.name,
+    ...(plan.description ? { description: plan.description } : {}),
+    saved: Boolean(versions.some((version) => version.uploadedAt)),
+    ...(plan.weekStages?.length
+      ? {
+          week_stages: plan.weekStages.map((item) => ({
+            week: item.weekIndex + 1,
+            stage: COROS_WEEK_STAGES.find((stage) => stage.value === item.stage)?.slug
+          }))
+        }
+      : {}),
+    sessions: sessionLines(plan).map((line, index) => {
+      const entry = byKey.get(plan.workouts[index].key);
+      const facts = [entry?.volume, entry?.stepsSummary].filter(Boolean).join(" · ");
+      return facts ? `${line} — ${facts}` : line;
+    }),
+    ...(whole.length ? { workouts: whole.map(workoutSource) } : {})
   });
 }
 

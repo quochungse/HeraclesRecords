@@ -2544,6 +2544,7 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "search_coros_exercises",
   "draft_workout",
   "draft_training_plan",
+  "get_plan_draft",
   "request_coach_input"
 ]);
 
@@ -2622,6 +2623,7 @@ export function getClaudeCodeTools(
       tool.name === "draft_workout" ||
       tool.name === "draft_training_plan" ||
       tool.name === "revise_training_plan" ||
+      tool.name === "get_plan_draft" ||
       tool.name === "search_coros_exercises"
     );
   });

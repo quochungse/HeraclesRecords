@@ -8,6 +8,7 @@ import type {
   HrZonePreview,
   PersistedChatEntry,
   PlanDraftPreview,
+  PlanEvent,
   WorkoutDeletePreview
 } from "../../electron/types";
 
@@ -87,6 +88,12 @@ export interface ChatToolNoticeEntry {
   message: string;
 }
 
+/** The athlete or COROS changed a coach's creation (P1.3); an anchor. */
+export interface ChatPlanEventEntry {
+  kind: "planEvent";
+  event: PlanEvent;
+}
+
 /**
  * An entry a newer build wrote, of a kind this one cannot draw. It keeps its
  * place in the timeline and goes back to the store untouched, so this window's
@@ -101,6 +108,7 @@ export type ChatEntry = (
   | ChatMessageEntry
   | ChatCoachPromptEntry
   | ChatPlanDraftEntry
+  | ChatPlanEventEntry
   | ChatWorkoutDeleteEntry
   | ChatActivityVisualEntry
   | ChatFitnessTrendEntry
@@ -265,6 +273,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   message: ["role", "content", "source", "reasoningSummary", "usage", "model", "automation"],
   coachPrompt: ["prompt"],
   planDraft: ["draft"],
+  planEvent: ["event"],
   workoutDelete: ["preview"],
   activityVisual: ["preview"],
   activityHrTrend: ["preview"],
@@ -299,6 +308,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "planDraft") {
     return { kind: "planDraft", draft: entry.draft };
+  }
+  if (entry.kind === "planEvent") {
+    return { kind: "planEvent", event: entry.event };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };
@@ -362,6 +374,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "planDraft") {
     return { kind: "planDraft", draft: entry.draft };
+  }
+  if (entry.kind === "planEvent") {
+    return { kind: "planEvent", event: entry.event };
   }
   if (entry.kind === "workoutDelete") {
     return { kind: "workoutDelete", preview: entry.preview };

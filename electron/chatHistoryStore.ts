@@ -27,6 +27,7 @@ import type {
   PersistedChatMessageEntry,
   PersistedChatSource,
   PlanDraftPreview,
+  PlanEvent,
   PlanDraftPreviewEntry,
   PlanWorkoutEntryInput,
   SaveChatSessionOptions,
@@ -169,6 +170,59 @@ function parseSource(value: unknown): PersistedChatSource | undefined {
     "mcpTools",
     "mcpError"
   ]);
+}
+
+const PLAN_EVENT_ACTIONS = ["edited", "restored", "imported", "removedOnCoros"] as const;
+
+function parsePlanEvent(value: unknown): PlanEvent | null {
+  if (
+    !isRecord(value) ||
+    typeof value.eventId !== "string" ||
+    typeof value.artifactId !== "string" ||
+    typeof value.draftId !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.at !== "number" ||
+    !Number.isFinite(value.at) ||
+    !(PLAN_EVENT_ACTIONS as readonly unknown[]).includes(value.action)
+  ) {
+    return null;
+  }
+  const version = (raw: unknown) =>
+    typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : undefined;
+  const fromVersion = version(value.fromVersion);
+  const toVersion = version(value.toVersion);
+  const changes = Array.isArray(value.changes)
+    ? value.changes.filter((line): line is string => typeof line === "string")
+    : undefined;
+  return keepUnknownKeys<PlanEvent>(
+    {
+      eventId: value.eventId,
+      artifactId: value.artifactId,
+      draftId: value.draftId,
+      action: value.action as PlanEvent["action"],
+      author: value.author === "coros" ? "coros" : "athlete",
+      name: value.name,
+      artifactType: value.artifactType === "workout" ? "workout" : "plan",
+      ...(fromVersion ? { fromVersion } : {}),
+      ...(toVersion ? { toVersion } : {}),
+      ...(changes ? { changes } : {}),
+      at: value.at
+    },
+    value,
+    [
+      "eventId",
+      "artifactId",
+      "draftId",
+      "action",
+      "author",
+      "name",
+      "artifactType",
+      "fromVersion",
+      "toVersion",
+      "changes",
+      "at"
+    ]
+  );
 }
 
 function parseCoachInputPrompt(value: unknown): CoachInputPrompt | null {
@@ -1003,6 +1057,7 @@ const ENTRY_META_KEYS = ["kind", "mid", "mrev"] as const;
 const KNOWN_ENTRY_KINDS = new Set([
   "message",
   "planDraft",
+  "planEvent",
   "coachPrompt",
   "workoutDelete",
   "activityVisual",
@@ -1079,6 +1134,11 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
     return draft ? cardEntry({ kind: "planDraft", draft }, value, "draft") : null;
+  }
+
+  if (value.kind === "planEvent") {
+    const event = parsePlanEvent(value.event);
+    return event ? cardEntry({ kind: "planEvent", event }, value, "event") : null;
   }
 
   if (value.kind === "coachPrompt") {

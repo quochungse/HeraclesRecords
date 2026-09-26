@@ -348,6 +348,10 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   Restore, hoặc nhập bản từ COROS (D12). Mang `artifactId`, `from`, `to` và dòng diff dạng chữ.
   `toWireMessages` mở nó thành một dòng "[Athlete edited …]" hoặc "[Changed in Library …]"
   **tại vị trí đó** trong lịch sử, thay vì chép lại cả plan vào mọi lượt.
+- (Đã làm: mục lục là `creationIndex`/`withCreationIndex`; renderer đọc version ngay trước khi
+  gửi, analysis qua dep `getPlanArtifacts`. Lần sửa trong editor đã sinh `planEvent` ngay từ
+  P1.3, còn trong một lượt `planEvent` đi kèm message kế tiếp của người dùng, không thành message
+  riêng, để vai vẫn xen kẽ.)
 - Bỏ `withPlanEdits`/`planEditNote`, cả trong chat lẫn `coachAnalysisService`. Draft cũ có
   `editedAt` mà không có `planEvent` hiện trong mục lục là "edited by athlete"; model đọc chi
   tiết bằng `get_plan_draft`.
