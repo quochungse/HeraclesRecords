@@ -113,11 +113,11 @@ const tierOf = (policy, table) =>
     );
   }
 
-  // AI Plan opens Coach on a blank brief (P2.5): the generator dialog it used
-  // to open is gone, and must not come back beside the conversation.
+  // AI Plan asks for the brief first, then opens Coach on it (P2.5): the
+  // generator dialog it used to open is gone, and must not come back.
   assert.ok(
-    view.includes("onGenerate={() => onOpenCoach({ newPlan: true })}"),
-    "AI Plan must open a new plan conversation in Coach"
+    /<CoachBriefEditor[\s\S]*?mode="new"[\s\S]*?onOpenCoach\(\{ newPlan: \{ request, sources: newPlanSources \} \}\)/.test(view),
+    "AI Plan must take the brief on its own screen and open a new plan conversation in Coach from it"
   );
   assert.ok(!view.includes("TrainingPlanGenerator"), "the generator dialog is gone");
 }

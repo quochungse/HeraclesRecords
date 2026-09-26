@@ -100,6 +100,7 @@ import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
+import { CoachAskPicker } from "./CoachAskPicker";
 import { remoteErrorMessage } from "./remoteError";
 import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
@@ -1152,61 +1153,70 @@ export function ChatView({
    * `scheduleRefs` entry just before it.
    */
   const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
-  /**
-   * Chips asked for before any conversation is open — Coach mounting for the
-   * first time from the Calendar. Opening the first conversation resets what
-   * belongs to a conversation, so they wait here until one is open.
-   */
-  const scheduleRefsWaitingRef = useRef<ScheduleRef[] | null>(null);
-  useEffect(() => {
-    if (!activeSessionId || !scheduleRefsWaitingRef.current) return;
-    setPendingScheduleRefs(scheduleRefsWaitingRef.current);
-    scheduleRefsWaitingRef.current = null;
-  }, [activeSessionId]);
 
   /**
-   * Coach opened from the Library about a plan it wrote: the conversation that
-   * wrote it, with the plan beside the composer. A conversation deleted since
-   * took the plan's drafts with it, so a new one starts from the plan's name.
+   * A question asked from outside Coach — the Calendar, the Library — waiting
+   * on the athlete to say which conversation it goes in. `suggestedId` is the
+   * conversation a Coach plan was made in, found before the picker opens.
    */
+  const [askPending, setAskPending] = useState<{ request: CoachOpenRequest; suggestedId: string | null } | null>(null);
+  /** A plan AI Plan just started, whose outline is drawn as soon as its conversation is open. */
+  const [autoOutline, setAutoOutline] = useState<{ sessionId: string; artifactId: string } | null>(null);
+
   const openAsked = async (request: CoachOpenRequest) => {
     if (!api) return;
     if (request.newPlan) {
-      await startPlanConversation();
+      await startPlanConversation(request.newPlan);
       return;
     }
-    // The calendar is the athlete's, not a conversation's: the chips join the one open.
-    if (request.scheduleRefs?.length) {
-      const refs = request.scheduleRefs.slice(0, 3);
-      if (activeSessionIdRef.current) setPendingScheduleRefs(refs);
-      else scheduleRefsWaitingRef.current = refs;
-      composerRef.current?.setDraft(request.prompt ?? "");
-      requestAnimationFrame(() => composerRef.current?.focus());
-      return;
-    }
-    const sessionId = request.draftId
+    const suggestedId = request.draftId
       ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
       : null;
-    if (sessionId) {
-      if (sessionId !== activeSessionIdRef.current) await loadSession(sessionId);
-      setPendingRefs(request.refs ?? []);
-    } else if (request.draftId) {
-      await handleNewChat();
-      setPendingRefs([]);
-      const name = request.refs?.[0]?.name;
-      if (name) composerRef.current?.setDraft(`About my plan "${name}": `);
-    }
-    if (request.prompt) composerRef.current?.setDraft(request.prompt);
-    requestAnimationFrame(() => composerRef.current?.focus());
+    setAskPending({ request, suggestedId });
   };
 
   /**
-   * AI Plan (P2.5): a new conversation named "New plan" that opens on a blank
-   * brief — the generator's defaults, no model asked. It takes Coach's
-   * settings, as any new conversation does, and is named after the goal once
-   * the brief has one.
+   * The question goes where the athlete picked: a conversation, or a new one.
+   * What it is about waits beside the composer — the calendar's chips, or a
+   * Coach plan's, which only mean something in the conversation holding its
+   * drafts; anywhere else the plan is named in the question instead.
    */
-  const startPlanConversation = async () => {
+  const askIn = async (sessionId: string | null) => {
+    const pending = askPending;
+    setAskPending(null);
+    if (!pending || !api) return;
+    const { request, suggestedId } = pending;
+    if (streaming || exportingLatestActivity) {
+      onError("Coach is still answering. Ask again when it has finished.");
+      return;
+    }
+    if (sessionId === null) await handleNewChat();
+    else if (sessionId !== activeSessionIdRef.current) await loadSession(sessionId);
+    // Picking the conversation already open keeps what was waiting there;
+    // anything else was cleared by the switch.
+    if (request.scheduleRefs?.length) setPendingScheduleRefs(request.scheduleRefs.slice(0, 3));
+    const planHere = Boolean(request.draftId) && sessionId !== null && sessionId === suggestedId;
+    if (planHere && request.refs?.length) setPendingRefs(request.refs);
+    const name = request.refs?.[0]?.name;
+    const prompt = request.prompt ?? (request.draftId && !planHere && name ? `About my plan "${name}": ` : "");
+    if (prompt) composerRef.current?.setDraft(prompt);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /** What the picker says the question is about. */
+  const askSubject = (request: CoachOpenRequest): string => {
+    const labels = [...(request.scheduleRefs ?? []).map((ref) => ref.label), ...(request.refs ?? []).map((ref) => ref.name)];
+    return labels.length ? `About ${labels.join(", ")}` : "Pick the conversation this question goes in.";
+  };
+
+  /**
+   * AI Plan (P2.5): the athlete filled in the brief on its own screen first,
+   * and only now is a conversation made — opening on that brief, with what
+   * Coach may read as they left it — and the outline is drawn straight away
+   * (`autoOutline`): Start plan is the athlete asking for it. It is named
+   * after the goal, or "New plan" until the brief has one.
+   */
+  const startPlanConversation = async ({ request, sources }: NonNullable<CoachOpenRequest["newPlan"]>) => {
     if (!api) return;
     if (streaming || exportingLatestActivity) {
       // The request is already consumed, so dropping it would lose the click.
@@ -1217,8 +1227,12 @@ export function ChatView({
     try {
       await flushPendingSave();
       const created = await api.createChatSession(chatSettings.provider);
-      const brief = await api.createPlanBrief(created.id);
-      const titled = (await api.renameChatSession(created.id, NEW_PLAN_TITLE).catch(() => null)) ?? created;
+      const brief = await api.createPlanBrief(created.id, request);
+      if (!(sources.activities && sources.sleep && sources.zones)) {
+        await api.setConversationSettings({ sessionId: created.id, sources }).catch(() => undefined);
+      }
+      const title = brief.request.goal.trim() ? briefTitle(brief.request) : NEW_PLAN_TITLE;
+      const titled = (await api.renameChatSession(created.id, title).catch(() => null)) ?? created;
       setSessions((current) => [titled, ...current]);
       setActiveSessionId(created.id);
       persistedBaseRef.current = 0;
@@ -1227,6 +1241,7 @@ export function ChatView({
       const entries: ChatEntry[] = [{ kind: "planBrief", artifactId: brief.artifactId }];
       setTimeline(entries);
       persistHistory(created.id, entries, true);
+      setAutoOutline({ sessionId: created.id, artifactId: brief.artifactId });
     } catch (caught) {
       onError(remoteErrorMessage(caught, "Could not start a plan."));
     }
@@ -2866,6 +2881,27 @@ export function ChatView({
       artifactId,
       ...(note?.trim() ? { note: note.trim() } : {})
     });
+
+  /*
+   * The outline AI Plan asked for, drawn once the new conversation is on
+   * screen. Not from `startPlanConversation` itself: `sendMessage` reads the
+   * timeline, the open conversation and its settings from the render it
+   * belongs to, and there those are still the conversation being left.
+   */
+  useEffect(() => {
+    if (!autoOutline) return;
+    // Left before it was drawn: the card's own button is there when they return.
+    if (activeSessionId !== autoOutline.sessionId) {
+      setAutoOutline(null);
+      return;
+    }
+    if (streaming || exportingLatestActivity || activeSessionIdRef.current !== autoOutline.sessionId) return;
+    if (conversationSettings?.sessionId !== autoOutline.sessionId) return;
+    if (!timeline.some((entry) => entry.kind === "planBrief" && entry.artifactId === autoOutline.artifactId)) return;
+    setAutoOutline(null);
+    void drawOutline(autoOutline.artifactId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOutline, activeSessionId, conversationSettings, timeline, streaming, exportingLatestActivity]);
 
   /** "Write the sessions" to the brief's outline, as a turn of the conversation (P2.3). */
   const writeSessions = (artifactId: string) =>
@@ -4606,6 +4642,7 @@ function AnalysisSilentChip({
           <Suspense fallback={null}>
             <CoachCanvas
               api={api}
+              listOpen={planPanelOpen}
               artifactId={openCreationId}
               creations={listedCreations}
               cards={planDrafts}
@@ -4615,14 +4652,8 @@ function AnalysisSilentChip({
               editingDraftId={editingPlanDraftId ?? editingWorkoutDraftId}
               planSportStyle={planSportStyle}
               onOpen={(draftId) => openCreation(draftId)}
-              onBack={() => {
-                setOpenCreationId(null);
-                setPlanPanelOpen(true);
-              }}
-              onClose={() => {
-                setOpenCreationId(null);
-                setPlanPanelOpen(false);
-              }}
+              onCloseList={() => setPlanPanelOpen(false)}
+              onCloseDetails={() => setOpenCreationId(null)}
               onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
                 void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
               }
@@ -4632,16 +4663,37 @@ function AnalysisSilentChip({
                 handleRemovePlanDraft(draftId);
                 setOpenCreationId(null);
               }}
-              onViewInChat={(draftId) => handleScrollToPlanChat(draftId)}
+              onViewInChat={(draftId) => {
+                // The card is in the conversation, under the details' screen.
+                setOpenCreationId(null);
+                handleScrollToPlanChat(draftId);
+              }}
               onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
               calendarOf={calendarOf}
-              onAsk={addRef}
+              onAsk={(ref) => {
+                // The question is written in the composer, under the details.
+                setOpenCreationId(null);
+                addRef(ref);
+              }}
             />
           </Suspense>
         ) : null}
       </div>
       <ChatSettingsModal {...settingsModalProps} />
       {contextHistoryDialog}
+      {/* Held until a conversation is open: Coach mounting for the first time
+          from the Calendar opens its newest one, and a pick made before that
+          landed would be switched away from under the athlete. */}
+      {askPending && activeSessionId ? (
+        <CoachAskPicker
+          subject={askSubject(askPending.request)}
+          sessions={sessions}
+          suggestedId={askPending.suggestedId}
+          activeId={activeSessionId}
+          onPick={(sessionId) => void askIn(sessionId)}
+          onCancel={() => setAskPending(null)}
+        />
+      ) : null}
       <McpSessionPrompt
         servers={mcpPrompt}
         busy={mcpPromptBusy}
@@ -4652,7 +4704,7 @@ function AnalysisSilentChip({
       {editingBriefId && planBriefs[editingBriefId] && conversationSettings ? (
         <Suspense fallback={null}>
           <CoachBriefEditor
-            brief={planBriefs[editingBriefId]!}
+            request={planBriefs[editingBriefId]!.request}
             firstMonday={briefMonday}
             sources={conversationSettings.sources}
             saving={briefSave.saving}

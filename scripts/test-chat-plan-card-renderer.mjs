@@ -256,10 +256,20 @@ async function main() {
   );
   assert.equal(await harness("exists", '.chat-creation-card [data-action="edit"]'), true);
 
-  // Open shows the canvas beside the conversation (P1.4), read with the
-  // Library reader's own week cards, from the same document.
+  // Open shows the creation's details on a screen of their own (P1.4, UAT),
+  // read with the Library reader's own week cards, from the same document —
+  // and the column beside the conversation does not widen to hold them.
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-canvas.is-artifact .plan-week-card"), "the canvas opens on the plan");
+  await waitFor(() => harness("exists", ".chat-canvas-dialog .plan-week-card"), "the details open on the plan");
+  assert.equal(await harness("exists", "aside.chat-canvas .plan-week-card"), false, "not inside the canvas column");
+  assert.equal(await page(`document.querySelector(".chat-canvas-dialog")?.getAttribute("role")`), "dialog");
+  // Portalled out of `.chat-view`, it still has the chat's tokens: without them
+  // the primary button's fill and border were voided, found in the running app.
+  assert.notEqual(
+    await page(`getComputedStyle(document.querySelector('.chat-canvas-dialog [data-action="saveAsPlan"]')).backgroundColor`),
+    "rgba(0, 0, 0, 0)",
+    "the details' primary button keeps the chat's fill"
+  );
   assert.equal(await harness("count", ".chat-canvas .plan-week-card"), 3, "every week, an undated plan's too");
   assert.equal(
     await page(`document.querySelector(".chat-canvas .chat-creation-figures dd")?.textContent`),
@@ -277,7 +287,12 @@ async function main() {
   await waitFor(() => harness("exists", ".chat-canvas .plan-session"), "a session opens in place");
   await page(`document.querySelector(".chat-canvas .plan-session").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
   await waitFor(async () => !(await harness("exists", ".chat-canvas .plan-session")), "Escape steps back to the weeks");
-  assert.equal(await harness("exists", ".chat-canvas.is-artifact"), true, "without closing the canvas");
+  assert.equal(await harness("exists", ".chat-canvas-dialog"), true, "without closing the details");
+  // A second Escape closes the details, and opening them again finds the plan.
+  await page(`document.querySelector(".chat-canvas-dialog").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await waitFor(async () => !(await harness("exists", ".chat-canvas-dialog")), "Escape closes the details");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-canvas-dialog .plan-week-card"), "the details open again");
 
   // Removed before it is saved, the card's draft goes too (P0.8).
   await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
@@ -829,6 +844,9 @@ async function main() {
   await harness("click", ".chat-canvas .plan-week-card:nth-child(2) .plan-week-ask");
   await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "the week waits beside the composer");
   assert.match((await harness("text", ".chat-refs-pending .chat-ref-chip")) ?? "", /Hanoi Half base · Week 2/);
+  assert.equal(await harness("exists", ".chat-canvas-dialog"), false, "the details close onto the composer");
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", '.chat-canvas-dialog [data-action="askPlan"]'), "the details open again");
   await harness("click", '.chat-canvas [data-action="askPlan"]');
   await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 2, "and the whole plan beside it");
   await harness("click", ".chat-refs-pending .chat-ref-chip:last-of-type .chat-ref-remove");
@@ -859,6 +877,13 @@ async function main() {
   }, { ...BASE_SCRIPT, findChatSessionForDraft: "s1" });
   await waitFor(() => harness("callCount", "findChatSessionForDraft"), "the conversation is looked for");
   assert.deepEqual((await harness("calls", "findChatSessionForDraft"))[0].args, ["plan-1"]);
+  await waitFor(() => harness("exists", ".coach-ask-picker"), "the athlete picks where to ask");
+  assert.match(
+    (await harness("text", ".coach-ask-option:not(.is-new)")) ?? "",
+    /Where this plan was made/,
+    "the plan's own conversation leads the list"
+  );
+  await harness("click", ".coach-ask-option:not(.is-new)");
   await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "and the plan waits to be asked about");
 
   // -------------------------------------------------------------------------
@@ -1196,32 +1221,43 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // AI Plan opens Coach on a blank brief in a new conversation (P2.5)
+  // AI Plan: the brief is filled in first, then a conversation opens on it
+  // and the outline is drawn at once (P2.5, UAT)
   // -------------------------------------------------------------------------
-  const BLANK = { ...BASE_BRIEF, artifactId: "brief-new", sessionId: "s-new", request: { ...BASE_BRIEF.request, goalKind: "race", goal: "", race: { date: "" }, weeks: undefined, difficulty: "custom" } };
-  await harness("mount", "ChatView", { pendingPrompt: { newPlan: true } }, {
+  const STARTED = { ...BASE_BRIEF, artifactId: "brief-new", sessionId: "s-new" };
+  const NO_SLEEP = { activities: true, sleep: false, zones: true };
+  await harness("mount", "ChatView", { pendingPrompt: { newPlan: { request: STARTED.request, sources: NO_SLEEP } } }, {
     ...BASE_SCRIPT,
-    getConversationSettings: ALL_SOURCES,
+    setConversationSettings: { sessionId: "s-new", sources: NO_SLEEP },
+    getConversationSettings: { sessionId: "s-new", sources: NO_SLEEP },
+    getPlanBriefs: [STARTED],
     createChatSession: { id: "s-new", provider: "claude-code", title: "New chat", updatedAt: new Date().toISOString() },
-    createPlanBrief: BLANK,
+    createPlanBrief: STARTED,
     renameChatSession: { id: "s-new", provider: "claude-code", title: "New plan", updatedAt: new Date().toISOString() },
     saveChatSession: { id: "s-new", provider: "claude-code", title: "New plan", updatedAt: new Date().toISOString() }
   });
-  const planBrief = await waitFor(async () => (await harness("calls", "createPlanBrief"))[0], "a blank brief is made, with no model asked");
+  const planBrief = await waitFor(async () => (await harness("calls", "createPlanBrief"))[0], "the brief is made");
   assert.equal(planBrief.args[0], "s-new", "in the new conversation");
+  assert.deepEqual(planBrief.args[1], JSON.parse(JSON.stringify(STARTED.request)), "from what the athlete filled in");
+  assert.deepEqual(
+    (await harness("calls", "setConversationSettings"))[0]?.args[0],
+    { sessionId: "s-new", sources: NO_SLEEP },
+    "with what Coach may read as the athlete left it"
+  );
   assert.deepEqual((await harness("calls", "renameChatSession"))[0]?.args, ["s-new", "New plan"]);
-  await waitFor(() => harness("exists", `.chat-brief-card[data-artifact-id="brief-new"]`), "the brief's card is the conversation's first entry");
   const savedNew = await waitFor(
     async () => (await harness("calls", "saveChatSession")).find((call) => call.args[0] === "s-new"),
-    "and the anchor is saved at once"
+    "the anchor is saved at once"
   );
-  assert.deepEqual(savedNew.args[1].map((entry) => entry.kind), ["planBrief"]);
-  assert.equal(await harness("callCount", "sendChat"), 0, "nothing is sent to a model");
-  assert.equal(
-    await page(`[...document.querySelectorAll(".chat-brief-card button")].some((b) => b.textContent.trim() === "Draw the outline")`),
-    false,
-    "a blank brief still misses race day, so the outline waits"
+  assert.equal(savedNew.args[1][0]?.kind, "planBrief", "the brief's anchor is the conversation's first entry");
+  const outlineTurn = await waitFor(
+    async () => (await harness("calls", "sendChat"))[0],
+    "Start plan draws the outline without another press"
   );
+  assert.equal(outlineTurn.args[3], "s-new", "in the new conversation");
+  assert.deepEqual(outlineTurn.args[4], { step: "outline", artifactId: "brief-new" }, "as the outline step of that brief");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(await harness("callCount", "sendChat"), 1, "and only once");
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

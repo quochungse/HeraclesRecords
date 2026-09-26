@@ -1622,7 +1622,9 @@ function registerIpcHandlers(): void {
     "chat:updatePlanBrief",
     (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
   );
-  ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string) => createPlanBriefForSession(sessionId));
+  ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string, request?: import("./types").PlanBriefRequest) =>
+    createPlanBriefForSession(sessionId, request)
+  );
   ipcMain.handle("chat:updatePlanOutline", (_event, artifactId: string, outline: unknown) =>
     adjustPlanOutline(artifactId, outline)
   );

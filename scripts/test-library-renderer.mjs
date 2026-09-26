@@ -859,6 +859,48 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // 3c''-ai. AI Plan takes the brief step by step, then starts the plan (UAT)
+  // -------------------------------------------------------------------------
+  {
+    await harness("mount", "TrainingLibraryView", { height: 900 }, { getTrainingLibrarySnapshot: snapshotOf([]) });
+    await openPlansTab();
+    const footer = () =>
+      evaluate(`Array.from(document.querySelectorAll(".coach-sheet footer button")).map((b) => b.textContent.trim())`);
+    const press = (label) =>
+      evaluate(
+        `Array.from(document.querySelectorAll(".coach-sheet button")).find((b) => b.textContent.trim().startsWith(${JSON.stringify(label)})).click()`
+      );
+    await evaluate(`Array.from(document.querySelectorAll("button")).find((b) => b.textContent.trim() === "AI Plan").click()`);
+    await settle();
+    assert.deepEqual(await footer(), ["Cancel", "Next"], "the goal step leads on to the week, and cannot start the plan");
+    await press("Build a base");
+    await press("Next");
+    await settle();
+    assert.deepEqual(await footer(), ["Cancel", "Back", "Start plan"], "the week step starts it, or goes back");
+    await press("Back");
+    await settle();
+    await press("A race or event");
+    await press("Next");
+    await settle();
+    assert.equal(
+      await evaluate(`Array.from(document.querySelectorAll(".coach-sheet footer button")).find((b) => b.textContent.trim() === "Start plan").disabled`),
+      true,
+      "a brief missing race day cannot start: the outline it asks for would be refused"
+    );
+    await press("Back");
+    await settle();
+    await press("Build a base");
+    await press("Next");
+    await settle();
+    await press("Start plan");
+    await settle();
+    const opened = await evaluate(`window.__harness.calls("prop:onOpenCoach").map((call) => call.args[0])`);
+    assert.equal(opened.length, 1, "Start plan opens Coach once");
+    assert.equal(opened[0].newPlan?.request?.goalKind, "base", "with the brief as it was filled in");
+    assert.equal(await evaluate(`Boolean(document.querySelector(".coach-sheet"))`), false, "and the brief's screen closes");
+  }
+
+  // -------------------------------------------------------------------------
   // 3c''-bis. The read on opening reaches the list, and never goes backwards
   // -------------------------------------------------------------------------
   {

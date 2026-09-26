@@ -3247,8 +3247,12 @@ export interface CoachOpenRequest {
   refs?: PlanRef[];
   /** The calendar or a COROS plan: chips beside the composer of the conversation open (P3.5). */
   scheduleRefs?: ScheduleRef[];
-  /** AI Plan (P2.5): a new conversation that opens on a blank plan brief. */
-  newPlan?: boolean;
+  /**
+   * AI Plan (P2.5): a new conversation that opens on this brief. The athlete
+   * fills it in first, on the brief's own screen, and the conversation is
+   * made only when they finish — with what Coach may read set as they left it.
+   */
+  newPlan?: { request: PlanBriefRequest; sources: TrainingPlanDataSources };
 }
 
 /**

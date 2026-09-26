@@ -775,7 +775,8 @@ const api = {
   getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
-  createPlanBrief: (sessionId: string): Promise<PlanBrief> => ipcRenderer.invoke("chat:createPlanBrief", sessionId),
+  createPlanBrief: (sessionId: string, request?: PlanBriefRequest): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:createPlanBrief", sessionId, request),
   updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanOutline", artifactId, outline),
   getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>

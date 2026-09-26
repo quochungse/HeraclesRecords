@@ -550,18 +550,30 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation is not appended there (`appendVersion` takes the conversation it was asked from).
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
-  index of creations, or one open beside the conversation — a sheet over it below 1100px — with
-  the reader's ridge, week cards and session view, a version picker, a Versions tab whose lines
-  come from `electron/planDiff.ts` (node-free, shared with `restorePlanDraftVersion`'s
-  `planEvent`), and Restore, which writes the old content as a new version. Its buttons and the
-  card's come from one function, `artifactActions`. The composer is a container
-  (`chat-composer`), because the canvas narrows the conversation on a wide window too.
+  index of creations is a column beside the conversation that **never widens**, and opening one
+  shows its **details on a screen of their own** (`.chat-canvas-dialog`, portalled to `<body>`
+  inside a `.coach-sheet` for the library tokens, below the plan editor's band) — the reader's
+  ridge, week cards and session view, a version picker, a Versions tab whose lines come from
+  `electron/planDiff.ts` (node-free, shared with `restorePlanDraftVersion`'s `planEvent`), and
+  Restore, which writes the old content as a new version. The details used to open inside the
+  column, widened to 760px, which squeezed the conversation for as long as a plan was open.
+  Escape steps back a layer and then closes them; Ask Coach and "In chat" close them, because
+  what they lead to is under them. Its buttons and the card's come from one function,
+  `artifactActions`. The composer is a container (`chat-composer`), because the column narrows
+  the conversation on a wide window too.
   Drafts are deleted with their conversation; the 24-hour prune is gone.
-  **AI Plan opens Coach; the plan generator dialog is gone** (P2.5 of
-  docs/coach-plan-canvas.md). The Library's AI Plan button calls `onOpenCoach({ newPlan: true })`,
-  and Coach starts a conversation named "New plan" on a blank brief (`chat:createPlanBrief`, the
-  form's defaults from the next Monday, no model asked), renamed after the goal once the brief has
-  one. From there the plan is the conversation's pipeline — brief, outline, sessions, described
+  **AI Plan asks for the brief first, then opens Coach on it; the plan generator dialog is gone**
+  (P2.5 of docs/coach-plan-canvas.md). The Library's AI Plan button opens `CoachBriefEditor` in
+  `mode="new"` over the Library — the brief's own screen, with what Coach may read — and nothing
+  exists until Start plan: then `onOpenCoach({ newPlan: { request, sources } })`, and Coach makes the
+  conversation, its brief (`chat:createPlanBrief` with the request, no model asked) and, when a
+  source was switched off, its settings, named after the goal ("New plan" until there is one) —
+  and **draws the outline at once** (`autoOutline`, fired from an effect once the new
+  conversation has rendered, because `sendMessage` reads the timeline and settings of the render
+  it belongs to). The screen is stepped: Goal offers only **Next**, Your week offers Back and
+  Start plan, and Start plan waits until the brief has no open question, since the outline step
+  would refuse it. Cancel leaves no empty conversation behind, which opening straight into Coach
+  used to. From there the plan is the conversation's pipeline — brief, outline, sessions, described
   under Coach below — and the plan it writes is a Coach creation, not a library draft.
   `TrainingPlanGenerator`, its outline and run steps, `trainingLibrary:generatePlan`/`outlinePlan`,
   the in-memory `generatedDrafts` and `trainingPlanFromDraftPreview` were removed with it; a library
@@ -815,8 +827,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   handed the conversation's `sessionId`, so what it proposes is filed under its conversation, and its
   `creationIndex` carries the briefs and proposals too. `npm run test:schedule-changes`,
   `test:schedule-change-renderer`.
-  **Ask Coach from the Calendar and the Library points rather than pastes** (P3.5): a
-  `CoachOpenRequest.scheduleRefs` puts chips beside the open conversation's composer, sent as a
+  **Ask Coach from the Calendar and the Library points rather than pastes** (P3.5), and **asks where
+  first**: `CoachAskPicker` offers a new conversation or a recent one — led by the conversation a
+  Coach plan was made in, when the question is about one — rather than joining whichever was open.
+  A Coach plan's `PlanRef` chip only goes to its own conversation (it names drafts that live there);
+  anywhere else the plan is named in the question. The picker waits for a conversation to be open,
+  or Coach's first mount would switch away from the pick. A `CoachOpenRequest.scheduleRefs` puts
+  chips beside the picked conversation's composer, sent as a
   `scheduleRefs` anchor (not a `PlanRef`, which names a Coach creation) that `toWireMessages` folds
   into the question with the ids the read tools take. The Calendar's week and session asks used to
   paste figures into a prompt; the Library reader's open session offers Ask Coach for any COROS plan.

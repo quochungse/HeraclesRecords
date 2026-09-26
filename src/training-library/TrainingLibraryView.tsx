@@ -16,6 +16,7 @@ import { createPortal } from "react-dom";
 import type {
   CoachOpenRequest,
   TrainingActivityMatch,
+  TrainingPlanDataSources,
   TrainingHubStatus,
   TrainingLibrarySnapshot,
   TrainingPlanDocument,
@@ -26,6 +27,9 @@ import {
   createTrainingPlan,
   summarizeTrainingPlan
 } from "../../electron/trainingPlanDomain";
+import { defaultPlanBriefRequest } from "../../electron/planBrief";
+import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
+import CoachBriefEditor from "../chat/CoachBriefEditor";
 import type { CorosLinkApi } from "../coroslink-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -169,6 +173,9 @@ export function TrainingLibraryView({
   /* The plan being read. Reading and editing are different intentions and
      only one can be on screen, so opening the editor clears this. */
   const [readingPlan, setReadingPlan] = useState<TrainingPlanDocument | null>(null);
+  /* AI Plan's brief (P2.5), filled in here before any conversation is made:
+     Cancel leaves nothing behind, and Start plan opens Coach on it. */
+  const [newPlanSources, setNewPlanSources] = useState<TrainingPlanDataSources | null>(null);
   const [calendarChange, setCalendarChange] = useState<{
     plan: TrainingPlanDocument;
     action: PlanCalendarAction;
@@ -735,7 +742,7 @@ export function TrainingLibraryView({
           onResumeDraft={resumePlanDraft}
           inert={planScreen !== null}
           onCreate={createPlan}
-          onGenerate={() => onOpenCoach({ newPlan: true })}
+          onGenerate={() => setNewPlanSources({ activities: true, sleep: true, zones: true })}
           offline={current.offline}
           onOpen={openPlan}
           matches={current.matches}
@@ -962,6 +969,21 @@ export function TrainingLibraryView({
           busy={calendarBusy ? { target: "confirm", label: "Removing…" } : undefined}
           onConfirm={() => void confirmCalendarChange()}
           onCancel={() => setCalendarChange(null)}
+        />
+      ) : null}
+
+      {newPlanSources ? (
+        <CoachBriefEditor
+          mode="new"
+          request={defaultPlanBriefRequest(firstPlanMonday())}
+          firstMonday={firstPlanMonday()}
+          sources={newPlanSources}
+          onSourcesChange={setNewPlanSources}
+          onSave={(request) => {
+            setNewPlanSources(null);
+            onOpenCoach({ newPlan: { request, sources: newPlanSources } });
+          }}
+          onClose={() => setNewPlanSources(null)}
         />
       ) : null}
 

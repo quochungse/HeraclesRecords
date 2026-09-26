@@ -61,7 +61,7 @@ import { PLAN_BRIEF_TOOL } from "./planBrief";
 import {
   briefForOutline,
   briefForSessions,
-  createBlankPlanBrief,
+  createPlanBrief,
   deletePlanBriefs,
   listPlanBriefs,
   savePlanOutline,
@@ -2449,7 +2449,7 @@ async function streamOutlineStep(
       return JSON.stringify({
         ok: true,
         message:
-          "Outline accepted and shown to the athlete on a card. Reply with one sentence and nothing else: do not restate the weeks."
+          "Outline accepted and shown to the athlete on a card under your reply. Reply with one sentence and nothing else: do not restate the weeks."
       });
     }
   });
@@ -2521,9 +2521,9 @@ async function streamSessionsStep(
   }
 }
 
-/** AI Plan (P2.5): the blank brief a new conversation opens on, with its anchor saved in it. */
-export function createPlanBriefForSession(sessionId: string): PlanBrief {
-  return createBlankPlanBrief(sessionId);
+/** AI Plan (P2.5): the brief a new conversation opens on — the athlete's, or a blank one. */
+export function createPlanBriefForSession(sessionId: string, request?: PlanBriefRequest): PlanBrief {
+  return createPlanBrief(sessionId, request);
 }
 
 /** The athlete's adjustment of a brief's outline, from its own screen (P2.2). */

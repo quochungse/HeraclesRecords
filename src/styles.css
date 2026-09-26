@@ -15935,7 +15935,12 @@ tr.data-intervals-row-missing {
 }
 
 /* ----- Training Coach chatbot ----- */
-.chat-view {
+/* The chat's tokens, on the chat and on what Coach portals out of it: a
+   creation's details screen sits under <body>, where a `var()` naming one of
+   these would otherwise void its declaration — the primary button drew with
+   no fill and no border there. */
+.chat-view,
+.chat-canvas-backdrop {
   /* Chat-scoped neutral/monochrome palette. Overrides the app's green
      accent within the chat only, so the rest of the app is unaffected. */
   --accent: #9aa1ad;
@@ -15954,7 +15959,9 @@ tr.data-intervals-row-missing {
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
   --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
+}
 
+.chat-view {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -16410,17 +16417,39 @@ tr.data-intervals-row-missing {
 
 /* ----- The canvas (docs/coach-plan-canvas.md, P1.4) ----- */
 
-/* The Creations list, widened when a creation is open: a plan is a grid of
-   weeks, and a week reads as seven columns from about 680px of card. */
-.chat-canvas.is-artifact {
-  flex-basis: clamp(420px, 46vw, 760px);
+/* A creation's details, on a screen of their own over the conversation. The
+   list beside the conversation keeps its width; the details take what a
+   plan's weeks need — seven columns from about 680px of card — up to the
+   Library reader's measure. */
+.chat-canvas-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 24px;
+  background: var(--tl-scrim);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: tl-fade-in var(--dur-fast) var(--ease) both;
 }
 
-.chat-canvas-artifact {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
+.chat-plan-panel.chat-canvas-dialog {
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: 980px;
+  max-height: 100%;
+  margin: auto;
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  animation: tl-sheet-in var(--dur-base) var(--tl-ease-out) both;
+}
+
+.chat-canvas-dialog:focus {
+  outline: none;
+}
+
+/* The list marks the creation whose details are open. */
+.chat-plan-list-item[aria-current="true"] {
+  background: var(--glass-bg-hover);
 }
 
 .chat-canvas-head {
@@ -16591,16 +16620,10 @@ tr.data-intervals-row-missing {
   line-height: 1.45;
 }
 
-/* Too narrow for the conversation and a plan side by side: the creation is
-   a sheet over the conversation, and the list stays the column it was. */
-@media (max-width: 1100px) {
-  .chat-canvas.is-artifact {
-    position: absolute;
-    inset: 0;
-    z-index: 8;
-    margin: var(--sidebar-float-gap);
-    background: var(--menu-surface);
-    box-shadow: var(--shadow-elevated);
+/* A narrow window gives the details' screen its edge. */
+@media (max-width: 980px) {
+  .chat-canvas-backdrop {
+    padding: 10px;
   }
 }
 
@@ -19967,6 +19990,68 @@ tr.data-intervals-row-missing {
   justify-content: flex-end;
 }
 
+/* Where a question asked from the Calendar or the Library goes: a new
+   conversation or one of the recent ones, a row each. */
+.coach-ask-picker {
+  width: min(460px, 100%);
+}
+
+.coach-ask-list {
+  max-height: min(360px, 60vh);
+}
+
+.tl-dialog .coach-ask-list li {
+  padding: 0;
+}
+
+.coach-ask-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.coach-ask-option:hover {
+  background: var(--glass-bg-hover);
+}
+
+.coach-ask-option:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.coach-ask-option > svg {
+  color: var(--text-muted);
+}
+
+.coach-ask-option.is-new > svg {
+  color: var(--accent-strong);
+}
+
+.coach-ask-option strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-dialog .coach-ask-option span {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* What the athlete pointed at (P1.7): chips above the composer while the
    question is written, and a line above the question once it is sent. */
 .chat-refs-pending,
@@ -21579,7 +21664,7 @@ tr.data-intervals-row-missing {
 }
 
 /* --- Chat (Coach) --------------------------------------------------------- */
-:root[data-theme="paper"] .chat-view {
+:root[data-theme="paper"] :is(.chat-view, .chat-canvas-backdrop) {
   --surface: var(--glass-bg-elevated);
   --accent: #6b6560;
   --accent-strong: #3d3a36;
@@ -21593,6 +21678,9 @@ tr.data-intervals-row-missing {
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
   --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
+}
+
+:root[data-theme="paper"] .chat-view {
   background:
     radial-gradient(
       1100px 520px at 50% -8%,

@@ -86,13 +86,18 @@ function hasVersions(artifactId: string): boolean {
 }
 
 /**
- * A brief nobody has said anything about yet (P2.5): the generator form's
- * defaults, starting on the next Monday, with no field marked. It is what
- * AI Plan opens a new conversation on — no model is asked, so it costs
- * nothing, and the athlete fills it in on its own screen or asks Coach to.
+ * The brief AI Plan opens a new conversation on (P2.5): the one the athlete
+ * filled in on the brief's screen before the conversation existed, with no
+ * field marked, since every one is theirs. Without one it is the generator
+ * form's defaults from the next Monday. No model is asked either way.
  */
-export function createBlankPlanBrief(sessionId: string, today = new Date()): PlanBrief {
-  return writeBrief(crypto.randomUUID(), defaultPlanBriefRequest(firstPlanMonday(today)), {}, sessionId);
+export function createPlanBrief(sessionId: string, request?: unknown, today = new Date()): PlanBrief {
+  if (request === undefined) {
+    return writeBrief(crypto.randomUUID(), defaultPlanBriefRequest(firstPlanMonday(today)), {}, sessionId);
+  }
+  const checked = parseStoredBrief(JSON.stringify({ request }));
+  if (!checked) throw new Error("That brief could not be read.");
+  return writeBrief(crypto.randomUUID(), checked.request, {}, sessionId);
 }
 
 /**

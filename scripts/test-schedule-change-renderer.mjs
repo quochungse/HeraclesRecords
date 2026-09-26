@@ -264,7 +264,14 @@ async function main() {
     getChatSession: TRANSCRIPT.slice(0, 2),
     getScheduleChanges: []
   });
+  // Asked from outside Coach, the question goes where the athlete picks (UAT).
+  await waitFor(() => harness("exists", ".coach-ask-picker"), "the athlete is asked which conversation");
+  assert.match((await harness("text", ".coach-ask-picker")) ?? "", /Sat 27 Sep · Long run/, "the picker says what the question is about");
+  assert.equal(await harness("exists", ".coach-ask-option.is-new"), true, "a new conversation is offered");
+  assert.equal(await harness("exists", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), false, "nothing lands before a pick");
+  await harness("click", ".coach-ask-option:not(.is-new)");
   await waitFor(() => harness("exists", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), "the chip waits by the composer");
+  assert.equal(await harness("exists", ".coach-ask-picker"), false, "and the picker is gone");
   assert.match(await harness("text", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), /Sat 27 Sep · Long run/);
   assert.equal(await harness("value", "textarea"), "How should I approach it?", "the question is the athlete's to finish");
   await harness("keyDown", "textarea", "Enter");

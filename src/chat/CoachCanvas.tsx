@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import {
-  ArrowLeft,
   BookOpen,
   ChevronRight,
   MessageCircle,
@@ -33,22 +33,24 @@ import { creationStatus } from "./creationChoices";
 import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
 
 /**
- * The canvas: where a coach's creations are read beside the conversation
- * rather than over it (docs/coach-plan-canvas.md, P1.4). Two modes — the
- * index of what Coach has made here, and one creation open — in one pane
- * that stands where the Creations list stood, and becomes a sheet over the
- * conversation when the window is too narrow for both.
+ * The canvas (docs/coach-plan-canvas.md, P1.4): the index of what Coach has
+ * made in this conversation, in a column beside it that keeps its width, and
+ * — when one is opened — that creation's details on a screen of their own.
+ * The details used to open inside the column, which widened to hold a plan's
+ * seven-day weeks and squeezed the conversation for as long as it was open;
+ * a dialog gives the weeks the width they need and gives it back on close.
  *
- * It reads with the Library reader's own pieces: the ridge, the week cards
- * with their seven columns, the session view. It edits nothing — the editor
- * is the one place a creation changes (D10) — and its buttons come from
- * `artifactActions`, the function the card's come from (D9).
+ * The details read with the Library reader's own pieces: the ridge, the week
+ * cards with their seven columns, the session view. They edit nothing — the
+ * editor is the one place a creation changes (D10) — and the buttons come
+ * from `artifactActions`, the function the card's come from (D9).
  *
  * Loaded when first opened, with the library's stylesheet the week cards are
  * drawn by, as the plan editor is.
  */
 export default function CoachCanvas({
   api,
+  listOpen,
   artifactId,
   creations,
   cards,
@@ -57,8 +59,8 @@ export default function CoachCanvas({
   uploadingDraftId,
   editingDraftId,
   onOpen,
-  onBack,
-  onClose,
+  onCloseList,
+  onCloseDetails,
   onUpload,
   onEdit,
   onRestore,
@@ -70,7 +72,9 @@ export default function CoachCanvas({
   planSportStyle
 }: {
   api?: CorosLinkApi;
-  /** Any version's draft id of the creation open; null is the index. */
+  /** Whether the index column is shown. */
+  listOpen: boolean;
+  /** Any version's draft id of the creation whose details are open, or null. */
   artifactId: string | null;
   /** The newest version of each creation, in the order they were made. */
   creations: PlanDraftPreview[];
@@ -82,8 +86,8 @@ export default function CoachCanvas({
   /** The creation whose editor is open, whose way on is back into it. */
   editingDraftId?: string | null;
   onOpen: (draftId: string) => void;
-  onBack: () => void;
-  onClose: () => void;
+  onCloseList: () => void;
+  onCloseDetails: () => void;
   onUpload: (
     draftId: string,
     destination: TrainingPlanDestination,
@@ -104,44 +108,62 @@ export default function CoachCanvas({
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
   const open = artifactId ? creationOf(artifactId, creations, versionIndex) : null;
+  const artifactOf = (draftId: string) => versionIndex.get(draftId)?.artifactId ?? draftId;
+  const openArtifact = open ? artifactOf(open.draftId) : null;
   return (
-    <aside
-      id="chat-creations-panel"
-      className={`chat-plan-panel chat-canvas${open ? " is-artifact" : ""}`}
-      aria-label="Coach creations"
-    >
-      {open ? (
-        <ArtifactView
-          key={versionIndex.get(open.draftId)?.artifactId ?? open.draftId}
-          api={api}
-          newest={open}
-          cards={cards}
-          versionIndex={versionIndex}
-          documentFor={documentFor}
-          uploadingDraftId={uploadingDraftId}
-          editing={Boolean(editingDraftId && sameCreation(editingDraftId, open.draftId, versionIndex))}
-          canGoBack={creations.length > 1}
-          onBack={onBack}
-          onClose={onClose}
-          onUpload={onUpload}
-          onEdit={onEdit}
-          onRestore={onRestore}
-          onRemove={onRemove}
-          onViewInChat={onViewInChat}
-          onCalendar={onCalendar}
-          calendar={calendarOf?.(open.draftId)}
-          onAsk={onAsk}
-        />
-      ) : (
-        <CreationIndex
-          creations={creations}
-          onCorosOf={(draftId) => isOnCoros(versionIndex.get(draftId))}
-          onOpen={onOpen}
-          onClose={onClose}
-          planSportStyle={planSportStyle}
-        />
-      )}
-    </aside>
+    <>
+      {listOpen ? (
+        <aside id="chat-creations-panel" className="chat-plan-panel chat-canvas" aria-label="Coach creations">
+          <CreationIndex
+            creations={creations}
+            openId={openArtifact}
+            artifactOf={artifactOf}
+            onCorosOf={(draftId) => isOnCoros(versionIndex.get(draftId))}
+            onOpen={onOpen}
+            onClose={onCloseList}
+            planSportStyle={planSportStyle}
+          />
+        </aside>
+      ) : null}
+      {open
+        ? /* Portalled to <body>, as the Library's editor is: a fixed box inside
+             the Coach panel is bounded by the shell's stacking context and
+             drawn under the rail. `.coach-sheet` carries the library tokens
+             the week cards need, below the band the plan editor opens in. */
+          createPortal(
+            <div className="coach-sheet">
+              <div
+                className="chat-canvas-backdrop"
+                role="presentation"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) onCloseDetails();
+                }}
+              >
+                <ArtifactView
+                  key={openArtifact}
+                  api={api}
+                  newest={open}
+                  cards={cards}
+                  versionIndex={versionIndex}
+                  documentFor={documentFor}
+                  uploadingDraftId={uploadingDraftId}
+                  editing={Boolean(editingDraftId && sameCreation(editingDraftId, open.draftId, versionIndex))}
+                  onClose={onCloseDetails}
+                  onUpload={onUpload}
+                  onEdit={onEdit}
+                  onRestore={onRestore}
+                  onRemove={onRemove}
+                  onViewInChat={onViewInChat}
+                  onCalendar={onCalendar}
+                  calendar={calendarOf?.(open.draftId)}
+                  onAsk={onAsk}
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
 
@@ -165,12 +187,17 @@ function creationOf(
 
 function CreationIndex({
   creations,
+  openId,
+  artifactOf,
   onCorosOf,
   onOpen,
   onClose,
   planSportStyle
 }: {
   creations: PlanDraftPreview[];
+  /** The creation whose details are open, marked in the list. */
+  openId: string | null;
+  artifactOf: (draftId: string) => string;
   onCorosOf: (draftId: string) => boolean;
   onOpen: (draftId: string) => void;
   onClose: () => void;
@@ -212,6 +239,7 @@ function CreationIndex({
               <button
                 type="button"
                 className="chat-plan-list-item"
+                aria-current={openId === artifactOf(draft.draftId) ? "true" : undefined}
                 onClick={() => onOpen(draft.draftId)}
                 aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
               >
@@ -258,8 +286,6 @@ function ArtifactView({
   documentFor,
   uploadingDraftId,
   editing,
-  canGoBack,
-  onBack,
   onClose,
   onUpload,
   onEdit,
@@ -277,8 +303,6 @@ function ArtifactView({
   documentFor: (draftId: string) => TrainingPlanDocument | null | undefined;
   uploadingDraftId: string | null;
   editing: boolean;
-  canGoBack: boolean;
-  onBack: () => void;
   onClose: () => void;
   onUpload: (
     draftId: string,
@@ -315,20 +339,28 @@ function ArtifactView({
     setOpenSession(null);
   }, [shownId]);
 
-  // Escape steps back one layer, and only for a key pressed inside the pane:
-  // the composer beside it has its own use for the key.
+  // Escape steps back one layer — the session, the removal question, then the
+  // screen itself. A dialog stacked over this one (the editor, the calendar)
+  // holds the focus, so a key pressed there is left to it.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (!rootRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && target !== document.body) return;
       if (openSession) setOpenSession(null);
       else if (confirming) setConfirming(false);
-      else return;
+      else closeRef.current();
       event.stopPropagation();
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [openSession, confirming]);
+  // The screen takes the focus as it opens, so Escape and Tab start inside it.
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   const isWorkout = newest.artifactType === "workout";
   const planDocument = documentFor(shownId);
@@ -405,19 +437,15 @@ function ArtifactView({
   }));
 
   return (
-    <div className="chat-canvas-artifact" ref={rootRef}>
+    <div
+      className="chat-plan-panel chat-canvas chat-canvas-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      tabIndex={-1}
+      ref={rootRef}
+    >
       <header className="chat-canvas-head">
-        {canGoBack ? (
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="All creations"
-            title="All creations"
-            onClick={onBack}
-          >
-            <ArrowLeft size={16} aria-hidden="true" />
-          </button>
-        ) : null}
         <div className="chat-canvas-title">
           <span className="chat-creation-kicker">
             {isWorkout ? "One-off workout" : "Training plan"}

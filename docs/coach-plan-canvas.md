@@ -393,7 +393,8 @@ khởi động lại rồi bấm lưu sẽ ghi lại mọi buổi (lỗi lúc tr
 - Nút chính và phụ đến từ **một** pure function `artifactActions(artifact, version, editLock)`,
   dùng chung cho card và canvas, nên hai nơi không bao giờ lệch nhau (D9).
 - Cửa sổ hẹp (dưới ~1100px): canvas thành sheet phủ lên luồng chat, có nút quay lại. 7 cột tuần
-  tự về dạng danh sách qua container query đang có (`plan-week`, 680px).
+  tự về dạng danh sách qua container query đang có (`plan-week`, 680px). (Đã thay ở UAT §12:
+  chi tiết artifact luôn là màn hình riêng, canvas không giãn.)
 - Diff là module thuần `planDiff.ts` (thêm, bỏ, dời, đổi buổi; đổi stage, tên, mô tả), dùng
   chung cho canvas, dòng "v1 → v2", `planEvent` và tool result.
 - Test: suite renderer mới `test:chat-canvas-renderer` (mục lục, artifact, version cũ chỉ đọc,
@@ -1079,7 +1080,7 @@ patch làm version nhiều hơn, nên Q5 là bắt buộc. Việc thu nhỏ bi�
 Mặc định nhỏ, đổi được khi review:
 - Ngưỡng one-shot 14 ngày tính từ buổi đầu tới buổi cuối (không phải từ hôm nay).
 - Bộ chip mặc định ở P1.8.
-- Canvas dưới ~1100px thành sheet.
+- ~~Canvas dưới ~1100px thành sheet.~~ Thay bằng màn hình chi tiết riêng (UAT §12).
 - Lượt pipeline mang 6 lượt gần nhất.
 
 ## 10. Tài liệu phải sửa
@@ -1109,3 +1110,23 @@ Trong P0, các task độc lập với nhau trừ P0.3 dựa trên phần vẽ c
 nên có trong một bản phát hành riêng trước P1.
 
 Tổng cỡ việc thô: P0 ≈ 1.5 tuần, P1 ≈ 3–4 tuần, P2 ≈ 3 tuần, P3 ≈ 3–4 tuần sau probe.
+
+## 12. UAT 2026-09-26
+
+Ba thay đổi sau khi dùng thử bản P0–P3:
+
+1. **AI Plan hỏi brief trước, rồi mới tạo cuộc chat.** Nút AI Plan mở `CoachBriefEditor`
+   (`mode="new"`) ngay trên Library, kèm các công tắc nguồn dữ liệu. Chưa có gì được tạo cho tới
+   khi bấm Start plan; lúc đó `onOpenCoach({ newPlan: { request, sources } })`, và Coach tạo cuộc
+   chat, brief (`chat:createPlanBrief` nhận `request`), cài đặt nguồn nếu có nguồn bị tắt, đặt tên
+   theo mục tiêu, rồi **vẽ outline ngay** — không dừng chờ bấm "Draw the outline". Màn hình đi
+   từng bước: bước Goal chỉ có Next, bước Your week có Back và Start plan; Start plan chỉ bấm
+   được khi brief không còn câu hỏi mở. Huỷ thì không để lại cuộc chat rỗng.
+2. **Chi tiết creation mở thành màn hình riêng; canvas không giãn.** Cột mục lục giữ nguyên độ
+   rộng; mở một creation hiện `.chat-canvas-dialog` (portal ra `<body>`, trong `.coach-sheet`).
+   Escape lùi một lớp rồi đóng; Ask Coach và "In chat" đóng màn hình vì thứ chúng dẫn tới nằm
+   dưới nó. Bỏ nút quay lại mục lục và luật `.chat-canvas.is-artifact`.
+3. **Ask Coach từ ngoài cuộc chat hỏi chọn cuộc chat.** `CoachAskPicker`: New conversation hoặc
+   một cuộc gần đây, cuộc tạo ra plan (nếu có) đứng đầu. Chip `PlanRef` chỉ đi vào cuộc chat
+   chứa draft của nó; nơi khác thì tên plan nằm trong câu hỏi.
+

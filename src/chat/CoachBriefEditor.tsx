@@ -1,7 +1,7 @@
 import { Check, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PlanBrief, PlanBriefRequest, TrainingPlanDataSources } from "../../electron/types";
+import type { PlanBriefRequest, TrainingPlanDataSources } from "../../electron/types";
 import { generationRequestProblems, type TrainingPlanGenerationField } from "../../electron/trainingPlanGeneration";
 import { GeneratorGoalStep } from "../training-library/GeneratorGoalStep";
 import { GeneratorWeekStep } from "../training-library/GeneratorWeekStep";
@@ -32,10 +32,15 @@ const STEPS: readonly { step: BriefStep; label: string }[] = [
  * Saving keeps whatever is there, open questions included: the card lists
  * them, and drawing the outline waits for them.
  *
+ * AI Plan opens the same screen before any conversation exists (P2.5): the
+ * athlete says what the plan is for first, and the conversation is made from
+ * what they saved. `mode="new"` words it that way.
+ *
  * Loaded when first opened, with the library's stylesheet its steps are drawn by.
  */
 export default function CoachBriefEditor({
-  brief,
+  request: initial,
+  mode = "edit",
   firstMonday,
   sources,
   saving = false,
@@ -44,7 +49,9 @@ export default function CoachBriefEditor({
   onSave,
   onClose
 }: {
-  brief: PlanBrief;
+  request: PlanBriefRequest;
+  /** "new" is AI Plan's: nothing is saved until the conversation is made from it. */
+  mode?: "edit" | "new";
   firstMonday: string;
   sources: TrainingPlanDataSources;
   saving?: boolean;
@@ -53,7 +60,7 @@ export default function CoachBriefEditor({
   onSave: (request: PlanBriefRequest) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<GeneratorForm>(() => formFromBrief(brief.request, firstMonday, sources));
+  const [form, setForm] = useState<GeneratorForm>(() => formFromBrief(initial, firstMonday, sources));
   const [step, setStep] = useState<BriefStep>("goal");
   // The form holds the sources only for its checks; the switches write the conversation's.
   const current = { ...form, sources };
@@ -94,7 +101,7 @@ export default function CoachBriefEditor({
             <span className="plan-generator-title-icon"><Sparkles size={16} /></span>
             <div className="plan-generator-heading">
               <p className="tl-eyebrow">Training Coach</p>
-              <h2 id="coach-brief-title">Plan brief</h2>
+              <h2 id="coach-brief-title">{mode === "new" ? "New plan" : "Plan brief"}</h2>
             </div>
             <nav className="plan-generator-steps" aria-label="Steps">
               {STEPS.map((item, index) => {
@@ -130,7 +137,7 @@ export default function CoachBriefEditor({
                     <li key={source.value}>
                       <span>
                         <strong id={`coach-brief-source-${source.value}`}>{source.label}</strong>
-                        <small>{on ? source.detail : "Not shared in this conversation"}</small>
+                        <small>{on ? source.detail : mode === "new" ? "Not shared with Coach" : "Not shared in this conversation"}</small>
                       </span>
                       <button
                         type="button"
@@ -163,24 +170,43 @@ export default function CoachBriefEditor({
 
           <footer>
             <p className="plan-generator-footer-hint">
-              {error ?? problems[0]?.message ?? "Coach draws the outline from this brief."}
+              {error ??
+                problems[0]?.message ??
+                (mode === "new"
+                  ? "A conversation opens on this brief, and Coach starts drawing the outline."
+                  : "Coach draws the outline from this brief.")}
             </p>
             <button type="button" className="ghost-button" onClick={onClose}>
               Cancel
             </button>
-            {step === "goal" ? (
-              <button type="button" className="ghost-button" onClick={() => setStep("week")}>
-                Your week
+            {step === "week" ? (
+              <button type="button" className="ghost-button" onClick={() => setStep("goal")}>
+                Back
               </button>
             ) : null}
-            <button
-              type="button"
-              className="primary-button"
-              disabled={saving}
-              onClick={() => onSave(briefFromForm(current, firstMonday))}
-            >
-              {saving ? "Saving…" : "Save brief"}
-            </button>
+            {step === "goal" ? (
+              /* A new plan is started from the last step, so Next is the way on
+                 there; an edit can be saved from either. */
+              <button
+                type="button"
+                className={mode === "new" ? "primary-button" : "ghost-button"}
+                onClick={() => setStep("week")}
+              >
+                Next
+              </button>
+            ) : null}
+            {mode === "edit" || step === "week" ? (
+              <button
+                type="button"
+                className="primary-button"
+                /* Starting draws the outline at once, and a brief with an open
+                   question would only be refused by the step: say so here. */
+                disabled={saving || (mode === "new" && problems.length > 0)}
+                onClick={() => onSave(briefFromForm(current, firstMonday))}
+              >
+                {saving ? (mode === "new" ? "Starting…" : "Saving…") : mode === "new" ? "Start plan" : "Save brief"}
+              </button>
+            ) : null}
           </footer>
         </section>
       </div>
