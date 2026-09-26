@@ -3218,6 +3218,26 @@ export interface PlanRef {
   label: string;
 }
 
+/**
+ * What the athlete pointed at on the calendar or in a COROS plan when asking
+ * (P3.5): a day, a week, one scheduled session, an activity, or one session
+ * of any plan in the Library. Not a `PlanRef`: that names a Coach creation,
+ * and a build that reads one would drop a ref it cannot parse. Carried as a
+ * `scheduleRefs` anchor just before the question.
+ */
+export interface ScheduleRef {
+  scope: "day" | "week" | "session";
+  /** yyyyMMdd: the day, the week's Monday, or the session's day. Absent for a session of a plan not on the calendar. */
+  day?: string;
+  /** A session: the calendar's `planId` (a running copy or the athlete's own), or a COROS plan's id. */
+  planId?: string;
+  idInPlan?: string;
+  /** A finished activity rather than a planned session. */
+  activityId?: string;
+  /** What is pointed at, as it is read: "Sat 27 Sep · Long run". */
+  label: string;
+}
+
 /** Coach opened from elsewhere with something to talk about (P1.7). */
 export interface CoachOpenRequest {
   /** Text for the composer. */
@@ -3225,6 +3245,8 @@ export interface CoachOpenRequest {
   /** A Coach creation; its conversation is opened when it can be found. */
   draftId?: string;
   refs?: PlanRef[];
+  /** The calendar or a COROS plan: chips beside the composer of the conversation open (P3.5). */
+  scheduleRefs?: ScheduleRef[];
   /** AI Plan (P2.5): a new conversation that opens on a blank plan brief. */
   newPlan?: boolean;
 }
@@ -3920,6 +3942,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "planDraft"; draft: PlanDraftPreview }
   | { kind: "planEvent"; event: PlanEvent }
   | { kind: "planRefs"; refs: PlanRef[] }
+  /** An anchor: what on the calendar or in a COROS plan the next question is about (P3.5). */
+  | { kind: "scheduleRefs"; refs: ScheduleRef[] }
   /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
   | { kind: "planBrief"; artifactId: string }
   /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */

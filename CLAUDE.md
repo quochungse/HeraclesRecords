@@ -814,6 +814,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   handed the conversation's `sessionId`, so what it proposes is filed under its conversation, and its
   `creationIndex` carries the briefs and proposals too. `npm run test:schedule-changes`,
   `test:schedule-change-renderer`.
+  **Ask Coach from the Calendar and the Library points rather than pastes** (P3.5): a
+  `CoachOpenRequest.scheduleRefs` puts chips beside the open conversation's composer, sent as a
+  `scheduleRefs` anchor (not a `PlanRef`, which names a Coach creation) that `toWireMessages` folds
+  into the question with the ids the read tools take. The Calendar's week and session asks used to
+  paste figures into a prompt; the Library reader's open session offers Ask Coach for any COROS plan.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and
   `get_training_plan` from `detail`. A plan on the calendar is read as its **running copy** — its

@@ -46,7 +46,8 @@ import {
 } from "react";
 import type {
   TrainingActivityMatch,
-  TrainingPlanDocument
+  TrainingPlanDocument,
+  TrainingPlanEntry
 } from "../../electron/types";
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
 import type { CorosLinkApi } from "../coroslink-api";
@@ -110,6 +111,8 @@ interface PlanReaderProps {
   onDelete?: (plan: TrainingPlanDocument) => void;
   /** Opens the conversation the plan came from, to ask about it (P1.7). */
   onAskCoach?: (plan: TrainingPlanDocument) => void;
+  /** Opens Coach with one session of a COROS plan — any plan, not only Coach's — beside the composer (P3.5). */
+  onAskCoachAboutSession?: (plan: TrainingPlanDocument, entry: TrainingPlanEntry, label: string) => void;
   /** A kept session's activity, opened on the screen for its sport. */
   onOpenActivity?: (activityId: string) => void;
 }
@@ -138,6 +141,7 @@ export function PlanReader({
   onArchive,
   onDelete,
   onAskCoach,
+  onAskCoachAboutSession,
   onOpenActivity
 }: PlanReaderProps) {
   const { unitSystem } = useUnitSystem();
@@ -292,6 +296,9 @@ export function PlanReader({
   };
 
   if (open) {
+    const openEntry = plan.entries.find((entry) => entry.id === open.entry.id);
+    /* Only a session COROS knows by id: Coach reads it with get_training_plan. */
+    const askable = onAskCoachAboutSession && plan.remoteId && openEntry?.idInPlan ? openEntry : undefined;
     return (
       <section
         ref={scroller}
@@ -304,13 +311,23 @@ export function PlanReader({
         <PlanSessionView
           key={open.entry.id}
           session={open}
-          entry={plan.entries.find((entry) => entry.id === open.entry.id)}
+          entry={openEntry}
           planName={plan.name}
           position={{ index: openIndex, of: sessions.length }}
           unitSystem={unitSystem}
           api={api}
           onOpenActivity={onOpenActivity}
           onBack={closeSession}
+          onAskCoach={
+            askable
+              ? () =>
+                  onAskCoachAboutSession!(
+                    plan,
+                    askable,
+                    [open.entry.title, `Week ${open.weekIndex + 1}`, open.dayLabel, plan.name].filter(Boolean).join(" · ")
+                  )
+              : undefined
+          }
           onStep={(direction) => {
             const next = sessions[openIndex + direction];
             if (next) {

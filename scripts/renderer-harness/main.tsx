@@ -350,6 +350,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           onArchive={spy("onArchive")}
           onDelete={spy("onDelete")}
           onOpenActivity={spy("onOpenActivity")}
+          {...(options.askAboutSessions ? { onAskCoachAboutSession: spy("onAskCoachAboutSession") } : {})}
         />
       </main>
     );

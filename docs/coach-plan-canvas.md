@@ -857,7 +857,7 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   `getPlanArtifacts`). Preset *Weekly review* và *Post-activity debrief* được dặn đề xuất thay đổi lịch
   bằng tool thay vì chỉ nói; analysis đã tạo từ trước giữ playbook của nó.
 
-**P3.5 Hỏi về đúng chỗ, từ Calendar và Library** · M
+**P3.5 Hỏi về đúng chỗ, từ Calendar và Library** · M · *xong*
 - Kind neo mới `scheduleRefs { refs: [{ scope: day | week | session, day, plan_id?, id_in_plan?,
   label }] }` — **không** mở rộng `PlanRef`, vì `parsePlanRef` đòi `artifactId`/`draftId` và một
   build P1 sẽ không đọc được. `toWireMessages` gộp vào câu hỏi như `planRefs`.
@@ -865,6 +865,16 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   Library reader: "Ask Coach" trên một buổi của **mọi** plan COROS (không chỉ plan của Coach),
   trỏ `plan_id` + `id_in_plan` để Coach đọc bằng `get_training_plan`.
 - Test: `test:chat-plan-card-renderer` (chip), `test:chat-context-compaction` (wire).
+- **Đã làm.** `ScheduleRef { scope, day?, planId?, idInPlan?, activityId?, label }` (camelCase như
+  mọi entry lưu), `CoachOpenRequest.scheduleRefs`. Chip nằm cạnh composer của **cuộc chat đang mở**
+  (lịch là của athlete, không của cuộc chat nào), tối đa 3, gửi thành neo `scheduleRefs` ngay trước
+  câu hỏi; `scheduleRefsNote` gộp vào câu hỏi kèm id mà tool đọc (`plan_id`, `id_in_plan`,
+  `activity_id`, ngày) và tên tool để đọc. Calendar: Ask Coach của tuần và của buổi/hoạt động trong
+  panel ngày giờ mở Coach với chip và một câu hỏi để athlete viết tiếp, thay cho đoạn prompt dán số
+  liệu (`describeDayForCoach` đã bỏ). Scope `day` có trong mô hình và trên wire, nhưng màn Calendar
+  chưa có nút hỏi riêng một ngày — hỏi buổi hoặc tuần đã phủ nó. Library reader: một buổi đang mở
+  của **mọi** plan COROS có id (`remoteId` + `idInPlan`) có nút Ask Coach. Test ở
+  `test:schedule-change-renderer` (chip, wire, neo; nút trong reader) và `test:chat-context-compaction`.
 
 **Thứ tự:** P3.0 → (P3.1 ∥ P3.2) → P3.3 → (P3.4 ∥ P3.5). Cỡ việc thô: P3.0 ≈ 1–2 ngày (tuỳ lịch
 chạy probe), P3.1 ≈ 3 ngày, P3.2 ≈ 2 ngày, P3.3 ≈ 1–1.5 tuần, P3.4 ≈ 3 ngày, P3.5 ≈ 4 ngày.

@@ -620,6 +620,20 @@ test("a set proposed in imperial units is applied in them", async () => {
   assert.equal(changes.readScheduleChanges([imperial.changeSetId])[0].unitSystem, "imperial");
 });
 
+// --- P3.5: what the calendar pointed at survives the store ---------------------------
+
+test("a scheduleRefs anchor is kept through a save, unknown keys and all", () => {
+  const session = history.createChatSession("claude-api");
+  const ref = { scope: "session", day: tomorrow, planId: "R1", idInPlan: "5", label: "Long run", laterField: 1 };
+  history.saveChatSession(session.id, [
+    { kind: "scheduleRefs", refs: [ref, { scope: "fortnight", label: "not a scope" }] },
+    { kind: "message", role: "user", content: "Too long?" }
+  ]);
+  const [anchor] = history.getChatSession(session.id);
+  assert.equal(anchor.kind, "scheduleRefs");
+  assert.deepEqual(anchor.refs, [ref], "a ref this build cannot read is dropped; one it can keeps what it does not know");
+});
+
 // --- P3.4: an analysis leaves at most two cards ------------------------------------
 
 test("an analysis run leaves at most two cards, and says why the third is refused", async () => {

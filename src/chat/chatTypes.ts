@@ -10,6 +10,7 @@ import type {
   PlanDraftPreview,
   PlanEvent,
   PlanRef,
+  ScheduleRef,
   WorkoutDeletePreview
 } from "../../electron/types";
 
@@ -102,6 +103,12 @@ export interface ChatPlanRefsEntry {
   refs: PlanRef[];
 }
 
+/** The calendar or a COROS plan, pointed at when asking (P3.5); an anchor before the question. */
+export interface ChatScheduleRefsEntry {
+  kind: "scheduleRefs";
+  refs: ScheduleRef[];
+}
+
 /** The athlete or COROS changed a coach's creation (P1.3); an anchor. */
 export interface ChatPlanEventEntry {
   kind: "planEvent";
@@ -141,6 +148,7 @@ export type ChatEntry = (
   | ChatPlanDraftEntry
   | ChatPlanEventEntry
   | ChatPlanRefsEntry
+  | ChatScheduleRefsEntry
   | ChatPlanBriefEntry
   | ChatPlanOutlineEntry
   | ChatWorkoutDeleteEntry
@@ -310,6 +318,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   planDraft: ["draft"],
   planEvent: ["event"],
   planRefs: ["refs"],
+  scheduleRefs: ["refs"],
   planBrief: ["artifactId"],
   planOutline: ["artifactId", "outlineVersion"],
   workoutDelete: ["preview"],
@@ -353,6 +362,9 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "scheduleRefs") {
+    return { kind: "scheduleRefs", refs: entry.refs };
   }
   if (entry.kind === "planBrief") {
     return { kind: "planBrief", artifactId: entry.artifactId };
@@ -431,6 +443,9 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   }
   if (entry.kind === "planRefs") {
     return { kind: "planRefs", refs: entry.refs };
+  }
+  if (entry.kind === "scheduleRefs") {
+    return { kind: "scheduleRefs", refs: entry.refs };
   }
   if (entry.kind === "planBrief") {
     return { kind: "planBrief", artifactId: entry.artifactId };

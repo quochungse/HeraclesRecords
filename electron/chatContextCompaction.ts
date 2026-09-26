@@ -8,7 +8,8 @@ import type {
   PlanDraftPreview,
   PlanEvent,
   PlanRef,
-  ScheduleChangeSet
+  ScheduleChangeSet,
+  ScheduleRef
 } from "./types";
 import { briefLine, outlineLine } from "./planBrief";
 
@@ -174,6 +175,8 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
     } else if (entry.kind === "planRefs") {
       // Rides on the question it was attached to, which follows it.
       events.push(planRefsNote(entry.refs));
+    } else if (entry.kind === "scheduleRefs") {
+      events.push(scheduleRefsNote(entry.refs));
     } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
@@ -198,6 +201,29 @@ export function planRefsNote(refs: readonly PlanRef[]): string {
     return `the ${what} "${ref.name}"${version} (draft_id ${ref.draftId}) — ${where}`;
   });
   return `[The athlete is asking about ${lines.join("; and ")}. Read it with get_plan_draft if you need more than this.]`;
+}
+
+/**
+ * What on the calendar or in a COROS plan the athlete pointed at (P3.5), as a
+ * line in front of their question — with the ids the read tools take, so the
+ * coach reads what it is about instead of guessing from the words.
+ */
+export function scheduleRefsNote(refs: readonly ScheduleRef[]): string {
+  const lines = refs.map((ref) => {
+    if (ref.scope === "week") return `the week ${ref.label}${ref.day ? ` (from ${ref.day}; read it with list_scheduled_workouts)` : ""}`;
+    if (ref.scope === "day") return `the day ${ref.label}${ref.day ? ` (${ref.day})` : ""}`;
+    if (ref.activityId) return `the activity ${ref.label} (activity_id ${ref.activityId})`;
+    const ids = [
+      ref.planId ? `plan_id ${ref.planId}` : undefined,
+      ref.idInPlan ? `id_in_plan ${ref.idInPlan}` : undefined,
+      ref.day ? `on ${ref.day}` : undefined
+    ].filter(Boolean);
+    return `the session ${ref.label}${ids.length ? ` (${ids.join(", ")})` : ""}`;
+  });
+  return (
+    `[The athlete is asking about ${lines.join("; and ")}. ` +
+    "Read what you need with list_scheduled_workouts, get_training_plan or get_activity_detail.]"
+  );
 }
 
 /** A `planEvent` as a line in front of the coach, where it happened. */

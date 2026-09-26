@@ -231,6 +231,72 @@ async function main() {
     "the transcript keeps an anchor, not the set"
   );
 
+  // P3.5: the calendar points at a session, and the chip rides in front of the question.
+  const REF = { scope: "session", day: "20260927", planId: "R1", idInPlan: "5", label: "Sat 27 Sep · Long run" };
+  await harness("mount", "ChatView", { pendingPrompt: { prompt: "How should I approach it?", scheduleRefs: [REF] } }, {
+    ...BASE_SCRIPT,
+    getChatSession: TRANSCRIPT.slice(0, 2),
+    getScheduleChanges: []
+  });
+  await waitFor(() => harness("exists", ".chat-schedule-refs-pending .chat-ref-chip"), "the chip waits by the composer");
+  assert.match(await harness("text", ".chat-schedule-refs-pending .chat-ref-chip"), /Sat 27 Sep · Long run/);
+  assert.equal(await harness("value", "textarea"), "How should I approach it?", "the question is the athlete's to finish");
+  await harness("keyDown", "textarea", "Enter");
+  const asked = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question is sent");
+  const wire = asked.args[1];
+  assert.match(
+    wire.at(-1).content,
+    /^\[The athlete is asking about the session Sat 27 Sep · Long run \(plan_id R1, id_in_plan 5, on 20260927\)\. Read what you need with list_scheduled_workouts, get_training_plan or get_activity_detail\.\]\n\nHow should I approach it\?$/,
+    "the ref is folded into the question, with the ids the tools take"
+  );
+  await waitFor(() => harness("exists", ".chat-refs-row"), "the question shows what it was about");
+  assert.equal(await harness("exists", ".chat-schedule-refs-pending"), false, "the chip went with the question");
+  const savedRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  const at = savedRefs.findIndex((entry) => entry.kind === "scheduleRefs");
+  assert.ok(at >= 0, "the refs are saved as an anchor");
+  assert.deepEqual(savedRefs[at].refs, [REF]);
+  assert.equal(savedRefs[at + 1]?.content, "How should I approach it?", "just before the question");
+
+  // P3.5: any COROS plan's session is asked about from the Library reader — not only Coach's plans.
+  const run = (id, week, day, title, idInPlan) => ({
+    id,
+    weekIndex: week,
+    dayIndex: day,
+    sortOrder: 0,
+    title,
+    workout: { key: id, name: title, sport: "run", steps: [{ kind: "training", target_type: "time", target_duration_seconds: 1800 }] },
+    ...(idInPlan ? { idInPlan } : {})
+  });
+  const LIBRARY_PLAN = {
+    id: "coros:T1",
+    remoteId: "T1",
+    remoteVersion: 1,
+    name: "Base block",
+    description: "",
+    sportMix: ["run"],
+    weekCount: 2,
+    weekStages: [],
+    entries: [run("e1", 0, 1, "Easy", "1"), run("e2", 1, 3, "Tempo", "4")],
+    calendar: "unscheduled",
+    tags: [],
+    favorite: false,
+    archived: false,
+    updatedAt: "2026-09-01T00:00:00.000Z"
+  };
+  await harness("mount", "PlanReader", { plan: LIBRARY_PLAN, askAboutSessions: true, width: 1000, height: 900 });
+  await waitFor(() => harness("exists", ".plan-entry"), "the reader draws its sessions");
+  await page(`[...document.querySelectorAll(".plan-entry")].find((row) => row.textContent.includes("Tempo")).click()`);
+  await waitFor(() => harness("exists", ".plan-session-ask"), "the open session offers Ask Coach");
+  await harness("click", ".plan-session-ask");
+  const [ask] = await harness("calls", "prop:onAskCoachAboutSession");
+  assert.equal(ask.args[1].idInPlan, "4");
+  assert.equal(ask.args[2], "Tempo · Week 2 · Thu · Base block");
+  await harness("mount", "PlanReader", { plan: LIBRARY_PLAN, width: 1000, height: 900 });
+  await waitFor(() => harness("exists", ".plan-entry"), "drawn again, with nowhere to ask");
+  await page(`[...document.querySelectorAll(".plan-entry")].find((row) => row.textContent.includes("Tempo")).click()`);
+  await waitFor(() => harness("exists", ".plan-session"), "the session opens");
+  assert.equal(await harness("exists", ".plan-session-ask"), false, "no button without somewhere to send it");
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((text) => !/act\(|ReactDOMTestUtils|COROS is away/.test(text)), []);
   console.log("schedule change renderer tests passed");

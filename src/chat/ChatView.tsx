@@ -78,7 +78,8 @@ import type {
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutDeletePreview,
-  ScheduleChangeSet
+  ScheduleChangeSet,
+  ScheduleRef
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { sportTheme } from "../training-library/sportTheme";
@@ -346,6 +347,11 @@ const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
+}
+
+/** One chip per thing pointed at. */
+function scheduleRefKey(ref: ScheduleRef): string {
+  return `${ref.scope}|${ref.day ?? ""}|${ref.planId ?? ""}|${ref.idInPlan ?? ""}|${ref.activityId ?? ""}`;
 }
 
 function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
@@ -1141,6 +1147,13 @@ export function ChatView({
   };
 
   /**
+   * The calendar or a COROS plan, pointed at from its screen and waiting
+   * beside the composer until the next question goes (P3.5). Sent as a
+   * `scheduleRefs` entry just before it.
+   */
+  const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
+
+  /**
    * Coach opened from the Library about a plan it wrote: the conversation that
    * wrote it, with the plan beside the composer. A conversation deleted since
    * took the plan's drafts with it, so a new one starts from the plan's name.
@@ -1149,6 +1162,13 @@ export function ChatView({
     if (!api) return;
     if (request.newPlan) {
       await startPlanConversation();
+      return;
+    }
+    // The calendar is the athlete's, not a conversation's: the chips join the one open.
+    if (request.scheduleRefs?.length) {
+      setPendingScheduleRefs(request.scheduleRefs.slice(0, 3));
+      composerRef.current?.setDraft(request.prompt ?? "");
+      requestAnimationFrame(() => composerRef.current?.focus());
       return;
     }
     const sessionId = request.draftId
@@ -1201,6 +1221,7 @@ export function ChatView({
   const resetEphemeralChatState = () => {
     // A reference belongs to the conversation it was picked in.
     setPendingRefs([]);
+    setPendingScheduleRefs([]);
     setUploadedPlans({});
     pendingCoachPromptsRef.current = [];
     resumedCoachPromptRef.current = null;
@@ -2724,14 +2745,18 @@ export function ChatView({
         : entry
     );
     const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
+    // A step and an answer to Coach's question are not about the calendar chips.
+    const scheduleRefs = originalPrompt || aboutRefs || pipeline ? [] : pendingScheduleRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
           ...answeredTimeline,
           ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
+          ...(scheduleRefs.length ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs }] : []),
           { kind: "message", role: "user", content: trimmed }
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
+    if (scheduleRefs.length) setPendingScheduleRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -4045,6 +4070,23 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "scheduleRefs") {
+              return (
+                <div
+                  key={`scheduleRefs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={scheduleRefKey(ref)} className="chat-ref-chip">
+                      {ref.label}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
             if (entry.kind === "planBrief") {
               const brief = planBriefs[entry.artifactId];
               if (!brief) return null;
@@ -4480,6 +4522,28 @@ function AnalysisSilentChip({
         </div>
       </div>
 
+          {pendingScheduleRefs.length ? (
+            <div className="chat-refs-pending chat-schedule-refs-pending" aria-label="Asking about the calendar">
+              <span className="chat-asked-kicker">Asking about</span>
+              {pendingScheduleRefs.map((ref) => (
+                <span key={scheduleRefKey(ref)} className="chat-ref-chip">
+                  {ref.label}
+                  <button
+                    type="button"
+                    className="chat-ref-remove"
+                    aria-label={`Stop asking about ${ref.label}`}
+                    onClick={() =>
+                      setPendingScheduleRefs((current) =>
+                        current.filter((item) => scheduleRefKey(item) !== scheduleRefKey(ref))
+                      )
+                    }
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {pendingRefs.length ? (
             <div className="chat-refs-pending" aria-label="Asking about">
               <span className="chat-asked-kicker">Asking about</span>
