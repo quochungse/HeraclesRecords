@@ -65,9 +65,11 @@
   --success-text: #6ee7a8;
   --success-dot: #34d399;
 
-  --warning-bg: rgba(216, 155, 34, 0.15);
-  --warning-border: rgba(251, 191, 36, 0.25);
-  --warning-text: #fbbf24;
+  /* Orange, not amber: the default accent is gold (#e7b04c), and a warning
+     in #fbbf24 beside it read as one more accent rather than as a warning. */
+  --warning-bg: rgba(251, 146, 60, 0.14);
+  --warning-border: rgba(251, 146, 60, 0.3);
+  --warning-text: #fb923c;
 
   --error-bg: rgba(194, 65, 12, 0.15);
   --error-border: rgba(248, 113, 113, 0.25);
@@ -302,9 +304,9 @@ svg:focus-visible {
   --success-text: #0f6f4b;
   --success-dot: #12915f;
 
-  --warning-bg: rgba(180, 122, 18, 0.15);
-  --warning-border: rgba(180, 122, 18, 0.36);
-  --warning-text: #8a5d09;
+  --warning-bg: rgba(154, 77, 11, 0.12);
+  --warning-border: rgba(154, 77, 11, 0.34);
+  --warning-text: #9a4d0b;
 
   --error-bg: rgba(185, 40, 30, 0.11);
   --error-border: rgba(185, 40, 30, 0.3);
@@ -16436,7 +16438,10 @@ tr.data-intervals-row-missing {
   flex: 0 1 auto;
   width: 100%;
   max-width: 980px;
-  max-height: 100%;
+  /* One height for both tabs: sized by content, the sheet shrank by 155px
+     when Versions was picked and grew back on Plan. */
+  height: 100%;
+  max-height: 880px;
   margin: auto;
   background: var(--menu-surface);
   box-shadow: var(--shadow-elevated);
@@ -17881,7 +17886,12 @@ tr.data-intervals-row-missing {
     color var(--dur-fast) var(--ease);
 }
 
-.chat-creations-pill:hover {
+.chat-creations-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-creations-pill:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
   background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
   color: var(--text-primary);
@@ -20169,8 +20179,10 @@ tr.data-intervals-row-missing {
   line-height: 1.3;
 }
 
+/* Neutral: the kicker names a kind of card, and the accent is kept for the
+   one thing on a card to press. */
 .chat-creation-kicker {
-  color: var(--chat-signal-strong);
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -20189,12 +20201,17 @@ tr.data-intervals-row-missing {
   flex: none;
   padding: 3px 9px;
   border-radius: var(--radius-pill);
-  color: var(--chat-signal-strong);
-  background: var(--chat-signal-soft);
+  color: var(--text-secondary);
+  background: var(--glass-bg-elevated);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.chat-creation-status[data-tone="pending"] {
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .chat-creation-status[data-saved="true"] {
@@ -20289,6 +20306,17 @@ tr.data-intervals-row-missing {
   padding-left: 0;
   border-left: 0;
   color: var(--text-muted);
+}
+
+/* A day of the strip the plan does not run on: before its first session or
+   after its last. Hatched and unlabelled, so it cannot read as a rest day. */
+.chat-creation-days > li.is-outside {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in srgb, var(--text-muted) 12%, transparent) 5px 10px
+  );
+  opacity: 0.6;
 }
 
 /* A plan brief (P2.1): the generator's snapshot rows, each marked with where
@@ -20756,9 +20784,9 @@ tr.data-intervals-row-missing {
   padding: 9px 12px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--chat-signal-strong);
-  background: var(--chat-signal-soft);
-  border: 1px solid var(--chat-signal-border);
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-sm);
 }
 
@@ -21348,7 +21376,7 @@ tr.data-intervals-row-missing {
 }
 
 .chat-change-line[data-status="applied"] .chat-change-line-status {
-  color: var(--chat-signal-strong);
+  color: var(--success-text);
 }
 
 .chat-change-line[data-status="failed"] .chat-change-line-status {

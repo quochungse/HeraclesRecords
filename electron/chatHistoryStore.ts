@@ -1417,6 +1417,14 @@ export function deriveSessionTitleFromEntries(
   return DEFAULT_SESSION_TITLE;
 }
 
+/**
+ * The line under a conversation's title: the last thing said in it. A card
+ * came after the words that introduced it, so reading back to the first card
+ * made the preview its summary ("Run · structured"), which says nothing about
+ * the conversation. A question still waiting for the athlete outranks what
+ * was said, because it is something to do; cards speak only when nothing was
+ * said at all.
+ */
 function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
@@ -1424,15 +1432,19 @@ function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
       const preview = entry.content.trim().replace(/\s+/g, " ");
       return preview.length > 80 ? `${preview.slice(0, 80)}…` : preview;
     }
+    if (entry.kind === "coachPrompt" && !entry.prompt.answeredAt) {
+      return `Waiting for your answer: ${entry.prompt.question}`;
+    }
+  }
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
     if (entry.kind === "planDraft") {
       // A removed creation is not what the conversation is about any more.
       if (entry.draft.removedAt) continue;
-      return entry.draft.summary || entry.draft.name;
+      return entry.draft.name || entry.draft.summary;
     }
     if (entry.kind === "coachPrompt") {
-      return entry.prompt.answeredAt
-        ? entry.prompt.question
-        : `Waiting for your answer: ${entry.prompt.question}`;
+      return entry.prompt.question;
     }
     if (entry.kind === "workoutDelete") {
       return entry.preview.summary;

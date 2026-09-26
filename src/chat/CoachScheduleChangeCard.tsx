@@ -27,12 +27,13 @@ export function CoachScheduleChangeCard({
 }) {
   const open = proposedLines(changeSet);
   const busy = Boolean(busyLine) || disabled;
-  const deletion = changeSet.lines.every((line) => line.op === "remove" || line.op === "deleteWorkout");
+  // One kicker for every set: a set of removals read "Delete", which named an
+  // operation as though it were the kind of card.
   return (
     <article className="chat-plan-card chat-creation-card chat-change-card" data-change-set-id={changeSet.changeSetId}>
       <header className="chat-creation-head">
         <div>
-          <span className="chat-creation-kicker">{deletion ? "Delete" : "Calendar changes"}</span>
+          <span className="chat-creation-kicker">Calendar changes</span>
           <h4>{changeSet.summary}</h4>
           <span className="chat-plan-card-summary">{changeSetHead(changeSet)}</span>
         </div>

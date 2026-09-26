@@ -328,9 +328,9 @@ async function currentSession(
 ): Promise<{ entry: TrainingHubScheduledWorkoutEntry } | { stale: string }> {
   const entries = await deps.listScheduledWorkoutEntries(session.happenDay, session.happenDay);
   const entry = entries.find((candidate) => candidate.planId === session.planId && candidate.idInPlan === session.idInPlan);
-  if (!entry) return { stale: `"${session.name}" is no longer on the calendar on ${dashed(session.happenDay)}.` };
+  if (!entry) return { stale: `"${session.name}" is no longer on the calendar on ${cardDay(session.happenDay)}.` };
   if (session.name && entry.name !== session.name) {
-    return { stale: `The session on ${dashed(session.happenDay)} is now "${entry.name}", not "${session.name}".` };
+    return { stale: `The session on ${cardDay(session.happenDay)} is now "${entry.name}", not "${session.name}".` };
   }
   return { entry };
 }
@@ -356,7 +356,7 @@ async function applyRemove(line: ScheduleChangeLine, deps: ScheduleChangeDeps): 
 
 /** A day gone by the time the line is applied: COROS refuses one, and the proposal was about the days ahead. */
 function pastDay(day: string, deps: ScheduleChangeDeps): string | undefined {
-  return day < deps.today() ? `${dashed(day)} has passed.` : undefined;
+  return day < deps.today() ? `${cardDay(day)} has passed.` : undefined;
 }
 
 async function applyMove(line: ScheduleChangeLine, deps: ScheduleChangeDeps): Promise<LineOutcome> {
@@ -408,7 +408,7 @@ async function applyAdd(line: ScheduleChangeLine, deps: ScheduleChangeDeps, unit
   const onDay = await deps.listScheduledWorkoutEntries(line.toDay, line.toDay);
   const sameName = onDay.filter((entry) => entry.name === line.workout!.name).length;
   if (sameName > (line.sameNameOnDay ?? 0)) {
-    return { status: "stale", reason: `"${line.workout.name}" is already on the calendar on ${dashed(line.toDay)}.` };
+    return { status: "stale", reason: `"${line.workout.name}" is already on the calendar on ${cardDay(line.toDay)}.` };
   }
   await deps.moves.createAndScheduleWorkout({ ...line.workout, save_to_library: false }, line.toDay, unitSystem, false);
   return { status: "applied" };
@@ -423,6 +423,19 @@ async function applyDeleteWorkout(line: ScheduleChangeLine, deps: ScheduleChange
   return { status: "applied" };
 }
 
-export function dashed(day: string): string {
-  return /^\d{8}$/.test(day) ? `${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6)}` : day;
+const CARD_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const CARD_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/**
+ * `Sat 27 Sep`, as a card line reads. The reason a line went out of date is
+ * read on the same card as its label, so it names the day the same way —
+ * it used to print `2026-09-29` under a label that said `Tue 29 Sep`.
+ */
+export function cardDay(day: string): string {
+  const digits = day.replace(/-/g, "");
+  if (!/^\d{8}$/.test(digits)) return day;
+  const date = new Date(Number(digits.slice(0, 4)), Number(digits.slice(4, 6)) - 1, Number(digits.slice(6, 8)), 12);
+  return Number.isNaN(date.valueOf())
+    ? day
+    : `${CARD_DAY_NAMES[date.getDay()]} ${date.getDate()} ${CARD_MONTH_NAMES[date.getMonth()]}`;
 }

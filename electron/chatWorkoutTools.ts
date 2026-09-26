@@ -42,7 +42,7 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
-import { createScheduleChangeSet, type NewScheduleChangeLine } from "./chatScheduleChanges";
+import { cardDay, createScheduleChangeSet, type NewScheduleChangeLine } from "./chatScheduleChanges";
 import { CHAT_PLAN_TOOL_NAMES, getChatPlanTools, handleChatPlanTool, isChatPlanTool } from "./chatPlanTools";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
@@ -1776,14 +1776,6 @@ function formatDisplayScheduleDate(value?: string): string | undefined {
 }
 
 const MAX_SCHEDULE_CHANGES = 20;
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
-
-/** `Sat 27 Sep`, as a card line reads. */
-function cardDay(day: string): string {
-  const date = parsePlanDay(day);
-  return date ? `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}` : day;
-}
 
 function normalizedDay(value: unknown): string | undefined {
   const day = typeof value === "string" ? value.replace(/-/g, "").trim() : "";

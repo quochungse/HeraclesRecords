@@ -1086,6 +1086,27 @@ assert.equal(restoredVisual[0].preview.sportType, 100);
     "Plan my week"
   );
 
+  // A card after the words that introduced it does not speak for the
+  // conversation either: its summary ("Run · structured") says nothing.
+  const cardAfterWords = createChatSession("claude-code", removedDb);
+  saveChatSession(
+    cardAfterWords.id,
+    [keptMessage, { kind: "message", role: "assistant", content: "Here it is." }, structuredClone(oneOffWorkoutEntry)],
+    removedDb,
+    { knownEntryCount: 0 }
+  );
+  assert.equal(
+    listChatSessions("claude-code", removedDb).find((row) => row.id === cardAfterWords.id).preview,
+    "Here it is."
+  );
+  // With nothing said at all, the card names it.
+  const cardOnly = createChatSession("claude-code", removedDb);
+  saveChatSession(cardOnly.id, [structuredClone(oneOffWorkoutEntry)], removedDb, { knownEntryCount: 0 });
+  assert.equal(
+    listChatSessions("claude-code", removedDb).find((row) => row.id === cardOnly.id).preview,
+    oneOffWorkoutEntry.draft.name
+  );
+
   // And a draft that was never removed keeps saying nothing about it, rather
   // than gaining a null field that a `deepEqual` elsewhere would trip on.
   assert.equal(

@@ -108,6 +108,11 @@ import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import { refinementChips } from "./creationChoices";
+import {
+  requestRuntime,
+  runtimeFromSettings,
+  type GeneratorRuntime
+} from "../training-library/planGeneratorRuntime";
 import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
 import {
   creationVersions,
@@ -2373,9 +2378,38 @@ export function ChatView({
 
 
 
+  /**
+   * Whether the open conversation holds nothing and nothing hangs off it: no
+   * entry, and no analysis attached. Such a conversation is a blank page, not
+   * a record — New chat reuses it, and leaving it lets it go, so the list
+   * stops collecting rows called "New chat" with nothing in them.
+   */
+  const openConversationIsBlank = () =>
+    Boolean(
+      activeSessionId &&
+        timeline.length === 0 &&
+        !liveAnalysis &&
+        !sessionAttention.get(activeSessionId)?.attached &&
+        (sessions.find((session) => session.id === activeSessionId)?.messageCount ?? 0) === 0
+    );
+  const letGoOfBlankConversation = async () => {
+    if (!api || !activeSessionId || !openConversationIsBlank()) return;
+    const blankId = activeSessionId;
+    try {
+      await api.deleteChatSession(blankId);
+      setSessions((current) => current.filter((session) => session.id !== blankId));
+    } catch {
+      // Keeping an empty row is harmless; failing to leave it would not be.
+    }
+  };
+
   const handleNewChat = async () => {
     if (!api || streaming || exportingLatestActivity) return;
     onError(null);
+    if (openConversationIsBlank()) {
+      requestAnimationFrame(() => composerRef.current?.focus());
+      return;
+    }
     try {
       // The conversation being left may still owe its row a save; see loadSession.
       await flushPendingSave();
@@ -2395,6 +2429,7 @@ export function ChatView({
       return;
     }
     onError(null);
+    await letGoOfBlankConversation();
     await loadSession(sessionId);
   };
 
@@ -3242,7 +3277,25 @@ export function ChatView({
     }
   };
 
-  const isLocalProvider = chatSettings.provider === "local";
+  /*
+   * The AI that answers in this conversation, resolved the way `streamChat`
+   * resolves it: the conversation's own choice where it made one, Coach's
+   * settings for the rest. The composer's pickers show and change this — they
+   * used to show Coach's settings, so a conversation with an AI of its own
+   * answered with one model while the pill named another.
+   */
+  const conversationRuntime = conversationSettings?.runtime;
+  const effectiveRuntime: GeneratorRuntime = {
+    ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? chatSettings.provider),
+    ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
+    ...(conversationRuntime?.effort ? { effort: conversationRuntime.effort } : {})
+  };
+  const effectiveProvider = effectiveRuntime.provider;
+  // What the composer can send is the conversation's AI.
+  const isLocalProvider = effectiveProvider === "local";
+  // The sign-in gates stay on Coach's own provider: a gate replaces the whole
+  // conversation, and one whose AI lacks a key is still worth reading — the
+  // send checks that key and names it instead.
   const isClaudeProvider = chatSettings.provider === "claude-code";
   const isOpenRouterProvider = chatSettings.provider === "openrouter";
   const isClaudeApiProvider = chatSettings.provider === "claude-api";
@@ -3352,54 +3405,75 @@ export function ChatView({
     setOpenCreationId(null);
   }, [activeSessionId]);
 
-  const providerSwitch = (
-    <ProviderSwitch
-      provider={chatSettings.provider}
-      disabled={savingSettings || isBusy}
-      onChange={(provider) => void handleProviderChange(provider)}
-    />
-  );
-  const selectedModel =
-    chatSettings.provider === "claude-api"
-      ? chatSettings.anthropic.model
-      : chatSettings.provider === "claude-code"
-        ? chatSettings.claudeCode.model ?? ""
-        : chatSettings.provider === "openrouter"
-          ? chatSettings.openRouter.model
-          : chatSettings.chatgpt.model ?? "";
-  const selectedEffort =
-    chatSettings.provider === "claude-api"
-      ? chatSettings.anthropic.effort
-      : chatSettings.claudeCode.effort;
-  const providerControls = (
+  /*
+   * A change made in the composer is this conversation's (Q1 of the Coach
+   * Workbench review): it is written to the conversation's settings, and only
+   * what differs from Coach's settings is stored, so picking Coach's own AI
+   * clears the override. With no conversation open yet, there is nothing to
+   * scope it to and it changes Coach's settings as before.
+   */
+  const coachRuntime = runtimeFromSettings(chatSettings);
+  const changeCoachRuntime = (next: GeneratorRuntime) => {
+    if (next.provider !== chatSettings.provider) void handleProviderChange(next.provider);
+    else if (next.model !== coachRuntime.model) void handleModelChange(next.model);
+    else if (next.effort !== coachRuntime.effort) void handleEffortChange(next.effort);
+  };
+  const changeConversationRuntime = (next: GeneratorRuntime) => {
+    if (!conversationSettings) {
+      changeCoachRuntime(next);
+      return;
+    }
+    const override = requestRuntime(next, chatSettings);
+    const { runtime: _previous, ...rest } = conversationSettings;
+    updateConversationSettings(override ? { ...rest, runtime: override } : rest);
+    if (next.provider === "claude-code" && api) {
+      void api.getClaudeCodeStatus().then(setClaudeStatus).catch(() => undefined);
+    }
+  };
+  /*
+   * The same three pickers for two subjects: the composer's change this
+   * conversation, and a sign-in gate's change Coach's own settings — the gate
+   * is about Coach's provider, so a pick scoped to the conversation would
+   * leave the athlete standing in front of it.
+   */
+  const renderProviderControls = (
+    runtime: GeneratorRuntime,
+    change: (next: GeneratorRuntime) => void
+  ) => (
     <div className="chat-provider-controls">
-      {providerSwitch}
+      <ProviderSwitch
+        provider={runtime.provider}
+        disabled={savingSettings || isBusy}
+        onChange={(provider) => change(runtimeFromSettings(chatSettings, provider))}
+      />
       <ModelSwitch
-        provider={chatSettings.provider}
-        model={selectedModel}
+        provider={runtime.provider}
+        model={runtime.model}
         defaultModel={
-          chatSettings.provider === "claude-code"
+          runtime.provider === "claude-code"
             ? (claudeStatus?.defaultModel ??
               chatSettings.claudeCode.defaultModel)
             : undefined
         }
         availableModels={
-          chatSettings.provider === "claude-code"
+          runtime.provider === "claude-code"
             ? (claudeStatus?.availableModels ??
               chatSettings.claudeCode.availableModels)
             : undefined
         }
         disabled={savingSettings || isBusy}
-        onChange={(model) => void handleModelChange(model)}
+        onChange={(model) => change({ ...runtime, model })}
       />
       <EffortSwitch
-        provider={chatSettings.provider}
-        effort={selectedEffort}
+        provider={runtime.provider}
+        effort={runtime.effort}
         disabled={savingSettings || isBusy}
-        onChange={(effort) => void handleEffortChange(effort)}
+        onChange={(effort) => change({ ...runtime, effort })}
       />
     </div>
   );
+  const providerControls = renderProviderControls(effectiveRuntime, changeConversationRuntime);
+  const coachProviderControls = renderProviderControls(coachRuntime, changeCoachRuntime);
 
   const conversationSidebarOpen = chatSettings.sidebarOpen !== false;
   const sidebarProps = {
@@ -3510,7 +3584,7 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
@@ -3605,7 +3679,7 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
@@ -3673,7 +3747,7 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
@@ -3733,7 +3807,7 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
@@ -3960,26 +4034,31 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          {listedCreations.length > 0 ? (
-            <button
-              type="button"
-              className="chat-creations-pill"
-              aria-expanded={planPanelOpen}
-              aria-controls="chat-creations-panel"
-              onClick={() => setPlanPanelOpen((open) => !open)}
-              title={
-                planPanelOpen ? "Hide Coach creations" : "Show Coach creations"
-              }
-            >
-              {planPanelOpen ? (
-                <PanelRightClose size={13} aria-hidden="true" />
-              ) : (
-                <PanelRightOpen size={13} aria-hidden="true" />
-              )}
-              Creations
-              <span className="chat-creations-count">{listedCreations.length}</span>
-            </button>
-          ) : null}
+          {/* Always drawn, so the header's controls stay where they are from one
+              conversation to the next; with nothing made it is only disabled. */}
+          <button
+            type="button"
+            className="chat-creations-pill"
+            aria-expanded={planPanelOpen}
+            aria-controls="chat-creations-panel"
+            disabled={listedCreations.length === 0}
+            onClick={() => setPlanPanelOpen((open) => !open)}
+            title={
+              listedCreations.length === 0
+                ? "Nothing made in this conversation yet"
+                : planPanelOpen
+                  ? "Hide Coach creations"
+                  : "Show Coach creations"
+            }
+          >
+            {planPanelOpen ? (
+              <PanelRightClose size={13} aria-hidden="true" />
+            ) : (
+              <PanelRightOpen size={13} aria-hidden="true" />
+            )}
+            Creations
+            <span className="chat-creations-count">{listedCreations.length}</span>
+          </button>
           {isChatGptProvider ? (
             <button
               type="button"

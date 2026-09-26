@@ -1220,7 +1220,9 @@ function formatRunStepSummary(
           : step.target_duration_seconds !== undefined
             ? `${Math.round(step.target_duration_seconds / 60)} min`
             : undefined;
-  const intensity = step.intensity
+  // A step with no intensity says nothing about one: "@ Not set" three times
+  // over told the athlete only that a field was empty.
+  const intensity = step.intensity && step.intensity.type !== "none"
     ? `@ ${formatWorkoutIntensityForUnits(step.intensity, unitSystem)}`
     : step.pace
       ? `@ ${formatLegacyPaceForUnits(step.pace, unitSystem)}`

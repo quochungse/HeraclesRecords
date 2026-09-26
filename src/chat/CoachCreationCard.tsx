@@ -33,6 +33,29 @@ export interface CreationFigures {
   reading: PlanReaderWeek[];
   /** The first week with a session in it, for the strip under the ridge. */
   firstWeek?: PlanReaderWeek;
+  /**
+   * First and last day of a plan whose every session is dated, `YYYY-MM-DD`.
+   * A day of the strip outside it is not a rest day: the plan is not running
+   * then, and calling it "Rest" said something untrue about the plan.
+   */
+  span?: { first: string; last: string };
+}
+
+/** The dated span of a plan, when every session has a date. */
+export function datedSpan(document: TrainingPlanDocument): { first: string; last: string } | undefined {
+  const days = document.entries
+    .map((entry) => parsePlanDay(entry.workout.schedule_date))
+    .filter((date): date is Date => Boolean(date))
+    .map((date) => formatPlanDay(date, true))
+    .sort();
+  return days.length && days.length === document.entries.length
+    ? { first: days[0], last: days[days.length - 1] }
+    : undefined;
+}
+
+/** Whether a strip day lies outside a dated plan's span. */
+export function outsideSpan(date: string | undefined, span: CreationFigures["span"]): boolean {
+  return Boolean(date && span && (date < span.first || date > span.last));
 }
 
 /**
@@ -76,29 +99,37 @@ export function creationFigures(document: TrainingPlanDocument): CreationFigures
     peakWeek: `${formatRidgeValue(peak, measure)} ${RIDGE_UNITS[measure]}`,
     sports: sports.map((sport) => formatWorkoutSport(sport)).join(", "),
     reading: weeks,
-    firstWeek: busy[0]
+    firstWeek: busy[0],
+    span: datedSpan(document)
   };
 }
 
-function WeekStrip({ week }: { week: PlanReaderWeek }) {
+function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigures["span"] }) {
   return (
     <div className="chat-creation-week">
       <span className="chat-creation-week-label">Week {week.weekIndex + 1}</span>
       <ol className="chat-creation-days">
-        {week.days.map((day) => (
-          <li key={day.dayIndex} className={day.entries.length ? "" : "is-rest"}>
-            <b>{day.label}</b>
-            {day.entries.length ? (
-              day.entries.map((entry) => (
-                <span key={entry.id} style={sportChipStyle(entry.sport)}>
-                  {entry.title}
-                </span>
-              ))
-            ) : (
-              <span>Rest</span>
-            )}
-          </li>
-        ))}
+        {week.days.map((day) => {
+          const outside = !day.entries.length && outsideSpan(day.date, span);
+          return (
+            <li
+              key={day.dayIndex}
+              className={day.entries.length ? "" : outside ? "is-outside" : "is-rest"}
+              title={outside ? "Not part of this plan" : undefined}
+            >
+              <b>{day.label}</b>
+              {day.entries.length ? (
+                day.entries.map((entry) => (
+                  <span key={entry.id} style={sportChipStyle(entry.sport)}>
+                    {entry.title}
+                  </span>
+                ))
+              ) : outside ? null : (
+                <span>Rest</span>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );
@@ -192,7 +223,11 @@ export function CoachCreationCard({
           ) : null}
         </div>
         <div className="chat-creation-head-aside">
-          <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
+          <span
+            className="chat-creation-status"
+            data-saved={status.saved ? "true" : "false"}
+            data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
+          >
             {calendar?.running && status.saved ? "On calendar" : status.label}
           </span>
           <button
@@ -232,10 +267,12 @@ export function CoachCreationCard({
       {figures && figures.reading.length > 2 ? (
         <PlanWeekRidge weeks={figures.reading} onJump={() => onOpen()} />
       ) : null}
-      {figures?.firstWeek ? <WeekStrip week={figures.firstWeek} /> : null}
+      {figures?.firstWeek ? <WeekStrip week={figures.firstWeek} span={figures.span} /> : null}
 
       {isWorkout && entry?.stepsSummary ? (
-        <p className="chat-creation-steps">{entry.stepsSummary}</p>
+        // Summaries written before the builder stopped printing an empty
+        // intensity still carry it; the card drops it the same way.
+        <p className="chat-creation-steps">{entry.stepsSummary.replace(/ @ Not set\b/g, "")}</p>
       ) : null}
 
       {status.saved ? (
@@ -266,7 +303,10 @@ export function CoachCreationCard({
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
       />
-      {refinements?.length && !editing ? (
+      {/* A saved one-off workout is not changed from the conversation — nothing
+          on COROS would follow — so it offers no follow-ups that would write
+          a version the Library copy never hears about. */}
+      {refinements?.length && !editing && !(isWorkout && status.saved) ? (
         <div className="chat-refine" aria-label="Ask Coach to change it">
           {refinements.map((text) => (
             <button

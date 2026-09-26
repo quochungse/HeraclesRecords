@@ -1215,6 +1215,22 @@ async function main() {
   );
   assert.match(keyError, /OpenRouter API key/, "the key this conversation's AI needs, not Coach's");
   assert.equal(await harness("callCount", "sendChat"), 0, "and nothing is sent to fail in the main process");
+  // The composer names the AI that answers here, not Coach's (R0.3): it used
+  // to show Coach's settings while the turn went to the conversation's own.
+  assert.equal(
+    await page(`[...document.querySelectorAll("[title]")].some((node) => node.title === "Coach provider: OpenRouter")`),
+    true,
+    "the provider pill shows the conversation's AI"
+  );
+  // And changing it changes this conversation, not Coach's settings.
+  await harness("clearCalls");
+  await page(`document.querySelector('.chat-provider-select [role="combobox"], .chat-provider-select.app-select-trigger, [title="Coach provider: OpenRouter"]').click()`);
+  await waitFor(() => harness("exists", '[role="option"]'), "the provider menu opens");
+  await page(`[...document.querySelectorAll('[role="option"]')].find((node) => node.textContent.includes("Claude subscription")).click()`);
+  await waitFor(() => harness("callCount", "setConversationSettings"), "the conversation's AI is written");
+  const written = (await harness("calls", "setConversationSettings"))[0].args[0];
+  assert.equal(written.runtime, undefined, "picking Coach's own AI clears the conversation's override");
+  assert.equal(await harness("callCount", "saveChatSettings"), 0, "and Coach's settings are left alone");
 
   // A pull that merged another machine's brief and settings.
   await harness("mount", "ChatView", {}, {
@@ -1312,6 +1328,88 @@ async function main() {
     afterStop.some((entry) => entry.kind === "planDraft" && entry.draft.draftId === "plan-3"),
     "the card a stopped turn produced is saved with the conversation"
   );
+
+  // -------------------------------------------------------------------------
+  // A dated plan's strip: a day the plan does not run on is not a rest day
+  // (R0.1), and a saved one-off workout offers no follow-ups (R0.2).
+  // -------------------------------------------------------------------------
+  const datedDocument = {
+    ...DOCUMENT,
+    id: "draft:dated-1",
+    name: "Two days",
+    weekCount: 1,
+    weekStages: [],
+    entries: [
+      { day: "20261001", dayIndex: 3, title: "Easy 40" },
+      { day: "20261003", dayIndex: 5, title: "Long 70" }
+    ].map((item, index) => ({
+      id: `entry:dated-1:${index}`,
+      weekIndex: 0,
+      dayIndex: item.dayIndex,
+      sortOrder: index,
+      title: item.title,
+      workout: {
+        key: `d${index}`,
+        name: item.title,
+        sport: "run",
+        schedule_date: item.day,
+        steps: [{ kind: "training", target_type: "time", target_duration_seconds: 2400 }]
+      }
+    }))
+  };
+  const savedWorkout = {
+    draftId: "workout-saved",
+    artifactType: "workout",
+    name: "Shakeout 20",
+    summary: "Run · structured",
+    entries: [{ key: "w", name: "Shakeout 20", sport: "run", saveToLibrary: true, stepsSummary: "warmup 10 min @ Not set → training 5 min @ Not set" }],
+    conflicts: [],
+    warnings: [],
+    uploadedAt: 5,
+    uploadResult: { destination: "workoutLibrary", workoutsCreated: 1, workoutsScheduled: 0 }
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      { kind: "message", role: "user", content: "Two runs this week" },
+      {
+        kind: "planDraft",
+        draft: {
+          ...PREVIEW,
+          draftId: "dated-1",
+          name: "Two days",
+          summary: "2 sessions · Thu 1 Oct – Sat 3 Oct · Run",
+          entries: PREVIEW.entries.slice(0, 2).map((entry, index) => ({
+            ...entry,
+            scheduleDate: index ? "2026-10-03" : "2026-10-01"
+          }))
+        }
+      },
+      { kind: "planDraft", draft: savedWorkout }
+    ],
+    getPlanDraftDocument: datedDocument
+  });
+  await waitFor(() => harness("exists", '[data-draft-id="dated-1"] .chat-creation-days'), "the dated plan draws its week");
+  const strip = await page(`[...document.querySelectorAll('[data-draft-id="dated-1"] .chat-creation-days > li')].map((li) => [li.className, li.textContent.trim()])`);
+  assert.deepEqual(
+    strip.map(([className]) => className),
+    ["is-outside", "is-outside", "is-outside", "", "is-rest", "", "is-outside"],
+    "Mon–Wed and Sun lie outside the plan; Fri inside it is a rest day"
+  );
+  assert.equal(
+    strip.filter(([className]) => className === "is-outside").some(([, text]) => text.includes("Rest")),
+    false,
+    "a day outside the plan is never called a rest day"
+  );
+  const workoutCard = '[data-draft-id="workout-saved"]';
+  await waitFor(() => harness("exists", workoutCard), "the saved workout is drawn");
+  assert.equal(await harness("exists", `${workoutCard} .chat-refine`), false, "a saved one-off workout offers no follow-ups");
+  assert.equal(
+    (await harness("text", `${workoutCard} .chat-creation-steps`)).includes("Not set"),
+    false,
+    "an empty intensity is not printed"
+  );
+  assert.equal(await harness("attr", `${workoutCard} .chat-creation-status`, "data-tone"), "saved");
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);

@@ -453,7 +453,11 @@ function ArtifactView({
           </span>
           <h2 title={title}>{title}</h2>
         </div>
-        <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
+        <span
+          className="chat-creation-status"
+          data-saved={status.saved ? "true" : "false"}
+          data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
+        >
           {calendar?.running && status.saved ? "On calendar" : status.label}
         </span>
         {onAsk ? (
