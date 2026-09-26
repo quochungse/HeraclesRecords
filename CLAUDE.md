@@ -803,7 +803,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   a provider and a model are **one** choice, so the pair comes whole from whichever side made
   it, the analysis first, and effort is taken the same way on its own — merged field by field,
   a model picked for Claude went out to the conversation's OpenRouter. The row goes with the
-  conversation.
+  conversation. The renderer's key check before a send asks about the **conversation's**
+  provider, and a pull touching `chat_conversation_settings` or `chat_plan_artifacts` makes
+  `ChatView` read the settings and the briefs again.
 
   **A plan longer than two weeks starts as a brief** (P2.1): `request_plan_brief` writes the
   generator's request — less the conversation's sources and AI — to a `chat_plan_artifacts` row,
@@ -820,7 +822,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   `ChatPipelineStep`; the athlete sees their words, and `streamOutlineStep` replaces them on the
   wire with the generator's outline prompt built from the brief. The turn is read-only, offered
   `propose_plan_outline`, and withheld every writing tool; a brief that is gone, has become a
-  plan or is still missing a field rejects the send before anything streams. The artifact keeps
+  plan or is still missing a field rejects the send before anything streams, and the renderer
+  then takes the step's words back out of the conversation (`remoteErrorMessage` strips Electron's
+  "Error invoking remote method" off the reason). The artifact keeps
   **one** outline (`outline_json`), with `outline_version` counting every draw, redraw and hand
   adjustment; the transcript holds `planOutline { artifactId, outlineVersion }` anchors and the
   card is drawn at the **latest** one, earlier ones folding to a line. Adjust outline

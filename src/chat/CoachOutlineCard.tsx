@@ -32,6 +32,7 @@ export function CoachOutlineCard({
   busy = false,
   editing = false,
   written = false,
+  blocked,
   onWriteSessions,
   onAdjust,
   onRedraw
@@ -43,6 +44,8 @@ export function CoachOutlineCard({
   editing?: boolean;
   /** The sessions are written (P2.3): the plan is changed from its own card from here on. */
   written?: boolean;
+  /** What the brief still misses for the sessions to be written, as the main process would refuse it. */
+  blocked?: string;
   onWriteSessions?: () => void;
   onAdjust?: () => void;
   onRedraw?: (note: string) => void;
@@ -170,8 +173,14 @@ export function CoachOutlineCard({
               <button
                 type="button"
                 className="chat-plan-upload"
-                disabled={busy || problems.length > 0}
-                title={problems.length ? "Adjust or redraw the outline so it fits the brief first" : undefined}
+                disabled={busy || problems.length > 0 || Boolean(blocked)}
+                title={
+                  blocked
+                    ? blocked
+                    : problems.length
+                      ? "Adjust or redraw the outline so it fits the brief first"
+                      : undefined
+                }
                 onClick={onWriteSessions}
               >
                 Write the sessions

@@ -98,6 +98,7 @@ import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
+import { remoteErrorMessage } from "./remoteError";
 import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
@@ -951,7 +952,7 @@ export function ChatView({
         setRedrawAsk(artifactId);
       }
     } catch (caught) {
-      setBriefSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+      setBriefSave({ saving: false, error: remoteErrorMessage(caught, "The brief was not saved.") });
     }
   };
   /** A brief changed under its outline: whether to have it redrawn (P2.2). */
@@ -968,7 +969,7 @@ export function ChatView({
       setOutlineSave({ saving: false });
       setEditingOutlineId(null);
     } catch (caught) {
-      setOutlineSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+      setOutlineSave({ saving: false, error: remoteErrorMessage(caught, "The outline was not saved.") });
     }
   };
   /**
@@ -976,6 +977,8 @@ export function ChatView({
    * the conversation opens; a turn reads it again in the main process.
    */
   const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
+  /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
+  const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
@@ -990,7 +993,7 @@ export function ChatView({
     return () => {
       live = false;
     };
-  }, [api, activeSessionId]);
+  }, [api, activeSessionId, conversationSettingsVersion]);
   const conversationSettingsWriteRef = useRef(0);
   const updateConversationSettings = (next: ConversationSettings) => {
     setConversationSettingsState(next);
@@ -1179,7 +1182,12 @@ export function ChatView({
    * the brief has one.
    */
   const startPlanConversation = async () => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api) return;
+    if (streaming || exportingLatestActivity) {
+      // The request is already consumed, so dropping it would lose the click.
+      onError("Coach is still answering. Press AI Plan again when it has finished.");
+      return;
+    }
     onError(null);
     try {
       const created = await api.createChatSession(chatSettings.provider);
@@ -1194,7 +1202,7 @@ export function ChatView({
       setTimeline(entries);
       persistHistory(created.id, entries, true);
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not start a plan.");
+      onError(remoteErrorMessage(caught, "Could not start a plan."));
     }
   };
 
@@ -1621,6 +1629,14 @@ export function ChatView({
         // private trigger is `device` tier and a run is `derived`, so neither
         // arrives here. Same counter creating and deleting bumps.
         setAnalysesVersion((value) => value + 1);
+      }
+
+      // A brief or an outline written on another machine (P2.1–P2.2): the
+      // cards read them through `planBriefs`, which is let go so they are
+      // read again; a conversation's settings likewise (P2.0).
+      if (change.tables.includes("chat_plan_artifacts")) setPlanBriefs({});
+      if (change.tables.includes("chat_conversation_settings")) {
+        setConversationSettingsVersion((value) => value + 1);
       }
 
       if (!change.tables.includes("chat_sessions")) return;
@@ -2654,19 +2670,26 @@ export function ChatView({
       await handleLatestActivityFileRequest(trimmed);
       return true;
     }
+    // The AI this conversation answers with (P2.0), which may not be Coach's:
+    // a key missing for Coach's provider must not block a conversation that
+    // uses another, and one missing for the conversation's must.
+    const turnProvider = conversationSettings?.runtime?.provider ?? chatSettings.provider;
     if (
-      chatSettings.provider === "openrouter" &&
+      turnProvider === "openrouter" &&
       !chatSettings.openRouter.hasApiKey
     ) {
       onError("Add an OpenRouter API key in Settings, under Connections.");
       return false;
     }
-    if (chatSettings.provider === "local" && !chatSettings.local.model.trim()) {
+    if (
+      turnProvider === "local" &&
+      !(conversationSettings?.runtime?.model?.trim() || chatSettings.local.model.trim())
+    ) {
       onError("Enter a local model before starting the coach.");
       return false;
     }
     if (
-      chatSettings.provider === "claude-api" &&
+      turnProvider === "claude-api" &&
       !chatSettings.anthropic.hasApiKey
     ) {
       onError(
@@ -2792,8 +2815,14 @@ export function ChatView({
         );
         setTimeline(restoredEntries);
         persistHistory(activeSessionIdRef.current, restoredEntries, true);
+      } else if (pipeline) {
+        // A step the main process refused before anything streamed (P2.2):
+        // its words would sit in the conversation unanswered, and go to the
+        // model on every later turn, so the step is taken back.
+        setTimeline(timeline);
+        persistHistory(activeSessionIdRef.current, timeline, true);
       }
-      onError(caught instanceof Error ? caught.message : "Chat request failed.");
+      onError(remoteErrorMessage(caught, "Chat request failed."));
     }
     return true;
   };
@@ -4079,6 +4108,7 @@ function AnalysisSilentChip({
                       busy={streaming}
                       editing={editingOutlineId === brief.artifactId}
                       written={briefIsPlan(brief.artifactId)}
+                      blocked={briefOpenProblems(brief.request, conversationSettings?.sources)[0]}
                       onWriteSessions={() => void writeSessions(brief.artifactId)}
                       onAdjust={() => {
                         setOutlineSave({ saving: false });

@@ -650,6 +650,29 @@ hiện lại trong cuộc chat.
   brief và outline; `test:training-plan-generation`, `test:training-plan-simulation` chạy qua
   đường chat; `test:ipc-surface`.
 
+**Review P2 (2026-09-26).** Đọc lại toàn bộ P2.0–P2.5; đã sửa:
+- `sendMessage` kiểm tra key theo provider **của cuộc chat** (P2.0), không theo Coach: cuộc chat
+  dùng OpenRouter chưa có key giờ báo đúng key thiếu thay vì gửi rồi hỏng ở main. (Chiều ngược lại
+  — Coach chưa sẵn sàng, cuộc chat dùng AI khác — vẫn bị các gate toàn màn Coach chặn; đó là thiết
+  kế của màn, không đổi ở đây.)
+- Một bước pipeline main từ chối trước khi stream được **lấy lại** khỏi cuộc chat, thay vì để câu
+  "Draw the outline" không có trả lời nằm lại và đi theo mọi lượt sau.
+- Lỗi từ main hiện bằng lời của nó (`remoteErrorMessage`), không kèm "Error invoking remote
+  method '…': Error:".
+- Đồng bộ: một pull có `chat_plan_artifacts` làm ChatView đọc lại brief/outline; có
+  `chat_conversation_settings` thì đọc lại cài đặt của cuộc chat.
+- **Write the sessions** bị khoá khi brief còn thiếu điều main sẽ từ chối (ví dụ "From my data" khi
+  cuộc chat không chia sẻ Activities), không chỉ khi outline lệch brief.
+- `readOutline` kiểm tra đủ (stage 1–6, giờ, và từng key session: ngày, sport, phút), vì outline
+  đến từ IPC và từ row đồng bộ, và card đánh chỉ số tên thứ và theme sport bằng nó.
+- `request_plan_brief` trên brief đã có outline báo Coach rằng outline không đổi theo.
+- AI Plan bấm khi Coach đang trả lời thì nói ra, thay vì làm rơi yêu cầu.
+
+Còn lại, biết và chưa làm: câu hỏi "Redraw the outline?" khi đổi nguồn của cuộc chat dưới một
+outline đã vẽ; analysis không thấy brief trong `creationIndex`; ô số trong Adjust outline không xoá
+trắng được (giữ số cũ cho tới khi gõ số mới); tắt Sleep không bỏ Resting HR và Recovery % khỏi
+snapshot (chúng nằm trong dashboard, đi theo Activities); chưa chạy với provider thật.
+
 **Ship P2 khi:** từ nút AI Plan tới plan trên lịch, mọi bước nằm trong một cuộc chat; nguồn dữ
 liệu tắt ở cuộc chat thì không lượt nào đọc được; dialog generator không còn.
 

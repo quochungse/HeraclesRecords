@@ -207,6 +207,14 @@ export function handleRequestPlanBrief(
     brief_id: artifactId,
     brief: briefLine(brief.request),
     ...(parsed.dropped.length ? { not_taken: parsed.dropped } : {}),
+    // Changing a brief does not change its outline (P2.2): Coach says so
+    // rather than letting the athlete write sessions to a stale shape.
+    ...(brief.outline
+      ? {
+          outline:
+            "This brief already has an outline, drawn from it as it was. It is unchanged: tell the athlete to redraw or adjust it on its card if your change affects its weeks."
+        }
+      : {}),
     still_open: open,
     next:
       "The brief is on a card in the conversation. Stop here: say in a sentence what you filled in and, if anything " +
