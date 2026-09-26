@@ -7,7 +7,7 @@ import type {
   UploadPlanResult,
   WorkoutSport
 } from "../../electron/types";
-import { mondayOf, parsePlanDay, formatPlanDay } from "../../electron/trainingPlanDomain";
+import { parsePlanDay, formatPlanDay } from "../../electron/trainingPlanDomain";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import {
   RIDGE_UNITS,
@@ -20,6 +20,8 @@ import {
 import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
+import { datedForReading } from "./planDating";
+export { datedForReading };
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 
@@ -56,21 +58,6 @@ export function datedSpan(document: TrainingPlanDocument): { first: string; last
 /** Whether a strip day lies outside a dated plan's span. */
 export function outsideSpan(date: string | undefined, span: CreationFigures["span"]): boolean {
   return Boolean(date && span && (date < span.first || date > span.last));
-}
-
-/**
- * A plan whose every session is dated, read as starting on the Monday of its
- * first date, so a drawing names the days it will fall on. The date is only
- * for the drawing: a plan has no start date of its own.
- */
-export function datedForReading(document: TrainingPlanDocument): TrainingPlanDocument {
-  const dated = document.entries
-    .map((entry) => parsePlanDay(entry.workout.schedule_date))
-    .filter((date): date is Date => Boolean(date))
-    .sort((left, right) => left.valueOf() - right.valueOf());
-  return dated.length === document.entries.length && dated[0]
-    ? { ...document, startDate: formatPlanDay(mondayOf(dated[0]), true) }
-    : document;
 }
 
 /**
@@ -156,8 +143,6 @@ export function CoachCreationCard({
   onCoros = false,
   calendar,
   onCalendar,
-  refinements,
-  onRefine,
   onOpen
 }: {
   draft: PlanDraftPreview;
@@ -182,10 +167,6 @@ export function CoachCreationCard({
   calendar?: CreationCalendar;
   /** Opens the calendar dialog for this version. */
   onCalendar?: () => void;
-  /** The follow-ups offered under the card (P1.8). */
-  refinements?: readonly string[];
-  /** Sends a follow-up as a question about this creation; absent while Coach is answering. */
-  onRefine?: (text: string) => void;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -303,24 +284,6 @@ export function CoachCreationCard({
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
       />
-      {/* A saved one-off workout is not changed from the conversation — nothing
-          on COROS would follow — so it offers no follow-ups that would write
-          a version the Library copy never hears about. */}
-      {refinements?.length && !editing && !(isWorkout && status.saved) ? (
-        <div className="chat-refine" aria-label="Ask Coach to change it">
-          {refinements.map((text) => (
-            <button
-              key={text}
-              type="button"
-              className="chat-refine-chip"
-              disabled={!onRefine}
-              onClick={() => onRefine?.(text)}
-            >
-              {text}
-            </button>
-          ))}
-        </div>
-      ) : null}
 
     </article>
   );

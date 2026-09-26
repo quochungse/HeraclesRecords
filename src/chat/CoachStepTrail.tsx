@@ -9,12 +9,26 @@ export { stepRunEvent, type StepRun } from "./stepRun";
  * turn's bubble: a line per thing Coach did, the latest one still doing it,
  * and the words it is on. A long turn with only a spinner reads as stuck.
  */
-export function CoachStepTrail({ run }: { run: StepRun }) {
-  const tail = thoughtTail(run.notes.notes);
+export function CoachStepTrail({
+  run,
+  quiet = false
+}: {
+  run: StepRun;
+  /**
+   * An ordinary turn's trail, in its answer's bubble: the lines alone, with
+   * no heading and no tail of the thinking, which has its own disclosure there.
+   */
+  quiet?: boolean;
+}) {
+  const tail = quiet ? "" : thoughtTail(run.notes.notes);
   const last = run.notes.trail.length - 1;
   return (
-    <section className="chat-step-trail" aria-live="polite" aria-label={STEP_TITLE[run.step]}>
-      <span className="chat-creation-kicker">{STEP_TITLE[run.step]}</span>
+    <section
+      className={quiet ? "chat-step-trail is-quiet" : "chat-step-trail"}
+      aria-live="polite"
+      aria-label={STEP_TITLE[run.step]}
+    >
+      {quiet ? null : <span className="chat-creation-kicker">{STEP_TITLE[run.step]}</span>}
       {run.notes.trail.length ? (
         <ol>
           {run.notes.trail.map((item, index) => {

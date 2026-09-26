@@ -13,18 +13,24 @@ import {
   type RunNotes
 } from "../training-library/runTrail";
 
-/** A pipeline step while its turn runs: what Coach has done so far (P2.3). */
+/**
+ * A turn while it runs: what Coach has done so far (P2.3). A pipeline step's
+ * trail is a row of its own at the end of the transcript; an ordinary turn's
+ * (`"turn"`, R1 of the Workbench review) stands in the answer's bubble until
+ * the answer's words arrive.
+ */
 export interface StepRun {
   requestId: string;
-  step: ChatPipelineStep["step"];
+  step: ChatPipelineStep["step"] | "turn";
   notes: RunNotes;
   /** Hand-overs to the check so far: a second one means the first came back. */
   attempts: number;
 }
 
-export const STEP_TITLE: Record<ChatPipelineStep["step"], string> = {
+export const STEP_TITLE: Record<StepRun["step"], string> = {
   outline: "Drawing the outline",
-  sessions: "Writing the sessions"
+  sessions: "Writing the sessions",
+  turn: "Working on it"
 };
 
 const HAND_OVER_TOOL: Record<ChatPipelineStep["step"], string> = {
@@ -55,7 +61,7 @@ export function stepRunEvent(
       return { ...run, notes: notePassed(run.notes) };
     case "call": {
       const tool = event.tool?.split("__").at(-1);
-      if (tool === HAND_OVER_TOOL[run.step]) {
+      if (run.step !== "turn" && tool === HAND_OVER_TOOL[run.step]) {
         const attempts = run.attempts + 1;
         return { ...run, attempts, notes: noteHandOver(run.notes, run.step === "outline" ? "outline" : "plan", attempts) };
       }

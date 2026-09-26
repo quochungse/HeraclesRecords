@@ -842,15 +842,22 @@ async function main() {
   await harness("click", ".chat-creation-open");
   await waitFor(() => harness("exists", ".chat-canvas .plan-week-ask"), "each week offers Ask Coach");
   await harness("click", ".chat-canvas .plan-week-card:nth-child(2) .plan-week-ask");
-  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "the week waits beside the composer");
-  assert.match((await harness("text", ".chat-refs-pending .chat-ref-chip")) ?? "", /Hanoi Half base · Week 2/);
+  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "the week heads the composer (UAT, option A)");
+  const weekHeader = (await harness("text", ".chat-composer .chat-ref-header")) ?? "";
+  assert.match(weekHeader, /Week 2/);
+  assert.match((await harness("attr", ".chat-composer .chat-ref-header-text", "title")) ?? "", /Hanoi Half base/, "the plan it belongs to, on hover");
+  assert.match(weekHeader, /\d+ sessions?/, "and its figures, read from the plan in hand");
+  assert.equal(await harness("count", ".chat-composer .chat-ref-ridge > span.is-current"), 1, "the week stands out among the plan's weeks");
+  assert.equal(await harness("attr", ".chat-composer textarea", "placeholder"), "Ask about this week…");
   assert.equal(await harness("exists", ".chat-canvas-dialog"), false, "the details close onto the composer");
   await harness("click", ".chat-creation-open");
   await waitFor(() => harness("exists", '.chat-canvas-dialog [data-action="askPlan"]'), "the details open again");
   await harness("click", '.chat-canvas [data-action="askPlan"]');
-  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 2, "and the whole plan beside it");
-  await harness("click", ".chat-refs-pending .chat-ref-chip:last-of-type .chat-ref-remove");
-  await waitFor(async () => (await harness("count", ".chat-refs-pending .chat-ref-chip")) === 1, "a chip can be taken off");
+  await waitFor(async () => (await harness("count", ".chat-ref-header.is-list .chat-ref-chip")) === 2, "two fold to a line of chips (proposal A)");
+  assert.equal(await harness("count", ".chat-ref-header.is-list .chat-ref-chip .chat-ref-icon"), 2, "each with its icon");
+  await harness("click", ".chat-ref-header.is-list .chat-ref-chip:last-of-type .chat-ref-remove");
+  await waitFor(async () => !(await harness("exists", ".chat-ref-header.is-list")), "a chip can be taken off");
+  assert.match((await harness("text", ".chat-composer .chat-ref-header")) ?? "", /Week 2/, "and the one left heads the box again");
   await harness("setValue", ".chat-composer textarea", "Is this week too much?");
   await harness("click", ".chat-send");
   const asked = await waitFor(
@@ -865,8 +872,9 @@ async function main() {
     ["planRefs", "message"],
     "the reference is kept just before the question"
   );
-  assert.equal(await harness("exists", ".chat-refs-pending"), false, "and leaves the composer");
+  assert.equal(await harness("exists", ".chat-composer .chat-ref-header"), false, "and leaves the composer");
   await waitFor(() => harness("exists", ".chat-refs-row"), "it reads as a line above the question");
+  assert.equal(await harness("exists", ".chat-refs-row .chat-refs-open"), true, "with a way back to the creation");
 
   // From the Library: the conversation the plan came from, with the plan beside the composer.
   await harness("mount", "ChatView", {
@@ -884,7 +892,24 @@ async function main() {
     "the plan's own conversation leads the list"
   );
   await harness("click", ".coach-ask-option:not(.is-new)");
-  await waitFor(() => harness("exists", ".chat-refs-pending .chat-ref-chip"), "and the plan waits to be asked about");
+  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "and the plan waits to be asked about");
+  await harness("setValue", ".chat-composer textarea", "Half-written question");
+
+  // Leaving the conversation keeps its draft: the words and what they point
+  // at come back with it (UAT) — here, across a remount of the whole view.
+  await settle();
+  await harness("mount", "ChatView", {}, BASE_SCRIPT);
+  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "the reference is restored with the conversation");
+  assert.match((await harness("text", ".chat-composer .chat-ref-header")) ?? "", /Hanoi Half base/);
+  assert.equal(await harness("value", ".chat-composer textarea"), "Half-written question", "and so are the words");
+  await harness("click", ".chat-composer .chat-ref-header .chat-ref-remove");
+  await harness("setValue", ".chat-composer textarea", "");
+  await settle();
+  assert.equal(
+    await page(`"s1" in JSON.parse(localStorage.getItem("coroslink.coach.composerDrafts.v1") ?? "{}")`),
+    false,
+    "an emptied draft is not kept"
+  );
 
   // -------------------------------------------------------------------------
   // A follow-up under the card is a question about it (P1.8)
@@ -896,10 +921,11 @@ async function main() {
     ]
   });
   await waitFor(
-    async () => (await harness("count", ".chat-creation-card .chat-refine-chip")) === 2,
-    "Coach's own follow-ups, under its card"
+    async () => (await harness("count", ".chat-composer-followups .chat-refine-chip")) === 2,
+    "Coach's own follow-ups, above the composer (R1)"
   );
-  await harness("click", ".chat-creation-card .chat-refine-chip:first-child");
+  assert.equal(await harness("exists", ".chat-creation-card .chat-refine-chip"), false, "and not under the card");
+  await harness("click", ".chat-composer-followups .chat-refine-chip");
   const refined = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
   assert.match(refined.args[1].at(-1).content, /asking about the plan "Hanoi Half base" v1 \(draft_id plan-1\) — the whole of it\.[\s\S]*Lighter week 3$/);
   const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
@@ -914,9 +940,9 @@ async function main() {
     getConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: true, zones: true } },
     setConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
   });
-  await waitFor(() => harness("exists", ".chat-conversation-settings"), "the conversation's line is drawn");
-  assert.match((await harness("text", ".chat-conversation-settings")) ?? "", /Reads: Activities · Sleep · Zones\s*AI: Coach's settings/);
-  await harness("click", ".chat-conversation-settings");
+  await waitFor(() => harness("exists", ".chat-header-chip"), "the conversation's Reads chip is drawn");
+  assert.match((await harness("text", ".chat-header-chip")) ?? "", /Reads\s*Activities · Sleep · Zones/);
+  await harness("click", ".chat-header-chip");
   await waitFor(() => harness("count", ".coach-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
   await harness("click", ".coach-sheet li:nth-child(2) .plan-generator-source");
   await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
@@ -925,8 +951,8 @@ async function main() {
     { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
   );
   await waitFor(
-    async () => /Reads: Activities · Zones/.test((await harness("text", ".chat-conversation-settings")) ?? ""),
-    "and the line says so"
+    async () => /Reads\s*Activities · Zones$/.test((await harness("text", ".chat-header-chip")) ?? ""),
+    "and the chip says so"
   );
   await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
   await harness("setValue", ".chat-composer textarea", "How am I sleeping?");
@@ -1403,13 +1429,78 @@ async function main() {
   );
   const workoutCard = '[data-draft-id="workout-saved"]';
   await waitFor(() => harness("exists", workoutCard), "the saved workout is drawn");
-  assert.equal(await harness("exists", `${workoutCard} .chat-refine`), false, "a saved one-off workout offers no follow-ups");
+  assert.equal(await harness("exists", ".chat-composer-followups"), false, "a saved one-off workout offers no follow-ups");
   assert.equal(
     (await harness("text", `${workoutCard} .chat-creation-steps`)).includes("Not set"),
     false,
     "an empty intensity is not printed"
   );
   assert.equal(await harness("attr", `${workoutCard} .chat-creation-status`, "data-tone"), "saved");
+
+  // -------------------------------------------------------------------------
+  // R1: the conversation's head, the composer's About…, one avatar a turn,
+  // and an ordinary turn's trail in words.
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", { styles: true }, {
+    ...BASE_SCRIPT,
+    renameChatSession: { ...SESSION, title: "Base block" }
+  });
+  await waitFor(() => harness("appStylesReady"), "the app's stylesheet is in");
+  await waitFor(() => harness("exists", ".chat-conversation-title"), "the conversation's name heads the screen");
+  assert.equal(await harness("text", ".chat-conversation-title"), SESSION.title);
+  assert.equal(await harness("exists", ".chat-conversation-settings"), false, "the Reads · AI strip is gone");
+  assert.equal(await harness("count", ".chat-composer .chat-new-chat, .chat-composer-new-chat"), 0, "one New chat, in the list");
+  // The input grows with its words up to six lines, then scrolls (UAT).
+  const oneLine = await page(`document.querySelector(".chat-composer textarea").offsetHeight`);
+  await harness("setValue", ".chat-composer textarea", "1\n2\n3");
+  const threeLines = await page(`document.querySelector(".chat-composer textarea").offsetHeight`);
+  await harness("setValue", ".chat-composer textarea", "1\n2\n3\n4\n5\n6\n7\n8\n9\n10");
+  const tenLines = await page(`(() => { const t = document.querySelector(".chat-composer textarea"); return { height: t.offsetHeight, scroll: t.scrollHeight }; })()`);
+  assert.ok(threeLines > oneLine * 2, `three lines stand three lines high (${oneLine} → ${threeLines})`);
+  assert.ok(tenLines.height < tenLines.scroll, "past six lines it scrolls");
+  assert.ok(tenLines.height >= threeLines * 1.7, "after growing to six");
+  await harness("setValue", ".chat-composer textarea", "");
+  await harness("click", ".chat-conversation-title");
+  await waitFor(() => harness("exists", "#chat-conversation-title-input"), "pressing the name renames it");
+  await harness("setValue", "#chat-conversation-title-input", "Base block");
+  await page(`document.querySelector("#chat-conversation-title-input").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`);
+  await waitFor(() => harness("callCount", "renameChatSession"), "the new name is kept");
+  assert.equal((await harness("calls", "renameChatSession"))[0].args[1], "Base block");
+
+  // The user's bubble carries no avatar, and a turn's rows share one.
+  const avatars = await page(`[...document.querySelectorAll(".chat-thread > .chat-row")].map((row) => {
+    const avatar = row.querySelector(":scope > .chat-avatar");
+    return avatar ? getComputedStyle(avatar).display === "none" ? "none" : getComputedStyle(avatar).visibility : "absent";
+  })`);
+  // Build me a base block · Three easy weeks · card · answered question line
+  assert.deepEqual(avatars.slice(0, 3), ["none", "visible", "hidden"]);
+
+  await harness("click", ".chat-about-trigger");
+  await waitFor(() => harness("exists", ".chat-about-menu"), "About… opens");
+  await page(`[...document.querySelectorAll(".chat-about-option")].find((b) => b.textContent === "This week").click()`);
+  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "the week waits in the composer");
+  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
+  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
+  assert.equal(await harness("exists", ".chat-composer .chat-ref-header-kicker"), false, "no Asking about line (UAT)");
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-about-option")].some((b) => b.textContent === "Hanoi Half base")`),
+    false,
+    "the menu closed on the pick"
+  );
+
+  await harness("setValue", ".chat-composer textarea", "How does this week look?");
+  await harness("click", ".chat-send");
+  const traced = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question goes");
+  await harness("emit", "onChatStreamStart", { requestId: traced.args[0] });
+  await harness("emit", "onChatStreamInfo", { requestId: traced.args[0], kind: "mcp", status: "call", tool: "list_scheduled_workouts" });
+  await waitFor(() => harness("exists", ".chat-step-trail.is-quiet"), "an ordinary turn shows its trail");
+  assert.match(await harness("text", ".chat-step-trail.is-quiet"), /Checking your calendar/);
+  assert.equal(await page(`document.body.textContent.includes("Using list scheduled workouts")`), false);
+  await harness("emit", "onChatStreamDone", { requestId: traced.args[0], fullText: "Looks balanced.", finishReason: "stop" });
+  await settle();
+  const sentWithRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.ok(sentWithRefs.some((entry) => entry.kind === "scheduleRefs"), "the week travels as the question's anchor");
+  await waitFor(() => harness("exists", ".chat-row-user .chat-refs-row .chat-ref-chip"), "and is drawn inside the question");
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);

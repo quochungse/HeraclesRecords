@@ -43,7 +43,20 @@ const READS: Record<string, [doing: string, done: string]> = {
   get_training_zones: ["Reading your training zones", "Read your training zones"],
   get_sleep_summary: ["Reading your sleep and recovery", "Read your sleep and recovery"],
   list_scheduled_workouts: ["Checking your calendar", "Checked your calendar"],
-  search_coros_exercises: ["Finding exercises in the COROS library", "Found exercises in the COROS library"]
+  search_coros_exercises: ["Finding exercises in the COROS library", "Found exercises in the COROS library"],
+  // Every local tool has a line, so an ordinary Coach turn reads as work too
+  // (R1): its trail used to be one "Using get activity detail…".
+  get_hr_zone_summary: ["Reading your heart-rate zones", "Read your heart-rate zones"],
+  list_training_plans: ["Looking through your COROS plans", "Looked through your COROS plans"],
+  get_training_plan: ["Reading a COROS plan", "Read a COROS plan"],
+  get_plan_draft: ["Reading the plan made here", "Read the plan made here"],
+  draft_workout: ["Writing the workout", "Wrote the workout"],
+  draft_training_plan: ["Writing the plan", "Wrote the plan"],
+  revise_training_plan: ["Revising the plan", "Revised the plan"],
+  propose_schedule_changes: ["Checking the changes against your calendar", "Checked the changes against your calendar"],
+  delete_workout: ["Preparing the removal", "Prepared the removal"],
+  request_plan_brief: ["Setting out the brief", "Set out the brief"],
+  request_coach_input: ["Preparing a question", "Prepared a question"]
 };
 
 /** A read, as a line. An unknown COROS MCP tool is still a read of COROS. */

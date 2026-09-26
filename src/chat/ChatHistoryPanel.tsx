@@ -48,8 +48,10 @@ export function ChatHistoryPanel({
     }
     return sessions.filter(
       (session) =>
-        session.title.toLowerCase().includes(normalized) ||
-        session.preview.toLowerCase().includes(normalized)
+        // A summary may come without a preview (a conversation never written
+        // in); searching must not throw on it and take the whole screen down.
+        (session.title ?? "").toLowerCase().includes(normalized) ||
+        (session.preview ?? "").toLowerCase().includes(normalized)
     );
   }, [query, sessions]);
 
@@ -61,8 +63,21 @@ export function ChatHistoryPanel({
   return (
     <div className="chat-history-panel">
       <div className="chat-history-toolbar">
+        {/* The one New chat on the screen (R1): the composer had a second. A
+            quiet button beside the heading, where a list's own action goes,
+            rather than a filled bar above the list. */}
         <div className="chat-history-header">
-          <p className="eyebrow">Conversations</p>
+          <h2 className="chat-history-title">Conversations</h2>
+          <button
+            type="button"
+            className="chat-history-collapse-button chat-new-chat-sidebar"
+            onClick={onNewChat}
+            disabled={busy}
+            aria-label="New chat"
+            title="New chat"
+          >
+            <Plus size={16} aria-hidden="true" />
+          </button>
           <button
             type="button"
             className="chat-history-collapse-button"
@@ -75,15 +90,6 @@ export function ChatHistoryPanel({
             <PanelLeftClose size={16} aria-hidden="true" />
           </button>
         </div>
-        <button
-          type="button"
-          className="chat-new-chat chat-new-chat-sidebar"
-          onClick={onNewChat}
-          disabled={busy}
-        >
-          <Plus size={14} aria-hidden="true" />
-          New chat
-        </button>
         <label className="chat-history-search">
           <Search size={14} aria-hidden="true" />
           <input

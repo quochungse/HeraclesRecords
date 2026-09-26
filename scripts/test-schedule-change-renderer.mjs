@@ -268,11 +268,11 @@ async function main() {
   await waitFor(() => harness("exists", ".coach-ask-picker"), "the athlete is asked which conversation");
   assert.match((await harness("text", ".coach-ask-picker")) ?? "", /Sat 27 Sep · Long run/, "the picker says what the question is about");
   assert.equal(await harness("exists", ".coach-ask-option.is-new"), true, "a new conversation is offered");
-  assert.equal(await harness("exists", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), false, "nothing lands before a pick");
+  assert.equal(await harness("exists", "[aria-label=\"Asking about\"]"), false, "nothing lands before a pick");
   await harness("click", ".coach-ask-option:not(.is-new)");
-  await waitFor(() => harness("exists", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), "the chip waits by the composer");
+  await waitFor(() => harness("exists", "[aria-label=\"Asking about\"]"), "what it is about heads the composer");
   assert.equal(await harness("exists", ".coach-ask-picker"), false, "and the picker is gone");
-  assert.match(await harness("text", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), /Sat 27 Sep · Long run/);
+  assert.match(await harness("text", "[aria-label=\"Asking about\"]"), /Sat 27 Sep[\s\S]*Long run/);
   assert.equal(await harness("value", "textarea"), "How should I approach it?", "the question is the athlete's to finish");
   await harness("keyDown", "textarea", "Enter");
   const asked = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question is sent");
@@ -283,7 +283,7 @@ async function main() {
     "the ref is folded into the question, with the ids the tools take"
   );
   await waitFor(() => harness("exists", ".chat-refs-row"), "the question shows what it was about");
-  assert.equal(await harness("exists", "[aria-label=\"Asking about the calendar\"]"), false, "the chip went with the question");
+  assert.equal(await harness("exists", "[aria-label=\"Asking about\"]"), false, "the chip went with the question");
   const savedRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   const at = savedRefs.findIndex((entry) => entry.kind === "scheduleRefs");
   assert.ok(at >= 0, "the refs are saved as an anchor");

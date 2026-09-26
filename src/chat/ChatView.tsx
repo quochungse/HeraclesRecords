@@ -1,17 +1,17 @@
 import {
   Suspense,
-  forwardRef,
   lazy,
   memo,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode
 } from "react";
 import {
+  ArrowUpRight,
+  CalendarRange,
   Cloud,
   Database,
   ExternalLink,
@@ -22,18 +22,12 @@ import {
   LogOut,
   MessageCircle,
   Network,
-  PanelRightClose,
-  PanelRightOpen,
   Plug,
-  Plus,
   RefreshCw,
-  Send,
   Settings2,
   Sparkles,
-  Square,
   Terminal,
   User,
-  X,
   Zap
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -69,6 +63,7 @@ import type {
   PlanCalendarState,
   PlanDraftPreview,
   PlanRef,
+  WorkoutSport,
   PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionWritten,
@@ -82,6 +77,7 @@ import type {
   ScheduleRef
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
+import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -89,6 +85,9 @@ import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
+import { ComposerRefs, SportRefIcon, type ComposerRef } from "./ComposerRefs";
+import { clearComposerDraft, loadComposerDraft, saveComposerDraft } from "./composerDrafts";
+import { planRefPreview, refPlaceholder, scheduleRefPreview } from "./refPreview";
 import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
@@ -113,7 +112,7 @@ import {
   runtimeFromSettings,
   type GeneratorRuntime
 } from "../training-library/planGeneratorRuntime";
-import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
+import { coachProviderReadiness } from "./CoachModelsPanel";
 import {
   creationVersions,
   isLatestVersion,
@@ -130,6 +129,14 @@ import {
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
+import { ChatConversationHeader } from "./ChatConversationHeader";
+import {
+  ChatComposer,
+  isLatestActivityFileRequest,
+  type AboutOption,
+  type ChatComposerHandle
+} from "./ChatComposer";
+import { formatSessionRelativeTime } from "./chatSessionGroups";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
@@ -360,6 +367,93 @@ function scheduleRefKey(ref: ScheduleRef): string {
   return `${ref.scope}|${ref.day ?? ""}|${ref.planId ?? ""}|${ref.idInPlan ?? ""}|${ref.activityId ?? ""}`;
 }
 
+/**
+ * Whether a `planRefs`/`scheduleRefs` anchor leads into a question of the
+ * athlete's, over any other anchors of its kind: then the question's bubble
+ * draws it (R1), and the anchor draws nothing of its own.
+ */
+function refsJoinQuestion(timeline: readonly ChatEntry[], index: number): boolean {
+  for (let next = index + 1; next < timeline.length; next += 1) {
+    const entry = timeline[next];
+    if (entry?.kind === "planRefs" || entry?.kind === "scheduleRefs") continue;
+    return entry?.kind === "message" && entry.role === "user" && !entry.automation;
+  }
+  return false;
+}
+
+/**
+ * What a question was asked about, as a header line on its bubble (UAT,
+ * option A): the references, and a way back to the creation they name.
+ */
+function QuestionRefs({
+  timeline,
+  index,
+  onOpen,
+  sportOf
+}: {
+  timeline: readonly ChatEntry[];
+  index: number;
+  onOpen?: (draftId: string) => void;
+  /** A Coach plan session's sport, read from the plan in hand, for the icon. */
+  sportOf?: (ref: PlanRef) => WorkoutSport | undefined;
+}) {
+  const labels: { key: string; text: string; name?: string }[] = [];
+  let draftId: string | undefined;
+  let sport: WorkoutSport | undefined;
+  for (let previous = index - 1; previous >= 0; previous -= 1) {
+    const entry = timeline[previous];
+    if (entry?.kind === "planRefs") {
+      draftId ??= entry.refs[0]?.draftId;
+      sport ??= entry.refs.map((ref) => sportOf?.(ref)).find(Boolean);
+      labels.unshift(
+        ...entry.refs.map((ref, position) => ({
+          key: `p${previous}:${position}`,
+          text: ref.scope === "plan" ? ref.name : `${ref.name} · ${ref.label}`,
+          name: ref.name
+        }))
+      );
+    } else if (entry?.kind === "scheduleRefs") {
+      labels.unshift(...entry.refs.map((ref, position) => ({ key: `s${previous}:${position}`, text: ref.label })));
+    } else {
+      break;
+    }
+  }
+  if (!labels.length) return null;
+  // A plan named once: "Base to 10k · Week 2, Week 2 · Sat · Long 80".
+  const seen = new Set<string>();
+  for (const label of labels) {
+    const name = label.name;
+    if (!name) continue;
+    if (seen.has(name) && label.text.startsWith(`${name} · `)) label.text = label.text.slice(name.length + 3);
+    seen.add(name);
+  }
+  return (
+    <span className="chat-refs-row" aria-label="Asked about">
+      {sport ? (
+        <SportRefIcon sport={sport} />
+      ) : (
+        <CalendarRange size={12} aria-hidden="true" />
+      )}
+      {labels.map((label) => (
+        <span key={label.key} className="chat-ref-chip">
+          {label.text}
+        </span>
+      ))}
+      {draftId && onOpen ? (
+        <button
+          type="button"
+          className="chat-refs-open"
+          aria-label="Open in the Workbench"
+          title="Open in the Workbench"
+          onClick={() => onOpen(draftId)}
+        >
+          <ArrowUpRight size={12} aria-hidden="true" />
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
 function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
   if (target === "scheduled") return "Calendar";
   if (target === "library") return "Library";
@@ -426,9 +520,10 @@ function SourceBadge({ source }: { source: SourceInfo }) {
             <div
               key={group.source}
               className={`chat-source chat-source-tool chat-source-${group.source}`}
+              title={group.tools.join(", ")}
             >
               <Icon size={12} aria-hidden="true" />
-              {`${group.label} · ${group.tools.join(", ")}`}
+              {`${group.label} · ${group.tools.length} ${group.tools.length === 1 ? "read" : "reads"}`}
             </div>
           );
         })}
@@ -517,16 +612,6 @@ function TurnCostFooter({
   );
 }
 
-function isLatestActivityFileRequest(text: string): boolean {
-  const normalized = text.toLowerCase();
-  return (
-    /\b(download|export|save|get|grab)\b/.test(normalized) &&
-    /\b(latest|last|most recent|newest|recent)\b/.test(normalized) &&
-    /\b(activity|workout|run|ride)\b/.test(normalized) &&
-    /\b(file|fit|original)\b/.test(normalized)
-  );
-}
-
 function formatLatestActivityExportMessage(
   result: TrainingHubExportResult
 ): string {
@@ -537,173 +622,6 @@ function formatLatestActivityExportMessage(
   }
   return `Saved the latest activity ${formatLabel} file${activityName} to:\n\n\`${result.filePath}\``;
 }
-
-interface ChatComposerHandle {
-  focus: () => void;
-  setDraft: (value: string) => void;
-}
-
-interface ChatComposerProps {
-  providerControls: ReactNode;
-  initialDraft: string;
-  apiAvailable: boolean;
-  streaming: boolean;
-  exportingLatestActivity: boolean;
-  waitingForCoachAnswer: boolean;
-  isLocalProvider: boolean;
-  localModelConfigured: boolean;
-  onDraftChange: (value: string) => void;
-  onNewChat: () => void;
-  onSend: (message: string) => Promise<boolean>;
-  onStop: () => void;
-}
-
-const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
-  function ChatComposer(
-    {
-      providerControls,
-      initialDraft,
-      apiAvailable,
-      streaming,
-      exportingLatestActivity,
-      waitingForCoachAnswer,
-      isLocalProvider,
-      localModelConfigured,
-      onDraftChange,
-      onNewChat,
-      onSend,
-      onStop
-    },
-    ref
-  ) {
-    const [draft, setDraft] = useState(initialDraft);
-    const draftRef = useRef(initialDraft);
-    const submittingRef = useRef(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const trimmedDraft = draft.trim();
-    const latestActivityFileRequest = isLatestActivityFileRequest(trimmedDraft);
-    const localProviderBlocked =
-      isLocalProvider &&
-      !localModelConfigured &&
-      !latestActivityFileRequest;
-
-    const updateDraft = useCallback(
-      (value: string) => {
-        draftRef.current = value;
-        setDraft(value);
-        onDraftChange(value);
-      },
-      [onDraftChange]
-    );
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        focus: () => textareaRef.current?.focus(),
-        setDraft: updateDraft
-      }),
-      [updateDraft]
-    );
-
-    const submitDraft = async () => {
-      if (
-        !apiAvailable ||
-        !trimmedDraft ||
-        exportingLatestActivity ||
-        localProviderBlocked ||
-        submittingRef.current
-      ) {
-        return;
-      }
-
-      const submittedDraft = draft;
-      submittingRef.current = true;
-      updateDraft("");
-      try {
-        const accepted = await onSend(trimmedDraft);
-        if (!accepted && !draftRef.current) {
-          updateDraft(submittedDraft);
-        }
-      } finally {
-        submittingRef.current = false;
-      }
-    };
-
-    return (
-      <div className="chat-composer">
-        <div className="chat-composer-toolbar">
-          {providerControls}
-          <button
-            type="button"
-            className="chat-new-chat chat-composer-new-chat"
-            onClick={onNewChat}
-            disabled={!apiAvailable || streaming || exportingLatestActivity}
-            aria-label="Start a new chat"
-            title="Start a new chat"
-          >
-            <Plus size={14} aria-hidden="true" />
-            <span>New chat</span>
-          </button>
-        </div>
-        <div className="chat-composer-inner">
-          <textarea
-            ref={textareaRef}
-            className="chat-input"
-            value={draft}
-            onChange={(event) => updateDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                void submitDraft();
-              }
-            }}
-            placeholder={
-              waitingForCoachAnswer
-                ? "Type another answer…"
-                : "Ask your coach…"
-            }
-            rows={1}
-            disabled={exportingLatestActivity}
-          />
-          {streaming ? (
-            <button
-              type="button"
-              className="chat-send chat-stop"
-              onClick={onStop}
-              title="Stop"
-            >
-              <Square size={15} aria-hidden="true" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="chat-send"
-              onClick={() => void submitDraft()}
-              disabled={
-                !apiAvailable ||
-                !trimmedDraft ||
-                exportingLatestActivity ||
-                localProviderBlocked
-              }
-              title={
-                localProviderBlocked ? "Enter a local model first" : "Send"
-              }
-            >
-              <Send size={15} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        <p className="chat-disclaimer">
-          Coach can make mistakes. Verify important training decisions.
-        </p>
-      </div>
-    );
-  }
-);
 
 /**
  * The "Draw the outline" AI Plan sends on its own as a conversation opens on
@@ -1128,9 +1046,36 @@ export function ChatView({
   );
   const composerDraftRef = useRef("");
   const composerRef = useRef<ChatComposerHandle>(null);
+  /*
+   * The conversation the composer's draft belongs to, and a debounced save of
+   * it (UAT): the words and the references waiting beside them are kept per
+   * conversation, so leaving one and coming back — or restarting — finds the
+   * question as it was left. Set only when a conversation's draft is restored,
+   * so a save can never file one conversation's words under another.
+   */
+  const draftSessionRef = useRef<string | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRefsRef = useRef<PlanRef[]>([]);
+  const pendingScheduleRefsRef = useRef<ScheduleRef[]>([]);
+  const saveDraftNow = useCallback(() => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = null;
+    const sessionId = draftSessionRef.current;
+    if (!sessionId) return;
+    saveComposerDraft(sessionId, {
+      text: composerDraftRef.current,
+      refs: pendingRefsRef.current,
+      scheduleRefs: pendingScheduleRefsRef.current
+    });
+  }, []);
+  const scheduleDraftSave = useCallback(() => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(saveDraftNow, 300);
+  }, [saveDraftNow]);
   const handleComposerDraftChange = useCallback((value: string) => {
     composerDraftRef.current = value;
-  }, []);
+    scheduleDraftSave();
+  }, [scheduleDraftSave]);
 
   useEffect(() => {
     if (!pendingPrompt || !composerRef.current) {
@@ -1173,6 +1118,13 @@ export function ChatView({
    * `scheduleRefs` entry just before it.
    */
   const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
+  useEffect(() => {
+    pendingRefsRef.current = pendingRefs;
+    pendingScheduleRefsRef.current = pendingScheduleRefs;
+    scheduleDraftSave();
+  }, [pendingRefs, pendingScheduleRefs, scheduleDraftSave]);
+  // A draft still waiting on its debounce is written when the view goes.
+  useEffect(() => () => saveDraftNow(), [saveDraftNow]);
 
   /**
    * A question asked from outside Coach — the Calendar, the Library — waiting
@@ -1256,7 +1208,7 @@ export function ChatView({
       setSessions((current) => [titled, ...current]);
       setActiveSessionId(created.id);
       persistedBaseRef.current = 0;
-      resetEphemeralChatState();
+      resetEphemeralChatState(created.id);
       setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
       const entries: ChatEntry[] = [{ kind: "planBrief", artifactId: brief.artifactId }];
       setTimeline(entries);
@@ -1267,10 +1219,19 @@ export function ChatView({
     }
   };
 
-  const resetEphemeralChatState = () => {
-    // A reference belongs to the conversation it was picked in.
-    setPendingRefs([]);
-    setPendingScheduleRefs([]);
+  /**
+   * Leaving a conversation: the one being left keeps its draft, and the one
+   * opened gets its own back (UAT) — its words and what they point at. A
+   * reference belongs to the conversation it was picked in.
+   */
+  const resetEphemeralChatState = (sessionId?: string) => {
+    saveDraftNow();
+    draftSessionRef.current = sessionId ?? null;
+    const draft = sessionId ? loadComposerDraft(sessionId) : undefined;
+    setPendingRefs(draft?.refs ?? []);
+    setPendingScheduleRefs(draft?.scheduleRefs ?? []);
+    composerDraftRef.current = draft?.text ?? "";
+    composerRef.current?.setDraft(draft?.text ?? "");
     setUploadedPlans({});
     pendingCoachPromptsRef.current = [];
     resumedCoachPromptRef.current = null;
@@ -1395,7 +1356,7 @@ export function ChatView({
       const entries = await api.getChatSession(sessionId);
       persistedBaseRef.current = entries.length;
       setTimeline(fromPersistedEntries(entries));
-      resetEphemeralChatState();
+      resetEphemeralChatState(sessionId);
       setActiveSessionId(sessionId);
       void markSessionRead(sessionId);
     } catch {
@@ -1479,7 +1440,7 @@ export function ChatView({
     setActiveSessionId(created.id);
     persistedBaseRef.current = 0;
     setTimeline([]);
-    resetEphemeralChatState();
+    resetEphemeralChatState(created.id);
     return created.id;
   };
 
@@ -2390,13 +2351,18 @@ export function ChatView({
         timeline.length === 0 &&
         !liveAnalysis &&
         !sessionAttention.get(activeSessionId)?.attached &&
-        (sessions.find((session) => session.id === activeSessionId)?.messageCount ?? 0) === 0
+        (sessions.find((session) => session.id === activeSessionId)?.messageCount ?? 0) === 0 &&
+        // A question being written is not blank: it is kept as a draft (UAT).
+        !composerDraftRef.current.trim() &&
+        !pendingRefs.length &&
+        !pendingScheduleRefs.length
     );
   const letGoOfBlankConversation = async () => {
     if (!api || !activeSessionId || !openConversationIsBlank()) return;
     const blankId = activeSessionId;
     try {
       await api.deleteChatSession(blankId);
+      clearComposerDraft(blankId);
       setSessions((current) => current.filter((session) => session.id !== blankId));
     } catch {
       // Keeping an empty row is harmless; failing to leave it would not be.
@@ -2418,7 +2384,7 @@ export function ChatView({
       setActiveSessionId(created.id);
       persistedBaseRef.current = 0;
       setTimeline([]);
-      resetEphemeralChatState();
+      resetEphemeralChatState(created.id);
     } catch (caught) {
       onError(remoteErrorMessage(caught, "Could not start a new chat."));
     }
@@ -2488,7 +2454,7 @@ export function ChatView({
           setActiveSessionId(created.id);
           persistedBaseRef.current = 0;
           setTimeline([]);
-          resetEphemeralChatState();
+          resetEphemeralChatState(created.id);
         }
       }
     } catch (caught) {
@@ -2833,7 +2799,9 @@ export function ChatView({
       : [
           ...answeredTimeline,
           ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
-          ...(scheduleRefs.length ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs }] : []),
+          ...(scheduleRefs.length
+            ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs.map(({ detail: _detail, sport: _sport, ...ref }) => ref) }]
+            : []),
           { kind: "message", role: "user", content: trimmed }
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
@@ -2841,7 +2809,7 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
-    setStepRun(pipeline ? { requestId, step: pipeline.step, notes: EMPTY_NOTES, attempts: 0 } : null);
+    setStepRun({ requestId, step: pipeline?.step ?? "turn", notes: EMPTY_NOTES, attempts: 0 });
     turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
@@ -3325,6 +3293,91 @@ export function ChatView({
   const listedCreations = planDrafts.filter((draft) =>
     isLatestVersion(versionIndex, draft.draftId)
   );
+  /** The whole of a creation, as a question points at it. */
+  const wholeCreationRef = (draft: PlanDraftPreview): PlanRef => {
+    const versionInfo = versionIndex.get(draft.draftId);
+    return {
+      artifactId: versionInfo?.artifactId ?? draft.draftId,
+      draftId: draft.draftId,
+      ...(versionInfo ? { version: versionInfo.version } : {}),
+      name: draft.name,
+      artifactType: draft.artifactType === "workout" ? "workout" : "plan",
+      scope: "plan",
+      label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
+    };
+  };
+  /*
+   * The follow-ups of the conversation's newest creation, above the composer
+   * (R1). They were under every card, so an old version's chips stayed on
+   * screen asking to change a plan that had since moved on. A saved one-off
+   * workout has none: nothing on COROS would follow.
+   */
+  const newestCreation = [...listedCreations].reverse().find((draft) => !draft.removedAt);
+  const newestSavedWorkout =
+    newestCreation?.artifactType === "workout" &&
+    Boolean(newestCreation.uploadedAt || newestCreation.uploadResult || uploadedPlans[newestCreation.draftId]);
+  const composerFollowUps =
+    newestCreation && !newestSavedWorkout && api
+      ? {
+          subject: newestCreation.name,
+          chips: refinementChips(
+            newestCreation,
+            versionIndex
+              .get(newestCreation.draftId)
+              ?.siblings.find((item) => item.draftId === newestCreation.draftId)?.refinements
+          ),
+          onPick: (text: string) => void sendMessage(text, undefined, [wholeCreationRef(newestCreation)])
+        }
+      : null;
+  /*
+   * What "About…" offers (R1): a week or a day of the calendar, and anything
+   * made in this conversation — the chips Ask Coach from the Calendar and the
+   * Library put here, reachable from the composer itself.
+   */
+  const aboutOptions: AboutOption[] = (() => {
+    const today = new Date();
+    const thisMonday = mondayOfDate(today);
+    const nextMonday = new Date(thisMonday);
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    const weekRef = (monday: Date): ScheduleRef => {
+      const keys = Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(monday);
+        day.setDate(day.getDate() + index);
+        return keyFromDate(day);
+      });
+      return { scope: "week", day: keys[0], label: `Week of ${weekRangeLabel(keys)}` };
+    };
+    const addScheduleRef = (ref: ScheduleRef) =>
+      setPendingScheduleRefs((current) =>
+        current.some((item) => scheduleRefKey(item) === scheduleRefKey(ref)) ? current : [...current, ref]
+      );
+    return [
+      {
+        key: "today",
+        group: "Your calendar",
+        label: "Today",
+        onPick: () => addScheduleRef({ scope: "day", day: keyFromDate(today), label: "Today" })
+      },
+      { key: "this-week", group: "Your calendar", label: "This week", onPick: () => addScheduleRef(weekRef(thisMonday)) },
+      { key: "next-week", group: "Your calendar", label: "Next week", onPick: () => addScheduleRef(weekRef(nextMonday)) },
+      ...listedCreations.map((draft) => ({
+        key: `creation:${draft.draftId}`,
+        group: "Made in this conversation",
+        label: draft.name,
+        onPick: () => addRef(wholeCreationRef(draft))
+      }))
+    ];
+  })();
+  const activeSession = sessions.find((session) => session.id === activeSessionId);
+  /** Under the conversation's name: what it has made, and when it last moved. */
+  const conversationSubtitle = [
+    listedCreations.length
+      ? `${listedCreations.length} creation${listedCreations.length === 1 ? "" : "s"}`
+      : "",
+    activeSession?.messageCount ? `last reply ${formatSessionRelativeTime(activeSession.updatedAt)}` : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
   /* The transcript's preview is light; the steps a card reviews or edits come
      from the draft's document. */
   const documentOf = (draft: PlanDraftPreview) =>
@@ -3473,6 +3526,21 @@ export function ChatView({
     </div>
   );
   const providerControls = renderProviderControls(effectiveRuntime, changeConversationRuntime);
+  /* What the question points at, previewed from the plans already in hand
+     (UAT, option A): no request is made for it. */
+  const composerRefs: ComposerRef[] = [
+    ...pendingScheduleRefs.map((ref) => ({
+      key: `s:${scheduleRefKey(ref)}`,
+      preview: scheduleRefPreview(ref),
+      onRemove: () =>
+        setPendingScheduleRefs((current) => current.filter((item) => scheduleRefKey(item) !== scheduleRefKey(ref)))
+    })),
+    ...pendingRefs.map((ref) => ({
+      key: `p:${refKey(ref)}`,
+      preview: planRefPreview(ref, documentForDraft(ref.draftId), unitSystem),
+      onRemove: () => setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
+    }))
+  ];
   const coachProviderControls = renderProviderControls(coachRuntime, changeCoachRuntime);
 
   const conversationSidebarOpen = chatSettings.sidebarOpen !== false;
@@ -3944,18 +4012,26 @@ function AnalysisSilentChip({
      own at the very end, under whatever the step has produced so far — above
      a chart the step drew, it read as finished while it was still working.
      The step's words, when it has any, still stand where the turn began. */
-  const stepActive = Boolean(streaming && stepRun && stepRun.requestId === activeRequestIdRef.current);
+  const runLive = Boolean(streaming && stepRun && stepRun.requestId === activeRequestIdRef.current);
+  const stepActive = runLive && stepRun?.step !== "turn";
+  /* An ordinary turn shows its trail — a line per read, in the athlete's
+     words — until the answer's words arrive (R1): it used to be one line
+     naming the tool ("Using get activity detail…"). */
+  const turnTrail =
+    runLive && stepRun && stepRun.step === "turn" && stepRun.notes.trail.length && !compacting
+      ? stepRun
+      : null;
   const pendingStatus = (
     <div className="chat-stream-pending">
-      {activeTool || !thinkingText ? (
+      {turnTrail ? (
+        <CoachStepTrail run={turnTrail} quiet />
+      ) : activeTool || !thinkingText ? (
         <span className="chat-stream-status">
           {compacting
             ? "Compacting the conversation…"
-            : activeTool
-              ? `Using ${activeTool.replace(/_/g, " ")}…`
-              : resumedCoachPromptRef.current
-                ? "Resuming plan…"
-                : "Working on it…"}
+            : resumedCoachPromptRef.current
+              ? "Resuming plan…"
+              : "Working on it…"}
         </span>
       ) : null}
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
@@ -4007,20 +4083,21 @@ function AnalysisSilentChip({
 
   return (
     <div className="chat-view">
-      <div className="chat-header">
-        <div className="chat-header-title">
-          <span>Training Coach</span>
-        </div>
-        <div className="chat-header-end">
-          <button
-            type="button"
-            className="chat-settings-button"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Open settings"
-          >
-            <Settings2 size={16} aria-hidden="true" />
-            Settings
-          </button>
+      <ChatConversationHeader
+        title={activeSession?.title ?? "New chat"}
+        subtitle={conversationSubtitle}
+        onRename={
+          activeSessionId ? (title) => void handleRenameSession(activeSessionId, title) : undefined
+        }
+        reads={
+          conversationSettings
+            ? SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
+                .map(([, label]) => label)
+                .join(" · ")
+            : null
+        }
+        onOpenReads={() => setConversationSettingsOpen(true)}
+        analyses={
           <ConversationAnalyses
             api={api}
             sessionId={activeSessionId}
@@ -4034,32 +4111,13 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          {/* Always drawn, so the header's controls stay where they are from one
-              conversation to the next; with nothing made it is only disabled. */}
-          <button
-            type="button"
-            className="chat-creations-pill"
-            aria-expanded={planPanelOpen}
-            aria-controls="chat-creations-panel"
-            disabled={listedCreations.length === 0}
-            onClick={() => setPlanPanelOpen((open) => !open)}
-            title={
-              listedCreations.length === 0
-                ? "Nothing made in this conversation yet"
-                : planPanelOpen
-                  ? "Hide Coach creations"
-                  : "Show Coach creations"
-            }
-          >
-            {planPanelOpen ? (
-              <PanelRightClose size={13} aria-hidden="true" />
-            ) : (
-              <PanelRightOpen size={13} aria-hidden="true" />
-            )}
-            Creations
-            <span className="chat-creations-count">{listedCreations.length}</span>
-          </button>
-          {isChatGptProvider ? (
+        }
+        creations={listedCreations.length}
+        creationsOpen={planPanelOpen}
+        onToggleCreations={() => setPlanPanelOpen((open) => !open)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        trailing={
+          isChatGptProvider ? (
             <button
               type="button"
               className="chat-signout"
@@ -4068,41 +4126,13 @@ function AnalysisSilentChip({
               <LogOut size={14} aria-hidden="true" />
               Sign out
             </button>
-          ) : null}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       <div className="chat-layout">
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
-          {conversationSettings ? (
-            <button
-              type="button"
-              className="chat-conversation-settings"
-              data-action="conversationSettings"
-              onClick={() => setConversationSettingsOpen(true)}
-              title="What Coach reads here, and which AI answers"
-            >
-              <span>
-                Reads:{" "}
-                {SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
-                  .map(([, label]) => label)
-                  .join(" · ") || "nothing of yours"}
-              </span>
-              <span>
-                AI:{" "}
-                {conversationSettings.runtime
-                  ? [
-                      COACH_PROVIDER_LABELS[conversationSettings.runtime.provider ?? chatSettings.provider],
-                      conversationSettings.runtime.model,
-                      conversationSettings.runtime.effort
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : "Coach's settings"}
-              </span>
-            </button>
-          ) : null}
           <div className="chat-transcript" ref={scrollRef}>
         <div className="chat-thread">
           {timeline.length === 0 && !streaming ? (
@@ -4135,6 +4165,11 @@ function AnalysisSilentChip({
                   </button>
                 ))}
               </div>
+              {/* Said once, where a conversation starts, rather than under
+                  every turn of every conversation. */}
+              <p className="chat-disclaimer">
+                Coach can make mistakes. Check important training decisions.
+              </p>
             </div>
           ) : null}
 
@@ -4204,6 +4239,12 @@ function AnalysisSilentChip({
                   </div>
                 </ChatRow>
               );
+            }
+
+            // Drawn inside the question they belong to (R1): as a row of their
+            // own they sat on the left, the question on the right.
+            if ((entry.kind === "planRefs" || entry.kind === "scheduleRefs") && refsJoinQuestion(timeline, index)) {
+              return null;
             }
 
             if (entry.kind === "planRefs") {
@@ -4435,26 +4476,6 @@ function AnalysisSilentChip({
                         )
                       }
                       onCoros={isOnCoros(versionInfo)}
-                      refinements={refinementChips(
-                        draft,
-                        versionInfo?.siblings.find((item) => item.draftId === draft.draftId)?.refinements
-                      )}
-                      onRefine={
-                        api && !streaming
-                          ? (text) =>
-                              void sendMessage(text, undefined, [
-                                {
-                                  artifactId: versionInfo?.artifactId ?? draft.draftId,
-                                  draftId: draft.draftId,
-                                  ...(versionInfo ? { version: versionInfo.version } : {}),
-                                  name: draft.name,
-                                  artifactType: draft.artifactType === "workout" ? "workout" : "plan",
-                                  scope: "plan",
-                                  label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
-                                }
-                              ])
-                          : undefined
-                      }
                       calendar={calendarOf(draft.draftId)}
                       onCalendar={api ? () => setCalendarFor(draft.draftId) : undefined}
                       onEdit={
@@ -4628,16 +4649,29 @@ function AnalysisSilentChip({
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
                       <AssistantMarkdown content={entry.content} />
-                      {entry.source ? (
-                        <SourceBadge source={entry.source} />
+                      {/* Where the answer came from and what it cost, as one
+                          quiet line under it rather than two rows of pills. */}
+                      {entry.source || entry.usage ? (
+                        <div className="chat-answer-foot">
+                          {entry.source ? <SourceBadge source={entry.source} /> : null}
+                          <TurnCostFooter usage={entry.usage} model={entry.model} />
+                        </div>
                       ) : null}
-                      <TurnCostFooter
-                        usage={entry.usage}
-                        model={entry.model}
-                      />
                     </>
                   ) : (
-                    entry.content
+                    <>
+                      <QuestionRefs
+                        timeline={timeline}
+                        index={index}
+                        onOpen={openCreation}
+                        sportOf={(ref) =>
+                          ref.scope === "session"
+                            ? planRefPreview(ref, documentForDraft(ref.draftId), unitSystem).sport
+                            : undefined
+                        }
+                      />
+                      {entry.content}
+                    </>
                   )}
                 </div>
               </ChatRow>
@@ -4683,52 +4717,15 @@ function AnalysisSilentChip({
         </div>
       </div>
 
-          {pendingScheduleRefs.length ? (
-            <div className="chat-refs-pending" aria-label="Asking about the calendar">
-              <span className="chat-asked-kicker">Asking about</span>
-              {pendingScheduleRefs.map((ref) => (
-                <span key={scheduleRefKey(ref)} className="chat-ref-chip">
-                  {ref.label}
-                  <button
-                    type="button"
-                    className="chat-ref-remove"
-                    aria-label={`Stop asking about ${ref.label}`}
-                    onClick={() =>
-                      setPendingScheduleRefs((current) =>
-                        current.filter((item) => scheduleRefKey(item) !== scheduleRefKey(ref))
-                      )
-                    }
-                  >
-                    <X size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {pendingRefs.length ? (
-            <div className="chat-refs-pending" aria-label="Asking about">
-              <span className="chat-asked-kicker">Asking about</span>
-              {pendingRefs.map((ref) => (
-                <span key={refKey(ref)} className="chat-ref-chip">
-                  {ref.name}
-                  {ref.scope === "plan" ? "" : ` · ${ref.label}`}
-                  <button
-                    type="button"
-                    className="chat-ref-remove"
-                    aria-label={`Stop asking about ${ref.scope === "plan" ? ref.name : ref.label}`}
-                    onClick={() =>
-                      setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
-                    }
-                  >
-                    <X size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : null}
           <ChatComposer
             ref={composerRef}
             providerControls={providerControls}
+            attachments={
+              composerRefs.length ? <ComposerRefs refs={composerRefs} /> : null
+            }
+            placeholder={refPlaceholder(composerRefs.map((item) => item.preview))}
+            aboutOptions={aboutOptions}
+            followUps={composerFollowUps}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
             streaming={streaming}
@@ -4737,7 +4734,6 @@ function AnalysisSilentChip({
             isLocalProvider={isLocalProvider}
             localModelConfigured={localModelConfigured}
             onDraftChange={handleComposerDraftChange}
-            onNewChat={() => void handleNewChat()}
             onSend={sendMessage}
             onStop={handleStop}
           />

@@ -1029,6 +1029,51 @@ Overview, Media, Data, and Settings are in the main bundle.
   asserts the refusals come from the validator. Collapsing the step's last copy needs
   `$defs`/`$ref`, deliberately not used on the main write path: not every provider resolves a
   `$ref` well when *writing* arguments.
+
+  **The screen's frame follows the Coach Workbench review** (2026-09-26). The head is the
+  open conversation's (`ChatConversationHeader`: its name, renamed in place, a Reads chip
+  for its sources, the Analyses chip, Creations, a gear), not "Training Coach" over a
+  Reads · AI strip. The composer is one box (`ChatComposer.tsx`), quiet at rest — a hairline, no fill,
+  `--chat-signal-border` while it is written in (the chat scope redefines `--accent` as a
+  grey, so the chat's own accent is `--chat-signal`), and a send button that fills only once
+  there is something to send. **What the question points at heads the box**
+  (`ComposerRefs`, UAT proposal A — built to the mockup, not a variant of it): one ref is
+  its mark (a week or plan as the plan's weeks in bars of its sport's colour, the week asked
+  about in full; a session or activity as its sport's own icon, the default only when the sport
+  is unknown), what it is, and its brief — what it belongs to is the text's title, the
+  "Asking about ·" line having been taken out (UAT); two or three fold to one line of chips
+  under "About", a plan or week chip drawn with the calendar week. **The question being
+  written is a draft per conversation** (`composerDrafts.ts`, localStorage
+  `coroslink.coach.composerDrafts.v1`, `device` tier): its words and its references are
+  saved as they change and restored by `resetEphemeralChatState(sessionId)` whenever that
+  conversation is opened, emptied drafts are removed, a deleted conversation's goes with it,
+  and a blank conversation holding a draft is not blank. A Coach creation's
+  brief is read by `refPreview.ts` from the plan already in hand, so it costs no request; a
+  calendar or activity ref's comes from its label and a display-only `ScheduleRef.detail`,
+  and `sport`, which `sendMessage` strips before the `scheduleRefs` anchor is stored (no stored
+  entry gains a field). An activity's COROS code is not a program code, so its sport is
+  `activityWorkoutSport`, not `workoutSportFromType`. The placeholder asks about what is there. **Ask Coach is on every session's own
+  screen** — Activities' detail pane, a run's page on Running, a session on Strength — through
+  `activityCoachRequest` (`src/training/askCoachAbout.ts`), the Calendar's ref with the
+  activity's id; a session only Hevy knows carries none. **About** points at today, a week or a creation,
+  and an **AI chip** under the words names the model (`.chat-ai-chip`, `runtimeSummary`, the
+  provider in its label; warning-toned once the provider's status is read and it is not set
+  up). **That chip is the
+  conversation's AI**: it states what `streamChat` will resolve (the conversation's runtime
+  over Coach's settings) and opens "AI for this conversation" (`ConversationAiSheet`, the
+  generator's `GeneratorProviderPanel`), where a change writes `chat_conversation_settings`.
+  Three pickers under the words read as settings to fiddle with on every turn (UAT). "This
+  conversation" states the AI as it stands too — provider, model and effort, whether it is
+  Coach's default or chosen here, and whether it is set up. The sign-in gates keep the full
+  pickers, scoped to Coach's own settings, because a gate is about Coach's provider. There is
+  no All · Needs you filter over the list; the row's badge says it. The newest creation's follow-up chips
+  sit inside the empty box as "Try …", not under every card, giving way to the words and to a
+  ref; a saved one-off workout has none. A question's `planRefs`/`scheduleRefs` anchors are
+  drawn as a header line inside its bubble (`refsJoinQuestion`), the plan named once, with
+  a way back to the creation in the Workbench. `test:ref-preview` holds the previews. One avatar per turn, none for the athlete. An ordinary turn shows
+  its `runTrail` lines too (`StepRun.step === "turn"`); every local tool has a line there.
+  There is one New chat, at the head of the list, and a blank conversation is reused or,
+  when left, deleted — unless an analysis is attached to it.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval

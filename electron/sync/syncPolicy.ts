@@ -415,6 +415,9 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   "coroslink.appleMusic.selectedPlaylistId": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.
   "coroslink.updatePrompt.dismissedVersion": "device",
+  // What was being written in each Coach conversation, and what it pointed at:
+  // an unsent question on this machine, not the athlete's record.
+  "coroslink.coach.composerDrafts.v1": "device",
 
   // Visit centroids and route polylines for the activity globe, read back out
   // of the activity details; refetched on demand.

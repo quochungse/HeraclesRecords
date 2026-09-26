@@ -3236,6 +3236,14 @@ export interface ScheduleRef {
   activityId?: string;
   /** What is pointed at, as it is read: "Sat 27 Sep · Long run". */
   label: string;
+  /**
+   * Its figures for the composer's header while the question is written —
+   * "Run · 10.2 km · 52:10". Display only: stripped before the anchor is
+   * stored, so no stored entry gains a field an older build would drop.
+   */
+  detail?: string;
+  /** Its sport, for the header's icon. Display only, stripped with `detail`. */
+  sport?: WorkoutSport;
 }
 
 /** Coach opened from elsewhere with something to talk about (P1.7). */
