@@ -940,6 +940,10 @@ ghi thẳng vào database của app ba cuộc chat, card dựng bằng chính c�
   hơn" ghi (op và status lạ: không nút, đếm riêng ở đầu card); card xoá kiểu cũ (chỉ hiện, không làm gì).
 - **P3 sample · analysis and asks** — lượt analysis (chip playbook + câu trả lời có attribution) kèm đề
   xuất của nó; chip "About" của tuần, của một hoạt động và của buổi trong plan Library.
+- **P3 sample · creations** — creation cho canvas, không lưu gì lên COROS: plan "Sample · Base to 10k"
+  ba version (v1 Coach, v2 Coach sửa qua `revise_training_plan`, v3 bạn sửa như plan editor lưu, kèm
+  dòng `planEvent`) và workout lẻ "Sample · Tempo 35". Nút Creations hiện 2; mở canvas để xem index,
+  tab Versions, Restore; card v3 ghi "Edited by you".
 - **P3 sample · live changes** (`--live`) — trong một cửa sổ 3 tuần trống cách ít nhất 4 tuần: một plan
   lên lịch (T2 Easy 5k, T4 Tempo, T7 Long run, T3 tuần sau Easy 6k), bốn buổi riêng, một workout thư
   viện, tất cả tên "Sample …". Đề xuất 6 dòng: dời Long run (buổi plan) sang CN, thay Tempo (buổi plan),

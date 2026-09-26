@@ -8,10 +8,12 @@
 // what is checked in a turn is checked here too.
 //
 //   npm run sample:coach-p3
-//     Offline. Two conversations whose cards show every state a line can be
+//     Offline. Three conversations: cards showing every state a line can be
 //     in, a proposal left by an analysis, what the calendar and the Library
-//     point at, a delete card from before change sets, and lines a newer
-//     build wrote. Nothing on COROS is written; pressing Apply or Try again on
+//     point at, a delete card from before change sets, lines a newer build
+//     wrote — and Coach creations for the canvas: a plan in three versions
+//     (Coach's, Coach's revision, an edit of yours) and a one-off workout,
+//     none of them saved to COROS. Nothing on COROS is written; pressing Apply or Try again on
 //     these reads COROS and finds nothing, so every line goes "out of date".
 //
 //   npm run sample:coach-p3 -- --live
@@ -348,6 +350,116 @@ const fake = (idInPlan, day, name) => ({ planId: FAKE_PLAN, idInPlan: String(idI
   ]);
 }
 
+// --- C: Coach creations, for the canvas ---------------------------------------------------
+
+{
+  const sessionId = conversation("P3 sample · creations");
+  const run = (name, minutes, extra = {}) => ({
+    key: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name,
+    sport: "run",
+    steps: [
+      { kind: "warmup", target_type: "time", target_duration_seconds: 600, intensity: { type: "none" } },
+      { kind: "training", target_type: "time", target_duration_seconds: (minutes - 15) * 60, intensity: { type: "none" } },
+      { kind: "cooldown", target_type: "time", target_duration_seconds: 300, intensity: { type: "none" } }
+    ],
+    ...extra
+  });
+  const cards = [];
+  const tool = async (name, args) => {
+    const result = JSON.parse(
+      await workoutTools.handleChatWorkoutTool(name, args, {
+        sessionId,
+        allowUpcomingWorkouts: false,
+        onPlanDraft: (preview) => cards.push(preview)
+      })
+    );
+    if (!result.ok) throw new Error(`${name} refused the sample: ${JSON.stringify(result)}`);
+    return cards[cards.length - 1];
+  };
+
+  // v1, by Coach: three undated weeks, so it saves to COROS as one plan and nothing is dated.
+  const v1 = await tool("draft_training_plan", {
+    name: "Sample · Base to 10k",
+    description: "Three weeks building an aerobic base toward a 10k. Written by the sample script; nothing is on COROS.",
+    week_stages: [
+      { week: 1, stage: "base" },
+      { week: 2, stage: "base" },
+      { week: 3, stage: "build" }
+    ],
+    workouts: [
+      run("Easy 40", 40, { week: 1, day: "tue" }),
+      run("Steady 45", 45, { week: 1, day: "thu" }),
+      run("Long 70", 70, { week: 1, day: "sat" }),
+      run("Easy 40 again", 40, { week: 2, day: "tue" }),
+      run("Steady 50", 50, { week: 2, day: "thu" }),
+      run("Long 80", 80, { week: 2, day: "sat" }),
+      run("Easy 45", 45, { week: 3, day: "tue" }),
+      run("Tempo 45", 45, { week: 3, day: "thu" }),
+      run("Long 90", 90, { week: 3, day: "sun" })
+    ],
+    suggested_refinements: ["Make week 2 lighter", "Add strides", "Long runs on Sunday"]
+  });
+  // v2, by Coach: a revision, so the card folds v1 and the canvas has versions to compare.
+  const v2 = await tool("revise_training_plan", {
+    draft_id: v1.draftId,
+    summary: "Long runs moved to Sunday, week 2 made lighter",
+    ops: [
+      { op: "move_session", key: "long-70", week: 1, day: "sun" },
+      { op: "move_session", key: "long-80", week: 2, day: "sun" },
+      { op: "replace_session", key: "steady-50", workout: run("Easy 35", 35) },
+      { op: "set_week_stage", week: 3, stage: "peak" }
+    ],
+    suggested_refinements: ["Add a race week", "More hills"]
+  });
+  // v3, by the athlete: an edit as the plan editor saves it, with the line the conversation shows.
+  const document = workoutTools.planDraftDocument(v2.draftId);
+  const edited = {
+    ...document,
+    name: "Sample · Base to 10k (my edit)",
+    entries: document.entries.map((entry) =>
+      entry.title === "Tempo 45" ? { ...entry, dayIndex: 2, title: "Tempo 40", workout: { ...entry.workout, name: "Tempo 40" } } : entry
+    )
+  };
+  const saved = await workoutTools.savePlanDraftEdit(v2.draftId, edited, "metric");
+  if (saved.kind !== "written") throw new Error("The sample edit was refused as a conflict.");
+  const event = {
+    kind: "planEvent",
+    event: {
+      eventId: `sample-edit-${Date.now()}`,
+      artifactId: saved.artifactId,
+      draftId: saved.preview.draftId,
+      action: "edited",
+      author: "athlete",
+      name: saved.preview.name,
+      artifactType: "plan",
+      fromVersion: saved.fromVersion,
+      toVersion: saved.toVersion,
+      ...(saved.changes.length ? { changes: saved.changes } : {}),
+      at: Date.now()
+    }
+  };
+  // A one-off workout, undated: its card offers the Workout Library or the calendar.
+  const workout = await tool("draft_workout", {
+    workout: run("Sample · Tempo 35", 35),
+    suggested_refinements: ["Make it a progression run"]
+  });
+
+  history.saveChatSession(sessionId, [
+    user("Build me three weeks toward a 10k."),
+    coach("Three weeks: two of base, one of build. Open it in the canvas to read it week by week."),
+    { kind: "planDraft", draft: v1 },
+    user("Put the long runs on Sunday and make week 2 lighter."),
+    coach("Done — the card above folds into this version."),
+    { kind: "planDraft", draft: v2 },
+    event,
+    { kind: "planDraft", draft: saved.preview },
+    user("And give me one tempo run I can do any day."),
+    coach("Here it is; save it to the library or put it on a day."),
+    { kind: "planDraft", draft: workout }
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // --live: temporary data on COROS, and a proposal to apply against it
 // ---------------------------------------------------------------------------
@@ -500,6 +612,7 @@ database.closeDatabase();
 console.log(`
 Open the app → Coach. The conversations are filed under your "${provider}" provider:
   P3 sample · card states          every line state, a newer build's lines, a pre-P3 delete card
-  P3 sample · analysis and asks    an analysis's proposal; chips from the Calendar and the Library${LIVE ? `
+  P3 sample · analysis and asks    an analysis's proposal; chips from the Calendar and the Library
+  P3 sample · creations            a plan in three versions (Coach, Coach, you) and a one-off workout — Creations / canvas${LIVE ? `
   P3 sample · live changes         apply against real (temporary) COROS data in ${manifest.live.start}–${manifest.live.end}` : ""}
 Remove it all with: npm run sample:coach-p3 -- --cleanup`);
