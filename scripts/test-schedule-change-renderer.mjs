@@ -128,7 +128,7 @@ async function settle() {
 }
 
 const lineStates = () =>
-  page(`[...document.querySelectorAll(".chat-change-line")].map((row) => [row.dataset.status, row.querySelector(".chat-change-line-status")?.textContent ?? ""])`);
+  page(`[...document.querySelectorAll(".chat-change-line")].sort((a, b) => a.dataset.lineId.localeCompare(b.dataset.lineId)).map((row) => [row.dataset.status, row.querySelector(".chat-change-line-status")?.textContent ?? ""])`);
 
 async function main() {
   await app.whenReady();
@@ -168,6 +168,14 @@ async function main() {
   assert.equal(await harness("text", ".chat-change-card .chat-plan-card-summary"), "1 applied · 2 to decide");
   assert.equal(await harness("text", ".chat-change-card .chat-plan-upload"), "Apply all 2");
   assert.equal(await harness("count", ".chat-change-apply"), 2, "an applied line has no buttons");
+  // What is over folds under one line while anything is still open (R2).
+  assert.equal(await harness("exists", "details.chat-change-done:not([open])"), true, "the applied line folds under Done");
+  assert.match(await harness("text", ".chat-change-done > summary"), /Done\s*1 applied/);
+  assert.equal(
+    await page(`document.querySelector('.chat-change-group[aria-label="To decide"]').querySelectorAll(".chat-change-line").length`),
+    2,
+    "the two still open lead"
+  );
 
   // The rest at once: one stale, one applied — each line says how it ended.
   await harness("setScript", {
@@ -215,7 +223,7 @@ async function main() {
   });
   await waitFor(() => harness("exists", ".chat-change-card"), "drawn with its failures");
   assert.equal(
-    await page(`[...document.querySelectorAll(".chat-change-line")].map((row) => [...row.querySelectorAll("button")].map((button) => button.textContent).join("+")).join("|")`),
+    await page(`[...document.querySelectorAll(".chat-change-line")].sort((a, b) => a.dataset.lineId.localeCompare(b.dataset.lineId)).map((row) => [...row.querySelectorAll("button")].map((button) => button.textContent).join("+")).join("|")`),
     "Try again||Remove+Dismiss",
     "Try again only where nothing landed"
   );

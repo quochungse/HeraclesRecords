@@ -1,6 +1,14 @@
 import { Loader2 } from "lucide-react";
 import type { ScheduleChangeLine, ScheduleChangeSet } from "../../electron/types";
-import { canApply, changeSetHead, lineStatusLabel, proposedLines } from "./scheduleChangeModel";
+import {
+  canApply,
+  changeDayLabel,
+  changeSetDays,
+  changeSetHead,
+  groupChangeLines,
+  lineStatusLabel,
+  proposedLines
+} from "./scheduleChangeModel";
 
 /**
  * Coach's proposal to the calendar or the workout library, under the answer
@@ -27,6 +35,35 @@ export function CoachScheduleChangeCard({
 }) {
   const open = proposedLines(changeSet);
   const busy = Boolean(busyLine) || disabled;
+  const { toDecide, retry, done } = groupChangeLines(changeSet);
+  const days = changeSetDays(changeSet);
+  // What is over folds under one line while anything is still open; with
+  // nothing left to decide it is the whole card, so it stands open.
+  const groups = [
+    { title: "To decide", lines: toDecide, folded: false },
+    { title: "Needs another try", lines: retry, folded: false },
+    { title: "Done", lines: done, folded: toDecide.length + retry.length > 0 }
+  ];
+  const doneSummary = done
+    .map((line) => lineStatusLabel(line).toLowerCase())
+    .reduce<Record<string, number>>((counts, label) => ({ ...counts, [label]: (counts[label] ?? 0) + 1 }), {});
+  const doneText = Object.entries(doneSummary)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" · ");
+  const renderLines = (lines: ScheduleChangeLine[]) => (
+    <ul className="chat-change-lines">
+      {lines.map((line) => (
+        <ChangeLine
+          key={line.lineId}
+          line={line}
+          busy={busyLine === line.lineId || (busyLine === "*" && line.status === "proposed")}
+          disabled={busy}
+          onApply={onApply ? () => onApply(line.lineId) : undefined}
+          onDismiss={onDismiss ? () => onDismiss(line.lineId) : undefined}
+        />
+      ))}
+    </ul>
+  );
   // One kicker for every set: a set of removals read "Delete", which named an
   // operation as though it were the kind of card.
   return (
@@ -39,18 +76,41 @@ export function CoachScheduleChangeCard({
         </div>
       </header>
 
-      <ul className="chat-change-lines">
-        {changeSet.lines.map((line) => (
-          <ChangeLine
-            key={line.lineId}
-            line={line}
-            busy={busyLine === line.lineId || (busyLine === "*" && line.status === "proposed")}
-            disabled={busy}
-            onApply={onApply ? () => onApply(line.lineId) : undefined}
-            onDismiss={onDismiss ? () => onDismiss(line.lineId) : undefined}
-          />
-        ))}
-      </ul>
+      {days.length ? (
+        <ol className="chat-change-days" aria-label="The days these changes touch">
+          {days.map((day) => (
+            <li key={day.day}>
+              <b>{changeDayLabel(day.day)}</b>
+              {day.marks.map((mark, index) => (
+                <span key={index} className="chat-change-mark" data-kind={mark.kind}>
+                  {mark.name}
+                </span>
+              ))}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      {groups.map((group) =>
+        group.lines.length ? (
+          group.folded ? (
+            <details key={group.title} className="chat-change-group chat-change-done">
+              <summary>
+                <span className="chat-creation-kicker">{group.title}</span>
+                <span>{doneText}</span>
+              </summary>
+              {renderLines(group.lines)}
+            </details>
+          ) : (
+            <section key={group.title} className="chat-change-group" aria-label={group.title}>
+              {groups.filter((item) => item.lines.length).length > 1 ? (
+                <span className="chat-creation-kicker">{group.title}</span>
+              ) : null}
+              {renderLines(group.lines)}
+            </section>
+          )
+        ) : null
+      )}
 
       {open.length > 1 && (onApply || onDismiss) ? (
         <div className="chat-plan-actions">
@@ -86,7 +146,7 @@ function ChangeLine({
 }) {
   const destructive = line.op === "remove" || line.op === "deleteWorkout";
   return (
-    <li className="chat-change-line" data-status={line.status} data-op={line.op}>
+    <li className="chat-change-line" data-status={line.status} data-op={line.op} data-line-id={line.lineId}>
       <div className="chat-change-line-text">
         <span className="chat-change-line-label">{line.label}</span>
         {line.status !== "proposed" ? (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import {
   BookOpen,
+  ChevronLeft,
   ChevronRight,
   MessageCircle,
   PanelRightClose,
@@ -33,24 +33,29 @@ import { creationStatus } from "./creationChoices";
 import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
 
 /**
- * The canvas (docs/coach-plan-canvas.md, P1.4): the index of what Coach has
- * made in this conversation, in a column beside it that keeps its width, and
- * — when one is opened — that creation's details on a screen of their own.
- * The details used to open inside the column, which widened to hold a plan's
- * seven-day weeks and squeezed the conversation for as long as it was open;
- * a dialog gives the weeks the width they need and gives it back on close.
+ * The Workbench (Coach Workbench review, R2; docs/coach-plan-canvas.md, P1.4):
+ * one panel beside the conversation holding what Coach has made in it — the
+ * index while nothing is open, a creation's details once one is.
+ *
+ * It replaced two surfaces: a column that was only the index, mostly empty,
+ * and a modal screen for the details, under which the conversation could not
+ * be typed into — "Ask Coach" had to close it to reach the composer. The
+ * panel is not modal: the composer stays live beside it, and asking about a
+ * week puts the chip there without closing anything. What made the modal
+ * necessary (UAT #2: a column that widened squeezed the conversation) is
+ * answered by the conversation list folding while the panel is open, and by
+ * the panel becoming a sheet over the transcript on a narrow window.
  *
  * The details read with the Library reader's own pieces: the ridge, the week
- * cards with their seven columns, the session view. They edit nothing — the
- * editor is the one place a creation changes (D10) — and the buttons come
- * from `artifactActions`, the function the card's come from (D9).
+ * cards, the session view. They edit nothing — the editor is the one place a
+ * creation changes (D10) — and the buttons come from `artifactActions`, the
+ * function the card's come from (D9).
  *
  * Loaded when first opened, with the library's stylesheet the week cards are
  * drawn by, as the plan editor is.
  */
 export default function CoachCanvas({
   api,
-  listOpen,
   artifactId,
   creations,
   cards,
@@ -72,8 +77,6 @@ export default function CoachCanvas({
   planSportStyle
 }: {
   api?: CorosLinkApi;
-  /** Whether the index column is shown. */
-  listOpen: boolean;
   /** Any version's draft id of the creation whose details are open, or null. */
   artifactId: string | null;
   /** The newest version of each creation, in the order they were made. */
@@ -111,59 +114,39 @@ export default function CoachCanvas({
   const artifactOf = (draftId: string) => versionIndex.get(draftId)?.artifactId ?? draftId;
   const openArtifact = open ? artifactOf(open.draftId) : null;
   return (
-    <>
-      {listOpen ? (
-        <aside id="chat-creations-panel" className="chat-plan-panel chat-canvas" aria-label="Coach creations">
-          <CreationIndex
-            creations={creations}
-            openId={openArtifact}
-            artifactOf={artifactOf}
-            onCorosOf={(draftId) => isOnCoros(versionIndex.get(draftId))}
-            onOpen={onOpen}
-            onClose={onCloseList}
-            planSportStyle={planSportStyle}
-          />
-        </aside>
-      ) : null}
-      {open
-        ? /* Portalled to <body>, as the Library's editor is: a fixed box inside
-             the Coach panel is bounded by the shell's stacking context and
-             drawn under the rail. `.coach-sheet` carries the library tokens
-             the week cards need, below the band the plan editor opens in. */
-          createPortal(
-            <div className="coach-sheet">
-              <div
-                className="chat-canvas-backdrop"
-                role="presentation"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) onCloseDetails();
-                }}
-              >
-                <ArtifactView
-                  key={openArtifact}
-                  api={api}
-                  newest={open}
-                  cards={cards}
-                  versionIndex={versionIndex}
-                  documentFor={documentFor}
-                  uploadingDraftId={uploadingDraftId}
-                  editing={Boolean(editingDraftId && sameCreation(editingDraftId, open.draftId, versionIndex))}
-                  onClose={onCloseDetails}
-                  onUpload={onUpload}
-                  onEdit={onEdit}
-                  onRestore={onRestore}
-                  onRemove={onRemove}
-                  onViewInChat={onViewInChat}
-                  onCalendar={onCalendar}
-                  calendar={calendarOf?.(open.draftId)}
-                  onAsk={onAsk}
-                />
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
-    </>
+    <aside id="chat-creations-panel" className="chat-plan-panel chat-canvas chat-workbench" aria-label="Workbench">
+      {open ? (
+        <ArtifactView
+          key={openArtifact}
+          api={api}
+          newest={open}
+          cards={cards}
+          versionIndex={versionIndex}
+          documentFor={documentFor}
+          uploadingDraftId={uploadingDraftId}
+          editing={Boolean(editingDraftId && sameCreation(editingDraftId, open.draftId, versionIndex))}
+          onBack={onCloseDetails}
+          onClose={onCloseList}
+          onUpload={onUpload}
+          onEdit={onEdit}
+          onRestore={onRestore}
+          onRemove={onRemove}
+          onViewInChat={onViewInChat}
+          onCalendar={onCalendar}
+          calendar={calendarOf?.(open.draftId)}
+          onAsk={onAsk}
+        />
+      ) : (
+        <CreationIndex
+          creations={creations}
+          onCorosOf={(draftId) => isOnCoros(versionIndex.get(draftId))}
+          calendarOf={calendarOf}
+          onOpen={onOpen}
+          onClose={onCloseList}
+          planSportStyle={planSportStyle}
+        />
+      )}
+    </aside>
   );
 }
 
@@ -185,24 +168,39 @@ function creationOf(
   return creations.find((creation) => sameCreation(creation.draftId, draftId, versionIndex)) ?? null;
 }
 
+/** Where a creation stands, as the Workbench's index groups them. */
+type IndexGroup = "Not saved" | "Saved" | "On the calendar";
+const INDEX_GROUPS: IndexGroup[] = ["Not saved", "Saved", "On the calendar"];
+
 function CreationIndex({
   creations,
-  openId,
-  artifactOf,
   onCorosOf,
+  calendarOf,
   onOpen,
   onClose,
   planSportStyle
 }: {
   creations: PlanDraftPreview[];
-  /** The creation whose details are open, marked in the list. */
-  openId: string | null;
-  artifactOf: (draftId: string) => string;
   onCorosOf: (draftId: string) => boolean;
+  calendarOf?: (draftId: string) => CreationCalendar | undefined;
   onOpen: (draftId: string) => void;
   onClose: () => void;
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
+  /*
+   * Grouped by what is left to do with them (R2): what is not saved yet is
+   * what still wants a decision, so it comes first. One group is not headed.
+   */
+  const groupOf = (draft: PlanDraftPreview): IndexGroup =>
+    !creationStatus(draft, onCorosOf(draft.draftId)).saved
+      ? "Not saved"
+      : calendarOf?.(draft.draftId)?.running
+        ? "On the calendar"
+        : "Saved";
+  const groups = INDEX_GROUPS.map((group) => ({
+    group,
+    items: creations.filter((draft) => groupOf(draft) === group)
+  })).filter((entry) => entry.items.length);
   return (
     <>
       <header className="chat-plan-list-header">
@@ -211,8 +209,8 @@ function CreationIndex({
             <BookOpen size={15} aria-hidden="true" />
           </span>
           <div>
-            <strong>Coach creations</strong>
-            <span>Plans and one-off workouts</span>
+            <strong>Workbench</strong>
+            <span>Plans and workouts made here</span>
           </div>
         </div>
         <div className="chat-plan-list-header-end">
@@ -220,14 +218,47 @@ function CreationIndex({
           <button
             type="button"
             className="icon-button"
-            aria-label="Hide Coach creations"
-            title="Hide Coach creations"
+            aria-label="Close the Workbench"
+            title="Close the Workbench"
             onClick={onClose}
           >
             <PanelRightClose size={16} aria-hidden="true" />
           </button>
         </div>
       </header>
+      {/* One scroller under the header for every group (UAT): each group's
+          list sat directly in the panel, which clips, so a long Workbench
+          could not be scrolled at all. */}
+      <div className="chat-plan-index-body">
+        {groups.map(({ group, items }) => (
+          <section key={group} className="chat-plan-list-group" aria-label={group}>
+            {groups.length > 1 ? <h3 className="chat-plan-list-group-label">{group}</h3> : null}
+            <CreationRows
+              creations={items}
+              onCorosOf={onCorosOf}
+              onOpen={onOpen}
+              planSportStyle={planSportStyle}
+            />
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function CreationRows({
+  creations,
+  onCorosOf,
+  onOpen,
+  planSportStyle
+}: {
+  creations: PlanDraftPreview[];
+  onCorosOf: (draftId: string) => boolean;
+  onOpen: (draftId: string) => void;
+  planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
+}) {
+  return (
+    <>
       <ol className="chat-plan-list">
         {creations.map((draft, index) => {
           const status = creationStatus(draft, onCorosOf(draft.draftId));
@@ -239,7 +270,6 @@ function CreationIndex({
               <button
                 type="button"
                 className="chat-plan-list-item"
-                aria-current={openId === artifactOf(draft.draftId) ? "true" : undefined}
                 onClick={() => onOpen(draft.draftId)}
                 aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
               >
@@ -286,6 +316,7 @@ function ArtifactView({
   documentFor,
   uploadingDraftId,
   editing,
+  onBack,
   onClose,
   onUpload,
   onEdit,
@@ -303,6 +334,9 @@ function ArtifactView({
   documentFor: (draftId: string) => TrainingPlanDocument | null | undefined;
   uploadingDraftId: string | null;
   editing: boolean;
+  /** Back to the index. */
+  onBack: () => void;
+  /** Closes the Workbench. */
   onClose: () => void;
   onUpload: (
     draftId: string,
@@ -339,25 +373,25 @@ function ArtifactView({
     setOpenSession(null);
   }, [shownId]);
 
-  // Escape steps back one layer — the session, the removal question, then the
-  // screen itself. A dialog stacked over this one (the editor, the calendar)
-  // holds the focus, so a key pressed there is left to it.
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  // Escape steps back one layer — the session, the removal question, then
+  // back to the index — and only while the focus is in the panel: the
+  // composer beside it is live, and its Escape is its own.
+  const backRef = useRef(onBack);
+  backRef.current = onBack;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       const target = event.target as Node;
-      if (!rootRef.current?.contains(target) && target !== document.body) return;
+      if (!rootRef.current?.contains(target)) return;
       if (openSession) setOpenSession(null);
       else if (confirming) setConfirming(false);
-      else closeRef.current();
+      else backRef.current();
       event.stopPropagation();
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [openSession, confirming]);
-  // The screen takes the focus as it opens, so Escape and Tab start inside it.
+  // The details take the focus as they open, so Escape and Tab start inside.
   useEffect(() => {
     rootRef.current?.focus();
   }, []);
@@ -438,14 +472,23 @@ function ArtifactView({
 
   return (
     <div
-      className="chat-plan-panel chat-canvas chat-canvas-dialog"
-      role="dialog"
-      aria-modal="true"
+      className="chat-canvas-detail"
+      role="region"
       aria-label={title}
       tabIndex={-1}
       ref={rootRef}
     >
       <header className="chat-canvas-head">
+        <button
+          type="button"
+          className="icon-button chat-canvas-back"
+          data-action="workbenchBack"
+          aria-label="All creations"
+          title="All creations"
+          onClick={onBack}
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
         <div className="chat-canvas-title">
           <span className="chat-creation-kicker">
             {isWorkout ? "One-off workout" : "Training plan"}
@@ -480,7 +523,7 @@ function ArtifactView({
           <MessageCircle size={14} aria-hidden="true" />
           In chat
         </button>
-        <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
+        <button type="button" className="icon-button" aria-label="Close the Workbench" onClick={onClose}>
           <X size={18} aria-hidden="true" />
         </button>
       </header>
@@ -636,6 +679,7 @@ function ArtifactView({
               onRestore={onRestore ? () => onRestore(shown.draftId) : undefined}
               onCalendar={onCalendar && latest ? () => onCalendar(shown.draftId) : undefined}
               onCalendarNow={calendar?.running ?? false}
+              sheetSide="above"
             />
             <button
               type="button"

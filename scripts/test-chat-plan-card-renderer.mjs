@@ -256,20 +256,17 @@ async function main() {
   );
   assert.equal(await harness("exists", '.chat-creation-card [data-action="edit"]'), true);
 
-  // Open shows the creation's details on a screen of their own (P1.4, UAT),
-  // read with the Library reader's own week cards, from the same document —
-  // and the column beside the conversation does not widen to hold them.
+  // Open shows the creation's details in the Workbench (R2): a panel beside
+  // the conversation, not a modal — the composer stays usable.
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-canvas-dialog .plan-week-card"), "the details open on the plan");
-  assert.equal(await harness("exists", "aside.chat-canvas .plan-week-card"), false, "not inside the canvas column");
-  assert.equal(await page(`document.querySelector(".chat-canvas-dialog")?.getAttribute("role")`), "dialog");
-  // Portalled out of `.chat-view`, it still has the chat's tokens: without them
-  // the primary button's fill and border were voided, found in the running app.
-  assert.notEqual(
-    await page(`getComputedStyle(document.querySelector('.chat-canvas-dialog [data-action="saveAsPlan"]')).backgroundColor`),
-    "rgba(0, 0, 0, 0)",
-    "the details' primary button keeps the chat's fill"
-  );
+  await waitFor(() => harness("exists", ".chat-workbench .chat-canvas-detail .plan-week-card"), "the details open on the plan");
+  assert.equal(await page(`document.querySelector(".chat-canvas-detail")?.getAttribute("role")`), "region", "not a dialog");
+  assert.equal(await page(`Boolean(document.querySelector(".chat-view .chat-workbench"))`), true, "inside the chat, not portalled");
+  assert.equal(await page(`document.querySelector(".chat-composer textarea").disabled`), false, "the composer stays live beside it");
+  // Under 1600 px the conversation list folds while the Workbench is open, and
+  // comes back when it closes — the conversation keeps its width (R2).
+  assert.equal(await page(`window.innerWidth < 1600`), true, "the harness window is narrower than the fold");
+  assert.equal(await harness("exists", ".chat-sidebar-shell.is-open"), false, "the list folds");
   assert.equal(await harness("count", ".chat-canvas .plan-week-card"), 3, "every week, an undated plan's too");
   assert.equal(
     await page(`document.querySelector(".chat-canvas .chat-creation-figures dd")?.textContent`),
@@ -287,12 +284,14 @@ async function main() {
   await waitFor(() => harness("exists", ".chat-canvas .plan-session"), "a session opens in place");
   await page(`document.querySelector(".chat-canvas .plan-session").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
   await waitFor(async () => !(await harness("exists", ".chat-canvas .plan-session")), "Escape steps back to the weeks");
-  assert.equal(await harness("exists", ".chat-canvas-dialog"), true, "without closing the details");
-  // A second Escape closes the details, and opening them again finds the plan.
-  await page(`document.querySelector(".chat-canvas-dialog").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
-  await waitFor(async () => !(await harness("exists", ".chat-canvas-dialog")), "Escape closes the details");
+  assert.equal(await harness("exists", ".chat-canvas-detail"), true, "without closing the details");
+  // A second Escape steps back to the Workbench's index, and opening the
+  // creation again finds the plan.
+  await page(`document.querySelector(".chat-canvas-detail").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await waitFor(async () => !(await harness("exists", ".chat-canvas-detail")), "Escape steps back from the details");
+  assert.equal(await harness("exists", ".chat-workbench .chat-plan-list-item"), true, "to the index");
   await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", ".chat-canvas-dialog .plan-week-card"), "the details open again");
+  await waitFor(() => harness("exists", ".chat-canvas-detail .plan-week-card"), "the details open again");
 
   // Removed before it is saved, the card's draft goes too (P0.8).
   await harness("click", ".chat-canvas-foot .chat-creation-modal-remove");
@@ -300,6 +299,7 @@ async function main() {
   await waitFor(() => harness("callCount", "removePlanDraft"), "the unsaved draft is let go");
   assert.deepEqual((await harness("calls", "removePlanDraft"))[0].args, ["plan-1"]);
   await waitFor(async () => !(await harness("exists", ".chat-creation-card")), "the card leaves the conversation");
+  await waitFor(() => harness("exists", ".chat-sidebar-shell.is-open"), "with nothing left in it, the Workbench closes and the list comes back");
   await harness("mount", "ChatView", {}, BASE_SCRIPT);
   await waitFor(() => harness("exists", ".chat-creation-card"), "the plan card is drawn again");
 
@@ -480,7 +480,7 @@ async function main() {
   assert.equal(await page(`document.querySelectorAll(".chat-creation-card").length`), 1, "one card is drawn whole");
   assert.match(
     (await harness("text", ".chat-version-row")) ?? "",
-    /v1 · replaced by v2 from you/,
+    /v1 · by Coach\s*View$/,
     "and the line says what replaced it"
   );
   assert.match(
@@ -828,9 +828,21 @@ async function main() {
     ...BASE_SCRIPT,
     previewTrainingPlanCalendar: { planId: "chat:plan-1", startDay: "20990105", anchorDay: "20990105", entries: [], blockers: [] }
   });
-  await waitFor(() => harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), "a programme offers the calendar too");
-  await harness("click", '.chat-creation-card [data-action="addToCalendar"]');
+  // Its other ways to save are in the sheet beside Save to COROS, each saying
+  // what it does (R2) — not a row of sibling buttons.
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="saveOptions"]'), "a programme offers other ways to save");
+  assert.equal(await harness("exists", '.chat-creation-card .chat-plan-review[data-action="addToCalendar"]'), false, "not as a button of its own");
+  await harness("click", '.chat-creation-card [data-action="saveOptions"]');
+  await waitFor(() => harness("exists", '.chat-save-sheet [data-action="addToCalendar"]'), "the sheet lists the calendar");
+  assert.match(
+    (await harness("text", '.chat-save-sheet [data-action="addToCalendar"] .chat-save-option-outcome')) ?? "",
+    /COROS keeps the calendar in step/,
+    "with what it does"
+  );
+  assert.match((await harness("text", '.chat-save-sheet [data-action="saveAsPlan"]')) ?? "", /Suggested/, "and the lead marked");
+  await harness("click", '.chat-save-sheet [data-action="addToCalendar"]');
   await waitFor(() => harness("callCount", "previewTrainingPlanCalendar"), "read before it is saved");
+  assert.equal(await harness("exists", ".chat-save-sheet"), false, "the sheet closes on the pick");
   assert.equal((await harness("calls", "previewTrainingPlanCalendar"))[0].args[0], "chat:plan-1");
   assert.equal(await harness("callCount", "uploadTrainingPlanDraft"), 0, "nothing saved until the day is picked");
 
@@ -849,9 +861,8 @@ async function main() {
   assert.match(weekHeader, /\d+ sessions?/, "and its figures, read from the plan in hand");
   assert.equal(await harness("count", ".chat-composer .chat-ref-ridge > span.is-current"), 1, "the week stands out among the plan's weeks");
   assert.equal(await harness("attr", ".chat-composer textarea", "placeholder"), "Ask about this week…");
-  assert.equal(await harness("exists", ".chat-canvas-dialog"), false, "the details close onto the composer");
-  await harness("click", ".chat-creation-open");
-  await waitFor(() => harness("exists", '.chat-canvas-dialog [data-action="askPlan"]'), "the details open again");
+  assert.equal(await harness("exists", ".chat-canvas-detail"), true, "and the details stay open beside it (R2)");
+  await waitFor(() => harness("exists", '.chat-canvas-detail [data-action="askPlan"]'), "the details still offer the plan");
   await harness("click", '.chat-canvas [data-action="askPlan"]');
   await waitFor(async () => (await harness("count", ".chat-ref-header.is-list .chat-ref-chip")) === 2, "two fold to a line of chips (proposal A)");
   assert.equal(await harness("count", ".chat-ref-header.is-list .chat-ref-chip .chat-ref-icon"), 2, "each with its icon");

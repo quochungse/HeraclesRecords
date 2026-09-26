@@ -117,7 +117,7 @@ import {
   creationVersions,
   isLatestVersion,
   isOnCoros,
-  supersededLine,
+  versionLine,
   withDocumentSources
 } from "./creationVersions";
 import {
@@ -175,6 +175,10 @@ const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
 
 /** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
 const NEW_PLAN_TITLE = "New plan";
+/** Below this window width the conversation list folds while the Workbench is open. */
+const WORKBENCH_FOLD_WIDTH = 1600;
+/** Below this window width the Workbench is a sheet over the conversation. */
+const WORKBENCH_SHEET_WIDTH = 1180;
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -3313,6 +3317,10 @@ export function ChatView({
    * workout has none: nothing on COROS would follow.
    */
   const newestCreation = [...listedCreations].reverse().find((draft) => !draft.removedAt);
+  /** Versions an event line already speaks for, so their own line is not drawn too. */
+  const eventedDraftIds = new Set(
+    timeline.flatMap((entry) => (entry.kind === "planEvent" ? [entry.event.draftId] : []))
+  );
   const newestSavedWorkout =
     newestCreation?.artifactType === "workout" &&
     Boolean(newestCreation.uploadedAt || newestCreation.uploadResult || uploadedPlans[newestCreation.draftId]);
@@ -3420,6 +3428,7 @@ export function ChatView({
    * COROS has moved on — no request — and brings a newer COROS version in.
    */
   const openCreation = (draftId: string) => {
+    setPlanPanelOpen(true);
     setOpenCreationId(draftId);
     if (!api || !isOnCoros(versionIndex.get(draftId))) return;
     const sessionId = activeSessionIdRef.current;
@@ -3457,6 +3466,29 @@ export function ChatView({
     setPlanPanelOpen(false);
     setOpenCreationId(null);
   }, [activeSessionId]);
+
+  /*
+   * The Workbench (R2): open while its index or a creation's details are.
+   * While it is open on a window narrower than WORKBENCH_FOLD_WIDTH the
+   * conversation list folds, so the conversation keeps its width — the reason
+   * the details were once a modal screen (UAT #2). The fold is not the
+   * athlete's own collapse: closing the Workbench brings the list back. Under
+   * WORKBENCH_SHEET_WIDTH the Workbench is a sheet over the whole
+   * conversation, composer included (UAT).
+   */
+  const workbenchOpen = (planPanelOpen || Boolean(openCreationId)) && listedCreations.length > 0;
+  const closeWorkbench = () => {
+    setPlanPanelOpen(false);
+    setOpenCreationId(null);
+  };
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const workbenchFoldsList = workbenchOpen && viewportWidth < WORKBENCH_FOLD_WIDTH;
+  const workbenchCovers = workbenchOpen && viewportWidth < WORKBENCH_SHEET_WIDTH;
 
   /*
    * A change made in the composer is this conversation's (Q1 of the Coach
@@ -3545,7 +3577,9 @@ export function ChatView({
 
   const conversationSidebarOpen = chatSettings.sidebarOpen !== false;
   const sidebarProps = {
-    open: conversationSidebarOpen,
+    // Folded, not collapsed, while the Workbench needs the width (R2).
+    open: conversationSidebarOpen && !workbenchFoldsList,
+    folded: workbenchFoldsList,
     overlay: false,
     sessions,
     activeSessionId,
@@ -4113,8 +4147,8 @@ function AnalysisSilentChip({
           />
         }
         creations={listedCreations.length}
-        creationsOpen={planPanelOpen}
-        onToggleCreations={() => setPlanPanelOpen((open) => !open)}
+        creationsOpen={workbenchOpen}
+        onToggleCreations={() => (workbenchOpen ? closeWorkbench() : setPlanPanelOpen(true))}
         onOpenSettings={() => setSettingsOpen(true)}
         trailing={
           isChatGptProvider ? (
@@ -4130,7 +4164,9 @@ function AnalysisSilentChip({
         }
       />
 
-      <div className="chat-layout">
+      <div
+        className={workbenchCovers ? "chat-layout is-workbench-sheet" : "chat-layout"}
+      >
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
           <div className="chat-transcript" ref={scrollRef}>
@@ -4402,10 +4438,21 @@ function AnalysisSilentChip({
                 >
                   <span className="chat-asked-kicker">{what}</span>
                   <span className="chat-asked-question">{event.name}</span>
-                  <span className="chat-version-note">
+                  {/* One line (R2): the first change and how many more, the
+                      whole list on hover and in the Workbench's Versions. It
+                      used to print every change, wrapping over three lines. */}
+                  <span className="chat-version-note" title={event.changes?.join("\n")}>
                     {verb}
-                    {event.changes?.length ? ` · ${event.changes.join(" · ")}` : ""}
+                    {event.changes?.length ? ` · ${event.changes[0]}` : ""}
+                    {event.changes && event.changes.length > 1 ? ` · +${event.changes.length - 1} more` : ""}
                   </span>
+                  <button
+                    type="button"
+                    className="chat-local-action chat-plan-event-view"
+                    onClick={() => openCreation(event.draftId)}
+                  >
+                    View
+                  </button>
                   {undoTo ? (
                     <button
                       type="button"
@@ -4431,6 +4478,9 @@ function AnalysisSilentChip({
               // the card with buttons, and two full copies of one plan read as
               // two plans.
               if (versionInfo && !versionInfo.latest) {
+                // One action, one line (R2): a version an edit, a restore or an
+                // import made already has that event's line just before it.
+                if (eventedDraftIds.has(draft.draftId)) return null;
                 return (
                   <div
                     key={`${draft.draftId}#${index}`}
@@ -4441,7 +4491,14 @@ function AnalysisSilentChip({
                       {draft.artifactType === "workout" ? "Workout" : "Plan"}
                     </span>
                     <span className="chat-asked-question">{draft.name}</span>
-                    <span className="chat-version-note">{supersededLine(versionInfo)}</span>
+                    <span className="chat-version-note">{versionLine(versionInfo)}</span>
+                    <button
+                      type="button"
+                      className="chat-local-action chat-plan-event-view"
+                      onClick={() => openCreation(draft.draftId)}
+                    >
+                      View
+                    </button>
                   </div>
                 );
               }
@@ -4738,11 +4795,10 @@ function AnalysisSilentChip({
             onStop={handleStop}
           />
         </div>
-        {(planPanelOpen || openCreationId) && listedCreations.length > 0 ? (
+        {workbenchOpen ? (
           <Suspense fallback={null}>
             <CoachCanvas
               api={api}
-              listOpen={planPanelOpen}
               artifactId={openCreationId}
               creations={listedCreations}
               cards={planDrafts}
@@ -4752,8 +4808,11 @@ function AnalysisSilentChip({
               editingDraftId={editingPlanDraftId ?? editingWorkoutDraftId}
               planSportStyle={planSportStyle}
               onOpen={(draftId) => openCreation(draftId)}
-              onCloseList={() => setPlanPanelOpen(false)}
-              onCloseDetails={() => setOpenCreationId(null)}
+              onCloseList={closeWorkbench}
+              onCloseDetails={() => {
+                setPlanPanelOpen(true);
+                setOpenCreationId(null);
+              }}
               onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
                 void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
               }
@@ -4764,16 +4823,20 @@ function AnalysisSilentChip({
                 setOpenCreationId(null);
               }}
               onViewInChat={(draftId) => {
-                // The card is in the conversation, under the details' screen.
-                setOpenCreationId(null);
+                // The card is in the conversation beside the Workbench; on a
+                // narrow window the Workbench covers it, so it steps aside.
+                if (workbenchCovers) closeWorkbench();
                 handleScrollToPlanChat(draftId);
               }}
               onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
               calendarOf={calendarOf}
               onAsk={(ref) => {
-                // The question is written in the composer, under the details.
-                setOpenCreationId(null);
+                // Beside the Workbench the composer is live (R2): the chip goes
+                // there and nothing closes. Under the sheet, which covers the
+                // composer too (UAT), the sheet steps aside to show it.
                 addRef(ref);
+                if (workbenchCovers) closeWorkbench();
+                requestAnimationFrame(() => composerRef.current?.focus());
               }}
             />
           </Suspense>

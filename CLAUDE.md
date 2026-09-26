@@ -548,19 +548,30 @@ Overview, Media, Data, and Settings are in the main bundle.
   Saves are serialised per creation (`savingArtifacts`) and reads against COROS shared per
   creation (`corosSyncsInFlight`); a version answered after the athlete moved to another
   conversation is not appended there (`appendVersion` takes the conversation it was asked from).
-  **A creation is read in the canvas** (`CoachCanvas`,
-  lazy with the library's stylesheet), which replaced the Creations list and its popup: the
-  index of creations is a column beside the conversation that **never widens**, and opening one
-  shows its **details on a screen of their own** (`.chat-canvas-dialog`, portalled to `<body>`
-  inside a `.coach-sheet` for the library tokens, below the plan editor's band) — the reader's
-  ridge, week cards and session view, a version picker, a Versions tab whose lines come from
-  `electron/planDiff.ts` (node-free, shared with `restorePlanDraftVersion`'s `planEvent`), and
-  Restore, which writes the old content as a new version. The details used to open inside the
-  column, widened to 760px, which squeezed the conversation for as long as a plan was open.
-  Escape steps back a layer and then closes them; Ask Coach and "In chat" close them, because
-  what they lead to is under them. Its buttons and the card's come from one function,
-  `artifactActions`. The composer is a container (`chat-composer`), because the column narrows
-  the conversation on a wide window too.
+  **A creation is read in the Workbench** (`CoachCanvas`, `.chat-workbench`, lazy with the
+  library's stylesheet; Coach Workbench review R2): one panel beside the conversation that is the
+  index while nothing is open (grouped Not saved · Saved · On the calendar) and a creation's
+  details once one is — the reader's ridge, week cards and session view, a version picker, a
+  Versions tab whose lines come from `electron/planDiff.ts` (node-free, shared with
+  `restorePlanDraftVersion`'s `planEvent`), and Restore, which writes the old content as a new
+  version. **It is not modal**: the composer stays live beside it, and Ask Coach puts its chip
+  there without closing anything. It replaced a narrow index column and a modal details screen
+  (`.chat-canvas-dialog`, which UAT #2 had made modal because a widening column squeezed the
+  conversation). That squeeze is now answered by the conversation list **folding** while the
+  Workbench is open under `WORKBENCH_FOLD_WIDTH` (1600 px) — folded, not collapsed: the
+  athlete's own collapse setting is untouched and the list returns on close — and, under
+  `WORKBENCH_SHEET_WIDTH` (1180 px), by the Workbench becoming a sheet over the whole
+  conversation, composer included — stopping at the composer left a strip of transcript
+  under its edge (UAT) — and Ask Coach then closes it to show the chip it adds. Escape steps back a layer (the
+  session, the removal question, the index), only while focus is in the panel. Its buttons and
+  the card's come from one function, `artifactActions`; the leading way to save stands alone and
+  the rest are in a **save sheet** beside it (`CreationActions`), each with `actionOutcome`'s
+  sentence of what it does. In the transcript an older version is one line (`versionLine`,
+  "v1 · by Coach", with View), and a version an event made is not drawn again under that event's
+  line; an event line shows its first change and a count, the rest on hover. A change set's card
+  groups its lines (To decide · Needs another try · Done, folded while anything is open) and
+  draws the days it touches as they stand once applied (`changeSetDays`). The composer is a
+  container (`chat-composer`), because the Workbench narrows the conversation.
   Drafts are deleted with their conversation; the 24-hour prune is gone.
   **AI Plan asks for the brief first, then opens Coach on it; the plan generator dialog is gone**
   (P2.5 of docs/coach-plan-canvas.md). The Library's AI Plan button opens `CoachBriefEditor` in

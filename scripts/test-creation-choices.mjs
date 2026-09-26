@@ -268,4 +268,66 @@ const ids = (choices) => ({
   assert.deepEqual(refinementChips({ ...plan(run), artifactType: "workout" }), ["Shorter", "Easier", "Harder"]);
 }
 
+// actionOutcome (R2): every way to save says what it does in the save sheet,
+// and the two calendar ways say how they differ.
+{
+  const { actionOutcome } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "chat", "creationChoices.ts")).href
+  );
+  const week = plan(entry("a", "2026-09-28"), entry("b", "2026-10-02"));
+  const choices = planSaveChoices(week, today);
+  for (const action of [choices.primary, ...choices.secondary, ...choices.more]) {
+    assert.ok(actionOutcome(action, week).length > 20, `${action.id} is explained`);
+  }
+  assert.match(actionOutcome(choices.primary, week), /workout of its own[\s\S]*→/, "sessions on the calendar name their span");
+  assert.match(
+    actionOutcome({ id: "addToCalendar", label: "", destination: "nativePlan" }, week),
+    /COROS keeps the calendar in step/,
+    "a plan on the calendar says COROS keeps it"
+  );
+  assert.match(
+    actionOutcome({ id: "saveToLibrary", label: "", destination: "workoutLibrary" }, workout()),
+    /any day/,
+    "a workout for the library, for any day"
+  );
+}
+
+// changeSetDays and groupChangeLines (R2): the days a set touches, and its
+// lines by what is left to do.
+{
+  const { changeSetDays, groupChangeLines, changeDayLabel } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "chat", "scheduleChangeModel.ts")).href
+  );
+  const session = (name, happenDay) => ({ planId: "p", idInPlan: name, happenDay, name });
+  const set = {
+    changeSetId: "c",
+    summary: "",
+    createdAt: "",
+    updatedAt: "",
+    lines: [
+      { lineId: "l1", op: "move", label: "", status: "proposed", session: session("Long", "20260927"), toDay: "20260928" },
+      { lineId: "l2", op: "remove", label: "", status: "failed", session: session("Strides", "20260929") },
+      { lineId: "l3", op: "replace", label: "", status: "dismissed", session: session("Tempo", "20260930"), workout: { name: "Easy" } },
+      { lineId: "l4", op: "remove", label: "", status: "failed", retry: false, session: session("Hills", "20261001") },
+      { lineId: "l5", op: "teleport", label: "", status: "proposed" }
+    ]
+  };
+  assert.deepEqual(
+    changeSetDays(set).map((day) => [day.day, day.marks.map((mark) => `${mark.kind}:${mark.name}`)]),
+    [
+      ["20260927", ["gone:Long"]],
+      ["20260928", ["new:Long"]],
+      ["20260929", ["failed:Strides"]],
+      ["20261001", ["failed:Hills"]]
+    ],
+    "a dismissed line and an op this build does not know change no day"
+  );
+  const groups = groupChangeLines(set);
+  assert.deepEqual(
+    [groups.toDecide, groups.retry, groups.done].map((lines) => lines.map((line) => line.lineId)),
+    [["l1"], ["l2"], ["l3", "l4", "l5"]]
+  );
+  assert.equal(changeDayLabel("20260929"), "Tue 29 Sep");
+}
+
 console.log("test-creation-choices: ok");

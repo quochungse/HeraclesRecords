@@ -119,7 +119,6 @@
    */
   --sidebar-row-text: #dadadf;
   --sidebar-row-icon: #9b9ba1;
-  --sidebar-radius: var(--radius-xl);
   --sidebar-glass-border: rgba(255, 255, 255, 0.14);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -15921,12 +15920,9 @@ tr.data-intervals-row-missing {
 }
 
 /* ----- Training Coach chatbot ----- */
-/* The chat's tokens, on the chat and on what Coach portals out of it: a
-   creation's details screen sits under <body>, where a `var()` naming one of
-   these would otherwise void its declaration — the primary button drew with
-   no fill and no border there. */
-.chat-view,
-.chat-canvas-backdrop {
+/* The chat's tokens. The Workbench sits inside the chat now (R2), so
+   nothing Coach draws is portalled out from under them. */
+.chat-view {
   /* Chat-scoped neutral/monochrome palette. Overrides the app's green
      accent within the chat only, so the rest of the app is unaffected. */
   --accent: #9aa1ad;
@@ -16147,22 +16143,70 @@ tr.data-intervals-row-missing {
   min-height: 0;
 }
 
+/* The Workbench (Coach Workbench review, R2): a plain column beside the
+   conversation with one hairline, like the conversation list on the other
+   side — wide enough for a plan's weeks, which the index column was not. */
 .chat-plan-panel {
   display: flex;
-  flex: 0 0 clamp(248px, 20vw, 296px);
+  flex: 0 0 clamp(380px, 34vw, 500px);
   flex-direction: column;
   align-self: stretch;
   min-width: 0;
   min-height: 0;
-  margin: var(--sidebar-float-gap) var(--sidebar-float-gap)
-    var(--sidebar-float-gap) 0;
   overflow: hidden;
-  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
-  border-radius: var(--sidebar-radius);
-  background: var(--sidebar-glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  box-shadow: var(--sidebar-glass-shadow);
+  border-left: 1px solid var(--sidebar-divider);
+  background: var(--menu-surface);
+}
+
+/* On a narrow window it is a sheet over the whole conversation, composer
+   included (UAT): stopping at the composer left a strip of the transcript
+   showing under its edge. Ask Coach closes it to show the chip it adds. */
+.chat-layout.is-workbench-sheet > .chat-plan-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-left: 0;
+  box-shadow: var(--shadow-elevated);
+}
+
+.chat-canvas-detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-canvas-detail:focus {
+  outline: none;
+}
+
+/* The Workbench index scrolls as one body under its header. */
+.chat-plan-index-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 18%, transparent)
+    transparent;
+}
+
+.chat-plan-list-group {
+  display: grid;
+}
+
+/* A group's list is laid out by the body that scrolls, not a scroller itself. */
+.chat-plan-index-body .chat-plan-list {
+  overflow: visible;
+}
+
+.chat-plan-list-group-label {
+  margin: 12px 14px 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .chat-plan-list-header {
@@ -16403,44 +16447,6 @@ tr.data-intervals-row-missing {
 
 /* ----- The canvas (docs/coach-plan-canvas.md, P1.4) ----- */
 
-/* A creation's details, on a screen of their own over the conversation. The
-   list beside the conversation keeps its width; the details take what a
-   plan's weeks need — seven columns from about 680px of card — up to the
-   Library reader's measure. */
-.chat-canvas-backdrop {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  padding: 24px;
-  background: var(--tl-scrim);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  animation: tl-fade-in var(--dur-fast) var(--ease) both;
-}
-
-.chat-plan-panel.chat-canvas-dialog {
-  flex: 0 1 auto;
-  width: 100%;
-  max-width: 980px;
-  /* One height for both tabs: sized by content, the sheet shrank by 155px
-     when Versions was picked and grew back on Plan. */
-  height: 100%;
-  max-height: 880px;
-  margin: auto;
-  background: var(--menu-surface);
-  box-shadow: var(--shadow-elevated);
-  animation: tl-sheet-in var(--dur-base) var(--tl-ease-out) both;
-}
-
-.chat-canvas-dialog:focus {
-  outline: none;
-}
-
-/* The list marks the creation whose details are open. */
-.chat-plan-list-item[aria-current="true"] {
-  background: var(--glass-bg-hover);
-}
-
 .chat-canvas-head {
   display: flex;
   align-items: center;
@@ -16607,13 +16613,6 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.45;
-}
-
-/* A narrow window gives the details' screen its edge. */
-@media (max-width: 980px) {
-  .chat-canvas-backdrop {
-    padding: 10px;
-  }
 }
 
 .chat-main-login {
@@ -21278,6 +21277,105 @@ tr.data-intervals-row-missing {
   gap: 8px;
 }
 
+/* The leading way to save and, joined to it, the sheet of every other way
+   (Workbench review, R2). */
+.chat-save-actions {
+  position: relative;
+}
+
+.chat-save-split {
+  display: inline-flex;
+}
+
+.chat-save-split > .chat-plan-upload:first-child:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.chat-save-split > .chat-save-more {
+  margin-left: -1px;
+  padding: 8px 9px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.chat-save-sheet {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  width: min(420px, 100%);
+  min-width: 280px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.chat-save-sheet[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.chat-save-sheet-title {
+  padding: 2px 8px 6px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chat-save-option {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-save-option:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+}
+
+.chat-save-option-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.chat-save-option-head strong {
+  font-weight: 600;
+}
+
+.chat-save-option-head em {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.chat-save-option-outcome {
+  padding-left: 21px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* The outline's way on to the sessions stands at the row's end, as a next
    step does, apart from the buttons that change the outline itself. */
 .chat-outline-next {
@@ -21763,6 +21861,74 @@ tr.data-intervals-row-missing {
   list-style: none;
 }
 
+/* The days the set touches, as they stand once it is applied (R2). */
+.chat-change-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-change-days > li {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-change-days b {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-change-mark {
+  overflow: hidden;
+  padding-left: 5px;
+  border-left: 3px solid var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-change-mark[data-kind="new"] {
+  border-left-color: var(--chat-signal);
+}
+
+.chat-change-mark[data-kind="gone"] {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.chat-change-mark[data-kind="failed"] {
+  border-left-color: var(--error-text);
+}
+
+.chat-change-group {
+  display: grid;
+  gap: 6px;
+}
+
+.chat-change-done > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-change-done[open] > summary {
+  margin-bottom: 6px;
+}
+
 .chat-change-line {
   display: flex;
   align-items: center;
@@ -22131,7 +22297,7 @@ tr.data-intervals-row-missing {
 }
 
 /* --- Chat (Coach) --------------------------------------------------------- */
-:root[data-theme="paper"] :is(.chat-view, .chat-canvas-backdrop) {
+:root[data-theme="paper"] .chat-view {
   --surface: var(--glass-bg-elevated);
   --accent: #6b6560;
   --accent-strong: #3d3a36;
@@ -32475,7 +32641,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   height: 100px;
   min-width: 0;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: flex-end;
   gap: 4px;
   padding: 0;
@@ -32496,8 +32662,14 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
 
 /* A stack of the week's sports, bottom up in one fixed order, each in the hue
    its sessions wear below. The hover and this week lift the whole stack. */
+/* The chart spans the width; a bar does not (UAT). A week's column is its
+   share of the row, and its bar a fixed width in the middle of it, so four
+   weeks across a whole reader draw four bars rather than four slabs. The
+   outline card's bars take the same width. */
 .plan-ridge-bar {
   display: flex;
+  width: 100%;
+  max-width: 28px;
   height: var(--plan-bar-height);
   flex-direction: column-reverse;
   gap: 1px;

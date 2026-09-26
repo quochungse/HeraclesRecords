@@ -9,6 +9,7 @@ import type {
 export function ChatSidebar({
   open,
   overlay,
+  folded = false,
   sessions,
   activeSessionId,
   busy,
@@ -26,6 +27,8 @@ export function ChatSidebar({
 }: {
   open: boolean;
   overlay: boolean;
+  /** Folded for the Workbench rather than collapsed: no way to expand it is offered. */
+  folded?: boolean;
   sessions: ChatSessionSummary[];
   activeSessionId: string | null;
   busy?: boolean;
@@ -116,7 +119,7 @@ export function ChatSidebar({
           </div>
         </aside>
       </div>
-      {!open && !overlay ? (
+      {!open && !overlay && !folded ? (
         <button
           type="button"
           className="chat-sidebar-expand-button"

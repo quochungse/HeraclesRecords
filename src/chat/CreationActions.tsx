@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Bookmark,
   CalendarDays,
+  ChevronDown,
   Loader2,
-  MoreHorizontal,
   PencilLine,
   RotateCcw,
   TriangleAlert
@@ -14,7 +14,7 @@ import type {
   PlanDraftSaveOptions,
   TrainingPlanDestination
 } from "../../electron/types";
-import { artifactActions, type CreationAction } from "./creationChoices";
+import { actionOutcome, artifactActions, type CreationAction } from "./creationChoices";
 
 function todayKey(): string {
   const now = new Date();
@@ -48,7 +48,8 @@ export function CreationActions({
   onCoros = false,
   onRestore,
   onCalendar,
-  onCalendarNow = false
+  onCalendarNow = false,
+  sheetSide = "below"
 }: {
   draft: PlanDraftPreview;
   uploading: boolean;
@@ -73,6 +74,8 @@ export function CreationActions({
   onCalendar?: () => void;
   /** COROS is running a copy of the plan on the calendar already. */
   onCalendarNow?: boolean;
+  /** Where the ways to save open: under a card, over a footer. */
+  sheetSide?: "below" | "above";
 }) {
   const today = todayKey();
   const offered = artifactActions(draft, { latest, editing, saved, onCoros, onCalendar: onCalendarNow }, today);
@@ -90,6 +93,26 @@ export function CreationActions({
         }
       : offered;
   const [showMore, setShowMore] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // A press outside the sheet or Escape closes it, Escape in the capture phase
+  // so a sheet inside a panel that also answers Escape closes first.
+  useEffect(() => {
+    if (!showMore) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setShowMore(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setShowMore(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [showMore]);
   /* A workout put on the calendar is otherwise not kept in the library. */
   const [keepInLibrary, setKeepInLibrary] = useState(false);
   const isWorkout = draft.artifactType === "workout";
@@ -213,12 +236,13 @@ export function CreationActions({
   const calendarOffered = [choices.primary, ...choices.secondary].some(
     (action) => action.id === "putOnCalendar"
   );
+  const others = [...choices.secondary, ...choices.more];
   const schedulesWorkout =
     isWorkout &&
     (pickedDate !== null || choices.primary.id === "scheduleWorkout");
 
   return (
-    <div className="chat-creation-actions">
+    <div className="chat-creation-actions" ref={rootRef}>
       {calendarOffered && draft.conflicts.length > 0 ? (
         <p className="chat-plan-destination-summary" data-tone="alert">
           <TriangleAlert size={13} aria-hidden="true" />
@@ -252,7 +276,7 @@ export function CreationActions({
           Also keep in library
         </label>
       ) : null}
-      <div className="chat-plan-actions">
+      <div className="chat-plan-actions chat-save-actions">
         {pickedDate !== null ? (
           <>
             <button
@@ -282,8 +306,28 @@ export function CreationActions({
           </>
         ) : (
           <>
-            {button(choices.primary, true)}
-            {choices.secondary.map((action) => button(action, false))}
+            {/* One way leads, as D3 picks it; every other way to save is in
+                the sheet beside it, each with what it does (R2). They used to
+                stand as sibling buttons whose labels had to carry the
+                difference between a COROS plan and workouts of their own. */}
+            <span className="chat-save-split">
+              {button(choices.primary, true)}
+              {others.length ? (
+                <button
+                  type="button"
+                  className="chat-plan-upload chat-save-more"
+                  data-action="saveOptions"
+                  aria-haspopup="menu"
+                  aria-expanded={showMore}
+                  aria-label="Other ways to save"
+                  title="Other ways to save"
+                  onClick={() => setShowMore((open) => !open)}
+                  disabled={uploading}
+                >
+                  <ChevronDown size={14} aria-hidden="true" />
+                </button>
+              ) : null}
+            </span>
             {onEdit ? (
               <button
                 type="button"
@@ -296,19 +340,31 @@ export function CreationActions({
                 Edit
               </button>
             ) : null}
-            {showMore ? choices.more.map((action) => button(action, false)) : null}
-            {choices.more.length > 0 && !showMore ? (
-              <button
-                type="button"
-                className="chat-plan-review"
-                data-action="more"
-                aria-label="More ways to save"
-                title="More ways to save"
-                onClick={() => setShowMore(true)}
-                disabled={uploading}
-              >
-                <MoreHorizontal size={14} aria-hidden="true" />
-              </button>
+            {showMore ? (
+              <div className="chat-save-sheet" data-side={sheetSide} role="menu" aria-label="Ways to save">
+                <span className="chat-save-sheet-title">Save “{draft.name}”</span>
+                {[choices.primary, ...others].map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    role="menuitem"
+                    className="chat-save-option"
+                    data-action={action.id}
+                    disabled={uploading}
+                    onClick={() => {
+                      setShowMore(false);
+                      run(action);
+                    }}
+                  >
+                    <span className="chat-save-option-head">
+                      <ActionIcon action={action} busy={false} />
+                      <strong>{action.label}</strong>
+                      {action === choices.primary ? <em>Suggested</em> : null}
+                    </span>
+                    <span className="chat-save-option-outcome">{actionOutcome(action, draft)}</span>
+                  </button>
+                ))}
+              </div>
             ) : null}
           </>
         )}

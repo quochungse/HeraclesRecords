@@ -88,6 +88,23 @@ const AUTHORS: Record<PlanArtifactVersion["author"], string> = {
   coros: "a change in the Library"
 };
 
+const MADE_BY: Record<PlanArtifactVersion["author"], string> = {
+  coach: "Coach",
+  athlete: "you",
+  coros: "the Library"
+};
+
+/**
+ * "v1 · by Coach": the one line an older version keeps in the conversation
+ * (Workbench review, R2). It used to add "replaced by v4 from you" on every
+ * such line, five of them over one plan, when the card below already says
+ * which version is the newest; which one replaced it is the Workbench's
+ * Versions tab.
+ */
+export function versionLine(info: CreationVersion): string {
+  return `v${info.version} · by ${MADE_BY[info.author]}`;
+}
+
 /** "v1 · replaced by v2 from Coach", for a version that is no longer the newest. */
 export function supersededLine(info: CreationVersion): string {
   const newest = info.siblings[info.siblings.length - 1];

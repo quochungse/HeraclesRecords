@@ -238,6 +238,43 @@ export function artifactActions(
 }
 
 /**
+ * What pressing an action does, in a sentence (Coach Workbench review, R2):
+ * the save sheet lists every way to save a creation with this under its name,
+ * because "Put sessions on calendar" and "Add to calendar…" differ only in
+ * what COROS keeps, and a label cannot say that.
+ */
+export function actionOutcome(action: CreationAction, draft: PlanDraftPreview): string {
+  const isWorkout = draft.artifactType === "workout";
+  const dates = draft.entries.map(entryDate).filter((date): date is string => Boolean(date)).sort();
+  const span =
+    dates.length > 1
+      ? `, ${formatDay(dates[0])} → ${formatDay(dates[dates.length - 1])}`
+      : dates.length === 1
+        ? `, ${formatDay(dates[0])}`
+        : "";
+  switch (action.id) {
+    case "putOnCalendar":
+      return `Each session becomes a workout of its own on your COROS calendar${span}. Move or delete them one by one.`;
+    case "saveAsPlan":
+      return "The sessions stay together as one plan in your Training Library. Put it on the calendar later, from there or from here.";
+    case "addToCalendar":
+      return "Saved as one COROS plan and started on a day you pick. COROS keeps the calendar in step with the plan.";
+    case "saveToLibrary":
+      return isWorkout
+        ? "Ready to schedule any day, from the Library or the Calendar."
+        : "Each session is saved to your Workout Library, ready to schedule any day.";
+    case "scheduleWorkout":
+      return `On your COROS calendar${span}.`;
+    case "pickWorkoutDate":
+      return "On your COROS calendar, on a day you pick.";
+    case "updatePlan":
+      return "Changes the COROS plan this was saved as.";
+    case "saveAsNewPlan":
+      return "A second COROS plan. The one saved before stays as it is.";
+  }
+}
+
+/**
  * The follow-ups under a creation (P1.8): what Coach offered with this
  * version, or a set that fits its kind when it offered none. A press sends
  * the chip's own words as a question about the creation — not an edit, which

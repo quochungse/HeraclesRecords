@@ -118,8 +118,8 @@ export function ChatConversationHeader({
             creations === 0
               ? "Nothing made in this conversation yet"
               : creationsOpen
-                ? "Hide Coach creations"
-                : "Show Coach creations"
+                ? "Close the Workbench"
+                : "Open the Workbench: what Coach made here"
           }
         >
           {creationsOpen ? (
@@ -127,7 +127,7 @@ export function ChatConversationHeader({
           ) : (
             <PanelRightOpen size={13} aria-hidden="true" />
           )}
-          Creations
+          Workbench
           <span className="chat-creations-count">{creations}</span>
         </button>
         {trailing}

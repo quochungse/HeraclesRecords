@@ -63,6 +63,87 @@ export function changeSetHead(set: ScheduleChangeSet): string {
   return parts.join(" · ");
 }
 
+/**
+ * The card's lines by what is left to do with them (Workbench review, R2):
+ * to decide, worth another try, and done. They were one list in the order
+ * Coach wrote them, so the two lines still waiting sat under five that were
+ * over. A line a newer build wrote is done as far as this build goes.
+ */
+export function groupChangeLines(set: ScheduleChangeSet): {
+  toDecide: ScheduleChangeLine[];
+  retry: ScheduleChangeLine[];
+  done: ScheduleChangeLine[];
+} {
+  const toDecide: ScheduleChangeLine[] = [];
+  const retry: ScheduleChangeLine[] = [];
+  const done: ScheduleChangeLine[] = [];
+  for (const line of set.lines) {
+    if (line.status === "proposed" && canApply(line)) toDecide.push(line);
+    else if (line.status === "failed" && line.retry !== false && canApply(line)) retry.push(line);
+    else done.push(line);
+  }
+  return { toDecide, retry, done };
+}
+
+/** One day the set touches, and what it does there. */
+export interface ChangeDay {
+  /** yyyyMMdd. */
+  day: string;
+  marks: { name: string; kind: "gone" | "new" | "kept" | "failed" }[];
+}
+
+/**
+ * The days a set touches, as they stand once every line still open is
+ * applied: a session leaving a day struck through, one arriving marked new.
+ * Only what the lines name — the card knows nothing else of the calendar —
+ * so it is the days, not the whole week. Dismissed and out-of-date lines
+ * change nothing and are left out.
+ */
+export function changeSetDays(set: ScheduleChangeSet): ChangeDay[] {
+  const days = new Map<string, ChangeDay["marks"]>();
+  const mark = (day: string | undefined, name: string, kind: ChangeDay["marks"][number]["kind"]) => {
+    if (!day || !/^\d{8}$/.test(day)) return;
+    const list = days.get(day) ?? [];
+    list.push({ name, kind });
+    days.set(day, list);
+  };
+  for (const line of set.lines) {
+    if (!canApply(line) || !["proposed", "applied", "failed"].includes(line.status)) continue;
+    const failed = line.status === "failed";
+    const from = line.session;
+    const newName = line.workout?.name ?? from?.name ?? "";
+    switch (line.op) {
+      case "move":
+        mark(from?.happenDay, from?.name ?? "", failed ? "kept" : "gone");
+        if (!failed) mark(line.toDay, from?.name ?? "", "new");
+        else mark(line.toDay, from?.name ?? "", "failed");
+        break;
+      case "replace":
+        mark(from?.happenDay, from?.name ?? "", failed ? "kept" : "gone");
+        mark(from?.happenDay, newName, failed ? "failed" : "new");
+        break;
+      case "remove":
+        mark(from?.happenDay, from?.name ?? "", failed ? "failed" : "gone");
+        break;
+      case "add":
+        mark(line.toDay, newName, failed ? "failed" : "new");
+        break;
+      default:
+        break;
+    }
+  }
+  return [...days.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([day, marks]) => ({ day, marks }));
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/** `Tue 29 Sep`, as the lines name a day. */
+export function changeDayLabel(day: string): string {
+  const date = new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)), 12);
+  return `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`;
+}
+
 /** The change sets a transcript anchors, once each, in order. */
 export function scheduleChangeIds(entries: readonly (ChatEntry | PersistedChatEntry)[]): string[] {
   return [...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))];
