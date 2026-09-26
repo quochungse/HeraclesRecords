@@ -310,7 +310,10 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   `test:sync-policy`.
 
 **P1.2 Coach sửa bằng patch (D11)** · L
-- Tool mới `revise_training_plan { draft_id, base_version, ops[], summary, suggested_refinements? }`.
+- Tool mới `revise_training_plan { draft_id, ops[], summary, suggested_refinements? }`.
+  (Đã làm: không có `base_version` — mỗi version có `draft_id` riêng, nên `draft_id` chính là
+  bản gốc của thao tác; `summary` lưu ở cột `change_summary`. Thao tác áp trong
+  `electron/planRevision.ts`, thuần. `suggested_refinements` đến ở P1.8.)
   Các thao tác: `move_session {key, week, day}`, `replace_session {key, workout}`,
   `remove_session {key}`, `add_session {week, day, workout}`, `set_week_stage {week, stage}`,
   `rename {name}`, `set_description {description}`. `day` là tên thứ như P0.7. Workout lẻ dùng
@@ -318,16 +321,22 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 - Áp thao tác lên `document_json` của version mới nhất, rồi kiểm tra như `draft_training_plan`
   (`validatePlanDraft`, và `generatedPlanProblems` khi plan bị buộc theo outline). Hỏng thì trả
   lý do ngay trong lượt.
-- `base_version` khác version mới nhất (người dùng vừa sửa, hoặc vừa nhập bản từ COROS): từ
-  chối, kèm tóm tắt bản mới nhất; model đọc lại bằng `get_plan_draft`.
-- Plan đã lưu: trước khi áp thao tác, đồng bộ với COROS theo P1.6.
+- `draft_id` không phải version mới nhất (người dùng vừa sửa, hoặc vừa nhập bản từ COROS): từ
+  chối, kèm `draft_id` và danh sách buổi của bản mới nhất; model đọc thêm bằng `get_plan_draft`.
+- Plan đã lưu: trước khi áp thao tác, đồng bộ với COROS theo P1.6. Cho tới P1.6, sửa một
+  artifact đã lưu bị **từ chối** (`draft_saved`), để một version mới không thành plan COROS thứ
+  hai.
+- Remove một artifact chưa lưu xoá **mọi** version và đánh dấu mọi card của nó, nếu không bản
+  trước bản mới nhất sẽ bung ra lại.
 - Thành công: ghi row version mới (`author: coach`), thêm một entry `planDraft` mới vào
   transcript (id mới, preview gọn), trả về tóm tắt, diff và kết quả kiểm tra.
 - `draft_training_plan` nhận `revises: <draft_id>` cho trường hợp viết lại gần hết; kết quả cũng
   là version mới của cùng artifact.
 - **Không** nằm trong `READ_ONLY_ALLOWED_TOOLS`: analysis chạy ngầm và lượt pipeline chỉ được
   tạo artifact mới, không được sửa artifact có sẵn, để bản người dùng đang theo dõi không bị đổi
-  sau lưng họ. Nguồn `null` trong `LOCAL_CHAT_TOOL_SOURCES`, như `draft_training_plan`.
+  sau lưng họ. Vì cùng lý do, `executeChatTool` bỏ `revises` khỏi `draft_training_plan` ở mọi
+  lượt không phải `interactive`. Nguồn `null` trong `LOCAL_CHAT_TOOL_SOURCES`, như
+  `draft_training_plan`.
 - Test: `test:chat-workout-tools` (từng thao tác, xung đột version, kiểm tra),
   `test:coach-analysis-guards`, `test:chat-tool-sources`, schema < 20 kB.
 

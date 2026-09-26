@@ -454,6 +454,23 @@ async function main() {
     /Training plan · v2/,
     "the card names its version"
   );
+  // Removed, a creation goes whole: the older version does not unfold in its place.
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("exists", ".chat-creation-modal"), "the newest version opens");
+  await harness("click", ".chat-creation-modal-remove");
+  await harness("click", ".chat-creation-modal-footer .chat-local-action.is-danger");
+  await waitFor(() => harness("callCount", "removePlanDraft"), "its drafts are let go");
+  assert.deepEqual((await harness("calls", "removePlanDraft")).at(-1).args, ["plan-1-v2"]);
+  await waitFor(
+    async () => !(await harness("exists", ".chat-creation-card")) && !(await harness("exists", ".chat-version-row")),
+    "neither version is drawn"
+  );
+  const afterRemove = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    afterRemove.filter((entry) => entry.kind === "planDraft").map((entry) => Boolean(entry.draft.removedAt)),
+    [true, true],
+    "both cards are marked removed"
+  );
 
   // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)

@@ -3550,15 +3550,24 @@ export function ChatView({
    */
   const handleRemovePlanDraft = (draftId: string) => {
     setOpenCreationId((current) => (current === draftId ? null : current));
-    const removed = planDrafts.find((draft) => draft.draftId === draftId);
-    // Unsaved, the draft goes too; saved, it stays, because the plan on COROS
-    // names it. The card is marked either way.
-    if (api && removed && !removed.uploadedAt && !removed.uploadResult && !uploadedPlans[draftId]) {
+    // A creation is removed whole: every version's card, or the one before
+    // the newest would unfold in its place.
+    const versionIds = new Set([
+      draftId,
+      ...(versionIndex.get(draftId)?.siblings.map((version) => version.draftId) ?? [])
+    ]);
+    const removed = planDrafts.filter((draft) => versionIds.has(draft.draftId));
+    const saved = removed.some(
+      (draft) => draft.uploadedAt || draft.uploadResult || uploadedPlans[draft.draftId]
+    ) || (versionIndex.get(draftId)?.siblings.some((version) => version.uploadedAt) ?? false);
+    // Unsaved, the drafts go too; saved, they stay, because the plan on COROS
+    // names one. The cards are marked either way.
+    if (api && removed.length > 0 && !saved) {
       void api.removePlanDraft(draftId).catch(() => undefined);
     }
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === draftId
+        entry.kind === "planDraft" && versionIds.has(entry.draft.draftId) && !entry.draft.removedAt
           ? { ...entry, draft: { ...entry.draft, removedAt: Date.now() } }
           : entry
       );

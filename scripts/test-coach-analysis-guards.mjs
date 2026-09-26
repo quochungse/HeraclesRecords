@@ -168,11 +168,14 @@ assert.equal(
     ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
     ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
   ];
-  // Eleven since `upload_training_plan`, which never wrote anything, was removed.
-  assert.ok(localToolNames.length >= 11, "the tool-name scrape has drifted");
+  // Twelve: `upload_training_plan`, which never wrote anything, was removed,
+  // and `revise_training_plan` was added.
+  assert.ok(localToolNames.length >= 12, "the tool-name scrape has drifted");
 
   // 6's own lists: nine reads plus `request_coach_input`, which is reachable
-  // and answers "no athlete is available"; the two writes are refused.
+  // and answers "no athlete is available"; the writes are refused. Revising
+  // counts as one: it changes a card the athlete is following, and a run
+  // nobody is watching may only add cards of its own.
   const expectedAllowed = new Set([
     "list_recent_activities",
     "get_activity_detail",
@@ -185,7 +188,7 @@ assert.equal(
     "draft_training_plan",
     "request_coach_input"
   ]);
-  const expectedBlocked = new Set(["delete_workout"]);
+  const expectedBlocked = new Set(["delete_workout", "revise_training_plan"]);
 
   for (const name of localToolNames) {
     const decided = expectedAllowed.has(name) || expectedBlocked.has(name);
@@ -199,6 +202,18 @@ assert.equal(
       `${name} must be ${expectedAllowed.has(name) ? "allowed" : "blocked"} under read-only`
     );
   }
+}
+
+// `draft_training_plan` can also revise, through `revises`; a run that only
+// reads has it taken off the arguments before the tool sees them, so the tool
+// the allowlist lets through cannot do what the allowlist keeps out.
+{
+  const service = readFileSync(path.join(repoRoot, "electron", "chatService.ts"), "utf8");
+  assert.match(
+    service,
+    /const \{ revises: _revises, \.\.\.unrevised \} = args;\s*return handleChatWorkoutTool\(name as ChatWorkoutToolName, toolPolicy === "interactive" \? args : unrevised,/,
+    "only an interactive turn may pass revises to a draft tool"
+  );
 }
 
 // The one caller of "none" is the rolling summariser, and every suite that

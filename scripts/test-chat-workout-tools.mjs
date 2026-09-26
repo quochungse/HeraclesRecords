@@ -18,6 +18,7 @@ const { buildDraftTrainingPlanInputSchema, buildDraftWorkoutInputSchema } = awai
 const {
   buildTrainingPlanDestinationInput,
   buildTrainingPlanUploadInput,
+  buildRevisePlanInputSchema,
   isChatWorkoutTool
 } = await import(
   `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}`
@@ -161,7 +162,8 @@ for (const field of ["schedule_date", "save_to_library", "sort_no"]) {
 // and is 81% intensity variants. Collapsing that last copy needs `$defs`/`$ref`,
 // which not every provider resolves well when *writing* arguments, so it is
 // deliberately not done on the app's main write path.
-for (const [label, built] of [["plan", schema], ["workout", workoutSchema]]) {
+// The revision carries one workout schema, for replace_session and add_session.
+for (const [label, built] of [["plan", schema], ["workout", workoutSchema], ["revise", buildRevisePlanInputSchema()]]) {
   const size = JSON.stringify(built).length;
   assert.ok(
     size < 20_000,

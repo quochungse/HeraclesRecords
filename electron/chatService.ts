@@ -2529,7 +2529,10 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
  *
  * Drafting stays allowed because it is already non-destructive — the draft
  * tools return a preview and the real write only happens from the athlete's
- * confirmation card.
+ * confirmation card. Revising is not: `revise_training_plan` would change a
+ * card the athlete is following behind their back, so it stays off this list,
+ * and `executeChatTool` drops `draft_training_plan`'s `revises` for the same
+ * reason.
  */
 const READ_ONLY_ALLOWED_TOOLS = new Set([
   "list_recent_activities",
@@ -2618,6 +2621,7 @@ export function getClaudeCodeTools(
     return (
       tool.name === "draft_workout" ||
       tool.name === "draft_training_plan" ||
+      tool.name === "revise_training_plan" ||
       tool.name === "search_coros_exercises"
     );
   });
@@ -2678,7 +2682,11 @@ async function executeChatTool(
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
-    return handleChatWorkoutTool(name as ChatWorkoutToolName, args, {
+    // A run that only reads may add a creation but not change one the athlete
+    // is following: `revises` would make its plan the next version of theirs,
+    // so here the draft is simply a new one.
+    const { revises: _revises, ...unrevised } = args;
+    return handleChatWorkoutTool(name as ChatWorkoutToolName, toolPolicy === "interactive" ? args : unrevised, {
       onPlanDraft: (preview: PlanDraftPreview) => {
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
@@ -2991,6 +2999,9 @@ function withLiveToolInstructions(
         "plan is offered first as one COROS plan (give it a description and, for a periodised " +
         "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
         "or schedules it from there — nothing you call writes to COROS. " +
+        "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
+        "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
+        "its next version instead of a second card. " +
         "Use list_scheduled_workouts + delete_workout to stage deletions. " +
         "The athlete confirms via the Delete from COROS button in chat.",
       "",

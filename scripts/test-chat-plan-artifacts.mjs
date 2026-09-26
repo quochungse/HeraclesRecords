@@ -12,6 +12,10 @@
 //   * A row from before versions reads as its own version 1.
 //   * Versions group by creation; the newest is the highest number, and two
 //     machines that each made the next one offline keep both.
+//   * Coach revises by operations (P1.2): only the newest version, all of the
+//     operations or none, through the checks a new draft passes; a workout
+//     takes only a new workout and a name; a saved creation is refused for
+//     now; and removing a creation removes every version of it.
 //
 // Usage:
 //   npm run test:chat-plan-artifacts
@@ -195,6 +199,228 @@ test("a card's steps come back from its document by key", () => {
     [1800, 5400]
   );
   assert.equal(versions.withDocumentSources(plan, undefined), plan, "nothing to add, nothing changed");
+});
+
+// --- Coach revises what it made (P1.2) ---------------------------------------
+
+async function revise(args) {
+  const cards = [];
+  const response = JSON.parse(
+    await tools.handleChatWorkoutTool("revise_training_plan", args, {
+      allowUpcomingWorkouts: false,
+      onPlanDraft: (card) => cards.push(card)
+    })
+  );
+  return { response, card: cards[0] };
+}
+
+const block = await draft("draft_training_plan", {
+  name: "Build block",
+  week_stages: [{ week: 1, stage: "base" }],
+  workouts: [
+    run("Easy Monday", 1800, { week: 1, day: "mon" }),
+    run("Tempo Thursday", 2700, { week: 1, day: "thu" }),
+    run("Long Saturday", 5400, { week: 2, day: "sat" })
+  ]
+});
+
+test("a revision is the next version of the same creation, and changes only what it lists", async () => {
+  const { response, card } = await revise({
+    draft_id: block.draftId,
+    summary: "Long run moved to Sunday, tempo made shorter",
+    ops: [
+      { op: "move_session", key: "long-saturday", week: 2, day: "sun" },
+      { op: "replace_session", key: "tempo-thursday", workout: run("Short tempo", 2100) },
+      { op: "add_session", week: 2, day: "tue", workout: run("Easy Tuesday", 1800) },
+      { op: "remove_session", key: "easy-monday" },
+      { op: "set_week_stage", week: 2, stage: "build" },
+      { op: "rename", name: "Build block, shorter" }
+    ]
+  });
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(response.version, 2);
+  assert.equal(card.draftId, response.draft_id, "the card is the new version");
+  assert.equal(card.entries.some((entry) => "source" in entry), false, "and it is light");
+
+  const row = database.getChatPlanDraft(response.draft_id);
+  assert.equal(row.artifactId, block.draftId);
+  assert.equal(row.version, 2);
+  assert.equal(row.parentDraftId, block.draftId);
+  assert.equal(row.author, "coach");
+  assert.equal(row.changeSummary, "Long run moved to Sunday, tempo made shorter");
+
+  const document = tools.planDraftDocument(response.draft_id);
+  assert.equal(document.name, "Build block, shorter");
+  const byKey = new Map(document.entries.map((entry) => [entry.workout.key, entry]));
+  assert.deepEqual([...byKey.keys()].sort(), ["easy-tuesday", "long-saturday", "tempo-thursday"]);
+  assert.deepEqual([byKey.get("long-saturday").weekIndex, byKey.get("long-saturday").dayIndex], [1, 6]);
+  assert.equal(byKey.get("tempo-thursday").workout.name, "Short tempo", "a replaced session keeps its key");
+  assert.equal(byKey.get("tempo-thursday").workout.steps[0].target_duration_seconds, 2100);
+  assert.deepEqual([byKey.get("tempo-thursday").weekIndex, byKey.get("tempo-thursday").dayIndex], [0, 3], "and its place");
+  assert.deepEqual(document.weekStages, [{ weekIndex: 0, stage: 2 }, { weekIndex: 1, stage: 3 }]);
+
+  const original = tools.planDraftDocument(block.draftId);
+  assert.equal(original.entries.length, 3, "version 1 is left as it was");
+  assert.equal(original.name, "Build block");
+
+  const listed = tools.planArtifacts([block.draftId]);
+  assert.deepEqual(listed.map((item) => item.version), [1, 2]);
+  assert.equal(listed[1].changeSummary, "Long run moved to Sunday, tempo made shorter");
+});
+
+test("only the newest version may be revised, and a refusal names it", async () => {
+  const { response, card } = await revise({
+    draft_id: block.draftId,
+    summary: "Rename",
+    ops: [{ op: "rename", name: "Stale" }]
+  });
+  assert.equal(response.ok, false);
+  assert.equal(response.error_code, "not_latest_version");
+  assert.equal(response.latest.version, 2);
+  assert.ok(response.latest.sessions.some((line) => line.startsWith("long-saturday · week 2 sun")));
+  assert.equal(card, undefined, "no card");
+  assert.equal(tools.planArtifacts([block.draftId]).length, 2, "and no version");
+});
+
+test("an operation that cannot apply refuses the whole revision", async () => {
+  const [, latest] = tools.planArtifacts([block.draftId]);
+  const { response } = await revise({
+    draft_id: latest.draftId,
+    summary: "Two changes",
+    ops: [
+      { op: "rename", name: "Would be fine" },
+      { op: "move_session", key: "no-such-session", week: 1, day: "mon" },
+      { op: "add_session", week: 3, workout: run("Dayless", 600) },
+      { op: "shuffle" }
+    ]
+  });
+  assert.equal(response.ok, false);
+  assert.equal(response.error_code, "revision_not_applied");
+  assert.equal(response.errors.length, 3, response.errors.join(" | "));
+  assert.match(response.errors[0], /no session with key "no-such-session"/);
+  assert.match(response.errors[1], /needs week \(1–52\) and day/);
+  assert.match(response.errors[2], /unknown op "shuffle"/);
+  assert.equal(tools.planArtifacts([block.draftId]).length, 2);
+  assert.equal(tools.planDraftDocument(latest.draftId).name, "Build block, shorter");
+});
+
+test("a revised plan is checked like a new one", async () => {
+  const [, latest] = tools.planArtifacts([block.draftId]);
+  const { response } = await revise({
+    draft_id: latest.draftId,
+    summary: "Broken tempo",
+    ops: [
+      {
+        op: "replace_session",
+        key: "tempo-thursday",
+        workout: { name: "Broken tempo", sport: "run", steps: [{ kind: "training", target_type: "time" }] }
+      }
+    ]
+  });
+  assert.equal(response.ok, false);
+  assert.equal(response.error_code, undefined, "refused by the validator, not by the operations");
+  assert.ok(response.errors.length > 0, JSON.stringify(response));
+  assert.equal(tools.planArtifacts([block.draftId]).length, 2);
+
+  const mixed = await revise({
+    draft_id: latest.draftId,
+    summary: "Mixed placement",
+    ops: [{ op: "move_session", key: "long-saturday", schedule_date: "20991004" }]
+  });
+  assert.equal(mixed.response.ok, false);
+  assert.match(mixed.response.errors[0], /placed by week and day, not by date/);
+});
+
+test("a dated plan is moved by week and day from the Monday of its first session", async () => {
+  // Wednesday 30 September 2099 and Friday 2 October: week 1 starts Monday 28 September.
+  const dated = await draft("draft_training_plan", {
+    name: "This week",
+    workouts: [
+      run("Easy Wednesday", 1800, { schedule_date: "20990930" }),
+      run("Strides Friday", 1500, { schedule_date: "20991002" })
+    ]
+  });
+  const { response } = await revise({
+    draft_id: dated.draftId,
+    summary: "Strides to Sunday of next week",
+    ops: [{ op: "move_session", key: "strides-friday", week: 2, day: "sun" }]
+  });
+  assert.equal(response.ok, true, JSON.stringify(response));
+  const plan = JSON.parse(database.getChatPlanDraft(response.draft_id).planJson);
+  assert.deepEqual(
+    plan.workouts.map((workout) => [workout.key, workout.schedule_date]),
+    [["easy-wednesday", "20990930"], ["strides-friday", "20991011"]]
+  );
+});
+
+test("a workout takes a whole new workout and keeps its day", async () => {
+  const single = await draft("draft_workout", {
+    workout: run("Hill repeats", 2400),
+    calendar_date: "20991003"
+  });
+  const moved = await revise({
+    draft_id: single.draftId,
+    summary: "Move it",
+    ops: [{ op: "move_session", key: "hill-repeats", schedule_date: "20991004" }]
+  });
+  assert.equal(moved.response.ok, false);
+  assert.match(moved.response.errors[0], /only replace_session and rename/);
+
+  const { response, card } = await revise({
+    draft_id: single.draftId,
+    summary: "Shorter hills",
+    ops: [{ op: "replace_session", workout: run("Short hills", 1800) }]
+  });
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(card.artifactType, "workout");
+  assert.equal(card.entries[0].scheduleDate, "2099-10-03", "the day the coach suggested stays");
+  const document = tools.planDraftDocument(response.draft_id);
+  assert.equal(document.entries[0].workout.key, "hill-repeats");
+  assert.equal(document.entries[0].workout.steps[0].target_duration_seconds, 1800);
+});
+
+test("a rewrite through draft_training_plan's revises is a version too", async () => {
+  const [, latest] = tools.planArtifacts([block.draftId]);
+  let card;
+  const response = JSON.parse(
+    await tools.handleChatWorkoutTool(
+      "draft_training_plan",
+      {
+        name: "Build block, rewritten",
+        revises: latest.draftId,
+        workouts: [run("Only run", 3000, { week: 1, day: "wed" })]
+      },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { card = drafted; } }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(response.version, 3);
+  assert.equal(database.getChatPlanDraft(card.draftId).artifactId, block.draftId);
+  assert.equal(database.getChatPlanDraft(card.draftId).changeSummary, "Rewritten by Coach.");
+});
+
+test("a saved creation is not revised from the conversation yet", async () => {
+  const saved = await draft("draft_training_plan", {
+    name: "Saved block",
+    workouts: [run("One run", 1800, { week: 1, day: "mon" })]
+  });
+  database.markChatPlanDraftUploaded(saved.draftId, Date.now());
+  const { response } = await revise({
+    draft_id: saved.draftId,
+    summary: "Rename",
+    ops: [{ op: "rename", name: "Renamed" }]
+  });
+  assert.equal(response.ok, false);
+  assert.equal(response.error_code, "draft_saved");
+});
+
+test("removing a creation lets every version go", () => {
+  const ids = tools.planArtifacts([block.draftId]).map((item) => item.draftId);
+  assert.equal(ids.length, 3);
+  tools.discardPlanDraft(ids[ids.length - 1]);
+  for (const id of ids) {
+    assert.equal(database.getChatPlanDraft(id), undefined, `${id} is gone`);
+  }
 });
 
 let failed = 0;

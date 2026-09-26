@@ -3141,6 +3141,8 @@ export interface PlanArtifactVersion {
   uploadedAt?: number;
   /** Changed in place by a build before versions — on another machine, say. */
   editedAt?: number;
+  /** What this version changed, in its author's words. */
+  changeSummary?: string;
 }
 
 export interface PlanWorkoutEntryInput {

@@ -500,6 +500,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_plan_drafts", "parent_draft_id", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "author", "TEXT");
   ensureColumn(db, "chat_plan_drafts", "document_json", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "change_summary", "TEXT");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
@@ -2798,6 +2799,7 @@ interface ChatPlanDraftRow {
   parent_draft_id: string | null;
   author: string | null;
   document_json: string | null;
+  change_summary: string | null;
 }
 
 export type ChatPlanDraftAuthor = "coach" | "athlete" | "coros";
@@ -2814,10 +2816,12 @@ export interface StoredChatPlanDraftRecord {
   parentDraftId?: string;
   author?: ChatPlanDraftAuthor;
   documentJson?: string;
+  /** What this version changed, in its author's words. */
+  changeSummary?: string;
 }
 
 const CHAT_PLAN_DRAFT_COLUMNS =
-  "draft_id, plan_json, preview_json, created_at, uploaded_at, artifact_id, version, parent_draft_id, author, document_json";
+  "draft_id, plan_json, preview_json, created_at, uploaded_at, artifact_id, version, parent_draft_id, author, document_json, change_summary";
 
 function chatPlanDraftRecord(row: ChatPlanDraftRow): StoredChatPlanDraftRecord {
   return {
@@ -2832,7 +2836,8 @@ function chatPlanDraftRecord(row: ChatPlanDraftRow): StoredChatPlanDraftRecord {
     ...(row.author === "coach" || row.author === "athlete" || row.author === "coros"
       ? { author: row.author }
       : {}),
-    ...(row.document_json ? { documentJson: row.document_json } : {})
+    ...(row.document_json ? { documentJson: row.document_json } : {}),
+    ...(row.change_summary ? { changeSummary: row.change_summary } : {})
   };
 }
 
@@ -2840,7 +2845,7 @@ export function saveChatPlanDraft(record: StoredChatPlanDraftRecord): void {
   requireDatabase()
     .prepare(
       `INSERT INTO chat_plan_drafts (${CHAT_PLAN_DRAFT_COLUMNS})
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(draft_id) DO UPDATE SET
          plan_json = excluded.plan_json,
          preview_json = excluded.preview_json,
@@ -2850,7 +2855,8 @@ export function saveChatPlanDraft(record: StoredChatPlanDraftRecord): void {
          version = excluded.version,
          parent_draft_id = excluded.parent_draft_id,
          author = excluded.author,
-         document_json = excluded.document_json`
+         document_json = excluded.document_json,
+         change_summary = excluded.change_summary`
     )
     .run(
       record.draftId,
@@ -2862,7 +2868,8 @@ export function saveChatPlanDraft(record: StoredChatPlanDraftRecord): void {
       record.version ?? null,
       record.parentDraftId ?? null,
       record.author ?? null,
-      record.documentJson ?? null
+      record.documentJson ?? null,
+      record.changeSummary ?? null
     );
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [record.draftId]);
 }

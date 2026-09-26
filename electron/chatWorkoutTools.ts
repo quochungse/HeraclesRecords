@@ -33,6 +33,12 @@ import {
   trainingPlanFromCoachDraftPreview
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
+import {
+  PLAN_DAYS,
+  PLAN_REVISION_OPS,
+  applyPlanRevision,
+  planAsDraftArgs
+} from "./planRevision";
 import type {
   CorosMcpTool,
   CorosTrainingPlanDraftInput,
@@ -74,6 +80,8 @@ interface StoredPlanDraft {
   version: number;
   parentDraftId?: string;
   author: ChatPlanDraftAuthor;
+  /** What this version changed, in the words of whoever made it. */
+  changeSummary?: string;
   /**
    * The plan as COROS last answered it, once it has been saved there
    * (P1.6); otherwise the document is derived from `plan` whenever it is read.
@@ -163,6 +171,7 @@ function persistPlanDraft(stored: StoredPlanDraft): void {
     version: stored.version,
     ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
     author: stored.author,
+    ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
     documentJson: JSON.stringify(draftDocument(stored))
   });
 }
@@ -187,6 +196,7 @@ function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
     version: row.version ?? 1,
     ...(row.parentDraftId ? { parentDraftId: row.parentDraftId } : {}),
     author: row.author ?? "coach",
+    ...(row.changeSummary ? { changeSummary: row.changeSummary } : {}),
     ...(document ? { document } : {})
   };
 }
@@ -215,6 +225,7 @@ export const CHAT_WORKOUT_TOOL_NAMES = [
   "search_coros_exercises",
   "draft_workout",
   "draft_training_plan",
+  "revise_training_plan",
   "list_scheduled_workouts",
   "delete_workout"
 ] as const;
@@ -304,8 +315,19 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
         "Strength and Hybrid Fitness exercise names are checked against the COROS catalog; use search_coros_exercises first " +
         "and pass its exact IDs and names. If candidates are returned, revise the affected steps and call this tool again. " +
-        "Nothing is saved to COROS by this or any tool: the athlete saves from the card. Returns a draftId and a short preview.",
-      inputSchema: buildDraftTrainingPlanInputSchema()
+        "Nothing is saved to COROS by this or any tool: the athlete saves from the card. Returns a draftId and a short preview. " +
+        "To change a plan you already drafted, use revise_training_plan; set revises only when rewriting most of it.",
+      inputSchema: withRevises(buildDraftTrainingPlanInputSchema())
+    },
+    {
+      name: "revise_training_plan",
+      description:
+        "Change a plan or workout you already drafted in this conversation, by listing only what changes. " +
+        "The result is a new version of the same card; the old one folds away. " +
+        "draft_id must be the newest version's; if it is not, the newest is returned to revise instead. " +
+        "Sessions are named by their key. A single workout takes only replace_session (with the whole new workout) and rename. " +
+        "The revised plan is checked like a new draft; a refusal lists every problem, and nothing is changed.",
+      inputSchema: buildRevisePlanInputSchema()
     },
     {
       name: "list_scheduled_workouts",
@@ -392,6 +414,9 @@ export async function handleChatWorkoutTool(
       "plan",
       options?.planRequest
     );
+  }
+  if (name === "revise_training_plan") {
+    return handleRevisePlan(args, options?.onPlanDraft, options?.allowUpcomingWorkouts !== false, options?.unitSystem ?? "metric");
   }
   if (name === "draft_workout") {
     return handleDraftWorkout(
@@ -507,8 +532,6 @@ async function handleSearchCorosExercises(
       "Use exact exercise_id and exercise_name values from these results in the matching draft tool. Refine the search if a needed movement is not represented."
   });
 }
-
-const PLAN_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 interface RawPlacement {
   key: string;
@@ -748,32 +771,49 @@ async function detectScheduleConflicts(
   return conflicts;
 }
 
-async function handleDraftTrainingPlan(
+type PreparedDraft =
+  | { ok: true; draft: CorosTrainingPlanDraft; conflicts: string[] }
+  | { ok: false; response: string };
+
+/**
+ * Every check a draft passes before it is kept — placement, the validator,
+ * the generator's request, the exercise catalog — and the calendar's say on
+ * it. A new draft and a revision go through this one path, so a revision is
+ * refused for exactly what a new plan would be.
+ */
+async function prepareDraft(
   args: Record<string, unknown>,
-  onPlanDraft?: (preview: PlanDraftPreview) => void,
-  allowUpcomingWorkouts = true,
-  unitSystem: UnitSystem = "metric",
-  artifactType: "plan" | "workout" = "plan",
-  planRequest?: TrainingPlanGenerationRequest
-): Promise<string> {
+  {
+    allowUpcomingWorkouts,
+    planRequest,
+    retryTool
+  }: {
+    allowUpcomingWorkouts: boolean;
+    planRequest?: TrainingPlanGenerationRequest;
+    retryTool: string;
+  }
+): Promise<PreparedDraft> {
+  const refuse = (body: Record<string, unknown>): PreparedDraft => ({
+    ok: false,
+    response: JSON.stringify({ ok: false, ...body })
+  });
   const placementErrors = planPlacementErrors(args);
   if (placementErrors.length > 0) {
-    return JSON.stringify({ ok: false, errors: placementErrors });
+    return refuse({ errors: placementErrors });
   }
   const draft = toPlanDraft(args);
   const validation = validatePlanDraft(draft, {
     todayDay: formatScheduleDay(new Date())
   });
   if (!validation.ok) {
-    return JSON.stringify({ ok: false, errors: validation.errors });
+    return refuse({ errors: validation.errors });
   }
   /* Before the exercises are resolved: that can cost COROS requests, and a
      draft with the wrong number of sessions is going to be rewritten anyway. */
   if (planRequest) {
     const problems = generatedPlanProblems(draft.workouts, planRequest);
     if (problems.length > 0) {
-      return JSON.stringify({
-        ok: false,
+      return refuse({
         error_code: "plan_breaks_request",
         errors: problems.slice(0, 20),
         action: "Fix every problem listed and call draft_training_plan again with the whole plan. Do not ask the athlete."
@@ -783,11 +823,7 @@ async function handleDraftTrainingPlan(
 
   const exerciseResolution = await resolveTrainingPlanExercises(draft);
   if (exerciseResolution.issues.length > 0) {
-    const retryTool = artifactType === "workout"
-      ? "draft_workout"
-      : "draft_training_plan";
-    return JSON.stringify({
-      ok: false,
+    return refuse({
       error_code: "exercise_resolution_required",
       issues: exerciseResolution.issues.map((issue) => ({
         workout_key: issue.workoutKey,
@@ -810,17 +846,45 @@ async function handleDraftTrainingPlan(
   const conflicts = allowUpcomingWorkouts && !planRequest
     ? await detectScheduleConflicts(resolvedDraft)
     : [];
+  return { ok: true, draft: resolvedDraft, conflicts };
+}
+
+async function handleDraftTrainingPlan(
+  args: Record<string, unknown>,
+  onPlanDraft?: (preview: PlanDraftPreview) => void,
+  allowUpcomingWorkouts = true,
+  unitSystem: UnitSystem = "metric",
+  artifactType: "plan" | "workout" = "plan",
+  planRequest?: TrainingPlanGenerationRequest
+): Promise<string> {
+  /* A rewrite of a plan already drafted is a version of it, not a new card;
+     asked before anything is checked, since a stale id is refused anyway. */
+  const revises = !planRequest && artifactType === "plan" ? String(args.revises ?? "").trim() : "";
+  const target = revises ? revisionTarget(revises, "plan") : undefined;
+  if (target && !target.ok) return target.response;
+
+  const prepared = await prepareDraft(args, {
+    allowUpcomingWorkouts,
+    planRequest,
+    retryTool: artifactType === "workout" ? "draft_workout" : "draft_training_plan"
+  });
+  if (!prepared.ok) return prepared.response;
+
+  if (target?.ok) {
+    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft);
+  }
+
   const draftId = crypto.randomUUID();
-  const preview = buildPlanPreview(draftId, resolvedDraft, {
-    scheduleConflicts: conflicts,
+  const preview = buildPlanPreview(draftId, prepared.draft, {
+    scheduleConflicts: prepared.conflicts,
     unitSystem,
     artifactType
   });
-  preview.conflicts = conflicts;
+  preview.conflicts = prepared.conflicts;
 
   const stored: StoredPlanDraft = {
     draftId,
-    plan: resolvedDraft,
+    plan: prepared.draft,
     preview,
     createdAt: Date.now(),
     artifactId: draftId,
@@ -857,6 +921,220 @@ async function handleDraftTrainingPlan(
       ? "The workout card is shown under your reply; the athlete saves it from there. Say why this session, briefly; do not repeat its steps."
       : "The plan card is shown under your reply; the athlete saves it from there. Explain the plan's logic and its key weeks; do not list every session."
   });
+}
+
+/** The versions of a creation, oldest first, as the renderer orders them. */
+function versionsOf(artifactId: string): StoredPlanDraft[] {
+  return listChatPlanDraftVersions(artifactId).flatMap((row) => {
+    try {
+      return [storedFromRecord(row)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Each session in a line the model can name it by. */
+function sessionLines(plan: CorosTrainingPlanDraft): string[] {
+  return plan.workouts.map((workout) => {
+    const placed = plan.layout?.[workout.key];
+    const where = workout.schedule_date
+      ? workout.schedule_date
+      : placed
+        ? `week ${placed.weekIndex + 1} ${PLAN_DAYS[placed.dayIndex]}`
+        : "unplaced";
+    return `${workout.key} · ${where} · ${workout.sport ?? "run"} · ${workout.name}`;
+  });
+}
+
+type RevisionTarget =
+  | { ok: true; latest: StoredPlanDraft }
+  | { ok: false; response: string };
+
+/**
+ * The version a revision is written on top of. Only the newest may be: a
+ * revision of an older one would drop whatever came after it — the athlete's
+ * own edit, say — without anyone deciding that. A saved creation is refused
+ * until changing it can update the plan on COROS rather than make a second.
+ */
+function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
+  const refuse = (body: Record<string, unknown>): RevisionTarget => ({
+    ok: false,
+    response: JSON.stringify({ ok: false, ...body })
+  });
+  const named = loadStoredPlanDraft(draftId);
+  if (!named) {
+    return refuse({
+      error_code: "draft_not_found",
+      errors: [`No draft ${draftId} in this conversation. Draft a new one instead.`]
+    });
+  }
+  if (only === "plan" && named.preview.artifactType === "workout") {
+    return refuse({
+      error_code: "draft_is_a_workout",
+      errors: [`${draftId} is a single workout. Change it with revise_training_plan and replace_session.`]
+    });
+  }
+  const versions = versionsOf(named.artifactId);
+  const latest = versions[versions.length - 1] ?? named;
+  if (versions.some((version) => version.uploadedAt) || named.uploadedAt) {
+    return refuse({
+      error_code: "draft_saved",
+      errors: [
+        "This is already saved to COROS, and changing it from the conversation is not available yet. " +
+          "Tell the athlete what to change in the Training Library, or draft a new one if they want it."
+      ]
+    });
+  }
+  if (latest.draftId !== named.draftId) {
+    return refuse({
+      error_code: "not_latest_version",
+      errors: [
+        `${draftId} is version ${named.version}; the newest is version ${latest.version}` +
+          `${latest.author === "athlete" ? ", which the athlete edited" : ""}. Revise that one.`
+      ],
+      latest: {
+        draft_id: latest.draftId,
+        version: latest.version,
+        name: latest.plan.name,
+        sessions: sessionLines(latest.plan)
+      }
+    });
+  }
+  return { ok: true, latest };
+}
+
+/** A new version of `latest`'s creation, kept and shown in place of it. */
+function storeRevision(
+  latest: StoredPlanDraft,
+  prepared: Extract<PreparedDraft, { ok: true }>,
+  unitSystem: UnitSystem,
+  changeSummary: string,
+  onPlanDraft?: (preview: PlanDraftPreview) => void
+): string {
+  const artifactType = latest.preview.artifactType ?? "plan";
+  const draftId = crypto.randomUUID();
+  const preview = buildPlanPreview(draftId, prepared.draft, {
+    scheduleConflicts: prepared.conflicts,
+    unitSystem,
+    artifactType
+  });
+  preview.conflicts = prepared.conflicts;
+  const stored: StoredPlanDraft = {
+    draftId,
+    plan: prepared.draft,
+    preview,
+    // Later than the version it replaces even within one millisecond, since
+    // the order of two versions of one number is decided by this.
+    createdAt: Math.max(Date.now(), latest.createdAt + 1),
+    artifactId: latest.artifactId,
+    version: latest.version + 1,
+    parentDraftId: latest.draftId,
+    author: "coach",
+    changeSummary
+  };
+  persistPlanDraft(stored);
+  onPlanDraft?.(lightPreview(preview));
+  return JSON.stringify({
+    ok: true,
+    draft_id: draftId,
+    version: stored.version,
+    preview: {
+      name: preview.name,
+      summary: preview.summary,
+      conflicts: preview.conflicts,
+      warnings: preview.warnings
+    },
+    message:
+      `Version ${stored.version} is shown under your reply in place of version ${latest.version}. ` +
+      "Say what changed and why in a sentence or two; do not list the sessions."
+  });
+}
+
+async function handleRevisePlan(
+  args: Record<string, unknown>,
+  onPlanDraft: ((preview: PlanDraftPreview) => void) | undefined,
+  allowUpcomingWorkouts: boolean,
+  unitSystem: UnitSystem
+): Promise<string> {
+  const draftId = String(args.draft_id ?? "").trim();
+  const summary = String(args.summary ?? "").trim();
+  if (!draftId || !summary) {
+    return JSON.stringify({ ok: false, errors: ["draft_id, ops and summary are required."] });
+  }
+  const target = revisionTarget(draftId);
+  if (!target.ok) return target.response;
+  const artifactType = target.latest.preview.artifactType ?? "plan";
+  const applied = applyPlanRevision(planAsDraftArgs(target.latest.plan), args.ops, artifactType);
+  if (!applied.ok) {
+    return JSON.stringify({
+      ok: false,
+      error_code: "revision_not_applied",
+      errors: applied.errors,
+      sessions: sessionLines(target.latest.plan)
+    });
+  }
+  const prepared = await prepareDraft(applied.args, {
+    allowUpcomingWorkouts,
+    retryTool: "revise_training_plan"
+  });
+  if (!prepared.ok) return prepared.response;
+  return storeRevision(target.latest, prepared, unitSystem, summary.slice(0, 200), onPlanDraft);
+}
+
+/** `draft_training_plan`'s schema, with the one field a rewrite adds. */
+function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = (schema.properties ?? {}) as Record<string, unknown>;
+  return {
+    ...schema,
+    properties: {
+      ...properties,
+      revises: {
+        type: "string",
+        description:
+          "Only when rewriting most of a plan you already drafted here: its newest draft_id. The result is its next version. For smaller changes use revise_training_plan."
+      }
+    }
+  };
+}
+
+export function buildRevisePlanInputSchema(): Record<string, unknown> {
+  const workout = (buildDraftWorkoutInputSchema() as { properties: { workout: Record<string, unknown> } })
+    .properties.workout;
+  return {
+    type: "object",
+    properties: {
+      draft_id: { type: "string", description: "The newest version's draft_id." },
+      summary: {
+        type: "string",
+        description: "One short sentence for the athlete saying what changed, e.g. \"Long run moved to Sunday\"."
+      },
+      ops: {
+        type: "array",
+        minItems: 1,
+        description:
+          "Changes in order. move_session {key, week, day}; replace_session {key, workout}; remove_session {key}; " +
+          "add_session {week, day, workout}; set_week_stage {week, stage}; rename {name}; set_description {description}. " +
+          "On a dated plan a session may take schedule_date instead of week and day; week 1 is the week of its first session.",
+        items: {
+          type: "object",
+          properties: {
+            op: { type: "string", enum: [...PLAN_REVISION_OPS] },
+            key: { type: "string", description: "The session's key." },
+            week: { type: "integer", minimum: 1, maximum: 52 },
+            day: { type: "string", enum: [...PLAN_DAYS] },
+            schedule_date: { type: "string", pattern: "^\\d{8}$" },
+            workout: { ...workout, description: "The whole new workout; its key is kept from the session it replaces." },
+            stage: { type: "string", enum: COROS_WEEK_STAGES.map((stage) => stage.slug) },
+            name: { type: "string" },
+            description: { type: "string" }
+          },
+          required: ["op"]
+        }
+      }
+    },
+    required: ["draft_id", "summary", "ops"]
+  };
 }
 
 async function handleListScheduledWorkouts(
@@ -1317,7 +1595,8 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             createdAt: stored.createdAt,
             ...(stored.parentDraftId ? { parentDraftId: stored.parentDraftId } : {}),
             ...(stored.uploadedAt ? { uploadedAt: stored.uploadedAt } : {}),
-            ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {})
+            ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
+            ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {})
           }
         ];
       } catch {
@@ -1479,17 +1758,19 @@ export function saveWorkoutDraftEdit(
 
 /**
  * A creation the athlete removed from the conversation before saving it: the
- * draft goes too, rather than staying in the table for as long as the
+ * drafts go too — every version, or removing the newest would bring the one
+ * before it back — rather than staying in the table for as long as the
  * conversation does. A saved one is refused — it is only hidden, because the
  * plan on COROS names its draft (`coach.draftId`).
  */
 export function discardPlanDraft(draftId: string): void {
   const stored = loadStoredPlanDraft(draftId);
   if (!stored) return;
-  if (stored.uploadedAt) {
+  const versions = versionsOf(stored.artifactId);
+  if (stored.uploadedAt || versions.some((version) => version.uploadedAt)) {
     throw new Error("A saved creation is hidden, not removed.");
   }
-  deletePlanDraftsOf([draftId]);
+  deletePlanDraftsOf([...new Set([draftId, ...versions.map((version) => version.draftId)])]);
 }
 
 /**
