@@ -2461,6 +2461,12 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
+      /** Coach drew a brief's outline (P2.2); `brief` carries it. */
+      kind: "planOutline";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
       kind: "workoutDelete";
       preview: WorkoutDeletePreview;
     }
@@ -2674,8 +2680,36 @@ export interface PlanBrief {
   request: PlanBriefRequest;
   /** Fields Coach filled in, and from where; a field absent here is the form's default. */
   origins: Partial<Record<PlanBriefField, PlanBriefOrigin>>;
+  /** The plan's shape, once drawn (P2.2): only the current one is kept. */
+  outline?: PlanBriefOutline;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * A brief's outline as stored (P2.2). `version` counts every outline the
+ * artifact has had — each drawing, redrawing and adjustment is the next — so a
+ * `planOutline` anchor can tell whether the outline it marks is still the one
+ * on its artifact.
+ */
+export interface PlanBriefOutline {
+  outline: TrainingPlanOutline;
+  version: number;
+  /** Who made this one: Coach drew it, or the athlete adjusted it by hand. */
+  author: "coach" | "athlete";
+  updatedAt: string;
+}
+
+/**
+ * A conversation turn that is a step of the plan pipeline (P2.2), not a
+ * question: its tool set, its policy and its prompt come from the step. The
+ * renderer shows the step's words; the main process sends the step's prompt.
+ */
+export interface ChatPipelineStep {
+  step: "outline";
+  artifactId: string;
+  /** A redraw: what the athlete wants changed in the outline there is. */
+  note?: string;
 }
 
 /** The athlete's data a generation may read, each on or off. */
@@ -3840,6 +3874,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "planRefs"; refs: PlanRef[] }
   /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
   | { kind: "planBrief"; artifactId: string }
+  /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */
+  | { kind: "planOutline"; artifactId: string; outlineVersion: number }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }

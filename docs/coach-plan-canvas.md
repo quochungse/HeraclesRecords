@@ -557,6 +557,27 @@ hiện lại trong cuộc chat.
 - Sửa brief khi đã có outline thì hỏi "Redraw the outline?", như công tắc nguồn đang làm.
 
 **P2.2 Outline** · L
+- (Đã làm: bước pipeline đi qua `chat:send` — tham số thứ năm `ChatPipelineStep { step: "outline",
+  artifactId, note? }` — chứ không phải channel riêng, nên lượt vẫn stream, huỷ và lưu như một lượt
+  chat. Renderer hiện chữ "Draw the outline" / "Redraw the outline: <ghi chú>"; main thay tin nhắn
+  user cuối trên wire bằng `trainingPlanOutlinePrompt` (brief + nguồn của cuộc chat, và với redraw
+  thì outline hiện có và ghi chú). `streamOutlineStep` chạy read-only, `runTools` cấp
+  `propose_plan_outline` và giữ lại `draft_training_plan`, `draft_workout`, `revise_training_plan`,
+  `request_plan_brief`; nguồn bị tắt bị giữ như P2.0. Brief không còn, đã thành plan, hoặc còn
+  thiếu gì thì lượt bị từ chối trước khi stream (renderer hoàn lại như mọi lần gửi hỏng).
+  Outline lưu trên row artifact: `outline_json` = `{ outline, author, updatedAt }`, chỉ giữ outline
+  hiện tại; `outline_version` đếm mọi lần vẽ, vẽ lại và chỉnh tay. Một lượt được chấp nhận hai lần
+  thì ghi đè version của chính nó. Neo `planOutline { artifactId, outlineVersion }`; card vẽ ở neo
+  **mới nhất** của artifact, neo cũ gập thành một dòng "Redrawn below". Chỉnh tay không ghi neo:
+  card mới nhất hiện "Adjusted by you · vN". **Adjust outline** là `CoachOutlineEditor` (sheet của
+  generator trong `.coach-sheet`): stage, giờ, số buổi, tuần nhẹ; focus và buổi chính là của Coach,
+  đổi bằng redraw. Kiểm tra bằng `planOutlineProblems`, và `chat:updatePlanOutline` từ chối đúng
+  những câu đó. Card brief có nút chính **Draw the outline** khi chưa có outline và brief đủ; sửa
+  brief khi đã có outline thì hỏi "Redraw the outline?" (vẽ mới, không phải revision). `creationIndex`
+  ghi "outline vN: 12 weeks, 4–6 h a week[, adjusted by the athlete]". **Chưa làm:** nút **Write
+  the sessions** (P2.3), và câu hỏi khi đổi nguồn của cuộc chat dưới một outline đã vẽ (generator
+  có hỏi). Test: `test:plan-outline` (chạy lượt thật dưới `HERACLES_SIMULATE_PLAN_AI`), case P2.2
+  trong `test:chat-plan-card-renderer`.)
 - Draw the outline gửi một lượt (message thấy được: "Draw the outline") với `planRequest` lấy từ
   brief. Lượt chạy **`toolPolicy: "read-only"`** và `runTools` cấp `propose_plan_outline`, như
   generator: `chat:send` thường có `delete_workout`, và một lượt viết plan không cần nó.
@@ -620,6 +641,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat:syncPlanArtifact` | P1.6 | Đọc `detail`, nhập bản COROS mới hơn thành version |
 | `chat:conversationSettings`, `chat:setConversationSettings` | P2.0 | Nguồn dữ liệu và runtime của cuộc chat |
 | `chat:createPlanBrief`, `chat:updatePlanBrief`, `chat:updatePlanOutline` | P2 | Brief và outline không qua model |
+| `chat:send` + `ChatPipelineStep` | P2.2 | Tham số thứ năm: lượt là một bước pipeline (outline), không phải câu hỏi |
 | `chat:planBriefs` | P2.1 | Đọc brief của các anchor `planBrief` |
 | `trainingLibrary:generatePlan`, `trainingLibrary:outlinePlan` | P2.5 | **Bỏ** |
 

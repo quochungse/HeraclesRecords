@@ -933,6 +933,127 @@ async function main() {
   assert.match(withBrief.args[1].at(-1).content, /- Brief · brief_id brief-1 · race \(Half\) "Hanoi Half" on 2031-05-18/);
 
   // -------------------------------------------------------------------------
+  // An outline: asked for from the brief, read on its card, adjusted by hand,
+  // redrawn with a note (P2.2)
+  // -------------------------------------------------------------------------
+  // On the real clock: the brief's own checks hold a plan to starting within a year.
+  const soon = new Date();
+  soon.setDate(soon.getDate() + ((8 - soon.getDay()) % 7 || 7));
+  const soonMonday = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`;
+  const BASE_BRIEF = {
+    ...BRIEF,
+    artifactId: "brief-2",
+    request: { ...BRIEF.request, goalKind: "base", goal: "", race: undefined, weeks: 8, difficulty: "intermediate", startDate: soonMonday },
+    origins: {}
+  };
+  const OUTLINE = {
+    summary: "Eight weeks of base, easing every fourth.",
+    basis: "About four hours a week lately.",
+    weeks: Array.from({ length: 8 }, (_, index) => ({
+      stage: index < 6 ? 2 : 3,
+      lighter: index === 3,
+      hours: 4 + (index % 4) * 0.5,
+      sessions: 5,
+      focus: `Week ${index + 1} focus`,
+      keySessions: index === 1 ? [{ dayIndex: 5, name: "Long run", sport: "run", minutes: 100 }] : []
+    }))
+  };
+  const ALL_SOURCES = { sessionId: "s1", sources: { activities: true, sleep: true, zones: true } };
+
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      { kind: "message", role: "user", content: "A base block" },
+      { kind: "planBrief", artifactId: "brief-2" }
+    ],
+    getPlanBriefs: [BASE_BRIEF],
+    getConversationSettings: ALL_SOURCES
+  });
+  await waitFor(() => harness("exists", ".chat-brief-card"), "the brief is drawn");
+  await page(`[...document.querySelectorAll(".chat-brief-card button")].find((b) => b.textContent.trim() === "Draw the outline").click()`);
+  const drawn = await waitFor(async () => (await harness("calls", "sendChat"))[0], "Draw the outline sends a turn");
+  assert.deepEqual(drawn.args[4], { step: "outline", artifactId: "brief-2" }, "the step travels beside the words");
+  assert.equal(drawn.args[1].at(-1).content.endsWith("Draw the outline"), true, "the words are what the athlete sees");
+  await harness("emit", "onChatStreamStart", { requestId: drawn.args[0] });
+  await harness("emit", "onChatStreamInfo", {
+    requestId: drawn.args[0],
+    kind: "planOutline",
+    brief: { ...BASE_BRIEF, outline: { outline: OUTLINE, version: 1, author: "coach", updatedAt: "" } }
+  });
+  await harness("emit", "onChatStreamDone", { requestId: drawn.args[0], fullText: "Here is the shape.", finishReason: "stop" });
+  await waitFor(() => harness("exists", ".chat-outline-card"), "the outline lands on its card");
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-brief-card button")].some((b) => b.textContent.trim() === "Draw the outline")`),
+    false,
+    "the brief stops asking for an outline once it has one"
+  );
+  const outlineText = (await harness("text", ".chat-outline-card")) ?? "";
+  assert.match(outlineText, /Plan outline[\s\S]*8 weeks · 4–5.5 h a week · 5 sessions/);
+  assert.match(outlineText, /What Coach read: About four hours a week lately\./);
+  assert.equal(await harness("count", ".chat-outline-bar"), 8, "a bar a week");
+  assert.equal(await harness("count", ".chat-outline-bar.is-lighter"), 1);
+  await page(`document.querySelectorAll(".chat-outline-bar")[1].click()`);
+  await waitFor(
+    async () => /Week 2 · Base[\s\S]*Long run/.test((await harness("text", ".chat-outline-week")) ?? ""),
+    "picking a bar shows that week"
+  );
+
+  await page(`[...document.querySelectorAll(".chat-outline-card button")].find((b) => b.textContent.trim() === "Adjust outline").click()`);
+  await waitFor(() => harness("exists", ".coach-sheet .chat-outline-editor"), "Adjust outline opens its own screen");
+  assert.equal(await harness("count", ".chat-outline-editor-weeks > li"), 8);
+  await page(`(() => { const input = document.querySelectorAll('.chat-outline-editor input[aria-label^="Sessions in week"]')[0]; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "9"); input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await waitFor(
+    async () => /Week 1 has 9 sessions/.test((await harness("text", ".chat-outline-editor .plan-generator-footer-hint")) ?? ""),
+    "the screen says what breaks the brief, as the tool would"
+  );
+  const saveDisabled = () =>
+    page(`[...document.querySelectorAll(".chat-outline-editor button")].find((b) => b.textContent.trim() === "Save outline").disabled`);
+  assert.equal(await saveDisabled(), true, "and will not save it");
+  await page(`(() => { const input = document.querySelectorAll('.chat-outline-editor input[aria-label^="Sessions in week"]')[0]; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "5"); input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await page(`document.querySelectorAll('.chat-outline-editor-lighter input')[5].click()`);
+  await waitFor(async () => (await saveDisabled()) === false, "a change that fits can be saved");
+  await harness("setScript", {
+    updatePlanOutline: {
+    ...BASE_BRIEF,
+    outline: {
+      outline: { ...OUTLINE, weeks: OUTLINE.weeks.map((week, index) => (index === 5 ? { ...week, lighter: true } : week)) },
+      version: 2,
+      author: "athlete",
+      updatedAt: ""
+    }
+    }
+  });
+  await page(`[...document.querySelectorAll(".chat-outline-editor button")].find((b) => b.textContent.trim() === "Save outline").click()`);
+  const adjusted = await waitFor(async () => (await harness("calls", "updatePlanOutline"))[0], "the adjustment is saved");
+  assert.equal(adjusted.args[0], "brief-2");
+  assert.equal(adjusted.args[1].weeks[5].lighter, true);
+  assert.equal(adjusted.args[1].weeks[0].sessions, 5);
+  await waitFor(async () => !(await harness("exists", ".coach-sheet .chat-outline-editor")), "and the screen closes");
+  await waitFor(
+    async () => /Adjusted by you · v2/.test((await harness("text", ".chat-outline-card")) ?? ""),
+    "the card says whose outline it is now"
+  );
+
+  await harness("clearCalls");
+  await page(`[...document.querySelectorAll(".chat-outline-card button")].find((b) => b.textContent.includes("Redraw with a note")).click()`);
+  await waitFor(() => harness("exists", ".chat-outline-redraw input"), "the note opens under the card");
+  await harness("setValue", ".chat-outline-redraw input", "travelling in week 6");
+  await harness("click", ".chat-outline-redraw button[type=submit]");
+  const redraw = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a redraw is a turn too");
+  assert.deepEqual(redraw.args[4], { step: "outline", artifactId: "brief-2", note: "travelling in week 6" });
+  assert.equal(redraw.args[1].at(-1).content.endsWith("Redraw the outline: travelling in week 6"), true);
+  await harness("emit", "onChatStreamStart", { requestId: redraw.args[0] });
+  await harness("emit", "onChatStreamInfo", {
+    requestId: redraw.args[0],
+    kind: "planOutline",
+    brief: { ...BASE_BRIEF, outline: { outline: OUTLINE, version: 3, author: "coach", updatedAt: "" } }
+  });
+  await harness("emit", "onChatStreamDone", { requestId: redraw.args[0], fullText: "Redrawn.", finishReason: "stop" });
+  await waitFor(async () => /Redrawn below/.test((await harness("text", ".chat-plan-event-row")) ?? ""), "the earlier outline folds");
+  assert.equal(await harness("count", ".chat-outline-card"), 1, "one card, at the latest anchor");
+  assert.match((await harness("text", ".chat-outline-card")) ?? "", /Outline · v3/);
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

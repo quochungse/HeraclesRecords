@@ -16,12 +16,15 @@ import type {
   CorosMcpTool,
   PlanBriefField,
   PlanBriefOrigin,
+  PlanBriefOutline,
   PlanBriefRequest,
   TrainingPlanDayKind,
   TrainingPlanDifficulty,
   TrainingPlanGenerationDay,
   TrainingPlanGenerationWeek,
   TrainingPlanGoalKind,
+  TrainingPlanOutline,
+  TrainingPlanOutlineWeek,
   WorkoutSport
 } from "./types";
 import { TRAINING_PLAN_GOAL_KINDS } from "./trainingPlanGeneration";
@@ -266,6 +269,66 @@ export function parseStoredBrief(json: string | undefined): {
   } catch {
     return undefined;
   }
+}
+
+function isOutlineWeek(value: unknown): value is TrainingPlanOutlineWeek {
+  return (
+    isRecord(value) &&
+    Number.isInteger(value.stage) &&
+    typeof value.hours === "number" &&
+    Number.isInteger(value.sessions) &&
+    typeof value.lighter === "boolean" &&
+    typeof value.focus === "string" &&
+    Array.isArray(value.keySessions)
+  );
+}
+
+/** An outline as the athlete's edit or the store hands it over, or nothing when it is not one. */
+export function readOutline(value: unknown): TrainingPlanOutline | undefined {
+  if (!isRecord(value) || !Array.isArray(value.weeks) || !value.weeks.length) return undefined;
+  if (!value.weeks.every(isOutlineWeek)) return undefined;
+  return {
+    summary: typeof value.summary === "string" ? value.summary : "",
+    basis: typeof value.basis === "string" ? value.basis : "",
+    weeks: value.weeks.map((week) => ({
+      stage: week.stage,
+      lighter: week.lighter,
+      hours: week.hours,
+      sessions: week.sessions,
+      focus: week.focus,
+      keySessions: week.keySessions
+    }))
+  };
+}
+
+/** A brief's stored outline (P2.2), or nothing when the column is empty or unreadable. */
+export function parseStoredOutline(json: string | undefined, version: number | undefined): PlanBriefOutline | undefined {
+  if (!json || typeof version !== "number") return undefined;
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!isRecord(parsed)) return undefined;
+    const outline = readOutline(parsed.outline);
+    if (!outline) return undefined;
+    return {
+      outline,
+      version,
+      author: parsed.author === "athlete" ? "athlete" : "coach",
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : ""
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** An outline in a few words, for Coach's index of what the conversation holds. */
+export function outlineLine(stored: PlanBriefOutline): string {
+  const weeks = stored.outline.weeks;
+  const hours = weeks.map((week) => week.hours);
+  const low = Math.min(...hours);
+  const high = Math.max(...hours);
+  const span = low === high ? `${low} h a week` : `${low}–${high} h a week`;
+  const by = stored.author === "athlete" ? ", adjusted by the athlete" : "";
+  return `outline v${stored.version}: ${weeks.length} week${weeks.length === 1 ? "" : "s"}, ${span}${by}`;
 }
 
 /** What each field of a brief is made of, for telling which ones an edit changed. */

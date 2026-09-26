@@ -60,8 +60,15 @@ import {
   trainingPlanOutlinePrompt
 } from "./trainingPlanGeneration";
 import { PLAN_BRIEF_TOOL } from "./planBrief";
-import { deletePlanBriefs, listPlanBriefs, updatePlanBrief } from "./chatPlanBriefs";
-import type { PlanBrief, PlanBriefRequest } from "./types";
+import {
+  briefForOutline,
+  deletePlanBriefs,
+  listPlanBriefs,
+  savePlanOutline,
+  updatePlanBrief,
+  updatePlanOutline
+} from "./chatPlanBriefs";
+import type { ChatPipelineStep, PlanBrief, PlanBriefRequest } from "./types";
 import {
   simulatePlanAi,
   simulatedDraftArgs,
@@ -583,13 +590,17 @@ export async function streamConversationTurn(
   requestId: string,
   messages: ChatMessage[],
   unitSystem: UnitSystem,
-  sessionId?: string
+  sessionId?: string,
+  pipeline?: ChatPipelineStep
 ): Promise<void> {
   let settings: import("./types").ConversationSettings | undefined;
   try {
     settings = sessionId ? getConversationSettings(sessionId) : undefined;
   } catch {
     settings = undefined;
+  }
+  if (pipeline?.step === "outline") {
+    return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
   }
   return streamChat(sink, requestId, messages, {
     unitSystem,
@@ -2527,6 +2538,114 @@ export async function outlineTrainingPlan(
   } finally {
     runTools.delete(requestId);
   }
+}
+
+/** What a pipeline step never needs: it writes nothing but its own step. */
+const PIPELINE_WITHHELD_TOOLS = new Set([
+  "draft_training_plan",
+  "draft_workout",
+  "revise_training_plan",
+  PLAN_BRIEF_TOOL
+]);
+
+/** The pipeline step's reach: the conversation's sources, and none of the writing tools. */
+function pipelineReach(sources: import("./types").TrainingPlanDataSources): Pick<RunTools, "allow" | "context"> {
+  const everything = sources.activities && sources.sleep && sources.zones;
+  return {
+    allow: (name) => !PIPELINE_WITHHELD_TOOLS.has(name) && !toolReadsWithheldSource(name, sources),
+    ...(everything
+      ? {}
+      : { context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true } })
+  };
+}
+
+/** The last user message of a wire transcript, carrying `content` instead. */
+function withLastUserContent(messages: ChatMessage[], content: string): ChatMessage[] {
+  const last = messages.map((message) => message.role).lastIndexOf("user");
+  if (last < 0) return [...messages, { role: "user", content }];
+  return messages.map((message, index) => (index === last ? { ...message, content } : message));
+}
+
+/**
+ * "Draw the outline", as a turn of the conversation (P2.2). It is the
+ * generator's outline turn with the brief as its request and the
+ * conversation's sources and AI: read-only, offered `propose_plan_outline`
+ * and none of the writing tools, and checked inside the turn by
+ * `planOutlineProblems`. The athlete's visible words are replaced on the wire
+ * by the outline prompt, which carries the brief and — for a redraw — the
+ * outline there is and what to change in it. An accepted outline is written
+ * to the brief's artifact as its next version and announced as a
+ * `planOutline` anchor.
+ *
+ * A step that cannot run — no brief, a brief that became a plan, one still
+ * missing what an outline needs — rejects before anything is streamed, so the
+ * renderer undoes the turn as it does for any send that fails.
+ */
+async function streamOutlineStep(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForOutline(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) throw new Error(invalid.message);
+  const note = pipeline.note?.trim();
+  const revision = note && brief.outline ? { outline: brief.outline.outline, note } : undefined;
+
+  let written: number | undefined;
+  runTools.set(requestId, {
+    extra: [PLAN_OUTLINE_TOOL_DEFINITION],
+    ...pipelineReach(sources),
+    handle: async (_name, args) => {
+      const parsed = parsePlanOutline(args);
+      const problems = parsed.outline ? planOutlineProblems(parsed.outline, request) : parsed.errors;
+      if (!parsed.outline || problems.length) {
+        return JSON.stringify({
+          ok: false,
+          error_code: parsed.outline ? "outline_breaks_request" : "outline_incomplete",
+          errors: problems.slice(0, 20),
+          action: `Fix every problem listed and call ${PLAN_OUTLINE_TOOL} again with the whole outline. Do not ask the athlete.`
+        });
+      }
+      const saved = savePlanOutline(brief.artifactId, parsed.outline, "coach", written);
+      written = saved.outline?.version;
+      sink.emit("chat:streamInfo", { requestId, kind: "planOutline", brief: saved });
+      return JSON.stringify({
+        ok: true,
+        message:
+          "Outline accepted and shown to the athlete on a card. Reply with one sentence and nothing else: do not restate the weeks."
+      });
+    }
+  });
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(sink, requestId, "outline", request, unitSystem, revision);
+    } else {
+      await streamChat(sink, requestId, withLastUserContent(messages, trainingPlanOutlinePrompt(request, revision)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
+    }
+  } finally {
+    runTools.delete(requestId);
+  }
+}
+
+/** The athlete's adjustment of a brief's outline, from its own screen (P2.2). */
+export function adjustPlanOutline(artifactId: string, outline: unknown): PlanBrief {
+  return updatePlanOutline(artifactId, outline);
 }
 
 export function cancelChat(requestId: string): void {

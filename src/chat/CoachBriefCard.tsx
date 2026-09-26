@@ -19,7 +19,9 @@ export function CoachBriefCard({
   firstMonday,
   sources,
   editing = false,
-  onEdit
+  busy = false,
+  onEdit,
+  onDrawOutline
 }: {
   brief: PlanBrief;
   firstMonday: string;
@@ -27,7 +29,14 @@ export function CoachBriefCard({
   sources?: TrainingPlanDataSources;
   /** Its screen is open: the way on is back into it. */
   editing?: boolean;
+  /** A turn is running: the outline waits for it. */
+  busy?: boolean;
   onEdit?: () => void;
+  /**
+   * Ask Coach for the outline (P2.2). Absent once there is one — its card
+   * leads from then on — and while the brief still misses what it needs.
+   */
+  onDrawOutline?: () => void;
 }) {
   const rows = briefRows(brief, firstMonday);
   const open = briefOpenProblems(brief.request, sources);
@@ -79,6 +88,11 @@ export function CoachBriefCard({
 
       <div className="chat-creation-actions">
         <div className="chat-plan-actions">
+          {onDrawOutline ? (
+            <button type="button" className="chat-plan-upload" disabled={busy} onClick={onDrawOutline}>
+              Draw the outline
+            </button>
+          ) : null}
           <button type="button" className="chat-plan-review" disabled={!onEdit} onClick={onEdit}>
             {editing ? "Continue editing" : "Edit brief"}
           </button>

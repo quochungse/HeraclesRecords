@@ -831,6 +831,19 @@ Overview, Media, Data, and Settings are in the main bundle.
   interactive only (`test:coach-analysis-guards`), and it needs the turn's conversation, which is
   why `StreamChatOptions` carries a `sessionId`.
 
+  **The outline is a turn of the conversation, not a dialog** (P2.2). "Draw the outline" on the
+  brief's card — and "Redraw with a note" on the outline's — sends `chat:send` a fifth argument,
+  `ChatPipelineStep`; the athlete sees their words, and `streamOutlineStep` replaces them on the
+  wire with the generator's outline prompt built from the brief. The turn is read-only, offered
+  `propose_plan_outline`, and withheld every writing tool; a brief that is gone, has become a
+  plan or is still missing a field rejects the send before anything streams. The artifact keeps
+  **one** outline (`outline_json`), with `outline_version` counting every draw, redraw and hand
+  adjustment; the transcript holds `planOutline { artifactId, outlineVersion }` anchors and the
+  card is drawn at the **latest** one, earlier ones folding to a line. Adjust outline
+  (`CoachOutlineEditor`) asks no model and writes no anchor: `chat:updatePlanOutline` refuses
+  exactly what `planOutlineProblems` hands Coach. `test:plan-outline` runs the real turn under
+  `HERACLES_SIMULATE_PLAN_AI`.
+
   **A transcript entry is rebuilt field by field in four places, and an unlisted field is
   dropped in silence.** `PersistedChatMessageEntry` declares it, `parseMessageEntry`
   (`chatHistoryStore`) restores it off disk, and `toPersistedEntries` / `fromPersistedEntries`

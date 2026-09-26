@@ -73,6 +73,8 @@ import type {
   ConversationSettings,
   PlanBrief,
   PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -784,11 +786,14 @@ const api = {
     requestId: string,
     messages: ChatMessage[],
     unitSystem: UnitSystem,
-    sessionId?: string
-  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId),
+    sessionId?: string,
+    pipeline?: ChatPipelineStep
+  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId, pipeline),
   getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
+  updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:updatePlanOutline", artifactId, outline),
   getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>
     ipcRenderer.invoke("chat:conversationSettings", sessionId),
   setConversationSettings: (settings: ConversationSettings): Promise<ConversationSettings> =>

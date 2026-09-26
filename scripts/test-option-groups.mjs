@@ -96,6 +96,11 @@ const EXEMPT = [
     why: "A chart of the outline's weeks, each bar as tall as its hours and in its stage's hue: picking one shows that week. The arrangement is the control, as a month of days is."
   },
   {
+    file: "src/chat/CoachOutlineCard.tsx",
+    marker: "chat-outline-bar",
+    why: "The same chart as the generator's outline step, on the outline's card in the conversation (P2.2): a bar a week, and picking one shows that week."
+  },
+  {
     file: "src/chat/analyses/AnalysisCreate.tsx",
     marker: "coach-analysis-starter",
     why: "Starter cards carry a description and the trigger they would set — a chip holds neither."

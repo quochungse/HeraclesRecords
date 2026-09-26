@@ -347,6 +347,7 @@ import {
   setConversationSettings,
   listConversationPlanBriefs,
   editPlanBrief,
+  adjustPlanOutline,
   findChatSessionForDraft,
   editPlanDraft,
   generateTrainingPlan,
@@ -1598,19 +1599,36 @@ function registerIpcHandlers(): void {
   // Kicks off streaming; assistant text is pushed via chat:stream* events.
   ipcMain.handle(
     "chat:send",
-    (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem, sessionId?: string) =>
+    (
+      _event,
+      requestId: string,
+      messages: ChatMessage[],
+      unitSystem?: UnitSystem,
+      sessionId?: string,
+      pipeline?: import("./types").ChatPipelineStep
+    ) =>
       streamConversationTurn(
         createWindowSink(mainWindow),
         requestId,
         messages,
         normalizeUnitSystem(unitSystem),
-        typeof sessionId === "string" && sessionId ? sessionId : undefined
+        typeof sessionId === "string" && sessionId ? sessionId : undefined,
+        pipeline?.step === "outline" && typeof pipeline.artifactId === "string"
+          ? {
+              step: "outline",
+              artifactId: pipeline.artifactId,
+              ...(typeof pipeline.note === "string" && pipeline.note.trim() ? { note: pipeline.note.trim() } : {})
+            }
+          : undefined
       )
   );
   ipcMain.handle("chat:planBriefs", (_event, artifactIds: string[]) => listConversationPlanBriefs(artifactIds));
   ipcMain.handle(
     "chat:updatePlanBrief",
     (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
+  );
+  ipcMain.handle("chat:updatePlanOutline", (_event, artifactId: string, outline: unknown) =>
+    adjustPlanOutline(artifactId, outline)
   );
   ipcMain.handle("chat:conversationSettings", (_event, sessionId: string) =>
     getConversationSettings(sessionId)

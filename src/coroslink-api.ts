@@ -70,6 +70,8 @@ import type {
   ConversationSettings,
   PlanBrief,
   PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
   PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -565,13 +567,17 @@ export interface CorosLinkApi {
     messages: ChatMessage[],
     unitSystem: UnitSystem,
     /** The conversation the turn is in, whose sources and AI it takes (P2.0). */
-    sessionId?: string
+    sessionId?: string,
+    /** A step of the plan pipeline rather than a question (P2.2). */
+    pipeline?: ChatPipelineStep
   ) => Promise<void>;
-  /** What one conversation reads and which AI answers it (P2.0). */
   /** The briefs behind a conversation's brief cards (P2.1). */
   getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;
   /** The athlete's edit of a brief; a field changed loses its "from chat" or "from data". */
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest) => Promise<PlanBrief>;
+  /** The athlete's adjustment of a brief's outline; refused when it breaks the brief (P2.2). */
+  updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline) => Promise<PlanBrief>;
+  /** What one conversation reads and which AI answers it (P2.0). */
   getConversationSettings: (sessionId: string) => Promise<ConversationSettings>;
   setConversationSettings: (settings: ConversationSettings) => Promise<ConversationSettings>;
   cancelChat: (requestId: string) => Promise<void>;

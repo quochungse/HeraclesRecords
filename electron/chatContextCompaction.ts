@@ -9,7 +9,7 @@ import type {
   PlanEvent,
   PlanRef
 } from "./types";
-import { briefLine } from "./planBrief";
+import { briefLine, outlineLine } from "./planBrief";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -275,7 +275,8 @@ export function creationIndex(
   ].flatMap((artifactId) => {
     const brief = briefById.get(artifactId);
     if (!brief || creations.has(artifactId)) return [];
-    return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · no outline yet`];
+    const shape = brief.outline ? outlineLine(brief.outline) : "no outline yet";
+    return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · ${shape}`];
   });
   if (creations.size === 0 && briefLines.length === 0) return null;
   const lines = [...creations.values()].map(({ draft, version }) => {
