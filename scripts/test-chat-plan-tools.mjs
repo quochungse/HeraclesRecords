@@ -211,6 +211,16 @@ test("an archived plan is listed only when asked for", async () => {
   assert.equal(plans.find((line) => line.plan_id === "A1")?.archived, true);
 });
 
+test("an archived plan still on the calendar is listed", async () => {
+  stubCoros();
+  databaseModule.saveTrainingPlanMetadata({ planId: "coros:T1", favorite: false, tags: [], archived: true, updatedAt: "2027-01-01T00:00:00.000Z" });
+  const { plans } = await call("list_training_plans", {}, { today });
+  const base = plans.find((line) => line.plan_id === "T1");
+  assert.equal(base?.calendar_plan_id, "R1", "archived is out of the way, not off the calendar");
+  assert.equal(base.archived, true);
+  databaseModule.saveTrainingPlanMetadata({ planId: "coros:T1", favorite: false, tags: [], archived: false, updatedAt: "2027-01-01T00:00:00.000Z" });
+});
+
 test("without the athlete's activities the list carries no progress, and says why", async () => {
   stubCoros();
   const result = await call("list_training_plans", {}, { today, progress: false });

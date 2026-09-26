@@ -157,11 +157,12 @@ async function listTrainingPlans(args: Record<string, unknown>, options: ChatPla
 
   const lines = plans.flatMap((plan) => {
     const meta = metadata.get(plan.id);
-    if (meta?.archived && !includeArchived) return [];
     /* A run taken off, or one that ran out while its plan is still listed, is history. */
     if (plan.calendar === "stopped") return [];
     if (plan.calendar !== "unscheduled" && plan.sourcePlanId && templates.has(plan.sourcePlanId)) return [];
     const running = plan.calendar === "running" ? plan : plan.remoteId ? runningOf.get(plan.remoteId) : undefined;
+    /* Archived is out of the way, not off the calendar: a plan still running is listed. */
+    if (meta?.archived && !includeArchived && !running) return [];
     const coach = coachDraft(meta?.coach?.draftId, options);
     return [
       {

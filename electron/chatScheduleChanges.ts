@@ -38,6 +38,7 @@ import { formatScheduleDay } from "./corosWorkoutBuilder";
 import {
   defaultScheduleMoveDeps,
   moveCalendarSession,
+  PartialReplaceError,
   replaceCalendarSession,
   type ScheduleMoveDeps
 } from "./scheduleMoves";
@@ -112,6 +113,7 @@ function parseLine(value: unknown): ScheduleChangeLine | undefined {
       : {}),
     status,
     ...(text(value.reason) ? { reason: text(value.reason) } : {}),
+    ...(value.retry === false ? { retry: false } : {}),
     ...(text(value.settledAt) ? { settledAt: text(value.settledAt) } : {})
   } as ScheduleChangeLine;
 }
@@ -213,10 +215,13 @@ const defaultDeps: ScheduleChangeDeps = {
   deleteWorkoutProgram
 };
 
-type LineOutcome = Pick<ScheduleChangeLine, "status" | "reason">;
+type LineOutcome = Pick<ScheduleChangeLine, "status" | "reason" | "retry">;
 
 /**
  * Applies one line, or every proposed line when `lineId` is absent, in order.
+ * A failed line is tried again only when it is named, and only when nothing
+ * of it landed (`retry`): COROS going away for a moment should not cost the
+ * athlete the proposal.
  * Each outcome is written as soon as it is known, so a set stopped part-way
  * (a crash, COROS going away) keeps what it did.
  */
@@ -235,7 +240,8 @@ export async function applyScheduleChange(
       // Read again per line: another line, or another machine, may have settled it.
       set = requireSet(changeSetId);
       const line = set.lines.find((candidate) => candidate.lineId === target.lineId);
-      if (!line || line.status !== "proposed" || !OPS.includes(line.op)) continue;
+      const retrying = Boolean(lineId) && line?.status === "failed" && line.retry !== false;
+      if (!line || (line.status !== "proposed" && !retrying) || !OPS.includes(line.op)) continue;
       const outcome = await applyLine(line, deps, set.unitSystem ?? "metric");
       set = save({
         ...set,
@@ -245,6 +251,7 @@ export async function applyScheduleChange(
                 ...candidate,
                 status: outcome.status,
                 ...(outcome.reason ? { reason: outcome.reason } : { reason: undefined }),
+                ...(outcome.retry === false ? { retry: false as const } : { retry: undefined }),
                 settledAt: new Date().toISOString()
               }
             : candidate
@@ -293,7 +300,11 @@ async function applyLine(
         return { status: "failed", reason: "This build cannot apply that change." };
     }
   } catch (error) {
-    return { status: "failed", reason: error instanceof Error ? error.message : String(error) };
+    return {
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error),
+      ...(error instanceof PartialReplaceError ? { retry: false as const } : {})
+    };
   }
 }
 

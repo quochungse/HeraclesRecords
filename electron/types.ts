@@ -3872,6 +3872,13 @@ export interface ScheduleChangeLine {
   status: ScheduleChangeStatus;
   /** Why a line failed or went stale. */
   reason?: string;
+  /**
+   * `false` on a failed line that must not be tried again: part of it landed
+   * (a replacement added, its original not removed), so a second try would
+   * write that part twice. Any other failed line may be tried again — each
+   * try reads COROS first, as the first did.
+   */
+  retry?: false;
   /** When it was applied, failed, dismissed or found stale. */
   settledAt?: string;
 }

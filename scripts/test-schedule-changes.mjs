@@ -317,7 +317,7 @@ test("a session gone or changed since the proposal is out of date, and nothing i
   assert.equal(coros.removals().length, 0, "nothing is removed that Coach did not see");
 });
 
-test("a refusal fails the line and says why; the line is not tried again", async () => {
+test("a refusal fails the line and says why; it is tried again only when named", async () => {
   const coros = fakeCoros();
   coros.put({ idInPlan: 16, happenDay: tomorrow, name: "Intervals" });
   const { staged } = await stageDelete({ target: "scheduled", schedule_date: tomorrow, workout_name: "Intervals" });
@@ -325,8 +325,37 @@ test("a refusal fails the line and says why; the line is not tried again", async
   const set = await changes.applyScheduleChange(staged.changeSetId);
   assert.equal(set.lines[0].status, "failed");
   assert.match(set.lines[0].reason, /Plan data is illegal/);
+  assert.equal(set.lines[0].retry, undefined, "nothing of it landed, so it may be tried again");
   await changes.applyScheduleChange(staged.changeSetId);
-  assert.equal(coros.removals().length, 1, "a failed line waits for Coach to propose it again");
+  assert.equal(coros.removals().length, 1, "Apply all leaves a failed line alone");
+  const retried = await changes.applyScheduleChange(staged.changeSetId, "l1");
+  assert.equal(retried.lines[0].status, "applied");
+  assert.equal(retried.lines[0].reason, undefined, "the old reason goes with the failure");
+  assert.equal(coros.removals().length, 2);
+});
+
+test("a replacement that landed half-way is never tried again", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 51, happenDay: tomorrow, name: "Tempo" });
+  const { staged } = await propose([
+    { op: "replace", session: { plan_id: OWN_SCHEDULE, id_in_plan: "51", date: tomorrow }, workout: easyRun() }
+  ]);
+  // The add goes through; the removal after it is refused.
+  let writes = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/training/schedule/update") && ++writes === 2) {
+      coros.state.failNextWrite = { code: "5000", message: "Busy." };
+    }
+    return realFetch(url, init);
+  };
+  const set = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(set.lines[0].status, "failed");
+  assert.match(set.lines[0].reason, /The new workout was added, but the old one could not be removed/);
+  assert.equal(set.lines[0].retry, false);
+  const again = await changes.applyScheduleChange(staged.changeSetId, "l1");
+  assert.equal(again.lines[0].status, "failed");
+  assert.equal(coros.state.entities.length, 2, "the day holds both, and no third");
 });
 
 test("calendar and library: two lines, each applied and recorded on its own", async () => {
@@ -606,6 +635,14 @@ test("the Calendar's drag moves a plan's session through its copy, and the athle
   assert.deepEqual(coros.copy("R5").entities.map((entity) => [entity.idInPlan, entity.dayNo]), [["1", 1]]);
   await moves.moveCalendarSession({ planId: OWN_SCHEDULE, idInPlan: "31", happenDay: tomorrow }, daysFromNow(2));
   assert.deepEqual(coros.state.entities.map((entity) => entity.happenDay), [daysFromNow(2)]);
+  const listed = coros.state.requests.filter((line) => line === "POST /training/plan/query").length;
+  const own = coros.state.entities[0];
+  await moves.moveCalendarSession({ planId: OWN_SCHEDULE, idInPlan: own.idInPlan, happenDay: own.happenDay }, daysFromNow(3));
+  assert.equal(
+    coros.state.requests.filter((line) => line === "POST /training/plan/query").length,
+    listed,
+    "the athlete's own schedule is asked about once, not on every drag"
+  );
   await assert.rejects(
     moves.moveCalendarSession({ planId: "R5", idInPlan: "1", happenDay: dayOf(planMonday, 1) }, daysFromNow(-1)),
     /before today/

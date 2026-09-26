@@ -1152,6 +1152,17 @@ export function ChatView({
    * `scheduleRefs` entry just before it.
    */
   const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
+  /**
+   * Chips asked for before any conversation is open — Coach mounting for the
+   * first time from the Calendar. Opening the first conversation resets what
+   * belongs to a conversation, so they wait here until one is open.
+   */
+  const scheduleRefsWaitingRef = useRef<ScheduleRef[] | null>(null);
+  useEffect(() => {
+    if (!activeSessionId || !scheduleRefsWaitingRef.current) return;
+    setPendingScheduleRefs(scheduleRefsWaitingRef.current);
+    scheduleRefsWaitingRef.current = null;
+  }, [activeSessionId]);
 
   /**
    * Coach opened from the Library about a plan it wrote: the conversation that
@@ -1166,7 +1177,9 @@ export function ChatView({
     }
     // The calendar is the athlete's, not a conversation's: the chips join the one open.
     if (request.scheduleRefs?.length) {
-      setPendingScheduleRefs(request.scheduleRefs.slice(0, 3));
+      const refs = request.scheduleRefs.slice(0, 3);
+      if (activeSessionIdRef.current) setPendingScheduleRefs(refs);
+      else scheduleRefsWaitingRef.current = refs;
       composerRef.current?.setDraft(request.prompt ?? "");
       requestAnimationFrame(() => composerRef.current?.focus());
       return;
@@ -4523,7 +4536,7 @@ function AnalysisSilentChip({
       </div>
 
           {pendingScheduleRefs.length ? (
-            <div className="chat-refs-pending chat-schedule-refs-pending" aria-label="Asking about the calendar">
+            <div className="chat-refs-pending" aria-label="Asking about the calendar">
               <span className="chat-asked-kicker">Asking about</span>
               {pendingScheduleRefs.map((ref) => (
                 <span key={scheduleRefKey(ref)} className="chat-ref-chip">

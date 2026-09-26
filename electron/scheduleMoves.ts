@@ -70,9 +70,21 @@ export const defaultScheduleMoveDeps: ScheduleMoveDeps = {
 export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = defaultScheduleMoveDeps): Promise<boolean> {
   const cached = getCorosPlanCache(planId);
   if (cached) return cached.calendar === "running";
+  if (notRunning.has(planId)) return false;
   const listed = await deps.listNativeCorosPlans();
-  return listed.some((plan) => plan.remoteId === planId && plan.executeStatus === 1);
+  const running = listed.some((plan) => plan.remoteId === planId && plan.executeStatus === 1);
+  if (!running) notRunning.add(planId);
+  return running;
 }
+
+/**
+ * Calendar `planId`s COROS has said are not a running plan — in practice the
+ * athlete's own schedule, whose id never changes. `plan/query` is the heaviest
+ * thing COROS serves, and without this every drag of one of the athlete's own
+ * sessions paid for it. An id is never reused for a plan, so the answer holds
+ * for the life of the process.
+ */
+const notRunning = new Set<string>();
 
 /** The day a running copy counts `dayNo` from: the Monday of its start day's week. */
 function copyAnchor(raw: Record<string, unknown>): Date {
@@ -163,8 +175,11 @@ export async function replaceCalendarSession(
       ...(ref.pbVersion ? { pbVersion: ref.pbVersion } : {})
     });
   } catch (error) {
-    throw new Error(
+    throw new PartialReplaceError(
       `The new workout was added, but the old one could not be removed (${error instanceof Error ? error.message : String(error)}).`
     );
   }
 }
+
+/** A replacement that added its workout and could not take the old one off: trying again would add it twice. */
+export class PartialReplaceError extends Error {}

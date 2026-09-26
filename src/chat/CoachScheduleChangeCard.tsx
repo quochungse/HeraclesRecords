@@ -95,6 +95,14 @@ function ChangeLine({
           </span>
         ) : null}
       </div>
+      {line.status === "failed" && line.retry !== false && onApply ? (
+        <div className="chat-change-line-actions">
+          <button type="button" className="chat-change-dismiss" disabled={disabled} onClick={onApply}>
+            {busy ? <Loader2 className="chat-spinner" size={12} aria-hidden="true" /> : null}
+            Try again
+          </button>
+        </div>
+      ) : null}
       {line.status === "proposed" && (onApply || onDismiss) ? (
         <div className="chat-change-line-actions">
           {onApply ? (

@@ -198,6 +198,32 @@ async function main() {
   await harness("clickNth", ".chat-change-apply", 1);
   await waitFor(() => harness("callCount", "getScheduleChanges"), "the row is read again after a failure");
 
+  // A failed line may be tried again — unless part of it landed.
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getScheduleChanges: [
+      {
+        ...SET,
+        lines: [
+          { ...SET.lines[0], status: "failed", reason: "COROS is away." },
+          { ...SET.lines[1], status: "failed", reason: "The new workout was added, but the old one could not be removed.", retry: false },
+          SET.lines[2]
+        ]
+      }
+    ],
+    applyScheduleChange: { ...SET, lines: [{ ...SET.lines[0], status: "applied" }, { ...SET.lines[1], status: "failed", retry: false }, SET.lines[2]] }
+  });
+  await waitFor(() => harness("exists", ".chat-change-card"), "drawn with its failures");
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-change-line")].map((row) => [...row.querySelectorAll("button")].map((button) => button.textContent).join("+")).join("|")`),
+    "Try again||Remove+Dismiss",
+    "Try again only where nothing landed"
+  );
+  await harness("clearCalls");
+  await harness("clickText", ".chat-change-line button", "Try again");
+  await waitFor(async () => (await lineStates())[0][0] === "applied", "the retried line is applied");
+  assert.deepEqual((await harness("calls", "applyScheduleChange"))[0].args, ["sc-1", "l1"]);
+
   // Dismiss one line.
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
@@ -238,8 +264,8 @@ async function main() {
     getChatSession: TRANSCRIPT.slice(0, 2),
     getScheduleChanges: []
   });
-  await waitFor(() => harness("exists", ".chat-schedule-refs-pending .chat-ref-chip"), "the chip waits by the composer");
-  assert.match(await harness("text", ".chat-schedule-refs-pending .chat-ref-chip"), /Sat 27 Sep · Long run/);
+  await waitFor(() => harness("exists", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), "the chip waits by the composer");
+  assert.match(await harness("text", "[aria-label=\"Asking about the calendar\"] .chat-ref-chip"), /Sat 27 Sep · Long run/);
   assert.equal(await harness("value", "textarea"), "How should I approach it?", "the question is the athlete's to finish");
   await harness("keyDown", "textarea", "Enter");
   const asked = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question is sent");
@@ -250,7 +276,7 @@ async function main() {
     "the ref is folded into the question, with the ids the tools take"
   );
   await waitFor(() => harness("exists", ".chat-refs-row"), "the question shows what it was about");
-  assert.equal(await harness("exists", ".chat-schedule-refs-pending"), false, "the chip went with the question");
+  assert.equal(await harness("exists", "[aria-label=\"Asking about the calendar\"]"), false, "the chip went with the question");
   const savedRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   const at = savedRefs.findIndex((entry) => entry.kind === "scheduleRefs");
   assert.ok(at >= 0, "the refs are saved as an anchor");

@@ -20208,7 +20208,10 @@ tr.data-intervals-row-missing {
 
 /* A plan brief (P2.1): the generator's snapshot rows, each marked with where
    Coach took it from; a row with no mark is the default nobody has spoken to. */
-.chat-brief-card {
+/* The cards of Coach's steps and proposals hold their own positioned overlays. */
+.chat-brief-card,
+.chat-outline-card,
+.chat-change-card {
   position: relative;
 }
 
@@ -20525,6 +20528,16 @@ tr.data-intervals-row-missing {
 .chat-outline-editor-week {
   display: grid;
   gap: 2px;
+}
+
+/* A week with no stage still draws its edge, in the quiet line colour. */
+.chat-outline-editor {
+  --tl-stage: var(--glass-border);
+}
+
+/* The stage menu shares the row with the figures and may not push them out of it. */
+.chat-outline-editor-stage {
+  min-width: 0;
 }
 
 .chat-outline-editor-week strong {

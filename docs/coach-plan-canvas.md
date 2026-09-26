@@ -883,6 +883,33 @@ chạy probe), P3.1 ≈ 3 ngày, P3.2 ≈ 2 ngày, P3.3 ≈ 1–1.5 tuần, P3.4
 áp được từng dòng; buổi của plan đang chạy vẫn thuộc plan sau khi dời; đề xuất sống qua restart và
 qua máy khác; áp hai lần không ghi hai lần.
 
+**Review tổng thể P3 (2026-09-26).** Sửa được:
+- Kéo một buổi **riêng** trên màn Calendar giờ phải hỏi `isRunningCopy`, và lịch riêng không bao giờ có
+  trong cache plan — mỗi lần kéo tốn một `plan/query` (request nặng nhất COROS có). `scheduleMoves`
+  nhớ các `planId` COROS đã nói không phải bản chạy trong suốt process.
+- Một dòng *failed* vì COROS vắng mặt một lúc thì mất luôn đề xuất. Giờ dòng failed có **Try again**
+  (chỉ khi được gọi đích danh, không qua Apply all), trừ khi một phần đã ghi (`retry: false` — thay
+  buổi riêng đã thêm bài mới mà không xoá được bài cũ; thử lại sẽ thêm lần nữa).
+- Chip lịch bị xoá khi Coach mount lần đầu từ màn Calendar: lần load cuộc chat đầu tiên reset những gì
+  thuộc về cuộc chat. Chip giờ chờ đến khi có cuộc chat mở.
+- Plan đã lưu trữ nhưng đang chạy trên lịch bị ẩn khỏi `list_training_plans`.
+- `test:chat-style-names` đỏ từ P2: class không có rule (`chat-outline-card`, `chat-outline-editor`,
+  `chat-outline-editor-stage`, `is-done` của trail) cộng hai class P3; đã thêm rule thật hoặc bỏ hook.
+- (Trong P3.3) state `scheduleChanges` khai báo sau chỗ dùng — cuộc chat có neo đề xuất văng khi vẽ.
+
+Test: 138 bộ không cần cửa sổ và 13 bộ renderer đều qua, trừ `test:library-renderer` ("got 8 of 24"),
+lỗi đã có từ trước P3. `npm run build` qua.
+
+Còn lại, đã biết:
+- Chưa chạy trên tài khoản thật đường áp của P3.3 (dời/thay buổi của plan qua bản chạy, thêm/thay buổi
+  riêng); P3.0 mới đo từng thao tác COROS riêng lẻ.
+- Scope `day` của `scheduleRefs` chưa có nút riêng trên màn Calendar.
+- Hai máy áp cùng một change set gần như cùng lúc: không ghi COROS hai lần, nhưng máy sau có thể ghi
+  *stale* đè *applied* trên card.
+- Hai lần ghi vào cùng một bản chạy gần như cùng lúc (kéo trên Calendar và áp đề xuất) có thể mất một
+  thay đổi — mỗi lần đọc `detail` rồi ghi cả plan, không có khoá phiên bản.
+- Ref có scope mà build này không biết bị bỏ khi đọc (như `planRefs`).
+
 **Việc tồn đọng nên làm trước hoặc cùng P3** (từ các lần review): câu hỏi "Redraw the outline?"
 khi đổi nguồn của cuộc chat; analysis không thấy brief (gộp vào P3.4); phần đã ghi của một lần lưu
 bị ngắt chỉ nhớ trong RAM (P3.3 có thể dùng cùng cơ chế lưu kết quả từng dòng).
@@ -918,7 +945,7 @@ Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, r�
 | `chat_plan_artifacts` (mới, P1.1) | `personal` | `artifact_id` PK, `session_id`, `kind` (plan/workout), `start_monday`, `race_day`, `refinements_json`, `brief_json` (P2), `outline_json` + `outline_version` (P2), `updated_at`. Chỉ những gì không suy ra được: không có tên, trạng thái hay id COROS (đọc từ version). Hai máy sửa brief cùng lúc thì bản sau thắng, như draft Library |
 | `chat_conversation_settings` (mới, P2.0) | `personal` | `session_id` PK, `sources_json`, `runtime_json`, `updated_at`. Bảng riêng, không thêm cột vào `chat_sessions`, để không đụng merger của bảng đó |
 | Setting `chat.coach.inlineSuggestions` (P1.9) | `preference` | `auto` \| `on` \| `off` |
-| `chat_schedule_changes` (mới, P3.2) | `personal` | `change_set_id` PK, `session_id`, `summary`, `lines_json` (mỗi dòng: op, target, trạng thái, kết quả, lý do), `created_at`, `updated_at`. Personal để áp được từ máy kia; áp hai lần an toàn vì mỗi dòng đọc lại lịch trước khi ghi |
+| `chat_schedule_changes` (mới, P3.2) | `personal` | `change_set_id` PK, `session_id`, `summary`, `lines_json` (mỗi dòng: `lineId`, `op`, `label`, `session`/`toDay`/`workout`/`program`, `status`, `reason`, `retry`, `settledAt`), `created_at`, `updated_at`; `unit_system` (P3.3, qua `ensureColumn`). Personal để áp được từ máy kia; áp hai lần an toàn vì mỗi dòng đọc lại lịch trước khi ghi |
 | Entry kind mới `planEvent`, `planRefs` (P1), `planBrief`, `planOutline` (P2), `scheduleChange`, `scheduleRefs` (P3) | trong `chat_sessions` | Chỉ là neo (Q3) |
 
 - Thêm bảng thì phân loại trong `syncPolicy.ts`, hoặc `test:sync-policy` fail.
