@@ -529,6 +529,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
   a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
   where an answer that overdoes it shows.
+  **An upload COROS stops part-way through is not retried whole** (`PartialUploadError` from
+  `uploadTrainingPlan`, which writes one session per request): the error names the sessions that
+  landed, and a second press writes only the rest.
+  **A draft is read from its row every time, never from a copy held in memory**
+  (`loadStoredPlanDraft`): a row changes behind the process — another machine saves the creation
+  and the pull marks it uploaded — and a cached copy let this machine `plan/add` it a second time.
+  Saves are serialised per creation (`savingArtifacts`) and reads against COROS shared per
+  creation (`corosSyncsInFlight`); a version answered after the athlete moved to another
+  conversation is not appended there (`appendVersion` takes the conversation it was asked from).
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with
@@ -803,7 +812,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   a provider and a model are **one** choice, so the pair comes whole from whichever side made
   it, the analysis first, and effort is taken the same way on its own — merged field by field,
   a model picked for Claude went out to the conversation's OpenRouter. The row goes with the
-  conversation.
+  conversation. The renderer's key check before a send asks about the **conversation's**
+  provider, and a pull touching `chat_conversation_settings` or `chat_plan_artifacts` makes
+  `ChatView` read the settings and the briefs again.
 
   **A plan longer than two weeks starts as a brief** (P2.1): `request_plan_brief` writes the
   generator's request — less the conversation's sources and AI — to a `chat_plan_artifacts` row,
@@ -820,7 +831,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   `ChatPipelineStep`; the athlete sees their words, and `streamOutlineStep` replaces them on the
   wire with the generator's outline prompt built from the brief. The turn is read-only, offered
   `propose_plan_outline`, and withheld every writing tool; a brief that is gone, has become a
-  plan or is still missing a field rejects the send before anything streams. The artifact keeps
+  plan or is still missing a field rejects the send before anything streams, and the renderer
+  then takes the step's words back out of the conversation (`remoteErrorMessage` strips Electron's
+  "Error invoking remote method" off the reason). The artifact keeps
   **one** outline (`outline_json`), with `outline_version` counting every draw, redraw and hand
   adjustment; the transcript holds `planOutline { artifactId, outlineVersion }` anchors and the
   card is drawn at the **latest** one, earlier ones folding to a line. Adjust outline
@@ -854,7 +867,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   lose.** Since P0.1 of [docs/coach-plan-canvas.md](docs/coach-plan-canvas.md), every parser
   passes the keys it does not handle through (`keepUnknownKeys`), a kind it does not know
   travels as `{ kind: "opaque", raw }` and is unwrapped back to `raw` on its way to SQLite,
-  and the renderer carries both (`ChatOpaqueEntry`, `extra`). So a field still has to be
+  and the renderer carries both (`ChatOpaqueEntry`, `extra`). So does a kind this build *knows*
+  in a shape it cannot read — a required field missing, say: dropping it would take it out of
+  the row on the next save, and it may be a newer build's shape; only an entry with no `kind`
+  at all is dropped. So a field still has to be
   listed to be *read* — the paragraph above stands for a field this build uses — but no
   longer to *survive*. That protects nothing written against a build from before it: an
   older build drops an unknown field and can win the merge with its copy

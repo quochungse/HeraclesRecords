@@ -667,8 +667,10 @@ assert.deepEqual(
 deleteChatSession(traced.id, db);
 
 // Both halves are required: the marker says who looked, `at` says when, and a
-// chip that can answer neither is not worth restoring. The entry is dropped
-// rather than half-rendered, and the turns around it are untouched.
+// chip that can answer neither is not worth restoring. The entry is not
+// half-rendered: it is carried verbatim as an opaque entry, drawn as nothing,
+// so this machine's next save does not take it out of the row (Q4) — it may be
+// a newer build's shape. The turns around it are untouched.
 const brokenTraces = [
   { kind: "automationSilent", at: lookedAt },
   { kind: "automationSilent", analysis: { ...marker, name: "" }, at: lookedAt },
@@ -680,8 +682,10 @@ for (const broken of brokenTraces) {
   const parsed = parseChatTranscriptJson(
     JSON.stringify([{ kind: "message", role: "user", content: "hi" }, broken])
   );
-  assert.equal(parsed.length, 1, `half-formed trace kept: ${JSON.stringify(broken)}`);
+  assert.equal(parsed.length, 2, `half-formed trace carried: ${JSON.stringify(broken)}`);
   assert.equal(parsed[0].kind, "message", "the surrounding turn survives it");
+  assert.equal(parsed[1].kind, "opaque", `not restored as a chip: ${JSON.stringify(broken)}`);
+  assert.deepEqual(parsed[1].raw, JSON.parse(JSON.stringify(broken)), "and kept exactly as the row held it");
 }
 
 // A field this build does not know rides along on the trace too (Q4).

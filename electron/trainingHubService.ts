@@ -3646,6 +3646,25 @@ function workoutSportTypeForService(sport: keyof typeof WORKOUT_SPORT_CAPABILITI
   return sport === "hyrox" ? 4 : WORKOUT_SPORT_CAPABILITIES[sport].sportType;
 }
 
+/**
+ * An upload COROS stopped part-way through: the sessions in `written` are on
+ * COROS already — in the library, on the calendar — and the rest are not.
+ * Each session is its own request, so a failure on the fifth leaves four
+ * behind, and a caller that retried the whole upload would write those four
+ * twice.
+ */
+export class PartialUploadError extends Error {
+  constructor(
+    message: string,
+    readonly written: UploadPlanResult["entries"],
+    readonly workoutsCreated: number,
+    readonly workoutsScheduled: number
+  ) {
+    super(message);
+    this.name = "PartialUploadError";
+  }
+}
+
 export async function uploadTrainingPlan(
   draftInput: CorosTrainingPlanDraftInput,
   unitSystem: UnitSystem = "metric"
@@ -3681,6 +3700,27 @@ export async function uploadTrainingPlan(
   );
 
   for (const entry of resolvedDraft.workouts) {
+    try {
+      await uploadOneWorkout(entry);
+    } catch (cause) {
+      if (!entries.length && !workoutsCreated) throw cause;
+      throw new PartialUploadError(
+        cause instanceof Error ? cause.message : String(cause),
+        entries,
+        workoutsCreated,
+        workoutsScheduled
+      );
+    }
+  }
+
+  return {
+    planName: draft.name,
+    workoutsCreated,
+    workoutsScheduled,
+    entries
+  };
+
+  async function uploadOneWorkout(entry: (typeof resolvedDraft.workouts)[number]): Promise<void> {
     const payload = buildWorkoutPayloadFromEntry(entry, context);
     const workoutSignature = JSON.stringify(payload);
     const saveToLibrary = entry.save_to_library !== false;
@@ -3732,13 +3772,6 @@ export async function uploadTrainingPlan(
       });
     }
   }
-
-  return {
-    planName: draft.name,
-    workoutsCreated,
-    workoutsScheduled,
-    entries
-  };
 }
 
 export async function createLibraryWorkout(

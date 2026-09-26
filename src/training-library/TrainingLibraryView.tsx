@@ -1554,7 +1554,7 @@ function PlanIndex({
             type="button"
             className="primary-button"
             disabled={offline}
-            title={offline ? "Reconnect to COROS to generate a plan" : undefined}
+            title={offline ? "Reconnect to COROS to plan with Coach" : undefined}
             onClick={onGenerate}
           >
             <Sparkles size={15} aria-hidden="true" /> AI Plan

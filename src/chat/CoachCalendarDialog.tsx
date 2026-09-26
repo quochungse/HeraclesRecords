@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TrainingPlanDocument } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import { remoteErrorMessage } from "./remoteError";
 import { TrainingPlanCalendarDialog } from "../training-library/TrainingPlanCalendarDialog";
 import "../training-library/trainingLibrary.css";
 import { datedForReading } from "./CoachCreationCard";
@@ -47,7 +48,7 @@ export default function CoachCalendarDialog({
       })
       .catch((cause: unknown) => {
         if (!live) return;
-        onError(cause instanceof Error ? cause.message : "Could not read the plan.");
+        onError(remoteErrorMessage(cause, "Could not read the plan."));
         onClose();
       });
     return () => {

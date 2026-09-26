@@ -146,6 +146,12 @@ function createStubApi(): CorosLinkApi {
             if (answer === "__pending") {
               return new Promise((resolve) => pending.set(property, resolve));
             }
+            // A call main refuses, worded as Electron words it on the way back.
+            if (answer && typeof answer === "object" && typeof (answer as { __reject?: unknown }).__reject === "string") {
+              return Promise.reject(
+                new Error(`Error invoking remote method '${property}': Error: ${(answer as { __reject: string }).__reject}`)
+              );
+            }
             return Promise.resolve(answer);
           };
       cache.set(property, value);

@@ -716,6 +716,44 @@ async function main() {
   await waitFor(() => harness("exists", ".tl-plan-modal .plan-editor-name"), "then the editor opens");
   await page(`document.querySelector('.tl-plan-modal [aria-label="Close"], .tl-plan-modal .plan-editor-close')?.click()`);
 
+  // Review of P1: an answer from COROS that lands after the athlete moved to
+  // another conversation does not put its card there, and one version shared
+  // by two asks is one card.
+  const OTHER = { ...SESSION, id: "s2", title: "Other chat" };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    listTrainingLibraryWorkouts: [],
+    listChatSessions: [SESSION, OTHER],
+    __byArg: {
+      getChatSession: {
+        '"s1"': [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+        '"s2"': [{ kind: "message", role: "user", content: "Something else" }]
+      }
+    },
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: "__pending"
+  });
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-open"), "the saved card is drawn");
+  await settle();
+  await harness("click", ".chat-creation-open");
+  await waitFor(() => harness("callCount", "syncPlanFromCoros"), "opening asks COROS");
+  await page(`[...document.querySelectorAll(".chat-session-row-title")].find((title) => title.textContent.includes("Other chat")).click()`);
+  await waitFor(
+    async () => /Something else/.test((await page(`document.querySelector(".chat-messages, .chat-timeline, main")?.textContent`)) ?? (await page(`document.body.textContent`))),
+    "the other conversation is open"
+  );
+  await harness("clearCalls");
+  await harness("resolvePending", "syncPlanFromCoros", IMPORTED);
+  await settle();
+  assert.equal(await harness("exists", ".chat-plan-event-row"), false, "no line for another conversation's creation here");
+  assert.equal(
+    (await harness("calls", "saveChatSession")).some((call) => JSON.stringify(call.args[1]).includes("plan-1-coros")),
+    false,
+    "and nothing of it saved into this one"
+  );
+
   // -------------------------------------------------------------------------
   // A Coach plan goes on the calendar from the conversation, and says so (P1.6)
   // -------------------------------------------------------------------------
@@ -1084,6 +1122,77 @@ async function main() {
     await page(`[...document.querySelectorAll(".chat-outline-card button, .chat-brief-card button")].some((b) => /Adjust outline|Redraw|Write the sessions|Edit brief/.test(b.textContent))`),
     false,
     "and neither the brief nor the outline offers a change the main process would refuse"
+  );
+
+  // -------------------------------------------------------------------------
+  // Review of P2: a refused step is taken back, the error reads as a reason,
+  // the conversation's own AI decides the key check, and a pull re-reads
+  // briefs and settings
+  // -------------------------------------------------------------------------
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [
+      { kind: "message", role: "user", content: "A base block" },
+      { kind: "planBrief", artifactId: "brief-2" }
+    ],
+    getPlanBriefs: [BASE_BRIEF],
+    getConversationSettings: ALL_SOURCES,
+    sendChat: { __reject: "That brief is no longer in this conversation." }
+  });
+  await waitFor(() => harness("exists", ".chat-brief-card"), "the brief is drawn");
+  await page(`[...document.querySelectorAll(".chat-brief-card button")].find((b) => b.textContent.trim() === "Draw the outline").click()`);
+  await waitFor(async () => (await harness("calls", "sendChat")).length === 1, "the step is sent");
+  const refusedError = await waitFor(
+    async () => (await harness("calls", "prop:onError")).map((call) => call.args[0]).find((message) => typeof message === "string" && message),
+    "the refusal is reported"
+  );
+  assert.equal(refusedError, "That brief is no longer in this conversation.", "in its own words, not Electron's plumbing");
+  await waitFor(
+    async () => !(await page(`[...document.querySelectorAll(".chat-row-user")].some((row) => row.textContent.includes("Draw the outline"))`)),
+    "the refused step's words are taken back"
+  );
+  const takenBack = (await harness("calls", "saveChatSession")).at(-1);
+  assert.ok(takenBack, "and the conversation is saved without them");
+  assert.equal(
+    takenBack.args[1].some((entry) => entry.kind === "message" && entry.content === "Draw the outline"),
+    false
+  );
+
+  // Coach's AI is ready; this conversation answers with OpenRouter, which has no key.
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getConversationSettings: { ...ALL_SOURCES, runtime: { provider: "openrouter", model: "some/model" } }
+  });
+  await waitFor(() => harness("callCount", "getConversationSettings"), "the conversation's settings are read");
+  await settle();
+  await harness("setValue", ".chat-composer textarea", "How was my week?");
+  await harness("click", ".chat-send");
+  const keyError = await waitFor(
+    async () => (await harness("calls", "prop:onError")).map((call) => call.args[0]).find((message) => typeof message === "string" && message),
+    "the missing key is named"
+  );
+  assert.match(keyError, /OpenRouter API key/, "the key this conversation's AI needs, not Coach's");
+  assert.equal(await harness("callCount", "sendChat"), 0, "and nothing is sent to fail in the main process");
+
+  // A pull that merged another machine's brief and settings.
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    getChatSession: [{ kind: "planBrief", artifactId: "brief-2" }],
+    getPlanBriefs: [BASE_BRIEF],
+    getConversationSettings: ALL_SOURCES
+  });
+  await waitFor(() => harness("exists", ".chat-brief-card"), "the brief is drawn");
+  const briefReads = await harness("callCount", "getPlanBriefs");
+  const settingsReads = await harness("callCount", "getConversationSettings");
+  await harness("setScript", {
+    getPlanBriefs: [{ ...BASE_BRIEF, outline: { outline: OUTLINE, version: 1, author: "coach", updatedAt: "" } }]
+  });
+  await harness("emit", "onSyncChanged", { tables: ["chat_plan_artifacts", "chat_conversation_settings"], applied: 2, skipped: 0 });
+  await waitFor(async () => (await harness("callCount", "getPlanBriefs")) > briefReads, "the briefs are read again");
+  await waitFor(async () => (await harness("callCount", "getConversationSettings")) > settingsReads, "and so are the settings");
+  await waitFor(
+    async () => !(await page(`[...document.querySelectorAll(".chat-brief-card button")].some((b) => b.textContent.trim() === "Draw the outline")`)),
+    "the brief now knows its outline, drawn on the other machine"
   );
 
   // -------------------------------------------------------------------------

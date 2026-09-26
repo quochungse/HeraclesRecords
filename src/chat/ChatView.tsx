@@ -98,6 +98,7 @@ import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
+import { remoteErrorMessage } from "./remoteError";
 import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
@@ -951,7 +952,7 @@ export function ChatView({
         setRedrawAsk(artifactId);
       }
     } catch (caught) {
-      setBriefSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+      setBriefSave({ saving: false, error: remoteErrorMessage(caught, "The brief was not saved.") });
     }
   };
   /** A brief changed under its outline: whether to have it redrawn (P2.2). */
@@ -968,7 +969,7 @@ export function ChatView({
       setOutlineSave({ saving: false });
       setEditingOutlineId(null);
     } catch (caught) {
-      setOutlineSave({ saving: false, error: caught instanceof Error ? caught.message : String(caught) });
+      setOutlineSave({ saving: false, error: remoteErrorMessage(caught, "The outline was not saved.") });
     }
   };
   /**
@@ -976,6 +977,8 @@ export function ChatView({
    * the conversation opens; a turn reads it again in the main process.
    */
   const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
+  /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
+  const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
@@ -990,7 +993,7 @@ export function ChatView({
     return () => {
       live = false;
     };
-  }, [api, activeSessionId]);
+  }, [api, activeSessionId, conversationSettingsVersion]);
   const conversationSettingsWriteRef = useRef(0);
   const updateConversationSettings = (next: ConversationSettings) => {
     setConversationSettingsState(next);
@@ -1179,7 +1182,12 @@ export function ChatView({
    * the brief has one.
    */
   const startPlanConversation = async () => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api) return;
+    if (streaming || exportingLatestActivity) {
+      // The request is already consumed, so dropping it would lose the click.
+      onError("Coach is still answering. Press AI Plan again when it has finished.");
+      return;
+    }
     onError(null);
     try {
       const created = await api.createChatSession(chatSettings.provider);
@@ -1194,7 +1202,7 @@ export function ChatView({
       setTimeline(entries);
       persistHistory(created.id, entries, true);
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not start a plan.");
+      onError(remoteErrorMessage(caught, "Could not start a plan."));
     }
   };
 
@@ -1621,6 +1629,14 @@ export function ChatView({
         // private trigger is `device` tier and a run is `derived`, so neither
         // arrives here. Same counter creating and deleting bumps.
         setAnalysesVersion((value) => value + 1);
+      }
+
+      // A brief or an outline written on another machine (P2.1–P2.2): the
+      // cards read them through `planBriefs`, which is let go so they are
+      // read again; a conversation's settings likewise (P2.0).
+      if (change.tables.includes("chat_plan_artifacts")) setPlanBriefs({});
+      if (change.tables.includes("chat_conversation_settings")) {
+        setConversationSettingsVersion((value) => value + 1);
       }
 
       if (!change.tables.includes("chat_sessions")) return;
@@ -2190,7 +2206,7 @@ export function ChatView({
         await ensureActiveSession("chatgpt");
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "ChatGPT sign-in failed.");
+      onError(remoteErrorMessage(caught, "ChatGPT sign-in failed."));
     } finally {
       setSigningIn(false);
     }
@@ -2218,9 +2234,7 @@ export function ChatView({
       return status;
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Claude Code detection failed."
+        remoteErrorMessage(caught, "Claude Code detection failed.")
       );
       return null;
     } finally {
@@ -2288,9 +2302,7 @@ export function ChatView({
       }
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save Claude settings."
+        remoteErrorMessage(caught, "Could not save Claude settings.")
       );
     }
   };
@@ -2310,7 +2322,7 @@ export function ChatView({
       setTimeline([]);
       resetEphemeralChatState();
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not start a new chat.");
+      onError(remoteErrorMessage(caught, "Could not start a new chat."));
     }
   };
 
@@ -2357,7 +2369,7 @@ export function ChatView({
       );
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Could not rename chat."
+        remoteErrorMessage(caught, "Could not rename chat.")
       );
     }
   };
@@ -2381,7 +2393,7 @@ export function ChatView({
         }
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not delete chat.");
+      onError(remoteErrorMessage(caught, "Could not delete chat."));
     }
   };
 
@@ -2399,7 +2411,7 @@ export function ChatView({
         setClaudeStatus(status);
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Provider change failed.");
+      onError(remoteErrorMessage(caught, "Provider change failed."));
     }
   };
 
@@ -2417,9 +2429,7 @@ export function ChatView({
       setChatSettings(await api.saveChatSettings(nextSettings));
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the reasoning effort."
+        remoteErrorMessage(caught, "Could not save the reasoning effort.")
       );
     } finally {
       setSavingSettings(false);
@@ -2470,9 +2480,7 @@ export function ChatView({
       setChatSettings(saved);
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the selected model."
+        remoteErrorMessage(caught, "Could not save the selected model.")
       );
     } finally {
       setSavingSettings(false);
@@ -2596,9 +2604,7 @@ export function ChatView({
       }
     } catch (caught) {
       showToast(
-        caught instanceof Error
-          ? caught.message
-          : "Could not compact this conversation.",
+        remoteErrorMessage(caught, "Could not compact this conversation."),
         "error"
       );
     } finally {
@@ -2634,7 +2640,7 @@ export function ChatView({
       );
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Could not read the context.";
+        remoteErrorMessage(caught, "Could not read the context.");
       setContextInspection((current) =>
         current?.sessionId === sessionId ? { ...current, error: message } : current
       );
@@ -2654,19 +2660,26 @@ export function ChatView({
       await handleLatestActivityFileRequest(trimmed);
       return true;
     }
+    // The AI this conversation answers with (P2.0), which may not be Coach's:
+    // a key missing for Coach's provider must not block a conversation that
+    // uses another, and one missing for the conversation's must.
+    const turnProvider = conversationSettings?.runtime?.provider ?? chatSettings.provider;
     if (
-      chatSettings.provider === "openrouter" &&
+      turnProvider === "openrouter" &&
       !chatSettings.openRouter.hasApiKey
     ) {
       onError("Add an OpenRouter API key in Settings, under Connections.");
       return false;
     }
-    if (chatSettings.provider === "local" && !chatSettings.local.model.trim()) {
+    if (
+      turnProvider === "local" &&
+      !(conversationSettings?.runtime?.model?.trim() || chatSettings.local.model.trim())
+    ) {
       onError("Enter a local model before starting the coach.");
       return false;
     }
     if (
-      chatSettings.provider === "claude-api" &&
+      turnProvider === "claude-api" &&
       !chatSettings.anthropic.hasApiKey
     ) {
       onError(
@@ -2792,8 +2805,14 @@ export function ChatView({
         );
         setTimeline(restoredEntries);
         persistHistory(activeSessionIdRef.current, restoredEntries, true);
+      } else if (pipeline) {
+        // A step the main process refused before anything streamed (P2.2):
+        // its words would sit in the conversation unanswered, and go to the
+        // model on every later turn, so the step is taken back.
+        setTimeline(timeline);
+        persistHistory(activeSessionIdRef.current, timeline, true);
       }
-      onError(caught instanceof Error ? caught.message : "Chat request failed.");
+      onError(remoteErrorMessage(caught, "Chat request failed."));
     }
     return true;
   };
@@ -2924,9 +2943,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to save the workout or plan to COROS."
+        remoteErrorMessage(caught, "Failed to save the workout or plan to COROS.")
       );
     } finally {
       setUploadingDraftId(null);
@@ -2985,8 +3002,14 @@ export function ChatView({
    */
   const appendVersion = (
     written: PlanVersionWritten,
-    action: "edited" | "restored" | "imported" | "removedOnCoros"
+    action: "edited" | "restored" | "imported" | "removedOnCoros",
+    /** The conversation the write was asked from; a card never lands in another. */
+    sessionId: string | null = activeSessionIdRef.current
   ) => {
+    // An answer that arrives after the athlete moved to another conversation
+    // belongs to the one it was asked from, which is no longer on screen: the
+    // version is in the store, and the canvas lists it there.
+    if (!sessionId || activeSessionIdRef.current !== sessionId) return;
     const event: ChatEntry = {
       kind: "planEvent",
       event: {
@@ -3004,8 +3027,13 @@ export function ChatView({
       }
     };
     setTimeline((prev) => {
+      // Two asks can share one read against COROS (the canvas opening while
+      // an edit begins), and so one version: its card goes in once.
+      if (prev.some((entry) => entry.kind === "planDraft" && entry.draft.draftId === written.preview.draftId)) {
+        return prev;
+      }
       const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: written.preview }];
-      persistHistory(activeSessionIdRef.current, next, true);
+      persistHistory(sessionId, next, true);
       return next;
     });
   };
@@ -3060,9 +3088,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to delete workout from COROS."
+        remoteErrorMessage(caught, "Failed to delete workout from COROS.")
       );
     } finally {
       setDeletingRequestId(null);
@@ -3097,9 +3123,7 @@ export function ChatView({
       });
     } catch (caught) {
       const message =
-        caught instanceof Error
-          ? caught.message
-          : "Latest activity FIT export failed.";
+        remoteErrorMessage(caught, "Latest activity FIT export failed.");
       onError(message);
       setTimeline((prev) => {
         const next: ChatEntry[] = [
@@ -3171,12 +3195,15 @@ export function ChatView({
     // A plan on COROS is read against COROS first (D12): an edit made in the
     // Library comes in as the newest version, and the editor opens on that.
     let target = draftId;
+    const sessionId = activeSessionIdRef.current;
     if (api && isOnCoros(versionIndex.get(draftId))) {
       const sync = await api
         .syncPlanFromCoros(draftId, unitSystem)
         .catch((): PlanCorosSync => ({ kind: "current" }));
+      // Moved to another conversation while COROS answered: no editor opens there.
+      if (activeSessionIdRef.current !== sessionId) return;
       if (sync.kind !== "current") {
-        appendVersion(sync.written, sync.kind);
+        appendVersion(sync.written, sync.kind, sessionId);
         target = sync.written.preview.draftId;
       }
     }
@@ -3189,10 +3216,11 @@ export function ChatView({
   const openCreation = (draftId: string) => {
     setOpenCreationId(draftId);
     if (!api || !isOnCoros(versionIndex.get(draftId))) return;
+    const sessionId = activeSessionIdRef.current;
     void api
       .syncPlanFromCoros(draftId, unitSystem, true)
       .then((sync) => {
-        if (sync.kind !== "current") appendVersion(sync.written, sync.kind);
+        if (sync.kind !== "current") appendVersion(sync.written, sync.kind, sessionId);
       })
       .catch(() => undefined);
   };
@@ -3201,10 +3229,11 @@ export function ChatView({
   const handleRestoreVersion = async (draftId: string) => {
     if (!api) return;
     onError(null);
+    const sessionId = activeSessionIdRef.current;
     try {
-      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored");
+      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored", sessionId);
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not restore that version.");
+      onError(remoteErrorMessage(caught, "Could not restore that version."));
     }
   };
   const editingWorkoutDraft =
@@ -4079,6 +4108,7 @@ function AnalysisSilentChip({
                       busy={streaming}
                       editing={editingOutlineId === brief.artifactId}
                       written={briefIsPlan(brief.artifactId)}
+                      blocked={briefOpenProblems(brief.request, conversationSettings?.sources)[0]}
                       onWriteSessions={() => void writeSessions(brief.artifactId)}
                       onAdjust={() => {
                         setOutlineSave({ saving: false });

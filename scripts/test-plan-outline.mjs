@@ -53,6 +53,7 @@ const generation = await import(distUrl("trainingPlanGeneration.js"));
 const model = await import(pathToFileURL(path.join(repoRoot, "src/chat/planOutlineModel.ts")).href);
 const chatTypes = await import(pathToFileURL(path.join(repoRoot, "src/chat/chatTypes.ts")).href);
 const stepRun = await import(pathToFileURL(path.join(repoRoot, "src/chat/stepRun.ts")).href);
+const remoteError = await import(pathToFileURL(path.join(repoRoot, "src/chat/remoteError.ts")).href);
 const runTrail = await import(pathToFileURL(path.join(repoRoot, "src/training-library/runTrail.ts")).href);
 
 database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "plan-outline-")));
@@ -256,9 +257,9 @@ test("the transcript holds only the anchor, through a save and the renderer", ()
     [["a-1", 1], ["a-1", 2]]
   );
   assert.equal(
-    history.parseChatTranscriptJson(JSON.stringify([{ kind: "planOutline", artifactId: "a-1" }])).length,
-    0,
-    "no version, no anchor"
+    history.parseChatTranscriptJson(JSON.stringify([{ kind: "planOutline", artifactId: "a-1" }]))[0].kind,
+    "opaque",
+    "no version, no anchor — carried as it was rather than dropped"
   );
   assert.deepEqual([...model.latestOutlineAnchors(back)], [["a-1", 4]], "the card is drawn at the latest anchor");
 });
@@ -421,6 +422,48 @@ test("a step's wire: the last six messages and the step's prompt, no summary, no
     [{ role: "user", content: "P" }],
     "the summary a compacted conversation opens with is not carried"
   );
+});
+
+test("an outline from outside is read in full: stage and key sessions included", () => {
+  const good = sampleOutline(2);
+  good.weeks[0].keySessions = [{ dayIndex: 5, name: "Long run", sport: "run", minutes: 90 }];
+  assert.ok(brief.readOutline(good));
+  const bad = (patch, session) => {
+    const outline = structuredClone(good);
+    Object.assign(outline.weeks[0], patch);
+    if (session) outline.weeks[0].keySessions = [{ ...good.weeks[0].keySessions[0], ...session }];
+    return brief.readOutline(outline);
+  };
+  assert.equal(bad({ stage: 0 }), undefined, "Not set is no stage for an outline week");
+  assert.equal(bad({ stage: 9 }), undefined);
+  assert.equal(bad({ hours: -1 }), undefined);
+  assert.equal(bad({}, { dayIndex: 7 }), undefined, "the card indexes weekday names with it");
+  assert.equal(bad({}, { sport: "quidditch" }), undefined, "and sport themes");
+  assert.equal(bad({}, { minutes: 0 }), undefined);
+  const artifactId = readyBrief("s-strict");
+  briefs.savePlanOutline(artifactId, sampleOutline(6), "coach");
+  const odd = structuredClone(briefs.planBriefOf(artifactId).outline.outline);
+  odd.weeks[1].keySessions = [{ dayIndex: 12, name: "x", sport: "run" }];
+  assert.throws(() => briefs.updatePlanOutline(artifactId, odd), /could not be read/);
+});
+
+test("Coach changing a brief that has an outline is told the outline stayed as it was", () => {
+  const artifactId = readyBrief("s-told");
+  const before = JSON.parse(briefs.handleRequestPlanBrief({ brief_id: artifactId, constraints: "Knee" }, "s-told", undefined, new Date()));
+  assert.equal(before.outline, undefined, "no outline, nothing to say");
+  briefs.savePlanOutline(artifactId, sampleOutline(6), "coach");
+  const after = JSON.parse(briefs.handleRequestPlanBrief({ brief_id: artifactId, constraints: "Knee, and travel" }, "s-told", undefined, new Date()));
+  assert.equal(after.ok, true);
+  assert.match(after.outline, /already has an outline[\s\S]*redraw or adjust it/);
+});
+
+test("a refusal from the main process reads as its reason", () => {
+  assert.equal(
+    remoteError.remoteErrorMessage(new Error("Error invoking remote method 'chat:send': Error: Draw the outline first: the sessions are written to it."), "x"),
+    "Draw the outline first: the sessions are written to it."
+  );
+  assert.equal(remoteError.remoteErrorMessage(new Error("Plain."), "x"), "Plain.");
+  assert.equal(remoteError.remoteErrorMessage(undefined, "Fallback."), "Fallback.");
 });
 
 /** An outline of `weeks` base weeks, five sessions and `hours` a week, with no key sessions. */

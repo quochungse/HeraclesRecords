@@ -1329,6 +1329,125 @@ test("a Coach plan goes on the calendar from the conversation, and the card know
   assert.ok(Array.isArray(running.matches));
 });
 
+test("restoring a version of a plan on COROS takes the newest version's ids, not its own", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const first = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const firstIds = new Map(first.entries.map((entry) => [entry.workout.key, entry.idInPlan]));
+
+  // Version 2 drops the easy run, and COROS is updated to match.
+  const dropped = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: preview.draftId, summary: "No easy run", ops: [{ op: "remove_session", key: "easy-monday" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(dropped.ok, true, JSON.stringify(dropped));
+  await chatWorkoutTools.uploadPlanDraftById(dropped.draft_id, "metric", "nativePlan");
+  const second = chatWorkoutTools.planDraftDocument(dropped.draft_id);
+
+  // Version 1 back, as version 3.
+  const restored = chatWorkoutTools.restorePlanDraftVersion(preview.draftId, "metric");
+  const third = chatWorkoutTools.planDraftDocument(restored.preview.draftId);
+  const byKey = new Map(third.entries.map((entry) => [entry.workout.key, entry]));
+  assert.equal(third.remoteId, "900", "still a change to that plan");
+  assert.equal(third.remoteVersion, second.remoteVersion, "checked against the plan as it is now");
+  assert.equal(byKey.get("easy-monday").idInPlan, undefined, "the easy run is gone from COROS, so it comes back as a new session");
+  assert.notEqual(firstIds.get("easy-monday"), undefined, "(it had an id in version 1)");
+  assert.equal(
+    byKey.get("long-sunday").idInPlan,
+    second.entries.find((entry) => entry.workout.key === "long-sunday").idInPlan,
+    "the session that stayed keeps the id COROS has for it"
+  );
+  const updated = await chatWorkoutTools.uploadPlanDraftById(restored.preview.draftId, "metric", "nativePlan");
+  assert.equal(updated.conflict, undefined, "and it updates the plan without a false conflict");
+  assert.equal(coros.to("/training/plan/add").length, 1, "no second plan");
+});
+
+test("two reads against COROS begun together bring its change back once", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const inLibrary = chatWorkoutTools.planDraftDocument(preview.draftId);
+  await library.savePlanToCoros({ plan: { ...inLibrary, name: "Renamed in the Library" }, unitSystem: "metric" });
+  // The canvas opening and an edit begun at the same moment.
+  const [first, second] = await Promise.all([
+    chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true }),
+    chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId)
+  ]);
+  assert.equal(first.kind, "imported");
+  assert.equal(second.kind, "imported");
+  assert.equal(first.written.preview.draftId, second.written.preview.draftId, "one version, shared");
+  const artifact = databaseModule.getChatPlanDraft(preview.draftId).artifactId ?? preview.draftId;
+  assert.equal(databaseModule.listChatPlanDraftVersions(artifact).length, 2, "the saved one and COROS's change, nothing twice");
+});
+
+test("sessions put on the calendar before COROS stopped are not written again", async () => {
+  let failNext = false;
+  const coros = stubCoros({
+    "/training/program/calculate": () =>
+      ok({ planDuration: 1800, planDistance: 500000, planTrainingLoad: 40, planSets: 3, exerciseBarChart: [] }),
+    "/training/schedule/query": () => ok({ entities: [], programs: [] }),
+    "/training/schedule/update": () => {
+      if (failNext) {
+        failNext = false;
+        return { apiCode: "A1", message: "Service exceptions", result: "1001" };
+      }
+      return ok();
+    },
+    "/account/query": ok({}),
+    "coros-traininghub-v2": ok({})
+  });
+  const preview = await coachDraft(datedBlock);
+  // The first session lands, then COROS refuses the second.
+  const original = globalThis.fetch;
+  let scheduled = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/training/schedule/update") && ++scheduled === 2) failNext = true;
+    return original(url, init);
+  };
+  await assert.rejects(
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar"),
+    /COROS stopped part-way: "Easy Monday" was saved and stays there; the rest were not .*Saving again adds only the rest/
+  );
+  assert.equal(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, undefined, "not saved as a whole");
+  const writes = coros.to("/training/schedule/update").length;
+
+  const done = await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar");
+  assert.equal(coros.to("/training/schedule/update").length, writes + 1, "only the session that did not land");
+  assert.equal(done.workoutsScheduled, 2, "and the result counts both");
+  assert.deepEqual(done.entries.map((entry) => entry.name), ["Easy Monday", "Long Sunday"]);
+  assert.ok(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, "now it is saved");
+  globalThis.fetch = original;
+});
+
+test("two saves of one creation begun together write one plan", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  const results = await Promise.allSettled([
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan"),
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan")
+  ]);
+  assert.deepEqual(results.map((result) => result.status).sort(), ["fulfilled", "rejected"]);
+  assert.match(results.find((result) => result.status === "rejected").reason.message, /already being saved/);
+  assert.equal(coros.to("/training/plan/add").length, 1);
+});
+
+test("a save made on another machine is seen here: the row, not a copy in memory, decides", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  chatWorkoutTools.planDraftDocument(preview.draftId); // read once, as the card does
+  // The other machine saved it; the pull marks the row.
+  databaseModule.markChatPlanDraftUploaded(preview.draftId, Date.now());
+  await assert.rejects(
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan"),
+    /already uploaded/,
+    "not saved a second time"
+  );
+});
+
 test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

@@ -271,15 +271,39 @@ export function parseStoredBrief(json: string | undefined): {
   }
 }
 
+/** A key session as the card draws it: a day of the week, a name and a sport it knows. */
+function isOutlineSession(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Number.isInteger(value.dayIndex) &&
+    (value.dayIndex as number) >= 0 &&
+    (value.dayIndex as number) <= 6 &&
+    typeof value.name === "string" &&
+    WORKOUT_SPORTS.includes(value.sport as WorkoutSport) &&
+    (value.minutes === undefined || (Number.isInteger(value.minutes) && (value.minutes as number) > 0))
+  );
+}
+
+/**
+ * A week of an outline. Checked in full, stage and key sessions included:
+ * the athlete's edit arrives over IPC and a synced row from another build,
+ * and the card indexes weekday names and sport themes with what it holds.
+ */
 function isOutlineWeek(value: unknown): value is TrainingPlanOutlineWeek {
   return (
     isRecord(value) &&
     Number.isInteger(value.stage) &&
+    (value.stage as number) >= 1 &&
+    (value.stage as number) <= 6 &&
     typeof value.hours === "number" &&
+    Number.isFinite(value.hours) &&
+    value.hours >= 0 &&
     Number.isInteger(value.sessions) &&
+    (value.sessions as number) >= 0 &&
     typeof value.lighter === "boolean" &&
     typeof value.focus === "string" &&
-    Array.isArray(value.keySessions)
+    Array.isArray(value.keySessions) &&
+    value.keySessions.every(isOutlineSession)
   );
 }
 

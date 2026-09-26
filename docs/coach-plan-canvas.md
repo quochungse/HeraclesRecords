@@ -140,7 +140,9 @@ Từ đó, năm quy tắc:
   outline, dòng diff, tham chiếu của một câu hỏi) là một entry kind mới, chỉ mang id trỏ vào
   bảng và vài chữ để đọc. Build cũ bỏ entry đó khi đọc, nhưng nhờ H1 nó vẫn sống ở máy mới và
   trên vault; máy cũ chỉ mất phần hiển thị, không mất dữ liệu.
-- **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi. Không cứu được build cũ
+- **Q4. Từ P0.1, parser giữ nguyên kind và field lạ** thay vì bỏ đi — và từ review P0, cả một kind
+  đã biết nhưng không đọc được (thiếu field bắt buộc, sai kiểu): nó thành opaque, không hiện gì,
+  và về lại store y nguyên, thay vì bị lần lưu sau xoá khỏi row. Không cứu được build cũ
   hiện có (Q1–Q3 vẫn phải giữ), nhưng làm mọi thay đổi *sau* P0.1 an toàn hơn, và là đường để
   một ngày nào đó được nới Q1.
 - **Q5. Entry `planDraft` trong transcript không mang `source`; `preview_json` thì vẫn mang.**
@@ -288,6 +290,25 @@ Không kind mới, không bảng mới. P0.1 nên ở một bản phát hành c�
 **Ship P0 khi:** card hiện đúng một bản dưới câu trả lời ở mọi độ rộng; câu hỏi đã trả lời còn
 thấy được; workout sửa được trước khi lưu; generator lên lịch đúng Thứ Hai đã chọn; tool result
 không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run build` sạch.
+
+**Review P0 (2026-09-26).** Đọc lại toàn bộ P0.1–P0.8; đã sửa:
+- **Entry của một kind đã biết mà không đọc được bị bỏ**, nên lần lưu sau xoá nó khỏi row trên máy
+  này — trái với Q4. Đó có thể là hình dạng của một build mới hơn (một field trở thành tuỳ chọn, như
+  `bindingId` của marker analysis từng làm ở đây). Giờ nó được giữ nguyên dạng opaque: không hiện,
+  không gửi cho model, về lại store y nguyên. Entry không có `kind` vẫn bị bỏ. Bốn test từng khẳng
+  định "bị bỏ" nay khẳng định "không hiện dở, và không mất".
+- **Lưu từng buổi lên COROS bị ngắt giữa chừng** ("Put sessions on calendar", "Save to Workout
+  Library"): các buổi trước đã nằm trên COROS nhưng card vẫn "chưa lưu", và bấm lại ghi trùng chúng.
+  Giờ `uploadTrainingPlan` ném `PartialUploadError` kèm những buổi đã ghi; lỗi nói rõ buổi nào đã
+  lên, và lần bấm lại chỉ ghi phần còn thiếu (giữ trong RAM của lần chạy app này).
+- `upload_training_plan` (bỏ ở P0.7) được liệt kê lại trong `LOCAL_CHAT_TOOL_SOURCES` như tên cũ,
+  để câu trả lời cũ đã gọi nó không bị gắn nhãn "MCP".
+
+Test mới: case lưu bị ngắt trong `test:coros-plan-writes` (fail trên code cũ); kiểm tra nhãn tool cũ
+trong `test:chat-tool-sources`.
+
+Còn lại, biết và chưa làm: phần đã ghi của một lần lưu bị ngắt chỉ được nhớ trong lần chạy app đó —
+khởi động lại rồi bấm lưu sẽ ghi lại mọi buổi (lỗi lúc trước đã nói buổi nào đã lên).
 
 ### P1 — Vòng lặp chỉnh sửa
 
@@ -497,6 +518,32 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
 lượt; canvas thay modal; plan đã lưu vẫn cập nhật và lên lịch được từ Coach, và sửa ở Library
 hiện lại trong cuộc chat.
 
+**Review P1 (2026-09-26).** Đọc lại toàn bộ P1.1–P1.9; đã sửa:
+- **Draft đọc từ row, không từ bản giữ trong RAM.** `loadStoredPlanDraft` ưu tiên `draftStore`
+  (cache trong tiến trình), trong khi `versionsOf` đọc SQLite. Một row đổi sau lưng tiến trình —
+  máy kia lưu creation lên COROS và pull đánh dấu `uploaded_at` — thì máy này vẫn thấy "chưa lưu"
+  và cho `plan/add` lần nữa: **một plan trùng trên COROS**. Cache đã bỏ.
+- **Hai lần lưu bắt đầu cùng lúc** (bấm đúp, hoặc card và canvas) cùng qua kiểm tra "đã lưu" rồi
+  mỗi lần `plan/add` một plan; giờ có khoá đang-lưu theo creation (`savingArtifacts`).
+- **Hai lần đọc COROS cùng lúc** (mở canvas và bấm Edit) mỗi lần ghi một version "Changed in the
+  Library" giống nhau; giờ lời gọi thứ hai dùng chung kết quả lần đầu (`corosSyncsInFlight`), và
+  `appendVersion` không chèn một card hai lần.
+- **Card lạc cuộc chat.** `openCreation`/Edit đọc COROS bất đồng bộ; nếu người dùng chuyển cuộc
+  chat trong lúc chờ, version mới được chèn và lưu vào **cuộc chat đang mở**, không phải cuộc chat
+  của creation. `appendVersion` giờ nhận cuộc chat đã hỏi và bỏ qua khi nó không còn mở (version
+  vẫn nằm trong store); Edit không mở editor ở cuộc chat khác.
+- **Restore trên plan đã lên COROS** giữ `idInPlan` của version cũ; một buổi đã bị xoá khỏi COROS
+  ở version sau sẽ được gửi với id không còn tồn tại. Giờ nội dung cũ nhận định danh COROS từ
+  version mới nhất theo key, như một lần revise; buổi đã bị xoá quay lại là buổi mới.
+- Lỗi của các thao tác creation (lưu, sửa, khôi phục, lịch) hiện bằng lời của nó (`remoteErrorMessage`).
+
+Test mới: bốn case trong `test:coros-plan-writes`, một case trong `test:chat-plan-card-renderer`;
+cả năm fail trên code cũ.
+
+Còn lại, biết và chưa làm: revise dời hết buổi của tuần đầu làm plan có ngày bị đánh số tuần lại
+(week 1 tính từ Thứ Hai của buổi đầu tiên), `week_stages` khi đó lệch một tuần; chip tinh chỉnh
+bấm khi Coach đang chờ câu trả lời (`coachPrompt`) thì được coi là câu trả lời.
+
 ### P2 — Một pipeline
 
 **P2.0 Cài đặt theo cuộc chat (D13, D14)** · M
@@ -649,6 +696,29 @@ hiện lại trong cuộc chat.
 - Test: `test:plan-generator-model` giữ; `test:plan-generator-renderer` chuyển thành renderer của
   brief và outline; `test:training-plan-generation`, `test:training-plan-simulation` chạy qua
   đường chat; `test:ipc-surface`.
+
+**Review P2 (2026-09-26).** Đọc lại toàn bộ P2.0–P2.5; đã sửa:
+- `sendMessage` kiểm tra key theo provider **của cuộc chat** (P2.0), không theo Coach: cuộc chat
+  dùng OpenRouter chưa có key giờ báo đúng key thiếu thay vì gửi rồi hỏng ở main. (Chiều ngược lại
+  — Coach chưa sẵn sàng, cuộc chat dùng AI khác — vẫn bị các gate toàn màn Coach chặn; đó là thiết
+  kế của màn, không đổi ở đây.)
+- Một bước pipeline main từ chối trước khi stream được **lấy lại** khỏi cuộc chat, thay vì để câu
+  "Draw the outline" không có trả lời nằm lại và đi theo mọi lượt sau.
+- Lỗi từ main hiện bằng lời của nó (`remoteErrorMessage`), không kèm "Error invoking remote
+  method '…': Error:".
+- Đồng bộ: một pull có `chat_plan_artifacts` làm ChatView đọc lại brief/outline; có
+  `chat_conversation_settings` thì đọc lại cài đặt của cuộc chat.
+- **Write the sessions** bị khoá khi brief còn thiếu điều main sẽ từ chối (ví dụ "From my data" khi
+  cuộc chat không chia sẻ Activities), không chỉ khi outline lệch brief.
+- `readOutline` kiểm tra đủ (stage 1–6, giờ, và từng key session: ngày, sport, phút), vì outline
+  đến từ IPC và từ row đồng bộ, và card đánh chỉ số tên thứ và theme sport bằng nó.
+- `request_plan_brief` trên brief đã có outline báo Coach rằng outline không đổi theo.
+- AI Plan bấm khi Coach đang trả lời thì nói ra, thay vì làm rơi yêu cầu.
+
+Còn lại, biết và chưa làm: câu hỏi "Redraw the outline?" khi đổi nguồn của cuộc chat dưới một
+outline đã vẽ; analysis không thấy brief trong `creationIndex`; ô số trong Adjust outline không xoá
+trắng được (giữ số cũ cho tới khi gõ số mới); tắt Sleep không bỏ Resting HR và Recovery % khỏi
+snapshot (chúng nằm trong dashboard, đi theo Activities); chưa chạy với provider thật.
 
 **Ship P2 khi:** từ nút AI Plan tới plan trên lịch, mọi bước nằm trong một cuộc chat; nguồn dữ
 liệu tắt ở cuộc chat thì không lượt nào đọc được; dialog generator không còn.

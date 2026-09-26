@@ -15,7 +15,8 @@ import {
   listScheduledWorkoutEntries,
   resolveTrainingPlanExercises,
   searchWorkoutExercises,
-  uploadTrainingPlan
+  uploadTrainingPlan,
+  PartialUploadError
 } from "./trainingHubService";
 import {
   deleteChatPlanDraft,
@@ -192,11 +193,22 @@ interface DeleteWorkoutParams {
   plan_program_id?: string;
 }
 
-const draftStore = new Map<string, StoredPlanDraft>();
+/**
+ * Creations with a save to COROS in flight. The "already saved" check reads
+ * the row, and two saves begun before either writes both pass it — a
+ * double press, or the card and the canvas at once — and would each `plan/add`
+ * a plan. Keyed by creation, since every version of one saves the same plan.
+ */
+const savingArtifacts = new Set<string>();
+
+/** What a save COROS stopped part-way through had already written, by draft. */
+const partialWrites = new Map<
+  string,
+  { entries: UploadPlanResult["entries"]; workoutsCreated: number; workoutsScheduled: number }
+>();
 const deleteRequestStore = new Map<string, StoredDeleteRequest>();
 
 function persistPlanDraft(stored: StoredPlanDraft): void {
-  draftStore.set(stored.draftId, stored);
   saveChatPlanDraft({
     draftId: stored.draftId,
     planJson: JSON.stringify(stored.plan),
@@ -254,21 +266,19 @@ function storedFromRecord(row: StoredChatPlanDraftRecord): StoredPlanDraft {
   };
 }
 
+/**
+ * A draft as its row holds it now. Read every time, never from a copy held in
+ * memory: a row changes behind this process's back — another machine saves
+ * the creation to COROS and the pull marks it uploaded — and a copy taken
+ * before would let this machine save it again as a second plan.
+ */
 function loadStoredPlanDraft(draftId: string): StoredPlanDraft | undefined {
-  const cached = draftStore.get(draftId);
-  if (cached) {
-    return cached;
-  }
-
   const row = getChatPlanDraft(draftId);
   if (!row) {
     return undefined;
   }
-
   try {
-    const stored = storedFromRecord(row);
-    draftStore.set(draftId, stored);
-    return stored;
+    return storedFromRecord(row);
   } catch {
     return undefined;
   }
@@ -1370,13 +1380,35 @@ export function corosEvent(action: "imported" | "removedOnCoros", written: PlanV
  * canvas does on opening. Otherwise it is one request (the raw detail and its
  * version), and a second only when COROS is newer, to read it as a plan.
  */
+/**
+ * Reads against COROS in flight, by creation. The canvas opening and an edit
+ * begun at the same moment both ask, and two reads that each find COROS newer
+ * would each write the same "Changed in the Library" version; the second
+ * caller shares the first one's answer instead.
+ */
+const corosSyncsInFlight = new Map<string, Promise<PlanCorosSync>>();
+
 export async function syncPlanDraftFromCoros(
   draftId: string,
   unitSystem: UnitSystem = "metric",
-  { cacheOnly = false }: { cacheOnly?: boolean } = {}
+  options: { cacheOnly?: boolean } = {}
 ): Promise<PlanCorosSync> {
   const named = loadStoredPlanDraft(draftId);
   if (!named || named.preview.artifactType === "workout") return { kind: "current" };
+  const running = corosSyncsInFlight.get(named.artifactId);
+  if (running) return running;
+  const sync = readPlanDraftFromCoros(named, unitSystem, options).finally(() => {
+    corosSyncsInFlight.delete(named.artifactId);
+  });
+  corosSyncsInFlight.set(named.artifactId, sync);
+  return sync;
+}
+
+async function readPlanDraftFromCoros(
+  named: StoredPlanDraft,
+  unitSystem: UnitSystem,
+  { cacheOnly = false }: { cacheOnly?: boolean }
+): Promise<PlanCorosSync> {
   const versions = versionsOf(named.artifactId);
   const latest = versions[versions.length - 1] ?? named;
   if (!latest.uploadedAt) return { kind: "current" };
@@ -1815,7 +1847,25 @@ export async function uploadPlanDraftById(
   if (stored.uploadedAt) {
     throw new Error("This training plan was already uploaded.");
   }
+  if (savingArtifacts.has(stored.artifactId)) {
+    throw new Error("This creation is already being saved to COROS.");
+  }
+  savingArtifacts.add(stored.artifactId);
+  try {
+    return await saveDraftTo(stored, unitSystem, destination, scheduleDate, keepInLibrary, options);
+  } finally {
+    savingArtifacts.delete(stored.artifactId);
+  }
+}
 
+async function saveDraftTo(
+  stored: StoredPlanDraft,
+  unitSystem: UnitSystem,
+  destination: TrainingPlanDestination,
+  scheduleDate: string | undefined,
+  keepInLibrary: boolean,
+  options: PlanDraftSaveOptions
+): Promise<UploadPlanResult> {
   if (destination === "nativePlan") {
     return savePlanDraftAsCorosPlan(stored, unitSystem, options);
   }
@@ -1845,7 +1895,39 @@ export async function uploadPlanDraftById(
       );
     }
   }
-  const uploaded = await uploadTrainingPlan(input, unitSystem);
+  // Sessions an earlier attempt wrote before COROS stopped are not written
+  // again: that attempt told the athlete they were there, and a retry adds
+  // only the rest. Held for this run of the app; the message said what landed.
+  const earlier = partialWrites.get(stored.draftId);
+  const remaining = earlier
+    ? { ...input, workouts: input.workouts.filter((workout) => !earlier.entries.some((entry) => entry.key === workout.key)) }
+    : input;
+  let uploaded: UploadPlanResult;
+  try {
+    uploaded = await uploadTrainingPlan(remaining, unitSystem);
+  } catch (cause) {
+    if (!(cause instanceof PartialUploadError)) throw cause;
+    const held = {
+      entries: [...(earlier?.entries ?? []), ...cause.written],
+      workoutsCreated: (earlier?.workoutsCreated ?? 0) + cause.workoutsCreated,
+      workoutsScheduled: (earlier?.workoutsScheduled ?? 0) + cause.workoutsScheduled
+    };
+    partialWrites.set(stored.draftId, held);
+    const names = cause.written.map((entry) => `"${entry.name}"`).join(", ");
+    throw new Error(
+      `COROS stopped part-way: ${names} ${cause.written.length === 1 ? "was" : "were"} saved and stay${cause.written.length === 1 ? "s" : ""} there; ` +
+        `the rest were not (${cause.message}). Saving again adds only the rest.`
+    );
+  }
+  if (earlier) {
+    uploaded = {
+      ...uploaded,
+      entries: [...earlier.entries, ...uploaded.entries],
+      workoutsCreated: earlier.workoutsCreated + uploaded.workoutsCreated,
+      workoutsScheduled: earlier.workoutsScheduled + uploaded.workoutsScheduled
+    };
+    partialWrites.delete(stored.draftId);
+  }
   const result: UploadPlanResult = {
     ...uploaded,
     destination,
@@ -2315,10 +2397,12 @@ export function restorePlanDraftVersion(
     author: "athlete",
     changeSummary: `Restored version ${older.version}`,
     // Written on top of the newest, whatever the athlete had open.
-    edited: false,
-    // Its sessions as that version had them, with whatever COROS identity
-    // they carried; the plan's own identity is the newest's.
-    ...(older.document ? { document: draftDocument(older) } : {})
+    edited: false
+    // No document of its own: the old content is given the newest version's
+    // COROS identity session by session, as a revision is. The old version's
+    // own `idInPlan`s are what COROS held back then, and a session removed
+    // on COROS since would be sent under an id that is no longer there —
+    // restored, it is a new session to COROS.
   });
 }
 
@@ -2425,10 +2509,7 @@ export function discardPlanDraft(draftId: string): void {
  * answer "draft not found"; now a draft lives exactly as long as the card.
  */
 export function deletePlanDraftsOf(draftIds: readonly string[]): void {
-  for (const draftId of draftIds) {
-    draftStore.delete(draftId);
-    deleteChatPlanDraft(draftId);
-  }
+  for (const draftId of draftIds) deleteChatPlanDraft(draftId);
 }
 
 /** Remove delete requests older than 24 hours */
