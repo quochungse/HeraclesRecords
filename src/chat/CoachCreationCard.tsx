@@ -20,6 +20,7 @@ import {
 import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
+import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 
 export interface CreationFigures {
@@ -122,6 +123,8 @@ export function CoachCreationCard({
   onEdit,
   editing = false,
   onCoros = false,
+  calendar,
+  onCalendar,
   onOpen
 }: {
   draft: PlanDraftPreview;
@@ -142,6 +145,10 @@ export function CoachCreationCard({
   editing?: boolean;
   /** Another version of it is a COROS plan, which saving this one updates. */
   onCoros?: boolean;
+  /** Where the plan stands on the calendar, when COROS is running it (P1.6). */
+  calendar?: CreationCalendar;
+  /** Opens the calendar dialog for this version. */
+  onCalendar?: () => void;
   onOpen: () => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
@@ -180,7 +187,7 @@ export function CoachCreationCard({
         </div>
         <div className="chat-creation-head-aside">
           <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
-            {status.label}
+            {calendar?.running && status.saved ? "On calendar" : status.label}
           </span>
           <button
             type="button"
@@ -229,7 +236,9 @@ export function CoachCreationCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {status.label === "On COROS"
+            {calendar?.running && status.saved
+              ? `On your COROS calendar${calendar.line ? ` · ${calendar.line}` : ""}.`
+              : status.label === "On COROS"
               ? `Saved to your COROS plans as “${draft.name}”.`
               : status.label === "In library"
                 ? "Saved to your COROS Workout Library."
@@ -248,6 +257,8 @@ export function CoachCreationCard({
         onEdit={onEdit}
         editing={editing}
         onCoros={onCoros || (status.saved && status.label === "On COROS")}
+        onCalendar={onCalendar}
+        onCalendarNow={calendar?.running ?? false}
       />
 
     </article>

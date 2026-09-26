@@ -1303,6 +1303,32 @@ test("a plan deleted on COROS leaves a proposal, saved again as a new plan (P1.6
   assert.equal(coros.to("/training/plan/update").length, 0);
 });
 
+test("a Coach plan goes on the calendar from the conversation, and the card knows it (P1.6)", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+
+  // Before it is saved, the preview reads it through the chat.
+  const before = await library.previewPlanOnCalendar(`chat:${preview.draftId}`, "20990803");
+  assert.deepEqual(before.blockers, []);
+  assert.deepEqual(
+    before.entries.map((entry) => entry.happenDay),
+    ["20990803", "20990816"],
+    "each session on the day the coach dated it"
+  );
+  assert.deepEqual(chatWorkoutTools.planCalendarStates([preview.draftId]), [], "not on COROS, so nothing to say");
+
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const saved = chatWorkoutTools.planCalendarStates([preview.draftId]);
+  assert.deepEqual(saved.map((state) => [state.remotePlanId, Boolean(state.running)]), [["coros:900", false]]);
+
+  await library.putPlanOnCalendar("coros:900", "20990803");
+  const [running] = chatWorkoutTools.planCalendarStates([preview.draftId]);
+  assert.ok(running.running, "the running copy, from the plan cache");
+  assert.equal(running.running.sourcePlanId, "900");
+  assert.equal(running.running.calendar, "running");
+  assert.ok(Array.isArray(running.matches));
+});
+
 test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);

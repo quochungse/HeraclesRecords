@@ -3184,6 +3184,18 @@ export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
  * changed — then its COROS form is the creation's newest version — or
  * deleted there, which leaves it a proposal to save again.
  */
+/**
+ * Where a Coach plan on COROS stands on the calendar (P1.6): COROS's running
+ * copy of it, as the plan cache holds it, and the matches of what was done
+ * against it — read from this machine, at no cost.
+ */
+export interface PlanCalendarState {
+  artifactId: string;
+  remotePlanId: string;
+  running?: TrainingPlanDocument;
+  matches: TrainingActivityMatch[];
+}
+
 export type PlanCorosSync =
   | { kind: "current" }
   | { kind: "imported" | "removedOnCoros"; written: PlanVersionWritten };

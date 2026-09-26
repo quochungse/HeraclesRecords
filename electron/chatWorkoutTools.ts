@@ -17,15 +17,17 @@ import {
 } from "./trainingHubService";
 import {
   deleteChatPlanDraft,
+  findCachedRunningCorosPlan,
   getChatPlanDraft,
   getCorosPlanCache,
+  listTrainingActivityMatches,
   listChatPlanDraftVersions,
   markChatPlanDraftUploaded,
   saveChatPlanDraft,
   type ChatPlanDraftAuthor,
   type StoredChatPlanDraftRecord
 } from "./database";
-import { getNativeTrainingPlan, savePlanToCoros } from "./trainingLibraryService";
+import { getNativeTrainingPlan, savePlanToCoros, setChatPlanReader } from "./trainingLibraryService";
 import { isDeletedNativePlan, readNativeCorosPlanRaw } from "./corosTrainingPlanAdapter";
 import {
   COROS_WEEK_STAGES,
@@ -47,6 +49,7 @@ import type {
   CorosTrainingPlanDraftInput,
   DeleteWorkoutResult,
   PlanArtifactVersion,
+  PlanCalendarState,
   PlanCorosSync,
   PlanDraftPreview,
   PlanDraftSaveOptions,
@@ -254,6 +257,9 @@ function loadStoredPlanDraft(draftId: string): StoredPlanDraft | undefined {
     return undefined;
   }
 }
+
+// A Coach creation is read by the Library's calendar preview as `chat:<draftId>`.
+setChatPlanReader((draftId) => planDraftDocument(draftId));
 
 export const CHAT_WORKOUT_TOOL_NAMES = [
   "search_coros_exercises",
@@ -1998,6 +2004,37 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
       }
     })
   );
+}
+
+/**
+ * Where each Coach plan on COROS stands on the calendar, for the cards: its
+ * newest saved version's plan, the running copy the plan cache holds of it,
+ * and what was done against that copy. Nothing is asked of COROS.
+ */
+export function planCalendarStates(draftIds: readonly string[]): PlanCalendarState[] {
+  const artifacts = new Set<string>();
+  for (const draftId of draftIds) {
+    const row = getChatPlanDraft(draftId);
+    if (row) artifacts.add(row.artifactId ?? row.draftId);
+  }
+  let matches: ReturnType<typeof listTrainingActivityMatches> | undefined;
+  return [...artifacts].flatMap((artifactId): PlanCalendarState[] => {
+    const versions = versionsOf(artifactId);
+    const saved = [...versions].reverse().find((version) => version.uploadedAt && draftDocument(version).remoteId);
+    if (!saved || saved.preview.artifactType === "workout") return [];
+    const remoteId = draftDocument(saved).remoteId!;
+    const runningId = findCachedRunningCorosPlan(remoteId);
+    const running = runningId ? getCorosPlanCache(runningId) : undefined;
+    matches ??= listTrainingActivityMatches();
+    return [
+      {
+        artifactId,
+        remotePlanId: `coros:${remoteId}`,
+        ...(running ? { running } : {}),
+        matches: running ? matches.filter((match) => match.schedulePlanId === running.remoteId) : []
+      }
+    ];
+  });
 }
 
 /** A version's plan — a workout's too, as a plan of one session. */

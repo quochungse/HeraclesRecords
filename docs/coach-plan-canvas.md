@@ -415,6 +415,15 @@ không còn `source`; `test:chat-transcript-compat` xác nhận §4; `npm run bu
   `detached` không còn danh tính, lần lưu sau là `plan/add`; `isOnCoros` đọc dấu mới nhất. Coach
   sửa plan đã đổi trên COROS: bản COROS được nhập trước (một `planEvent` qua stream
   `chat:streamInfo` kind `planEvent`, và card của nó), rồi thay đổi của Coach chồng lên.)
+- (P1.6c đã làm: "Add to calendar…" dùng `TrainingPlanCalendarDialog` qua `CoachCalendarDialog`;
+  bản chưa lưu đưa vào preview dưới id `chat:<draftId>` — `previewPlanOnCalendar` đọc nó qua
+  `setChatPlanReader`, chatWorkoutTools đăng ký, để hai module không import nhau — và
+  `saveFirst` lưu đúng một lần. Nút có trên plan đã lưu chưa chạy trên lịch, và là lựa chọn phụ
+  của một programme chưa lưu; plan one-shot không có, vì đã dẫn bằng "Put sessions on
+  calendar". Trạng thái lấy từ `chat:planCalendarState` — bản chạy trong `coros_plan_cache` và
+  các match đã lưu, không tốn request — qua `creationCalendar`: "On calendar", "Week n of N" hoặc
+  "Starts …", và `describeCompliance` của Library (không bao giờ 0%). Chưa làm: "Remove from
+  calendar" và "Open in Library" — thuộc P1.7.)
 - **Save to COROS**: `savePlanToCoros` với `document_json`, như Library. Version vừa lưu được
   đọc lại từ COROS (việc Library đã làm sau mỗi lần lưu) và `document_json` của nó được thay bằng
   bản đọc về, để mang `corosProgram` và `idInPlan`.

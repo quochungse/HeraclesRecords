@@ -716,6 +716,71 @@ async function main() {
   await page(`document.querySelector('.tl-plan-modal [aria-label="Close"], .tl-plan-modal .plan-editor-close')?.click()`);
 
   // -------------------------------------------------------------------------
+  // A Coach plan goes on the calendar from the conversation, and says so (P1.6)
+  // -------------------------------------------------------------------------
+  const RUNNING = {
+    ...DOCUMENT,
+    id: "coros:905",
+    remoteId: "905",
+    calendar: "running",
+    sourcePlanId: "900",
+    startDate: "2099-01-05",
+    entries: DOCUMENT.entries.map((entry, index) => ({ ...entry, idInPlan: String(index + 1) }))
+  };
+  const SAVED_ONLY = {
+    ...BASE_SCRIPT,
+    getChatSession: [TRANSCRIPT[0], TRANSCRIPT[1], { kind: "planDraft", draft: SAVED_V1 }],
+    getPlanArtifacts: [
+      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, uploadedAt: 3, remotePlanId: "coros:900" }
+    ],
+    syncPlanFromCoros: { kind: "current" },
+    getPlanCalendarState: [
+      {
+        artifactId: "plan-1",
+        remotePlanId: "coros:900",
+        running: RUNNING,
+        matches: [{ schedulePlanId: "905", scheduleIdInPlan: "1", status: "upcoming" }]
+      }
+    ]
+  };
+  await harness("mount", "ChatView", {}, SAVED_ONLY);
+  await waitFor(
+    async () => (await harness("text", ".chat-creation-card .chat-creation-status")) === "On calendar",
+    "a plan COROS is running reads as on the calendar"
+  );
+  assert.match((await harness("text", ".chat-creation-card .chat-plan-success")) ?? "", /On your COROS calendar · Starts .* · 1 session ahead\./);
+  assert.equal(await harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), false, "and is not offered again");
+
+  // Saved, not running: added from the card, through the Library's dialog.
+  await harness("mount", "ChatView", {}, {
+    ...SAVED_ONLY,
+    getPlanCalendarState: [{ artifactId: "plan-1", remotePlanId: "coros:900", matches: [] }],
+    getPlanDraftDocument: { ...DOCUMENT, id: "coros:900", remoteId: "900" },
+    previewTrainingPlanCalendar: {
+      planId: "coros:900",
+      startDay: "20990105",
+      anchorDay: "20990105",
+      entries: [],
+      blockers: []
+    }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), "a saved plan offers the calendar");
+  await harness("click", '.chat-creation-card [data-action="addToCalendar"]');
+  await waitFor(() => harness("callCount", "previewTrainingPlanCalendar"), "the dialog reads what COROS will do");
+  assert.equal((await harness("calls", "previewTrainingPlanCalendar"))[0].args[0], "coros:900");
+
+  // Not saved: the dialog reads it through the chat, and saves it first.
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT,
+    previewTrainingPlanCalendar: { planId: "chat:plan-1", startDay: "20990105", anchorDay: "20990105", entries: [], blockers: [] }
+  });
+  await waitFor(() => harness("exists", '.chat-creation-card [data-action="addToCalendar"]'), "a programme offers the calendar too");
+  await harness("click", '.chat-creation-card [data-action="addToCalendar"]');
+  await waitFor(() => harness("callCount", "previewTrainingPlanCalendar"), "read before it is saved");
+  assert.equal((await harness("calls", "previewTrainingPlanCalendar"))[0].args[0], "chat:plan-1");
+  assert.equal(await harness("callCount", "uploadTrainingPlanDraft"), 0, "nothing saved until the day is picked");
+
+  // -------------------------------------------------------------------------
   // Stopped after it produced a card, the turn keeps the card (P0.8)
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {

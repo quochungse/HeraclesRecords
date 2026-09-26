@@ -37,6 +37,7 @@ import {
   planArtifacts,
   restorePlanDraftVersion,
   syncPlanDraftFromCoros,
+  planCalendarStates,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -2411,6 +2412,10 @@ export async function syncPlanFromCoros(
 
 export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
   return restorePlanDraftVersion(draftId, unitSystem);
+}
+
+export function listPlanCalendarStates(draftIds: string[]): import("./types").PlanCalendarState[] {
+  return planCalendarStates(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
 }
 
 export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {

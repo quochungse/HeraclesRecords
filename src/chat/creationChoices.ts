@@ -18,6 +18,7 @@
 import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
 
 export type CreationActionId =
+  | "addToCalendar"
   | "updatePlan"
   | "saveAsNewPlan"
   | "scheduleWorkout"
@@ -175,8 +176,19 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
 export type ArtifactActions =
   | { kind: "older"; restore: boolean }
   | { kind: "editing" }
-  | { kind: "saved" }
+  | { kind: "saved"; addToCalendar: boolean }
   | { kind: "save"; choices: CreationChoices };
+
+/**
+ * The plan onto the COROS calendar as its running copy (P1.6), through the
+ * Library's dialog — which saves a plan not on COROS yet first. Not a way of
+ * saving: a plan is on the calendar only as a COROS plan.
+ */
+const ADD_TO_CALENDAR: CreationAction = {
+  id: "addToCalendar",
+  label: "Add to calendar…",
+  destination: "nativePlan"
+};
 
 /**
  * `saved` is whether any version is saved; `onCoros`, whether one is a COROS
@@ -187,14 +199,24 @@ export type ArtifactActions =
  */
 export function artifactActions(
   draft: PlanDraftPreview,
-  state: { latest: boolean; editing?: boolean; saved?: boolean; onCoros?: boolean },
+  state: {
+    latest: boolean;
+    editing?: boolean;
+    saved?: boolean;
+    onCoros?: boolean;
+    /** COROS is running a copy of the plan on the calendar already. */
+    onCalendar?: boolean;
+  },
   today: string
 ): ArtifactActions {
   const saved = state.saved ?? Boolean(draft.uploadedAt || draft.uploadResult);
   const isPlan = draft.artifactType !== "workout";
   if (!state.latest) return { kind: "older", restore: !saved || (isPlan && Boolean(state.onCoros)) };
   if (state.editing) return { kind: "editing" };
-  if (draft.uploadedAt || draft.uploadResult) return { kind: "saved" };
+  if (draft.uploadedAt || draft.uploadResult) {
+    const asPlan = isPlan && (draft.uploadResult?.destination === "nativePlan" || Boolean(state.onCoros));
+    return { kind: "saved", addToCalendar: asPlan && !state.onCalendar };
+  }
   if (isPlan && state.onCoros) {
     return {
       kind: "save",
@@ -205,5 +227,12 @@ export function artifactActions(
       }
     };
   }
-  return { kind: "save", choices: planSaveChoices(draft, today) };
+  const choices = planSaveChoices(draft, today);
+  // A programme can go on the calendar as a plan, saved first; a one-shot plan
+  // already leads with putting its sessions there, and a second calendar
+  // button beside that one would ask the same question two ways.
+  if (isPlan && choices.primary.id === "saveAsPlan") {
+    return { kind: "save", choices: { ...choices, secondary: [...choices.secondary, ADD_TO_CALENDAR] } };
+  }
+  return { kind: "save", choices };
 }

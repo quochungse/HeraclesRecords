@@ -27,6 +27,7 @@ import { sportTheme } from "../training-library/sportTheme";
 import "../training-library/trainingLibrary.css";
 import { creationFigures, datedForReading } from "./CoachCreationCard";
 import { CreationActions } from "./CreationActions";
+import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
 
@@ -62,6 +63,8 @@ export default function CoachCanvas({
   onRestore,
   onRemove,
   onViewInChat,
+  onCalendar,
+  calendarOf,
   planSportStyle
 }: {
   api?: CorosLinkApi;
@@ -90,6 +93,10 @@ export default function CoachCanvas({
   onRestore?: (draftId: string) => void;
   onRemove: (draftId: string) => void;
   onViewInChat: (draftId: string) => void;
+  /** Opens the calendar dialog for a version. */
+  onCalendar?: (draftId: string) => void;
+  /** Where a creation stands on the calendar, by any version's draft id. */
+  calendarOf?: (draftId: string) => CreationCalendar | undefined;
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
   const open = artifactId ? creationOf(artifactId, creations, versionIndex) : null;
@@ -117,6 +124,8 @@ export default function CoachCanvas({
           onRestore={onRestore}
           onRemove={onRemove}
           onViewInChat={onViewInChat}
+          onCalendar={onCalendar}
+          calendar={calendarOf?.(open.draftId)}
         />
       ) : (
         <CreationIndex
@@ -251,7 +260,9 @@ function ArtifactView({
   onEdit,
   onRestore,
   onRemove,
-  onViewInChat
+  onViewInChat,
+  onCalendar,
+  calendar
 }: {
   api?: CorosLinkApi;
   newest: PlanDraftPreview;
@@ -274,6 +285,8 @@ function ArtifactView({
   onRestore?: (draftId: string) => void;
   onRemove: (draftId: string) => void;
   onViewInChat: (draftId: string) => void;
+  onCalendar?: (draftId: string) => void;
+  calendar?: CreationCalendar;
 }) {
   const { unitSystem } = useUnitSystem();
   const info = versionIndex.get(newest.draftId);
@@ -375,7 +388,7 @@ function ArtifactView({
           <h2 title={title}>{title}</h2>
         </div>
         <span className="chat-creation-status" data-saved={status.saved ? "true" : "false"}>
-          {status.label}
+          {calendar?.running && status.saved ? "On calendar" : status.label}
         </span>
         <button
           type="button"
@@ -523,6 +536,8 @@ function ArtifactView({
               onCoros={onCoros}
               onEdit={onEdit && (latest || editing) ? () => onEdit(newest.draftId) : undefined}
               onRestore={onRestore ? () => onRestore(shown.draftId) : undefined}
+              onCalendar={onCalendar && latest ? () => onCalendar(shown.draftId) : undefined}
+              onCalendarNow={calendar?.running ?? false}
             />
             <button
               type="button"

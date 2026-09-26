@@ -508,7 +508,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   newest version is the saved one is read against COROS; a newer COROS copy becomes its newest
   version (`author: coros`, saved, sessions re-keyed to the coach's keys by `idInPlan`) with a
   `planEvent`, and a plan deleted there leaves a version with no COROS identity, saved next as a
-  new plan. An unsaved version is never synced over: it is checked when it is sent.
+  new plan. An unsaved version is never synced over: it is checked when it is sent. **It goes on
+  the calendar from the conversation** through the Library's own `TrainingPlanCalendarDialog`
+  (`CoachCalendarDialog`): an unsaved version is previewed as `chat:<draftId>`, which
+  `previewPlanOnCalendar` reads through a reader the chat registers (`setChatPlanReader` — the
+  two modules must not import each other), and is saved first, once. The card says where it
+  stands from `chat:planCalendarState` — the running copy in `coros_plan_cache` and the stored
+  matches, no request — in the Library's own compliance words (`creationCalendar`).
   **A creation is read in the canvas** (`CoachCanvas`,
   lazy with the library's stylesheet), which replaced the Creations list and its popup: the
   index of creations, or one open beside the conversation — a sheet over it below 1100px — with

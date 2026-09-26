@@ -67,6 +67,7 @@ import type {
   TrainingPlanOutlineRevision,
   TrainingPlanGenerationResult,
   PlanArtifactVersion,
+  PlanCalendarState,
   PlanCorosSync,
   PlanDraftSaveOptions,
   PlanVersionSave,
@@ -685,6 +686,8 @@ export interface CorosLinkApi {
    * request.
    */
   syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) => Promise<PlanCorosSync>;
+  /** Where each Coach plan on COROS stands on the calendar, from this machine's cache (P1.6). */
+  getPlanCalendarState: (draftIds: string[]) => Promise<PlanCalendarState[]>;
   /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
   removePlanDraft: (draftId: string) => Promise<void>;
   /**

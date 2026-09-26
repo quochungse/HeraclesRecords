@@ -60,6 +60,7 @@ import type {
   McpServerStatus,
   PersistedChatEntry,
   PlanArtifactVersion,
+  PlanCalendarState,
   PlanDraftPreview,
   PlanCorosSync,
   PlanDraftSaveOptions,
@@ -84,6 +85,7 @@ import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
+import { creationCalendar, localDayKey } from "./creationCalendar";
 import {
   creationVersions,
   isLatestVersion,
@@ -132,6 +134,7 @@ const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
 const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
+const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -821,6 +824,37 @@ export function ChatView({
     };
   }, [api, artifactKey]);
   const versionIndex = creationVersions(artifactVersions);
+  /**
+   * Where each creation on COROS stands on the calendar, from this machine's
+   * plan cache (P1.6). Read again when a card changes or a plan is added.
+   */
+  const [calendarStates, setCalendarStates] = useState<PlanCalendarState[]>([]);
+  const [calendarRead, setCalendarRead] = useState(0);
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setCalendarStates([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanCalendarState(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((states) => {
+        if (live) setCalendarStates(Array.isArray(states) ? states : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey, calendarRead]);
+  const calendarOf = (draftId: string) => {
+    const artifactId = versionIndex.get(draftId)?.artifactId ?? draftId;
+    return creationCalendar(
+      calendarStates.find((state) => state.artifactId === artifactId),
+      localDayKey()
+    );
+  };
+  /** The version the calendar dialog is open for. */
+  const [calendarFor, setCalendarFor] = useState<string | null>(null);
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
   const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
@@ -2523,8 +2557,8 @@ export function ChatView({
     scheduleDate?: string,
     keepInLibrary?: boolean,
     options?: PlanDraftSaveOptions
-  ) => {
-    if (!api || uploadingDraftId) return;
+  ): Promise<UploadPlanResult | undefined> => {
+    if (!api || uploadingDraftId) return undefined;
     setUploadingDraftId(draftId);
     setCorosConflict(null);
     onError(null);
@@ -2541,7 +2575,7 @@ export function ChatView({
       // written, and the athlete says which one stands (P1.6).
       if (result.conflict) {
         setCorosConflict({ draftId, name: result.planName });
-        return;
+        return result;
       }
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
@@ -3745,6 +3779,8 @@ function AnalysisSilentChip({
                         )
                       }
                       onCoros={isOnCoros(versionInfo)}
+                      calendar={calendarOf(draft.draftId)}
+                      onCalendar={api ? () => setCalendarFor(draft.draftId) : undefined}
                       onEdit={
                         api && (draft.artifactType !== "workout" || documentOf(draft))
                           ? () => void openCreationEditor(draft.draftId)
@@ -3998,6 +4034,8 @@ function AnalysisSilentChip({
                 setOpenCreationId(null);
               }}
               onViewInChat={(draftId) => handleScrollToPlanChat(draftId)}
+              onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
+              calendarOf={calendarOf}
             />
           </Suspense>
         ) : null}
@@ -4011,6 +4049,29 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
+      {api && calendarFor ? (
+        <Suspense fallback={null}>
+          <CoachCalendarDialog
+            api={api}
+            draftId={calendarFor}
+            saved={Boolean(
+              planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadedAt ||
+                planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadResult ||
+                uploadedPlans[calendarFor]
+            )}
+            onSave={async () => {
+              const result = await handleUploadPlanDraft(calendarFor, "nativePlan");
+              return Boolean(result && !result.conflict);
+            }}
+            onClose={() => setCalendarFor(null)}
+            onAdded={() => {
+              setCalendarFor(null);
+              setCalendarRead((value) => value + 1);
+            }}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
       {corosConflict ? (
         <Suspense fallback={null}>
           <CorosConflictDialog
