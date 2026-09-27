@@ -40,10 +40,20 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["get_sleep_summary", "db"],
     ["list_scheduled_workouts", "coros"],
     ["search_coros_exercises", "coros"],
-    ["upload_training_plan", "coros"],
     ["delete_workout", "coros"],
+    ["propose_schedule_changes", "coros"],
     ["draft_workout", null],
     ["draft_training_plan", null],
+    // Removed in P0.7 (it never wrote anything); stored answers still name it,
+    // and without this their badge would call it an MCP server's tool.
+    ["upload_training_plan", null],
+    ["revise_training_plan", null],
+    ["get_plan_draft", "db"],
+    // The Library's cache and the stored matches; the plan itself is read from COROS.
+    ["list_training_plans", "db"],
+    ["get_training_plan", "coros"],
+    // Writes a brief; reads nothing.
+    ["request_plan_brief", null],
     ["request_coach_input", null]
   ]);
 

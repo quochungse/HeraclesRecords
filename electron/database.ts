@@ -226,6 +226,35 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_provider_updated
       ON chat_sessions(provider, updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS chat_conversation_settings (
+      session_id TEXT PRIMARY KEY,
+      sources_json TEXT,
+      runtime_json TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_schedule_changes (
+      change_set_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      summary TEXT NOT NULL,
+      lines_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_plan_artifacts (
+      artifact_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      kind TEXT NOT NULL,
+      start_monday TEXT,
+      race_day TEXT,
+      brief_json TEXT,
+      outline_json TEXT,
+      outline_version INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chat_plan_drafts (
       draft_id TEXT PRIMARY KEY,
       plan_json TEXT NOT NULL,
@@ -490,6 +519,20 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // and the summary is a fact about the conversation.
   ensureColumn(db, "chat_sessions", "coach_summary", "TEXT");
   ensureColumn(db, "chat_sessions", "coach_summary_through", "INTEGER");
+  // A coach's creation has versions (docs/coach-plan-canvas.md, P1.1): each is
+  // a row of its own, `artifact_id` groups them, and `document_json` holds the
+  // plan as the library reads it. Columns rather than fields inside the JSON,
+  // because a build without them writes the JSON back without what it does not
+  // know, and names only the columns it knows when it syncs.
+  ensureColumn(db, "chat_plan_drafts", "artifact_id", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "version", "INTEGER");
+  ensureColumn(db, "chat_plan_drafts", "parent_draft_id", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "author", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "document_json", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "change_summary", "TEXT");
+  ensureColumn(db, "chat_plan_drafts", "refinements_json", "TEXT");
+  // The units a change set's workouts were written in (P3.3).
+  ensureColumn(db, "chat_schedule_changes", "unit_system", "TEXT");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
@@ -1220,7 +1263,17 @@ export function setChatSessionCoachSummaryRow(
     .run(summary, through, id);
 }
 
-export function listChatSessionRows(provider: string): ChatSessionRow[] {
+/** A provider's conversations, or every conversation when it is absent. */
+export function listChatSessionRows(provider?: string): ChatSessionRow[] {
+  if (provider === undefined) {
+    return requireDatabase()
+      .prepare(
+        `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at
+         FROM chat_sessions
+         ORDER BY updated_at DESC`
+      )
+      .all() as ChatSessionRow[];
+  }
   return requireDatabase()
     .prepare(
       `SELECT id, provider, title, messages_json, created_at, updated_at, pinned_at
@@ -2783,7 +2836,16 @@ interface ChatPlanDraftRow {
   preview_json: string;
   created_at: number;
   uploaded_at: number | null;
+  artifact_id: string | null;
+  version: number | null;
+  parent_draft_id: string | null;
+  author: string | null;
+  document_json: string | null;
+  change_summary: string | null;
+  refinements_json: string | null;
 }
+
+export type ChatPlanDraftAuthor = "coach" | "athlete" | "coros";
 
 export interface StoredChatPlanDraftRecord {
   draftId: string;
@@ -2791,25 +2853,71 @@ export interface StoredChatPlanDraftRecord {
   previewJson: string;
   createdAt: number;
   uploadedAt?: number;
+  /** The creation this is a version of; a row written before versions is its own. */
+  artifactId?: string;
+  version?: number;
+  parentDraftId?: string;
+  author?: ChatPlanDraftAuthor;
+  documentJson?: string;
+  /** What this version changed, in its author's words. */
+  changeSummary?: string;
+  /** The follow-ups Coach offered with this version, as JSON (P1.8). */
+  refinementsJson?: string;
+}
+
+const CHAT_PLAN_DRAFT_COLUMNS =
+  "draft_id, plan_json, preview_json, created_at, uploaded_at, artifact_id, version, parent_draft_id, author, document_json, change_summary, refinements_json";
+
+function chatPlanDraftRecord(row: ChatPlanDraftRow): StoredChatPlanDraftRecord {
+  return {
+    draftId: row.draft_id,
+    planJson: row.plan_json,
+    previewJson: row.preview_json,
+    createdAt: row.created_at,
+    uploadedAt: row.uploaded_at ?? undefined,
+    ...(row.artifact_id ? { artifactId: row.artifact_id } : {}),
+    ...(row.version ? { version: row.version } : {}),
+    ...(row.parent_draft_id ? { parentDraftId: row.parent_draft_id } : {}),
+    ...(row.author === "coach" || row.author === "athlete" || row.author === "coros"
+      ? { author: row.author }
+      : {}),
+    ...(row.document_json ? { documentJson: row.document_json } : {}),
+    ...(row.change_summary ? { changeSummary: row.change_summary } : {}),
+    ...(row.refinements_json ? { refinementsJson: row.refinements_json } : {})
+  };
 }
 
 export function saveChatPlanDraft(record: StoredChatPlanDraftRecord): void {
   requireDatabase()
     .prepare(
-      `INSERT INTO chat_plan_drafts (draft_id, plan_json, preview_json, created_at, uploaded_at)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO chat_plan_drafts (${CHAT_PLAN_DRAFT_COLUMNS})
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(draft_id) DO UPDATE SET
          plan_json = excluded.plan_json,
          preview_json = excluded.preview_json,
          created_at = excluded.created_at,
-         uploaded_at = excluded.uploaded_at`
+         uploaded_at = excluded.uploaded_at,
+         artifact_id = excluded.artifact_id,
+         version = excluded.version,
+         parent_draft_id = excluded.parent_draft_id,
+         author = excluded.author,
+         document_json = excluded.document_json,
+         change_summary = excluded.change_summary,
+         refinements_json = excluded.refinements_json`
     )
     .run(
       record.draftId,
       record.planJson,
       record.previewJson,
       record.createdAt,
-      record.uploadedAt ?? null
+      record.uploadedAt ?? null,
+      record.artifactId ?? null,
+      record.version ?? null,
+      record.parentDraftId ?? null,
+      record.author ?? null,
+      record.documentJson ?? null,
+      record.changeSummary ?? null,
+      record.refinementsJson ?? null
     );
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [record.draftId]);
 }
@@ -2819,41 +2927,70 @@ export function getChatPlanDraft(
 ): StoredChatPlanDraftRecord | undefined {
   const row = requireDatabase()
     .prepare(
-      `SELECT draft_id, plan_json, preview_json, created_at, uploaded_at
+      `SELECT ${CHAT_PLAN_DRAFT_COLUMNS}
        FROM chat_plan_drafts
        WHERE draft_id = ?`
     )
     .get(draftId) as ChatPlanDraftRow | undefined;
 
-  if (!row) {
-    return undefined;
-  }
+  return row ? chatPlanDraftRecord(row) : undefined;
+}
 
-  return {
-    draftId: row.draft_id,
-    planJson: row.plan_json,
-    previewJson: row.preview_json,
-    createdAt: row.created_at,
-    uploadedAt: row.uploaded_at ?? undefined
-  };
+/**
+ * Every version of the creation a draft belongs to, oldest first. A row from
+ * before versions has no `artifact_id` and is the one version of itself.
+ */
+export function listChatPlanDraftVersions(artifactId: string): StoredChatPlanDraftRecord[] {
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT ${CHAT_PLAN_DRAFT_COLUMNS}
+       FROM chat_plan_drafts
+       WHERE artifact_id = ? OR (artifact_id IS NULL AND draft_id = ?)
+       ORDER BY COALESCE(version, 1), created_at`
+    )
+    .all(artifactId, artifactId) as ChatPlanDraftRow[];
+  return rows.map(chatPlanDraftRecord);
+}
+
+/**
+ * The most recently updated conversation holding a card for any of these
+ * drafts (P1.7). A card carries its draft id in the transcript, so this is a
+ * text search, bounded by the ids being quoted — one pass over the table for
+ * every id, rather than one per id.
+ */
+export function findChatSessionMentioning(draftIds: readonly string[]): string | undefined {
+  if (!draftIds.length) return undefined;
+  const row = requireDatabase()
+    .prepare(
+      `SELECT id FROM chat_sessions
+       WHERE ${draftIds.map(() => "instr(messages_json, ?) > 0").join(" OR ")}
+       ORDER BY updated_at DESC LIMIT 1`
+    )
+    .get(...draftIds.map((draftId) => `"draftId":"${draftId}"`)) as { id: string } | undefined;
+  return row?.id;
+}
+
+/**
+ * Whether one conversation holds a card for any of these drafts — the same
+ * text search as `findChatSessionMentioning`, over one row rather than all.
+ */
+export function chatSessionMentionsDraft(sessionId: string, draftIds: readonly string[]): boolean {
+  const statement = requireDatabase().prepare(
+    `SELECT 1 FROM chat_sessions WHERE id = ? AND instr(messages_json, ?) > 0`
+  );
+  return draftIds.some((draftId) => Boolean(statement.get(sessionId, `"draftId":"${draftId}"`)));
 }
 
 export function listChatPlanDrafts(): StoredChatPlanDraftRecord[] {
   const rows = requireDatabase()
     .prepare(
-      `SELECT draft_id, plan_json, preview_json, created_at, uploaded_at
+      `SELECT ${CHAT_PLAN_DRAFT_COLUMNS}
        FROM chat_plan_drafts
        ORDER BY created_at DESC`
     )
     .all() as ChatPlanDraftRow[];
 
-  return rows.map((row) => ({
-    draftId: row.draft_id,
-    planJson: row.plan_json,
-    previewJson: row.preview_json,
-    createdAt: row.created_at,
-    uploadedAt: row.uploaded_at ?? undefined
-  }));
+  return rows.map(chatPlanDraftRecord);
 }
 
 export function markChatPlanDraftUploaded(
@@ -2868,6 +3005,226 @@ export function markChatPlanDraftUploaded(
     )
     .run(uploadedAt, draftId);
   notifySyncedRow("chat_plan_drafts", ["draft_id"], [draftId]);
+}
+
+/** A conversation's own settings (P2.0), as stored; absent is Coach's for everything. */
+export function getChatConversationSettingsRow(
+  sessionId: string
+): { sourcesJson?: string; runtimeJson?: string } | undefined {
+  const row = requireDatabase()
+    .prepare("SELECT sources_json, runtime_json FROM chat_conversation_settings WHERE session_id = ?")
+    .get(sessionId) as { sources_json: string | null; runtime_json: string | null } | undefined;
+  if (!row) return undefined;
+  return {
+    ...(row.sources_json ? { sourcesJson: row.sources_json } : {}),
+    ...(row.runtime_json ? { runtimeJson: row.runtime_json } : {})
+  };
+}
+
+export function saveChatConversationSettingsRow(
+  sessionId: string,
+  sourcesJson: string | null,
+  runtimeJson: string | null
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_conversation_settings (session_id, sources_json, runtime_json, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET
+         sources_json = excluded.sources_json,
+         runtime_json = excluded.runtime_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(sessionId, sourcesJson, runtimeJson, new Date().toISOString());
+  notifySyncedRow("chat_conversation_settings", ["session_id"], [sessionId]);
+}
+
+interface ChatScheduleChangeRow {
+  change_set_id: string;
+  session_id: string | null;
+  summary: string;
+  unit_system: string | null;
+  lines_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A change set as stored; its lines are parsed by `chatScheduleChanges`. */
+export interface StoredChatScheduleChange {
+  changeSetId: string;
+  sessionId?: string;
+  summary: string;
+  unitSystem?: string;
+  linesJson: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function chatScheduleChangeRecord(row: ChatScheduleChangeRow): StoredChatScheduleChange {
+  return {
+    changeSetId: row.change_set_id,
+    ...(row.session_id ? { sessionId: row.session_id } : {}),
+    summary: row.summary,
+    ...(row.unit_system ? { unitSystem: row.unit_system } : {}),
+    linesJson: row.lines_json,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function getChatScheduleChanges(changeSetIds: readonly string[]): StoredChatScheduleChange[] {
+  if (!changeSetIds.length) return [];
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT * FROM chat_schedule_changes WHERE change_set_id IN (${changeSetIds.map(() => "?").join(", ")})`
+    )
+    .all(...changeSetIds) as ChatScheduleChangeRow[];
+  return rows.map(chatScheduleChangeRecord);
+}
+
+export function saveChatScheduleChange(record: StoredChatScheduleChange): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_schedule_changes (change_set_id, session_id, summary, unit_system, lines_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(change_set_id) DO UPDATE SET
+         session_id = excluded.session_id,
+         summary = excluded.summary,
+         unit_system = excluded.unit_system,
+         lines_json = excluded.lines_json,
+         updated_at = excluded.updated_at`
+    )
+    .run(
+      record.changeSetId,
+      record.sessionId ?? null,
+      record.summary,
+      record.unitSystem ?? null,
+      record.linesJson,
+      record.createdAt,
+      record.updatedAt
+    );
+  notifySyncedRow("chat_schedule_changes", ["change_set_id"], [record.changeSetId]);
+}
+
+/** A conversation's change sets go with it. */
+export function deleteChatScheduleChangesOf(sessionId: string): void {
+  const database = requireDatabase();
+  const ids = database
+    .prepare("SELECT change_set_id FROM chat_schedule_changes WHERE session_id = ?")
+    .all(sessionId) as Array<{ change_set_id: string }>;
+  const drop = database.prepare("DELETE FROM chat_schedule_changes WHERE change_set_id = ?");
+  for (const { change_set_id: id } of ids) {
+    if (drop.run(id).changes > 0) notifySyncedDelete("chat_schedule_changes", id);
+  }
+}
+
+export function deleteChatConversationSettingsRow(sessionId: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM chat_conversation_settings WHERE session_id = ?")
+    .run(sessionId);
+  if (result.changes > 0) notifySyncedDelete("chat_conversation_settings", sessionId);
+}
+
+/**
+ * What a Coach creation holds before and beside its versions
+ * (docs/coach-plan-canvas.md §7, P2): its brief, its outline, and the dates
+ * they give it. Nothing that can be read off a version — its name, whether it
+ * is saved — is kept here.
+ */
+export interface ChatPlanArtifactRow {
+  artifactId: string;
+  sessionId?: string;
+  kind: "plan" | "workout";
+  startMonday?: string;
+  raceDay?: string;
+  briefJson?: string;
+  outlineJson?: string;
+  outlineVersion?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StoredChatPlanArtifactRow {
+  artifact_id: string;
+  session_id: string | null;
+  kind: string;
+  start_monday: string | null;
+  race_day: string | null;
+  brief_json: string | null;
+  outline_json: string | null;
+  outline_version: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function chatPlanArtifactFromRow(row: StoredChatPlanArtifactRow): ChatPlanArtifactRow {
+  return {
+    artifactId: row.artifact_id,
+    ...(row.session_id ? { sessionId: row.session_id } : {}),
+    kind: row.kind === "workout" ? "workout" : "plan",
+    ...(row.start_monday ? { startMonday: row.start_monday } : {}),
+    ...(row.race_day ? { raceDay: row.race_day } : {}),
+    ...(row.brief_json ? { briefJson: row.brief_json } : {}),
+    ...(row.outline_json ? { outlineJson: row.outline_json } : {}),
+    ...(typeof row.outline_version === "number" ? { outlineVersion: row.outline_version } : {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function getChatPlanArtifactRow(artifactId: string): ChatPlanArtifactRow | undefined {
+  const row = requireDatabase()
+    .prepare("SELECT * FROM chat_plan_artifacts WHERE artifact_id = ?")
+    .get(artifactId) as StoredChatPlanArtifactRow | undefined;
+  return row ? chatPlanArtifactFromRow(row) : undefined;
+}
+
+export function listChatPlanArtifactRows(artifactIds: readonly string[]): ChatPlanArtifactRow[] {
+  if (artifactIds.length === 0) return [];
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT * FROM chat_plan_artifacts WHERE artifact_id IN (${artifactIds.map(() => "?").join(", ")})`
+    )
+    .all(...artifactIds) as StoredChatPlanArtifactRow[];
+  return rows.map(chatPlanArtifactFromRow);
+}
+
+export function saveChatPlanArtifactRow(row: ChatPlanArtifactRow): void {
+  requireDatabase()
+    .prepare(
+      `INSERT INTO chat_plan_artifacts
+         (artifact_id, session_id, kind, start_monday, race_day, brief_json, outline_json, outline_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(artifact_id) DO UPDATE SET
+         session_id = excluded.session_id,
+         kind = excluded.kind,
+         start_monday = excluded.start_monday,
+         race_day = excluded.race_day,
+         brief_json = excluded.brief_json,
+         outline_json = excluded.outline_json,
+         outline_version = excluded.outline_version,
+         updated_at = excluded.updated_at`
+    )
+    .run(
+      row.artifactId,
+      row.sessionId ?? null,
+      row.kind,
+      row.startMonday ?? null,
+      row.raceDay ?? null,
+      row.briefJson ?? null,
+      row.outlineJson ?? null,
+      row.outlineVersion ?? null,
+      row.createdAt,
+      row.updatedAt
+    );
+  notifySyncedRow("chat_plan_artifacts", ["artifact_id"], [row.artifactId]);
+}
+
+export function deleteChatPlanArtifactRow(artifactId: string): void {
+  const result = requireDatabase()
+    .prepare("DELETE FROM chat_plan_artifacts WHERE artifact_id = ?")
+    .run(artifactId);
+  if (result.changes > 0) notifySyncedDelete("chat_plan_artifacts", artifactId);
 }
 
 export function deleteChatPlanDraft(draftId: string): void {

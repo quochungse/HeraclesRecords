@@ -1,47 +1,33 @@
 import {
   Suspense,
-  forwardRef,
   lazy,
   memo,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode
 } from "react";
 import {
-  BookOpen,
-  Bookmark,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CircleCheck,
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarRange,
   Cloud,
   Database,
   ExternalLink,
   FileDown,
   FileText,
-  Info,
   KeyRound,
   Loader2,
   LogOut,
   MessageCircle,
   Network,
-  PanelRightClose,
-  PanelRightOpen,
   Plug,
-  Plus,
   RefreshCw,
-  Send,
   Settings2,
   Sparkles,
-  Square,
   Terminal,
-  Trash2,
-  TriangleAlert,
   User,
   Zap
 } from "lucide-react";
@@ -50,17 +36,6 @@ import remarkGfm from "remark-gfm";
 import type { CorosLinkApi } from "../coroslink-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import {
-  POUNDS_PER_KILOGRAM,
-  formatDistanceValue,
-  formatElevationValue,
-  formatPaceValue,
-  kilogramsToDisplayWeight,
-  kmhToDisplaySpeed,
-  speedUnit,
-  weightUnit,
-  type UnitSystem
-} from "../units/units";
 import type {
   AnthropicEffort,
   ChatAuthStatus,
@@ -79,18 +54,32 @@ import type {
   McpServerConfig,
   McpServerStatus,
   PersistedChatEntry,
+  PlanArtifactVersion,
+  PlanBrief,
+  PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
+  CoachOpenRequest,
+  ConversationSettings,
+  PlanCalendarState,
   PlanDraftPreview,
+  PlanRef,
+  WorkoutSport,
+  PlanCorosSync,
+  PlanDraftSaveOptions,
+  PlanVersionWritten,
   PlanDraftPreviewEntry,
-  PlanWorkoutEntryInput,
   TrainingPlanDestination,
+  TrainingPlanDocument,
   TrainingHubExportResult,
   UploadPlanResult,
-  WorkoutIntensityInput,
   WorkoutDeletePreview,
-  DeleteWorkoutResult
+  ScheduleChangeSet,
+  ScheduleRef,
+  TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
+import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -98,23 +87,66 @@ import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
+import { ComposerRefs, SportRefIcon, type ComposerRef } from "./ComposerRefs";
+import { clearComposerDraft, loadComposerDraft, saveComposerDraft } from "./composerDrafts";
+import { planRefPreview, refPlaceholder, scheduleRefPreview } from "./refPreview";
 import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
-import { CoachCreationModal } from "./CoachCreationModal";
+import { CoachCreationCard } from "./CoachCreationCard";
+import { CoachBriefCard } from "./CoachBriefCard";
+import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
+import { proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
+import { CoachOutlineCard } from "./CoachOutlineCard";
+import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
+import { EMPTY_NOTES } from "../training-library/runTrail";
+import { briefOpenProblems, briefTitle } from "./planBriefModel";
+import { CoachAskPicker } from "./CoachAskPicker";
+import { remoteErrorMessage } from "./remoteError";
+import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
+import { ConfirmDialog } from "../training-library/ConfirmDialog";
+import { createPortal } from "react-dom";
+import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
+import { defaultPlanBriefRequest } from "../../electron/planBrief";
+import { creationCalendar, localDayKey } from "./creationCalendar";
+import { refinementChips } from "./creationChoices";
+import {
+  requestRuntime,
+  runtimeFromSettings,
+  runtimeModelOptions,
+  runtimeSummary,
+  type GeneratorRuntime
+} from "../training-library/planGeneratorRuntime";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
+import {
+  creationVersions,
+  isLatestVersion,
+  isOnCoros,
+  versionLine,
+  withDocumentSources
+} from "./creationVersions";
 import {
   DEFAULT_COMPACT_CONTEXT,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits
+  withCreationIndex
 } from "../../electron/chatContextCompaction";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
+import { ChatConversationHeader } from "./ChatConversationHeader";
+import {
+  ChatComposer,
+  isLatestActivityFileRequest,
+  type AboutOption,
+  type ChatComposerHandle
+} from "./ChatComposer";
+import { formatSessionRelativeTime } from "./chatSessionGroups";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
+import { ModelOptionsContext } from "./modelOptionsContext";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
   fromPersistedEntries,
@@ -124,8 +156,8 @@ import {
   upsertFitnessTrendEntry,
   upsertHrZoneEntry,
   upsertPlanDraftEntry,
-  upsertWorkoutDeleteEntry,
   isChatVisualEntry,
+  settleTurnEntries,
   type ChatEntry,
   type SourceInfo
 } from "./chatTypes";
@@ -138,6 +170,54 @@ import {
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
 const CoachPlanEditor = lazy(() => import("./CoachPlanEditor"));
+/* "Edit" on a coach's one-off workout: the workout builder, loaded when used. */
+const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
+const CoachCanvas = lazy(() => import("./CoachCanvas"));
+const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
+const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
+const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
+const ConversationAiSheet = lazy(() =>
+  import("./CoachConversationSettings").then((module) => ({ default: module.ConversationAiSheet }))
+);
+const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
+const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
+
+/** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
+const NEW_PLAN_TITLE = "New plan";
+/** What an empty conversation offers (R3): three intents, each a few ways in. */
+const EMPTY_INTENTS: readonly {
+  title: string;
+  prompts: readonly { text: string; detail?: string; plan?: boolean }[];
+}[] = [
+  {
+    title: "Review",
+    prompts: [
+      { text: "How did my latest session go?" },
+      { text: "How does this week compare with last week?" },
+      { text: "Am I recovered enough for a hard session?" }
+    ]
+  },
+  {
+    title: "Plan",
+    prompts: [
+      { text: "Start a training plan…", detail: "Your goal and your week, then an outline", plan: true },
+      { text: "Give me one session for today" },
+      { text: "Build a balanced week from my recent training" }
+    ]
+  },
+  {
+    title: "Adjust",
+    prompts: [
+      { text: "Rearrange this week around my schedule" },
+      { text: "I'm ill, ease the next few days" },
+      { text: "Add strength around my endurance sessions" }
+    ]
+  }
+];
+/** Below this window width the conversation list folds while the Workbench is open. */
+const WORKBENCH_FOLD_WIDTH = 1600;
+/** Below this window width the Workbench is a sheet over the conversation. */
+const WORKBENCH_SHEET_WIDTH = 1180;
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -296,11 +376,16 @@ interface LiveAnalysisRun {
 interface ChatViewProps {
   api: CorosLinkApi | undefined;
   onError: (message: string | null) => void;
+  /** An informational toast (UAT): a send refused while another conversation answers. */
+  onMessage?: (message: string | null) => void;
   onPlanUploaded?: () => void;
   /** Fires when a coach request is in progress (streaming or exporting). */
   onActivityChange?: (active: boolean) => void;
-  /** Text preloaded into the composer (e.g. "Ask Coach" from the calendar). */
-  pendingPrompt?: string | null;
+  /**
+   * Text preloaded into the composer (e.g. "Ask Coach" from the calendar), or
+   * a Coach plan to ask about in the conversation it came from (P1.7).
+   */
+  pendingPrompt?: string | CoachOpenRequest | null;
   onPendingPromptConsumed?: () => void;
   /**
    * True while the Coach view is the visible one. The panel stays mounted when
@@ -310,1183 +395,107 @@ interface ChatViewProps {
   active?: boolean;
 }
 
-function canonicalPlanDistanceMeters(source: PlanWorkoutEntryInput): number {
-  if (source.distance_km && source.distance_km > 0) {
-    return source.distance_km * 1_000;
-  }
-  let total = 0;
-  for (const step of source.steps ?? []) {
-    if ("repeat" in step) {
-      total += step.repeat * step.steps.reduce(
-        (sum, child) => sum + (child.target_distance_meters ?? 0),
-        0
-      );
-    } else {
-      total += step.target_distance_meters ?? 0;
-    }
-  }
-  return total;
-}
-
-function formatPlanSourceVolume(
-  source: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  const meters = canonicalPlanDistanceMeters(source);
-  if (meters <= 0) return undefined;
-  return formatDistanceValue(meters, unitSystem, {
-    swim: source.sport === "swim"
-  });
-}
-
-type PlanSourceNode = NonNullable<PlanWorkoutEntryInput["steps"]>[number];
-type PlanSourceRepeat = Extract<PlanSourceNode, { repeat: number }>;
-type PlanSourceStep = Exclude<PlanSourceNode, { repeat: number }>;
-
-function isPlanSourceRepeat(step: PlanSourceNode): step is PlanSourceRepeat {
-  return "repeat" in step;
-}
-
-function formatPlanDuration(seconds: number): string {
-  if (seconds < 90) return `${Math.round(seconds)} sec`;
-  const minutes = seconds / 60;
-  return Number.isInteger(minutes)
-    ? `${minutes} min`
-    : `${minutes.toFixed(1)} min`;
-}
-
-function formatPlanStepTarget(
-  step: PlanSourceStep,
-  sport: PlanWorkoutEntryInput["sport"],
-  unitSystem: UnitSystem
-): string {
-  if (step.target_distance_meters) {
-    return formatDistanceValue(step.target_distance_meters, unitSystem, {
-      swim: sport === "swim"
-    });
-  }
-  if (step.target_elevation_gain_meters) {
-    return `${formatElevationValue(step.target_elevation_gain_meters, unitSystem)} gain`;
-  }
-  if (step.target_duration_seconds) {
-    return formatPlanDuration(step.target_duration_seconds);
-  }
-  if (step.target_reps) return `${step.target_reps} reps`;
-  if (step.target_routes) {
-    return `${step.target_routes} ${step.target_routes === 1 ? "route" : "routes"}`;
-  }
-  if (step.target_hr_recovery_bpm) {
-    return `to ${step.target_hr_recovery_bpm} bpm`;
-  }
-  if (step.send_off_seconds) return `${formatPlanDuration(step.send_off_seconds)} send-off`;
-  if (step.target_load) return `${step.target_load} TL`;
-  return "Open";
-}
-
-function formatPlanSourceSteps(
-  source: PlanWorkoutEntryInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  const formatStep = (
-    step: NonNullable<PlanWorkoutEntryInput["steps"]>[number]
-  ): string => {
-    if (isPlanSourceRepeat(step)) {
-      return `${step.repeat}x (${step.steps.map((child) => formatStep(child)).join(", ")})`;
-    }
-    const target = formatPlanStepTarget(step, source.sport, unitSystem);
-    const intensity = step.intensity
-      ? formatPlanIntensity(step.intensity, unitSystem)
-      : step.pace
-        ? formatLegacyPlanPace(step.pace, unitSystem)
-        : undefined;
-    return `${step.kind ?? "training"} ${target}${intensity ? ` @ ${intensity}` : ""}`;
-  };
-  return source.steps?.length
-    ? source.steps.map(formatStep).join(" → ")
-    : undefined;
-}
-
-function isStrengthExerciseStep(step: PlanSourceStep): boolean {
-  return step.kind === "training" || step.kind === "interval";
-}
-
-function strengthStepTitle(step: PlanSourceStep): string {
-  if (step.exercise_name?.trim()) return step.exercise_name.trim();
-  if (step.name?.trim()) return step.name.trim();
-  if (step.kind === "warmup") return "Warm-up";
-  if (step.kind === "cooldown") return "Cooldown";
-  if (step.kind === "rest") return "Recovery";
-  return "Strength exercise";
-}
-
-function strengthStepMarker(step: PlanSourceStep, exerciseNumber?: number): string {
-  if (exerciseNumber !== undefined) return String(exerciseNumber);
-  if (step.kind === "warmup") return "W";
-  if (step.kind === "cooldown") return "C";
-  if (step.kind === "rest") return "R";
-  return "S";
-}
-
-function countStrengthExercises(steps: readonly PlanSourceNode[]): number {
-  return steps.reduce((count, step) => {
-    if (isPlanSourceRepeat(step)) {
-      return count + step.steps.filter(isStrengthExerciseStep).length;
-    }
-    return count + (isStrengthExerciseStep(step) ? 1 : 0);
-  }, 0);
-}
-
-function StrengthPlanStructure({
-  source,
-  unitSystem
-}: {
-  source: PlanWorkoutEntryInput;
-  unitSystem: UnitSystem;
-}) {
-  const steps = source.steps ?? [];
-  const exerciseCount = countStrengthExercises(steps);
-  let exerciseNumber = 0;
-
-  const renderStep = (step: PlanSourceStep, key: string) => {
-    const exercise = isStrengthExerciseStep(step);
-    const currentExerciseNumber = exercise ? ++exerciseNumber : undefined;
-    const intensity = step.intensity
-      ? formatPlanIntensity(step.intensity, unitSystem)
-      : undefined;
-    const setCount = step.sets && step.sets > 1 ? `${step.sets} sets` : undefined;
-    const setRest = step.sets && step.sets > 1 && step.rest_value !== undefined
-      ? `${formatPlanDuration(step.rest_value)} rest`
-      : undefined;
-
-    return (
-      <li
-        key={key}
-        className={`chat-plan-strength-step is-${step.kind ?? "training"}`}
-      >
-        <span className="chat-plan-strength-marker" aria-hidden="true">
-          {strengthStepMarker(step, currentExerciseNumber)}
-        </span>
-        <span className="chat-plan-strength-step-copy">
-          <strong>{strengthStepTitle(step)}</strong>
-        </span>
-        <span className="chat-plan-strength-prescription">
-          {setCount ? <span>{setCount}</span> : null}
-          <strong>{formatPlanStepTarget(step, source.sport, unitSystem)}</strong>
-          {intensity ? <span>{intensity}</span> : null}
-          {setRest ? <span>{setRest}</span> : null}
-        </span>
-      </li>
-    );
-  };
-
-  return (
-    <section
-      className="chat-plan-strength-structure"
-      aria-label={`${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"} in strength session structure`}
-    >
-      <header className="chat-plan-strength-header">
-        <strong>Session structure</strong>
-        <span>
-          {exerciseCount} {exerciseCount === 1 ? "exercise" : "exercises"}
-        </span>
-      </header>
-      <ol className="chat-plan-strength-steps">
-        {steps.map((step, index) => {
-          if (!isPlanSourceRepeat(step)) {
-            return renderStep(step, `step-${index}`);
-          }
-          return (
-            <li key={`repeat-${index}`} className="chat-plan-strength-repeat">
-              <div className="chat-plan-strength-repeat-header">
-                <strong>{step.name?.trim() || "Repeat block"}</strong>
-                <span>{step.repeat} rounds</span>
-              </div>
-              <ol>
-                {step.steps.map((child, childIndex) =>
-                  renderStep(child, `repeat-${index}-step-${childIndex}`)
-                )}
-              </ol>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
-function formatPlanPaceRange(
-  lowSecondsPerKm: number,
-  highSecondsPerKm: number,
-  unitSystem: UnitSystem
-): string {
-  const clock = (value: number) => formatPaceValue(value, unitSystem).split(" ")[0];
-  return `${clock(lowSecondsPerKm)}–${clock(highSecondsPerKm)}/${unitSystem === "imperial" ? "mi" : "km"}`;
-}
-
-function formatPlanIntensity(
-  intensity: WorkoutIntensityInput,
-  unitSystem: UnitSystem
-): string | undefined {
-  if (intensity.type === "none") return undefined;
-  if (intensity.type === "pace" || intensity.type === "effortPace") {
-    return formatPlanPaceRange(
-      intensity.lowSecondsPerKm,
-      intensity.highSecondsPerKm,
-      unitSystem
-    );
-  }
-  if (intensity.type === "speed") {
-    const lowKmh = intensity.unit === "mph" ? intensity.low * 1.609344 : intensity.low;
-    const highKmh = intensity.unit === "mph" ? intensity.high * 1.609344 : intensity.high;
-    return `${kmhToDisplaySpeed(lowKmh, unitSystem).toFixed(1)}–${kmhToDisplaySpeed(highKmh, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
-  }
-  if (intensity.type === "weight") {
-    if (intensity.mode === "bodyweight") return "Bodyweight";
-    const kilograms = intensity.unit === "lb"
-      ? intensity.value / POUNDS_PER_KILOGRAM
-      : intensity.value;
-    return `${kilogramsToDisplayWeight(kilograms, unitSystem).toFixed(1)} ${weightUnit(unitSystem)}`;
-  }
-  if (intensity.type === "heartRate") {
-    return `${intensity.lowBpm}–${intensity.highBpm} bpm`;
-  }
-  if (intensity.type === "power") {
-    return `${intensity.lowWatts}–${intensity.highWatts} W`;
-  }
-  if (intensity.type === "cadence") {
-    return `${intensity.low}–${intensity.high} ${intensity.unit}`;
-  }
-  if (intensity.type === "swimStroke") return intensity.stroke;
-  if (intensity.type === "rpe") return `RPE ${intensity.value}`;
-  return undefined;
-}
-
-function formatLegacyPlanPace(
-  pace: string,
-  unitSystem: UnitSystem
-): string {
-  const match = pace.trim().match(/^(\d+):([0-5]\d)(?:-(\d+):([0-5]\d))?\/(km|mi)$/i);
-  if (!match) return pace;
-  const sourceFactor = match[5]?.toLowerCase() === "mi" ? 1 / 1.609344 : 1;
-  const low = (Number(match[1]) * 60 + Number(match[2])) * sourceFactor;
-  const high = match[3]
-    ? (Number(match[3]) * 60 + Number(match[4])) * sourceFactor
-    : low;
-  return formatPlanPaceRange(low, high, unitSystem);
-}
-
-const PLAN_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-function planDateFromSchedule(scheduleDate: string): Date | undefined {
-  const match = scheduleDate.match(PLAN_DATE_RE);
-  if (!match) return undefined;
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-}
-
-/** Calendar-badge parts for a scheduled date: weekday / day number / month. */
-function planDateParts(
-  scheduleDate?: string
-): { weekday: string; day: string; month: string } | undefined {
-  if (!scheduleDate) return undefined;
-  const date = planDateFromSchedule(scheduleDate);
-  if (!date) return undefined;
-  return {
-    weekday: new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date),
-    day: String(date.getDate()),
-    month: new Intl.DateTimeFormat(undefined, { month: "short" }).format(date)
-  };
-}
-
-/** One-line localized label, e.g. "Tue, Aug 4". Falls back to the raw value. */
-function formatPlanDateLabel(scheduleDate: string): string {
-  const date = planDateFromSchedule(scheduleDate);
-  if (!date) return scheduleDate;
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  }).format(date);
-}
-
-function planEntryScheduleDate(entry: PlanDraftPreviewEntry): string | undefined {
-  if (entry.scheduleDate) return entry.scheduleDate;
-  const sourceDate = entry.source?.schedule_date;
-  if (!sourceDate || !/^\d{8}$/.test(sourceDate)) return undefined;
-  return `${sourceDate.slice(0, 4)}-${sourceDate.slice(4, 6)}-${sourceDate.slice(6, 8)}`;
-}
-
-function localPlanDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function planWeekStart(date: Date): Date {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const daysSinceMonday = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - daysSinceMonday);
-  return start;
-}
-
-function formatPlanWeekRange(start: Date): string {
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-  const month = new Intl.DateTimeFormat(undefined, { month: "short" });
-  if (start.getMonth() === end.getMonth()) {
-    return `${month.format(start)} ${start.getDate()}-${end.getDate()}`;
-  }
-  return `${month.format(start)} ${start.getDate()}-${month.format(end)} ${end.getDate()}`;
-}
-
-interface PlanWeekGroup {
-  id: string;
-  label: string;
-  dateRange: string;
-  entries: PlanDraftPreviewEntry[];
-}
-
-function groupPlanEntriesByWeek(entries: PlanDraftPreviewEntry[]): PlanWeekGroup[] {
-  const groups = new Map<string, { start: Date; entries: PlanDraftPreviewEntry[] }>();
-  const unscheduled: PlanDraftPreviewEntry[] = [];
-  const sortedEntries = [...entries].sort((left, right) => {
-    const leftDate = planEntryScheduleDate(left) ?? "9999-99-99";
-    const rightDate = planEntryScheduleDate(right) ?? "9999-99-99";
-    return leftDate.localeCompare(rightDate);
-  });
-
-  for (const entry of sortedEntries) {
-    const scheduleDate = planEntryScheduleDate(entry);
-    const date = scheduleDate ? planDateFromSchedule(scheduleDate) : undefined;
-    if (!date) {
-      unscheduled.push(entry);
-      continue;
-    }
-    const start = planWeekStart(date);
-    const id = localPlanDateKey(start);
-    const existing = groups.get(id);
-    if (existing) {
-      existing.entries.push(entry);
-    } else {
-      groups.set(id, { start, entries: [entry] });
-    }
-  }
-
-  const weeks = [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([id, group], index) => ({
-      id,
-      label: `Week ${index + 1}`,
-      dateRange: formatPlanWeekRange(group.start),
-      entries: group.entries
-    }));
-  if (unscheduled.length > 0) {
-    weeks.push({
-      id: "unscheduled",
-      label: "Unscheduled",
-      dateRange: "No calendar date",
-      entries: unscheduled
-    });
-  }
-  return weeks;
-}
+/** The sources a conversation can share, in the order its strip names them. */
+const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][] = [
+  ["activities", "Activities"],
+  ["sleep", "Sleep"],
+  ["zones", "Zones"]
+];
 
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
 }
 
-function WorkoutPreviewCard({
-  draft,
-  uploading,
-  uploaded,
-  onUpload
-}: {
-  draft: PlanDraftPreview;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (
-    destination: TrainingPlanDestination,
-    scheduleDate?: string
-  ) => void;
-}) {
-  const { unitSystem } = useUnitSystem();
-  const entry = draft.entries[0];
-  const suggestedDate = entry ? planEntryScheduleDate(entry) : undefined;
-  const today = localPlanDateKey(new Date());
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "workoutLibrary" | "calendar">
-  >(suggestedDate ? "calendar" : "workoutLibrary");
-  const [scheduleDate, setScheduleDate] = useState(suggestedDate ?? today);
-  const uploadedResult =
-    uploaded ??
-    (draft.uploadResult
-      ? {
-          planName: draft.name,
-          workoutsCreated: draft.uploadResult.workoutsCreated,
-          workoutsScheduled: draft.uploadResult.workoutsScheduled,
-          entries: [],
-          destination: draft.uploadResult.destination
-        }
-      : undefined);
-  const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
-  const uploadedDestination =
-    uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
-  const calendarDateParts = destination === "calendar"
-    ? planDateParts(scheduleDate)
-    : undefined;
-  const calendarDateInvalid =
-    destination === "calendar" && (!scheduleDate || scheduleDate < today);
-  const SportIcon = sportTheme(entry?.sport).icon;
-  const hasStrengthStructure = Boolean(
-    entry &&
-      (entry.sport === "strength" || entry.sport === "hyrox") &&
-      entry.source?.steps?.length
-  );
-  const volume = entry
-    ? (entry.source
-        ? formatPlanSourceVolume(entry.source, unitSystem)
-        : undefined) ?? entry.volume ?? "Not set"
-    : "Not set";
-  const steps = entry
-    ? (entry.source
-        ? formatPlanSourceSteps(entry.source, unitSystem)
-        : undefined) ?? entry.stepsSummary ?? "No structure provided"
-    : "No structure provided";
-
-  return (
-    <div className="chat-plan-card chat-workout-card">
-      <div className="chat-plan-card-header">
-        <div className="chat-plan-card-title">
-          <span className="chat-workout-card-kicker">One-off workout</span>
-          <h4>{draft.name}</h4>
-          <span className="chat-plan-card-summary">{draft.summary}</span>
-        </div>
-        {entry ? (
-          <span
-            className="chat-plan-sport-dot"
-            style={planSportStyle(entry.sport)}
-            title={formatWorkoutSport(entry.sport ?? "run")}
-          >
-            <SportIcon size={12} strokeWidth={2.2} aria-hidden="true" />
-          </span>
-        ) : null}
-      </div>
-      {entry ? (
-        <ul className="chat-plan-entries chat-workout-entries">
-          <li
-            className={`chat-plan-entry${hasStrengthStructure ? " is-strength" : ""}`}
-            style={planSportStyle(entry.sport)}
-          >
-            <span
-              className={`chat-plan-entry-date${calendarDateParts ? "" : " is-undated"}`}
-              title={
-                destination === "calendar"
-                  ? `Add to Calendar on ${scheduleDate}`
-                  : "Save to Workout Library"
-              }
-            >
-              {calendarDateParts ? (
-                <>
-                  <span className="chat-plan-entry-weekday">
-                    {calendarDateParts.weekday}
-                  </span>
-                  <span className="chat-plan-entry-day">
-                    {calendarDateParts.day}
-                  </span>
-                  <span className="chat-plan-entry-month">
-                    {calendarDateParts.month}
-                  </span>
-                </>
-              ) : (
-                <Bookmark size={14} aria-hidden="true" />
-              )}
-            </span>
-            <span className="chat-plan-entry-main">
-              <span className="chat-plan-entry-name">{entry.name}</span>
-              {hasStrengthStructure && entry.source ? (
-                <StrengthPlanStructure
-                  source={entry.source}
-                  unitSystem={unitSystem}
-                />
-              ) : (
-                <span className="chat-plan-entry-steps">{steps}</span>
-              )}
-            </span>
-            <span className="chat-plan-entry-meta">
-              {!hasStrengthStructure ? (
-                <span className="chat-plan-entry-volume">{volume}</span>
-              ) : null}
-              <span className="chat-plan-entry-tags">
-                <span className="chat-plan-entry-type">{entry.workoutType}</span>
-                <span className="chat-plan-entry-sport">
-                  <SportIcon size={11} strokeWidth={2.2} aria-hidden="true" />
-                  {formatWorkoutSport(entry.sport ?? "run")}
-                </span>
-              </span>
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <div className="chat-plan-empty-week">
-          <Bookmark size={16} aria-hidden="true" />
-          <span>This workout does not contain any steps yet.</span>
-        </div>
-      )}
-      {isUploaded ? (
-        <p className="chat-plan-success">
-          <CircleCheck size={15} aria-hidden="true" />
-          <span>
-            {uploadedDestination === "calendar"
-              ? `Added to your COROS Calendar on ${formatPlanDateLabel(scheduleDate)}.`
-              : "Saved to your COROS Workout Library."}
-          </span>
-        </p>
-      ) : (
-        <>
-          <fieldset className="chat-plan-confirmation" disabled={uploading}>
-            <legend>Where should this workout go?</legend>
-            <div className="chat-plan-destination-options">
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "workoutLibrary" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="workoutLibrary"
-                  checked={destination === "workoutLibrary"}
-                  onChange={() => setDestination("workoutLibrary")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <BookOpen size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Workout Library</strong>
-                  <small>Save it as an unscheduled, reusable workout.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-              <label
-                className={`chat-plan-destination-option${
-                  destination === "calendar" ? " is-selected" : ""
-                }`}
-              >
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name={`workout-destination-${draft.draftId}`}
-                  value="calendar"
-                  checked={destination === "calendar"}
-                  onChange={() => setDestination("calendar")}
-                />
-                <span className="chat-plan-destination-icon">
-                  <CalendarDays size={16} aria-hidden="true" />
-                </span>
-                <span className="chat-plan-destination-copy">
-                  <strong>Calendar</strong>
-                  <small>Add this workout on the date you choose.</small>
-                </span>
-                <CircleCheck
-                  className="chat-plan-destination-check"
-                  size={16}
-                  aria-hidden="true"
-                />
-              </label>
-            </div>
-            {destination === "calendar" ? (
-              <label className="chat-workout-calendar-date">
-                <span>Calendar date</span>
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  min={today}
-                  onChange={(event) => setScheduleDate(event.target.value)}
-                />
-              </label>
-            ) : null}
-            <p className="chat-plan-destination-summary" data-tone="ok">
-              {destination === "calendar" ? (
-                <CalendarDays size={13} aria-hidden="true" />
-              ) : (
-                <BookOpen size={13} aria-hidden="true" />
-              )}
-              <span>
-                {destination === "calendar"
-                  ? `This workout will be added to Calendar on ${formatPlanDateLabel(scheduleDate)}.`
-                  : "This workout will be saved to your Workout Library without a calendar date."}
-                {" "}It will remain a one-off workout, not a training plan.
-              </span>
-            </p>
-          </fieldset>
-          <div className="chat-plan-actions">
-            <button
-              type="button"
-              className="chat-plan-upload"
-              onClick={() => onUpload(
-                destination,
-                destination === "calendar" ? scheduleDate : undefined
-              )}
-              disabled={uploading || !entry || calendarDateInvalid}
-            >
-              {uploading ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                destination === "calendar" ? (
-                  <CalendarDays size={14} aria-hidden="true" />
-                ) : (
-                  <Bookmark size={14} aria-hidden="true" />
-                )
-              )}
-              {destination === "calendar" ? "Add to Calendar" : "Save to Library"}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
+/** One chip per thing pointed at. */
+function scheduleRefKey(ref: ScheduleRef): string {
+  return `${ref.scope}|${ref.day ?? ""}|${ref.planId ?? ""}|${ref.idInPlan ?? ""}|${ref.activityId ?? ""}`;
 }
 
-function PlanPreviewCard({
-  draft,
-  uploading,
-  uploaded,
-  onUpload,
-  onReview
-}: {
-  draft: PlanDraftPreview;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (destination: TrainingPlanDestination) => void;
-  onReview?: () => void;
-}) {
-  const { unitSystem } = useUnitSystem();
-  const [destination, setDestination] = useState<
-    Extract<TrainingPlanDestination, "nativePlan" | "workoutLibrary" | "calendar">
-  >("nativePlan");
-  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
-  const weekTabsRef = useRef<HTMLDivElement>(null);
-  const uploadedResult =
-    uploaded ??
-    (draft.uploadResult
-      ? {
-          planName: draft.name,
-          workoutsCreated: draft.uploadResult.workoutsCreated,
-          workoutsScheduled: draft.uploadResult.workoutsScheduled,
-          entries: []
-        }
-      : undefined);
-  const isUploaded = Boolean(uploadedResult || draft.uploadedAt);
-  const savedTo = uploadedResult?.destination ?? draft.uploadResult?.destination ?? destination;
-  const planWeeks = groupPlanEntriesByWeek(draft.entries);
-  const scheduledWeekCount = planWeeks.filter(
-    (week) => week.id !== "unscheduled"
-  ).length;
-  const selectedWeek =
-    planWeeks.find((week) => week.id === selectedWeekId) ?? planWeeks[0];
-  const selectedWeekIndex = selectedWeek
-    ? planWeeks.findIndex((week) => week.id === selectedWeek.id)
-    : -1;
-  const sports = [
-    ...new Set(draft.entries.map((entry) => formatWorkoutSport(entry.sport ?? "run")))
-  ];
-  const sportKinds = [...new Set(draft.entries.map((entry) => entry.sport))];
-  const startDate = draft.entries
-    .map(planEntryScheduleDate)
-    .filter((date): date is string => Boolean(date))
-    .sort()[0];
-  const scheduledWorkoutCount = draft.entries.filter((entry) =>
-    Boolean(planEntryScheduleDate(entry))
-  ).length;
-  const unscheduledWorkoutCount = draft.entries.length - scheduledWorkoutCount;
-  const destinationLabel: Record<TrainingPlanDestination, string> = {
-    workoutLibrary: "COROS Workout Library",
-    calendar: "COROS Calendar",
-    /* Where a card saved before plans went to COROS says it went. */
-    localPlan: "Heracles Records Training Library",
-    nativePlan: "your COROS plans",
-    localTemplate: "Local Heracles Records template",
-    nativePlanAndCalendar: "COROS plan + Calendar"
-  };
-
-  useEffect(() => {
-    setSelectedWeekId(null);
-  }, [draft.draftId]);
-
-  useEffect(() => {
-    const activeTab = weekTabsRef.current?.querySelector<HTMLElement>(
-      '[role="tab"][aria-selected="true"]'
-    );
-    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [selectedWeek?.id]);
-
-  const selectAdjacentWeek = (offset: number) => {
-    const nextWeek = planWeeks[selectedWeekIndex + offset];
-    if (nextWeek) setSelectedWeekId(nextWeek.id);
-  };
-
-  return (
-    <div className="chat-plan-card">
-      <div className="chat-plan-card-header">
-        <div className="chat-plan-card-title">
-          <h4>{draft.name}</h4>
-          <span className="chat-plan-card-summary">{draft.summary}</span>
-        </div>
-        {sportKinds.length > 0 ? (
-          <span
-            className="chat-plan-sports"
-            role="img"
-            aria-label={sports.join(", ")}
-          >
-            {sportKinds.slice(0, 4).map((sport, index) => {
-              const SportIcon = sportTheme(sport).icon;
-              return (
-                <span
-                  key={`${sport ?? "unknown"}-${index}`}
-                  className="chat-plan-sport-dot"
-                  style={planSportStyle(sport)}
-                  title={sport ? formatWorkoutSport(sport) : "Workout"}
-                >
-                  <SportIcon size={10} strokeWidth={2.2} aria-hidden="true" />
-                </span>
-              );
-            })}
-          </span>
-        ) : null}
-      </div>
-      <div className="chat-plan-overview" aria-label="Plan overview">
-        <div className="chat-plan-overview-item">
-          <span>Weeks</span>
-          <strong>{scheduledWeekCount}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Workouts</span>
-          <strong>{draft.entries.length}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Sports</span>
-          <strong title={sports.join(", ")}>{sports.join(", ")}</strong>
-        </div>
-        <div className="chat-plan-overview-item">
-          <span>Starts</span>
-          <strong>{startDate ? formatPlanDateLabel(startDate) : "Not set"}</strong>
-        </div>
-      </div>
-      {selectedWeek ? (
-        <section
-          className="chat-plan-week"
-          aria-labelledby={`chat-plan-week-${draft.draftId}-${selectedWeek.id}`}
-        >
-          <div className="chat-plan-week-header">
-            <div>
-              <span>{selectedWeek.label}</span>
-              <h5 id={`chat-plan-week-${draft.draftId}-${selectedWeek.id}`}>
-                {selectedWeek.dateRange}
-              </h5>
-              <small>
-                {selectedWeek.entries.length}{" "}
-                {selectedWeek.entries.length === 1 ? "workout" : "workouts"}
-              </small>
-            </div>
-            {planWeeks.length > 1 ? (
-              <div className="chat-plan-week-stepper" aria-label="Change week">
-                <button
-                  type="button"
-                  onClick={() => selectAdjacentWeek(-1)}
-                  disabled={selectedWeekIndex <= 0}
-                  aria-label="Previous week"
-                  title="Previous week"
-                >
-                  <ChevronLeft size={15} aria-hidden="true" />
-                </button>
-                <span>{selectedWeekIndex + 1} of {planWeeks.length}</span>
-                <button
-                  type="button"
-                  onClick={() => selectAdjacentWeek(1)}
-                  disabled={selectedWeekIndex >= planWeeks.length - 1}
-                  aria-label="Next week"
-                  title="Next week"
-                >
-                  <ChevronRight size={15} aria-hidden="true" />
-                </button>
-              </div>
-            ) : null}
-          </div>
-          {planWeeks.length > 1 ? (
-            <div
-              ref={weekTabsRef}
-              className="chat-plan-week-tabs"
-              role="tablist"
-              aria-label="Plan weeks"
-            >
-              {planWeeks.map((week) => (
-                <button
-                  key={week.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={week.id === selectedWeek.id}
-                  className={week.id === selectedWeek.id ? "is-active" : ""}
-                  onClick={() => setSelectedWeekId(week.id)}
-                >
-                  <strong>{week.label}</strong>
-                  <span>{week.dateRange}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <ul className="chat-plan-entries">
-            {selectedWeek.entries.map((entry) => {
-              const SportIcon = sportTheme(entry.sport).icon;
-              const scheduleDate = planEntryScheduleDate(entry);
-              const dateParts = planDateParts(scheduleDate);
-              const hasStrengthStructure =
-                (entry.sport === "strength" || entry.sport === "hyrox") &&
-                Boolean(entry.source?.steps?.length);
-              const volume =
-                (entry.source
-                  ? formatPlanSourceVolume(entry.source, unitSystem)
-                  : undefined) ?? entry.volume ?? "Not set";
-              const steps =
-                (entry.source
-                  ? formatPlanSourceSteps(entry.source, unitSystem)
-                  : undefined) ?? entry.stepsSummary ?? "No structure provided";
-              return (
-                <li
-                  key={entry.key}
-                  className={`chat-plan-entry${hasStrengthStructure ? " is-strength" : ""}`}
-                  style={planSportStyle(entry.sport)}
-                >
-                  <span
-                    className={`chat-plan-entry-date${dateParts ? "" : " is-undated"}`}
-                    title={scheduleDate ?? "Saved to library only"}
-                  >
-                    {dateParts ? (
-                      <>
-                        <span className="chat-plan-entry-weekday">
-                          {dateParts.weekday}
-                        </span>
-                        <span className="chat-plan-entry-day">{dateParts.day}</span>
-                        <span className="chat-plan-entry-month">
-                          {dateParts.month}
-                        </span>
-                      </>
-                    ) : (
-                      <Bookmark size={14} aria-hidden="true" />
-                    )}
-                  </span>
-                  <span className="chat-plan-entry-main">
-                    <span className="chat-plan-entry-name">{entry.name}</span>
-                    {hasStrengthStructure && entry.source ? (
-                      <StrengthPlanStructure
-                        source={entry.source}
-                        unitSystem={unitSystem}
-                      />
-                    ) : (
-                      <span className="chat-plan-entry-steps">{steps}</span>
-                    )}
-                  </span>
-                  <span className="chat-plan-entry-meta">
-                    {!hasStrengthStructure ? (
-                      <span className="chat-plan-entry-volume">{volume}</span>
-                    ) : null}
-                    <span className="chat-plan-entry-tags">
-                      <span className="chat-plan-entry-type">
-                        {entry.workoutType}
-                      </span>
-                      <span className="chat-plan-entry-sport">
-                        <SportIcon size={11} strokeWidth={2.2} aria-hidden="true" />
-                        {formatWorkoutSport(entry.sport ?? "run")}
-                      </span>
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : (
-        <div className="chat-plan-empty-week">
-          <Bookmark size={16} aria-hidden="true" />
-          <span>This plan does not contain any workouts yet.</span>
-        </div>
-      )}
-      {draft.conflicts.length > 0 ? (
-        <details
-          className="chat-plan-issues"
-          data-tone="alert"
-          open={draft.conflicts.length <= 3}
-        >
-          <summary>
-            <span>
-              <TriangleAlert size={13} aria-hidden="true" />
-              <strong>
-                {draft.conflicts.length}{" "}
-                {draft.conflicts.length === 1
-                  ? "scheduling conflict"
-                  : "scheduling conflicts"}
-              </strong>
-            </span>
-            <small>Review before saving</small>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <ul className="chat-plan-warnings">
-            {draft.conflicts.map((item) => (
-              <li key={item}>
-                <TriangleAlert size={12} aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {draft.warnings.length > 0 ? (
-        <details
-          className="chat-plan-issues"
-          data-tone="note"
-          open={draft.warnings.length <= 3}
-        >
-          <summary>
-            <span>
-              <Info size={13} aria-hidden="true" />
-              <strong>
-                {draft.warnings.length}{" "}
-                {draft.warnings.length === 1 ? "plan note" : "plan notes"}
-              </strong>
-            </span>
-            <small>Additional plan details</small>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <ul className="chat-plan-notes">
-            {draft.warnings.map((item) => (
-              <li key={item}>
-                <Info size={12} aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {!isUploaded ? (
-        <fieldset className="chat-plan-confirmation" disabled={uploading}>
-          <legend>How should this plan be saved?</legend>
-          <div className="chat-plan-destination-options">
-            <label
-              className={`chat-plan-destination-option is-primary${
-                destination === "nativePlan" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="nativePlan"
-                checked={destination === "nativePlan"}
-                onChange={() => setDestination("nativePlan")}
-              />
-              <span className="chat-plan-destination-icon">
-                <BookOpen size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Training Plan</strong>
-                <small>Save these workouts together as one plan in your COROS plans.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "workoutLibrary" ? " is-selected" : ""
-              }`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="workoutLibrary"
-                checked={destination === "workoutLibrary"}
-                onChange={() => setDestination("workoutLibrary")}
-              />
-              <span className="chat-plan-destination-icon">
-                <Bookmark size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Individual Workouts</strong>
-                <small>Save each workout separately to the COROS Workout Library.</small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-            <label
-              className={`chat-plan-destination-option${
-                destination === "calendar" ? " is-selected" : ""
-              }${unscheduledWorkoutCount > 0 ? " is-disabled" : ""}`}
-            >
-              <input
-                className="sr-only"
-                type="radio"
-                name={`plan-destination-${draft.draftId}`}
-                value="calendar"
-                checked={destination === "calendar"}
-                onChange={() => setDestination("calendar")}
-                disabled={unscheduledWorkoutCount > 0}
-              />
-              <span className="chat-plan-destination-icon">
-                <CalendarDays size={16} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-destination-copy">
-                <strong>Calendar</strong>
-                <small>
-                  {unscheduledWorkoutCount > 0
-                    ? `${unscheduledWorkoutCount} ${
-                        unscheduledWorkoutCount === 1 ? "workout needs" : "workouts need"
-                      } a date.`
-                    : "Schedule workouts on the dates shown above."}
-                </small>
-              </span>
-              <CircleCheck
-                className="chat-plan-destination-check"
-                size={16}
-                aria-hidden="true"
-              />
-            </label>
-          </div>
-          <p
-            className="chat-plan-destination-summary"
-            data-tone={
-              destination === "calendar" && draft.conflicts.length > 0
-                ? "alert"
-                : "ok"
-            }
-          >
-            {destination === "calendar" && draft.conflicts.length > 0 ? (
-              <TriangleAlert size={13} aria-hidden="true" />
-            ) : (
-              <CircleCheck size={13} aria-hidden="true" />
-            )}
-            <span>
-              {destination === "nativePlan"
-                ? `This will be saved to COROS as one plan with ${draft.entries.length} ${
-                    draft.entries.length === 1 ? "workout" : "workouts"
-                  }. Put it on the calendar from its page in the Training Library.`
-                : destination === "calendar"
-                  ? `${scheduledWorkoutCount} ${
-                      scheduledWorkoutCount === 1 ? "workout" : "workouts"
-                    } will be added to your COROS Calendar.${
-                      draft.conflicts.length > 0
-                        ? ` Review ${draft.conflicts.length} ${
-                            draft.conflicts.length === 1 ? "conflict" : "conflicts"
-                          } before adding.`
-                        : " No scheduling conflicts."
-                    }`
-                  : `${draft.entries.length} ${
-                      draft.entries.length === 1 ? "workout" : "workouts"
-                    } will be saved individually to your COROS Workout Library. Dates will not be added to Calendar.`}
-            </span>
-          </p>
-        </fieldset>
-      ) : null}
-      {uploadedResult || isUploaded ? (
-        <p className="chat-plan-success">
-          <CircleCheck size={15} aria-hidden="true" />
-          <span>
-            {savedTo === "nativePlan"
-              ? `Saved to ${destinationLabel.nativePlan} as “${draft.name}”.`
-              : savedTo === "localPlan"
-              ? `Saved as a grouped plan in ${destinationLabel.localPlan}.`
-              : `Saved to ${destinationLabel[savedTo]}. ${
-                  uploadedResult?.workoutsScheduled ?? draft.uploadResult?.workoutsScheduled ?? 0
-                } scheduled, ${
-                  uploadedResult?.workoutsCreated ?? draft.uploadResult?.workoutsCreated ?? 0
-                } saved to library.`}
-          </span>
-        </p>
-      ) : (
-        <div className="chat-plan-actions">
-          {onReview ? (
-            <button
-              type="button"
-              className="chat-plan-review"
-              onClick={onReview}
-              disabled={uploading}
-              title="Change the plan before saving it"
-            >
-              <BookOpen size={14} aria-hidden="true" />
-              Edit plan first
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="chat-plan-upload"
-            onClick={() => onUpload(destination)}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : destination === "nativePlan" ? (
-              <BookOpen size={14} aria-hidden="true" />
-            ) : destination === "calendar" ? (
-              <CalendarDays size={14} aria-hidden="true" />
-            ) : (
-              <Bookmark size={14} aria-hidden="true" />
-            )}
-            {destination === "nativePlan"
-              ? "Save Plan"
-              : destination === "calendar"
-                ? "Add to Calendar"
-                : "Save Workouts"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CoachDraftPreviewCard({
-  draft,
-  uploading,
-  uploaded,
-  onUpload,
-  onReview
-}: {
-  draft: PlanDraftPreview;
-  uploading: boolean;
-  uploaded?: UploadPlanResult;
-  onUpload: (
-    destination: TrainingPlanDestination,
-    scheduleDate?: string
-  ) => void;
-  onReview?: () => void;
-}) {
-  if (draft.artifactType === "workout") {
-    return (
-      <WorkoutPreviewCard
-        draft={draft}
-        uploading={uploading}
-        uploaded={uploaded}
-        onUpload={onUpload}
-      />
-    );
+/**
+ * Whether a `planRefs`/`scheduleRefs` anchor leads into a question of the
+ * athlete's, over any other anchors of its kind: then the question's bubble
+ * draws it (R1), and the anchor draws nothing of its own.
+ */
+function refsJoinQuestion(timeline: readonly ChatEntry[], index: number): boolean {
+  for (let next = index + 1; next < timeline.length; next += 1) {
+    const entry = timeline[next];
+    if (entry?.kind === "planRefs" || entry?.kind === "scheduleRefs") continue;
+    return entry?.kind === "message" && entry.role === "user" && !entry.automation;
   }
+  return false;
+}
 
+/**
+ * What a question was asked about, as a header line on its bubble (UAT,
+ * option A): the references, and a way back to the creation they name.
+ */
+function QuestionRefs({
+  timeline,
+  index,
+  onOpen,
+  sportOf
+}: {
+  timeline: readonly ChatEntry[];
+  index: number;
+  onOpen?: (draftId: string) => void;
+  /** A Coach plan session's sport, read from the plan in hand, for the icon. */
+  sportOf?: (ref: PlanRef) => WorkoutSport | undefined;
+}) {
+  const labels: { key: string; text: string; name?: string }[] = [];
+  let draftId: string | undefined;
+  let sport: WorkoutSport | undefined;
+  for (let previous = index - 1; previous >= 0; previous -= 1) {
+    const entry = timeline[previous];
+    if (entry?.kind === "planRefs") {
+      draftId ??= entry.refs[0]?.draftId;
+      sport ??= entry.refs.map((ref) => sportOf?.(ref)).find(Boolean);
+      labels.unshift(
+        ...entry.refs.map((ref, position) => ({
+          key: `p${previous}:${position}`,
+          text: ref.scope === "plan" ? ref.name : `${ref.name} · ${ref.label}`,
+          name: ref.name
+        }))
+      );
+    } else if (entry?.kind === "scheduleRefs") {
+      labels.unshift(...entry.refs.map((ref, position) => ({ key: `s${previous}:${position}`, text: ref.label })));
+    } else {
+      break;
+    }
+  }
+  if (!labels.length) return null;
+  // A plan named once: "Base to 10k · Week 2, Week 2 · Sat · Long 80".
+  const seen = new Set<string>();
+  for (const label of labels) {
+    const name = label.name;
+    if (!name) continue;
+    if (seen.has(name) && label.text.startsWith(`${name} · `)) label.text = label.text.slice(name.length + 3);
+    seen.add(name);
+  }
   return (
-    <PlanPreviewCard
-      draft={draft}
-      uploading={uploading}
-      uploaded={uploaded}
-      onUpload={onUpload}
-      onReview={onReview}
-    />
+    <span className="chat-refs-row" aria-label="Asked about">
+      {sport ? (
+        <SportRefIcon sport={sport} />
+      ) : (
+        <CalendarRange size={12} aria-hidden="true" />
+      )}
+      {labels.map((label) => (
+        <span key={label.key} className="chat-ref-chip">
+          {label.text}
+        </span>
+      ))}
+      {draftId && onOpen ? (
+        <button
+          type="button"
+          className="chat-refs-open"
+          aria-label="Open in the Workbench"
+          title="Open in the Workbench"
+          onClick={() => onOpen(draftId)}
+        >
+          <ArrowUpRight size={12} aria-hidden="true" />
+        </button>
+      ) : null}
+    </span>
   );
 }
 
@@ -1496,17 +505,12 @@ function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
   return "Calendar and library";
 }
 
-function DeletePreviewCard({
-  preview,
-  deleting,
-  deleted,
-  onConfirm
-}: {
-  preview: WorkoutDeletePreview;
-  deleting: boolean;
-  deleted?: DeleteWorkoutResult;
-  onConfirm: () => void;
-}) {
+/**
+ * A delete card from before change sets (P3.2). Its request lived in the
+ * memory of the process that staged it, so nothing can be applied from it
+ * any more; it stays drawn because it is part of the conversation.
+ */
+function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
   return (
     <div className="chat-plan-card chat-delete-card">
       <div className="chat-plan-card-header">
@@ -1531,25 +535,7 @@ function DeletePreviewCard({
           </div>
         ) : null}
       </dl>
-      {deleted ? (
-        <p className="chat-plan-success">{deleted.message}</p>
-      ) : (
-        <div className="chat-plan-actions">
-          <button
-            type="button"
-            className="chat-delete-confirm"
-            onClick={onConfirm}
-            disabled={deleting}
-          >
-            {deleting ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : (
-              <Trash2 size={14} aria-hidden="true" />
-            )}
-            Delete from COROS
-          </button>
-        </div>
-      )}
+      <p className="chat-delete-expired">This card is from an earlier version and can no longer delete anything. Ask Coach again.</p>
     </div>
   );
 }
@@ -1579,9 +565,10 @@ function SourceBadge({ source }: { source: SourceInfo }) {
             <div
               key={group.source}
               className={`chat-source chat-source-tool chat-source-${group.source}`}
+              title={group.tools.join(", ")}
             >
               <Icon size={12} aria-hidden="true" />
-              {`${group.label} · ${group.tools.join(", ")}`}
+              {`${group.label} · ${group.tools.length} ${group.tools.length === 1 ? "read" : "reads"}`}
             </div>
           );
         })}
@@ -1610,14 +597,6 @@ function SourceBadge({ source }: { source: SourceInfo }) {
   );
 }
 
-/**
- * What the answer above cost, bottom-right under the bubble.
- *
- * Drawn only when a provider actually reported: an absent count means nobody
- * said, and a footer reading "0 Tokens" there would be a claim the app cannot
- * make. Every answer written before this shipped has no count either, so old
- * conversations stay as they were rather than growing a row of zeroes.
- */
 /**
  * A transcript row that decides once, when it mounts, whether to play the
  * entrance animation.
@@ -1655,6 +634,14 @@ function ChatRow({
   );
 }
 
+/**
+ * What the answer above cost, bottom-right under the bubble.
+ *
+ * Drawn only when a provider actually reported: an absent count means nobody
+ * said, and a footer reading "0 Tokens" there would be a claim the app cannot
+ * make. Every answer written before this shipped has no count either, so old
+ * conversations stay as they were rather than growing a row of zeroes.
+ */
 function TurnCostFooter({
   usage,
   model
@@ -1670,16 +657,6 @@ function TurnCostFooter({
   );
 }
 
-function isLatestActivityFileRequest(text: string): boolean {
-  const normalized = text.toLowerCase();
-  return (
-    /\b(download|export|save|get|grab)\b/.test(normalized) &&
-    /\b(latest|last|most recent|newest|recent)\b/.test(normalized) &&
-    /\b(activity|workout|run|ride)\b/.test(normalized) &&
-    /\b(file|fit|original)\b/.test(normalized)
-  );
-}
-
 function formatLatestActivityExportMessage(
   result: TrainingHubExportResult
 ): string {
@@ -1691,176 +668,145 @@ function formatLatestActivityExportMessage(
   return `Saved the latest activity ${formatLabel} file${activityName} to:\n\n\`${result.filePath}\``;
 }
 
-interface ChatComposerHandle {
-  focus: () => void;
-  setDraft: (value: string) => void;
+/**
+ * The "Draw the outline" AI Plan sends on its own as a conversation opens on
+ * its brief (UAT): the athlete pressed nothing, so it is not drawn as their
+ * message. It stays in the transcript — the outline's answer needs a turn of
+ * the athlete's in front of it on the wire — and is recognised by where it
+ * is: the first entry after the brief that begins the conversation.
+ */
+function isAutomaticOutlineStep(timeline: readonly ChatEntry[], index: number): boolean {
+  const entry = timeline[index];
+  return (
+    index === 1 &&
+    timeline[0]?.kind === "planBrief" &&
+    entry?.kind === "message" &&
+    entry.role === "user" &&
+    entry.content === outlineStepText()
+  );
 }
 
-interface ChatComposerProps {
-  providerControls: ReactNode;
-  initialDraft: string;
-  apiAvailable: boolean;
-  streaming: boolean;
-  exportingLatestActivity: boolean;
-  waitingForCoachAnswer: boolean;
-  isLocalProvider: boolean;
-  localModelConfigured: boolean;
-  onDraftChange: (value: string) => void;
-  onNewChat: () => void;
-  onSend: (message: string) => Promise<boolean>;
-  onStop: () => void;
+/**
+ * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
+ * analyses, so every entry a run produced says which coach spoke.
+ */
+function AnalysisAttribution({
+  marker
+}: {
+  marker: ChatEntryAnalysisMarker;
+}) {
+  return (
+    <span className="chat-analysis-attribution">
+      <Zap size={12} aria-hidden="true" />
+      {marker.name}
+      <span className="chat-analysis-attribution-trigger">
+        · {marker.triggerLabel}
+      </span>
+    </span>
+  );
 }
 
-const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
-  function ChatComposer(
-    {
-      providerControls,
-      initialDraft,
-      apiAvailable,
-      streaming,
-      exportingLatestActivity,
-      waitingForCoachAnswer,
-      isLocalProvider,
-      localModelConfigured,
-      onDraftChange,
-      onNewChat,
-      onSend,
-      onStop
-    },
-    ref
-  ) {
-    const [draft, setDraft] = useState(initialDraft);
-    const draftRef = useRef(initialDraft);
-    const submittingRef = useRef(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const trimmedDraft = draft.trim();
-    const latestActivityFileRequest = isLatestActivityFileRequest(trimmedDraft);
-    const localProviderBlocked =
-      isLocalProvider &&
-      !localModelConfigured &&
-      !latestActivityFileRequest;
+/**
+ * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
+ * default — it is machinery, not conversation — but openable, because an
+ * athlete judging an analysis's answer needs to see what it was asked.
+ */
+function AnalysisPromptChip({
+  marker,
+  prompt,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAnalysisMarker;
+  prompt: string;
+  index: number;
+  highlighted: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      className={`chat-row chat-row-analysis${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <button
+        type="button"
+        className="chat-analysis-chip"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <Zap size={12} aria-hidden="true" />
+        {marker.name}
+        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
+      </button>
+      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
+    </div>
+  );
+}
 
-    const updateDraft = useCallback(
-      (value: string) => {
-        draftRef.current = value;
-        setDraft(value);
-        onDraftChange(value);
-      },
-      [onDraftChange]
-    );
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        focus: () => textareaRef.current?.focus(),
-        setDraft: updateDraft
-      }),
-      [updateDraft]
-    );
-
-    const submitDraft = async () => {
-      if (
-        !apiAvailable ||
-        !trimmedDraft ||
-        exportingLatestActivity ||
-        localProviderBlocked ||
-        submittingRef.current
-      ) {
-        return;
-      }
-
-      const submittedDraft = draft;
-      submittingRef.current = true;
-      updateDraft("");
-      try {
-        const accepted = await onSend(trimmedDraft);
-        if (!accepted && !draftRef.current) {
-          updateDraft(submittedDraft);
-        }
-      } finally {
-        submittingRef.current = false;
-      }
-    };
-
-    return (
-      <div className="chat-composer">
-        <div className="chat-composer-toolbar">
-          {providerControls}
-          <button
-            type="button"
-            className="chat-new-chat chat-composer-new-chat"
-            onClick={onNewChat}
-            disabled={!apiAvailable || streaming || exportingLatestActivity}
-            aria-label="Start a new chat"
-            title="Start a new chat"
-          >
-            <Plus size={14} aria-hidden="true" />
-            <span>New chat</span>
-          </button>
-        </div>
-        <div className="chat-composer-inner">
-          <textarea
-            ref={textareaRef}
-            className="chat-input"
-            value={draft}
-            onChange={(event) => updateDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                void submitDraft();
-              }
-            }}
-            placeholder={
-              waitingForCoachAnswer
-                ? "Type another answer…"
-                : "Ask your coach…"
-            }
-            rows={1}
-            disabled={exportingLatestActivity}
-          />
-          {streaming ? (
-            <button
-              type="button"
-              className="chat-send chat-stop"
-              onClick={onStop}
-              title="Stop"
-            >
-              <Square size={15} aria-hidden="true" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="chat-send"
-              onClick={() => void submitDraft()}
-              disabled={
-                !apiAvailable ||
-                !trimmedDraft ||
-                exportingLatestActivity ||
-                localProviderBlocked
-              }
-              title={
-                localProviderBlocked ? "Enter a local model first" : "Send"
-              }
-            >
-              <Send size={15} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        <p className="chat-disclaimer">
-          Coach can make mistakes. Verify important training decisions.
-        </p>
-      </div>
-    );
+/**
+ * When the coach looked. Absolute, not relative: a transcript entry is read
+ * long after it was written, and "2h ago" becomes a lie the moment the
+ * conversation is reopened.
+ */
+function formatLookedAt(at: number): string {
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) {
+    return "";
   }
-);
+  const time = when.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  if (when.toDateString() === new Date().toDateString()) {
+    return time;
+  }
+  const day = when.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+  return `${day}, ${time}`;
+}
+
+/**
+ * 5.5: an analysis looked and had nothing to say. One line, the same pill as
+ * the playbook chip, but nothing to open — the whole point is that there is no
+ * content behind it.
+ */
+function AnalysisSilentChip({
+  marker,
+  at,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAnalysisMarker;
+  at: number;
+  index: number;
+  highlighted: boolean;
+}) {
+  return (
+    <div
+      className={`chat-row chat-row-analysis${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <span className="chat-analysis-chip chat-analysis-chip-static">
+        <Zap size={12} aria-hidden="true" />
+        {marker.name} looked, nothing new
+        <span className="chat-analysis-chip-trigger">
+          · {formatLookedAt(at)}
+        </span>
+      </span>
+    </div>
+  );
+}
 
 export function ChatView({
   api,
   onError,
+  onMessage,
   onPlanUploaded,
   onActivityChange,
   pendingPrompt,
@@ -1884,6 +830,9 @@ export function ChatView({
   const [analysesVersion, setAnalysesVersion] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState<ChatEntry[]>([]);
+  // The timeline as last drawn, for parking a turn when its conversation is left.
+  const timelineRef = useRef<ChatEntry[]>([]);
+  timelineRef.current = timeline;
   /**
    * How many stored entries this window's timeline accounts for (5.6b). A run
    * writing from the main process appends past that point, and the store keeps
@@ -1901,6 +850,27 @@ export function ChatView({
     Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
+  /*
+   * The conversation a running turn belongs to (UAT): the athlete may open
+   * another while Coach answers. The turn keeps writing to its own
+   * conversation — parked in `parkedTurnRef` while another is on screen —
+   * and only its conversation draws it.
+   */
+  const [turnSessionId, setTurnSessionId] = useState<string | null>(null);
+  const turnSessionIdRef = useRef<string | null>(null);
+  const parkedTurnRef = useRef<{ sessionId: string; timeline: ChatEntry[]; base: number } | null>(null);
+  /** A pipeline step's turn while it runs, and its trail (P2.3). */
+  const [stepRun, setStepRun] = useState<StepRun | null>(null);
+  const advanceStep = (requestId: string, event: Parameters<typeof stepRunEvent>[1]) =>
+    setStepRun((current) => (current?.requestId === requestId ? stepRunEvent(current, event) : current));
+  useEffect(() => {
+    if (streaming) return;
+    setStepRun(null);
+    // The turn has ended, parked or not: its conversation holds it now.
+    turnSessionIdRef.current = null;
+    parkedTurnRef.current = null;
+    setTurnSessionId(null);
+  }, [streaming]);
   /** A summariser turn is running ahead of the athlete's own. */
   const [compacting, setCompacting] = useState(false);
   /** Read by Stop, which fires from a handler the state has not reached. */
@@ -1927,9 +897,6 @@ export function ChatView({
   const [currentSource, setCurrentSource] = useState<SourceInfo | null>(null);
   const [mcpPrompt, setMcpPrompt] = useState<McpServerStatus[]>([]);
   const [mcpPromptBusy, setMcpPromptBusy] = useState(false);
-  const [selectedPlanDraftId, setSelectedPlanDraftId] = useState<
-    string | null
-  >(null);
   /**
    * The Creations panel starts closed and opens itself when the coach makes
    * something new — the one moment there is news in it. Every other time it is
@@ -1943,16 +910,237 @@ export function ChatView({
     number | null
   >(null);
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  /** An update COROS refused because the plan changed there meanwhile. */
+  const [corosConflict, setCorosConflict] = useState<{ draftId: string; name: string } | null>(null);
+  /**
+   * Each plan card's document, by draft and edit: the weeks and days the card
+   * draws come from what the draft becomes, not from its dates. `null` is a
+   * read that failed, kept so it is not retried on every render.
+   */
+  const [planDocuments, setPlanDocuments] = useState<
+    Record<string, TrainingPlanDocument | null>
+  >({});
+  const planDocumentKeys = timeline.flatMap((entry) =>
+    entry.kind === "planDraft" && !entry.draft.removedAt
+      ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}`]
+      : []
+  );
+  const missingPlanDocuments = planDocumentKeys
+    .filter((key) => !(key in planDocuments))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingPlanDocuments) return;
+    // Marked before the read lands, so the next render does not ask again; the
+    // answer replaces the mark whenever it arrives.
+    for (const key of missingPlanDocuments.split(",")) {
+      const draftId = key.slice(0, key.lastIndexOf(":"));
+      setPlanDocuments((current) => (key in current ? current : { ...current, [key]: null }));
+      void api
+        .getPlanDraftDocument(draftId)
+        .then((document) => {
+          setPlanDocuments((current) => ({ ...current, [key]: document ?? null }));
+        })
+        .catch(() => undefined);
+    }
+  }, [api, missingPlanDocuments]);
+  /**
+   * Every version of the creations in this conversation. Re-read whenever a
+   * card is added, edited or saved, which is when a version can appear.
+   */
+  const [artifactVersions, setArtifactVersions] = useState<PlanArtifactVersion[]>([]);
+  const artifactKey = timeline
+    .flatMap((entry) =>
+      entry.kind === "planDraft"
+        ? [`${entry.draft.draftId}:${entry.draft.editedAt ?? 0}:${entry.draft.uploadedAt ?? 0}`]
+        : []
+    )
+    .join(",");
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setArtifactVersions([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanArtifacts(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((versions) => {
+        if (live) setArtifactVersions(Array.isArray(versions) ? versions : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey]);
+  const versionIndex = creationVersions(artifactVersions);
+  /**
+   * Where each creation on COROS stands on the calendar, from this machine's
+   * plan cache (P1.6). Read again when a card changes or a plan is added.
+   */
+  const [calendarStates, setCalendarStates] = useState<PlanCalendarState[]>([]);
+  const [calendarRead, setCalendarRead] = useState(0);
+  useEffect(() => {
+    if (!api || !artifactKey) {
+      setCalendarStates([]);
+      return;
+    }
+    let live = true;
+    void api
+      .getPlanCalendarState(artifactKey.split(",").map((key) => key.split(":")[0]))
+      .then((states) => {
+        if (live) setCalendarStates(Array.isArray(states) ? states : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, artifactKey, calendarRead]);
+  const calendarOf = (draftId: string) => {
+    const artifactId = versionIndex.get(draftId)?.artifactId ?? draftId;
+    return creationCalendar(
+      calendarStates.find((state) => state.artifactId === artifactId),
+      localDayKey()
+    );
+  };
+  /** The version the calendar dialog is open for. */
+  const [calendarFor, setCalendarFor] = useState<string | null>(null);
+  /**
+   * The briefs behind the conversation's brief cards (P2.1), by artifact.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [planBriefs, setPlanBriefs] = useState<Record<string, PlanBrief | null>>({});
+  const missingBriefs = [
+    ...new Set(timeline.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ]
+    .filter((artifactId) => !(artifactId in planBriefs))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingBriefs) return;
+    const ids = missingBriefs.split(",");
+    setPlanBriefs((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getPlanBriefs(ids)
+      .then((briefs) =>
+        setPlanBriefs((current) => ({ ...current, ...Object.fromEntries(briefs.map((brief) => [brief.artifactId, brief])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingBriefs]);
+  /**
+   * The change sets behind the conversation's proposal cards (P3.2), by id.
+   * `null` is a read that found nothing, kept so it is not asked again.
+   */
+  const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
+  /** The line being applied (`"*"` for a whole set), by set. */
+  const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
+  const missingChangeSets = scheduleChangeIds(timeline)
+    .filter((changeSetId) => !(changeSetId in scheduleChanges))
+    .join(",");
+  useEffect(() => {
+    if (!api || !missingChangeSets) return;
+    const ids = missingChangeSets.split(",");
+    setScheduleChanges((current) => ({ ...Object.fromEntries(ids.map((id) => [id, null])), ...current }));
+    void api
+      .getScheduleChanges(ids)
+      .then((sets) =>
+        setScheduleChanges((current) => ({ ...current, ...Object.fromEntries(sets.map((set) => [set.changeSetId, set])) }))
+      )
+      .catch(() => undefined);
+  }, [api, missingChangeSets]);
+  /** The anchor each outline's card is drawn at: its latest (P2.2). */
+  const outlineAnchors = latestOutlineAnchors(timeline);
+  /** The brief whose screen is open, and how its save is going. */
+  const [editingBriefId, setEditingBriefId] = useState<string | null>(null);
+  const [briefSave, setBriefSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
+  /** The earliest Monday a plan may start on, for reading a brief's dates. */
+  const briefMonday = firstPlanMonday();
+  const saveBrief = async (artifactId: string, request: PlanBriefRequest) => {
+    if (!api) return;
+    setBriefSave({ saving: true });
+    try {
+      const before = planBriefs[artifactId];
+      const saved = await api.updatePlanBrief(artifactId, request);
+      setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      // A conversation AI Plan opened is named after the goal once it has one (P2.5).
+      const sessionId = activeSessionIdRef.current;
+      const title = sessions.find((session) => session.id === sessionId)?.title;
+      if (sessionId && title === NEW_PLAN_TITLE && saved.request.goal.trim()) {
+        void api
+          .renameChatSession(sessionId, briefTitle(saved.request))
+          .then((summary) => {
+            if (summary) setSessions((current) => current.map((session) => (session.id === summary.id ? summary : session)));
+          })
+          .catch(() => undefined);
+      }
+      setBriefSave({ saving: false });
+      setEditingBriefId(null);
+      // The outline was drawn from the brief as it was (P2.2): ask, as the
+      // generator asks when a source is switched under a drawn outline.
+      if (saved.outline && JSON.stringify(before?.request) !== JSON.stringify(saved.request)) {
+        setRedrawAsk(artifactId);
+      }
+    } catch (caught) {
+      setBriefSave({ saving: false, error: remoteErrorMessage(caught, "The brief was not saved.") });
+    }
+  };
+  /** A brief changed under its outline: whether to have it redrawn (P2.2). */
+  const [redrawAsk, setRedrawAsk] = useState<string | null>(null);
+  /** The outline whose Adjust screen is open, and how its save is going (P2.2). */
+  const [editingOutlineId, setEditingOutlineId] = useState<string | null>(null);
+  const [outlineSave, setOutlineSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
+  const saveOutline = async (artifactId: string, outline: TrainingPlanOutline) => {
+    if (!api) return;
+    setOutlineSave({ saving: true });
+    try {
+      const saved = await api.updatePlanOutline(artifactId, outline);
+      setPlanBriefs((current) => ({ ...current, [artifactId]: saved }));
+      setOutlineSave({ saving: false });
+      setEditingOutlineId(null);
+    } catch (caught) {
+      setOutlineSave({ saving: false, error: remoteErrorMessage(caught, "The outline was not saved.") });
+    }
+  };
+  /**
+   * What this conversation reads and which AI answers it (P2.0), read when
+   * the conversation opens; a turn reads it again in the main process.
+   */
+  const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
+  /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
+  const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
+  const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
+  const [aiSheetOpen, setAiSheetOpen] = useState(false);
+  useEffect(() => {
+    setConversationSettingsState(null);
+    if (!api || !activeSessionId) return;
+    let live = true;
+    void api
+      .getConversationSettings(activeSessionId)
+      .then((settings) => {
+        if (live) setConversationSettingsState(settings);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [api, activeSessionId, conversationSettingsVersion]);
+  const conversationSettingsWriteRef = useRef(0);
+  const updateConversationSettings = (next: ConversationSettings) => {
+    setConversationSettingsState(next);
+    // Only the last write's answer, and only for the conversation still open:
+    // two quick switches would otherwise settle on the first one's reply.
+    const write = ++conversationSettingsWriteRef.current;
+    void api
+      ?.setConversationSettings(next)
+      .then((saved) => {
+        if (write === conversationSettingsWriteRef.current && saved.sessionId === activeSessionIdRef.current) {
+          setConversationSettingsState(saved);
+        }
+      })
+      .catch(() => undefined);
+  };
   /* The coach's plan open in the editor, by draft id — "Edit plan first". */
   const [editingPlanDraftId, setEditingPlanDraftId] = useState<string | null>(null);
+  const [editingWorkoutDraftId, setEditingWorkoutDraftId] = useState<string | null>(null);
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
-  >({});
-  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(
-    null
-  );
-  const [deletedWorkouts, setDeletedWorkouts] = useState<
-    Record<string, DeleteWorkoutResult>
   >({});
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
@@ -1970,6 +1158,8 @@ export function ChatView({
   // Ref so the push-event handlers filter on the current request without
   // being recreated (and re-subscribed) on every keystroke.
   const activeRequestIdRef = useRef<string | null>(null);
+  /** The timeline's length when the running turn was sent: what comes after is the turn's. */
+  const turnStartRef = useRef(0);
   const activeSessionIdRef = useRef<string | null>(null);
   /**
    * A turn of the athlete's own is in the air, so the timeline on screen is
@@ -2032,26 +1222,54 @@ export function ChatView({
   const claudePollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Which conversation `seenPlanDraftIdsRef` is describing. */
-  const planPanelSessionRef = useRef<string | null>(null);
-  const seenPlanDraftIdsRef = useRef<Set<string>>(new Set());
   const chatHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const composerDraftRef = useRef("");
   const composerRef = useRef<ChatComposerHandle>(null);
+  /*
+   * The conversation the composer's draft belongs to, and a debounced save of
+   * it (UAT): the words and the references waiting beside them are kept per
+   * conversation, so leaving one and coming back — or restarting — finds the
+   * question as it was left. Set only when a conversation's draft is restored,
+   * so a save can never file one conversation's words under another.
+   */
+  const draftSessionRef = useRef<string | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRefsRef = useRef<PlanRef[]>([]);
+  const pendingScheduleRefsRef = useRef<ScheduleRef[]>([]);
+  const saveDraftNow = useCallback(() => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = null;
+    const sessionId = draftSessionRef.current;
+    if (!sessionId) return;
+    saveComposerDraft(sessionId, {
+      text: composerDraftRef.current,
+      refs: pendingRefsRef.current,
+      scheduleRefs: pendingScheduleRefsRef.current
+    });
+  }, []);
+  const scheduleDraftSave = useCallback(() => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(saveDraftNow, 300);
+  }, [saveDraftNow]);
   const handleComposerDraftChange = useCallback((value: string) => {
     composerDraftRef.current = value;
-  }, []);
+    scheduleDraftSave();
+  }, [scheduleDraftSave]);
 
   useEffect(() => {
     if (!pendingPrompt || !composerRef.current) {
       return;
     }
-    composerRef.current?.setDraft(pendingPrompt);
     onPendingPromptConsumed?.();
-    // Focus after the coach panel becomes visible.
-    requestAnimationFrame(() => composerRef.current?.focus());
+    if (typeof pendingPrompt === "string") {
+      composerRef.current?.setDraft(pendingPrompt);
+      // Focus after the coach panel becomes visible.
+      requestAnimationFrame(() => composerRef.current?.focus());
+      return;
+    }
+    void openAsked(pendingPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pendingPrompt,
@@ -2061,11 +1279,150 @@ export function ChatView({
     chatSettings.provider
   ]);
 
-  const resetEphemeralChatState = () => {
+  /**
+   * What the athlete pointed at, waiting beside the composer until the next
+   * question goes (P1.7). Sent as a `planRefs` entry just before it.
+   */
+  const [pendingRefs, setPendingRefs] = useState<PlanRef[]>([]);
+  const refKey = (ref: PlanRef) =>
+    `${ref.draftId}|${ref.scope}|${ref.weekIndex ?? ""}|${ref.sessionKey ?? ""}`;
+  const addRef = (ref: PlanRef) => {
+    setPendingRefs((current) =>
+      current.some((item) => refKey(item) === refKey(ref)) ? current : [...current, ref].slice(-3)
+    );
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /**
+   * The calendar or a COROS plan, pointed at from its screen and waiting
+   * beside the composer until the next question goes (P3.5). Sent as a
+   * `scheduleRefs` entry just before it.
+   */
+  const [pendingScheduleRefs, setPendingScheduleRefs] = useState<ScheduleRef[]>([]);
+  useEffect(() => {
+    pendingRefsRef.current = pendingRefs;
+    pendingScheduleRefsRef.current = pendingScheduleRefs;
+    scheduleDraftSave();
+  }, [pendingRefs, pendingScheduleRefs, scheduleDraftSave]);
+  // A draft still waiting on its debounce is written when the view goes.
+  useEffect(() => () => saveDraftNow(), [saveDraftNow]);
+
+  /**
+   * A question asked from outside Coach — the Calendar, the Library — waiting
+   * on the athlete to say which conversation it goes in. `suggestedId` is the
+   * conversation a Coach plan was made in, found before the picker opens.
+   */
+  const [askPending, setAskPending] = useState<{ request: CoachOpenRequest; suggestedId: string | null } | null>(null);
+  /** A plan AI Plan just started, whose outline is drawn as soon as its conversation is open. */
+  const [autoOutline, setAutoOutline] = useState<{ sessionId: string; artifactId: string } | null>(null);
+
+  const openAsked = async (request: CoachOpenRequest) => {
+    if (!api) return;
+    if (request.newPlan) {
+      await startPlanConversation(request.newPlan);
+      return;
+    }
+    const suggestedId = request.draftId
+      ? await api.findChatSessionForDraft(request.draftId).catch(() => null)
+      : null;
+    setAskPending({ request, suggestedId });
+  };
+
+  /**
+   * The question goes where the athlete picked: a conversation, or a new one.
+   * What it is about waits beside the composer — the calendar's chips, or a
+   * Coach plan's, which only mean something in the conversation holding its
+   * drafts; anywhere else the plan is named in the question instead.
+   */
+  const askIn = async (sessionId: string | null) => {
+    const pending = askPending;
+    setAskPending(null);
+    if (!pending || !api) return;
+    const { request, suggestedId } = pending;
+    // Pointing at something waits by the composer and sends nothing, so it
+    // may land while Coach answers elsewhere; the send is what waits.
+    if (exportingLatestActivity) {
+      onError("Coach is still busy. Ask again when it has finished.");
+      return;
+    }
+    if (sessionId === null) await handleNewChat();
+    else if (sessionId !== activeSessionIdRef.current) await loadSession(sessionId);
+    // Picking the conversation already open keeps what was waiting there;
+    // anything else was cleared by the switch.
+    if (request.scheduleRefs?.length) setPendingScheduleRefs(request.scheduleRefs.slice(0, 3));
+    const planHere = Boolean(request.draftId) && sessionId !== null && sessionId === suggestedId;
+    if (planHere && request.refs?.length) setPendingRefs(request.refs);
+    const name = request.refs?.[0]?.name;
+    const prompt = request.prompt ?? (request.draftId && !planHere && name ? `About my plan "${name}": ` : "");
+    if (prompt) composerRef.current?.setDraft(prompt);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  /** What the picker says the question is about. */
+  const askSubject = (request: CoachOpenRequest): string => {
+    const labels = [...(request.scheduleRefs ?? []).map((ref) => ref.label), ...(request.refs ?? []).map((ref) => ref.name)];
+    return labels.length ? `About ${labels.join(", ")}` : "Pick the conversation this question goes in.";
+  };
+
+  /**
+   * AI Plan (P2.5): the athlete filled in the brief on its own screen first,
+   * and only now is a conversation made — opening on that brief, with what
+   * Coach may read as they left it — and the outline is drawn straight away
+   * (`autoOutline`): Start plan is the athlete asking for it. It is named
+   * after the goal, or "New plan" until the brief has one.
+   */
+  const startPlanConversation = async ({ request, sources }: NonNullable<CoachOpenRequest["newPlan"]>) => {
+    if (!api) return;
+    if (streaming || exportingLatestActivity) {
+      // The request is already consumed, so dropping it would lose the click.
+      onError("Coach is still answering. Press AI Plan again when it has finished.");
+      return;
+    }
+    onError(null);
+    try {
+      await flushPendingSave();
+      const created = await api.createChatSession(chatSettings.provider);
+      const brief = await api.createPlanBrief(created.id, request);
+      if (!(sources.activities && sources.sleep && sources.zones)) {
+        await api.setConversationSettings({ sessionId: created.id, sources }).catch(() => undefined);
+      }
+      const title = brief.request.goal.trim() ? briefTitle(brief.request) : NEW_PLAN_TITLE;
+      const titled = (await api.renameChatSession(created.id, title).catch(() => null)) ?? created;
+      setSessions((current) => [titled, ...current]);
+      setActiveSessionId(created.id);
+      persistedBaseRef.current = 0;
+      resetEphemeralChatState(created.id);
+      setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+      const entries: ChatEntry[] = [{ kind: "planBrief", artifactId: brief.artifactId }];
+      setTimeline(entries);
+      persistHistory(created.id, entries, true);
+      setAutoOutline({ sessionId: created.id, artifactId: brief.artifactId });
+    } catch (caught) {
+      onError(remoteErrorMessage(caught, "Could not start a plan."));
+    }
+  };
+
+  /**
+   * Leaving a conversation: the one being left keeps its draft, and the one
+   * opened gets its own back (UAT) — its words and what they point at. A
+   * reference belongs to the conversation it was picked in.
+   */
+  const resetEphemeralChatState = (sessionId?: string) => {
+    saveDraftNow();
+    draftSessionRef.current = sessionId ?? null;
+    const draft = sessionId ? loadComposerDraft(sessionId) : undefined;
+    setPendingRefs(draft?.refs ?? []);
+    setPendingScheduleRefs(draft?.scheduleRefs ?? []);
+    composerDraftRef.current = draft?.text ?? "";
+    composerRef.current?.setDraft(draft?.text ?? "");
     setUploadedPlans({});
-    setDeletedWorkouts({});
-    pendingCoachPromptsRef.current = [];
-    resumedCoachPromptRef.current = null;
+    // A turn still running keeps its own state: it may have been left for
+    // another conversation, and its question cards and the card it resumed
+    // belong to it, not to whatever is on screen (UAT).
+    if (!activeRequestIdRef.current) {
+      pendingCoachPromptsRef.current = [];
+      resumedCoachPromptRef.current = null;
+    }
   };
 
   const persistHistory = (
@@ -2117,6 +1474,57 @@ export function ChatView({
       return;
     }
     persistTimeoutRef.current = setTimeout(run, 300);
+  };
+
+  /**
+   * Where a running turn writes (UAT): the timeline on screen while its
+   * conversation is, and its parked copy while the athlete reads another.
+   * A parked turn is saved against its own conversation with its own base,
+   * never through `persistHistory`, whose base describes the one on screen.
+   */
+  const turnTimeline = (update: (prev: ChatEntry[]) => ChatEntry[]) => {
+    const parked = parkedTurnRef.current;
+    if (parked) {
+      parked.timeline = update(parked.timeline);
+      return;
+    }
+    setTimeline(update);
+  };
+  const persistTurn = (entries: ChatEntry[]) => {
+    const parked = parkedTurnRef.current;
+    if (!parked) {
+      persistHistory(activeSessionIdRef.current, entries, true);
+      return;
+    }
+    if (!api) return;
+    const persisted = toPersistedEntries(entries);
+    const knownEntryCount = parked.base;
+    parked.base = persisted.length;
+    const saved: Promise<void> = api
+      .saveChatSession(parked.sessionId, persisted, { knownEntryCount })
+      .then((summary) => {
+        if (!summary) return;
+        setSessions((current) =>
+          [summary, ...current.filter((session) => session.id !== summary.id)].sort(
+            (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+          )
+        );
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inFlightSavesRef.current.delete(saved);
+      });
+    inFlightSavesRef.current.add(saved);
+  };
+  /**
+   * Leaving the conversation a turn is running in parks the turn: its
+   * timeline goes with it, and what the stream says from here lands there.
+   */
+  const parkTurnIfLeaving = () => {
+    const turnSession = turnSessionIdRef.current;
+    if (!activeRequestIdRef.current || !turnSession || parkedTurnRef.current) return;
+    if (turnSession !== activeSessionIdRef.current) return;
+    parkedTurnRef.current = { sessionId: turnSession, timeline: timelineRef.current, base: persistedBaseRef.current };
   };
 
   /**
@@ -2178,6 +1586,21 @@ export function ChatView({
 
   const loadSession = async (sessionId: string) => {
     if (!api) return;
+    parkTurnIfLeaving();
+    // Coming back to the conversation a turn is running in: its own timeline,
+    // as the stream has kept it, rather than the row — which holds only the
+    // question until the turn ends.
+    const parked = parkedTurnRef.current;
+    if (parked && parked.sessionId === sessionId) {
+      parkedTurnRef.current = null;
+      await flushPendingSave();
+      persistedBaseRef.current = parked.base;
+      setTimeline(parked.timeline);
+      resetEphemeralChatState(sessionId);
+      setActiveSessionId(sessionId);
+      void markSessionRead(sessionId);
+      return;
+    }
     try {
       // The conversation being left may still owe the row a save, and that
       // save carries `persistedBaseRef` — which is about to start describing a
@@ -2187,7 +1610,7 @@ export function ChatView({
       const entries = await api.getChatSession(sessionId);
       persistedBaseRef.current = entries.length;
       setTimeline(fromPersistedEntries(entries));
-      resetEphemeralChatState();
+      resetEphemeralChatState(sessionId);
       setActiveSessionId(sessionId);
       void markSessionRead(sessionId);
     } catch {
@@ -2238,7 +1661,7 @@ export function ChatView({
    */
   const openRunConversation = async (sessionId: string) => {
     if (!api) return;
-    const listed = await refreshSessions(chatSettings.provider);
+    const listed = await refreshSessions();
     if (!listed.some((session) => session.id === sessionId)) {
       onError("That conversation is no longer here — it may have been deleted.");
       return;
@@ -2249,10 +1672,12 @@ export function ChatView({
     await loadSession(sessionId);
   };
 
+  /* Every conversation, whichever AI answers it (Q1): the list used to be the
+     current provider's, so switching AI swapped it for another list. */
   const refreshSessions = useCallback(
-    async (provider: ChatProvider) => {
+    async () => {
       if (!api) return [];
-      const listed = await api.listChatSessions(provider);
+      const listed = await api.listChatSessions();
       setSessions(listed);
       return listed;
     },
@@ -2261,7 +1686,7 @@ export function ChatView({
 
   const ensureActiveSession = async (provider: ChatProvider) => {
     if (!api) return null;
-    const listed = await refreshSessions(provider);
+    const listed = await refreshSessions();
     if (listed.length > 0) {
       await loadSession(listed[0].id);
       return listed[0].id;
@@ -2271,7 +1696,7 @@ export function ChatView({
     setActiveSessionId(created.id);
     persistedBaseRef.current = 0;
     setTimeline([]);
-    resetEphemeralChatState();
+    resetEphemeralChatState(created.id);
     return created.id;
   };
 
@@ -2313,15 +1738,11 @@ export function ChatView({
    */
   useEffect(() => {
     if (!api?.onCoachAnalysisRunUpdate) return;
-    // The provider on screen, not the run's: an analysis may run on one of
-    // its own (decision 2), and that conversation belongs to that provider's
-    // list rather than this one.
-    const provider = chatSettings.provider;
     return api.onCoachAnalysisRunUpdate((run) => {
       if (!run.sessionId) return;
-      void refreshSessions(provider).catch(() => undefined);
+      void refreshSessions().catch(() => undefined);
     });
-  }, [api, chatSettings.provider, refreshSessions]);
+  }, [api, refreshSessions]);
 
   /**
    * 9.3: a run into a conversation the athlete is *not* looking at is exactly
@@ -2470,10 +1891,6 @@ export function ChatView({
    */
   useEffect(() => {
     if (!api?.onSyncChanged) return;
-    // The provider on screen, for the reason the run-update subscription gives:
-    // the list belongs to a provider, and a merged conversation of another
-    // provider's is not in it.
-    const provider = chatSettings.provider;
     return api.onSyncChanged((change) => {
       if (change.tables.includes("coach_analyses")) {
         // Which conversations carry the ⚡ mark is a fact about the analyses,
@@ -2484,8 +1901,18 @@ export function ChatView({
         setAnalysesVersion((value) => value + 1);
       }
 
+      // A brief or an outline written on another machine (P2.1–P2.2): the
+      // cards read them through `planBriefs`, which is let go so they are
+      // read again; a conversation's settings likewise (P2.0).
+      if (change.tables.includes("chat_plan_artifacts")) setPlanBriefs({});
+      // A proposal applied or dismissed on the other machine (P3.2).
+      if (change.tables.includes("chat_schedule_changes")) setScheduleChanges({});
+      if (change.tables.includes("chat_conversation_settings")) {
+        setConversationSettingsVersion((value) => value + 1);
+      }
+
       if (!change.tables.includes("chat_sessions")) return;
-      void refreshSessions(provider).catch(() => undefined);
+      void refreshSessions().catch(() => undefined);
 
       const sessionId = activeSessionIdRef.current;
       if (!sessionId) return;
@@ -2500,7 +1927,7 @@ export function ChatView({
       }
       void reloadTranscript(sessionId);
     });
-  }, [api, chatSettings.provider, refreshSessions]);
+  }, [api, refreshSessions]);
 
   // Load sign-in/provider state on mount.
   useEffect(() => {
@@ -2526,6 +1953,20 @@ export function ChatView({
             ? settingsResult.value
             : DEFAULT_CHAT_SETTINGS;
         setChatSettings(settings);
+        // Model lists a day old are read again in the background; only the
+        // lists are taken from the answer, so nothing changed meanwhile is lost.
+        // Started inside a promise so that no failure of it, synchronous or
+        // not, can stop the rest of this start-up from running.
+        void Promise.resolve()
+          .then(() => api.refreshChatModels())
+          .then((result) => {
+            // Read here, never inside the updater: a throw there is a throw
+            // in render, and it takes the whole screen with it.
+            const modelCatalogs = result?.settings?.modelCatalogs;
+            if (cancelled || !modelCatalogs) return;
+            setChatSettings((current) => ({ ...current, modelCatalogs }));
+          })
+          .catch(() => undefined);
         if (claudeResult.status === "fulfilled") {
           setClaudeStatus(claudeResult.value);
         }
@@ -2552,9 +1993,12 @@ export function ChatView({
   }, [api]);
 
   useEffect(() => {
-    if (!api || checkingAuth || streaming || !activeSessionId) return;
+    // Held while the turn on screen runs; another conversation's turn does
+    // not hold this one's saves.
+    if (!api || checkingAuth || !activeSessionId) return;
+    if (streaming && turnSessionId === activeSessionId) return;
     persistHistory(activeSessionId, timeline);
-  }, [api, checkingAuth, streaming, timeline, activeSessionId]);
+  }, [api, checkingAuth, streaming, turnSessionId, timeline, activeSessionId]);
 
   useEffect(() => {
     onActivityChange?.(streaming || exportingLatestActivity);
@@ -2712,14 +2156,14 @@ export function ChatView({
       const originalPrompt = resumedCoachPromptRef.current;
       resumedCoachPromptRef.current = null;
       if (!originalPrompt) return;
-      setTimeline((prev) => {
+      turnTimeline((prev) => {
         const next = prev.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
-        persistHistory(activeSessionIdRef.current, next, true);
+        persistTurn(next);
         return next;
       });
     };
@@ -2745,17 +2189,26 @@ export function ChatView({
       sourceRef.current = null;
       if (finishReason === "cancelled") {
         restoreResumedCoachPrompt();
+        // A card the turn produced before Stop is on screen and has a draft
+        // behind it; unsaved, it dropped out of the conversation on reload
+        // while its draft stayed.
+        turnTimeline((prev) => {
+          if (prev.length > turnStartRef.current) {
+            persistTurn(prev);
+          }
+          return prev;
+        });
         return;
       }
       resumedCoachPromptRef.current = null;
       if (finalText || coachPrompts.length > 0) {
-        setTimeline((prev) => {
-          let next: ChatEntry[] = [...prev];
+        turnTimeline((prev) => {
+          const closing: ChatEntry[] = [];
           if (source?.mcpError) {
-            next.push({ kind: "toolNotice", message: source.mcpError });
+            closing.push({ kind: "toolNotice", message: source.mcpError });
           }
           if (finalText) {
-            next.push({
+            closing.push({
               kind: "message",
               role: "assistant",
               content: finalText,
@@ -2769,11 +2222,12 @@ export function ChatView({
               ...(model ? { model } : {})
             });
           }
+          let next = settleTurnEntries(prev, turnStartRef.current, closing);
           for (const prompt of coachPrompts) {
             next = upsertCoachPromptEntry(next, prompt);
           }
           markSettled(prev, next);
-          persistHistory(activeSessionIdRef.current, next, true);
+          persistTurn(next);
           return next;
         });
       }
@@ -2809,6 +2263,7 @@ export function ChatView({
         }
         if (payload.requestId !== activeRequestIdRef.current) return;
         setActiveTool(null);
+        advanceStep(payload.requestId, { kind: "text", delta: payload.delta });
         streamedTextRef.current += payload.delta;
         setStreamingText((prev) => prev + payload.delta);
       }),
@@ -2817,6 +2272,15 @@ export function ChatView({
         // analysis's transcript is reloaded from disk when its run ends.
         if (payload.requestId === liveAnalysisRef.current?.runId) return;
         if (payload.requestId !== activeRequestIdRef.current) return;
+        if (payload.kind === "context" && payload.snapshotIncluded) {
+          advanceStep(payload.requestId, { kind: "snapshot" });
+        } else if (payload.kind === "thinking") {
+          advanceStep(payload.requestId, { kind: "thinking", delta: payload.delta });
+        } else if (payload.kind === "mcp" && payload.status === "call") {
+          advanceStep(payload.requestId, { kind: "call", tool: payload.tool });
+        } else if (payload.kind === "planDraft" || payload.kind === "planOutline") {
+          advanceStep(payload.requestId, { kind: "passed" });
+        }
         if (payload.kind === "context") {
           sourceRef.current = {
             snapshotIncluded: payload.snapshotIncluded,
@@ -2826,22 +2290,54 @@ export function ChatView({
           };
           setCurrentSource(sourceRef.current);
         } else if (payload.kind === "planDraft") {
-          setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
-        } else if (payload.kind === "workoutDelete") {
-          setTimeline((prev) =>
-            upsertWorkoutDeleteEntry(prev, payload.preview)
+          turnTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
+        } else if (payload.kind === "planEvent") {
+          turnTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
+        } else if (payload.kind === "planBrief") {
+          const brief = payload.brief;
+          setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+          // Filling in a brief already on screen changes its card, not the timeline.
+          turnTimeline((prev) =>
+            prev.some((entry) => entry.kind === "planBrief" && entry.artifactId === brief.artifactId)
+              ? prev
+              : [...prev, { kind: "planBrief", artifactId: brief.artifactId }]
+          );
+        } else if (payload.kind === "planOutline") {
+          const brief = payload.brief;
+          const outlineVersion = brief.outline?.version;
+          setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
+          if (outlineVersion !== undefined) {
+            // A turn whose outline is accepted twice rewrites its version, not its anchor.
+            turnTimeline((prev) =>
+              prev.some(
+                (entry) =>
+                  entry.kind === "planOutline" &&
+                  entry.artifactId === brief.artifactId &&
+                  entry.outlineVersion === outlineVersion
+              )
+                ? prev
+                : [...prev, { kind: "planOutline", artifactId: brief.artifactId, outlineVersion }]
+            );
+          }
+        } else if (payload.kind === "scheduleChange") {
+          const changeSet = payload.changeSet;
+          setScheduleChanges((current) => ({ ...current, [changeSet.changeSetId]: changeSet }));
+          turnTimeline((prev) =>
+            prev.some((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSet.changeSetId)
+              ? prev
+              : [...prev, { kind: "scheduleChange", changeSetId: changeSet.changeSetId }]
           );
         } else if (payload.kind === "activityVisual") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertActivityVisualEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertActivityVisualEntry(prev, payload.preview));
           }
         } else if (payload.kind === "fitnessTrend") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertFitnessTrendEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertFitnessTrendEntry(prev, payload.preview));
           }
         } else if (payload.kind === "hrZoneSummary") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertHrZoneEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertHrZoneEntry(prev, payload.preview));
           }
         } else if (payload.kind === "coachPrompt") {
           pendingCoachPromptsRef.current = [
@@ -2924,19 +2420,24 @@ export function ChatView({
           // next reload, and the athlete should not take a truncated answer
           // for a finished one.
           resumedCoachPromptRef.current = null;
-          setTimeline((prev) => {
-            let next: ChatEntry[] = [...prev];
-            if (partialText) {
-              next.push({
-                kind: "message",
-                role: "assistant",
-                content: partialText,
-                source,
-                reasoningSummary,
-                ...(payload.usage ? { usage: payload.usage } : {}),
-                ...(payload.model ? { model: payload.model } : {})
-              });
-            }
+          turnTimeline((prev) => {
+            let next = settleTurnEntries(
+              prev,
+              turnStartRef.current,
+              partialText
+                ? [
+                    {
+                      kind: "message",
+                      role: "assistant",
+                      content: partialText,
+                      source,
+                      reasoningSummary,
+                      ...(payload.usage ? { usage: payload.usage } : {}),
+                      ...(payload.model ? { model: payload.model } : {})
+                    }
+                  ]
+                : []
+            );
             for (const prompt of coachPrompts) {
               next = upsertCoachPromptEntry(next, prompt);
             }
@@ -2945,7 +2446,7 @@ export function ChatView({
               message: `Coach stopped before finishing: ${payload.message}`
             });
             markSettled(prev, next);
-            persistHistory(activeSessionIdRef.current, next, true);
+            persistTurn(next);
             return next;
           });
         } else {
@@ -2976,16 +2477,57 @@ export function ChatView({
     onError
   ]);
 
-  // Keep the transcript scrolled to the newest content.
+  /*
+   * Whether the transcript is read at its end, and so held there as it grows.
+   * Cards grow after they mount — a plan's figures and weeks arrive with its
+   * document, a brief with its row — so a conversation opened at its end used
+   * to settle with the last card cut off under the composer. The thread's size
+   * is watched instead of the state that grows it: streamed words, a live
+   * analysis and a late document all move it the same way. Scrolling up to
+   * read lets go, so a streaming answer no longer drags the athlete down.
+   */
+  const stickToEndRef = useRef(true);
+  /* Only a move up from where the view was last put lets go. A scroll event
+     can land after the thread has grown under it — a card's document arriving
+     between the jump to the end and the event — and read as "not at the end"
+     though nobody moved. */
+  const lastScrollTopRef = useRef(0);
+  const threadObserverRef = useRef<ResizeObserver | null>(null);
+  const observeThread = useCallback((thread: HTMLDivElement | null) => {
+    threadObserverRef.current?.disconnect();
+    threadObserverRef.current = null;
+    if (!thread || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const transcript = scrollRef.current;
+      if (transcript && stickToEndRef.current) {
+        transcript.scrollTo({ top: transcript.scrollHeight });
+        lastScrollTopRef.current = transcript.scrollTop;
+      }
+    });
+    observer.observe(thread);
+    // The transcript itself, too: the composer growing or a panel opening
+    // beside it changes how much of the thread shows without resizing it.
+    if (thread.parentElement) observer.observe(thread.parentElement);
+    threadObserverRef.current = observer;
+  }, []);
+  const handleTranscriptScroll = (event: { currentTarget: HTMLDivElement }) => {
+    const transcript = event.currentTarget;
+    if (transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40) {
+      stickToEndRef.current = true;
+    } else if (transcript.scrollTop < lastScrollTopRef.current) {
+      stickToEndRef.current = false;
+    }
+    lastScrollTopRef.current = transcript.scrollTop;
+  };
+
+  // A new entry, or another conversation, is read from its end.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [
-    timeline,
-    streamingText,
-    thinkingText,
-    liveAnalysis,
-    exportingLatestActivity
-  ]);
+    const transcript = scrollRef.current;
+    stickToEndRef.current = true;
+    if (!transcript) return;
+    transcript.scrollTo({ top: transcript.scrollHeight });
+    lastScrollTopRef.current = transcript.scrollTop;
+  }, [timeline]);
 
   const handleSignIn = async () => {
     if (!api) return;
@@ -2998,7 +2540,7 @@ export function ChatView({
         await ensureActiveSession("chatgpt");
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "ChatGPT sign-in failed.");
+      onError(remoteErrorMessage(caught, "ChatGPT sign-in failed."));
     } finally {
       setSigningIn(false);
     }
@@ -3026,9 +2568,7 @@ export function ChatView({
       return status;
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Claude Code detection failed."
+        remoteErrorMessage(caught, "Claude Code detection failed.")
       );
       return null;
     } finally {
@@ -3060,8 +2600,6 @@ export function ChatView({
       pollClaudeCodeStatus();
     }
   };
-
-
 
   const handleUpdateClaudeCode = async (
     patch: Partial<ChatSettings["claudeCode"]>
@@ -3096,37 +2634,71 @@ export function ChatView({
       }
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save Claude settings."
+        remoteErrorMessage(caught, "Could not save Claude settings.")
       );
     }
   };
 
-
-
-
+  /**
+   * Whether the open conversation holds nothing and nothing hangs off it: no
+   * entry, and no analysis attached. Such a conversation is a blank page, not
+   * a record — New chat reuses it, and leaving it lets it go, so the list
+   * stops collecting rows called "New chat" with nothing in them.
+   */
+  const openConversationIsBlank = () =>
+    Boolean(
+      activeSessionId &&
+        timeline.length === 0 &&
+        !liveAnalysis &&
+        !sessionAttention.get(activeSessionId)?.attached &&
+        (sessions.find((session) => session.id === activeSessionId)?.messageCount ?? 0) === 0 &&
+        // A question being written is not blank: it is kept as a draft (UAT).
+        !composerDraftRef.current.trim() &&
+        !pendingRefs.length &&
+        !pendingScheduleRefs.length
+    );
+  const letGoOfBlankConversation = async () => {
+    if (!api || !activeSessionId || !openConversationIsBlank()) return;
+    const blankId = activeSessionId;
+    try {
+      await api.deleteChatSession(blankId);
+      clearComposerDraft(blankId);
+      setSessions((current) => current.filter((session) => session.id !== blankId));
+    } catch {
+      // Keeping an empty row is harmless; failing to leave it would not be.
+    }
+  };
 
   const handleNewChat = async () => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api || exportingLatestActivity) return;
     onError(null);
+    if (openConversationIsBlank()) {
+      requestAnimationFrame(() => composerRef.current?.focus());
+      return;
+    }
+    parkTurnIfLeaving();
     try {
+      // The conversation being left may still owe its row a save; see loadSession.
+      await flushPendingSave();
       const created = await api.createChatSession(chatSettings.provider);
       setSessions((current) => [created, ...current]);
       setActiveSessionId(created.id);
       persistedBaseRef.current = 0;
       setTimeline([]);
-      resetEphemeralChatState();
+      resetEphemeralChatState(created.id);
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not start a new chat.");
+      onError(remoteErrorMessage(caught, "Could not start a new chat."));
     }
   };
 
   const handleSelectSession = async (sessionId: string) => {
-    if (!api || streaming || exportingLatestActivity || sessionId === activeSessionId) {
+    // Open while Coach answers elsewhere (UAT): the turn carries on in its own
+    // conversation. Only an activity export holds the list.
+    if (!api || exportingLatestActivity || sessionId === activeSessionId) {
       return;
     }
     onError(null);
+    await letGoOfBlankConversation();
     await loadSession(sessionId);
   };
 
@@ -3165,17 +2737,22 @@ export function ChatView({
       );
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Could not rename chat."
+        remoteErrorMessage(caught, "Could not rename chat.")
       );
     }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api || exportingLatestActivity) return;
+    if (streaming && sessionId === turnSessionIdRef.current) {
+      onMessage?.("Coach is answering in that conversation. Delete it when it has finished.");
+      return;
+    }
     onError(null);
     try {
       await api.deleteChatSession(sessionId);
-      const listed = await refreshSessions(chatSettings.provider);
+      clearComposerDraft(sessionId);
+      const listed = await refreshSessions();
       if (sessionId === activeSessionId) {
         if (listed.length > 0) {
           await loadSession(listed[0].id);
@@ -3185,11 +2762,11 @@ export function ChatView({
           setActiveSessionId(created.id);
           persistedBaseRef.current = 0;
           setTimeline([]);
-          resetEphemeralChatState();
+          resetEphemeralChatState(created.id);
         }
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not delete chat.");
+      onError(remoteErrorMessage(caught, "Could not delete chat."));
     }
   };
 
@@ -3201,13 +2778,15 @@ export function ChatView({
     try {
       const saved = await api.saveChatSettings(nextSettings);
       setChatSettings(saved);
-      await ensureActiveSession(provider);
+      // Coach's default AI changes which provider a new conversation starts
+      // with; the one open keeps its own (Q1).
+      if (!activeSessionIdRef.current) await ensureActiveSession(provider);
       if (provider === "claude-code") {
         const status = await api.getClaudeCodeStatus();
         setClaudeStatus(status);
       }
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Provider change failed.");
+      onError(remoteErrorMessage(caught, "Provider change failed."));
     }
   };
 
@@ -3225,9 +2804,7 @@ export function ChatView({
       setChatSettings(await api.saveChatSettings(nextSettings));
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the reasoning effort."
+        remoteErrorMessage(caught, "Could not save the reasoning effort.")
       );
     } finally {
       setSavingSettings(false);
@@ -3278,19 +2855,12 @@ export function ChatView({
       setChatSettings(saved);
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the selected model."
+        remoteErrorMessage(caught, "Could not save the selected model.")
       );
     } finally {
       setSavingSettings(false);
     }
   };
-
-
-
-
-
 
   const handleUpdateChatSettings = async (patch: Partial<ChatSettings>) => {
     const nextSettings = { ...chatSettings, ...patch };
@@ -3303,9 +2873,6 @@ export function ChatView({
       // keep local state even if persistence fails
     }
   };
-
-
-
 
   // First run on the local provider with no model chosen: pick one silently so
   // Coach is usable without a trip to Settings. The Coach Models dialog runs the
@@ -3328,7 +2895,6 @@ export function ChatView({
       })
       .catch(() => undefined);
   }, [api, checkingAuth, chatSettings, chatSettings.provider, chatSettings.local.model]);
-
 
   /**
    * Rolls the conversation's summary forward when the window says it is time,
@@ -3404,9 +2970,7 @@ export function ChatView({
       }
     } catch (caught) {
       showToast(
-        caught instanceof Error
-          ? caught.message
-          : "Could not compact this conversation.",
+        remoteErrorMessage(caught, "Could not compact this conversation."),
         "error"
       );
     } finally {
@@ -3442,7 +3006,7 @@ export function ChatView({
       );
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Could not read the context.";
+        remoteErrorMessage(caught, "Could not read the context.");
       setContextInspection((current) =>
         current?.sessionId === sessionId ? { ...current, error: message } : current
       );
@@ -3451,26 +3015,40 @@ export function ChatView({
 
   const sendMessage = async (
     trimmed: string,
-    answeredPrompt?: { promptId: string; choiceId: string }
+    answeredPrompt?: { promptId: string; choiceId: string },
+    /** What the question is about, when a chip says so rather than the composer. */
+    aboutRefs?: PlanRef[],
+    /** A step of the plan pipeline (P2.2): the words shown, the step's turn sent. */
+    pipeline?: ChatPipelineStep
   ): Promise<boolean> => {
-    if (!api || !trimmed || streaming || exportingLatestActivity) return false;
+    if (!api || !trimmed || exportingLatestActivity) return false;
+    if (streaming) {
+      // One turn at a time (UAT review): the view holds one turn's state, so a
+      // second conversation cannot answer while another does.
+      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
+      return false;
+    }
     if (isLatestActivityFileRequest(trimmed)) {
       await handleLatestActivityFileRequest(trimmed);
       return true;
     }
+    // The AI this conversation answers with (P2.0), which may not be Coach's:
+    // a key missing for Coach's provider must not block a conversation that
+    // uses another, and one missing for the conversation's must.
+    const turnProvider = effectiveRuntime.provider;
     if (
-      chatSettings.provider === "openrouter" &&
+      turnProvider === "openrouter" &&
       !chatSettings.openRouter.hasApiKey
     ) {
       onError("Add an OpenRouter API key in Settings, under Connections.");
       return false;
     }
-    if (chatSettings.provider === "local" && !chatSettings.local.model.trim()) {
+    if (turnProvider === "local" && !localModelConfigured) {
       onError("Enter a local model before starting the coach.");
       return false;
     }
     if (
-      chatSettings.provider === "claude-api" &&
+      turnProvider === "claude-api" &&
       !chatSettings.anthropic.hasApiKey
     ) {
       onError(
@@ -3478,7 +3056,9 @@ export function ChatView({
       );
       return false;
     }
-    let answeredPromptIndex = answeredPrompt
+    let answeredPromptIndex = pipeline
+      ? -1
+      : answeredPrompt
       ? timeline.findIndex(
           (entry) =>
             entry.kind === "coachPrompt" &&
@@ -3486,7 +3066,7 @@ export function ChatView({
             entry.prompt.answeredAt === undefined
         )
       : -1;
-    if (answeredPromptIndex < 0) {
+    if (answeredPromptIndex < 0 && !pipeline) {
       for (let index = timeline.length - 1; index >= 0; index -= 1) {
         const entry = timeline[index];
         if (entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined) {
@@ -3502,7 +3082,7 @@ export function ChatView({
     const answeredTimeline = timeline.map((entry, index): ChatEntry =>
       index === answeredPromptIndex && entry.kind === "coachPrompt"
         ? {
-            kind: "coachPrompt",
+            ...entry,
             prompt: {
               ...entry.prompt,
               answer: trimmed,
@@ -3515,15 +3095,28 @@ export function ChatView({
           }
         : entry
     );
+    const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
+    // A step and an answer to Coach's question are not about the calendar chips.
+    const scheduleRefs = originalPrompt || aboutRefs || pipeline ? [] : pendingScheduleRefs;
     const nextEntries: ChatEntry[] = originalPrompt
       ? answeredTimeline
       : [
           ...answeredTimeline,
+          ...(refs.length ? [{ kind: "planRefs" as const, refs }] : []),
+          ...(scheduleRefs.length
+            ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs.map(({ detail: _detail, sport: _sport, ...ref }) => ref) }]
+            : []),
           { kind: "message", role: "user", content: trimmed }
         ];
+    if (refs.length && !aboutRefs) setPendingRefs([]);
+    if (scheduleRefs.length) setPendingScheduleRefs([]);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    turnSessionIdRef.current = activeSessionIdRef.current;
+    setTurnSessionId(activeSessionIdRef.current);
+    setStepRun({ requestId, step: pipeline?.step ?? "turn", notes: EMPTY_NOTES, attempts: 0 });
+    turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
     setCurrentSource(null);
@@ -3543,22 +3136,43 @@ export function ChatView({
     // `tailStart` measured in one and sliced from the other would cut the
     // conversation at a boundary that does not exist in it.
     const persisted = toPersistedEntries(nextEntries);
-    const context = await compactBeforeSend(
-      activeSessionIdRef.current,
-      persisted
-    );
+    // A pipeline step carries only its recent messages (P2.4), so compacting
+    // before it would pay a summariser call for a summary it never sends.
+    const context = pipeline
+      ? null
+      : await compactBeforeSend(activeSessionIdRef.current, persisted);
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
     if (activeRequestIdRef.current !== requestId) return true;
-    const wireMessages = withPlanEdits(
+    // Every version the conversation's cards belong to, read now rather than
+    // from state: the list on screen may still be on its way, and the index is
+    // what tells the coach which draft_id is the newest.
+    const creationIds = persisted.flatMap((entry) =>
+      entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
+    );
+    const versions = creationIds.length
+      ? await api.getPlanArtifacts(creationIds).catch(() => artifactVersions)
+      : [];
+    const briefIds = [
+      ...new Set(persisted.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+    ];
+    const briefs = briefIds.length ? await api.getPlanBriefs(briefIds).catch(() => []) : [];
+    // Read now, not from state: a line applied on the other machine is what the coach should hear (P3.3).
+    const changeSetIds = scheduleChangeIds(persisted);
+    const changeSets = changeSetIds.length ? await api.getScheduleChanges(changeSetIds).catch(() => []) : [];
+    if (activeRequestIdRef.current !== requestId) return true;
+    const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
-      persisted
+      persisted,
+      Array.isArray(versions) ? versions : [],
+      Array.isArray(briefs) ? briefs : [],
+      Array.isArray(changeSets) ? changeSets : []
     );
     try {
-      await api.sendChat(requestId, wireMessages, unitSystem);
+      await api.sendChat(requestId, wireMessages, unitSystem, activeSessionIdRef.current ?? undefined, pipeline);
     } catch (caught) {
       activeRequestIdRef.current = null;
       setStreaming(false);
@@ -3567,16 +3181,80 @@ export function ChatView({
         const restoredEntries = timeline.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
-            ? { kind: "coachPrompt", prompt: originalPrompt }
+            ? { ...entry, prompt: originalPrompt }
             : entry
         );
         setTimeline(restoredEntries);
         persistHistory(activeSessionIdRef.current, restoredEntries, true);
+      } else if (pipeline) {
+        // A step the main process refused before anything streamed (P2.2):
+        // its words would sit in the conversation unanswered, and go to the
+        // model on every later turn, so the step is taken back.
+        setTimeline(timeline);
+        persistHistory(activeSessionIdRef.current, timeline, true);
       }
-      onError(caught instanceof Error ? caught.message : "Chat request failed.");
+      onError(remoteErrorMessage(caught, "Chat request failed."));
     }
     return true;
   };
+
+  /** "Draw the outline", or a redraw with the athlete's note, as a turn of the conversation (P2.2). */
+  const drawOutline = (artifactId: string, note?: string) =>
+    sendMessage(outlineStepText(note), undefined, [], {
+      step: "outline",
+      artifactId,
+      ...(note?.trim() ? { note: note.trim() } : {})
+    });
+
+  /*
+   * The outline AI Plan asked for, drawn once the new conversation is on
+   * screen. Not from `startPlanConversation` itself: `sendMessage` reads the
+   * timeline, the open conversation and its settings from the render it
+   * belongs to, and there those are still the conversation being left.
+   */
+  useEffect(() => {
+    if (!autoOutline) return;
+    // Left before it was drawn: the card's own button is there when they return.
+    if (activeSessionId !== autoOutline.sessionId) {
+      setAutoOutline(null);
+      return;
+    }
+    if (streaming || exportingLatestActivity || activeSessionIdRef.current !== autoOutline.sessionId) return;
+    if (conversationSettings?.sessionId !== autoOutline.sessionId) return;
+    if (!timeline.some((entry) => entry.kind === "planBrief" && entry.artifactId === autoOutline.artifactId)) return;
+    setAutoOutline(null);
+    void drawOutline(autoOutline.artifactId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOutline, activeSessionId, conversationSettings, timeline, streaming, exportingLatestActivity]);
+
+  /** "Write the sessions" to the brief's outline, as a turn of the conversation (P2.3). */
+  const writeSessions = (artifactId: string) =>
+    sendMessage("Write the sessions", undefined, [], { step: "sessions", artifactId });
+  /** Whether a brief's sessions are written: it has a version, and is a plan from then on. */
+  const briefIsPlan = (artifactId: string) => artifactVersions.some((version) => version.artifactId === artifactId);
+
+  /** Where in the transcript something waits on the athlete (R3), in order. */
+  const waitingIndices = timeline.flatMap((entry, index) => {
+    if (entry.kind === "coachPrompt") return entry.prompt.answeredAt === undefined ? [index] : [];
+    if (entry.kind === "scheduleChange") {
+      const set = scheduleChanges[entry.changeSetId];
+      return set && proposedLines(set).length ? [index] : [];
+    }
+    if (entry.kind === "planBrief") {
+      return planBriefs[entry.artifactId] && !briefIsPlan(entry.artifactId) ? [index] : [];
+    }
+    return [];
+  });
+  /* Counted as the conversation's row counts them — a proposal by its open
+     lines — so the bar and the list's "2 to decide" do not disagree. */
+  const waitingCount = waitingIndices.reduce((count, index) => {
+    const entry = timeline[index];
+    const set = entry?.kind === "scheduleChange" ? scheduleChanges[entry.changeSetId] : null;
+    return count + (set ? proposedLines(set).length : 1);
+  }, 0);
+  const [waitingCursor, setWaitingCursor] = useState(0);
+  /** The sources of a plan being started from the empty conversation, while its brief is open (R3). */
+  const [newPlanSources, setNewPlanSources] = useState<TrainingPlanDataSources | null>(null);
 
   const handleCoachPromptChoice = async (
     prompt: CoachInputPrompt,
@@ -3592,8 +3270,15 @@ export function ChatView({
     composerRef.current?.focus();
   };
 
+  /* Stop is asked of the main process and answered when the turn ends, which
+     can be a moment; the button says it heard in the meantime. */
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => {
+    if (!streaming) setStopping(false);
+  }, [streaming]);
   const handleStop = () => {
     if (!api || !activeRequestIdRef.current) return;
+    setStopping(true);
     void api.cancelChat(activeRequestIdRef.current);
     // A turn still being compacted has not reached a provider, so there is no
     // stream for the cancel above to find and no `chat:streamError` coming to
@@ -3610,18 +3295,29 @@ export function ChatView({
   const handleUploadPlanDraft = async (
     draftId: string,
     destination: TrainingPlanDestination,
-    scheduleDate?: string
-  ) => {
-    if (!api || uploadingDraftId) return;
+    scheduleDate?: string,
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
+  ): Promise<UploadPlanResult | undefined> => {
+    if (!api || uploadingDraftId) return undefined;
     setUploadingDraftId(draftId);
+    setCorosConflict(null);
     onError(null);
     try {
       const result = await api.uploadTrainingPlanDraft(
         draftId,
         unitSystem,
         destination,
-        scheduleDate
+        scheduleDate,
+        keepInLibrary,
+        options
       );
+      // The plan changed on COROS since this version was made: nothing was
+      // written, and the athlete says which one stands (P1.6).
+      if (result.conflict) {
+        setCorosConflict({ draftId, name: result.planName });
+        return result;
+      }
       const scheduledDates = new Map(
         result.entries.flatMap((entry) => {
           if (!entry.date) return [];
@@ -3638,7 +3334,7 @@ export function ChatView({
         const next = prev.map((entry) =>
           entry.kind === "planDraft" && entry.draft.draftId === draftId
             ? {
-                kind: "planDraft" as const,
+                ...entry,
                 draft: {
                   ...entry.draft,
                   uploadedAt: Date.now(),
@@ -3679,9 +3375,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to save the workout or plan to COROS."
+        remoteErrorMessage(caught, "Failed to save the workout or plan to COROS.")
       );
     } finally {
       setUploadingDraftId(null);
@@ -3699,13 +3393,25 @@ export function ChatView({
    */
   const handleRemovePlanDraft = (draftId: string) => {
     setOpenCreationId((current) => (current === draftId ? null : current));
+    // A creation is removed whole: every version's card, or the one before
+    // the newest would unfold in its place.
+    const versionIds = new Set([
+      draftId,
+      ...(versionIndex.get(draftId)?.siblings.map((version) => version.draftId) ?? [])
+    ]);
+    const removed = planDrafts.filter((draft) => versionIds.has(draft.draftId));
+    const saved = removed.some(
+      (draft) => draft.uploadedAt || draft.uploadResult || uploadedPlans[draft.draftId]
+    ) || (versionIndex.get(draftId)?.siblings.some((version) => version.uploadedAt) ?? false);
+    // Unsaved, the drafts go too; saved, they stay, because the plan on COROS
+    // names one. The cards are marked either way.
+    if (api && removed.length > 0 && !saved) {
+      void api.removePlanDraft(draftId).catch(() => undefined);
+    }
     setTimeline((prev) => {
       const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === draftId
-          ? {
-              kind: "planDraft",
-              draft: { ...entry.draft, removedAt: Date.now() }
-            }
+        entry.kind === "planDraft" && versionIds.has(entry.draft.draftId) && !entry.draft.removedAt
+          ? { ...entry, draft: { ...entry.draft, removedAt: Date.now() } }
           : entry
       );
       persistHistory(activeSessionIdRef.current, next, true);
@@ -3719,19 +3425,55 @@ export function ChatView({
    * the card's identity for sync is kept (`...entry.draft` first). `editedAt`
    * is what shows the coach this version on the next turn.
    */
-  const handlePlanDraftEdited = (preview: PlanDraftPreview) => {
-    setEditingPlanDraftId(null);
-    setOpenCreationId(preview.draftId);
+  /*
+   * A version the athlete made — an edit saved from the editor, or an older
+   * version restored — goes at the end of the conversation, where it was made:
+   * a line saying what happened, which is also how the coach is told once
+   * rather than handed the whole plan on every turn after (P1.3), and then
+   * the new version's card, under which the one it replaced folds away.
+   */
+  const appendVersion = (
+    written: PlanVersionWritten,
+    action: "edited" | "restored" | "imported" | "removedOnCoros",
+    /** The conversation the write was asked from; a card never lands in another. */
+    sessionId: string | null = activeSessionIdRef.current
+  ) => {
+    // An answer that arrives after the athlete moved to another conversation
+    // belongs to the one it was asked from, which is no longer on screen: the
+    // version is in the store, and the canvas lists it there.
+    if (!sessionId || activeSessionIdRef.current !== sessionId) return;
+    const event: ChatEntry = {
+      kind: "planEvent",
+      event: {
+        eventId: crypto.randomUUID(),
+        artifactId: written.artifactId,
+        draftId: written.preview.draftId,
+        action,
+        author: action === "imported" || action === "removedOnCoros" ? "coros" : "athlete",
+        name: written.preview.name,
+        artifactType: written.preview.artifactType === "workout" ? "workout" : "plan",
+        fromVersion: written.fromVersion,
+        toVersion: written.toVersion,
+        ...(written.changes.length ? { changes: written.changes } : {}),
+        at: Date.now()
+      }
+    };
     setTimeline((prev) => {
-      const next = prev.map((entry): ChatEntry =>
-        entry.kind === "planDraft" && entry.draft.draftId === preview.draftId
-          ? { kind: "planDraft", draft: { ...entry.draft, ...preview } }
-          : entry
-      );
-      persistHistory(activeSessionIdRef.current, next, true);
+      // Two asks can share one read against COROS (the canvas opening while
+      // an edit begins), and so one version: its card goes in once.
+      if (prev.some((entry) => entry.kind === "planDraft" && entry.draft.draftId === written.preview.draftId)) {
+        return prev;
+      }
+      const next: ChatEntry[] = [...prev, event, { kind: "planDraft", draft: written.preview }];
+      persistHistory(sessionId, next, true);
       return next;
     });
-    showToast("Plan updated. The coach will see your version on its next reply.");
+  };
+
+  const handlePlanDraftEdited = (written: PlanVersionWritten) => {
+    setEditingPlanDraftId(null);
+    setEditingWorkoutDraftId(null);
+    appendVersion(written, "edited");
   };
 
   const handleScrollToPlanChat = (draftId: string) => {
@@ -3740,22 +3482,8 @@ export function ChatView({
     );
     if (planIndex < 0) return;
 
-    let targetIndex = timeline.findIndex(
-      (entry, index) =>
-        index > planIndex &&
-        entry.kind === "message" &&
-        entry.role === "assistant"
-    );
-    if (targetIndex < 0) {
-      for (let index = planIndex - 1; index >= 0; index -= 1) {
-        const entry = timeline[index];
-        if (entry.kind === "message" && entry.role === "assistant") {
-          targetIndex = index;
-          break;
-        }
-      }
-    }
-    if (targetIndex < 0) return;
+    // The card itself: it is drawn in the conversation, under its answer.
+    const targetIndex = planIndex;
 
     const transcript = scrollRef.current;
     const target = transcript?.querySelector<HTMLElement>(
@@ -3782,22 +3510,27 @@ export function ChatView({
     }, 1800);
   };
 
-  const handleConfirmWorkoutDelete = async (requestId: string) => {
-    if (!api || deletingRequestId) return;
-    setDeletingRequestId(requestId);
+  const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
+    if (!api || applyingChange) return;
+    setApplyingChange({ changeSetId, lineId: lineId ?? "*" });
     onError(null);
     try {
-      const result = await api.confirmWorkoutDelete(requestId);
-      setDeletedWorkouts((prev) => ({ ...prev, [requestId]: result }));
-      onPlanUploaded?.();
+      const set = apply
+        ? await api.applyScheduleChange(changeSetId, lineId)
+        : await api.dismissScheduleChange(changeSetId, lineId);
+      setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+      if (apply) onPlanUploaded?.();
     } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Failed to delete workout from COROS."
-      );
+      onError(remoteErrorMessage(caught, apply ? "The change was not applied." : "The change was not dismissed."));
+      // What COROS did before the failure is in the row: read it again.
+      void api
+        .getScheduleChanges([changeSetId])
+        .then(([set]) => {
+          if (set) setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
+        })
+        .catch(() => undefined);
     } finally {
-      setDeletingRequestId(null);
+      setApplyingChange(null);
     }
   };
 
@@ -3829,9 +3562,7 @@ export function ChatView({
       });
     } catch (caught) {
       const message =
-        caught instanceof Error
-          ? caught.message
-          : "Latest activity FIT export failed.";
+        remoteErrorMessage(caught, "Latest activity FIT export failed.");
       onError(message);
       setTimeline((prev) => {
         const next: ChatEntry[] = [
@@ -3850,13 +3581,42 @@ export function ChatView({
     }
   };
 
-  const isLocalProvider = chatSettings.provider === "local";
+  /*
+   * The AI that answers in this conversation, resolved the way `streamChat`
+   * resolves it: the conversation's own choice where it made one, Coach's
+   * settings for the rest. The composer's pickers show and change this — they
+   * used to show Coach's settings, so a conversation with an AI of its own
+   * answered with one model while the pill named another.
+   */
+  const conversationRuntime = conversationSettings?.runtime;
+  /** The provider this conversation was started with, which it keeps (Q1). */
+  const conversationProvider =
+    sessions.find((session) => session.id === activeSessionId)?.provider ?? chatSettings.provider;
+  const effectiveRuntime: GeneratorRuntime = {
+    ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? conversationProvider),
+    ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
+    ...(conversationRuntime?.effort ? { effort: conversationRuntime.effort } : {})
+  };
+  const effectiveProvider = effectiveRuntime.provider;
+  // What the composer can send is the conversation's AI.
+  const isLocalProvider = effectiveProvider === "local";
+  // The sign-in gates stay on Coach's own provider: a gate replaces the whole
+  // conversation, and one whose AI lacks a key is still worth reading — the
+  // send checks that key and names it instead.
   const isClaudeProvider = chatSettings.provider === "claude-code";
   const isOpenRouterProvider = chatSettings.provider === "openrouter";
   const isClaudeApiProvider = chatSettings.provider === "claude-api";
   const isChatGptProvider = chatSettings.provider === "chatgpt";
-  const localModelConfigured = chatSettings.local.model.trim().length > 0;
+  // The conversation's own local model counts, not only Coach's.
+  const localModelConfigured = effectiveRuntime.model.trim().length > 0;
   const isBusy = streaming || exportingLatestActivity;
+  /* A turn running in the conversation on screen, or in another one (UAT). */
+  const turnHere = streaming && turnSessionId === activeSessionId;
+  const turnElsewhere = streaming && turnSessionId !== activeSessionId;
+  /** Why a send waits while Coach answers in another conversation (UAT). */
+  const answeringElsewhere = `Coach is still answering in "${
+    sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"
+  }". Send this when it has finished.`;
   const waitingForCoachAnswer = [...timeline]
     .reverse()
     .some(
@@ -3876,108 +3636,326 @@ export function ChatView({
   const planDrafts = timeline.flatMap((entry) =>
     entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft] : []
   );
-  const openCreation =
-    planDrafts.find((draft) => draft.draftId === openCreationId) ?? null;
-  const trainingPlanDrafts = planDrafts.filter(
-    (draft) => draft.artifactType !== "workout"
+  /** What the Creations list shows: each creation once, as its newest version. */
+  const listedCreations = planDrafts.filter((draft) =>
+    isLatestVersion(versionIndex, draft.draftId)
   );
-  const openCreationKicker =
-    openCreation === null
-      ? ""
-      : openCreation.artifactType === "workout"
-        ? "One-off workout"
-        : `Plan ${
-            trainingPlanDrafts.findIndex(
-              (draft) => draft.draftId === openCreation.draftId
-            ) + 1
-          } of ${trainingPlanDrafts.length}`;
-
-  /**
-   * Opening the panel is reserved for news, so this has to tell a creation
-   * that just arrived from one that was already in the transcript when the
-   * conversation was opened. Ids seen for this session are what separates
-   * them; switching conversations adopts whatever is there and closes up,
-   * because scrolling back through an old chat is not the coach proposing
-   * anything.
+  /** The whole of a creation, as a question points at it. */
+  const wholeCreationRef = (draft: PlanDraftPreview): PlanRef => {
+    const versionInfo = versionIndex.get(draft.draftId);
+    return {
+      artifactId: versionInfo?.artifactId ?? draft.draftId,
+      draftId: draft.draftId,
+      ...(versionInfo ? { version: versionInfo.version } : {}),
+      name: draft.name,
+      artifactType: draft.artifactType === "workout" ? "workout" : "plan",
+      scope: "plan",
+      label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
+    };
+  };
+  /*
+   * The follow-ups of the conversation's newest creation, above the composer
+   * (R1). They were under every card, so an old version's chips stayed on
+   * screen asking to change a plan that had since moved on. A saved one-off
+   * workout has none: nothing on COROS would follow.
    */
-  const planDraftIdKey = planDrafts.map((draft) => draft.draftId).join("|");
-  useEffect(() => {
-    const ids = planDrafts.map((draft) => draft.draftId);
-    if (planPanelSessionRef.current !== activeSessionId) {
-      planPanelSessionRef.current = activeSessionId;
-      seenPlanDraftIdsRef.current = new Set(ids);
-      setPlanPanelOpen(false);
-      setOpenCreationId(null);
-      setSelectedPlanDraftId(ids.at(-1) ?? null);
+  const newestCreation = [...listedCreations].reverse().find((draft) => !draft.removedAt);
+  /** Versions an event line already speaks for, so their own line is not drawn too. */
+  const eventedDraftIds = new Set(
+    timeline.flatMap((entry) => (entry.kind === "planEvent" ? [entry.event.draftId] : []))
+  );
+  const newestSavedWorkout =
+    newestCreation?.artifactType === "workout" &&
+    Boolean(newestCreation.uploadedAt || newestCreation.uploadResult || uploadedPlans[newestCreation.draftId]);
+  const composerFollowUps =
+    newestCreation && !newestSavedWorkout && api
+      ? {
+          subject: newestCreation.name,
+          chips: refinementChips(
+            newestCreation,
+            versionIndex
+              .get(newestCreation.draftId)
+              ?.siblings.find((item) => item.draftId === newestCreation.draftId)?.refinements
+          ),
+          onPick: (text: string) => void sendMessage(text, undefined, [wholeCreationRef(newestCreation)])
+        }
+      : null;
+  /*
+   * What "About…" offers (R1): a week or a day of the calendar, and anything
+   * made in this conversation — the chips Ask Coach from the Calendar and the
+   * Library put here, reachable from the composer itself.
+   */
+  const aboutOptions: AboutOption[] = (() => {
+    const today = new Date();
+    const thisMonday = mondayOfDate(today);
+    const nextMonday = new Date(thisMonday);
+    nextMonday.setDate(nextMonday.getDate() + 7);
+    const weekRef = (monday: Date): ScheduleRef => {
+      const keys = Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(monday);
+        day.setDate(day.getDate() + index);
+        return keyFromDate(day);
+      });
+      return { scope: "week", day: keys[0], label: `Week of ${weekRangeLabel(keys)}` };
+    };
+    const addScheduleRef = (ref: ScheduleRef) =>
+      setPendingScheduleRefs((current) =>
+        current.some((item) => scheduleRefKey(item) === scheduleRefKey(ref)) ? current : [...current, ref]
+      );
+    return [
+      {
+        key: "today",
+        group: "Your calendar",
+        label: "Today",
+        onPick: () => addScheduleRef({ scope: "day", day: keyFromDate(today), label: "Today" })
+      },
+      { key: "this-week", group: "Your calendar", label: "This week", onPick: () => addScheduleRef(weekRef(thisMonday)) },
+      { key: "next-week", group: "Your calendar", label: "Next week", onPick: () => addScheduleRef(weekRef(nextMonday)) },
+      ...listedCreations.map((draft) => ({
+        key: `creation:${draft.draftId}`,
+        group: "Made in this conversation",
+        label: draft.name,
+        onPick: () => addRef(wholeCreationRef(draft))
+      }))
+    ];
+  })();
+  const activeSession = sessions.find((session) => session.id === activeSessionId);
+  /** Under the conversation's name: what it has made, and when it last moved. */
+  const conversationSubtitle = [
+    listedCreations.length
+      ? `${listedCreations.length} creation${listedCreations.length === 1 ? "" : "s"}`
+      : "",
+    activeSession?.messageCount ? `last reply ${formatSessionRelativeTime(activeSession.updatedAt)}` : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  /* The transcript's preview is light; the steps a card reviews or edits come
+     from the draft's document. */
+  const documentOf = (draft: PlanDraftPreview) =>
+    planDocuments[`${draft.draftId}:${draft.editedAt ?? 0}`];
+  const withSources = (draft: PlanDraftPreview) => withDocumentSources(draft, documentOf(draft));
+  const documentForDraft = (draftId: string) => {
+    const card = planDrafts.find((draft) => draft.draftId === draftId);
+    return card ? documentOf(card) : undefined;
+  };
+  /* The one way into a creation's editor, from the card or the canvas. A
+     workout's editor needs its steps, which only the document has. */
+  const openCreationEditor = async (draftId: string) => {
+    const draft = planDrafts.find((item) => item.draftId === draftId);
+    if (!draft) return;
+    if (draft.artifactType === "workout" && !documentOf(draft)) return;
+    onError(null);
+    if (draft.artifactType === "workout") {
+      setEditingWorkoutDraftId(draftId);
       return;
     }
-    const fresh = ids.filter((id) => !seenPlanDraftIdsRef.current.has(id));
-    if (fresh.length === 0) return;
-    for (const id of fresh) seenPlanDraftIdsRef.current.add(id);
-    setSelectedPlanDraftId(fresh[fresh.length - 1] ?? null);
+    // A plan on COROS is read against COROS first (D12): an edit made in the
+    // Library comes in as the newest version, and the editor opens on that.
+    let target = draftId;
+    const sessionId = activeSessionIdRef.current;
+    if (api && isOnCoros(versionIndex.get(draftId))) {
+      const sync = await api
+        .syncPlanFromCoros(draftId, unitSystem)
+        .catch((): PlanCorosSync => ({ kind: "current" }));
+      // Moved to another conversation while COROS answered: no editor opens there.
+      if (activeSessionIdRef.current !== sessionId) return;
+      if (sync.kind !== "current") {
+        appendVersion(sync.written, sync.kind, sessionId);
+        target = sync.written.preview.draftId;
+      }
+    }
+    setEditingPlanDraftId(target);
+  };
+  /*
+   * Opening a creation on COROS in the canvas asks the plan cache whether
+   * COROS has moved on — no request — and brings a newer COROS version in.
+   */
+  const openCreation = (draftId: string) => {
     setPlanPanelOpen(true);
-    // `planDrafts` is rebuilt on every render; the id list is what actually
-    // changes, and re-running on the array identity would reopen the panel on
-    // every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, planDraftIdKey]);
+    setOpenCreationId(draftId);
+    if (!api || !isOnCoros(versionIndex.get(draftId))) return;
+    const sessionId = activeSessionIdRef.current;
+    void api
+      .syncPlanFromCoros(draftId, unitSystem, true)
+      .then((sync) => {
+        if (sync.kind !== "current") appendVersion(sync.written, sync.kind, sessionId);
+      })
+      .catch(() => undefined);
+  };
+  /* An older version made the newest again: a new card, and a line saying
+     so where it happened, as an edit leaves one. */
+  const handleRestoreVersion = async (draftId: string) => {
+    if (!api) return;
+    onError(null);
+    const sessionId = activeSessionIdRef.current;
+    try {
+      appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored", sessionId);
+    } catch (caught) {
+      onError(remoteErrorMessage(caught, "Could not restore that version."));
+    }
+  };
+  const editingWorkoutDraft =
+    editingWorkoutDraftId === null
+      ? null
+      : planDrafts.find((draft) => draft.draftId === editingWorkoutDraftId) ?? null;
+  const editingWorkout = editingWorkoutDraft ? withSources(editingWorkoutDraft) : null;
 
-  const providerSwitch = (
-    <ProviderSwitch
-      provider={chatSettings.provider}
-      disabled={savingSettings || isBusy}
-      onChange={(provider) => void handleProviderChange(provider)}
-    />
-  );
-  const selectedModel =
-    chatSettings.provider === "claude-api"
-      ? chatSettings.anthropic.model
-      : chatSettings.provider === "claude-code"
-        ? chatSettings.claudeCode.model ?? ""
-        : chatSettings.provider === "openrouter"
-          ? chatSettings.openRouter.model
-          : chatSettings.chatgpt.model ?? "";
-  const selectedEffort =
-    chatSettings.provider === "claude-api"
-      ? chatSettings.anthropic.effort
-      : chatSettings.claudeCode.effort;
-  const providerControls = (
+  /*
+   * The Creations list opens only when asked for (UAT): a creation is read in
+   * the conversation, on its card, so a new one does not pull the list open.
+   * Switching conversations closes it, with any details open.
+   */
+  useEffect(() => {
+    setPlanPanelOpen(false);
+    setOpenCreationId(null);
+  }, [activeSessionId]);
+
+  /*
+   * The Workbench (R2): open while its index or a creation's details are.
+   * While it is open on a window narrower than WORKBENCH_FOLD_WIDTH the
+   * conversation list folds, so the conversation keeps its width — the reason
+   * the details were once a modal screen (UAT #2). The fold is not the
+   * athlete's own collapse: closing the Workbench brings the list back. Under
+   * WORKBENCH_SHEET_WIDTH the Workbench is a sheet over the whole
+   * conversation, composer included (UAT).
+   */
+  const workbenchOpen = (planPanelOpen || Boolean(openCreationId)) && listedCreations.length > 0;
+  const closeWorkbench = () => {
+    setPlanPanelOpen(false);
+    setOpenCreationId(null);
+  };
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const workbenchFoldsList = workbenchOpen && viewportWidth < WORKBENCH_FOLD_WIDTH;
+  const workbenchCovers = workbenchOpen && viewportWidth < WORKBENCH_SHEET_WIDTH;
+
+  /*
+   * A change made in the composer is this conversation's (Q1 of the Coach
+   * Workbench review): it is written to the conversation's settings, and only
+   * what differs from Coach's settings is stored, so picking Coach's own AI
+   * clears the override. With no conversation open yet, there is nothing to
+   * scope it to and it changes Coach's settings as before.
+   */
+  const coachRuntime = runtimeFromSettings(chatSettings);
+  const changeCoachRuntime = (next: GeneratorRuntime) => {
+    if (next.provider !== chatSettings.provider) void handleProviderChange(next.provider);
+    else if (next.model !== coachRuntime.model) void handleModelChange(next.model);
+    else if (next.effort !== coachRuntime.effort) void handleEffortChange(next.effort);
+  };
+  const changeConversationRuntime = (next: GeneratorRuntime) => {
+    if (!conversationSettings) {
+      changeCoachRuntime(next);
+      return;
+    }
+    const override = requestRuntime(next, chatSettings, conversationProvider);
+    const { runtime: _previous, ...rest } = conversationSettings;
+    updateConversationSettings(override ? { ...rest, runtime: override } : rest);
+    if (next.provider === "claude-code" && api) {
+      void api.getClaudeCodeStatus().then(setClaudeStatus).catch(() => undefined);
+    }
+  };
+  /** Each provider's models as this screen last read them (`providerModelOptions`). */
+  const modelOptionsFor = (provider: ChatProvider) =>
+    runtimeModelOptions(provider, chatSettings, claudeStatus);
+  /*
+   * The three pickers, for the sign-in gates: a gate is about Coach's own
+   * provider, so its picks change Coach's settings — one scoped to the
+   * conversation would leave the athlete standing in front of it. The
+   * composer states the conversation's AI as one chip instead.
+   */
+  const renderProviderControls = (
+    runtime: GeneratorRuntime,
+    change: (next: GeneratorRuntime) => void
+  ) => (
     <div className="chat-provider-controls">
-      {providerSwitch}
-      <ModelSwitch
-        provider={chatSettings.provider}
-        model={selectedModel}
-        defaultModel={
-          chatSettings.provider === "claude-code"
-            ? (claudeStatus?.defaultModel ??
-              chatSettings.claudeCode.defaultModel)
-            : undefined
-        }
-        availableModels={
-          chatSettings.provider === "claude-code"
-            ? (claudeStatus?.availableModels ??
-              chatSettings.claudeCode.availableModels)
-            : undefined
-        }
+      <ProviderSwitch
+        provider={runtime.provider}
         disabled={savingSettings || isBusy}
-        onChange={(model) => void handleModelChange(model)}
+        onChange={(provider) => change(runtimeFromSettings(chatSettings, provider))}
+      />
+      <ModelSwitch
+        provider={runtime.provider}
+        model={runtime.model}
+        options={modelOptionsFor(runtime.provider)}
+        disabled={savingSettings || isBusy}
+        onChange={(model) => change({ ...runtime, model })}
       />
       <EffortSwitch
-        provider={chatSettings.provider}
-        effort={selectedEffort}
+        provider={runtime.provider}
+        model={runtime.model}
+        modelOptions={modelOptionsFor(runtime.provider)}
+        effort={runtime.effort}
         disabled={savingSettings || isBusy}
-        onChange={(effort) => void handleEffortChange(effort)}
+        onChange={(effort) => change({ ...runtime, effort })}
       />
     </div>
   );
+  /*
+   * The composer states the conversation's AI as one chip (UAT after R3):
+   * three pickers under the words read as settings to fiddle with on every
+   * turn. The chip opens "AI for this conversation", where it is changed.
+   */
+  const aiReadiness = coachProviderReadiness(chatSettings, authStatus, claudeStatus);
+  /* Only once its status has been read: a sign-in still being checked is not
+     a warning. */
+  const aiStatusRead =
+    (effectiveRuntime.provider !== "claude-code" || claudeStatus !== null) &&
+    (effectiveRuntime.provider !== "chatgpt" || authStatus !== null);
+  const aiBlocked = aiStatusRead && aiReadiness[effectiveRuntime.provider] === false;
+  const aiModelLine = runtimeSummary(
+    effectiveRuntime,
+    runtimeModelOptions(effectiveRuntime.provider, chatSettings, claudeStatus)
+  );
+  // The chip names the model; a local one says it is local, since its name
+  // alone ("No model chosen", "llama3") does not.
+  const aiSummary = effectiveRuntime.provider === "local" ? `Local · ${aiModelLine}` : aiModelLine;
+  /* What the question points at, previewed from the plans already in hand
+     (UAT, option A): no request is made for it. */
+  const composerRefs: ComposerRef[] = [
+    ...pendingScheduleRefs.map((ref) => ({
+      key: `s:${scheduleRefKey(ref)}`,
+      preview: scheduleRefPreview(ref),
+      onRemove: () =>
+        setPendingScheduleRefs((current) => current.filter((item) => scheduleRefKey(item) !== scheduleRefKey(ref)))
+    })),
+    ...pendingRefs.map((ref) => ({
+      key: `p:${refKey(ref)}`,
+      preview: planRefPreview(ref, documentForDraft(ref.draftId), unitSystem),
+      onRemove: () => setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
+    }))
+  ];
+  const providerControls = (
+    <button
+      type="button"
+      className={`chat-ai-chip${aiBlocked ? " is-blocked" : ""}`}
+      data-action="conversationAi"
+      disabled={savingSettings || isBusy}
+      aria-haspopup="dialog"
+      aria-label={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}, ${aiSummary}${aiBlocked ? ", not set up" : ""}. Change`}
+      title={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}`}
+      onClick={() => setAiSheetOpen(true)}
+    >
+      {aiBlocked ? <AlertTriangle size={13} aria-hidden="true" /> : <Sparkles size={13} aria-hidden="true" />}
+      <span>{aiSummary}</span>
+    </button>
+  );
+  const coachProviderControls = renderProviderControls(coachRuntime, changeCoachRuntime);
 
   const conversationSidebarOpen = chatSettings.sidebarOpen !== false;
   const sidebarProps = {
-    open: conversationSidebarOpen,
+    // Folded, not collapsed, while the Workbench needs the width (R2).
+    open: conversationSidebarOpen && !workbenchFoldsList,
+    folded: workbenchFoldsList,
     overlay: false,
     sessions,
     activeSessionId,
-    busy: isBusy,
+    // The list stays open while Coach answers (UAT); the answering row says so.
+    busy: exportingLatestActivity,
+    answeringSessionId: streaming ? turnSessionId : null,
     attention: sessionAttention,
     compactingSessionId,
     onClose: () => void handleUpdateChatSettings({ sidebarOpen: false }),
@@ -4008,14 +3986,18 @@ export function ChatView({
     />
   ) : null;
 
-  const settingsModalProps = {
-    api,
-    open: settingsOpen,
-    chatSettings,
-    onClose: () => setSettingsOpen(false),
-    onUpdateChatSettings: (patch: Partial<ChatSettings>) =>
-      void handleUpdateChatSettings(patch)
-  };
+  /* Coach's own settings are a dialog of their own (UAT after R3): as a
+     section of the app's Settings they buried that page's content. */
+  const openSettings = () => setSettingsOpen(true);
+  const settingsModal = (
+    <ChatSettingsModal
+      api={api}
+      open={settingsOpen}
+      chatSettings={chatSettings}
+      onClose={() => setSettingsOpen(false)}
+      onUpdateChatSettings={(patch: Partial<ChatSettings>) => void handleUpdateChatSettings(patch)}
+    />
+  );
 
   if (checkingAuth) {
     return (
@@ -4036,7 +4018,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
               Settings
@@ -4059,7 +4041,7 @@ export function ChatView({
                 <button
                   type="button"
                   className="primary-button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
                   Add API key
@@ -4080,12 +4062,11 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -4103,7 +4084,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
               Settings
@@ -4175,12 +4156,11 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -4197,7 +4177,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
               aria-label="Open settings"
             >
               <Settings2 size={16} aria-hidden="true" />
@@ -4222,7 +4202,7 @@ export function ChatView({
                 <button
                   type="button"
                   className="primary-button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
                   Add API key
@@ -4243,12 +4223,11 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
@@ -4269,7 +4248,7 @@ export function ChatView({
             <button
               type="button"
               className="chat-settings-button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings()}
               aria-label="Open settings"
             >
               <Settings2 size={16} aria-hidden="true" />
@@ -4303,150 +4282,111 @@ export function ChatView({
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
-              {providerControls}
+              {coachProviderControls}
             </div>
           </div>
         </div>
-        <ChatSettingsModal {...settingsModalProps} />
-      {contextHistoryDialog}
+        {settingsModal}
         {contextHistoryDialog}
       </div>
     );
   }
 
-/**
- * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
- * analyses, so every entry a run produced says which coach spoke.
- */
-function AnalysisAttribution({
-  marker
-}: {
-  marker: ChatEntryAnalysisMarker;
-}) {
-  return (
-    <span className="chat-analysis-attribution">
-      <Zap size={12} aria-hidden="true" />
-      {marker.name}
-      <span className="chat-analysis-attribution-trigger">
-        · {marker.triggerLabel}
-      </span>
-    </span>
-  );
-}
+  /* The running turn's bubble sits where the turn began, above the cards it
+     produces as it runs, so its answer reads before them — as it will once
+     settled (`settleTurnEntries`). One array with keys, so nothing remounts.
 
-/**
- * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
- * default — it is machinery, not conversation — but openable, because an
- * athlete judging an analysis's answer needs to see what it was asked.
- */
-function AnalysisPromptChip({
-  marker,
-  prompt,
-  index,
-  highlighted
-}: {
-  marker: ChatEntryAnalysisMarker;
-  prompt: string;
-  index: number;
-  highlighted: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div
-      className={`chat-row chat-row-analysis${
-        highlighted ? " is-chat-jump-target" : ""
-      }`}
-      data-chat-entry-index={index}
-    >
-      <button
-        type="button"
-        className="chat-analysis-chip"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <Zap size={12} aria-hidden="true" />
-        {marker.name}
-        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
-      </button>
-      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
-    </div>
-  );
-}
-
-/**
- * When the coach looked. Absolute, not relative: a transcript entry is read
- * long after it was written, and "2h ago" becomes a lie the moment the
- * conversation is reopened.
- */
-function formatLookedAt(at: number): string {
-  const when = new Date(at);
-  if (Number.isNaN(when.getTime())) {
-    return "";
-  }
-  const time = when.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-  if (when.toDateString() === new Date().toDateString()) {
-    return time;
-  }
-  const day = when.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric"
-  });
-  return `${day}, ${time}`;
-}
-
-/**
- * 5.5: an analysis looked and had nothing to say. One line, the same pill as
- * the playbook chip, but nothing to open — the whole point is that there is no
- * content behind it.
- */
-function AnalysisSilentChip({
-  marker,
-  at,
-  index,
-  highlighted
-}: {
-  marker: ChatEntryAnalysisMarker;
-  at: number;
-  index: number;
-  highlighted: boolean;
-}) {
-  return (
-    <div
-      className={`chat-row chat-row-analysis${
-        highlighted ? " is-chat-jump-target" : ""
-      }`}
-      data-chat-entry-index={index}
-    >
-      <span className="chat-analysis-chip chat-analysis-chip-static">
-        <Zap size={12} aria-hidden="true" />
-        {marker.name} looked, nothing new
-        <span className="chat-analysis-chip-trigger">
-          · {formatLookedAt(at)}
+     A pipeline step is the exception for its progress (UAT): the trail that
+     says Coach is drawing the outline or writing the sessions is a row of its
+     own at the very end, under whatever the step has produced so far — above
+     a chart the step drew, it read as finished while it was still working.
+     The step's words, when it has any, still stand where the turn began. */
+  const runLive = Boolean(turnHere && stepRun && stepRun.requestId === activeRequestIdRef.current);
+  const stepActive = runLive && stepRun?.step !== "turn";
+  /* An ordinary turn shows its trail — a line per read, in the athlete's
+     words — until the answer's words arrive (R1): it used to be one line
+     naming the tool ("Using get activity detail…"). */
+  const turnTrail =
+    runLive && stepRun && stepRun.step === "turn" && stepRun.notes.trail.length && !compacting
+      ? stepRun
+      : null;
+  const pendingStatus = (
+    <div className="chat-stream-pending">
+      {turnTrail ? (
+        <CoachStepTrail run={turnTrail} quiet />
+      ) : activeTool || !thinkingText ? (
+        <span className="chat-stream-status">
+          {compacting
+            ? "Compacting the conversation…"
+            : resumedCoachPromptRef.current
+              ? "Resuming plan…"
+              : "Working on it…"}
         </span>
-      </span>
+      ) : null}
+      {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
     </div>
   );
-}
+  const streamedAnswer = streamingText ? (
+    <>
+      {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
+      <AssistantMarkdown content={streamingText} streaming />
+    </>
+  ) : null;
+  const assistantRow = (key: string, children: ReactNode) => (
+    <div key={key} className="chat-row chat-row-assistant">
+      <div className="chat-avatar chat-avatar-assistant">
+        <Sparkles size={16} aria-hidden="true" />
+      </div>
+      <div className="chat-bubble chat-bubble-streaming">{children}</div>
+    </div>
+  );
+  const streamingRow = !turnHere
+    ? null
+    : stepActive
+      ? streamedAnswer
+        ? assistantRow("streaming-turn", streamedAnswer)
+        : null
+      : assistantRow(
+          "streaming-turn",
+          <>
+            {streamedAnswer ?? pendingStatus}
+            {currentSource ? <SourceBadge source={currentSource} /> : null}
+          </>
+        );
+  const stepTrailRow =
+    stepActive && stepRun
+      ? assistantRow(
+          "streaming-step",
+          <>
+            <CoachStepTrail run={stepRun} />
+            {streamedAnswer ? null : pendingStatus}
+            {currentSource ? <SourceBadge source={currentSource} /> : null}
+          </>
+        )
+      : null;
+  const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
+    const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
+    const placed = streamingRow ? [...rows.slice(0, at), streamingRow, ...rows.slice(at)] : rows;
+    return stepTrailRow ? [...placed, stepTrailRow] : placed;
+  };
 
   return (
     <div className="chat-view">
-      <div className="chat-header">
-        <div className="chat-header-title">
-          <span>Training Coach</span>
-        </div>
-        <div className="chat-header-end">
-          <button
-            type="button"
-            className="chat-settings-button"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Open settings"
-          >
-            <Settings2 size={16} aria-hidden="true" />
-            Settings
-          </button>
+      <ChatConversationHeader
+        title={activeSession?.title ?? "New chat"}
+        subtitle={conversationSubtitle}
+        onRename={
+          activeSessionId ? (title) => void handleRenameSession(activeSessionId, title) : undefined
+        }
+        reads={
+          conversationSettings
+            ? SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
+                .map(([, label]) => label)
+                .join(" · ")
+            : null
+        }
+        onOpenReads={() => setConversationSettingsOpen(true)}
+        analyses={
           <ConversationAnalyses
             api={api}
             sessionId={activeSessionId}
@@ -4460,27 +4400,13 @@ function AnalysisSilentChip({
               setAnalysisTarget({ kind: "detail", analysisId })
             }
           />
-          {planDrafts.length > 0 ? (
-            <button
-              type="button"
-              className="chat-creations-pill"
-              aria-expanded={planPanelOpen}
-              aria-controls="chat-creations-panel"
-              onClick={() => setPlanPanelOpen((open) => !open)}
-              title={
-                planPanelOpen ? "Hide Coach creations" : "Show Coach creations"
-              }
-            >
-              {planPanelOpen ? (
-                <PanelRightClose size={13} aria-hidden="true" />
-              ) : (
-                <PanelRightOpen size={13} aria-hidden="true" />
-              )}
-              Creations
-              <span className="chat-creations-count">{planDrafts.length}</span>
-            </button>
-          ) : null}
-          {isChatGptProvider ? (
+        }
+        creations={listedCreations.length}
+        creationsOpen={workbenchOpen}
+        onToggleCreations={() => (workbenchOpen ? closeWorkbench() : setPlanPanelOpen(true))}
+        onOpenSettings={() => openSettings()}
+        trailing={
+          isChatGptProvider ? (
             <button
               type="button"
               className="chat-signout"
@@ -4489,52 +4415,82 @@ function AnalysisSilentChip({
               <LogOut size={14} aria-hidden="true" />
               Sign out
             </button>
-          ) : null}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
-      <div className="chat-layout">
+      <div
+        className={workbenchCovers ? "chat-layout is-workbench-sheet" : "chat-layout"}
+      >
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
-          <div className="chat-transcript" ref={scrollRef}>
-        <div className="chat-thread">
-          {timeline.length === 0 && !streaming ? (
+          <div className="chat-transcript" ref={scrollRef} onScroll={handleTranscriptScroll}>
+        <div className="chat-thread" ref={observeThread}>
+          {/* What waits on the athlete here (R3), as a bar that jumps to each
+              in turn: a question, a change to decide, a brief not yet a plan. */}
+          {waitingIndices.length && !turnHere ? (
+            <button
+              type="button"
+              className="chat-waiting-bar"
+              onClick={() => {
+                const target = waitingIndices[waitingCursor % waitingIndices.length];
+                setWaitingCursor((value) => value + 1);
+                scrollRef.current
+                  ?.querySelector(`[data-chat-entry-index="${target}"]`)
+                  ?.scrollIntoView({ block: "center", behavior: "smooth" });
+              }}
+            >
+              {/* No arrow: what waits is as often above the reader as below. */}
+              {waitingCount === 1 ? "1 thing waiting on you" : `${waitingCount} things waiting on you`} · Jump
+            </button>
+          ) : null}
+          {timeline.length === 0 && !turnHere ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">
                 <Sparkles size={28} aria-hidden="true" />
               </div>
-              <h3>How can I help with your training?</h3>
-              <div className="chat-suggestions">
-                {[
-                  "How was my latest activity?",
-                  "Break down my latest workout by lap",
-                  "Create one workout for today and save it to my Workout Library",
-                  "Build a balanced week from my recent training",
-                  "Schedule bike intervals for Saturday",
-                  "Add strength around my endurance sessions",
-                  "Am I recovered enough for a hard session?",
-                  "Download my latest activity FIT file"
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    className="chat-suggestion"
-                    onClick={() => {
-                      composerRef.current?.setDraft(suggestion);
-                      composerRef.current?.focus();
-                    }}
-                  >
-                    {suggestion}
-                  </button>
+              <h3>What do you want to work on?</h3>
+              {/* Three things a conversation is for (R3), in place of eight
+                  suggestions of equal weight — one of them a FIT download. A
+                  plan starts on its brief, as AI Plan in the Library does. */}
+              <div className="chat-intents">
+                {EMPTY_INTENTS.map((intent) => (
+                  <section key={intent.title} className="chat-intent" aria-label={intent.title}>
+                    <span className="chat-creation-kicker">{intent.title}</span>
+                    {intent.prompts.map((prompt) => (
+                      <button
+                        key={prompt.text}
+                        type="button"
+                        className={prompt.plan ? "chat-suggestion is-plan" : "chat-suggestion"}
+                        onClick={() => {
+                          if (prompt.plan) {
+                            setNewPlanSources({ activities: true, sleep: true, zones: true });
+                            return;
+                          }
+                          composerRef.current?.setDraft(prompt.text);
+                          composerRef.current?.focus();
+                        }}
+                      >
+                        {prompt.text}
+                        {prompt.detail ? <small>{prompt.detail}</small> : null}
+                      </button>
+                    ))}
+                  </section>
                 ))}
               </div>
+              {/* Said once, where a conversation starts, rather than under
+                  every turn of every conversation. */}
+              <p className="chat-disclaimer">
+                Coach can make mistakes. Check important training decisions.
+              </p>
             </div>
           ) : null}
 
-          {timeline.map((entry, index) => {
+          {withStreamingRow(timeline.map((entry, index) => {
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
+            if (isAutomaticOutlineStep(timeline, index)) return null;
 
             if (entry.kind === "toolNotice") {
               return (
@@ -4555,13 +4511,32 @@ function AnalysisSilentChip({
 
             if (entry.kind === "coachPrompt") {
               if (entry.prompt.answeredAt !== undefined) {
-                return null;
+                // Kept as one line rather than dropped: the question and what
+                // was chosen are part of how the plan came to be, and the coach
+                // reads them on every turn anyway.
+                const chosen = entry.prompt.choices.find(
+                  (choice) => choice.id === entry.prompt.selectedChoiceId
+                );
+                return (
+                  <div
+                    key={entry.prompt.promptId}
+                    className="chat-row chat-row-assistant chat-asked-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">Asked</span>
+                    <span className="chat-asked-question">{entry.prompt.question}</span>
+                    <span className="chat-asked-answer">
+                      {chosen?.label ?? entry.prompt.answer ?? ""}
+                    </span>
+                  </div>
+                );
               }
               return (
                 <ChatRow
                   key={entry.prompt.promptId}
                   settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
                 >
                   <div className="chat-avatar chat-avatar-assistant">
                     <MessageCircle size={16} aria-hidden="true" />
@@ -4580,19 +4555,276 @@ function AnalysisSilentChip({
               );
             }
 
+            // Drawn inside the question they belong to (R1): as a row of their
+            // own they sat on the left, the question on the right.
+            if ((entry.kind === "planRefs" || entry.kind === "scheduleRefs") && refsJoinQuestion(timeline, index)) {
+              return null;
+            }
+
+            if (entry.kind === "planRefs") {
+              return (
+                <div
+                  key={`refs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={refKey(ref)} className="chat-ref-chip">
+                      {ref.name}
+                      {ref.scope === "plan" ? "" : ` · ${ref.label}`}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
+            if (entry.kind === "scheduleRefs") {
+              return (
+                <div
+                  key={`scheduleRefs#${index}`}
+                  className="chat-row chat-row-user chat-refs-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">About</span>
+                  {entry.refs.map((ref) => (
+                    <span key={scheduleRefKey(ref)} className="chat-ref-chip">
+                      {ref.label}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+
+            if (entry.kind === "planBrief") {
+              const brief = planBriefs[entry.artifactId];
+              if (!brief) return null;
+              return (
+                <div
+                  key={`brief:${entry.artifactId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachBriefCard
+                      brief={brief}
+                      firstMonday={briefMonday}
+                      sources={conversationSettings?.sources}
+                      editing={editingBriefId === brief.artifactId}
+                      onEdit={
+                        // Once there is an outline the brief is settled: the
+                        // outline is what is adjusted or redrawn from then on.
+                        brief.outline || briefIsPlan(brief.artifactId)
+                          ? undefined
+                          : () => {
+                              setBriefSave({ saving: false });
+                              setEditingBriefId(brief.artifactId);
+                            }
+                      }
+                      onDrawOutline={
+                        brief.outline || briefOpenProblems(brief.request, conversationSettings?.sources).length
+                          ? undefined
+                          : () => void drawOutline(brief.artifactId)
+                      }
+                      busy={streaming}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "planOutline") {
+              const brief = planBriefs[entry.artifactId];
+              if (!brief?.outline) return null;
+              if (outlineAnchors.get(entry.artifactId) !== index) {
+                // Redrawn below: the artifact keeps one outline, the latest card draws it.
+                return (
+                  <div
+                    key={`outline:${entry.artifactId}:${entry.outlineVersion}#${index}`}
+                    className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">Outline</span>
+                    <span className="chat-asked-question">v{entry.outlineVersion}</span>
+                    <span className="chat-version-note">Redrawn below</span>
+                  </div>
+                );
+              }
+              const outlined = brief as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> };
+              return (
+                <div
+                  key={`outline:${entry.artifactId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachOutlineCard
+                      brief={outlined}
+                      busy={streaming}
+                      editing={editingOutlineId === brief.artifactId}
+                      written={briefIsPlan(brief.artifactId)}
+                      blocked={briefOpenProblems(brief.request, conversationSettings?.sources)[0]}
+                      onWriteSessions={() => void writeSessions(brief.artifactId)}
+                      onAdjust={() => {
+                        setOutlineSave({ saving: false });
+                        setEditingOutlineId(brief.artifactId);
+                      }}
+                      onRedraw={(note) => void drawOutline(brief.artifactId, note)}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "planEvent") {
+              // A line where it happened, as the coach reads it; the card
+              // below it already shows what the creation is now.
+              const event = entry.event;
+              const what = event.artifactType === "workout" ? "Workout" : "Plan";
+              // Undo is a restore of the version this one replaced, offered
+              // only while it is still the newest: after that, undoing it
+              // would also undo whatever came since.
+              const eventVersion = versionIndex.get(event.draftId);
+              const undoTo =
+                api &&
+                event.author === "athlete" &&
+                event.fromVersion &&
+                eventVersion?.latest &&
+                !eventVersion.siblings.some((version) => version.uploadedAt)
+                  ? eventVersion.siblings.filter((version) => version.version === event.fromVersion).at(-1)
+                      ?.draftId
+                  : undefined;
+              const verb =
+                event.action === "edited"
+                  ? "Edited by you"
+                  : event.action === "restored"
+                    ? "Restored by you"
+                    : event.action === "imported"
+                      ? "Changed in the Library"
+                      : "Deleted on COROS";
+              return (
+                <div
+                  key={`${event.eventId}#${index}`}
+                  className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
+                  data-chat-entry-index={index}
+                >
+                  <span className="chat-asked-kicker">{what}</span>
+                  <span className="chat-asked-question">{event.name}</span>
+                  {/* One line (R2): the first change and how many more, the
+                      whole list on hover and in the Workbench's Versions. It
+                      used to print every change, wrapping over three lines. */}
+                  <span className="chat-version-note" title={event.changes?.join("\n")}>
+                    {verb}
+                    {event.changes?.length ? ` · ${event.changes[0]}` : ""}
+                    {event.changes && event.changes.length > 1 ? ` · +${event.changes.length - 1} more` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="chat-local-action chat-plan-event-view"
+                    onClick={() => openCreation(event.draftId)}
+                  >
+                    View
+                  </button>
+                  {undoTo ? (
+                    <button
+                      type="button"
+                      className="chat-local-action chat-plan-event-undo"
+                      onClick={() => void handleRestoreVersion(undoTo)}
+                    >
+                      Undo
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
+
             if (entry.kind === "planDraft") {
               // Removed by the athlete: the entry stays so the saved array
               // keeps its length, but nothing draws it.
               if (entry.draft.removedAt) {
                 return null;
               }
-              // Creations are read from the panel and the popup it opens, at
-              // every window width. There used to be a second copy of the card
-              // inline here for windows too narrow to hold the panel, and the
-              // width test that chose between them also decided whether the
-              // header's Creations button existed — so narrowing the window
-              // took the button away and left the panel with no way back.
-              return null;
+              const draft = entry.draft;
+              const versionInfo = versionIndex.get(draft.draftId);
+              // An older version folds to a line: the newest one below it is
+              // the card with buttons, and two full copies of one plan read as
+              // two plans.
+              if (versionInfo && !versionInfo.latest) {
+                // One action, one line (R2): a version an edit, a restore or an
+                // import made already has that event's line just before it.
+                if (eventedDraftIds.has(draft.draftId)) return null;
+                return (
+                  <div
+                    key={`${draft.draftId}#${index}`}
+                    className="chat-row chat-row-assistant chat-asked-row chat-version-row"
+                    data-chat-entry-index={index}
+                  >
+                    <span className="chat-asked-kicker">
+                      {draft.artifactType === "workout" ? "Workout" : "Plan"}
+                    </span>
+                    <span className="chat-asked-question">{draft.name}</span>
+                    <span className="chat-version-note">{versionLine(versionInfo)}</span>
+                    <button
+                      type="button"
+                      className="chat-local-action chat-plan-event-view"
+                      onClick={() => openCreation(draft.draftId)}
+                    >
+                      View
+                    </button>
+                  </div>
+                );
+              }
+              const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
+              // One copy at every window width, and nothing measured: the
+              // copy that used to live here was chosen by a width test, and
+              // that test also decided whether the Creations button existed.
+              return (
+                <div
+                  key={`${draft.draftId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachCreationCard
+                      draft={draft}
+                      version={versionInfo?.version}
+                      editing={draft.draftId === editingPlanDraftId || draft.draftId === editingWorkoutDraftId}
+                      document={planDocuments[documentKey] ?? undefined}
+                      uploading={uploadingDraftId === draft.draftId}
+                      uploaded={uploadedPlans[draft.draftId]}
+                      onUpload={(destination, scheduleDate, keepInLibrary, options) =>
+                        void handleUploadPlanDraft(
+                          draft.draftId,
+                          destination,
+                          scheduleDate,
+                          keepInLibrary,
+                          options
+                        )
+                      }
+                      onCoros={isOnCoros(versionInfo)}
+                      calendar={calendarOf(draft.draftId)}
+                      onCalendar={api ? () => setCalendarFor(draft.draftId) : undefined}
+                      onEdit={
+                        api && (draft.artifactType !== "workout" || documentOf(draft))
+                          ? () => void openCreationEditor(draft.draftId)
+                          : undefined
+                      }
+                      onOpen={() => {
+                        openCreation(draft.draftId);
+                      }}
+                    />
+                  </div>
+                </div>
+              );
             }
 
             if (entry.kind === "workoutDelete") {
@@ -4605,13 +4837,33 @@ function AnalysisSilentChip({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
-                    <DeletePreviewCard
-                      preview={entry.preview}
-                      deleting={deletingRequestId === entry.preview.requestId}
-                      deleted={deletedWorkouts[entry.preview.requestId]}
-                      onConfirm={() =>
-                        void handleConfirmWorkoutDelete(entry.preview.requestId)
-                      }
+                    <DeletePreviewCard preview={entry.preview} />
+                  </div>
+                </div>
+              );
+            }
+
+            if (entry.kind === "scheduleChange") {
+              const changeSet = scheduleChanges[entry.changeSetId];
+              if (!changeSet) return null;
+              const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
+              return (
+                // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
+                <div
+                  key={`scheduleChange:${entry.changeSetId}#${index}`}
+                  className="chat-row chat-row-assistant"
+                  data-chat-entry-index={index}
+                >
+                  <div className="chat-avatar chat-avatar-assistant">
+                    <Sparkles size={16} aria-hidden="true" />
+                  </div>
+                  <div className="chat-bubble chat-bubble-plan">
+                    <CoachScheduleChangeCard
+                      changeSet={changeSet}
+                      busyLine={busyLine}
+                      disabled={Boolean(applyingChange) || streaming}
+                      onApply={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, true)}
+                      onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                     />
                   </div>
                 </div>
@@ -4685,6 +4937,10 @@ function AnalysisSilentChip({
               );
             }
 
+            if (entry.kind === "opaque") {
+              return null;
+            }
+
             // 5.6: the synthetic user turn an analysis sends is stored with
             // role "user", but it was never typed by the athlete — showing it as
             // their bubble would misattribute the playbook to them.
@@ -4728,57 +4984,34 @@ function AnalysisSilentChip({
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
                       <AssistantMarkdown content={entry.content} />
-                      {entry.source ? (
-                        <SourceBadge source={entry.source} />
+                      {/* Where the answer came from and what it cost, as one
+                          quiet line under it rather than two rows of pills. */}
+                      {entry.source || entry.usage ? (
+                        <div className="chat-answer-foot">
+                          {entry.source ? <SourceBadge source={entry.source} /> : null}
+                          <TurnCostFooter usage={entry.usage} model={entry.model} />
+                        </div>
                       ) : null}
-                      <TurnCostFooter
-                        usage={entry.usage}
-                        model={entry.model}
-                      />
                     </>
                   ) : (
-                    entry.content
+                    <>
+                      <QuestionRefs
+                        timeline={timeline}
+                        index={index}
+                        onOpen={openCreation}
+                        sportOf={(ref) =>
+                          ref.scope === "session"
+                            ? planRefPreview(ref, documentForDraft(ref.draftId), unitSystem).sport
+                            : undefined
+                        }
+                      />
+                      {entry.content}
+                    </>
                   )}
                 </div>
               </ChatRow>
             );
-          })}
-
-          {streaming ? (
-            <div className="chat-row chat-row-assistant">
-              <div className="chat-avatar chat-avatar-assistant">
-                <Sparkles size={16} aria-hidden="true" />
-              </div>
-              <div className="chat-bubble chat-bubble-streaming">
-                {streamingText ? (
-                  <>
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                    <AssistantMarkdown content={streamingText} streaming />
-                  </>
-                ) : (
-                  <div className="chat-stream-pending">
-                    {activeTool || !thinkingText ? (
-                      <span className="chat-stream-status">
-                        {compacting
-                          ? "Compacting the conversation…"
-                          : activeTool
-                            ? `Using ${activeTool.replace(/_/g, " ")}…`
-                            : resumedCoachPromptRef.current
-                              ? "Resuming plan…"
-                              : "Working on it…"}
-                      </span>
-                    ) : null}
-                    {thinkingText ? (
-                      <ThinkingDisclosure content={thinkingText} live />
-                    ) : null}
-                  </div>
-                )}
-                {currentSource ? <SourceBadge source={currentSource} /> : null}
-              </div>
-            </div>
-          ) : null}
+          }))}
 
           {/* Same avatar and bubble as the persisted answer this becomes, so
               the reload at the end of the run does not make the row jump. */}
@@ -4822,136 +5055,89 @@ function AnalysisSilentChip({
           <ChatComposer
             ref={composerRef}
             providerControls={providerControls}
+            attachments={
+              composerRefs.length ? <ComposerRefs refs={composerRefs} /> : null
+            }
+            placeholder={refPlaceholder(composerRefs.map((item) => item.preview))}
+            aboutOptions={aboutOptions}
+            followUps={composerFollowUps}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
-            streaming={streaming}
+            streaming={turnHere}
+            blockedReason={turnElsewhere ? answeringElsewhere : undefined}
+            onBlocked={() => onMessage?.(answeringElsewhere)}
             exportingLatestActivity={exportingLatestActivity}
             waitingForCoachAnswer={waitingForCoachAnswer}
             isLocalProvider={isLocalProvider}
             localModelConfigured={localModelConfigured}
             onDraftChange={handleComposerDraftChange}
-            onNewChat={() => void handleNewChat()}
             onSend={sendMessage}
             onStop={handleStop}
+            stopping={stopping}
           />
         </div>
-        {planPanelOpen && planDrafts.length > 0 ? (
-          <aside
-            id="chat-creations-panel"
-            className="chat-plan-panel"
-            aria-label="Coach creations"
-          >
-            <header className="chat-plan-list-header">
-              <div>
-                <span className="chat-plan-panel-icon">
-                  <BookOpen size={15} aria-hidden="true" />
-                </span>
-                <div>
-                  <strong>Coach creations</strong>
-                  <span>Plans and one-off workouts</span>
-                </div>
-              </div>
-              <div className="chat-plan-list-header-end">
-                <strong className="chat-plan-list-count">
-                  {planDrafts.length}
-                </strong>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Hide Coach creations"
-                  title="Hide Coach creations"
-                  onClick={() => setPlanPanelOpen(false)}
-                >
-                  <PanelRightClose size={16} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-            <ol className="chat-plan-list">
-              {planDrafts.map((draft, index) => {
-                const saved = Boolean(
-                  uploadedPlans[draft.draftId] ||
-                    draft.uploadResult ||
-                    draft.uploadedAt
-                );
-                const isWorkout = draft.artifactType === "workout";
-                const planNumber = isWorkout
-                  ? 0
-                  : planDrafts
-                      .slice(0, index + 1)
-                      .filter((item) => item.artifactType !== "workout").length;
-                const weeks = isWorkout
-                  ? 0
-                  : Math.max(
-                      1,
-                      groupPlanEntriesByWeek(draft.entries).filter(
-                        (week) => week.id !== "unscheduled"
-                      ).length
-                    );
-                const primarySport = draft.entries[0]?.sport;
-                const SportIcon = sportTheme(primarySport).icon;
-                const selected = draft.draftId === selectedPlanDraftId;
-
-                return (
-                  <li key={draft.draftId}>
-                    <button
-                      type="button"
-                      className={`chat-plan-list-item${
-                        selected ? " is-selected" : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedPlanDraftId(draft.draftId);
-                        setOpenCreationId(draft.draftId);
-                      }}
-                      aria-haspopup="dialog"
-                      aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-                    >
-                      <span
-                        className="chat-plan-list-sport"
-                        style={planSportStyle(primarySport)}
-                      >
-                        <SportIcon
-                          size={15}
-                          strokeWidth={2}
-                          aria-hidden="true"
-                        />
-                      </span>
-                      <span className="chat-plan-list-copy">
-                        <span className="chat-plan-list-kicker">
-                          {isWorkout ? "One-off workout" : `Plan ${planNumber}`}
-                        </span>
-                        <strong>
-                          {draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}
-                        </strong>
-                        <span className="chat-plan-list-meta">
-                          <span>
-                            {draft.entries.length}{" "}
-                            {draft.entries.length === 1
-                              ? "workout"
-                              : "workouts"}
-                          </span>
-                          {!isWorkout ? (
-                            <span>
-                              {weeks} {weeks === 1 ? "week" : "weeks"}
-                            </span>
-                          ) : (
-                            <span>Workout Library</span>
-                          )}
-                          <span data-status={saved ? "saved" : "draft"}>
-                            {saved ? "Saved" : "Draft"}
-                          </span>
-                        </span>
-                      </span>
-                      <ChevronRight size={15} aria-hidden="true" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </aside>
+        {workbenchOpen ? (
+          <Suspense fallback={null}>
+            <CoachCanvas
+              api={api}
+              artifactId={openCreationId}
+              creations={listedCreations}
+              cards={planDrafts}
+              versionIndex={versionIndex}
+              documentFor={documentForDraft}
+              uploadingDraftId={uploadingDraftId}
+              editingDraftId={editingPlanDraftId ?? editingWorkoutDraftId}
+              planSportStyle={planSportStyle}
+              onOpen={(draftId) => openCreation(draftId)}
+              onCloseList={closeWorkbench}
+              onCloseDetails={() => {
+                setPlanPanelOpen(true);
+                setOpenCreationId(null);
+              }}
+              onUpload={(draftId, destination, scheduleDate, keepInLibrary, options) =>
+                void handleUploadPlanDraft(draftId, destination, scheduleDate, keepInLibrary, options)
+              }
+              onEdit={api ? (draftId) => void openCreationEditor(draftId) : undefined}
+              onRestore={api ? (draftId) => void handleRestoreVersion(draftId) : undefined}
+              onRemove={(draftId) => {
+                handleRemovePlanDraft(draftId);
+                setOpenCreationId(null);
+              }}
+              onViewInChat={(draftId) => {
+                // The card is in the conversation beside the Workbench; on a
+                // narrow window the Workbench covers it, so it steps aside.
+                if (workbenchCovers) closeWorkbench();
+                handleScrollToPlanChat(draftId);
+              }}
+              onCalendar={api ? (draftId) => setCalendarFor(draftId) : undefined}
+              calendarOf={calendarOf}
+              onAsk={(ref) => {
+                // Beside the Workbench the composer is live (R2): the chip goes
+                // there and nothing closes. Under the sheet, which covers the
+                // composer too (UAT), the sheet steps aside to show it.
+                addRef(ref);
+                if (workbenchCovers) closeWorkbench();
+                requestAnimationFrame(() => composerRef.current?.focus());
+              }}
+            />
+          </Suspense>
         ) : null}
       </div>
-      <ChatSettingsModal {...settingsModalProps} />
+      {settingsModal}
       {contextHistoryDialog}
+      {/* Held until a conversation is open: Coach mounting for the first time
+          from the Calendar opens its newest one, and a pick made before that
+          landed would be switched away from under the athlete. */}
+      {askPending && activeSessionId ? (
+        <CoachAskPicker
+          subject={askSubject(askPending.request)}
+          sessions={sessions}
+          suggestedId={askPending.suggestedId}
+          activeId={activeSessionId}
+          onPick={(sessionId) => void askIn(sessionId)}
+          onCancel={() => setAskPending(null)}
+        />
+      ) : null}
       <McpSessionPrompt
         servers={mcpPrompt}
         busy={mcpPromptBusy}
@@ -4959,75 +5145,178 @@ function AnalysisSilentChip({
         onLater={handleMcpPromptLater}
         onAuthorize={() => void handleMcpPromptAuthorize()}
       />
-      <CoachCreationModal
-        draft={openCreation}
-        kicker={openCreationKicker}
-        onClose={() => setOpenCreationId(null)}
-        onViewInChat={() => {
-          if (!openCreation) return;
-          setOpenCreationId(null);
-          handleScrollToPlanChat(openCreation.draftId);
-        }}
-        onRemove={() => {
-          if (!openCreation) return;
-          handleRemovePlanDraft(openCreation.draftId);
-        }}
-      >
-        {openCreation ? (
-          <CoachDraftPreviewCard
-            key={openCreation.draftId}
-            draft={openCreation}
-            uploading={uploadingDraftId === openCreation.draftId}
-            uploaded={uploadedPlans[openCreation.draftId]}
-            onUpload={(destination, scheduleDate) =>
-              void handleUploadPlanDraft(
-                openCreation.draftId,
-                destination,
-                scheduleDate
-              )
-            }
-            onReview={
-              api && openCreation.artifactType !== "workout"
-                ? () => {
-                    /* The card's modal steps aside for the editor — both
-                       close on Escape, and the card sits above the editor's
-                       layer — and comes back when the editor closes. */
-                    onError(null);
-                    setOpenCreationId(null);
-                    setEditingPlanDraftId(openCreation.draftId);
-                  }
-                : undefined
-            }
+      {editingBriefId && planBriefs[editingBriefId] && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            request={planBriefs[editingBriefId]!.request}
+            firstMonday={briefMonday}
+            sources={conversationSettings.sources}
+            saving={briefSave.saving}
+            error={briefSave.error}
+            onSourcesChange={(sources) => updateConversationSettings({ ...conversationSettings, sources })}
+            onSave={(request) => void saveBrief(editingBriefId, request)}
+            onClose={() => setEditingBriefId(null)}
           />
-        ) : null}
-      </CoachCreationModal>
+        </Suspense>
+      ) : null}
+      {newPlanSources ? (
+        // "Start a training plan…" from the empty conversation (R3): the same
+        // brief screen AI Plan opens in the Library, and the same way on.
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            mode="new"
+            request={defaultPlanBriefRequest(firstPlanMonday())}
+            firstMonday={firstPlanMonday()}
+            sources={newPlanSources}
+            onSourcesChange={setNewPlanSources}
+            onSave={(request) => {
+              const sources = newPlanSources;
+              setNewPlanSources(null);
+              void startPlanConversation({ request, sources });
+            }}
+            onClose={() => setNewPlanSources(null)}
+          />
+        </Suspense>
+      ) : null}
+      {editingOutlineId && planBriefs[editingOutlineId]?.outline ? (
+        <Suspense fallback={null}>
+          <CoachOutlineEditor
+            brief={planBriefs[editingOutlineId] as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> }}
+            saving={outlineSave.saving}
+            error={outlineSave.error}
+            onSave={(outline) => void saveOutline(editingOutlineId, outline)}
+            onClose={() => setEditingOutlineId(null)}
+          />
+        </Suspense>
+      ) : null}
+      {redrawAsk && planBriefs[redrawAsk]?.outline
+        ? createPortal(
+            <ConfirmDialog
+              title="Redraw the outline?"
+              description="The outline was drawn from the brief as it was. Coach can draw it again from the brief as it is now; keeping it leaves the outline as it stands, with anything that no longer fits listed on its card."
+              cancelLabel="Keep the outline"
+              confirmLabel="Redraw the outline"
+              onConfirm={() => {
+                const artifactId = redrawAsk;
+                setRedrawAsk(null);
+                void drawOutline(artifactId);
+              }}
+              onCancel={() => setRedrawAsk(null)}
+            />,
+            document.body
+          )
+        : null}
+      {aiSheetOpen ? (
+        <Suspense fallback={null}>
+          <ConversationAiSheet
+            chatSettings={chatSettings}
+            runtime={effectiveRuntime}
+            readiness={aiReadiness}
+            claudeStatus={claudeStatus}
+            onChange={changeConversationRuntime}
+            onClose={() => setAiSheetOpen(false)}
+            onOpenCoachSettings={() => {
+              setAiSheetOpen(false);
+              openSettings();
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {conversationSettingsOpen && conversationSettings ? (
+        <Suspense fallback={null}>
+          <CoachConversationSettings
+            portal
+            chatSettings={chatSettings}
+            conversation={conversationSettings}
+            baseProvider={conversationProvider}
+            readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
+            claudeStatus={claudeStatus}
+            onChange={updateConversationSettings}
+            onClose={() => setConversationSettingsOpen(false)}
+            onOpenCoachSettings={() => {
+              setConversationSettingsOpen(false);
+              openSettings();
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {api && calendarFor ? (
+        <Suspense fallback={null}>
+          <CoachCalendarDialog
+            api={api}
+            draftId={calendarFor}
+            saved={Boolean(
+              planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadedAt ||
+                planDrafts.find((draft) => draft.draftId === calendarFor)?.uploadResult ||
+                uploadedPlans[calendarFor]
+            )}
+            onSave={async () => {
+              const result = await handleUploadPlanDraft(calendarFor, "nativePlan");
+              return Boolean(result && !result.conflict);
+            }}
+            onClose={() => setCalendarFor(null)}
+            onAdded={() => {
+              setCalendarFor(null);
+              setCalendarRead((value) => value + 1);
+            }}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
+      {corosConflict ? (
+        <Suspense fallback={null}>
+          <CorosConflictDialog
+            name={corosConflict.name}
+            onOverwrite={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { overwrite: true })
+            }
+            onSaveAsNew={() =>
+              void handleUploadPlanDraft(corosConflict.draftId, "nativePlan", undefined, undefined, { asNew: true })
+            }
+            onCancel={() => setCorosConflict(null)}
+          />
+        </Suspense>
+      ) : null}
       {api && editingPlanDraftId ? (
         <Suspense fallback={null}>
           <CoachPlanEditor
             api={api}
             draftId={editingPlanDraftId}
             onSaved={handlePlanDraftEdited}
-            onClose={() => {
-              setOpenCreationId(editingPlanDraftId);
-              setEditingPlanDraftId(null);
-            }}
+            onClose={() => setEditingPlanDraftId(null)}
             onError={onError}
           />
         </Suspense>
       ) : null}
-      <AnalysesModal
-        api={api}
-        target={analysisTarget}
-        provider={chatSettings.provider}
-        onChanged={() => setAnalysesVersion((value) => value + 1)}
-        onClose={() => {
-          setAnalysisTarget(null);
-          // Catch-all: anything the modal changed is reflected on close, even
-          // a path that forgot to report itself.
-          setAnalysesVersion((value) => value + 1);
-        }}
-        onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
-      />
+      {api && editingWorkout?.entries[0]?.source ? (
+        <Suspense fallback={null}>
+          <CoachWorkoutEditor
+            api={api}
+            draft={editingWorkout}
+            workout={editingWorkout.entries[0].source}
+            onSaved={handlePlanDraftEdited}
+            onClose={() => setEditingWorkoutDraftId(null)}
+            onError={onError}
+          />
+        </Suspense>
+      ) : null}
+      {/* An analysis's model picker is three components down; the context
+          hands it the lists this screen has read. */}
+      <ModelOptionsContext.Provider value={modelOptionsFor}>
+        <AnalysesModal
+          api={api}
+          target={analysisTarget}
+          provider={chatSettings.provider}
+          onChanged={() => setAnalysesVersion((value) => value + 1)}
+          onClose={() => {
+            setAnalysisTarget(null);
+            // Catch-all: anything the modal changed is reflected on close, even
+            // a path that forgot to report itself.
+            setAnalysesVersion((value) => value + 1);
+          }}
+          onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
+        />
+      </ModelOptionsContext.Provider>
     </div>
   );
 }

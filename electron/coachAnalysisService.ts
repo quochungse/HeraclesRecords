@@ -5,6 +5,8 @@ import {
   createIdleWatchdog,
   getChatAuthStatus,
   getChatSettings,
+  getConversationSettings,
+  listPlanArtifactVersions,
   streamChat
 } from "./chatService";
 import type { ChatStreamCollectorSink, ChatStreamSink } from "./chatService";
@@ -12,7 +14,7 @@ import {
   applyTranscriptContext,
   summaryContextMessage,
   toWireMessages,
-  withPlanEdits,
+  withCreationIndex,
   type ContextWindow,
   type StoredTranscriptSummary
 } from "./chatContextCompaction";
@@ -49,6 +51,8 @@ import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
+import { listPlanBriefs } from "./chatPlanBriefs";
+import { readScheduleChanges } from "./chatScheduleChanges";
 import { ANALYSIS_DEFAULT_EFFORT, NOTHING_TO_REPORT } from "./types";
 import type {
   AnalysisRuntime,
@@ -66,6 +70,10 @@ import type {
   CoachAnalysisSpend,
   CoachAnalysisUpdate,
   PersistedChatEntry,
+  PlanArtifactVersion,
+  PlanBrief,
+  ScheduleChangeSet,
+  ConversationSettings,
   ProviderAuthVerdict
 } from "./types";
 
@@ -146,6 +154,25 @@ export function parseAnalysisOutput(text: string): AnalysisOutput {
 // Re-exported so callers that already talk to the runner do not need a second
 // import for the one constant behind its decision.
 export { ANALYSIS_DEFAULT_EFFORT };
+
+/**
+ * An analysis's runtime over its conversation's (P2.0, D14). A provider and a
+ * model are one choice — a model picked for Claude means nothing to OpenRouter —
+ * so the pair comes whole from whichever side made it, the analysis first;
+ * effort stands alone and is taken the same way.
+ */
+export function analysisRuntimeOver(
+  analysis: AnalysisRuntime,
+  conversation: AnalysisRuntime | undefined
+): AnalysisRuntime {
+  const pair = analysis.provider || analysis.model ? analysis : conversation ?? {};
+  const effort = analysis.effort || conversation?.effort;
+  return {
+    ...(pair.provider ? { provider: pair.provider } : {}),
+    ...(pair.model ? { model: pair.model } : {}),
+    ...(effort ? { effort } : {})
+  };
+}
 
 /** The runtime a run actually uses, with section 7's default filled in. */
 export function resolveAnalysisRuntime(
@@ -428,13 +455,6 @@ export function isOverBudget(spent: number, budget: number | null): boolean {
 }
 
 /**
- * The same question, asked of the deps — and asked in the order that matters.
- *
- * The ceiling is read first because the total is a SUM over the whole run log
- * and no ceiling is the default: without this, every athlete who never set a
- * budget pays for that scan on every run to discard the answer.
- */
-/**
  * 13: what a run cost is the sum of every provider turn it took, and the
  * rolling summariser (5.7) is one of those turns. Undefined stays undefined —
  * "nobody reported" is a different fact from "it was free", and adding a
@@ -454,6 +474,13 @@ function addTokenUsage(
   };
 }
 
+/**
+ * The same question, asked of the deps — and asked in the order that matters.
+ *
+ * The ceiling is read first because the total is a SUM over the whole run log
+ * and no ceiling is the default: without this, every athlete who never set a
+ * budget pays for that scan on every run to discard the answer.
+ */
 function overBudget(deps: CoachAnalysisRunnerDeps): boolean {
   const budget = deps.getBudget();
   if (budget === null || budget <= 0) {
@@ -559,6 +586,26 @@ export interface CoachAnalysisRunnerDeps {
   ): CoachAnalysisRun | null;
   /** Undefined when the conversation no longer exists (2.4). */
   getSessionEntries(sessionId: string): PersistedChatEntry[] | undefined;
+  /**
+   * Every version of the creations these cards belong to, for the index the
+   * run is sent with (P1.3). Optional so a suite with no database can leave it
+   * out; the index then lists each card as its own creation.
+   */
+  getPlanArtifacts?(draftIds: string[]): PlanArtifactVersion[];
+  /**
+   * The briefs and calendar proposals the conversation anchors (P3.4), for
+   * the same index: an analysis that cannot see a brief the athlete is filling
+   * in, or which of its last proposals were applied, answers as if it could.
+   * Optional, like the versions.
+   */
+  getPlanBriefs?(artifactIds: string[]): PlanBrief[];
+  getScheduleChanges?(changeSetIds: string[]): ScheduleChangeSet[];
+  /**
+   * The conversation's own settings (P2.0): its sources apply to the run, and
+   * its AI stands wherever the analysis has not chosen its own. Optional, for
+   * a suite with no database.
+   */
+  getConversationSettings?(sessionId: string): ConversationSettings | undefined;
   /** 5.7: the conversation's rolling summary and what it covers. */
   getSessionSummary(sessionId: string): StoredTranscriptSummary;
   setSessionSummary(sessionId: string, summary: string, through: number): void;
@@ -611,6 +658,8 @@ export interface CoachAnalysisRunnerDeps {
     options: {
       runtime?: CoachAnalysis["runtime"];
       toolPolicy: "read-only";
+      /** The conversation the run writes into; a proposal is filed under it (P3.4). */
+      sessionId?: string;
       roleInstructions?: string;
     }
   ): Promise<void>;
@@ -704,6 +753,37 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       return getChatSession(sessionId);
     },
     getSessionSummary: (sessionId) => readSessionSummary(sessionId),
+    // A conversation whose settings cannot be read runs on the analysis's own.
+    getConversationSettings: (sessionId) => {
+      try {
+        return getConversationSettings(sessionId);
+      } catch {
+        return undefined;
+      }
+    },
+    // Without the versions the index lists each card as its own creation,
+    // which is worse but not wrong — not a reason to fail the run.
+    getPlanArtifacts: (draftIds) => {
+      try {
+        return listPlanArtifactVersions(draftIds);
+      } catch {
+        return [];
+      }
+    },
+    getPlanBriefs: (artifactIds) => {
+      try {
+        return listPlanBriefs(artifactIds);
+      } catch {
+        return [];
+      }
+    },
+    getScheduleChanges: (changeSetIds) => {
+      try {
+        return readScheduleChanges(changeSetIds);
+      } catch {
+        return [];
+      }
+    },
     setSessionSummary: (sessionId, summary, through) => {
       writeSessionSummary(sessionId, summary, through);
     },
@@ -1376,7 +1456,11 @@ async function runOneBinding(
 
   // Section 7's default is resolved once, here, so the run log records what the
   // run actually used rather than what the definition happened to leave blank.
-  const runtime = resolveAnalysisRuntime(analysis);
+  const conversation = resolved.getConversationSettings?.(analysis.sessionId);
+  const runtime = resolveAnalysisRuntime({
+    ...analysis,
+    runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
+  });
   const startedAt = resolved.now().toISOString();
   let run = resolved.recordRun({
     analysisId: analysis.id,
@@ -1453,19 +1537,33 @@ async function runOneBinding(
     const streaming = resolved.streamChat(
       sink,
       run.id,
-      withPlanEdits(
+      withCreationIndex(
         [
           ...(summary ? [summaryContextMessage(summary)] : []),
           ...toWireMessages(tail),
           { role: "user", content: playbook }
         ],
-        /* The whole transcript, as the chat passes it: an edited plan's card
-           can sit in the part the summary folded away. */
-        session.entries
+        /* The whole transcript, as the chat passes it: a creation's card can
+           sit in the part the summary folded away. */
+        session.entries,
+        resolved.getPlanArtifacts?.(
+          session.entries.flatMap((entry) =>
+            entry.kind === "planDraft" && !entry.draft.removedAt ? [entry.draft.draftId] : []
+          )
+        ) ?? [],
+        resolved.getPlanBriefs?.([
+          ...new Set(session.entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+        ]) ?? [],
+        resolved.getScheduleChanges?.([
+          ...new Set(session.entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))
+        ]) ?? []
       ),
       {
         runtime,
         toolPolicy: "read-only",
+        // What a run proposes is filed under its conversation (P3.4).
+        sessionId: analysis.sessionId,
+        ...(conversation ? { sources: conversation.sources } : {}),
         ...(analysis.role ? { roleInstructions: analysis.role } : {})
       }
     );

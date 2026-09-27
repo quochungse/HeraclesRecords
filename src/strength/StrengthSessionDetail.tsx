@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronRight, Info, Trophy } from "lucide-react";
-import type { StrengthSession, UnitSystem } from "../../electron/types";
+import { ArrowUpRight, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
+import type { CoachOpenRequest, StrengthSession, UnitSystem } from "../../electron/types";
+import { activityCoachRequest } from "../training/askCoachAbout";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   buildExerciseRows,
@@ -209,10 +210,12 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
 interface StrengthSessionHeaderProps {
   entry: SessionAnalytics;
   showSource: boolean;
+  /** Asks Coach about this session, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
 /** What the session was, how much work it held, and the records it set. */
-export function StrengthSessionHeader({ entry, showSource }: StrengthSessionHeaderProps) {
+export function StrengthSessionHeader({ entry, showSource, onAskCoach }: StrengthSessionHeaderProps) {
   const { unitSystem } = useUnitSystem();
   const { session } = entry;
   const stats = useMemo(() => buildSessionStats(session), [session]);
@@ -221,11 +224,40 @@ export function StrengthSessionHeader({ entry, showSource }: StrengthSessionHead
 
   return (
     <header className="panel strength-card strength-session-detail-head">
-      <p className="eyebrow">
-        {formatSessionDate(session.startTime)}
-        {source ? ` · ${source}` : ""}
-      </p>
-      <h3>{session.name?.trim() || "Strength session"}</h3>
+      <div className="strength-session-detail-title-row">
+        <div>
+          <p className="eyebrow">
+            {formatSessionDate(session.startTime)}
+            {source ? ` · ${source}` : ""}
+          </p>
+          <h3>{session.name?.trim() || "Strength session"}</h3>
+        </div>
+        {onAskCoach ? (
+          <button
+            type="button"
+            className="ghost-button activity-ask-coach"
+            onClick={() =>
+              onAskCoach(
+                activityCoachRequest(
+                  {
+                    // A session only Hevy knows has no COROS id for Coach's tools.
+                    activityId: session.sourceIds?.coros ?? (session.source === "hevy" ? undefined : session.activityId),
+                    name: session.name,
+                    sportName: session.sportName ?? "Strength",
+                    sportType: session.sportType,
+                    startTime: session.startTime,
+                    duration: session.duration
+                  },
+                  unitSystem
+                )
+              )
+            }
+          >
+            <MessageCircle size={15} aria-hidden="true" />
+            Ask Coach
+          </button>
+        ) : null}
+      </div>
 
       <div className="strength-session-stats">
         <Stat label="Duration" value={formatSpan(stats.durationSec)} />

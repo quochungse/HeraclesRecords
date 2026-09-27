@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PlanDraftPreview, TrainingLibraryWorkout } from "../../electron/types";
+import type {
+  PlanVersionConflict,
+  PlanVersionWritten,
+  TrainingLibraryWorkout,
+  TrainingPlanDocument
+} from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { PlanEditor } from "../training-library/PlanEditor";
+import { NewerVersionDialog } from "./NewerVersionDialog";
 import { startDraft, type PlanDraft } from "../training-library/planDraft";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import "../training-library/trainingLibrary.css";
@@ -10,8 +16,8 @@ import "../training-library/trainingLibrary.css";
 interface CoachPlanEditorProps {
   api: CorosLinkApi;
   draftId: string;
-  /** The card as it reads after the edit. */
-  onSaved: (preview: PlanDraftPreview) => void;
+  /** The version the edit became. */
+  onSaved: (written: PlanVersionWritten) => void;
   onClose: () => void;
   onError: (message: string) => void;
 }
@@ -23,9 +29,11 @@ const messageOf = (cause: unknown) => (cause instanceof Error ? cause.message : 
  * Library.
  *
  * The plan is still the coach's until it is saved: it lives in the coach's
- * draft, behind the card, and is not one of the library's plan drafts. So the
- * editor saves back into that draft — same id, same card — and nothing here
- * writes to COROS. Keeping a library draft is not offered for the same reason.
+ * draft, behind the card, and is not one of the library's plan drafts. So a
+ * save here is the creation's next version (docs/coach-plan-canvas.md, P1.5)
+ * and nothing here writes to COROS. Keeping a library draft is not offered
+ * for the same reason. A save begun on a version Coach has since replaced
+ * asks before writing over it.
  *
  * Lazy-loaded by the chat, with the library's stylesheet, so a conversation
  * that never edits a plan never pays for either. The backdrop is the one the
@@ -36,6 +44,24 @@ export default function CoachPlanEditor({ api, draftId, onSaved, onClose, onErro
   const { unitSystem } = useUnitSystem();
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [workouts, setWorkouts] = useState<TrainingLibraryWorkout[]>([]);
+  const [conflict, setConflict] = useState<{
+    plan: TrainingPlanDocument;
+    newest: PlanVersionConflict["newest"];
+  } | null>(null);
+
+  const save = async (plan: TrainingPlanDocument, replaceNewer = false) => {
+    try {
+      const result = await api.editPlanDraft(draftId, plan, unitSystem, replaceNewer);
+      if (result.kind === "conflict") {
+        setConflict({ plan, newest: result.newest });
+        return;
+      }
+      setConflict(null);
+      onSaved(result);
+    } catch (cause) {
+      onError(messageOf(cause));
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -76,17 +102,20 @@ export default function CoachPlanEditor({ api, draftId, onSaved, onClose, onErro
           onDraftChange={setDraft}
           workouts={workouts}
           isNew={false}
-          saveLabel="Save to the card"
-          onSave={async (plan) => {
-            try {
-              onSaved(await api.editPlanDraft(draftId, plan, unitSystem));
-            } catch (cause) {
-              onError(messageOf(cause));
-            }
-          }}
+          saveLabel="Save changes"
+          onSave={(plan) => save(plan)}
           onClose={onClose}
         />
       </div>
+      {conflict ? (
+        <NewerVersionDialog
+          what="plan"
+          newest={conflict.newest}
+          onReplace={() => void save(conflict.plan, true)}
+          onKeepNewer={onClose}
+          onKeepEditing={() => setConflict(null)}
+        />
+      ) : null}
     </div>,
     document.body
   );

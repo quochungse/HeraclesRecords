@@ -249,6 +249,15 @@
   margin: 0;
 }
 
+/* The session's name, with Ask Coach at the far end of its line. */
+.strength-session-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
 .strength-session-detail-head h3 {
   margin: 0;
   font-size: 22px;

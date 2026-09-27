@@ -42,6 +42,7 @@ import {
   useState,
 } from "react";
 import type {
+  CoachOpenRequest,
   CombinedDownloadProgress,
   CombinedDownloadProgressEvent,
   DownloadJob,
@@ -370,7 +371,13 @@ export default function App() {
     () => new Set(),
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
-  const [coachPrefill, setCoachPrefill] = useState<string | null>(null);
+  const [coachPrefill, setCoachPrefill] = useState<string | CoachOpenRequest | null>(null);
+  /* Ask Coach from another screen (Calendar, Library, Activities, Running,
+     Strength): Coach opens and asks where the question goes. */
+  const askCoach = useCallback((request?: string | CoachOpenRequest) => {
+    setCoachPrefill(request ?? null);
+    setActiveView("coach");
+  }, []);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const [activeMediaTab, setActiveMediaTab] = useSelectionPreference(
     MEDIA_TAB_PREFERENCE,
@@ -2828,6 +2835,7 @@ export default function App() {
                     setSportScreenRequest(request);
                     setActiveView(request.view);
                   }}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -2838,10 +2846,7 @@ export default function App() {
                     api={api}
                     status={trainingHubStatus}
                     onOpenTraining={() => setActiveView("overview")}
-                    onOpenCoach={(prompt) => {
-                      setCoachPrefill(prompt ?? null);
-                      setActiveView("coach");
-                    }}
+                    onOpenCoach={askCoach}
                     onMessage={setMessage}
                     onError={setError}
                     onScheduleChanged={handleExternalScheduleChange}
@@ -2894,6 +2899,7 @@ export default function App() {
                       : null
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -2912,6 +2918,7 @@ export default function App() {
                       : null
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -2991,10 +2998,7 @@ export default function App() {
                   onMessage={setMessage}
                   onError={setError}
                   onOpenTraining={() => setActiveView("overview")}
-                  onOpenCoach={(prompt) => {
-                    setCoachPrefill(prompt);
-                    setActiveView("coach");
-                  }}
+                  onOpenCoach={askCoach}
                   onScheduleChanged={refreshUpcomingWorkouts}
                 />
               </Suspense>
@@ -3022,6 +3026,7 @@ export default function App() {
                     onActivityChange={setCoachStreaming}
                     pendingPrompt={coachPrefill}
                     onPendingPromptConsumed={() => setCoachPrefill(null)}
+                    onMessage={setMessage}
                     active={activeView === "coach"}
                   />
                 </Suspense>
@@ -3580,18 +3585,23 @@ function MediaOverviewTab({
           <p className="dashboard-subtitle">{subtitle}</p>
         </div>
         <button
-          className="secondary-button dashboard-welcome-action"
+          className="icon-button dashboard-welcome-action"
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          title="Refresh COROS data, the watch and the library"
+          title={
+            refreshing
+              ? "Refreshing…"
+              : "Refresh COROS data, the watch and the library"
+          }
+          aria-label={refreshing ? "Refreshing" : "Refresh"}
+          aria-busy={refreshing}
         >
-          {refreshing ? (
-            <Loader2 className="spin" size={16} aria-hidden="true" />
-          ) : (
-            <RefreshCw size={16} aria-hidden="true" />
-          )}
-          {refreshing ? "Refreshing" : "Refresh"}
+          <RefreshCw
+            size={16}
+            aria-hidden="true"
+            className={refreshing ? "spin" : ""}
+          />
         </button>
       </header>
 

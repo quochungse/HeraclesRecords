@@ -16,8 +16,11 @@ const {
   startClaudeCodeLogin,
   toClaudeModelOption,
   getClaudeCodeStatus,
+  compareClaudeVersions,
   getClaudeExecutableCandidates,
+  isStandardClaudeLocation,
   normalizeClaudeCodeError,
+  parseClaudeVersion,
   parseClaudeAuthStatusOutput,
   stripAnsi
 } = await import(`${providerUrl}?cacheBust=${Date.now()}`);
@@ -60,6 +63,42 @@ const macCandidates = getClaudeExecutableCandidates(undefined, "darwin", {
 });
 assert.ok(macCandidates.includes("/Users/tester/.local/bin/claude"));
 assert.ok(macCandidates.includes("/opt/homebrew/bin/claude"));
+
+// ----- Several installs: the newest wins, and a found path is not a choice -----
+
+// An npm install is found by its binary: PATH holds only a shell shim and a
+// .cmd, which execFile cannot start.
+const windowsEnv = {
+  USERPROFILE: String.raw`C:\Users\tester`,
+  LOCALAPPDATA: String.raw`C:\Users\tester\AppData\Local`,
+  APPDATA: String.raw`C:\Users\tester\AppData\Roaming`
+};
+assert.ok(
+  getClaudeExecutableCandidates(undefined, "win32", windowsEnv).includes(
+    String.raw`C:\Users\tester\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
+  )
+);
+// A path stored at a place detection looks anyway was written by detection
+// (older builds saved it), so it no longer pins that install; the case and
+// separators Windows ignores are ignored here too.
+assert.equal(
+  isStandardClaudeLocation("c:/users/tester/.local/bin/CLAUDE.exe", "win32", windowsEnv),
+  true
+);
+assert.equal(isStandardClaudeLocation(String.raw`D:\tools\claude.exe`, "win32", windowsEnv), false);
+assert.equal(isStandardClaudeLocation("   ", "win32", windowsEnv), false);
+assert.equal(isStandardClaudeLocation(undefined, "win32", windowsEnv), false);
+
+assert.deepEqual(parseClaudeVersion("2.1.283 (Claude Code)"), [2, 1, 283]);
+assert.equal(parseClaudeVersion("Claude Code"), undefined);
+// Compared as numbers: 2.1.283 is newer than 2.1.266 and than 2.1.99.
+assert.ok(compareClaudeVersions("2.1.283 (Claude Code)", "2.1.266 (Claude Code)") > 0);
+assert.ok(compareClaudeVersions("2.1.100", "2.1.99") > 0);
+assert.ok(compareClaudeVersions("2.2.0", "2.10.0") < 0);
+assert.equal(compareClaudeVersions("2.1.283", "2.1.283"), 0);
+// An install that cannot say its version loses to one that can.
+assert.ok(compareClaudeVersions(undefined, "0.0.1") < 0);
+assert.ok(compareClaudeVersions("0.0.1", undefined) > 0);
 
 const windowsCandidates = getClaudeExecutableCandidates(undefined, "win32", {
   USERPROFILE: "C:\\Users\\tester",

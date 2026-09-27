@@ -18,6 +18,7 @@
  * so this costs no new dependency — and because the bugs being chased are the
  * kind a real browser has: effects, event order, and a console nobody read.
  */
+import type { ComponentProps } from "react";
 import { StrictMode, useState, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
@@ -37,7 +38,6 @@ import { startDraft } from "../../src/training-library/planDraft";
 import { ConfirmDialog } from "../../src/training-library/ConfirmDialog";
 import { WorkoutWorkspace } from "../../src/training-library/WorkoutWorkspace";
 import { TrainingLibraryView } from "../../src/training-library/TrainingLibraryView";
-import { TrainingPlanGenerator } from "../../src/training-library/TrainingPlanGenerator";
 import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
@@ -111,7 +111,11 @@ function chatRowAnswer(method: string, args: unknown[]): unknown | undefined {
   if (!id) return undefined;
   if (method === "saveChatSession") {
     chatRows.set(id, (args[1] as unknown[]) ?? []);
-    return { id, title: "row", updatedAt: new Date().toISOString() };
+    // The conversation keeps its own title, as the real store's summary does.
+    const listed = Array.isArray(script.listChatSessions)
+      ? (script.listChatSessions as Array<{ id?: string; title?: string }>).find((session) => session.id === id)
+      : undefined;
+    return { id, title: listed?.title ?? "row", updatedAt: new Date().toISOString() };
   }
   if (method === "getChatSession") {
     return chatRows.get(id) ?? (scriptedAnswer(method, args) as unknown[]) ?? [];
@@ -145,6 +149,12 @@ function createStubApi(): CorosLinkApi {
             const answer = scriptedAnswer(property, args);
             if (answer === "__pending") {
               return new Promise((resolve) => pending.set(property, resolve));
+            }
+            // A call main refuses, worded as Electron words it on the way back.
+            if (answer && typeof answer === "object" && typeof (answer as { __reject?: unknown }).__reject === "string") {
+              return Promise.reject(
+                new Error(`Error invoking remote method '${property}': Error: ${(answer as { __reject: string }).__reject}`)
+              );
             }
             return Promise.resolve(answer);
           };
@@ -344,6 +354,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           onArchive={spy("onArchive")}
           onDelete={spy("onDelete")}
           onOpenActivity={spy("onOpenActivity")}
+          {...(options.askAboutSessions ? { onAskCoachAboutSession: spy("onAskCoachAboutSession") } : {})}
         />
       </main>
     );
@@ -355,25 +366,6 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
    * size rather than fixed over the window, so the width the weeks get is the
    * test's to choose. The draft is held here, as the view holds it.
    */
-  /* The AI plan generator on its own: the library opens it over the index,
-     and nothing it does depends on the library under it. */
-  TrainingPlanGenerator: (options) => {
-    loadLibraryStyles();
-    return (
-      <TrainingPlanGenerator
-        api={api}
-        covered={(options.covered as boolean | undefined) ?? false}
-        editedDraft={(options.editedDraft as never) ?? null}
-        onClose={spy("onClose")}
-        onKept={spy("onKept") as () => void}
-        onOpenPlan={spy("onOpenPlan") as () => void}
-        onSaved={spy("onSaved") as () => void}
-        onScheduled={spy("onScheduled") as () => void}
-        onReadPlan={spy("onReadPlan") as () => void}
-        onOpenCoach={spy("onOpenCoach")}
-      />
-    );
-  },
   PlanEditor: (options) => {
     loadLibraryStyles();
     return <PlanEditorHarness options={options} />;
@@ -544,7 +536,11 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       </main>
     );
   },
-  ChatView: (options) => (
+  // `styles: true` loads the app stylesheet, for a suite that measures layout;
+  // the older Coach suites stand on the unstyled ground they were written on.
+  ChatView: (options) => {
+    if (options.styles === true) loadAppStyles();
+    return (
     <ChatView
       api={api}
       onError={spy("onError") as () => void}
@@ -553,8 +549,12 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       // able to ask the second one.
       active={(options.active as boolean | undefined) ?? true}
       onActivityChange={spy("onActivityChange") as (active: boolean) => void}
+      pendingPrompt={options.pendingPrompt as ComponentProps<typeof ChatView>["pendingPrompt"]}
+      onPendingPromptConsumed={spy("onPendingPromptConsumed") as () => void}
+      onMessage={spy("onMessage") as (message: string | null) => void}
     />
-  ),
+    );
+  },
   AnalysisDetailView: (options) => (
     <AnalysisDetailView
       api={api}

@@ -1,6 +1,6 @@
-// The plan generator's simulated model (trainingPlanSimulation.ts), switched
-// on by HERACLES_SIMULATE_PLAN_AI=1 so the generator can be worked on without
-// an AI quota.
+// The plan pipeline's simulated model (trainingPlanSimulation.ts), switched
+// on by HERACLES_SIMULATE_PLAN_AI=1 so a conversation's outline and sessions
+// steps can be worked on without an AI quota.
 //
 // The script stands in for the model and nothing after it: its outline and
 // its plan go through the real checks and the real draft tool. So what this
@@ -14,18 +14,23 @@
 //   exact count, its hours within a fifth, the days, the minutes, race day.
 // - **Its first draft is one session short on purpose**, so the check's
 //   hand-back can be watched, and the fix after it passes.
-// - **The real draft tool takes it** and the plan it becomes has nothing a
-//   COROS save would refuse.
+// - **The real draft tool takes it**, writes it as the first version of the
+//   brief's artifact, and the plan it becomes has nothing a COROS save would
+//   refuse.
 // - **It is off unless the variable is exactly "1"**, and says it is
 //   simulated in its words.
 // - **`chatService` runs it in the model's place and nothing else changes**:
-//   both turns stream, call the real tools, resolve with an outline and a
-//   plan, and stop on `chat:cancel`.
+//   both steps of a conversation stream, call the real tools, leave an
+//   outline on the brief and a plan as its first version, and stop on
+//   `chat:cancel`.
 //
-// Launched through Electron as Node: `chatService` imports `electron`.
+// Launched through Electron as Node: `chatService` imports `electron`, and
+// the steps write to SQLite.
 //
 // Run: npm run test:training-plan-simulation
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -37,8 +42,28 @@ const generation = await import(distUrl("trainingPlanGeneration.js"));
 const simulation = await import(distUrl("trainingPlanSimulation.js"));
 const chatWorkoutTools = await import(distUrl("chatWorkoutTools.js"));
 const domain = await import(distUrl("trainingPlanDomain.js"));
+const database = await import(distUrl("database.js"));
+const briefs = await import(distUrl("chatPlanBriefs.js"));
 process.env.HERACLES_SIMULATE_PLAN_AI = "1";
 const chatService = await import(distUrl("chatService.js"));
+
+database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "plan-simulation-")));
+
+/** A conversation's brief holding `request`, as the steps read it. */
+function briefFor(request) {
+  const { sources: _sources, runtime: _runtime, outline: _outline, ...held } = request;
+  const now = new Date().toISOString();
+  const artifactId = `sim-${Math.random().toString(36).slice(2)}`;
+  database.saveChatPlanArtifactRow({
+    artifactId,
+    sessionId: "sim-session",
+    kind: "plan",
+    briefJson: JSON.stringify({ request: held, origins: {} }),
+    createdAt: now,
+    updatedAt: now
+  });
+  return artifactId;
+}
 
 let passed = 0;
 async function test(name, run) {
@@ -116,27 +141,29 @@ await test("a race week holds the race on race day, and the outline gives it the
   assert.match(race.name, /^Race: 10K/);
 });
 
-await test("the real draft tool takes the plan, and nothing in it would stop a COROS save", async () => {
+await test("the real draft tool takes the plan as the brief's first version, and nothing in it would stop a COROS save", async () => {
   const request = REQUESTS["a base with its length set"];
   const accepted = { ...request, outline: outlineFor(request) };
   const drafts = [];
   const answer = JSON.parse(
     await chatWorkoutTools.handleChatWorkoutTool("draft_training_plan", simulation.simulatedDraftArgs(accepted), {
       planRequest: accepted,
+      planArtifactId: "sim-artifact",
       onPlanDraft: (preview) => drafts.push(preview)
     })
   );
   assert.equal(answer.ok, true, JSON.stringify(answer));
-  const held = chatWorkoutTools.generatedPlanDraft(answer.draft_id);
-  const plan = generation.trainingPlanFromDraftPreview(held.preview, accepted, {
-    description: held.plan.description,
-    weekStages: held.plan.weekStages
-  });
+  assert.equal(database.listChatPlanDraftVersions("sim-artifact").length, 1);
+  const plan = chatService.getPlanDraftDocument(answer.draft_id);
   assert.equal(plan.weekCount, 6);
+  assert.deepEqual(
+    plan.weekStages,
+    accepted.outline.weeks.map((week, weekIndex) => ({ weekIndex, stage: week.stage })),
+    "the accepted outline's stages"
+  );
   assert.deepEqual(domain.validateTrainingPlan(plan).filter((issue) => issue.severity === "error"), []);
   assert.match(plan.name, /\(simulated\)$/, "the plan says it was simulated");
   assert.match(plan.description, /^Simulated plan — no AI wrote this/);
-  chatWorkoutTools.forgetGeneratedPlanDrafts([answer.draft_id]);
 });
 
 await test("a name COROS could not place takes its first candidate, or leaves", () => {
@@ -168,33 +195,43 @@ await test("it is off unless the variable says exactly 1", () => {
   assert.equal(simulation.simulatePlanAi({ HERACLES_SIMULATE_PLAN_AI: "1" }), true);
 });
 
-await test("chatService runs both turns on the script, through the real tools", async () => {
+await test("a conversation runs both steps on the script, through the real tools", async () => {
   const request = REQUESTS["a base with its length set"];
+  const artifactId = briefFor(request);
   const heard = [];
   const sink = { emit: (channel, payload) => heard.push({ channel, ...payload }) };
-  const outline = await chatService.outlineTrainingPlan(sink, "sim-outline", request);
-  assert.equal(outline.ok, true, outline.message);
-  assert.equal(outline.outline.weeks.length, 6);
+  const step = (requestId, pipeline) =>
+    chatService.streamConversationTurn(sink, requestId, [{ role: "user", content: "go" }], "metric", undefined, pipeline);
+
+  await step("sim-outline", { step: "outline", artifactId });
+  const outline = briefs.planBriefOf(artifactId).outline;
+  assert.equal(outline?.outline.weeks.length, 6);
   assert.match(heard.filter((event) => event.kind === "thinking").map((event) => event.delta).join(""), /^\*\*Simulated run — no AI is called\*\*/, "its thinking streams, and says what it is first");
   assert.equal(heard.filter((event) => event.tool === "propose_plan_outline").length, 1);
   assert.equal(heard.at(-1).channel, "chat:streamDone");
 
   heard.length = 0;
-  const plan = await chatService.generateTrainingPlan(sink, "sim-plan", { ...request, outline: outline.outline });
-  assert.equal(plan.ok, true, plan.message);
-  assert.equal(plan.plan.weekCount, 6);
+  await step("sim-plan", { step: "sessions", artifactId });
+  const versions = database.listChatPlanDraftVersions(artifactId);
+  assert.equal(versions.length, 1);
+  assert.equal(chatService.getPlanDraftDocument(versions[0].draftId).weekCount, 6);
   assert.equal(heard.filter((event) => event.tool === "draft_training_plan").length, 2, "the first draft is sent back and the second taken");
   assert.equal(heard.filter((event) => event.kind === "planDraft").length, 1);
   const thinking = heard.filter((event) => event.kind === "thinking").map((event) => event.delta).join("");
   assert.match(thinking, /\*\*Fixing what the check found\*\*\n\nWeek 1 /, "and it says what it fixed");
 });
 
-await test("a simulated turn stops on chat:cancel", async () => {
-  const sink = { emit: () => {} };
-  const running = chatService.outlineTrainingPlan(sink, "sim-cancel", REQUESTS["a week left to Coach"]);
+await test("a simulated step stops on chat:cancel", async () => {
+  const heard = [];
+  const sink = { emit: (channel, payload) => heard.push({ channel, ...payload }) };
+  const artifactId = briefFor(REQUESTS["a week left to Coach"]);
+  const running = chatService.streamConversationTurn(sink, "sim-cancel", [], "metric", undefined, { step: "outline", artifactId });
   await new Promise((resolve) => setTimeout(resolve, 150));
   chatService.cancelChat("sim-cancel");
-  assert.deepEqual(await running, { ok: false, reason: "cancelled" });
+  await running;
+  assert.equal(heard.at(-1).channel, "chat:streamDone");
+  assert.equal(heard.at(-1).finishReason, "cancelled");
+  assert.equal(briefs.planBriefOf(artifactId).outline, undefined, "nothing was written");
 });
 
 console.log(`training plan simulation OK — ${passed} checks`);

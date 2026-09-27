@@ -64,7 +64,9 @@ const POST_ACTIVITY_DEBRIEF: CoachAnalysisPreset = {
       "- How it compares with similar recent sessions (pace, heart rate, load, duration).\n" +
       "- Whether it fits the week's pattern, or breaks it.\n" +
       "- Anything in recovery or accumulated load that this session changes.\n\n" +
-      "Only raise something if it is materially different from recent history.",
+      "Only raise something if it is materially different from recent history. " +
+      "If it means a session in the next few days should move, change or go, propose that with " +
+      "propose_schedule_changes — the athlete applies it from the card — rather than only saying so.",
     runtime: {}
   },
   suggestedTrigger: { kind: "activity", sportTypes: [], minDurationSec: 1200 },
@@ -128,7 +130,9 @@ const WEEKLY_REVIEW: CoachAnalysisPreset = {
       "- What the week actually was: volume, intensity distribution, how it compares with the weeks before it.\n" +
       "- What was scheduled and did not happen, and whether that matters.\n" +
       "- The one thing that should change next week, if anything should.\n\n" +
-      "A week that went to plan is a finding too — say so briefly rather than inventing concerns.",
+      "A week that went to plan is a finding too — say so briefly rather than inventing concerns. " +
+      "When next week's calendar should change because of it, propose the changes with propose_schedule_changes " +
+      "for the athlete to apply.",
     runtime: { effort: "medium" }
   },
   suggestedTrigger: {

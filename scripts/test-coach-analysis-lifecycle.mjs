@@ -878,7 +878,7 @@ assert.match(
   // the composer writing into a conversation that is not there.
   assert.match(
     view,
-    /const listed = await refreshSessions\(chatSettings\.provider\);\n\s*if \(!listed\.some\(\(session\) => session\.id === sessionId\)\)/,
+    /const listed = await refreshSessions\(\);\n\s*if \(!listed\.some\(\(session\) => session\.id === sessionId\)\)/,
     "and the conversation has to still exist before it is opened"
   );
 

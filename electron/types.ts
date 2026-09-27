@@ -1651,7 +1651,15 @@ export interface ClaudeCodeConfig {
   /** Last observed CLI default model, cached so the picker can name it. */
   defaultModel?: string;
   /** Cached account model list, so the picker does not probe on every render. */
-  availableModels?: Array<{ value: string; label: string }>;
+  availableModels?: ModelCatalogEntry[];
+  /** When that list was last read from the CLI; a list older than a day is read again. */
+  availableModelsAt?: string;
+  /**
+   * Which CLI the list came from, as `<path>@<version>`. A list from another
+   * install or an older version is read again at once: an upgrade is exactly
+   * when the models change.
+   */
+  availableModelsFrom?: string;
   lastConnectionStatus?: ClaudeCodeConnectionState;
   lastCheckedAt?: string;
   permissions: ClaudeCodePermissions;
@@ -1668,7 +1676,7 @@ export interface ClaudeCodeStatus {
   /** Model Claude Code picks when none is requested, as reported by the CLI. */
   defaultModel?: string;
   /** Models this account can use, named with the versions the CLI reports. */
-  availableModels?: Array<{ value: string; label: string }>;
+  availableModels?: ModelCatalogEntry[];
   /** Signed-in Claude account, read live from the CLI and never persisted. */
   email?: string;
   /** Organisation the account belongs to, when Claude reports one. */
@@ -1696,6 +1704,49 @@ export interface ClaudeCodeLoginStart {
  * option for the subscription path.
  */
 export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * One model a provider offers, as its own list states it. A picker row, and
+ * — for the Messages API — what a request to it may carry.
+ *
+ * Every capability is optional because only some providers say: an absent
+ * field is "not stated", never "no". `efforts` is the exception worth
+ * reading twice: absent means every level is offered, `[]` means the model
+ * takes none.
+ */
+export interface ModelCatalogEntry {
+  value: string;
+  label: string;
+  /** Qualifier shown only in an open menu, never on the closed pill. */
+  detail?: string;
+  efforts?: AnthropicEffort[];
+  /** Accepts `thinking: { type: "adaptive" }` (Messages API). */
+  adaptiveThinking?: boolean;
+  /** The model's own ceiling for `max_tokens` (Messages API). */
+  maxOutputTokens?: number;
+  /**
+   * The model a declined turn is retried on server-side, picked from the
+   * model's own `allowed_fallback_models`; `""` when it has none.
+   */
+  fallbackModel?: string;
+}
+
+/** A provider's model list as last read from it (`modelCatalog.ts`). */
+export interface ModelCatalog {
+  models: ModelCatalogEntry[];
+  fetchedAt: string;
+}
+
+/** Providers whose list lives in `ChatSettings.modelCatalogs`; Claude Code keeps its own. */
+export type CatalogProvider = "claude-api" | "openrouter" | "chatgpt";
+
+export interface ModelCatalogRefresh {
+  settings: ChatSettings;
+  /** Present when Claude Code's list was read again, so its status can be replaced whole. */
+  claudeStatus?: ClaudeCodeStatus;
+  /** Why a provider's list could not be read, by provider; absent providers were fine or skipped. */
+  errors: Partial<Record<ChatProvider, string>>;
+}
 
 /** Direct Claude access with the athlete's own Anthropic API key. */
 export interface AnthropicApiConfig {
@@ -1761,7 +1812,6 @@ export interface OpenRouterConnectionTest {
   keyLabel?: string;
 }
 
-/** Hard cap on custom coach instructions so a pasted document cannot crowd out the coach prompt. */
 /**
  * The answer a run gives when it looked and found nothing worth saying. A
  * control token, not prose: it decides `silent` vs `success`, and the athlete
@@ -1770,6 +1820,7 @@ export interface OpenRouterConnectionTest {
  */
 export const NOTHING_TO_REPORT = "NOTHING_TO_REPORT";
 
+/** Hard cap on custom coach instructions so a pasted document cannot crowd out the coach prompt. */
 export const MAX_CUSTOM_COACH_INSTRUCTIONS = 4000;
 
 /**
@@ -1800,6 +1851,12 @@ export interface ChatSettings {
   claudeCode: ClaudeCodeConfig;
   openRouter: OpenRouterConfig;
   local: LocalChatConfig;
+  /**
+   * Each provider's model list as last read from it. Written only by the main
+   * process (`refreshModelCatalogs`); a save from the renderer never carries
+   * it back, so a stale copy in a window cannot overwrite a fresher list.
+   */
+  modelCatalogs?: Partial<Record<CatalogProvider, ModelCatalog>>;
   sidebarOpen?: boolean;
   /** When true, show activity/fitness/HR chart cards in the transcript. Default false. */
   visualizationsEnabled?: boolean;
@@ -1807,7 +1864,16 @@ export interface ChatSettings {
   customInstructions?: string;
   /** The rolling-summary window for chat and analyses alike. */
   compactContext: CompactContextSettings;
+  /**
+   * Whether Coach may attach a workout card it was not asked for, when it
+   * recommends a specific session (P1.9, D4). `auto` is on for the Claude
+   * providers, whose prompt cache makes the extra tool rounds cheap, and off
+   * for the rest.
+   */
+  inlineSuggestions?: InlineSuggestionsMode;
 }
+
+export type InlineSuggestionsMode = "auto" | "on" | "off";
 
 /**
  * What a compaction pass decided, as the renderer sees it.
@@ -1886,12 +1952,15 @@ export interface ChatSessionSummary {
   messageCount: number;
   /** ISO timestamp the conversation was pinned, or null when unpinned. */
   pinnedAt: string | null;
+  /**
+   * What in the conversation waits on the athlete (Coach Workbench review,
+   * R3): questions Coach asked and nobody answered, calendar changes still to
+   * decide, briefs that have not become a plan. Derived on every read; never
+   * stored, so nothing about it travels.
+   */
+  waiting?: { questions: number; decisions: number; briefs: number };
 }
 
-/**
- * What a turn is allowed to do. Analysis runs are `read-only` (decision 3):
- * they may read, analyse and draft, but never write to COROS.
- */
 /**
  * What one turn cost, summed across its tool rounds — a tool-using answer is
  * several provider calls and the athlete pays for all of them.
@@ -2284,6 +2353,10 @@ export interface ChatAuthStatus {
   signedIn: boolean;
   /** From the id_token, for display in the header when signed in. */
   email?: string;
+  /** The account's name, from the id_token, where it carries one. */
+  name?: string;
+  /** The ChatGPT plan ("plus", "pro", "team"…), from the id_token's auth claim. */
+  plan?: string;
   /** Access-token expiry (unix seconds), for debugging/telemetry only. */
   expiresAt?: number;
 }
@@ -2440,8 +2513,27 @@ export type ChatStreamInfo =
     }
   | {
       requestId: string;
-      kind: "workoutDelete";
-      preview: WorkoutDeletePreview;
+      /** Something happened to a creation during the turn — it changed on COROS (P1.6). */
+      kind: "planEvent";
+      event: PlanEvent;
+    }
+  | {
+      requestId: string;
+      /** Coach set out a plan brief for the athlete to check (P2.1). */
+      kind: "planBrief";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
+      /** Coach drew a brief's outline (P2.2); `brief` carries it. */
+      kind: "planOutline";
+      brief: PlanBrief;
+    }
+  | {
+      requestId: string;
+      /** Coach proposed changes to the calendar, or a deletion, for the athlete to apply (P3.2–P3.3). */
+      kind: "scheduleChange";
+      changeSet: ScheduleChangeSet;
     }
   | {
       requestId: string;
@@ -2621,6 +2713,71 @@ export interface TrainingPlanGenerationRequest {
   outline?: TrainingPlanOutline;
 }
 
+/**
+ * What one conversation reads and which AI answers it (P2.0, D13/D14), for
+ * every turn in it — chat, and analyses running in it. `runtime` holds only
+ * what differs from Coach's settings; an analysis's own runtime wins over it.
+ */
+export interface ConversationSettings {
+  sessionId: string;
+  sources: TrainingPlanDataSources;
+  runtime?: AnalysisRuntime;
+}
+
+/**
+ * A plan brief (docs/coach-plan-canvas.md, P2.1): what the athlete wants a
+ * plan to be, before it has a shape — the generator's request without the
+ * parts the conversation owns (its sources and AI) or that come later (the
+ * outline).
+ */
+export type PlanBriefRequest = Omit<TrainingPlanGenerationRequest, "runtime" | "sources" | "outline">;
+
+/** A brief's fields as its card and Coach's tool name them. */
+export type PlanBriefField = "goal" | "dates" | "sports" | "level" | "week" | "constraints";
+
+/** Where Coach took a field from: what was said in the conversation, or the athlete's data. */
+export type PlanBriefOrigin = "chat" | "data";
+
+export interface PlanBrief {
+  /** The creation it opens: its versions, once written, carry this id. */
+  artifactId: string;
+  sessionId?: string;
+  request: PlanBriefRequest;
+  /** Fields Coach filled in, and from where; a field absent here is the form's default. */
+  origins: Partial<Record<PlanBriefField, PlanBriefOrigin>>;
+  /** The plan's shape, once drawn (P2.2): only the current one is kept. */
+  outline?: PlanBriefOutline;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * A brief's outline as stored (P2.2). `version` counts every outline the
+ * artifact has had — each drawing, redrawing and adjustment is the next — so a
+ * `planOutline` anchor can tell whether the outline it marks is still the one
+ * on its artifact.
+ */
+export interface PlanBriefOutline {
+  outline: TrainingPlanOutline;
+  version: number;
+  /** Who made this one: Coach drew it, or the athlete adjusted it by hand. */
+  author: "coach" | "athlete";
+  updatedAt: string;
+}
+
+/**
+ * A conversation turn that is a step of the plan pipeline (P2.2), not a
+ * question: its tool set, its policy and its prompt come from the step. The
+ * renderer shows the step's words; the main process sends the step's prompt.
+ */
+export interface ChatPipelineStep {
+  /** Draw (or redraw) the brief's outline (P2.2), or write its sessions to it (P2.3). */
+  step: "outline" | "sessions";
+  artifactId: string;
+  /** A redraw: what the athlete wants changed in the outline there is. */
+  note?: string;
+}
+
 /** The athlete's data a generation may read, each on or off. */
 export interface TrainingPlanDataSources {
   /** Recent activities, and what COROS derives from them: fitness, records, predictions. */
@@ -2668,21 +2825,6 @@ export interface TrainingPlanOutlineRevision {
   outline: TrainingPlanOutline;
   note: string;
 }
-
-export type TrainingPlanOutlineResult =
-  | { ok: true; outline: TrainingPlanOutline }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-outline"; message: string };
-
-/**
- * How a generation ended. The stream carries its progress; this carries its
- * outcome, so the generator does not have to rebuild it from stream events.
- * `plan` is a new plan document, not yet saved anywhere.
- */
-export type TrainingPlanGenerationResult =
-  | { ok: true; plan: TrainingPlanDocument }
-  | { ok: false; reason: "cancelled" }
-  | { ok: false; reason: "invalid" | "failed" | "no-plan"; message: string };
 
 /**
  * What a plan is doing on the COROS calendar. A plan put there becomes an
@@ -3122,6 +3264,170 @@ export interface PlanDraftPreview {
   editedAt?: number;
 }
 
+/**
+ * What the athlete pointed at when asking (docs/coach-plan-canvas.md, P1.7):
+ * a creation, a week of it or one session. Carried as an anchor just before
+ * the question, so the coach is told what "this" is where it was asked.
+ */
+export interface PlanRef {
+  artifactId: string;
+  draftId: string;
+  version?: number;
+  name: string;
+  artifactType: "plan" | "workout";
+  scope: "plan" | "week" | "session";
+  weekIndex?: number;
+  sessionKey?: string;
+  /** What is pointed at, as it is read: "Week 6 (2–8 Nov) · Sun · Long run". */
+  label: string;
+}
+
+/**
+ * What the athlete pointed at on the calendar or in a COROS plan when asking
+ * (P3.5): a day, a week, one scheduled session, an activity, or one session
+ * of any plan in the Library. Not a `PlanRef`: that names a Coach creation,
+ * and a build that reads one would drop a ref it cannot parse. Carried as a
+ * `scheduleRefs` anchor just before the question.
+ */
+export interface ScheduleRef {
+  scope: "day" | "week" | "session";
+  /** yyyyMMdd: the day, the week's Monday, or the session's day. Absent for a session of a plan not on the calendar. */
+  day?: string;
+  /** A session: the calendar's `planId` (a running copy or the athlete's own), or a COROS plan's id. */
+  planId?: string;
+  idInPlan?: string;
+  /** A finished activity rather than a planned session. */
+  activityId?: string;
+  /** What is pointed at, as it is read: "Sat 27 Sep · Long run". */
+  label: string;
+  /**
+   * Its figures for the composer's header while the question is written —
+   * "Run · 10.2 km · 52:10". Display only: stripped before the anchor is
+   * stored, so no stored entry gains a field an older build would drop.
+   */
+  detail?: string;
+  /** Its sport, for the header's icon. Display only, stripped with `detail`. */
+  sport?: WorkoutSport;
+}
+
+/** Coach opened from elsewhere with something to talk about (P1.7). */
+export interface CoachOpenRequest {
+  /** Text for the composer. */
+  prompt?: string;
+  /** A Coach creation; its conversation is opened when it can be found. */
+  draftId?: string;
+  refs?: PlanRef[];
+  /** The calendar or a COROS plan: chips beside the composer of the conversation open (P3.5). */
+  scheduleRefs?: ScheduleRef[];
+  /**
+   * AI Plan (P2.5): a new conversation that opens on this brief. The athlete
+   * fills it in first, on the brief's own screen, and the conversation is
+   * made only when they finish — with what Coach may read set as they left it.
+   */
+  newPlan?: { request: PlanBriefRequest; sources: TrainingPlanDataSources };
+}
+
+/**
+ * Something that happened to a coach's creation that the coach did not do —
+ * the athlete edited it, restored an older version, or it changed on COROS
+ * (docs/coach-plan-canvas.md, P1.3). An anchor in the transcript, at the
+ * point it happened, so the coach is told once and in order rather than
+ * handed the whole plan again on every turn; what changed is in the table.
+ */
+export interface PlanEvent {
+  eventId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  /** The version the event left the creation at. */
+  draftId: string;
+  action: "edited" | "restored" | "imported" | "removedOnCoros";
+  author: "athlete" | "coros";
+  /** The creation's name when it happened. */
+  name: string;
+  artifactType: "plan" | "workout";
+  fromVersion?: number;
+  toVersion?: number;
+  /** What changed, a line each; absent where nothing measured it. */
+  changes?: string[];
+  /** Epoch milliseconds. */
+  at: number;
+}
+
+/**
+ * A version the athlete made — an edit saved from the editor (P1.5), or an
+ * older version restored (P1.4): its card, and what it changed against the
+ * version it replaced.
+ */
+export interface PlanVersionWritten {
+  kind: "written";
+  preview: PlanDraftPreview;
+  artifactId: string;
+  fromVersion: number;
+  toVersion: number;
+  changes: string[];
+}
+
+/**
+ * An edit begun on a version something has since replaced — Coach revised it,
+ * or it changed on another machine. Nothing was written; the athlete decides.
+ */
+export interface PlanVersionConflict {
+  kind: "conflict";
+  newest: { draftId: string; version: number; author: "coach" | "athlete" | "coros" };
+}
+
+export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
+
+/**
+ * Where a Coach plan on COROS stands on the calendar (P1.6): COROS's running
+ * copy of it, as the plan cache holds it, and the matches of what was done
+ * against it — read from this machine, at no cost.
+ */
+export interface PlanCalendarState {
+  artifactId: string;
+  remotePlanId: string;
+  running?: TrainingPlanDocument;
+  matches: TrainingActivityMatch[];
+}
+
+/**
+ * A creation on COROS read against COROS (P1.6, D12): unchanged there, or
+ * changed — then its COROS form is the creation's newest version — or
+ * deleted there, which leaves it a proposal to save again.
+ */
+export type PlanCorosSync =
+  | { kind: "current" }
+  | { kind: "imported" | "removedOnCoros"; written: PlanVersionWritten };
+
+/**
+ * One version of a coach's creation, as the conversation lists them
+ * (docs/coach-plan-canvas.md, P1.1). Every version is a draft row of its own
+ * and a `planDraft` entry in the transcript with the same `draftId`; this is
+ * what groups them.
+ */
+export interface PlanArtifactVersion {
+  draftId: string;
+  /** The creation: its first version's draft id. */
+  artifactId: string;
+  version: number;
+  /** Who made this version: the coach, the athlete in an editor, or COROS (a change made in the Library). */
+  author: "coach" | "athlete" | "coros";
+  name: string;
+  createdAt: number;
+  parentDraftId?: string;
+  uploadedAt?: number;
+  /** Changed in place by a build before versions — on another machine, say. */
+  editedAt?: number;
+  /** What this version changed, in its author's words. */
+  changeSummary?: string;
+  /** The COROS plan this version was saved as, `coros:<id>`. */
+  remotePlanId?: string;
+  /** The version that followed the plan's deletion on COROS; it has no plan there. */
+  detached?: boolean;
+  /** Follow-ups Coach offered with this version, as chips (P1.8). */
+  refinements?: string[];
+}
+
 export interface PlanWorkoutEntryInput {
   key: string;
   name: string;
@@ -3359,6 +3665,18 @@ export interface UploadPlanResult {
   /** The COROS plan it became, for a plan saved whole. */
   planId?: string;
   remoteWrites?: string[];
+  /**
+   * An update refused because the plan changed on COROS since this version
+   * was made (P1.6): nothing was written, and the athlete decides whether to
+   * write over it or save a new plan.
+   */
+  conflict?: { currentVersion?: number; expectedVersion: number };
+}
+
+/** How a plan version is saved to COROS (P1.6): over a plan that changed there, or as a new one. */
+export interface PlanDraftSaveOptions {
+  asNew?: boolean;
+  overwrite?: boolean;
 }
 
 export interface TrainingHubScheduledWorkoutEntry {
@@ -3588,6 +3906,78 @@ export interface DeleteWorkoutResult {
   message: string;
 }
 
+/**
+ * What Coach proposes to do to the calendar or the workout library, line by
+ * line, for the athlete to apply or dismiss (P3.2–P3.3 of
+ * docs/coach-plan-canvas.md). Kept in `chat_schedule_changes` (`personal`),
+ * so a proposal outlives a restart and can be applied from the other machine;
+ * the transcript holds only a `scheduleChange` anchor.
+ *
+ * Every line is checked against COROS again when it is applied, and one
+ * already applied is never written twice.
+ */
+export type ScheduleChangeOp = "move" | "replace" | "remove" | "add" | "deleteWorkout";
+export type ScheduleChangeStatus = "proposed" | "applied" | "failed" | "dismissed" | "stale";
+
+/** A session on the calendar as the proposal found it. */
+export interface ScheduleChangeSession {
+  /** The calendar's `planId`: a running plan's copy, or the athlete's own schedule. */
+  planId: string;
+  idInPlan: string;
+  /** yyyyMMdd. */
+  happenDay: string;
+  name: string;
+  planProgramId?: string;
+  programId?: string;
+  sportType?: number;
+}
+
+export interface ScheduleChangeLine {
+  lineId: string;
+  op: ScheduleChangeOp;
+  /** The line as the card states it. */
+  label: string;
+  /** The session a move, replace or remove acts on. */
+  session?: ScheduleChangeSession;
+  /** Where a move or an add lands (yyyyMMdd). */
+  toDay?: string;
+  /** What a replace or an add puts on the calendar. */
+  workout?: PlanWorkoutEntryInput;
+  /** A library workout a deletion removes. */
+  program?: { id: string; name: string };
+  /**
+   * For an add: sessions of the workout's name already on that day when it
+   * was proposed. One more than that means the line landed meanwhile (from
+   * the other machine); absent on a line from before this was kept, read as 0.
+   */
+  sameNameOnDay?: number;
+  status: ScheduleChangeStatus;
+  /** Why a line failed or went stale. */
+  reason?: string;
+  /**
+   * `false` on a failed line that must not be tried again: part of it landed
+   * (a replacement added, its original not removed), so a second try would
+   * write that part twice. Any other failed line may be tried again — each
+   * try reads COROS first, as the first did.
+   */
+  retry?: false;
+  /** When it was applied, failed, dismissed or found stale. */
+  settledAt?: string;
+}
+
+export interface ScheduleChangeSet {
+  changeSetId: string;
+  /** The conversation it was proposed in. */
+  sessionId?: string;
+  summary: string;
+  lines: ScheduleChangeLine[];
+  /** The units the workouts were written in; metric when absent. */
+  unitSystem?: UnitSystem;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A card from before change sets (P3.2): drawn, but its request died with the process that staged it. */
 export interface WorkoutDeletePreview {
   requestId: string;
   target: "scheduled" | "library" | "both";
@@ -3616,14 +4006,40 @@ export interface ChatEntryMergeMeta {
   mrev?: string;
 }
 
+/**
+ * An entry of a kind this build does not know — written by a newer build on
+ * another synced machine. It is carried verbatim rather than dropped, so a save
+ * here cannot take it out of the conversation (docs/coach-plan-canvas.md §4).
+ *
+ * In memory and over IPC it is this wrapper, because a `kind: string` member
+ * would stop every `entry.kind === "…"` check from narrowing. The row stores
+ * `raw` itself: `chatHistoryStore` unwraps it on the way to SQLite. `raw` holds
+ * everything but `mid`/`mrev`, which sit on the wrapper like on every entry.
+ */
+export interface PersistedChatOpaqueEntry {
+  kind: "opaque";
+  raw: Record<string, unknown>;
+}
+
 /** Persisted coach timeline entry (messages plus inline action cards). */
 export type PersistedChatEntry = ChatEntryMergeMeta &
   (
   | PersistedChatMessageEntry
   | PersistedChatAnalysisSilentEntry
+  | PersistedChatOpaqueEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }
+  | { kind: "planEvent"; event: PlanEvent }
+  | { kind: "planRefs"; refs: PlanRef[] }
+  /** An anchor: what on the calendar or in a COROS plan the next question is about (P3.5). */
+  | { kind: "scheduleRefs"; refs: ScheduleRef[] }
+  /** An anchor (Q3): the brief itself is `chat_plan_artifacts`'. */
+  | { kind: "planBrief"; artifactId: string }
+  /** An anchor (Q3): where an outline was drawn; the outline is on the artifact's row. */
+  | { kind: "planOutline"; artifactId: string; outlineVersion: number }
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
+  /** An anchor (Q3): the change set itself is `chat_schedule_changes`' (P3.2). */
+  | { kind: "scheduleChange"; changeSetId: string }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }

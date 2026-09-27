@@ -26,7 +26,7 @@ Module._load = function patchedLoad(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 
-const { countableUsage, createCollectorSink, createWindowSink } = require(
+const { countableUsage, createCollectorSink, createWindowSink, untilAborted } = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
 );
 const { parseChatTranscriptJson } = require(
@@ -174,11 +174,12 @@ assert.equal(collector.cancelled(), false);
 assert.equal(collector.error(), undefined);
 assert.equal(collector.text(), "Easy 40min.");
 
-// Cards land as they stream, the assistant message at done, prompts after it —
-// the order ChatView produces.
+// Cards land as they stream; at done the assistant message goes in front of the
+// turn's cards, which it introduces, and prompts after them — the order
+// ChatView's `settleTurnEntries` produces.
 assert.deepEqual(
   built.map((entry) => entry.kind),
-  ["fitnessTrend", "message", "coachPrompt"]
+  ["message", "fitnessTrend", "coachPrompt"]
 );
 
 // --- a re-emitted card replaces the first rather than appending ------------
@@ -188,8 +189,8 @@ runStream(upserts, [
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: [] } }],
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: ["x"] } }],
   ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d2", entries: [] } }],
-  ["chat:streamInfo", { kind: "workoutDelete", preview: { requestId: "w1", name: "a" } }],
-  ["chat:streamInfo", { kind: "workoutDelete", preview: { requestId: "w1", name: "b" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1", summary: "a" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1", summary: "b" } }],
   ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1", n: 1 } }],
   ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1", n: 2 } }],
   ["chat:streamInfo", { kind: "hrZoneSummary", preview: { previewId: "z1", n: 1 } }],
@@ -199,11 +200,11 @@ runStream(upserts, [
 const upserted = upserts.entries();
 assert.deepEqual(
   upserted.map((entry) => entry.kind),
-  ["planDraft", "planDraft", "workoutDelete", "activityVisual", "hrZoneSummary"]
+  ["planDraft", "planDraft", "scheduleChange", "activityVisual", "hrZoneSummary"]
 );
 assert.deepEqual(upserted[0].draft.entries, ["x"], "same draftId replaced in place");
 assert.equal(upserted[1].draft.draftId, "d2", "a different id appends");
-assert.equal(upserted[2].preview.name, "b");
+assert.deepEqual(upserted[2], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
 assert.equal(upserted[3].preview.n, 2);
 assert.equal(upserted[4].preview.n, 2);
 // A coachPrompt re-emitted under the same id collapses to one entry too.
@@ -217,7 +218,7 @@ runStream(dedupedPrompts, [
 assert.equal(dedupedPrompts.entries().length, 1);
 assert.equal(dedupedPrompts.entries()[0].prompt.v, 2);
 
-const assistant = built[1];
+const assistant = built[0];
 assert.equal(assistant.role, "assistant");
 assert.equal(assistant.content, "Easy 40min.");
 assert.equal(assistant.reasoningSummary, "checking yesterday");
@@ -318,7 +319,7 @@ assert.equal(copies.entries().length, 1);
 // parser drops would vanish the moment the athlete reopens the conversation.
 const persisted = parseChatTranscriptJson(JSON.stringify(built));
 assert.deepEqual(persisted, built, "every collected entry survives the store");
-assert.deepEqual(persisted[1].automation, marker);
+assert.deepEqual(persisted[0].automation, marker);
 
 // --- 13: a failed turn is not a refund -------------------------------------
 // Usage used to reach the collector only on `chat:streamDone`, which a stream
@@ -463,8 +464,14 @@ assert.deepEqual(persisted[1].automation, marker);
     /const sendStreamError = \(payload: \{[\s\S]{0,240}?\.\.\.\(usage \? \{ usage \} : \{\}\)/,
     "the one error send must carry what the turn spent"
   );
+  // The scripted plan run (`HERACLES_SIMULATE_PLAN_AI`) calls no model, so it
+  // has nothing to carry and sends its error itself; every turn that reaches a
+  // provider must go through `sendStreamError`.
+  const simulation = /async function simulatedPlanTurn\([\s\S]*?\n\}\r?\n/;
+  assert.match(source, simulation, "the simulated run is where this suite expects it");
+  const modelTurns = source.replace(simulation, "");
   assert.equal(
-    (source.match(/send\("chat:streamError"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamError"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );
@@ -480,7 +487,7 @@ assert.deepEqual(persisted[1].automation, marker);
     "the one done send must carry the cost and the model that answered"
   );
   assert.equal(
-    (source.match(/send\("chat:streamDone"/g) ?? []).length,
+    (modelTurns.match(/send\("chat:streamDone"/g) ?? []).length,
     1,
     "and it must be the only one, or the rule is back to being remembered"
   );
@@ -495,6 +502,38 @@ assert.deepEqual(persisted[1].automation, marker);
     /const addUsage = \([^)]*\) => \{\s*\n\s*const counted = countableUsage\(round\);/,
     "every tool round's report must go through the same rule"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Stop reaches a turn still being prepared (UAT #12)
+// ---------------------------------------------------------------------------
+// The status check, the MCP connections and the snapshot run before any
+// provider is asked, and a Stop pressed then was lost: nothing listened, and
+// a provider handed a signal already aborted never hears its event.
+{
+  const controller = new AbortController();
+  const slow = new Promise((resolve) => setTimeout(() => resolve("late"), 5000));
+  const started = Date.now();
+  const waiting = untilAborted(slow, controller.signal);
+  setTimeout(() => controller.abort(), 20);
+  await assert.rejects(waiting, /cancelled/);
+  assert.ok(Date.now() - started < 1000, "a step gives way when Stop is pressed, not when it finishes");
+
+  const already = new AbortController();
+  already.abort();
+  await assert.rejects(untilAborted(Promise.resolve(1), already.signal), /cancelled/, "an abort before the step starts counts too");
+
+  assert.equal(await untilAborted(Promise.resolve(7), new AbortController().signal), 7, "an untouched step passes through");
+  await assert.rejects(untilAborted(Promise.reject(new Error("boom")), new AbortController().signal), /boom/);
+
+  const whole = readSource(repoRoot, "electron", "chatService.ts");
+  const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
+  for (const step of ["inspectClaudeCodeStatus", "ensureAllMcpConnected", "buildTrainingContext", "getValidToken"]) {
+    assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
+    assert.match(turn, new RegExp(`await prepare\\(${step}\\(`), `${step} is prepared in a turn`);
+  }
+  const provider = readSource(repoRoot, "electron", "claudeCodeProvider.ts");
+  assert.match(provider, /if \(options\.signal\.aborted\)/, "the Claude provider checks a signal aborted before it was called");
 }
 
 Module._load = originalLoad;

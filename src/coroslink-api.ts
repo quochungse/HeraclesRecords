@@ -62,11 +62,17 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineResult,
-  TrainingPlanOutlineRevision,
-  TrainingPlanGenerationResult,
-  PlanDraftPreview,
+  PlanArtifactVersion,
+  ConversationSettings,
+  PlanBrief,
+  PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
+  PlanCalendarState,
+  PlanCorosSync,
+  PlanDraftSaveOptions,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -119,6 +125,7 @@ import type {
   CoachAnalysisSummary,
   CoachAnalysisUpdate,
   ChatSettings,
+  ModelCatalogRefresh,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
@@ -144,7 +151,7 @@ import type {
   UploadPlanResult,
   IntervalsStatus,
   IntervalsActivityWithStatus,
-  DeleteWorkoutResult,
+  ScheduleChangeSet,
   ManualActivityInput,
   ActivityDetailSummary,
   ActivityDetailSummarySync
@@ -302,27 +309,6 @@ export interface CorosLinkApi {
   ) => Promise<TrainingPlanMetadata>;
   /** Writes a plan to COROS and reads it back; a plan changed there since the edit began is a conflict. */
   saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest) => Promise<TrainingPlanSaveResult>;
-  /**
-   * The AI plan generator's turn, read-only: progress arrives on the
-   * `onChatStream*` events under `requestId`, and `cancelChat(requestId)`
-   * stops it. Resolves with the plan, or with why there is none.
-   */
-  generateTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem
-  ) => Promise<TrainingPlanGenerationResult>;
-  /**
-   * The plan's shape, week by week, before its sessions — or, given a
-   * revision, that shape redrawn as the athlete asked. Streams like
-   * `generateTrainingPlan` and is stopped the same way.
-   */
-  outlineTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem,
-    revision?: TrainingPlanOutlineRevision
-  ) => Promise<TrainingPlanOutlineResult>;
   /** A COROS copy of the plan, named "… Copy". */
   duplicateTrainingPlan: (planId: string) => Promise<TrainingPlanDocument>;
   /** `takeOffCalendar`: a plan on the calendar is taken off it first; without it, one is refused. */
@@ -526,6 +512,14 @@ export interface CorosLinkApi {
   ) => () => void;
   getChatAuthStatus: () => Promise<ChatAuthStatus>;
   getChatSettings: () => Promise<ChatSettings>;
+  /**
+   * Reads each provider's model list again where it is a day old (or, with
+   * `force`, the one named) and returns the settings holding them.
+   */
+  refreshChatModels: (options?: {
+    provider?: ChatProvider;
+    force?: boolean;
+  }) => Promise<ModelCatalogRefresh>;
   getBaseCoachInstructions: () => Promise<string>;
   saveChatSettings: (settings: ChatSettings) => Promise<ChatSettings>;
   testLocalChatConnection: (
@@ -555,8 +549,23 @@ export interface CorosLinkApi {
   sendChat: (
     requestId: string,
     messages: ChatMessage[],
-    unitSystem: UnitSystem
+    unitSystem: UnitSystem,
+    /** The conversation the turn is in, whose sources and AI it takes (P2.0). */
+    sessionId?: string,
+    /** A step of the plan pipeline rather than a question (P2.2). */
+    pipeline?: ChatPipelineStep
   ) => Promise<void>;
+  /** The briefs behind a conversation's brief cards (P2.1). */
+  getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;
+  /** The athlete's edit of a brief; a field changed loses its "from chat" or "from data". */
+  updatePlanBrief: (artifactId: string, request: PlanBriefRequest) => Promise<PlanBrief>;
+  /** A new conversation's brief (P2.5): the athlete's, or the defaults when absent. */
+  createPlanBrief: (sessionId: string, request?: PlanBriefRequest) => Promise<PlanBrief>;
+  /** The athlete's adjustment of a brief's outline; refused when it breaks the brief (P2.2). */
+  updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline) => Promise<PlanBrief>;
+  /** What one conversation reads and which AI answers it (P2.0). */
+  getConversationSettings: (sessionId: string) => Promise<ConversationSettings>;
+  setConversationSettings: (settings: ConversationSettings) => Promise<ConversationSettings>;
   cancelChat: (requestId: string) => Promise<void>;
   /**
    * Resolves what a turn in this conversation should send: the rolling summary
@@ -577,7 +586,8 @@ export interface CorosLinkApi {
     sessionId: string,
     entries?: PersistedChatEntry[]
   ) => Promise<ChatContextInspection>;
-  listChatSessions: (provider: ChatProvider) => Promise<ChatSessionSummary[]>;
+  /** Every conversation, whichever AI answers it (Q1 of the Coach Workbench review). */
+  listChatSessions: () => Promise<ChatSessionSummary[]>;
   getChatSession: (sessionId: string) => Promise<PersistedChatEntry[]>;
   createChatSession: (provider: ChatProvider) => Promise<ChatSessionSummary>;
   saveChatSession: (
@@ -665,13 +675,53 @@ export interface CorosLinkApi {
     draftId: string,
     unitSystem: UnitSystem,
     destination?: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    /** A workout put on the calendar is also kept in the Workout Library. */
+    keepInLibrary?: boolean,
+    /** For a plan already on COROS: save a new one, or write over a change made there (P1.6). */
+    options?: PlanDraftSaveOptions
   ) => Promise<UploadPlanResult>;
+  /** Every version of the creations these drafts belong to (P1.1). */
+  getPlanArtifacts: (draftIds: string[]) => Promise<PlanArtifactVersion[]>;
+  /** Makes an older version of a creation the newest again (P1.4). */
+  restorePlanVersion: (draftId: string, unitSystem: UnitSystem) => Promise<PlanVersionWritten>;
+  /**
+   * A creation on COROS read against COROS (P1.6): a change made there comes
+   * back as its newest version. `cacheOnly` asks the plan cache and costs no
+   * request.
+   */
+  syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) => Promise<PlanCorosSync>;
+  /** The conversation a Coach plan came from, by any of its versions' draft ids (P1.7). */
+  findChatSessionForDraft: (draftId: string) => Promise<string | null>;
+  /** Where each Coach plan on COROS stands on the calendar, from this machine's cache (P1.6). */
+  getPlanCalendarState: (draftIds: string[]) => Promise<PlanCalendarState[]>;
+  /** Lets go of a creation's draft once it is removed, unsaved, from the conversation. */
+  removePlanDraft: (draftId: string) => Promise<void>;
+  /**
+   * The athlete's edit of a coach's one-off workout, as the workout's next
+   * version (P1.5) — or, begun on a version since replaced, the newest one,
+   * unless `replaceNewer` says to write over it.
+   */
+  editWorkoutDraft: (
+    draftId: string,
+    workout: PlanWorkoutEntryInput,
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ) => Promise<PlanVersionSave>;
   /** The plan behind a Coach card, for the editor "Edit plan first" opens. */
   getPlanDraftDocument: (draftId: string) => Promise<TrainingPlanDocument>;
-  /** Writes the athlete's edit back into the coach's own draft; answers the card. */
-  editPlanDraft: (draftId: string, plan: TrainingPlanDocument, unitSystem?: UnitSystem) => Promise<PlanDraftPreview>;
-  confirmWorkoutDelete: (requestId: string) => Promise<DeleteWorkoutResult>;
+  /** The athlete's edit of a coach's plan as its next version; see `editWorkoutDraft`. */
+  editPlanDraft: (
+    draftId: string,
+    plan: TrainingPlanDocument,
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ) => Promise<PlanVersionSave>;
+  /** Coach's proposals to the calendar and the library, by the anchors' ids (P3.2). */
+  getScheduleChanges: (changeSetIds: string[]) => Promise<ScheduleChangeSet[]>;
+  /** Applies one line, or every proposed line; each is checked against COROS first. */
+  applyScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
+  dismissScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
   // ----- Sync -----
   chooseSyncFolder: () => Promise<string | null>;
   getSyncStatus: () => Promise<SyncStatus>;

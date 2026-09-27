@@ -42,6 +42,7 @@ const {
   NOTHING_TO_REPORT,
   cancelAnalysisRun,
   resolveAnalysisRuntime,
+  analysisRuntimeOver,
   SESSION_BURST_PER_HOUR,
   expandTriggerToQueue,
   isWithinQuietHours,
@@ -642,6 +643,101 @@ function addSession(world, id, entries = []) {
     world.streamCalls[1].messages.length > world.streamCalls[0].messages.length,
     "a later analysis sees what the earlier one wrote"
   );
+}
+
+// ---------------------------------------------------------------------------
+// A conversation's own settings reach its analyses (P2.0, D13/D14)
+// ---------------------------------------------------------------------------
+
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  world.deps.getConversationSettings = (sessionId) => ({
+    sessionId,
+    sources: { activities: true, sleep: false, zones: true },
+    runtime: { provider: "openrouter", model: "conversation-model", effort: "high" }
+  });
+  addAnalysis(world, "a1", { name: "Briefing", runtime: { effort: "low" } });
+  addSession(world, "s1", [{ kind: "message", role: "user", content: "Hi" }]);
+  addAttachment(world, "b1", { sessionId: "s1" });
+  // A provider and a model are one choice: a model picked for Coach's Claude is
+  // never sent to the conversation's OpenRouter.
+  const conversationAi = { provider: "openrouter", model: "conversation-model", effort: "high" };
+  assert.deepEqual(analysisRuntimeOver({ model: "claude-opus-5" }, conversationAi), { model: "claude-opus-5", effort: "high" });
+  assert.deepEqual(analysisRuntimeOver({ provider: "local" }, conversationAi), { provider: "local", effort: "high" });
+  assert.deepEqual(analysisRuntimeOver({}, conversationAi), conversationAi);
+  assert.deepEqual(analysisRuntimeOver({ effort: "max" }, undefined), { effort: "max" });
+  const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "schedule" }, world.deps);
+  assert.equal(run.status, "success");
+  const call = world.streamCalls[0];
+  assert.deepEqual(
+    call.options.runtime,
+    { provider: "openrouter", model: "conversation-model", effort: "low" },
+    "the conversation's AI stands where the analysis chose none, and the analysis's effort wins"
+  );
+  assert.deepEqual(call.options.sources, { activities: true, sleep: false, zones: true }, "and its sources apply");
+}
+
+// ---------------------------------------------------------------------------
+// P3.4: a run sees the conversation's briefs and proposals, and files its own
+// ---------------------------------------------------------------------------
+
+{
+  resetAnalysisQueueForTests();
+  const brief = {
+    artifactId: "art-1",
+    sessionId: "s1",
+    request: {
+      goalKind: "race",
+      goal: "Hanoi Half",
+      race: { date: "2026-11-15", distance: "Half marathon" },
+      sports: ["run"],
+      difficulty: "custom",
+      startDate: "2026-08-24",
+      week: { mode: "auto" }
+    },
+    origins: {},
+    createdAt: "2026-08-20T00:00:00.000Z",
+    updatedAt: "2026-08-20T00:00:00.000Z"
+  };
+  const proposal = {
+    changeSetId: "sc-1",
+    sessionId: "s1",
+    summary: "Ease the week",
+    lines: [
+      { lineId: "l1", op: "move", label: 'Move "Long run" from Sat 22 Aug to Sun 23 Aug', status: "applied" },
+      { lineId: "l2", op: "remove", label: 'Remove "Strides" from Fri 21 Aug', status: "proposed" }
+    ],
+    createdAt: "2026-08-20T00:00:00.000Z",
+    updatedAt: "2026-08-20T00:00:00.000Z"
+  };
+  const asked = { briefs: [], changeSets: [] };
+  const world = createWorld({
+    getPlanBriefs: (ids) => {
+      asked.briefs.push(ids);
+      return ids.includes("art-1") ? [brief] : [];
+    },
+    getScheduleChanges: (ids) => {
+      asked.changeSets.push(ids);
+      return ids.includes("sc-1") ? [proposal] : [];
+    }
+  });
+  addAnalysis(world, "a1", { conditions: { cooldownMin: 0, maxRunsPerDay: 9 } });
+  addSession(world, "s1", [
+    { kind: "message", role: "user", content: "Plan my half" },
+    { kind: "planBrief", artifactId: "art-1" },
+    { kind: "message", role: "assistant", content: "Here is a brief." },
+    { kind: "scheduleChange", changeSetId: "sc-1" }
+  ]);
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "success", JSON.stringify(run));
+  const call = world.streamCalls[0];
+  assert.equal(call.options.sessionId, "s1", "what the run proposes is filed under its conversation");
+  assert.deepEqual(asked, { briefs: [["art-1"]], changeSets: [["sc-1"]] });
+  const sent = call.messages.at(-1).content;
+  assert.match(sent, /- Brief · brief_id art-1 · /, "the brief the athlete is filling in is in view");
+  assert.match(sent, /- Calendar proposal "Ease the week" · 1 applied · 1 not decided yet/, "and what became of the last proposal");
 }
 
 // ---------------------------------------------------------------------------

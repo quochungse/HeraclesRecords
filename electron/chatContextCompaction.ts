@@ -2,8 +2,16 @@ import type {
   ChatMessage,
   ChatTokenUsage,
   CompactContextSettings,
-  PersistedChatEntry
+  PersistedChatEntry,
+  PlanArtifactVersion,
+  PlanBrief,
+  PlanDraftPreview,
+  PlanEvent,
+  PlanRef,
+  ScheduleChangeSet,
+  ScheduleRef
 } from "./types";
+import { briefLine, outlineLine } from "./planBrief";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -128,64 +136,231 @@ export function normalizeContextWindow(
  *
  * A `coachPrompt` is the exception and is expanded rather than dropped: the
  * question and the athlete's answer to it are a turn of the conversation, and
- * a coach that cannot see what it asked (or what it was told) re-asks.
+ * a coach that cannot see what it asked (or what it was told) re-asks. So is a
+ * `planEvent`: it is the one thing about a creation the coach did not write.
  */
 export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
-  return entries.flatMap((entry): ChatMessage[] => {
-    if (entry.kind === "message") {
-      return entry.content.trim()
-        ? [{ role: entry.role, content: entry.content }]
-        : [];
+  const wire: ChatMessage[] = [];
+  // What the athlete or COROS did to a creation, where it happened: the card
+  // itself is dropped like every card, and this is the part of it the coach
+  // did not write. It rides on the athlete's next message rather than being
+  // one of its own, so the roles still alternate; with nothing after it, on
+  // the athlete's last one.
+  let events: string[] = [];
+  const flushEvents = () => {
+    if (!events.length) return;
+    const note = events.join("\n\n");
+    events = [];
+    const last = wire[wire.length - 1];
+    if (last?.role === "user") {
+      wire[wire.length - 1] = { ...last, content: `${last.content}\n\n${note}` };
+    } else {
+      wire.push({ role: "user", content: note });
     }
-    if (entry.kind === "coachPrompt") {
+  };
+  const push = (message: ChatMessage) => {
+    if (events.length && message.role === "user") {
+      message = { ...message, content: `${events.join("\n\n")}\n\n${message.content}` };
+      events = [];
+    } else {
+      flushEvents();
+    }
+    wire.push(message);
+  };
+  for (const entry of entries) {
+    if (entry.kind === "message") {
+      if (entry.content.trim()) push({ role: entry.role, content: entry.content });
+    } else if (entry.kind === "planEvent") {
+      events.push(planEventNote(entry.event));
+    } else if (entry.kind === "planRefs") {
+      // Rides on the question it was attached to, which follows it.
+      events.push(planRefsNote(entry.refs));
+    } else if (entry.kind === "scheduleRefs") {
+      events.push(scheduleRefsNote(entry.refs));
+    } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
         .join("\n");
-      const question: ChatMessage = {
+      push({
         role: "assistant",
         content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices}`
-      };
-      return entry.prompt.answer
-        ? [question, { role: "user", content: entry.prompt.answer }]
-        : [question];
+      });
+      if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
     }
-    return [];
+  }
+  flushEvents();
+  return wire;
+}
+
+/** What the athlete pointed at, as a line in front of their question. */
+export function planRefsNote(refs: readonly PlanRef[]): string {
+  const lines = refs.map((ref) => {
+    const what = ref.artifactType === "workout" ? "workout" : "plan";
+    const version = ref.version ? ` v${ref.version}` : "";
+    const where = ref.scope === "plan" ? "the whole of it" : ref.label;
+    return `the ${what} "${ref.name}"${version} (draft_id ${ref.draftId}) — ${where}`;
   });
+  return `[The athlete is asking about ${lines.join("; and ")}. Read it with get_plan_draft if you need more than this.]`;
 }
 
 /**
- * What the athlete changed on a plan the coach drafted.
- *
- * The plan card is dropped from the wire like every other card, on the theory
- * that the coach already narrated it — which stops being true the moment the
- * athlete edits the plan in the editor: the version on the card is then one
- * the coach has never seen, and it would go on advising about its own. So an
- * edited draft is stated, whole, on every turn after the edit; each edit
- * rewrites the draft in place, so there is only ever one version to state.
+ * What on the calendar or in a COROS plan the athlete pointed at (P3.5), as a
+ * line in front of their question — with the ids the read tools take, so the
+ * coach reads what it is about instead of guessing from the words.
  */
-export function planEditNote(entries: PersistedChatEntry[]): string | null {
-  const edited = entries.flatMap((entry) =>
-    entry.kind === "planDraft" && entry.draft.editedAt && !entry.draft.removedAt ? [entry.draft] : []
-  );
-  if (!edited.length) return null;
-  const plans = edited.map((draft) => {
-    const sessions = draft.entries.map((item, index) => {
-      const when = item.scheduleDate ?? `session ${index + 1}`;
-      const facts = [item.volume, item.stepsSummary].filter(Boolean).join(" · ");
-      return `- ${when}: ${item.name}${facts ? ` — ${facts}` : ""}`;
-    });
-    const state = draft.uploadedAt ? "saved" : "not saved yet";
-    return [`Plan "${draft.name}" (draft_id ${draft.draftId}, ${state}):`, ...sessions].join("\n");
+export function scheduleRefsNote(refs: readonly ScheduleRef[]): string {
+  const lines = refs.map((ref) => {
+    if (ref.scope === "week") return `the week ${ref.label}${ref.day ? ` (from ${ref.day}; read it with list_scheduled_workouts)` : ""}`;
+    if (ref.scope === "day") return `the day ${ref.label}${ref.day ? ` (${ref.day})` : ""}`;
+    if (ref.activityId) return `the activity ${ref.label} (activity_id ${ref.activityId})`;
+    const ids = [
+      ref.planId ? `plan_id ${ref.planId}` : undefined,
+      ref.idInPlan ? `id_in_plan ${ref.idInPlan}` : undefined,
+      ref.day ? `on ${ref.day}` : undefined
+    ].filter(Boolean);
+    return `the session ${ref.label}${ids.length ? ` (${ids.join(", ")})` : ""}`;
   });
-  return [
-    "[The athlete edited a plan you drafted, in the plan editor. The card now holds this version; build on it rather than on the one you wrote.]",
-    ...plans
-  ].join("\n\n");
+  return (
+    `[The athlete is asking about ${lines.join("; and ")}. ` +
+    "Read what you need with list_scheduled_workouts, get_training_plan or get_activity_detail.]"
+  );
 }
 
-/** The wire with `planEditNote` put in front of the latest user message. */
-export function withPlanEdits(messages: ChatMessage[], entries: PersistedChatEntry[]): ChatMessage[] {
-  const note = planEditNote(entries);
+/** A `planEvent` as a line in front of the coach, where it happened. */
+export function planEventNote(event: PlanEvent): string {
+  const what = event.artifactType === "workout" ? "workout" : "plan";
+  const versions =
+    event.fromVersion && event.toVersion ? ` (v${event.fromVersion} → v${event.toVersion})` : "";
+  const lead =
+    event.action === "edited"
+      ? `[The athlete edited the ${what} "${event.name}"${versions} in the editor.`
+      : event.action === "restored"
+        ? `[The athlete restored an earlier version of the ${what} "${event.name}"${versions}.`
+        : event.action === "imported"
+          ? `[The ${what} "${event.name}" was changed in the Training Library or on COROS${versions}.`
+          : `[The ${what} "${event.name}" was deleted on COROS; its card is a proposal again.`;
+  const changes = event.changes?.length ? ` Changes: ${event.changes.join("; ")}.` : "";
+  return (
+    `${lead}${changes} Its newest version is draft_id ${event.draftId}; ` +
+    "read it with get_plan_draft before building on it.]"
+  );
+}
+
+/** How the index states where a creation went. */
+function creationState(draft: PlanDraftPreview): string {
+  const destination = draft.uploadResult?.destination;
+  if (!draft.uploadedAt && !destination) return "not saved";
+  if (destination === "calendar") return "on the calendar";
+  if (destination === "workoutLibrary") return "in the Workout Library";
+  if (destination === "nativePlan" || destination === "nativePlanAndCalendar") {
+    return draft.uploadResult?.planId ? `saved to COROS as plan ${draft.uploadResult.planId}` : "saved to COROS";
+  }
+  return "saved";
+}
+
+const VERSION_AUTHORS: Record<PlanArtifactVersion["author"], string> = {
+  coach: "you",
+  athlete: "the athlete",
+  coros: "a change in the Library"
+};
+
+/**
+ * Every creation still in the conversation, a line each, as it stands now
+ * (docs/coach-plan-canvas.md, P1.3). The cards are dropped from the wire like
+ * every other card, so without this the coach cannot name the plan it wrote
+ * three turns ago — not its draft id, not whether it was saved, not whether
+ * the athlete has since changed it. It costs about thirty tokens a creation;
+ * the detail is one `get_plan_draft` away.
+ *
+ * `versions` groups the cards: every version is a card of its own, and only
+ * the newest is listed. A card the list does not know is its own creation.
+ */
+export function creationIndex(
+  entries: PersistedChatEntry[],
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = [],
+  changeSets: readonly ScheduleChangeSet[] = []
+): string | null {
+  const known = new Map(versions.map((version) => [version.draftId, version]));
+  const creations = new Map<string, { draft: PlanDraftPreview; version?: PlanArtifactVersion }>();
+  for (const entry of entries) {
+    if (entry.kind !== "planDraft" || entry.draft.removedAt) continue;
+    const version = known.get(entry.draft.draftId);
+    const artifactId = version?.artifactId ?? entry.draft.draftId;
+    const current = creations.get(artifactId);
+    const newer =
+      !current ||
+      (version && current.version
+        ? version.version > current.version.version ||
+          (version.version === current.version.version && version.createdAt > current.version.createdAt)
+        : true);
+    if (newer) creations.set(artifactId, { draft: entry.draft, version });
+  }
+  // A brief is listed until it has a version: from then on the plan is the creation (P2.1).
+  const briefById = new Map(briefs.map((brief) => [brief.artifactId, brief]));
+  const briefLines = [
+    ...new Set(entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : [])))
+  ].flatMap((artifactId) => {
+    const brief = briefById.get(artifactId);
+    if (!brief || creations.has(artifactId)) return [];
+    const shape = brief.outline ? outlineLine(brief.outline) : "no outline yet";
+    return [`- Brief · brief_id ${artifactId} · ${briefLine(brief.request)} · ${shape}`];
+  });
+  // What became of each calendar proposal (P3.3): the card is where the athlete
+  // applied it, and the coach would otherwise think it still pending — or done.
+  const setById = new Map(changeSets.map((set) => [set.changeSetId, set]));
+  const changeLines = [
+    ...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))
+  ].flatMap((changeSetId) => {
+    const set = setById.get(changeSetId);
+    return set ? [`- Calendar proposal "${set.summary}" · ${changeSetState(set)}`] : [];
+  });
+  if (creations.size === 0 && briefLines.length === 0 && changeLines.length === 0) return null;
+  const lines = [...creations.values()].map(({ draft, version }) => {
+    const kind = draft.artifactType === "workout" ? "Workout" : "Plan";
+    const made = version
+      ? `v${version.version} by ${VERSION_AUTHORS[version.author]}`
+      : "v1 by you";
+    const edited = draft.editedAt ? " · edited by the athlete" : "";
+    const shape = draft.summary ? ` · ${draft.summary}` : "";
+    return `- ${kind} "${draft.name}" · draft_id ${draft.draftId} · ${made}${edited}${shape} · ${creationState(draft)}`;
+  });
+  return [
+    "[What you have made in this conversation, newest version of each. Read one with get_plan_draft; change one with revise_training_plan and its draft_id." +
+      (briefLines.length ? " Fill in a brief with request_plan_brief and its brief_id; the athlete edits it on its card." : "") +
+      (changeLines.length ? " A calendar proposal is applied by the athlete, line by line, from its card." : "") +
+      "]",
+    ...lines,
+    ...briefLines,
+    ...changeLines
+  ].join("\n");
+}
+
+/** How a proposal's lines stand: `2 applied · 1 out of date ("…") · 1 not decided`. */
+function changeSetState(set: ScheduleChangeSet): string {
+  const parts: string[] = [];
+  const of = (status: ScheduleChangeSet["lines"][number]["status"]) => set.lines.filter((line) => line.status === status);
+  if (of("applied").length) parts.push(`${of("applied").length} applied`);
+  for (const [status, word] of [["failed", "failed"], ["stale", "out of date"]] as const) {
+    const lines = of(status);
+    if (lines.length) {
+      parts.push(`${lines.length} ${word} (${lines.map((line) => `${line.label}: ${line.reason ?? "no reason given"}`).join("; ")})`);
+    }
+  }
+  if (of("dismissed").length) parts.push(`${of("dismissed").length} dismissed`);
+  if (of("proposed").length) parts.push(`${of("proposed").length} not decided yet`);
+  return parts.join(" · ");
+}
+
+/** The wire with `creationIndex` put in front of the latest user message. */
+export function withCreationIndex(
+  messages: ChatMessage[],
+  entries: PersistedChatEntry[],
+  versions: readonly PlanArtifactVersion[],
+  briefs: readonly PlanBrief[] = [],
+  changeSets: readonly ScheduleChangeSet[] = []
+): ChatMessage[] {
+  const note = creationIndex(entries, versions, briefs, changeSets);
   if (!note) return messages;
   let last = -1;
   messages.forEach((message, index) => {
@@ -282,6 +457,41 @@ export function planTranscriptContext(
   };
 }
 
+/** How a summary turn begins, and so how one is recognised. */
+const SUMMARY_HEADER = "[Earlier in this conversation, summarised]";
+
+/** How many messages before its own a pipeline step's turn carries (P2.4). */
+export const PIPELINE_RECENT_MESSAGES = 6;
+
+/**
+ * What a step of the plan pipeline sends (docs/coach-plan-canvas.md, P2.4):
+ * the last few messages before the step and the step's own prompt, which
+ * carries the brief and the outline. Not the whole conversation — a step's
+ * cost must not grow with how long the athlete has been talking — and not a
+ * summary either: a summary exists only once compaction has run, and making
+ * one for the step would cost a call of its own. The system prompt and the
+ * training snapshot are added by `streamChat` as for any turn.
+ *
+ * The step's message is the last user message of the wire the renderer
+ * sent; what it said there (the athlete's words, the creation index) is
+ * replaced by `prompt`. The kept messages start at a user message, which
+ * every provider wants first, and the summary a compacted conversation opens
+ * with is never among them.
+ */
+export function pipelineWire(
+  messages: readonly ChatMessage[],
+  prompt: string,
+  recent = PIPELINE_RECENT_MESSAGES
+): ChatMessage[] {
+  const last = messages.map((message) => message.role).lastIndexOf("user");
+  const before = (last < 0 ? messages : messages.slice(0, last)).filter(
+    (message) => !(message.role === "user" && message.content.startsWith(SUMMARY_HEADER))
+  );
+  const kept = before.slice(Math.max(0, before.length - recent));
+  while (kept.length && kept[0]!.role !== "user") kept.shift();
+  return [...kept, { role: "user", content: prompt }];
+}
+
 /**
  * How the summary reaches the model. A plain user turn, labelled, rather than
  * anything provider-specific: it has to read the same way to four providers,
@@ -292,7 +502,7 @@ export function summaryContextMessage(summary: string): ChatMessage {
   return {
     role: "user",
     content: [
-      "[Earlier in this conversation, summarised]",
+      SUMMARY_HEADER,
       summary,
       "[End of summary. The messages that follow are the recent turns in full.]"
     ].join("\n\n")

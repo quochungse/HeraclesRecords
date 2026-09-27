@@ -65,9 +65,11 @@
   --success-text: #6ee7a8;
   --success-dot: #34d399;
 
-  --warning-bg: rgba(216, 155, 34, 0.15);
-  --warning-border: rgba(251, 191, 36, 0.25);
-  --warning-text: #fbbf24;
+  /* Orange, not amber: the default accent is gold (#e7b04c), and a warning
+     in #fbbf24 beside it read as one more accent rather than as a warning. */
+  --warning-bg: rgba(251, 146, 60, 0.14);
+  --warning-border: rgba(251, 146, 60, 0.3);
+  --warning-text: #fb923c;
 
   --error-bg: rgba(194, 65, 12, 0.15);
   --error-border: rgba(248, 113, 113, 0.25);
@@ -117,9 +119,7 @@
    */
   --sidebar-row-text: #dadadf;
   --sidebar-row-icon: #9b9ba1;
-  --sidebar-radius: var(--radius-xl);
   --sidebar-glass-border: rgba(255, 255, 255, 0.14);
-  --sidebar-glass-highlight: rgba(255, 255, 255, 0.12);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
@@ -135,13 +135,6 @@
     linear-gradient(180deg, rgba(16, 20, 26, 0.92) 0%, rgba(10, 14, 20, 0.78) 100%);
   --sidebar-overlay-bg: var(--sidebar-glass-bg);
   --sidebar-overlay-shadow: var(--sidebar-glass-shadow);
-  --sidebar-indicator-bg: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 24%, transparent) 0%,
-    color-mix(in srgb, var(--accent-2) 14%, transparent) 100%
-  );
-  --sidebar-indicator-border: color-mix(in srgb, var(--accent-strong) 28%, transparent);
-  --sidebar-indicator-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
   --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
   /* One serif, and only for a screen's own title (§5 of
@@ -302,9 +295,9 @@ svg:focus-visible {
   --success-text: #0f6f4b;
   --success-dot: #12915f;
 
-  --warning-bg: rgba(180, 122, 18, 0.15);
-  --warning-border: rgba(180, 122, 18, 0.36);
-  --warning-text: #8a5d09;
+  --warning-bg: rgba(154, 77, 11, 0.12);
+  --warning-border: rgba(154, 77, 11, 0.34);
+  --warning-text: #9a4d0b;
 
   --error-bg: rgba(185, 40, 30, 0.11);
   --error-border: rgba(185, 40, 30, 0.3);
@@ -318,7 +311,6 @@ svg:focus-visible {
   --sidebar-row-text: #262d3c;
   --sidebar-row-icon: #5c6478;
   --sidebar-glass-border: rgba(19, 26, 40, 0.13);
-  --sidebar-glass-highlight: rgba(255, 255, 255, 0.9);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     var(--shadow-elevated);
@@ -335,13 +327,6 @@ svg:focus-visible {
     #ffffff;
   --sidebar-overlay-bg: var(--sidebar-glass-bg);
   --sidebar-overlay-shadow: var(--sidebar-glass-shadow);
-  --sidebar-indicator-bg: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 20%, transparent) 0%,
-    color-mix(in srgb, var(--accent-2) 12%, transparent) 100%
-  );
-  --sidebar-indicator-border: color-mix(in srgb, var(--accent) 36%, transparent);
-  --sidebar-indicator-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
   color: var(--text-primary);
   background: var(--bg-base);
@@ -2569,13 +2554,15 @@ input::placeholder {
 }
 
 /* The greeting block is the first flex child and the action the second, so the
-   button lands right. Nudged down a little: aligned to the top of a 42px
-   display line it reads as floating above the header rather than sitting in
-   it. */
+   button lands right. An icon alone — the title names what it refreshes — at
+   32px, a step under the 36px icon button, so it sits in the header rather
+   than competing with the greeting. Nudged down a little: aligned to the top
+   of a 42px display line it reads as floating above the header. */
 .dashboard-welcome-action {
   flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   margin-top: 6px;
-  white-space: nowrap;
 }
 
 /*
@@ -15935,6 +15922,8 @@ tr.data-intervals-row-missing {
 }
 
 /* ----- Training Coach chatbot ----- */
+/* The chat's tokens. The Workbench sits inside the chat now (R2), so
+   nothing Coach draws is portalled out from under them. */
 .chat-view {
   /* Chat-scoped neutral/monochrome palette. Overrides the app's green
      accent within the chat only, so the rest of the app is unaffected. */
@@ -15954,7 +15943,9 @@ tr.data-intervals-row-missing {
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
   --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
+}
 
+.chat-view {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -16126,15 +16117,15 @@ tr.data-intervals-row-missing {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: var(--sidebar-float-gap) 0;
   box-sizing: content-box;
-  transition: width var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
-    padding-left var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* A plain column with one hairline (Workbench review, R1): it was a floating
+   card with a border, a blur, a highlight and a shadow — a layer of its own
+   between the rail and the conversation, for what is only a list. */
 .chat-sidebar-shell.is-open {
-  width: 280px;
-  padding-left: var(--sidebar-float-gap);
+  width: 248px;
 }
 
 .chat-sidebar-shell.is-overlay-mode {
@@ -16154,22 +16145,70 @@ tr.data-intervals-row-missing {
   min-height: 0;
 }
 
+/* The Workbench (Coach Workbench review, R2): a plain column beside the
+   conversation with one hairline, like the conversation list on the other
+   side — wide enough for a plan's weeks, which the index column was not. */
 .chat-plan-panel {
   display: flex;
-  flex: 0 0 clamp(248px, 20vw, 296px);
+  flex: 0 0 clamp(380px, 34vw, 500px);
   flex-direction: column;
   align-self: stretch;
   min-width: 0;
   min-height: 0;
-  margin: var(--sidebar-float-gap) var(--sidebar-float-gap)
-    var(--sidebar-float-gap) 0;
   overflow: hidden;
-  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
-  border-radius: var(--sidebar-radius);
-  background: var(--sidebar-glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  box-shadow: var(--sidebar-glass-shadow);
+  border-left: 1px solid var(--sidebar-divider);
+  background: var(--menu-surface);
+}
+
+/* On a narrow window it is a sheet over the whole conversation, composer
+   included (UAT): stopping at the composer left a strip of the transcript
+   showing under its edge. Ask Coach closes it to show the chip it adds. */
+.chat-layout.is-workbench-sheet > .chat-workbench {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-left: 0;
+  box-shadow: var(--shadow-elevated);
+}
+
+.chat-canvas-detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-canvas-detail:focus {
+  outline: none;
+}
+
+/* The Workbench index scrolls as one body under its header. */
+.chat-plan-index-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 18%, transparent)
+    transparent;
+}
+
+.chat-plan-list-group {
+  display: grid;
+}
+
+/* A group's list is laid out by the body that scrolls, not a scroller itself. */
+.chat-plan-index-body .chat-plan-list {
+  overflow: visible;
+}
+
+.chat-plan-list-group-label {
+  margin: 12px 14px 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .chat-plan-list-header {
@@ -16408,91 +16447,193 @@ tr.data-intervals-row-missing {
   flex: none;
 }
 
-/* ----- The Creations popup ----- */
+/* ----- The canvas (docs/coach-plan-canvas.md, P1.4) ----- */
 
-/* Wider than the settings frame it shares its shell with: a plan is a grid of
-   weeks, and the extra width is what keeps a week on one row. */
-.chat-creation-modal {
-  width: min(880px, 96vw);
+/* Back, the name and close on one line; where it stands and the links to it
+   under the name, so the name has the panel's width. */
+.chat-canvas-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--glass-border);
 }
 
-.chat-creation-modal-title > div {
+.chat-canvas-title {
   display: grid;
+  grid-row: 1;
+  grid-column: 2;
   gap: 1px;
   min-width: 0;
 }
 
-.chat-creation-modal-title h2 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.chat-canvas-close {
+  grid-row: 1;
+  grid-column: 3;
 }
 
-.chat-creation-modal-title > div > span {
+.chat-canvas-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  grid-row: 2;
+  grid-column: 2 / 4;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Two lines before it is cut: the name is what the panel is about. */
+.chat-canvas-title h2 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.chat-canvas-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.chat-canvas-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  /* The same measure whether or not this creation needs a scrollbar. */
+  scrollbar-gutter: stable;
+}
+
+.chat-canvas-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.chat-canvas-foot > .chat-creation-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Remove sits at the far end from the save button, so the two are never
+   next to each other. */
+.chat-canvas-foot > .chat-creation-modal-remove {
+  margin-left: auto;
+}
+
+.chat-creation-modal-confirm {
+  flex: 1 1 200px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-canvas-older,
+.chat-canvas-loading,
+.chat-canvas-overview {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-canvas-older {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+}
+
+.chat-canvas-loading {
+  color: var(--text-muted);
+}
+
+.chat-canvas-overview {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.chat-canvas-versions {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-canvas-version {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.chat-canvas-version:hover {
+  background: var(--glass-bg);
+}
+
+.chat-canvas-versions > li[data-shown] > .chat-canvas-version {
+  border-color: var(--accent-glow);
+}
+
+.chat-canvas-version-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-canvas-version-head strong {
+  font-weight: 600;
+}
+
+.chat-canvas-version-head em {
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.chat-canvas-version-head time {
+  margin-left: auto;
   color: var(--text-muted);
   font-size: 11px;
 }
 
-.chat-creation-modal-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
+.chat-canvas-version-note {
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.chat-creation-modal-body {
-  overflow-y: auto;
-  padding: 16px;
-  /* Hold the scrollbar's width whether or not this creation needs one, so a
-     short workout and a twelve-week plan are laid out on the same measure. */
-  scrollbar-gutter: stable;
-}
-
-/* The card supplies the frame everywhere else; here the dialog is the frame,
-   so it draws none of its own. */
-.chat-creation-modal-body > .chat-plan-card {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  box-shadow: none;
-}
-
-/* Saving is the point of the card, and a long plan would otherwise put its
-   button below the fold. */
-.chat-creation-modal-body .chat-plan-actions {
-  position: sticky;
-  bottom: -1px;
-  padding: 10px 0 1px;
-  background: linear-gradient(
-    180deg,
-    transparent 0,
-    color-mix(in srgb, var(--surface) 92%, transparent) 18px
-  );
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-}
-
-.chat-creation-modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--glass-border);
-}
-
-/* Remove sits at the far end from the save button inside the card, so the two
-   are never next to each other. */
-.chat-creation-modal-remove {
-  margin-right: auto;
-}
-
-.chat-creation-modal-confirm {
-  margin-right: auto;
-  color: var(--text-muted);
+.chat-canvas-version-changes {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -16755,7 +16896,8 @@ tr.data-intervals-row-missing {
 .coach-models-panel .chat-local-settings-panel > .chat-settings-copy,
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools,
 .coach-models-panel .chat-local-settings-panel > .chat-local-actions,
-.coach-models-panel .chat-local-settings-panel > .chat-local-result {
+.coach-models-panel .chat-local-settings-panel > .chat-local-result,
+.coach-models-panel .chat-local-settings-panel > .chat-model-list-status {
   grid-column: 1 / -1;
 }
 
@@ -16888,40 +17030,10 @@ tr.data-intervals-row-missing {
   flex: 1;
   height: 100%;
   min-height: 0;
-  width: 280px;
-  min-width: 280px;
+  width: 248px;
+  min-width: 248px;
   overflow: hidden;
-  border: 1px solid var(--surface-line, var(--sidebar-glass-border));
-  border-radius: var(--sidebar-radius);
-  background: var(--sidebar-glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur-shell)) saturate(180%);
-  box-shadow: var(--sidebar-glass-shadow);
-}
-
-.chat-sidebar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    var(--sidebar-glass-highlight) 0%,
-    transparent 34%
-  );
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.chat-sidebar::after {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  z-index: 0;
-  border-radius: calc(var(--sidebar-radius) - 1px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  pointer-events: none;
+  border-right: 1px solid var(--sidebar-divider);
 }
 
 .chat-sidebar-inner {
@@ -17035,26 +17147,16 @@ tr.data-intervals-row-missing {
   display: grid;
   gap: 10px;
   flex: none;
-  padding: 14px 12px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 14px 12px 10px;
   position: relative;
   z-index: 1;
-  background: rgba(10, 14, 20, 0.42);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  backdrop-filter: blur(20px) saturate(140%);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .chat-history-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 2px;
   padding: 0 2px;
-}
-
-.chat-history-header .eyebrow {
-  margin: 0;
 }
 
 .chat-history-collapse-button {
@@ -17078,32 +17180,14 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
 }
 
-.chat-new-chat-sidebar {
-  width: 100%;
-  justify-content: center;
-  min-height: 40px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--accent-gradient);
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: none;
-  transition:
-    color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.chat-new-chat-sidebar:hover:not(:disabled) {
-  color: #ffffff;
-  background: var(--accent-gradient);
-  box-shadow: none;
-  transform: translateY(-1px);
-}
-
-.chat-new-chat-sidebar:active:not(:disabled) {
-  transform: translateY(0);
+.chat-history-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .chat-new-chat-sidebar:disabled {
@@ -17111,43 +17195,103 @@ tr.data-intervals-row-missing {
   cursor: default;
 }
 
-.chat-history-search {
+
+/* New chat and search in one box at the head of the list (UAT, A2): a
+   hairline box, New chat in the chat's accent ink, and search folded to an
+   icon at its end. Search takes the whole box while open, edged in the
+   accent. */
+.chat-history-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: stretch;
+  height: 34px;
+  overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  backdrop-filter: blur(12px) saturate(130%);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.chat-history-actions.is-searching {
+  border-color: var(--chat-signal-border);
+}
+
+.chat-history-new {
+  display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
   padding: 0 12px;
-  color: var(--text-muted);
-  box-shadow: var(--glass-inset);
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
 }
 
-.chat-history-search:focus-within {
-  border-color: var(--accent-glow);
+.chat-history-new:hover:not(:disabled) {
   background: var(--glass-bg-hover);
-  box-shadow:
-    var(--glass-inset),
-    0 0 0 3px var(--accent-soft);
 }
 
-.chat-history-search input {
+.chat-history-new:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.chat-history-new:focus-visible,
+.chat-history-actions-icon:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.chat-history-actions-divider {
+  width: 1px;
+  flex: none;
+  background: var(--glass-border);
+}
+
+.chat-history-actions-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.chat-history-actions-icon:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-history-search-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  color: var(--text-muted);
+}
+
+.chat-history-search-field input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
   color: var(--text-primary);
-  padding: 9px 0;
+  font: inherit;
   font-size: 13px;
 }
 
-.chat-history-search input:focus {
+.chat-history-search-field input:focus {
   outline: none;
 }
 
@@ -17186,8 +17330,9 @@ tr.data-intervals-row-missing {
   border-bottom: 1px solid var(--glass-border);
 }
 
+/* The pinned group's label reads in the ink, not the accent (UAT). */
 .chat-session-group.is-pinned-group .chat-session-group-label {
-  color: var(--accent-strong);
+  color: var(--text-primary);
   opacity: 1;
 }
 
@@ -17218,20 +17363,16 @@ tr.data-intervals-row-missing {
     transform var(--dur-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* A wash, as the app's rail does it: the row used to lift into a card with a
+   shadow and a shove under the pointer, and the open one glowed. */
 .chat-session-row:hover:not(:disabled) {
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-border);
+  background: var(--glass-bg);
   color: var(--text-primary);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-soft);
-  transform: translateX(2px);
 }
 
 .chat-session-row.is-active {
   color: var(--text-primary);
-  background: var(--sidebar-indicator-bg);
-  border-color: var(--sidebar-indicator-border);
-  box-shadow: var(--sidebar-indicator-shadow);
+  background: var(--glass-bg-hover);
 }
 
 .chat-session-row.is-active .chat-session-row-title {
@@ -17296,6 +17437,41 @@ tr.data-intervals-row-missing {
   margin-right: 5px;
   color: var(--accent-strong);
   vertical-align: -1px;
+}
+
+/* What waits on the athlete in the conversation (R3). */
+.chat-session-row-waiting {
+  justify-self: start;
+  max-width: 100%;
+  margin-top: 3px;
+  padding: 1px 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In the conversation: what waits on the athlete, and a jump to it (R3). */
+.chat-waiting-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: center;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-accent) 18%, var(--menu-surface));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-session-row-preview {
@@ -17437,11 +17613,16 @@ tr.data-intervals-row-missing {
   background: var(--error-bg);
 }
 
-.chat-sidebar-busy {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  color: var(--accent-strong);
+/* The conversation Coach is answering in (UAT): the row says so in place of
+   its time, and the rest of the list stays open. */
+.chat-session-row-answering {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--chat-signal, var(--text-secondary));
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .chat-settings-panel {
@@ -17691,10 +17872,21 @@ tr.data-intervals-row-missing {
   gap: 10px;
 }
 
+.chat-settings-account-who {
+  display: grid;
+  gap: 2px;
+}
+
 .chat-settings-email {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 13px;
+  font-weight: 600;
   word-break: break-word;
+}
+
+.chat-settings-account-who small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .chat-signout-settings,
@@ -17751,7 +17943,12 @@ tr.data-intervals-row-missing {
     color var(--dur-fast) var(--ease);
 }
 
-.chat-creations-pill:hover {
+.chat-creations-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-creations-pill:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
   background: color-mix(in srgb, var(--glass-bg-hover) 80%, transparent);
   color: var(--text-primary);
@@ -17826,32 +18023,6 @@ tr.data-intervals-row-missing {
   color: var(--text-primary);
   border-color: var(--accent);
   background: var(--glass-bg);
-}
-
-.chat-new-chat {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
-}
-
-.chat-new-chat:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--glass-bg);
-}
-
-.chat-new-chat:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 .chat-local-settings {
@@ -18243,6 +18414,23 @@ tr.data-intervals-row-missing {
 
 .chat-local-result.is-error {
   color: var(--error-text);
+}
+
+/* Where a provider's model list came from, and the button that reads it
+   again: one line under the model fields, the sentence taking what the
+   button leaves and wrapping above it on a narrow dialog. */
+.chat-model-list-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.chat-model-list-status > p {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
 }
 
 @media (max-width: 1080px) {
@@ -18773,6 +18961,39 @@ tr.data-intervals-row-missing {
   max-width: 480px;
 }
 
+/* Three intents, each a few ways in (R3). */
+.chat-intents {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 680px;
+}
+
+.chat-intent {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  text-align: left;
+}
+
+.chat-intent .chat-suggestion {
+  display: grid;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.chat-intent .chat-suggestion small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.chat-intent .chat-suggestion.is-plan {
+  border-color: color-mix(in srgb, var(--palette-accent) 45%, var(--glass-border));
+  color: var(--text-primary);
+}
+
 .chat-suggestion {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
@@ -18805,11 +19026,15 @@ tr.data-intervals-row-missing {
 }
 
 /* Composer */
+/* A container: what decides how much the toolbar can show is the column the
+   conversation has, and the canvas beside it takes that away from a wide
+   window as well as a narrow one. */
 .chat-composer {
+  container: chat-composer / inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 16px 4px;
+  padding: 8px 16px 14px;
 }
 
 .chat-composer-toolbar {
@@ -18828,8 +19053,11 @@ tr.data-intervals-row-missing {
   margin-bottom: 0;
 }
 
+/* The pickers do not shrink, so where the column is too narrow for them they
+   take a second line rather than running under the New chat button. */
 .chat-provider-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -19201,37 +19429,6 @@ tr.data-intervals-row-missing {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-}
-
-.chat-composer-new-chat {
-  min-height: 34px;
-  flex: none;
-  font-weight: 700;
-}
-
-.chat-composer-new-chat:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.chat-composer-new-chat:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-@media (max-width: 520px) {
-  .chat-composer-toolbar:not(.chat-composer-toolbar-login) {
-    gap: 8px;
-  }
-
-  .chat-composer-new-chat {
-    width: 34px;
-    padding: 0;
-    justify-content: center;
-  }
-
-  .chat-composer-new-chat span {
-    display: none;
   }
 }
 
@@ -19755,21 +19952,6 @@ tr.data-intervals-row-missing {
   gap: 12px;
 }
 
-.chat-plan-card-title {
-  min-width: 0;
-}
-
-.chat-workout-card-kicker {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--chat-signal-strong);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
 .chat-plan-card-header h4 {
   margin: 0 0 4px;
   font-size: 14px;
@@ -19784,46 +19966,25 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
-.chat-plan-sports {
-  display: inline-flex;
-  flex: none;
-  gap: 4px;
-  padding-top: 1px;
-}
-
-.chat-plan-sport-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  color: var(--chat-plan-sport, var(--text-secondary));
-  background: color-mix(in srgb, var(--chat-plan-sport, var(--text-secondary)) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--chat-plan-sport, var(--text-secondary)) 30%, transparent);
-}
-
-.chat-plan-overview {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow: hidden;
+/* A question the coach asked and the athlete answered, kept as one line. */
+.chat-asked-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 4px 10px;
+  width: fit-content;
+  max-width: calc(100% - 42px);
+  margin-left: 42px;
+  padding: 7px 12px;
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 48%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
-.chat-plan-overview-item {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px 10px;
-}
-
-.chat-plan-overview-item + .chat-plan-overview-item {
-  border-left: 1px solid var(--glass-border);
-}
-
-.chat-plan-overview-item span {
+.chat-asked-kicker {
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
@@ -19831,706 +19992,1505 @@ tr.data-intervals-row-missing {
   text-transform: uppercase;
 }
 
-.chat-plan-overview-item strong {
-  overflow: hidden;
+.chat-asked-question {
+  min-width: 0;
+}
+
+.chat-asked-answer {
   color: var(--text-primary);
-  font-size: 12px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+}
+
+.chat-version-note {
+  color: var(--text-muted);
+}
+
+/* A version something replaced, and a change the coach did not make, are
+   records rather than questions: they read a step quieter than the line an
+   answered question leaves. */
+.chat-version-row .chat-asked-question,
+.chat-plan-event-row .chat-asked-question {
+  color: var(--text-secondary);
+}
+
+/* A record stays one line (R2): what changed gives way first, and the name
+   after it, each cut with an ellipsis; the whole list is on hover and in the
+   Workbench's Versions. Wrapping left View alone on a second line. */
+.chat-version-row,
+.chat-plan-event-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.chat-version-row > *,
+.chat-plan-event-row > * {
+  flex: none;
+}
+
+.chat-version-row .chat-asked-question,
+.chat-plan-event-row .chat-asked-question,
+.chat-version-row .chat-version-note,
+.chat-plan-event-row .chat-version-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-plan-week {
+.chat-version-row .chat-version-note,
+.chat-plan-event-row .chat-version-note {
+  flex-shrink: 4;
+}
+
+/* What this conversation reads and which AI answers it (P2.0): one quiet
+   line above the transcript, opening the sheet that changes it. */
+/* The open conversation's name, standing where the screen's title was (R1).
+   A button, because pressing it renames the conversation. */
+/* The name takes what the controls leave, and is cut only when it must be:
+   both sides shrinking together cut "New chat" to "New c…". */
+.chat-header .chat-header-title {
   display: grid;
-  gap: 9px;
+  flex: 1 1 auto;
+  gap: 1px;
   min-width: 0;
 }
 
-.chat-plan-week-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 1px 2px 0;
-}
-
-.chat-plan-week-header > div:first-child {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  justify-content: start;
-  gap: 1px 8px;
-  min-width: 0;
-}
-
-.chat-plan-week-header > div:first-child > span {
-  grid-column: 1;
-  color: var(--chat-signal-strong);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.chat-plan-week-header h5 {
-  grid-column: 1;
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.chat-plan-week-header small {
-  grid-column: 2;
-  grid-row: 2;
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.chat-plan-week-stepper {
-  display: grid;
-  grid-template-columns: 28px auto 28px;
-  align-items: center;
-  gap: 5px;
+.chat-header .chat-header-end {
   flex: none;
 }
 
-.chat-plan-week-stepper button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-secondary);
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
-}
-
-.chat-plan-week-stepper button:hover:not(:disabled) {
-  border-color: var(--chat-signal-border);
-  background: var(--glass-bg-hover);
-  color: var(--chat-signal-strong);
-}
-
-.chat-plan-week-stepper button:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.chat-plan-week-stepper > span {
-  min-width: 42px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.chat-plan-week-tabs {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
-  overflow-x: auto;
-  padding: 0 0 2px;
-  scrollbar-width: none;
-  scroll-snap-type: x proximity;
-}
-
-.chat-plan-week-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.chat-plan-week-tabs button {
-  display: grid;
-  flex: 0 0 auto;
-  gap: 1px;
-  min-width: 104px;
-  padding: 7px 9px;
-  border: 1px solid var(--glass-border);
+.chat-conversation-title,
+.chat-conversation-title-input {
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
   text-align: left;
-  scroll-snap-align: start;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease);
 }
 
-.chat-plan-week-tabs button:hover:not(.is-active) {
-  border-color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+.chat-conversation-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.chat-conversation-title:not(:disabled):hover {
+  border-color: var(--glass-border);
+}
+
+.chat-conversation-title-input {
+  width: min(520px, 100%);
+  border-color: var(--glass-border);
   background: var(--glass-bg);
+}
+
+.chat-conversation-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* The line keeps its height when there is nothing to say on it. */
+.chat-conversation-subtitle:empty::before {
+  content: "\00a0";
+}
+
+/* What Coach reads here, as a chip beside the conversation's other controls
+   (it was a strip of grey text that did not look like a button). */
+.chat-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 280px;
+  padding: 4px 9px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--glass-bg) 66%, transparent);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.chat-header-chip b {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.chat-header-chip:hover {
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
+}
+
+.chat-header-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.chat-header-icon:hover {
+  border-color: var(--glass-border);
   color: var(--text-primary);
 }
 
-.chat-plan-week-tabs button:active {
-  transform: translateY(1px);
+/* The sheet's own layer sits inside this, over the whole window. */
+.coach-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
 }
 
-.chat-plan-week-tabs button.is-active {
-  border-color: var(--chat-signal-border);
-  background: var(--chat-signal-soft);
-  color: var(--chat-signal-strong);
+/* A move between two sheets of one dialog swaps the sheet and keeps the
+   scrim where it is, rather than fading both in again. */
+.coach-sheet[data-swapped] .plan-generator-scrim,
+.coach-sheet[data-swapped] .plan-generator-sheet {
+  animation: none;
 }
 
-.chat-plan-week-tabs strong {
-  font-size: 11px;
-  font-weight: 700;
+/* The generator's footer leads with its keep-for-chat box; this sheet has none. */
+.coach-sheet .plan-generator-sheet > footer {
+  justify-content: flex-end;
 }
 
-.chat-plan-week-tabs span {
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.chat-plan-empty-week {
+/* "This conversation": the AI as it stands, one row (name, model and
+   effort, where the choice comes from), its state, and Change. */
+.coach-conversation-ai {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 58px;
+  gap: 10px;
+  margin-top: 8px;
   padding: 10px 12px;
-  border: 1px dashed var(--glass-border);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.chat-plan-issues {
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--glass-bg) 58%, transparent);
+  background: var(--glass-bg);
 }
 
-.chat-plan-issues[data-tone="alert"] {
-  border-color: color-mix(in srgb, var(--error-text) 30%, var(--glass-border));
-}
-
-.chat-plan-issues summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 18px;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 7px 10px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  list-style: none;
-}
-
-.chat-plan-issues summary::-webkit-details-marker {
-  display: none;
-}
-
-.chat-plan-issues summary > span {
-  display: inline-flex;
-  align-items: center;
+.coach-conversation-ai > span:first-child {
+  display: flex;
   min-width: 0;
-  gap: 7px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.chat-plan-issues summary strong {
-  overflow: hidden;
-  font-size: 12px;
+.coach-conversation-ai strong {
+  font-size: 13px;
   font-weight: 600;
+}
+
+.coach-conversation-ai small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.coach-conversation-ai small.coach-conversation-ai-model {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* The composer's AI: one chip saying which AI answers, opening the sheet
+   that changes it. */
+.chat-ai-chip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.chat-ai-chip:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
+}
+
+.chat-ai-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.chat-ai-chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-ai-chip > span {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-plan-issues summary small {
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
+.chat-ai-chip b {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
-.chat-plan-issues summary > svg {
-  color: var(--text-muted);
-  transition: transform var(--dur-base) var(--ease);
+.chat-ai-chip.is-blocked {
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 }
 
-.chat-plan-issues[open] summary > svg {
-  transform: rotate(180deg);
+/* Where a question asked from the Calendar or the Library goes: a new
+   conversation or one of the recent ones, a row each. */
+.coach-ask-picker {
+  width: min(460px, 100%);
 }
 
-.chat-plan-issues[data-tone="alert"] summary > span > svg,
-.chat-plan-issues[data-tone="alert"] summary strong {
-  color: var(--error-text);
+.coach-ask-list {
+  max-height: min(360px, 60vh);
 }
 
-.chat-plan-issues[data-tone="note"] summary > span > svg {
-  color: var(--chat-signal-strong);
+.tl-dialog .coach-ask-list li {
+  padding: 0;
 }
 
-.chat-plan-issues summary:hover {
+.coach-ask-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.coach-ask-option:hover {
   background: var(--glass-bg-hover);
 }
 
-.chat-plan-issues summary:focus-visible {
-  --focus-ring-color: var(--chat-signal);
+.coach-ask-option:focus-visible {
   outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
-.chat-plan-issues > ul {
-  max-height: 180px;
-  overflow-y: auto;
-  padding: 0 10px 9px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 22%, transparent)
-    transparent;
-}
-
-.chat-plan-entries {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 52%, transparent);
-}
-
-.chat-plan-entry {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--chat-plan-sport, var(--text-muted)) 70%, transparent);
-}
-
-.chat-plan-entry + .chat-plan-entry {
-  border-top: 1px solid var(--glass-border);
-}
-
-.chat-plan-entry-date {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  min-width: 46px;
-  min-height: 48px;
-  padding: 4px 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg-elevated);
+.coach-ask-option > svg {
   color: var(--text-muted);
 }
 
-.chat-plan-entry-weekday,
-.chat-plan-entry-month {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
+.coach-ask-option.is-new > svg {
+  color: var(--accent-strong);
 }
 
-.chat-plan-entry-day {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
+.coach-ask-option strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chat-plan-entry-main {
+.tl-dialog .coach-ask-option span {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   One turn, one avatar (Workbench review, R1). An answer and the cards it
+   produced are one turn: three avatars down one column read as three
+   speakers. The athlete's own bubbles are told apart by where they sit. The
+   gutter stays, so the cards keep one left edge.
+   ------------------------------------------------------------------------- */
+.chat-row-user > .chat-avatar {
+  display: none;
+}
+
+.chat-row-user .chat-bubble {
+  max-width: 82%;
+}
+
+.chat-row-assistant + .chat-row-assistant > .chat-avatar {
+  visibility: hidden;
+}
+
+/* Every card as wide as the column: they were 510, 630 and 870 px by kind. */
+.chat-bubble.chat-bubble-plan {
+  flex: 1;
   min-width: 0;
+}
+
+/* Where an answer came from and what it cost: one quiet line under it. */
+.chat-answer-foot {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.chat-answer-foot .chat-sources {
+  margin-top: 0;
+  gap: 4px 12px;
+}
+
+.chat-answer-foot .chat-source {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.chat-answer-foot .chat-source svg {
+  color: var(--text-muted);
+}
+
+.chat-answer-foot .chat-source-error {
+  color: var(--error-text);
+}
+
+.chat-answer-foot .chat-turn-cost {
+  margin: 0 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   The composer as one box (R1): the words, and under them what the question
+   is about and which AI answers it.
+   ------------------------------------------------------------------------- */
+.chat-composer .chat-composer-inner {
   flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 10px 8px 14px;
+}
+
+/* ---------------------------------------------------------------------------
+   The composer, quieter (Coach Workbench UAT): a hairline box at rest and the
+   accent's edge while it is written in; About and the AI read as words, not
+   chips; the send button fills only once there is something to send.
+   ------------------------------------------------------------------------- */
+.chat-composer .chat-composer-inner {
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The chat scope redefines `--accent` as a grey; its own accent is
+   `--chat-signal`. */
+.chat-composer .chat-composer-inner:focus-within {
+  border-color: var(--chat-signal-border);
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] .chat-composer .chat-composer-inner {
+  background: var(--glass-bg-elevated);
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] .chat-composer .chat-composer-inner:focus-within {
+  box-shadow: none;
+}
+
+.chat-composer-row .chat-about-trigger,
+.chat-composer-row .chat-ai-chip {
+  min-height: 26px;
+  padding: 0 6px;
+  border-color: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.chat-composer-row .chat-about-trigger:hover,
+.chat-composer-row .chat-about-trigger[aria-expanded="true"],
+.chat-composer-row .chat-ai-chip:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.chat-composer-row .chat-ai-chip.is-blocked {
+  border-color: transparent;
+  color: var(--warning-text);
+}
+
+.chat-composer-row .chat-send {
+  background: var(--glass-bg);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.chat-composer-row .chat-send.is-ready {
+  background: var(--chat-signal);
+  color: #ffffff;
+}
+
+.chat-composer-row .chat-send.chat-stop {
+  background: var(--error-text);
+  color: #ffffff;
+}
+
+.chat-composer-row .chat-send:disabled {
+  opacity: 1;
+}
+
+.chat-composer-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@container chat-composer (max-width: 560px) {
+  .chat-composer-hint {
+    display: none;
+  }
+}
+
+/* The newest creation's follow-ups, inside the empty box as things to try. */
+.chat-composer-inner .chat-composer-followups {
+  max-width: none;
+  margin: 0;
+  gap: 4px;
+}
+
+.chat-composer-inner .chat-composer-followups-subject {
+  margin-right: 2px;
+  font-size: 11px;
+}
+
+.chat-composer-inner .chat-refine-chip {
+  padding: 2px 8px;
+  border-color: transparent;
+  background: var(--glass-bg);
+  font-size: 11px;
+}
+
+/* What the question points at, as a header on the box (UAT, proposal A):
+   its mark, "Asking about ·" what it belongs to, what it is and its figures.
+   Several fold to one line of chips under "About". */
+.chat-ref-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: -10px -10px 2px -14px;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  background: var(--glass-bg);
+}
+
+.chat-ref-header.is-list {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 10px 7px 12px;
+}
+
+.chat-ref-header-text {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chat-ref-header-kicker {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ref-header.is-list .chat-ref-header-kicker {
+  margin-right: 2px;
+}
+
+.chat-ref-header-title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ref-header-detail {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ref-header .chat-ref-remove {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.chat-ref-header.is-list .chat-ref-chip {
+  gap: 5px;
+  padding: 3px 8px 3px 9px;
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.chat-ref-header.is-list .chat-ref-chip .chat-ref-remove {
+  margin-left: 0;
+}
+
+.chat-ref-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.chat-ref-icon.is-sport {
+  color: var(--tl-sport, var(--text-secondary));
+}
+
+/* The plan's weeks in its sport's colour; the week asked about in full, the
+   rest at a lower strength. */
+.chat-ref-ridge {
+  display: inline-flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.chat-ref-ridge > span {
+  width: 6px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 40%, transparent);
+}
+
+.chat-ref-ridge > span.is-current {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+/* On the sent question: one line of what it was about, with a way back. */
+.chat-refs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text-muted);
+}
+
+.chat-refs-row .chat-ref-chip {
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.chat-refs-row .chat-ref-chip:not(:last-of-type)::after {
+  color: var(--text-muted);
+  content: ",";
+}
+
+.chat-refs-open {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chat-refs-open:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-refs-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The box grows with what is written, up to six lines, and scrolls past
+   that (UAT): a `rows={1}` textarea stayed one line high however long the
+   question, so a pasted paragraph was read through a slot. */
+.chat-composer .chat-input {
+  field-sizing: content;
+  min-height: calc(1.45em + 8px);
+  max-height: calc(6 * 1.45em + 8px);
+  overflow-y: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+}
+
+.chat-composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-composer-spacer {
+  flex: 1;
+}
+
+.chat-composer-row .chat-send {
+  width: 32px;
+  height: 32px;
+}
+
+/* The AI pickers, at the size of the chips beside them. */
+.chat-composer-row .chat-provider-controls {
+  gap: 6px;
+}
+
+.chat-composer-row .chat-provider-select .app-select-trigger,
+.chat-composer-row .chat-model-select .app-select-trigger {
+  min-height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.chat-composer-row .chat-provider-select .app-select-trigger:hover,
+.chat-composer-row .chat-model-select .app-select-trigger:hover {
+  transform: none;
+}
+
+.chat-composer-row .chat-provider-select .app-select-leading-icon,
+.chat-composer-row .chat-model-select .app-select-leading-icon {
+  width: 18px;
+  height: 18px;
+  box-shadow: none;
+}
+
+.chat-composer-row .chat-provider-select {
+  width: auto;
+}
+
+.chat-about {
+  position: relative;
+}
+
+.chat-about-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chat-about-trigger:hover,
+.chat-about-trigger[aria-expanded="true"] {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
+}
+
+/* Opens upward: the composer is the bottom edge of the screen. */
+.chat-about-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.chat-about-group {
+  display: grid;
   gap: 2px;
 }
 
-.chat-plan-entry-name {
-  font-size: 13px;
+.chat-about-group-label {
+  padding: 2px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chat-about-option {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-about-option:hover {
+  background: var(--glass-bg-hover);
+}
+
+/* The newest creation's follow-ups, just above the box. */
+.chat-composer-followups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 8px;
+}
+
+.chat-composer-followups-subject {
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-ref-remove {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chat-ref-remove:hover {
   color: var(--text-primary);
 }
 
-.chat-plan-entry-steps {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
+.chat-canvas-ask-session {
+  justify-self: start;
 }
 
-.chat-plan-entry.is-strength {
-  align-items: start;
-  padding-block: 10px;
-}
-
-.chat-plan-entry.is-strength .chat-plan-entry-date {
-  margin-top: 1px;
-}
-
-.chat-plan-entry.is-strength .chat-plan-entry-main {
-  gap: 7px;
-}
-
-.chat-plan-entry.is-strength .chat-plan-entry-name {
-  font-size: 13px;
-}
-
-.chat-plan-strength-structure {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 30%, transparent);
-}
-
-.chat-plan-strength-header,
-.chat-plan-strength-repeat-header {
+/* Follow-ups under a creation (P1.8): questions, drawn quieter than the
+   buttons that save it. */
+.chat-refine {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-refine-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.chat-refine-chip:hover:not(:disabled) {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.chat-refine-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* View and Undo on a one-line record: small, and after what they act on. At
+   the pill's own 34px they made a line of text three lines tall. */
+.chat-plan-event-view,
+.chat-plan-event-undo {
+  min-height: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.chat-asked-answer::before {
+  margin-right: 6px;
+  color: var(--text-muted);
+  font-weight: 400;
+  content: "→";
+}
+
+/* A coach's creation under the answer that proposed it: read-only, with the
+   way to save it and a way into the full view. */
+.chat-creation-card {
+  position: relative;
+}
+
+.chat-creation-head {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.chat-plan-strength-header {
-  min-height: 34px;
-  padding: 7px 9px;
-  border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--chat-plan-sport, var(--text-muted)) 7%, transparent);
+.chat-creation-head h4 {
+  margin: 2px 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.chat-plan-strength-header strong,
-.chat-plan-strength-repeat-header strong {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.chat-plan-strength-header > span,
-.chat-plan-strength-repeat-header > span {
+/* Neutral: the kicker names a kind of card, and the accent is kept for the
+   one thing on a card to press. */
+.chat-creation-kicker {
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.chat-creation-head-aside {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-creation-status {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: var(--glass-bg-elevated);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
-.chat-plan-strength-steps,
-.chat-plan-strength-repeat > ol {
-  display: grid;
-  list-style: none;
-  margin: 0;
-  padding: 4px;
-  gap: 2px;
+.chat-creation-status[data-tone="pending"] {
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
-.chat-plan-strength-step {
+.chat-creation-status[data-saved="true"] {
+  color: var(--success-text);
+  background: color-mix(in srgb, var(--success-text) 12%, transparent);
+}
+
+.chat-creation-figures {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  margin: 0;
+}
+
+.chat-creation-figures > div {
   min-width: 0;
-  min-height: 38px;
-  padding: 6px 7px;
+  padding: 7px 9px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--glass-bg) 54%, transparent);
+  background: var(--glass-bg-elevated);
 }
 
-.chat-plan-strength-step.is-rest {
-  min-height: 32px;
-  background: transparent;
-}
-
-.chat-plan-strength-step.is-warmup,
-.chat-plan-strength-step.is-cooldown {
-  background: color-mix(in srgb, var(--glass-bg) 28%, transparent);
-}
-
-.chat-plan-strength-marker {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid color-mix(in srgb, var(--chat-plan-sport, var(--text-muted)) 28%, var(--glass-border));
-  border-radius: var(--radius-sm);
-  color: var(--chat-plan-sport, var(--text-secondary));
-  background: color-mix(in srgb, var(--chat-plan-sport, var(--text-muted)) 10%, transparent);
-  font-size: 10px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.chat-plan-strength-step.is-rest .chat-plan-strength-marker,
-.chat-plan-strength-step.is-warmup .chat-plan-strength-marker,
-.chat-plan-strength-step.is-cooldown .chat-plan-strength-marker {
-  border-color: var(--glass-border);
-  background: var(--glass-bg);
+.chat-creation-figures dt {
   color: var(--text-muted);
-}
-
-.chat-plan-strength-step-copy {
-  display: grid;
-  min-width: 0;
-}
-
-.chat-plan-strength-step-copy strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.chat-creation-figures dd {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-plan-strength-prescription {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 3px 8px;
-  max-width: 260px;
-  text-align: right;
+.chat-creation-week {
+  display: grid;
+  gap: 5px;
 }
 
-.chat-plan-strength-prescription strong {
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.chat-plan-strength-prescription span {
+.chat-creation-week-label {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.2;
 }
 
-.chat-plan-strength-repeat {
-  overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--chat-plan-sport, var(--text-muted)) 6%, var(--glass-bg));
-}
-
-.chat-plan-strength-repeat-header {
-  min-height: 30px;
-  padding: 6px 9px 3px;
-}
-
-.chat-plan-strength-repeat > ol {
-  padding-top: 2px;
-}
-
-.chat-plan-entry-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-}
-
-.chat-plan-entry.is-strength .chat-plan-entry-meta {
-  align-self: start;
-}
-
-.chat-plan-entry-volume {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.chat-plan-entry-tags {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 5px;
-  max-width: 230px;
-}
-
-.chat-plan-entry-type {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  padding: 2px 7px;
-  white-space: nowrap;
-}
-
-.chat-plan-entry-sport {
-  display: inline-flex;
-  align-items: center;
+.chat-creation-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--chat-plan-sport, var(--text-secondary));
-  background: color-mix(in srgb, var(--chat-plan-sport, var(--text-secondary)) 13%, transparent);
-  border: 1px solid color-mix(in srgb, var(--chat-plan-sport, var(--text-secondary)) 26%, transparent);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-}
-
-.chat-plan-warnings,
-.chat-plan-notes {
-  list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  list-style: none;
 }
 
-.chat-plan-warnings {
-  color: var(--error-text);
-}
-
-.chat-plan-notes {
-  color: var(--text-secondary);
-}
-
-.chat-plan-warnings li,
-.chat-plan-notes li {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-}
-
-.chat-plan-warnings svg,
-.chat-plan-notes svg {
-  flex: none;
-  margin-top: 2px;
-}
-
-.chat-plan-confirmation {
+.chat-creation-days > li {
   display: grid;
-  gap: 10px;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 76%, transparent);
-}
-
-.chat-plan-confirmation legend {
-  margin-left: -4px;
-  padding: 0 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.chat-plan-destination-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.chat-plan-destination-option.is-primary {
-  grid-column: 1 / -1;
-}
-
-.chat-plan-destination-option {
-  position: relative;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 9px;
+  align-content: start;
+  gap: 3px;
   min-width: 0;
-  min-height: 64px;
-  padding: 9px 10px;
-  border: 1px solid var(--glass-border);
+  min-height: 52px;
+  padding: 6px;
   border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-creation-days b {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-creation-days span {
+  padding-left: 5px;
+  border-left: 3px solid var(--tl-sport, var(--chat-signal));
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-creation-days > li.is-rest span {
+  padding-left: 0;
+  border-left: 0;
+  color: var(--text-muted);
+}
+
+/* A day of the strip the plan does not run on: before its first session or
+   after its last. Hatched and unlabelled, so it cannot read as a rest day. */
+.chat-creation-days > li.is-outside {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in srgb, var(--text-muted) 12%, transparent) 5px 10px
+  );
+  opacity: 0.6;
+}
+
+/* A plan brief (P2.1): the generator's snapshot rows, each marked with where
+   Coach took it from; a row with no mark is the default nobody has spoken to. */
+/* The cards of Coach's steps and proposals hold their own positioned overlays. */
+.chat-brief-card,
+.chat-outline-card,
+.chat-change-card {
+  position: relative;
+}
+
+.chat-brief-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.chat-brief-rows > div {
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-brief-rows dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.chat-brief-rows dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.chat-brief-rows dd > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-brief-origin {
+  color: var(--chat-signal-strong);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.chat-brief-origin[data-origin="data"] {
+  color: var(--text-muted);
+}
+
+.chat-brief-reads {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-brief-open {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* A brief's outline (P2.2): a bar a week in its stage's hue, the stages as a
+   band under the bars, and the week picked out below. */
+.chat-outline-summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-outline-ridge {
+  display: grid;
+  gap: 4px;
+}
+
+.chat-outline-bars,
+.chat-outline-band {
+  display: grid;
+  grid-template-columns: repeat(var(--chat-outline-weeks), minmax(0, 1fr));
+  gap: 3px;
+}
+
+.chat-outline-bars {
+  align-items: end;
+  min-height: 72px;
+}
+
+.chat-outline-bar {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
+  transition: background var(--dur-fast) var(--ease);
 }
 
-.chat-plan-destination-option:hover:not(.is-disabled) {
-  border-color: color-mix(in srgb, var(--text-muted) 62%, transparent);
-  background: var(--glass-bg-hover);
+.chat-outline-bar > span {
+  width: 100%;
+  max-width: 28px;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: var(--tl-stage);
+  opacity: 0.75;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
-.chat-plan-destination-option:active:not(.is-disabled) {
-  transform: translateY(1px);
+.chat-outline-bar.is-lighter > span {
+  opacity: 0.4;
 }
 
-.chat-plan-destination-option.is-selected {
-  border-color: var(--chat-signal-border);
-  background: var(--chat-signal-soft);
+.chat-outline-bar:hover,
+.chat-outline-bar.is-selected {
+  background: var(--glass-bg);
 }
 
-.chat-plan-destination-option.is-disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
+.chat-outline-bar.is-selected > span {
+  opacity: 1;
 }
 
-.chat-plan-destination-option:has(input:focus-visible) {
-  outline: 2px solid var(--chat-signal);
+.chat-outline-bar:focus-visible {
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
-.chat-plan-destination-icon {
+.chat-outline-band > span {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--tl-stage);
+}
+
+.chat-outline-week {
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--glass-border);
+  gap: 6px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-muted);
+  background: var(--glass-bg-elevated);
+  box-shadow: inset 3px 0 0 var(--tl-stage);
 }
 
-.chat-plan-destination-option.is-selected .chat-plan-destination-icon {
-  border-color: var(--chat-signal-border);
-  color: var(--chat-signal-strong);
+.chat-outline-week > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
 }
 
-.chat-plan-destination-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.chat-plan-destination-copy strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12px;
+.chat-outline-week > header strong {
+  font-size: 13px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-plan-destination-copy small {
-  color: var(--text-muted);
-  font-size: 10px;
   line-height: 1.3;
 }
 
-.chat-plan-destination-check {
-  color: var(--chat-signal-strong);
-  opacity: 0;
+.chat-outline-week > header small,
+.chat-outline-week li small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
 }
 
-.chat-plan-destination-option.is-selected .chat-plan-destination-check {
-  opacity: 1;
+.chat-outline-week > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-outline-week ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-outline-week li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--sport-accent);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-outline-week li > span {
+  min-width: 26px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.chat-outline-week li > strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chat-outline-redraw {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-outline-redraw input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 7px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  background: var(--glass-bg);
+  font: inherit;
+  font-size: 12px;
+}
+
+.chat-outline-redraw input:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A pipeline step while its turn runs (P2.3): the card it is making, as a
+   line per thing Coach did, the latest still marked as under way. */
+.chat-step-trail {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+/* An ordinary turn's trail sits in the answer's own bubble, bare. */
+.chat-step-trail.is-quiet {
+  margin-bottom: 0;
+  padding: 0;
+  background: none;
+}
+
+.chat-step-trail ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-step-trail li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-step-trail li.is-doing {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.chat-step-trail li > i {
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--chat-signal);
+}
+
+.chat-step-trail-tail {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Adjust outline: the athlete's figures for each week, in the generator's sheet. */
+.chat-outline-editor-body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.chat-outline-editor-lede {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-outline-editor-weeks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-outline-editor-weeks > li {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(128px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: inset 3px 0 0 var(--tl-stage);
+}
+
+.chat-outline-editor-week {
+  display: grid;
+  gap: 2px;
+}
+
+/* A week with no stage still draws its edge, in the quiet line colour. */
+.chat-outline-editor {
+  --tl-stage: var(--glass-border);
+}
+
+/* The stage menu shares the row with the figures and may not push them out of it. */
+.chat-outline-editor-stage {
+  min-width: 0;
+}
+
+.chat-outline-editor-week strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-outline-editor-week small,
+.chat-outline-editor-figure span,
+.chat-outline-editor-focus {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-outline-editor-figure,
+.chat-outline-editor-lighter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-outline-editor-figure input {
+  width: 64px;
+  padding: 5px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--glass-bg-elevated);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-outline-editor-figure input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-outline-editor-lighter input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.chat-outline-editor-focus {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .chat-outline-editor-weeks > li {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.chat-creation-steps {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-creation-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-creation-open:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+.chat-creation-open:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .chat-creation-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-creation-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .chat-plan-destination-summary {
@@ -20566,9 +21526,9 @@ tr.data-intervals-row-missing {
   padding: 9px 12px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--chat-signal-strong);
-  background: var(--chat-signal-soft);
-  border: 1px solid var(--chat-signal-border);
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-sm);
 }
 
@@ -20616,10 +21576,135 @@ tr.data-intervals-row-missing {
   outline-offset: 2px;
 }
 
+.chat-creation-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-creation-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.chat-creation-keep input {
+  margin: 0;
+  accent-color: var(--chat-signal);
+}
+
 .chat-plan-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* The leading way to save and, joined to it, the sheet of every other way
+   (Workbench review, R2). */
+.chat-save-actions {
+  position: relative;
+}
+
+.chat-save-split {
+  display: inline-flex;
+}
+
+.chat-save-split > .chat-plan-upload:first-child:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.chat-save-split > .chat-save-more {
+  margin-left: -1px;
+  padding: 8px 9px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.chat-save-sheet {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  width: min(420px, 100%);
+  min-width: 280px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.chat-save-sheet[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.chat-save-sheet-title {
+  padding: 2px 8px 6px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chat-save-option {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-save-option:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+}
+
+.chat-save-option-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.chat-save-option-head strong {
+  font-weight: 600;
+}
+
+.chat-save-option-head em {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.chat-save-option-outcome {
+  padding-left: 21px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* The outline's way on to the sessions stands at the row's end, as a next
+   step does, apart from the buttons that change the outline itself. */
+.chat-outline-next {
+  margin-left: auto;
 }
 
 .chat-plan-review {
@@ -20678,8 +21763,6 @@ tr.data-intervals-row-missing {
   transform: translateY(1px);
 }
 
-.chat-plan-week-tabs button:focus-visible,
-.chat-plan-week-stepper button:focus-visible,
 .chat-plan-review:focus-visible,
 .chat-plan-upload:focus-visible {
   --focus-ring-color: var(--chat-signal);
@@ -20690,76 +21773,6 @@ tr.data-intervals-row-missing {
 @media (max-width: 600px) {
   .chat-plan-card {
     padding: 12px;
-  }
-
-  .chat-plan-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .chat-plan-overview-item:nth-child(3) {
-    border-left: 0;
-  }
-
-  .chat-plan-overview-item:nth-child(n + 3) {
-    border-top: 1px solid var(--glass-border);
-  }
-
-  .chat-plan-week-header {
-    align-items: flex-start;
-  }
-
-  .chat-plan-week-header > div:first-child {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-plan-week-header small {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .chat-plan-issues summary {
-    grid-template-columns: minmax(0, 1fr) 18px;
-  }
-
-  .chat-plan-issues summary small {
-    display: none;
-  }
-
-  .chat-plan-entry {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .chat-plan-entry-meta {
-    grid-column: 2;
-    align-items: flex-start;
-  }
-
-  .chat-plan-entry-tags {
-    justify-content: flex-start;
-  }
-
-  .chat-plan-strength-step {
-    grid-template-columns: 24px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .chat-plan-strength-step-copy strong {
-    white-space: normal;
-  }
-
-  .chat-plan-strength-prescription {
-    grid-column: 2;
-    justify-content: flex-start;
-    max-width: none;
-    text-align: left;
-  }
-
-  .chat-plan-destination-options {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-plan-destination-option.is-primary {
-    grid-column: auto;
   }
 
   .chat-workout-calendar-date {
@@ -20783,6 +21796,21 @@ tr.data-intervals-row-missing {
   flex-direction: column;
   gap: 10px;
   min-width: min(100%, 420px);
+}
+
+/* A chart has no width of its own — Recharts' ResponsiveContainer takes what
+   its box is given — and the bubble around it sizes to its content, so the
+   card's percentage had nothing to resolve against: Fitness trends drew 133px
+   wide, a chart 103px across, which read as missing. The bubble that holds a
+   chart takes the row instead, and the card fills it. */
+.chat-bubble-plan:has(> :is(.chat-visual-card, .chat-hr-trend-card)) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-bubble-plan > :is(.chat-visual-card, .chat-hr-trend-card) {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chat-hr-trend-card-header,
@@ -21142,27 +22170,192 @@ tr.data-intervals-row-missing {
   color: var(--text-secondary);
 }
 
-.chat-delete-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--error-text) 45%, transparent);
-  background: color-mix(in srgb, var(--error-text) 12%, transparent);
-  color: var(--error-text);
+.chat-delete-expired {
+  margin: 0;
+  color: var(--text-muted);
   font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Coach's proposals to the calendar and the library (P3.2–P3.3) */
+.chat-change-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The days the set touches, as they stand once it is applied (R2). */
+.chat-change-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-change-days > li {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-elevated);
+}
+
+.chat-change-days b {
+  color: var(--text-muted);
+  font-size: 10px;
   font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-change-mark {
+  overflow: hidden;
+  padding-left: 5px;
+  border-left: 3px solid var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-change-mark[data-kind="new"] {
+  border-left-color: var(--chat-signal);
+}
+
+.chat-change-mark[data-kind="gone"] {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.chat-change-mark[data-kind="failed"] {
+  border-left-color: var(--error-text);
+}
+
+.chat-change-group {
+  display: grid;
+  gap: 6px;
+}
+
+.chat-change-done > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
   cursor: pointer;
 }
 
-.chat-delete-confirm:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--error-text) 18%, transparent);
+.chat-change-done[open] > summary {
+  margin-bottom: 6px;
 }
 
-.chat-delete-confirm:disabled {
+.chat-change-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--glass-bg-elevated) 42%, transparent);
+}
+
+.chat-change-line-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chat-change-line-label {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-change-line-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.chat-change-line[data-status="applied"] .chat-change-line-status {
+  color: var(--success-text);
+}
+
+.chat-change-line[data-status="failed"] .chat-change-line-status {
+  color: var(--error-text);
+}
+
+.chat-change-line[data-status="stale"] .chat-change-line-status {
+  color: var(--warning-text);
+}
+
+.chat-change-line:is([data-status="dismissed"], [data-status="stale"]) .chat-change-line-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.chat-change-line-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.chat-change-apply,
+.chat-change-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.chat-change-apply {
+  border-color: var(--chat-signal-border);
+  color: var(--chat-signal-strong);
+  background: var(--chat-signal-soft);
+}
+
+.chat-change-apply.is-destructive {
+  border-color: color-mix(in srgb, var(--error-text) 45%, transparent);
+  color: var(--error-text);
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+}
+
+.chat-change-apply:hover:not(:disabled),
+.chat-change-dismiss:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.chat-change-apply:disabled,
+.chat-change-dismiss:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.chat-change-apply:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-change-dismiss:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* COROS MCP connect control */
@@ -21443,6 +22636,9 @@ tr.data-intervals-row-missing {
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
   --chat-signal-border: color-mix(in srgb, var(--palette-accent) 42%, transparent);
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
+}
+
+:root[data-theme="paper"] .chat-view {
   background:
     radial-gradient(
       1100px 520px at 50% -8%,
@@ -21502,17 +22698,6 @@ tr.data-intervals-row-missing {
   --accent-glow: var(--palette-accent-glow);
   --accent-soft: var(--palette-accent-soft);
   --accent-gradient: var(--palette-accent-gradient);
-
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-:root[data-theme="paper"] .chat-sidebar::before {
-  opacity: 0;
-}
-
-:root[data-theme="paper"] .chat-sidebar::after {
-  box-shadow: none;
 }
 
 :root[data-theme="paper"] .chat-sidebar.is-overlay {
@@ -21520,39 +22705,12 @@ tr.data-intervals-row-missing {
   box-shadow: var(--sidebar-overlay-shadow);
 }
 
-:root[data-theme="paper"] .chat-history-toolbar {
-  background: #ffffff;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom-color: rgba(19, 26, 40, 0.09);
-  box-shadow: none;
-}
-
-:root[data-theme="paper"] .chat-history-search {
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .chat-history-search:focus-within {
-  background: #ffffff;
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow:
-    var(--glass-inset),
-    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-:root[data-theme="paper"] .chat-session-row:hover:not(:disabled) {
-  background: var(--glass-bg);
-  border-color: rgba(19, 26, 40, 0.1);
-  box-shadow: none;
+:root[data-theme="paper"] .chat-history-actions {
+  background: var(--glass-bg-elevated);
 }
 
 :root[data-theme="paper"] .chat-session-row.is-active {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 8px 20px color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 :root[data-theme="paper"] .chat-settings-modal {
@@ -23144,6 +24302,34 @@ tr.data-intervals-row-missing {
   color: var(--accent-strong);
 }
 
+/* A day with something on it opens as a whole (UAT); an empty one does not,
+   so only these take the pointer. Its number is the keyboard's way in. */
+.calendar-day.is-openable {
+  cursor: pointer;
+}
+
+.calendar-day-open {
+  padding: 0 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calendar-day-open:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.calendar-day-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .calendar-day-add {
   display: inline-flex;
   align-items: center;
@@ -23446,6 +24632,36 @@ tr.data-intervals-row-missing {
   border-color: var(--accent);
 }
 
+/* Ask Coach on a session's own screen (Activities, Running, Strength): the
+   Calendar's ghost button, which is scoped to the calendar's surfaces. */
+.activity-ask-coach {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.activity-ask-coach:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.activity-ask-coach:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* --- shared ghost button (scoped to calendar surfaces) --- */
 
 .calendar-view .ghost-button,
@@ -23543,6 +24759,134 @@ tr.data-intervals-row-missing {
   min-height: 0;
   overflow-y: auto;
   padding: 18px 20px;
+}
+
+/* Back to the day a thing was opened from, where the date would be. */
+.calendar-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 0 -4px;
+  padding: 2px 6px 2px 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.calendar-detail-back:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.calendar-detail-back:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A day read as a whole: its totals, then a row for each thing on it. */
+.calendar-day-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.calendar-day-overview-totals {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.calendar-day-overview-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-day-overview-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.calendar-day-overview-item:hover {
+  background: var(--glass-bg-hover);
+}
+
+.calendar-day-overview-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.calendar-day-overview-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 16%, transparent);
+  color: var(--tl-sport, var(--text-secondary));
+}
+
+.calendar-day-overview-text {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.calendar-day-overview-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-day-overview-text small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.calendar-day-overview-status {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.calendar-day-overview-status[data-tone="done"] {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.calendar-day-overview-status[data-tone="missed"] {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.calendar-day-overview-chevron {
+  flex: none;
+  color: var(--text-muted);
 }
 
 .calendar-detail-empty {
@@ -31711,3 +33055,200 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   opacity: 0.55;
   cursor: default;
 }
+
+/* ============================================== Plan pieces shared with Coach
+ * The week ridge and the stage hues are drawn by the Training Library and by a
+ * coach's plan card in the conversation, which does not load the library's
+ * stylesheet. */
+
+/* ------------------------------------------------------ Stages, as colour */
+
+/*
+ * A week's stage is data — COROS's own six, Preparation to Transition — so it
+ * may take a hue, the same one on the ridge's band and down the edge of the
+ * week. The semantic inks are borrowed rather than a palette invented, so a
+ * stage follows the theme with everything else.
+ */
+[data-stage] {
+  --tl-stage: var(--text-muted);
+}
+
+[data-stage="preparation"] {
+  --tl-stage: var(--text-secondary);
+}
+
+[data-stage="base"] {
+  --tl-stage: var(--success-text);
+}
+
+[data-stage="build"] {
+  --tl-stage: var(--warning-text);
+}
+
+[data-stage="peak"] {
+  --tl-stage: var(--error-text);
+}
+
+[data-stage="race"] {
+  --tl-stage: var(--accent-strong);
+}
+
+[data-stage="transition"] {
+  --tl-stage: var(--text-muted);
+}
+
+/* ------------------------------------------------------- The week ridge */
+
+.plan-ridge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-ridge-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.plan-ridge-caption b {
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.plan-ridge-caption small {
+  font-size: 10px;
+}
+
+.plan-ridge-bars,
+.plan-ridge-stages {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(var(--plan-ridge-weeks), minmax(0, 1fr));
+}
+
+/* A week: its bar, and under it its number. The whole column is the target. */
+.plan-ridge-week {
+  display: flex;
+  height: 100px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover {
+  background: var(--glass-bg);
+}
+
+/* A stack of the week's sports, bottom up in one fixed order, each in the hue
+   its sessions wear below. The hover and this week lift the whole stack. */
+/* The chart spans the width; a bar does not (UAT). A week's column is its
+   share of the row, and its bar a fixed width in the middle of it, so four
+   weeks across a whole reader draw four bars rather than four slabs. The
+   outline card's bars take the same width. */
+.plan-ridge-bar {
+  display: flex;
+  width: 100%;
+  max-width: 28px;
+  height: var(--plan-bar-height);
+  flex-direction: column-reverse;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+}
+
+.plan-ridge-seg {
+  min-height: 2px;
+  flex-basis: 0;
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 62%, transparent);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.plan-ridge-week:hover .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-empty .plan-ridge-bar {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+.plan-ridge-week small {
+  height: 10px;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* This week: the stack at full strength and its number in the accent's ink. */
+.plan-ridge-week.is-current .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-current small {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.plan-ridge-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.plan-ridge-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.plan-ridge-legend > span::before {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--tl-sport, var(--text-muted));
+  content: "";
+}
+
+.plan-ridge-stage {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-ridge-stage[data-stage] {
+  color: var(--tl-stage);
+  background: color-mix(in srgb, var(--tl-stage) 16%, transparent);
+}
+

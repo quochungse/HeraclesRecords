@@ -1,4 +1,5 @@
-import type { AnthropicEffort, ChatProvider, ChatSettings } from "./types";
+import type {
+  InlineSuggestionsMode, AnthropicEffort, ChatProvider, ChatSettings } from "./types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "./types";
 import { normalizeContextWindow } from "./chatContextCompaction";
 import {
@@ -10,6 +11,12 @@ import {
   DEFAULT_ANTHROPIC_EFFORT,
   DEFAULT_ANTHROPIC_MODEL
 } from "./anthropicChatProvider";
+import {
+  CATALOG_PROVIDERS,
+  MODEL_CATALOG_KEYS,
+  parseCatalogEntries,
+  parseStoredCatalog
+} from "./modelCatalog";
 
 export const CHAT_SETTINGS_KEYS = {
   provider: "chat.provider",
@@ -25,6 +32,8 @@ export const CHAT_SETTINGS_KEYS = {
   claudeEffort: "chat.claudeCode.effort",
   claudeDefaultModel: "chat.claudeCode.defaultModel",
   claudeAvailableModels: "chat.claudeCode.availableModels",
+  claudeAvailableModelsAt: "chat.claudeCode.availableModelsAt",
+  claudeAvailableModelsFrom: "chat.claudeCode.availableModelsFrom",
   claudeLastConnectionStatus: "chat.claudeCode.lastConnectionStatus",
   claudeLastCheckedAt: "chat.claudeCode.lastCheckedAt",
   claudeRecentActivities: "chat.claudeCode.permissions.recentActivities",
@@ -39,10 +48,25 @@ export const CHAT_SETTINGS_KEYS = {
   sidebarOpen: "chat.sidebar.open",
   visualizationsEnabled: "chat.visualizations.enabled",
   customInstructions: "chat.customInstructions",
+  inlineSuggestions: "chat.coach.inlineSuggestions",
   compactContextEnabled: "chat.compactContext.enabled",
   compactContextLimit: "chat.compactContext.limit",
   compactContextKeep: "chat.compactContext.keep"
 } as const;
+
+function inlineSuggestionsMode(value: unknown): InlineSuggestionsMode {
+  return value === "on" || value === "off" ? value : "auto";
+}
+
+/** Whether a turn by `provider` may attach workout cards it was not asked for (P1.9). */
+export function inlineSuggestionsEnabled(
+  mode: InlineSuggestionsMode | undefined,
+  provider: ChatProvider
+): boolean {
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  return provider === "claude-code" || provider === "claude-api";
+}
 
 export interface ChatSettingsStore {
   get(key: string): string | undefined;
@@ -103,6 +127,10 @@ export function readChatSettingsFromStore(
       availableModels: parseModelOptions(
         store.get(CHAT_SETTINGS_KEYS.claudeAvailableModels)
       ),
+      availableModelsAt:
+        store.get(CHAT_SETTINGS_KEYS.claudeAvailableModelsAt) || undefined,
+      availableModelsFrom:
+        store.get(CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom) || undefined,
       lastConnectionStatus: normalizeClaudeConnectionStatus(
         store.get(CHAT_SETTINGS_KEYS.claudeLastConnectionStatus)
       ),
@@ -128,11 +156,13 @@ export function readChatSettingsFromStore(
       hasApiKey: apiKeyStores.local.hasApiKey(),
       toolsEnabled: store.get(CHAT_SETTINGS_KEYS.localToolsEnabled) !== "false"
     },
+    modelCatalogs: readModelCatalogs(store),
     sidebarOpen: store.get(CHAT_SETTINGS_KEYS.sidebarOpen) !== "false",
     visualizationsEnabled:
       store.get(CHAT_SETTINGS_KEYS.visualizationsEnabled) === "true",
     customInstructions:
       store.get(CHAT_SETTINGS_KEYS.customInstructions) || undefined,
+    inlineSuggestions: inlineSuggestionsMode(store.get(CHAT_SETTINGS_KEYS.inlineSuggestions)),
     compactContext: {
       // Defaults on. A conversation nobody compacts grows without bound, and
       // the athlete who would notice the bill is the one least likely to go
@@ -147,6 +177,16 @@ export function readChatSettingsFromStore(
       })
     }
   };
+}
+
+/** Every provider list that has been read and can still be parsed. */
+function readModelCatalogs(store: ChatSettingsStore): ChatSettings["modelCatalogs"] {
+  const catalogs: NonNullable<ChatSettings["modelCatalogs"]> = {};
+  for (const provider of CATALOG_PROVIDERS) {
+    const catalog = parseStoredCatalog(store.get(MODEL_CATALOG_KEYS[provider]));
+    if (catalog) catalogs[provider] = catalog;
+  }
+  return catalogs;
 }
 
 /** Undefined rather than NaN, so `normalizeContextWindow` falls back cleanly. */
@@ -204,6 +244,11 @@ export function saveChatSettingsToStore(
   } else {
     store.delete([CHAT_SETTINGS_KEYS.claudeAvailableModels]);
   }
+  // `modelCatalogs`, and when and from which CLI Claude Code's list was read,
+  // are deliberately not written here: a window's copy of them is whatever it
+  // last read, and saving a setting must not put an older answer back over one
+  // the main process has just read (`refreshModelCatalogs`,
+  // `readClaudeCodeModels`, which write them itself).
   const claudeDefaultModel = settings.claudeCode?.defaultModel?.trim();
   if (claudeDefaultModel) {
     store.set(CHAT_SETTINGS_KEYS.claudeDefaultModel, claudeDefaultModel);
@@ -264,6 +309,9 @@ export function saveChatSettingsToStore(
       settings.sidebarOpen ? "true" : "false"
     );
   }
+  if (settings.inlineSuggestions !== undefined) {
+    store.set(CHAT_SETTINGS_KEYS.inlineSuggestions, inlineSuggestionsMode(settings.inlineSuggestions));
+  }
   if (typeof settings.visualizationsEnabled === "boolean") {
     store.set(
       CHAT_SETTINGS_KEYS.visualizationsEnabled,
@@ -304,8 +352,10 @@ export function saveChatSettingsToStore(
     apiKeyStores.local.saveApiKey(settings.local.apiKey.trim());
   }
 
+  // A list read with a key describes that key's account, so it goes with it.
   if (settings.anthropic.clearApiKey) {
     apiKeyStores.anthropic.clearApiKey();
+    store.delete([MODEL_CATALOG_KEYS["claude-api"]]);
   } else if (
     typeof settings.anthropic.apiKey === "string" &&
     settings.anthropic.apiKey.trim()
@@ -315,6 +365,7 @@ export function saveChatSettingsToStore(
 
   if (settings.openRouter?.clearApiKey) {
     apiKeyStores.openRouter.clearApiKey();
+    store.delete([MODEL_CATALOG_KEYS.openrouter]);
   } else if (
     typeof settings.openRouter?.apiKey === "string" &&
     settings.openRouter.apiKey.trim()
@@ -328,18 +379,12 @@ export function saveChatSettingsToStore(
 /** Tolerates a corrupt or older payload by falling back to the static list. */
 function parseModelOptions(
   raw: string | undefined
-): Array<{ value: string; label: string }> | undefined {
+): ChatSettings["claudeCode"]["availableModels"] {
   if (!raw) return undefined;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return undefined;
-    const rows = parsed.filter(
-      (row): row is { value: string; label: string } =>
-        typeof row === "object" &&
-        row !== null &&
-        typeof (row as { value?: unknown }).value === "string" &&
-        typeof (row as { label?: unknown }).label === "string"
-    );
+    // The CLI's `default` row is the empty value, so an empty id is kept
+    // here where the other lists drop it.
+    const rows = parseCatalogEntries(JSON.parse(raw), { keepEmptyValue: true });
     return rows.length > 0 ? rows : undefined;
   } catch {
     return undefined;

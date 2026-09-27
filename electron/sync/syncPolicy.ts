@@ -55,6 +55,15 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // --- Coach: the reason this feature exists -------------------------------
   chat_sessions: "personal",
   chat_plan_drafts: "personal",
+  // What one conversation reads and which AI answers it (P2.0): the
+  // athlete's choice about that conversation, so it follows it.
+  chat_conversation_settings: "personal",
+  // A Coach creation's brief and outline (P2): what the athlete asked for,
+  // which has no version of its own until the sessions are written.
+  chat_plan_artifacts: "personal",
+  // Coach's proposals to the calendar (P3.2): personal, so one can be applied
+  // from the other machine; each line reads COROS again before it writes.
+  chat_schedule_changes: "personal",
   // One analysis, in one conversation, carrying its own trigger. Its
   // predecessors (coach_automations, coach_automation_bindings,
   // coach_automation_local_triggers, coach_automation_runs) are dropped by
@@ -215,6 +224,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.local.model": "preference",
   "chat.local.toolsEnabled": "preference",
   "chat.visualizations.enabled": "preference",
+  "chat.coach.inlineSuggestions": "preference",
   "chat.compactContext.enabled": "preference",
   "chat.compactContext.limit": "preference",
   "chat.compactContext.keep": "preference",
@@ -233,6 +243,13 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.claudeCode.executablePath": "device",
   // Probed from the local Claude Code install; means nothing on another machine.
   "chat.claudeCode.availableModels": "device",
+  "chat.claudeCode.availableModelsAt": "device",
+  "chat.claudeCode.availableModelsFrom": "device",
+  // Each provider's model list, as read with the key or account signed in on
+  // this machine (modelCatalog.ts). Another machine reads its own.
+  "chat.modelCatalog.claudeApi": "device",
+  "chat.modelCatalog.openRouter": "device",
+  "chat.modelCatalog.chatgpt": "device",
   "chat.claudeCode.defaultModel": "device",
   "chat.claudeCode.lastConnectionStatus": "device",
   "chat.claudeCode.lastCheckedAt": "device",
@@ -405,6 +422,9 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   "coroslink.appleMusic.selectedPlaylistId": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.
   "coroslink.updatePrompt.dismissedVersion": "device",
+  // What was being written in each Coach conversation, and what it pointed at:
+  // an unsent question on this machine, not the athlete's record.
+  "coroslink.coach.composerDrafts.v1": "device",
 
   // Visit centroids and route polylines for the activity globe, read back out
   // of the activity details; refetched on demand.

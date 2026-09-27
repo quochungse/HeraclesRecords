@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BrainCircuit, ChevronRight, Loader2, TriangleAlert, X } from "lucide-react";
 import type {
+  InlineSuggestionsMode,
   ChatSettings,
   CoachAnalysisPause,
   CoachAnalysisSpend
@@ -16,6 +17,7 @@ import {
 } from "../../electron/chatContextCompaction";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatTokens } from "./analyses/analysisLabels";
+import { OptionGroup } from "../components/OptionGroup";
 
 export function ChatSettingsPanel({
   api,
@@ -133,6 +135,28 @@ export function ChatSettingsPanel({
         <p className="chat-settings-copy">
           When off, heart rate trends, zone summaries, and activity charts are
           hidden. The coach still responds with text.
+        </p>
+      </section>
+
+      <section className="chat-settings-section">
+        <h3>Workout suggestions</h3>
+        <OptionGroup<InlineSuggestionsMode>
+          label="Workout cards Coach offers unasked"
+          size="sm"
+          value={chatSettings.inlineSuggestions ?? "auto"}
+          onChange={(inlineSuggestions) => onUpdateChatSettings({ inlineSuggestions })}
+          options={[
+            { value: "auto", label: "Automatic" },
+            { value: "on", label: "On" },
+            { value: "off", label: "Off" }
+          ]}
+        />
+        <p className="chat-settings-copy">
+          When Coach recommends a session, it can attach it as a workout card
+          you save in one press — at most two in one answer. Automatic turns
+          this on for Claude, whose cached context keeps the extra steps cheap,
+          and off for other providers, where each one costs more. The cost of
+          every answer is shown under it.
         </p>
       </section>
 

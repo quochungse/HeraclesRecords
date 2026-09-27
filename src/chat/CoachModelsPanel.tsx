@@ -24,12 +24,13 @@ import type {
   OpenRouterConnectionTest
 } from "../../electron/types";
 import {
-  ANTHROPIC_MODEL_OPTIONS,
-  CLAUDE_MODEL_OPTIONS,
-  REASONING_EFFORT_OPTIONS,
+  effortForModel,
+  effortOptionsFor,
   formatEffortOption,
   formatModelOptionLabel,
-  withNamedDefaultModel
+  providerModelOptions,
+  withCurrentModel,
+  type ChatModelOption
 } from "../../electron/chatModels";
 import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
@@ -54,6 +55,11 @@ const COACH_PROVIDER_ORDER: ChatProvider[] = [
   "openrouter",
   "local"
 ];
+
+/** "plus" → "Plus", "prolite" stays readable: the claim is a lowercase slug. */
+function chatGptPlanLabel(plan: string): string {
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
+}
 
 export const COACH_PROVIDER_LABELS: Record<ChatProvider, string> = {
   chatgpt: "ChatGPT",
@@ -134,6 +140,27 @@ export function coachModelsSummaryLine(
   return `${active} · ${summary.connected} of ${summary.total} providers connected`;
 }
 
+/** Where a provider's model list stands: read from the account and when, or the shipped one. */
+export function modelListLine(
+  source: { fetchedAt?: string; count: number } | undefined,
+  now = new Date()
+): string {
+  if (!source) {
+    return "Showing the built-in list. Refresh to read the models your account offers.";
+  }
+  const models = `${source.count} model${source.count === 1 ? "" : "s"} from your account`;
+  // A list kept by a build that did not record when it was read.
+  if (!source.fetchedAt) return `${models}.`;
+  const at = new Date(source.fetchedAt);
+  const sameDay = at.toDateString() === now.toDateString();
+  const when = sameDay
+    ? `today at ${at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+    : `on ${at.toLocaleDateString()}`;
+  return `${models}, read ${when}. Read again daily.`;
+}
+
+type ModelListProvider = "claude-code" | "claude-api" | "openrouter";
+
 export interface CoachModelsPanelProps {
   api: CorosLinkApi | undefined;
   /** Fired after anything is persisted, so callers can re-read what changed. */
@@ -184,6 +211,11 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [testingLocal, setTestingLocal] = useState(false);
   const [detectingLocal, setDetectingLocal] = useState(false);
 
+  const [refreshingModels, setRefreshingModels] = useState<ModelListProvider | null>(null);
+  const [modelListErrors, setModelListErrors] = useState<
+    Partial<Record<ModelListProvider, string>>
+  >({});
+
   // Settings and both account statuses in one pass, so the panel opens with
   // real values rather than filling in field by field.
   useEffect(() => {
@@ -202,6 +234,18 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       if (claude.status === "fulfilled") setClaudeStatus(claude.value);
       if (settings.status === "rejected") {
         setError("Could not load coach settings.");
+        return;
+      }
+      // Lists a day old are read again; only the lists are taken back, so a
+      // field being edited meanwhile keeps what was typed.
+      try {
+        const refreshed = await api.refreshChatModels();
+        // Read before the updater: a throw inside one is a throw in render.
+        const modelCatalogs = refreshed?.settings?.modelCatalogs;
+        if (cancelled || !modelCatalogs) return;
+        setChatSettings((current) => (current ? { ...current, modelCatalogs } : current));
+      } catch {
+        // The lists already held stay on screen.
       }
     })();
 
@@ -239,6 +283,94 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   }
 
   const busy = savingSettings;
+
+  /**
+   * Reads one provider's model list again now, whatever its age. Only the
+   * list is taken from the answer: the panel may hold an unsaved field.
+   */
+  const refreshModels = async (provider: ModelListProvider) => {
+    if (refreshingModels) return;
+    setRefreshingModels(provider);
+    try {
+      const result = await api.refreshChatModels({ provider, force: true });
+      const { modelCatalogs, claudeCode } = result.settings;
+      setChatSettings((current) =>
+        current
+          ? {
+              ...current,
+              modelCatalogs,
+              claudeCode: {
+                ...current.claudeCode,
+                availableModels: claudeCode.availableModels,
+                availableModelsAt: claudeCode.availableModelsAt
+              }
+            }
+          : current
+      );
+      if (result.claudeStatus) setClaudeStatus(result.claudeStatus);
+      setModelListErrors((current) => ({ ...current, [provider]: result.errors[provider] }));
+      await onChange?.();
+    } catch (caught) {
+      setModelListErrors((current) => ({
+        ...current,
+        [provider]: caught instanceof Error ? caught.message : "Could not read the model list."
+      }));
+    } finally {
+      setRefreshingModels(null);
+    }
+  };
+
+  const modelListSource = (provider: ModelListProvider) => {
+    if (provider === "claude-code") {
+      const listed = chatSettings.claudeCode.availableModels;
+      return listed?.length
+        ? { fetchedAt: chatSettings.claudeCode.availableModelsAt, count: listed.length }
+        : undefined;
+    }
+    const catalog = chatSettings.modelCatalogs?.[provider];
+    return catalog ? { fetchedAt: catalog.fetchedAt, count: catalog.models.length } : undefined;
+  };
+
+  const renderModelListStatus = (provider: ModelListProvider, enabled: boolean) => (
+    <div className="chat-model-list-status">
+      <p
+        className={modelListErrors[provider] ? "chat-local-result is-error" : "chat-settings-copy"}
+      >
+        {modelListErrors[provider] ?? modelListLine(modelListSource(provider))}
+      </p>
+      <button
+        type="button"
+        className="chat-local-action"
+        onClick={() => void refreshModels(provider)}
+        disabled={!enabled || refreshingModels !== null || busy}
+      >
+        {refreshingModels === provider ? (
+          <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+        ) : (
+          <RefreshCw size={14} aria-hidden="true" />
+        )}
+        Refresh models
+      </button>
+    </div>
+  );
+
+  /** A dropdown's rows for a provider, the chosen model kept even when no longer listed. */
+  const pickerRows = (options: ChatModelOption[], model: string) =>
+    withCurrentModel(options, model).map((option) => ({
+      value: option.value,
+      label: formatModelOptionLabel(option)
+    }));
+  const claudeCodeModels = providerModelOptions("claude-code", chatSettings, claudeStatus);
+  const claudeCodeModel = claudeCodeModels.find(
+    (option) => option.value === (chatSettings.claudeCode.model ?? "")
+  );
+  const anthropicModels = providerModelOptions("claude-api", chatSettings);
+  const anthropicModel = anthropicModels.find(
+    (option) => option.value === chatSettings.anthropic.model
+  );
+  const openRouterModels =
+    chatSettings.modelCatalogs?.openrouter?.models ??
+    (openRouterConnection?.models ?? []).map((model) => ({ value: model.id, label: model.name }));
 
   const handleSignIn = async () => {
     setSigningIn(true);
@@ -355,6 +487,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         message: "OpenRouter settings saved.",
         models: current?.models ?? []
       }));
+      if (apiKey) void refreshModels("openrouter");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -437,6 +570,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           ? "Claude API settings saved."
           : "Settings saved. Add an API key to start coaching."
       });
+      if (apiKey && saved?.anthropic.hasApiKey) void refreshModels("claude-api");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -634,7 +768,21 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         <h3>ChatGPT account</h3>
         {authStatus?.signedIn ? (
           <div className="chat-settings-account">
-            <span className="chat-settings-email">Signed in</span>
+            {/* Which account is signed in (UAT), not only that one is. */}
+            <span className="chat-settings-account-who">
+              <strong className="chat-settings-email">
+                {authStatus.name ?? authStatus.email ?? "Signed in"}
+              </strong>
+              <small>
+                {[
+                  authStatus.name && authStatus.email ? authStatus.email : null,
+                  authStatus.plan ? `ChatGPT ${chatGptPlanLabel(authStatus.plan)}` : null,
+                  "Signed in"
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </small>
+            </span>
             <button
               type="button"
               className="chat-signout chat-signout-settings"
@@ -830,19 +978,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               mode="dropdown"
               size="md"
               value={chatSettings.claudeCode.model ?? ""}
-              options={(
-                claudeStatus?.availableModels?.length
-                  ? claudeStatus.availableModels
-                  : chatSettings.claudeCode.availableModels?.length
-                    ? chatSettings.claudeCode.availableModels
-                    : withNamedDefaultModel(
-                        CLAUDE_MODEL_OPTIONS,
-                        chatSettings.claudeCode.defaultModel
-                      )
-              ).map((option) => ({
-                value: option.value,
-                label: formatModelOptionLabel(option)
-              }))}
+              options={pickerRows(claudeCodeModels, chatSettings.claudeCode.model ?? "")}
               onChange={(model) => updateClaudeCode({ model })}
             />
           </label>
@@ -853,8 +989,11 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               label="Reasoning effort"
               mode="dropdown"
               size="md"
-              value={chatSettings.claudeCode.effort}
-              options={REASONING_EFFORT_OPTIONS.map((option) => ({
+              value={
+                effortForModel(chatSettings.claudeCode.effort, claudeCodeModel?.efforts) ??
+                chatSettings.claudeCode.effort
+              }
+              options={effortOptionsFor(claudeCodeModel).map((option) => ({
                 value: option.value,
                 label: formatEffortOption(option)
               }))}
@@ -862,6 +1001,10 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             />
           </label>
         </div>
+        {renderModelListStatus(
+          "claude-code",
+          claudeStatus?.state === "connected" || claudeStatus?.authenticated === true
+        )}
         <p className="chat-settings-copy">
           Higher effort means deeper reasoning per answer and more of your
           subscription usage. Claude quietly drops to the highest level your
@@ -951,10 +1094,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               mode="dropdown"
               size="md"
               value={chatSettings.anthropic.model}
-              options={ANTHROPIC_MODEL_OPTIONS.map((option) => ({
-                value: option.value,
-                label: option.label
-              }))}
+              options={pickerRows(anthropicModels, chatSettings.anthropic.model)}
               onChange={(model) => updateAnthropic({ model })}
             />
           </label>
@@ -965,8 +1105,11 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               label="Reasoning effort"
               mode="dropdown"
               size="md"
-              value={chatSettings.anthropic.effort}
-              options={REASONING_EFFORT_OPTIONS.map((option) => ({
+              value={
+                effortForModel(chatSettings.anthropic.effort, anthropicModel?.efforts) ??
+                chatSettings.anthropic.effort
+              }
+              options={effortOptionsFor(anthropicModel).map((option) => ({
                 value: option.value,
                 label: formatEffortOption(option)
               }))}
@@ -974,9 +1117,11 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             />
           </label>
           <p className="chat-settings-copy">
-            Higher effort spends more tokens on reasoning before answering.
-            Lower effort is cheaper and faster for routine questions.
+            {anthropicModel?.efforts?.length === 0
+              ? `${anthropicModel.label} takes no effort setting; it answers the same at every level.`
+              : "Higher effort spends more tokens on reasoning before answering. Lower effort is cheaper and faster for routine questions. A level the model does not offer is sent as the nearest one below it."}
           </p>
+          {renderModelListStatus("claude-api", chatSettings.anthropic.hasApiKey)}
 
           <div className="chat-local-actions">
             <button
@@ -1051,8 +1196,8 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               spellCheck={false}
             />
             <datalist id="chat-openrouter-models">
-              {(openRouterConnection?.models ?? []).map((model) => (
-                <option key={model.id} value={model.id} label={model.name} />
+              {openRouterModels.map((model) => (
+                <option key={model.value} value={model.value} label={model.label} />
               ))}
             </datalist>
           </label>
@@ -1156,6 +1301,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               {openRouterConnection.message}
             </p>
           ) : null}
+          {renderModelListStatus("openrouter", chatSettings.openRouter.hasApiKey)}
         </div>
         <p className="chat-settings-copy">
           Coaching prompts and requested COROS data are sent through OpenRouter

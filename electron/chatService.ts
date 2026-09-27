@@ -4,7 +4,15 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
-import { deleteSettings, getSetting, setSetting } from "./database";
+import {
+  deleteChatConversationSettingsRow,
+  deleteChatScheduleChangesOf,
+  deleteSettings,
+  getChatConversationSettingsRow,
+  getSetting,
+  saveChatConversationSettingsRow,
+  setSetting
+} from "./database";
 import { applyAnalysisSessionDeleted } from "./coachAnalysisStore";
 import {
   formatScheduledExercisesForChat,
@@ -22,16 +30,26 @@ import {
 } from "./mcpClientManager";
 import { prefixToolName, splitToolName } from "./mcpToolNames";
 import {
+  applyScheduleChange,
+  dismissScheduleChange,
+  openLineCount,
+  readScheduleChanges
+} from "./chatScheduleChanges";
+import {
   getChatWorkoutTools,
   handleChatWorkoutTool,
   isChatWorkoutTool,
   uploadPlanDraftById,
-  confirmWorkoutDeleteById,
   deletePlanDraftsOf,
-  forgetGeneratedPlanDrafts,
-  generatedPlanDraft,
   planDraftDocument,
   savePlanDraftEdit,
+  saveWorkoutDraftEdit,
+  discardPlanDraft,
+  planArtifacts,
+  restorePlanDraftVersion,
+  syncPlanDraftFromCoros,
+  planCalendarStates,
+  chatSessionForDraft,
   type ChatWorkoutToolName
 } from "./chatWorkoutTools";
 import {
@@ -40,11 +58,23 @@ import {
   generationRequestProblems,
   parsePlanOutline,
   planOutlineProblems,
-  trainingPlanFromDraftPreview,
   trainingPlanGenerationPrompt,
   toolReadsWithheldSource,
   trainingPlanOutlinePrompt
 } from "./trainingPlanGeneration";
+import { PLAN_BRIEF_TOOL } from "./planBrief";
+import {
+  briefForOutline,
+  briefForSessions,
+  briefWaiting,
+  createPlanBrief,
+  deletePlanBriefs,
+  listPlanBriefs,
+  savePlanOutline,
+  updatePlanBrief,
+  updatePlanOutline
+} from "./chatPlanBriefs";
+import type { ChatPipelineStep, PlanBrief, PlanBriefRequest } from "./types";
 import {
   simulatePlanAi,
   simulatedDraftArgs,
@@ -92,18 +122,29 @@ import {
   type LocalChatRuntimeConfig
 } from "./localChatProvider";
 import {
+  listOpenRouterModelsRequest,
   streamOpenRouterChatCompletion,
   testOpenRouterConnectionRequest
 } from "./openRouterProvider";
 import {
   AnthropicProviderError,
+  listAnthropicModels,
   streamAnthropicChatCompletion,
   testAnthropicApiConnectionRequest,
   type AnthropicRuntimeConfig
 } from "./anthropicChatProvider";
 import {
+  MODEL_CATALOG_KEYS,
+  createCatalogRefresher,
+  isStale,
+  listChatGptModels,
+  openRouterEntries,
+  serializeCatalog
+} from "./modelCatalog";
+import {
   ClaudeCodeProviderError,
   getClaudeCodeStatus as inspectClaudeCodeStatus,
+  isStandardClaudeLocation,
   listClaudeCodeModels,
   logoutClaudeCode,
   startClaudeCodeLogin,
@@ -113,6 +154,7 @@ import {
 } from "./claudeCodeProvider";
 import {
   CHAT_SETTINGS_KEYS,
+  inlineSuggestionsEnabled,
   readChatSettingsFromStore,
   saveChatSettingsToStore,
   type ChatApiKeyStore,
@@ -120,12 +162,15 @@ import {
   type ChatSettingsStore
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
+import { inlineSuggestionsSection } from "./chatCoachContext";
 import {
   createChatSession,
   deleteChatSession,
   getChatSession,
   listChatSessions,
+  getChatSessionProvider,
   saveChatSession,
+  setWaitingCounter,
   setChatSessionPinned
 } from "./chatHistoryStore";
 import type {
@@ -137,6 +182,8 @@ import type {
   ChatEntryAnalysisMarker,
   ChatSettings,
   ChatProvider,
+  ModelCatalogEntry,
+  ModelCatalogRefresh,
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
@@ -164,17 +211,18 @@ import type {
   TrainingHubUpcomingWorkout,
   UploadPlanResult,
   PlanDraftPreview,
+  PlanWorkoutEntryInput,
+  PlanArtifactVersion,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanDocument,
   TrainingPlanGenerationRequest,
-  TrainingPlanGenerationResult,
-  TrainingPlanOutline,
-  TrainingPlanOutlineResult,
   TrainingPlanOutlineRevision,
-  DeleteWorkoutResult,
-  UnitSystem,
-  WorkoutDeletePreview
+  ScheduleChangeSet,
+  UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
+import { pipelineWire } from "./chatContextCompaction";
 import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
@@ -228,6 +276,65 @@ export function saveChatSettings(settings: ChatSettings): ChatSettings {
   return saveChatSettingsToStore(chatSettingsStore, chatApiKeyStores, settings);
 }
 
+// ----- Model lists -----
+
+/**
+ * Each provider's list, read where it is due (`createCatalogRefresher` holds
+ * the rules). Only the fetches and the keys live here.
+ */
+const refreshCatalogs = createCatalogRefresher({
+  fetchedAt: (provider) => getChatSettings().modelCatalogs?.[provider]?.fetchedAt,
+  list: async (provider) => {
+    if (provider === "claude-api") {
+      const apiKey = readEncryptedSecret(CHAT_SETTINGS_KEYS.anthropicApiKey);
+      return apiKey ? listAnthropicModels(apiKey) : undefined;
+    }
+    if (provider === "openrouter") {
+      const apiKey = readStoredOpenRouterApiKey();
+      return apiKey
+        ? openRouterEntries(await listOpenRouterModelsRequest(apiKey))
+        : undefined;
+    }
+    if (!getStoredToken()) return undefined;
+    const token = await getValidToken();
+    return listChatGptModels({
+      accessToken: token.access_token,
+      accountId: token.account_id,
+      originator: RESPONSES_ORIGINATOR
+    });
+  },
+  save: (provider, models) =>
+    chatSettingsStore.set(MODEL_CATALOG_KEYS[provider], serializeCatalog(models))
+});
+
+/**
+ * Reads the model lists that are due and returns the settings holding them.
+ * `claude-code` is read only when named: its list comes from spawning the
+ * CLI, which the status read already does on the same one-day clock.
+ */
+export async function refreshModelCatalogs(
+  options: { provider?: ChatProvider; force?: boolean } = {}
+): Promise<ModelCatalogRefresh> {
+  if (options.provider === "claude-code") {
+    const claudeStatus = await getClaudeCodeConnectionStatus({
+      forceModels: options.force
+    });
+    const errors: ModelCatalogRefresh["errors"] =
+      options.force && claudeStatus.authenticated && !claudeStatus.availableModels?.length
+        ? { "claude-code": "Claude Code did not list any models." }
+        : {};
+    return { settings: getChatSettings(), claudeStatus, errors };
+  }
+  if (options.provider === "local") {
+    return { settings: getChatSettings(), errors: {} };
+  }
+  const errors = await refreshCatalogs({
+    provider: options.provider,
+    force: options.force
+  });
+  return { settings: getChatSettings(), errors };
+}
+
 export async function testAnthropicApiConnection(
   config?: Partial<AnthropicApiConfig>
 ): Promise<AnthropicApiConnectionTest> {
@@ -253,7 +360,13 @@ function getClaudeCodeConfigDir(
   return dir;
 }
 
-export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus> {
+/**
+ * `forceModels` reads the account's model list again even when the one held
+ * is fresh — the refresh button's way in; everything else waits for the day.
+ */
+export async function getClaudeCodeConnectionStatus(
+  options: { forceModels?: boolean } = {}
+): Promise<ClaudeCodeStatus> {
   const settings = getChatSettings();
   const status = await inspectClaudeCodeStatus(
     settings.claudeCode.executablePath,
@@ -268,17 +381,27 @@ export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus>
       status.availableModels || settings.claudeCode.availableModels
   };
   const configDir = getClaudeCodeConfigDir(settings);
+  // A list is read again when there is none, when it is a day old, or when it
+  // came from another CLI than the one now in use — an upgrade, or a newer
+  // install found beside the old one, is exactly when the models change. At
+  // most once per launch for each of those, so a status poll never respawns it.
+  const source = claudeListSource(merged);
+  const listDue =
+    options.forceModels ||
+    !merged.availableModels?.length ||
+    isStale(settings.claudeCode.availableModelsAt) ||
+    settings.claudeCode.availableModelsFrom !== source;
+  const probeKey = `${configDir ?? "machine"}|${source}`;
   if (
-    !merged.availableModels?.length &&
+    listDue &&
     merged.executablePath &&
     merged.authenticated &&
-    !probedModelDirs.has(configDir ?? "machine")
+    (options.forceModels || !probedModelDirs.has(probeKey))
   ) {
-    probedModelDirs.add(configDir ?? "machine");
-    merged.availableModels = await readClaudeCodeModels(
-      merged.executablePath,
-      configDir
-    );
+    probedModelDirs.add(probeKey);
+    merged.availableModels =
+      (await readClaudeCodeModels(merged.executablePath, configDir, source)) ??
+      merged.availableModels;
   }
   recordClaudeCodeStatus(merged);
   return merged;
@@ -289,13 +412,25 @@ export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus>
 // store per run; Test connection forces a fresh read.
 const probedModelDirs = new Set<string>();
 
+/** Which CLI a list is read from: its path and the version it reports. */
+function claudeListSource(status: ClaudeCodeStatus): string {
+  return `${status.executablePath ?? ""}@${status.version ?? ""}`;
+}
+
 async function readClaudeCodeModels(
   executablePath: string,
-  configDir?: string
+  configDir: string | undefined,
+  source: string
 ): Promise<ClaudeCodeStatus["availableModels"]> {
   try {
     const models = await listClaudeCodeModels({ executablePath, configDir });
-    return models.length > 0 ? models : undefined;
+    if (models.length === 0) return undefined;
+    chatSettingsStore.set(
+      CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
+      new Date().toISOString()
+    );
+    chatSettingsStore.set(CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom, source);
+    return models;
   } catch {
     // The static list still covers the picker; retry on the next status read.
     return undefined;
@@ -426,12 +561,13 @@ export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTe
     settings.claudeCode.executablePath,
     configDir
   );
-  // An explicit connection test is the one moment worth re-reading the list.
-  probedModelDirs.delete(configDir ?? "machine");
+  // An explicit connection test is always worth re-reading the list for.
+  const source = claudeListSource(result.status);
+  probedModelDirs.add(`${configDir ?? "machine"}|${source}`);
   const status: ClaudeCodeStatus = {
     ...result.status,
     availableModels: result.status.executablePath
-      ? ((await readClaudeCodeModels(result.status.executablePath, configDir)) ??
+      ? ((await readClaudeCodeModels(result.status.executablePath, configDir, source)) ??
         settings.claudeCode.availableModels)
       : settings.claudeCode.availableModels
   };
@@ -443,7 +579,13 @@ function recordClaudeCodeStatus(status: ClaudeCodeStatus): void {
   const current = getChatSettings();
   const next: ClaudeCodeConfig = {
     ...current.claudeCode,
-    executablePath: current.claudeCode.executablePath || status.executablePath,
+    // Only a path the athlete chose is kept. Detection used to be written in
+    // here, which pinned the first install found for good and hid every
+    // upgrade made to another one; a path at a standard location is exactly
+    // that leftover, so it is let go and detection answers again.
+    executablePath: isStandardClaudeLocation(current.claudeCode.executablePath)
+      ? undefined
+      : current.claudeCode.executablePath,
     // Sticky: a status read that did not observe a turn reports no model, and
     // forgetting it would blank the picker's "Default (…)" label.
     defaultModel: status.defaultModel || current.claudeCode.defaultModel,
@@ -473,8 +615,27 @@ function isSameClaudeCodeRecord(
   );
 }
 
-export function listChatSessionsForProvider(provider: ChatProvider) {
-  return listChatSessions(provider);
+/*
+ * What waits on the athlete in a conversation (R3): the calendar changes
+ * still to decide and the briefs not yet a plan, read from their own rows,
+ * beside the unanswered questions the transcript holds. Every summary the
+ * store answers counts them this way. A row that cannot be read counts as
+ * nothing waiting rather than failing the whole list.
+ */
+setWaitingCounter(({ changeSetIds, briefIds }) => {
+  try {
+    return {
+      decisions: changeSetIds.length ? openLineCount(changeSetIds) : 0,
+      briefs: briefIds.filter((artifactId) => briefWaiting(artifactId)).length
+    };
+  } catch {
+    return { decisions: 0, briefs: 0 };
+  }
+});
+
+/** Every conversation, whichever AI answers it (Q1), with what waits in each. */
+export function listAllChatSessions() {
+  return listChatSessions();
 }
 
 export function getChatSessionEntries(id: string) {
@@ -497,14 +658,121 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
   return setChatSessionPinned(id, pinned);
 }
 
+/** A conversation's settings (P2.0): everything shared, and Coach's AI, until changed. */
+export function getConversationSettings(sessionId: string): import("./types").ConversationSettings {
+  const row = getChatConversationSettingsRow(sessionId);
+  let sources = { activities: true, sleep: true, zones: true };
+  let runtime: import("./types").AnalysisRuntime | undefined;
+  try {
+    const parsed = row?.sourcesJson ? (JSON.parse(row.sourcesJson) as Record<string, unknown>) : {};
+    sources = {
+      activities: parsed.activities !== false,
+      sleep: parsed.sleep !== false,
+      zones: parsed.zones !== false
+    };
+  } catch {
+    /* A row this build cannot read shares everything, as if there were none. */
+  }
+  try {
+    const parsed = row?.runtimeJson ? (JSON.parse(row.runtimeJson) as Record<string, unknown>) : undefined;
+    if (parsed) {
+      runtime = {
+        ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
+        ...(typeof parsed.model === "string" && parsed.model ? { model: parsed.model } : {}),
+        ...(isAnthropicEffortName(parsed.effort) ? { effort: parsed.effort } : {})
+      };
+      if (!Object.keys(runtime).length) runtime = undefined;
+    }
+  } catch {
+    runtime = undefined;
+  }
+  // A conversation keeps the provider it was started with (Q1 of the Coach
+  // Workbench review): Coach's default names the provider of a new one, and
+  // changing it later moves no conversation already under way.
+  const own = getChatSessionProvider(sessionId);
+  if (own && !runtime?.provider) runtime = { ...(runtime ?? {}), provider: own };
+  return { sessionId, sources, ...(runtime ? { runtime } : {}) };
+}
+
+export function setConversationSettings(
+  settings: import("./types").ConversationSettings
+): import("./types").ConversationSettings {
+  const sources = {
+    activities: settings.sources?.activities !== false,
+    sleep: settings.sources?.sleep !== false,
+    zones: settings.sources?.zones !== false
+  };
+  const everything = sources.activities && sources.sleep && sources.zones;
+  // The conversation's own provider goes without saying: only a change of it
+  // is stored, so a row holds only what differs.
+  const own = getChatSessionProvider(settings.sessionId);
+  const { provider: _own, ...rest } = settings.runtime ?? {};
+  const stated = settings.runtime?.provider && settings.runtime.provider !== own ? settings.runtime : rest;
+  const runtime = Object.keys(stated).length ? stated : undefined;
+  if (everything && !runtime) {
+    // Nothing that differs from Coach's settings: no row to keep in step.
+    deleteChatConversationSettingsRow(settings.sessionId);
+  } else {
+    saveChatConversationSettingsRow(
+      settings.sessionId,
+      everything ? null : JSON.stringify(sources),
+      runtime ? JSON.stringify(runtime) : null
+    );
+  }
+  return getConversationSettings(settings.sessionId);
+}
+
+/**
+ * A turn of the conversation, as the renderer sends it: with that
+ * conversation's sources and AI (P2.0, D13/D14).
+ */
+export async function streamConversationTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  sessionId?: string,
+  pipeline?: ChatPipelineStep
+): Promise<void> {
+  let settings: import("./types").ConversationSettings | undefined;
+  try {
+    settings = sessionId ? getConversationSettings(sessionId) : undefined;
+  } catch {
+    settings = undefined;
+  }
+  if (pipeline?.step === "outline") {
+    return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+  }
+  if (pipeline?.step === "sessions") {
+    return streamSessionsStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
+  }
+  return streamChat(sink, requestId, messages, {
+    unitSystem,
+    ...(sessionId ? { sessionId } : {}),
+    ...(settings?.runtime ? { runtime: settings.runtime } : {}),
+    ...(settings ? { sources: settings.sources } : {})
+  });
+}
+
+function isChatProviderName(value: unknown): value is ChatProvider {
+  return value === "claude-code" || value === "claude-api" || value === "chatgpt" || value === "openrouter" || value === "local";
+}
+
+function isAnthropicEffortName(value: unknown): value is import("./types").AnthropicEffort {
+  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max";
+}
+
 export function deleteChatSessionById(id: string): void {
   // Read before the row goes: the transcript is the only record of which
   // drafts were this conversation's.
-  const draftIds = getChatSession(id).flatMap((entry) =>
-    entry.kind === "planDraft" ? [entry.draft.draftId] : []
-  );
+  const entries = getChatSession(id);
+  const draftIds = entries.flatMap((entry) => (entry.kind === "planDraft" ? [entry.draft.draftId] : []));
+  const briefIds = entries.flatMap((entry) => (entry.kind === "planBrief" ? [entry.artifactId] : []));
   deleteChatSession(id);
   deletePlanDraftsOf(draftIds);
+  deletePlanBriefs(briefIds);
+  deleteChatConversationSettingsRow(id);
+  deleteChatScheduleChangesOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -583,6 +851,17 @@ function getAnthropicRuntimeConfig(
         ? config.apiKey.trim()
         : readEncryptedSecret(CHAT_SETTINGS_KEYS.anthropicApiKey)
   };
+}
+
+/** The model's row in the key's own list, when that list has been read. */
+function listedAnthropicModel(
+  settings: ChatSettings,
+  model: string
+): ModelCatalogEntry | undefined {
+  const id = model.trim() || settings.anthropic.model;
+  return settings.modelCatalogs?.["claude-api"]?.models.find(
+    (entry) => entry.value === id
+  );
 }
 
 function storeEncryptedSecret(key: string, secret: string, label: string): void {
@@ -681,7 +960,24 @@ export function getChatAuthStatus(): ChatAuthStatus {
   if (!token) {
     return { signedIn: false };
   }
-  return { signedIn: true, email: token.email, expiresAt: token.expires_at };
+  /* Name and plan are read off the stored id_token rather than stored
+     beside it, so a token saved by an older build reads the same. */
+  const claims = token.id_token ? decodeJwtClaims(token.id_token) : undefined;
+  const authClaim = claims?.["https://api.openai.com/auth"] as
+    | { chatgpt_plan_type?: unknown }
+    | undefined;
+  const name = typeof claims?.name === "string" && claims.name.trim() ? claims.name.trim() : undefined;
+  const plan =
+    typeof authClaim?.chatgpt_plan_type === "string" && authClaim.chatgpt_plan_type.trim()
+      ? authClaim.chatgpt_plan_type.trim()
+      : undefined;
+  return {
+    signedIn: true,
+    email: token.email ?? (typeof claims?.email === "string" ? claims.email : undefined),
+    ...(name ? { name } : {}),
+    ...(plan ? { plan } : {}),
+    expiresAt: token.expires_at
+  };
 }
 
 export function logoutChat(): ChatAuthStatus {
@@ -689,7 +985,13 @@ export function logoutChat(): ChatAuthStatus {
     controller.abort();
   }
   activeStreams.clear();
-  deleteSettings([SETTINGS.token, SETTINGS.authUpdatedAt, SETTINGS.model]);
+  // The model list was the signed-out account's, like the model that last worked.
+  deleteSettings([
+    SETTINGS.token,
+    SETTINGS.authUpdatedAt,
+    SETTINGS.model,
+    MODEL_CATALOG_KEYS.chatgpt
+  ]);
   return { signedIn: false };
 }
 
@@ -1021,6 +1323,14 @@ export function createIdleWatchdog(timeoutMs: number): IdleWatchdog {
 
 export interface StreamChatOptions {
   unitSystem?: UnitSystem;
+  /**
+   * What the conversation shares (P2.0). A source switched off is withheld
+   * from every tool that reads it and from the snapshot, and said in the
+   * prompt. Absent is everything, as before.
+   */
+  sources?: import("./types").TrainingPlanDataSources;
+  /** The conversation the turn is in: what a brief Coach sets out belongs to (P2.1). */
+  sessionId?: string;
   /** Analysis runs override the saved provider/model/effort (decision 2). */
   runtime?: AnalysisRuntime;
   /** Analysis runs narrow the tool set (decision 3). Defaults to interactive. */
@@ -1106,6 +1416,8 @@ export function createCollectorSink(
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
   let tokenModel: string | undefined;
+  /** Where the running turn's entries begin; its answer goes in front of its cards. */
+  let turnStart = 0;
 
   const reset = () => {
     pendingCoachPrompts = [];
@@ -1185,15 +1497,14 @@ export function createCollectorSink(
       return;
     }
 
-    if (kind === "workoutDelete") {
-      const preview = payload.preview as WorkoutDeletePreview | undefined;
-      if (!preview?.requestId) return;
+    if (kind === "scheduleChange") {
+      // An anchor (Q3); the change set is already its row (P3.2).
+      const changeSetId = (payload.changeSet as ScheduleChangeSet | undefined)?.changeSetId;
+      if (!changeSetId) return;
       upsertEntry(
         entries,
-        { kind: "workoutDelete", preview },
-        (candidate) =>
-          candidate.kind === "workoutDelete" &&
-          candidate.preview.requestId === preview.requestId
+        { kind: "scheduleChange", changeSetId },
+        (candidate) => candidate.kind === "scheduleChange" && candidate.changeSetId === changeSetId
       );
       return;
     }
@@ -1280,7 +1591,9 @@ export function createCollectorSink(
     const turnSource = source ?? undefined;
 
     if (fullText) {
-      entries.push({
+      // Before the cards this turn produced, as ChatView settles an
+      // interactive turn (`settleTurnEntries`): the answer introduces them.
+      entries.splice(Math.min(turnStart, entries.length), 0, {
         kind: "message",
         role: "assistant",
         content: fullText,
@@ -1313,6 +1626,7 @@ export function createCollectorSink(
       const record = (payload ?? {}) as Record<string, unknown>;
       if (channel === "chat:streamStart") {
         reset();
+        turnStart = entries.length;
         return;
       }
       if (channel === "chat:streamToken") {
@@ -1359,6 +1673,79 @@ export async function streamChat(
   requestId: string,
   messages: ChatMessage[],
   options: StreamChatOptions = {}
+): Promise<void> {
+  // A run that set its own reach (a plan generation) keeps it; otherwise the
+  // conversation's sources are this turn's, and only for this turn.
+  const reach = conversationReach(options.sources);
+  const ownsReach = Boolean(reach) && !runTools.has(requestId);
+  if (ownsReach && reach) runTools.set(requestId, { extra: [], ...reach });
+  if (options.sessionId) turnSessions.set(requestId, options.sessionId);
+  try {
+    await streamChatTurn(sink, requestId, messages, options);
+  } finally {
+    if (ownsReach) runTools.delete(requestId);
+    turnSessions.delete(requestId);
+    runCards.delete(requestId);
+  }
+}
+
+/** The conversation each turn in flight belongs to, for the tools that file something under it. */
+const turnSessions = new Map<string, string>();
+
+/**
+ * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
+ * is watching may leave at most `ANALYSIS_CARD_LIMIT` — drafts and calendar
+ * proposals together — and the rest is said in words. Held in code, not only
+ * in the prompt, because a run is the one place nobody is there to stop a
+ * model that overdoes it. A pipeline step is read-only too, but asked for, so
+ * it is not counted.
+ */
+const runCards = new Map<string, Set<string>>();
+const ANALYSIS_CARD_LIMIT = 2;
+const CARD_TOOLS: ReadonlySet<string> = new Set(["draft_workout", "draft_training_plan", "propose_schedule_changes"]);
+
+/**
+ * A conversation's sources as a turn's reach (P2.0): the tools that read a
+ * withheld source are not offered, the snapshot leaves it out, and the prompt
+ * says so. Nothing when everything is shared.
+ */
+export function conversationReach(
+  sources: import("./types").TrainingPlanDataSources | undefined
+): Pick<RunTools, "allow" | "context"> | undefined {
+  if (!sources || (sources.activities && sources.sleep && sources.zones)) return undefined;
+  return {
+    allow: (name) => !toolReadsWithheldSource(name, sources),
+    context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true }
+  };
+}
+
+/** `work`, or a rejection as soon as `signal` aborts, whichever is first. */
+export function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    work.catch(() => undefined);
+    return Promise.reject(new Error("Chat request cancelled."));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error("Chat request cancelled."));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+async function streamChatTurn(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  options: StreamChatOptions
 ): Promise<void> {
   const unitSystem = normalizeUnitSystem(options.unitSystem);
   const toolPolicy: ChatToolPolicy =
@@ -1437,6 +1824,14 @@ export async function streamChat(
 
   const controller = new AbortController();
   activeStreams.set(requestId, controller);
+  /*
+   * What a turn waits on before a provider is asked anything — the Claude
+   * status check, the MCP connections, the snapshot read from COROS — takes
+   * seconds, and a Stop pressed then used to be lost: nothing in that phase
+   * listened for the abort, and a provider handed a signal already aborted
+   * never hears the event. Each step gives way the moment Stop is pressed.
+   */
+  const prepare = <T,>(work: Promise<T>): Promise<T> => untilAborted(work, controller.signal);
   const releaseAbort = sink.bindAbort?.(controller);
 
   let fullText = "";
@@ -1447,10 +1842,10 @@ export async function streamChat(
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
       const claudeConfigDir = getClaudeCodeConfigDir(settings);
-      const status = await inspectClaudeCodeStatus(
+      const status = await prepare(inspectClaudeCodeStatus(
         settings.claudeCode.executablePath,
         claudeConfigDir
-      );
+      ));
       recordClaudeCodeStatus(status);
       if (!status.authenticated || !status.executablePath) {
         throw new ClaudeCodeProviderError(
@@ -1459,21 +1854,22 @@ export async function streamChat(
         );
       }
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         settings.claudeCode.permissions,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-code") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1564,19 +1960,20 @@ export async function streamChat(
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "openrouter") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1642,10 +2039,14 @@ export async function streamChat(
     }
 
     if (provider === "claude-api") {
-      const runtimeConfig = {
+      const baseConfig = {
         ...getAnthropicRuntimeConfig(settings.anthropic),
         ...(runtime.model ? { model: runtime.model } : {}),
         ...(runtime.effort ? { effort: runtime.effort } : {})
+      };
+      const runtimeConfig: AnthropicRuntimeConfig = {
+        ...baseConfig,
+        listed: listedAnthropicModel(settings, baseConfig.model)
       };
       if (!runtimeConfig.apiKey) {
         throw new AnthropicProviderError(
@@ -1654,18 +2055,19 @@ export async function streamChat(
         );
       }
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-api") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1728,20 +2130,20 @@ export async function streamChat(
     }
 
     if (provider === "local") {
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
         ...(runtime.model ? { model: runtime.model } : {})
       };
 
       if (runtimeConfig.toolsEnabled) {
-        await ensureAllMcpConnected();
+        await prepare(ensureAllMcpConnected());
       }
       const chatTools = toolsForRun(
         requestId,
@@ -1754,7 +2156,8 @@ export async function streamChat(
       );
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
-        chatTools
+        chatTools,
+        { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "local") }
       );
 
       send("chat:streamStart", { requestId });
@@ -1824,25 +2227,26 @@ export async function streamChat(
       return;
     }
 
-    const token = await getValidToken();
-    const { text: instructions, hasData } = await buildTrainingContext(
+    const token = await prepare(getValidToken());
+    const { text: instructions, hasData } = await prepare(buildTrainingContext(
       undefined,
       unitSystem,
       settings.customInstructions,
       roleInstructions,
       runTools.get(requestId)?.context
-    );
+    ));
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
-    await ensureAllMcpConnected();
+    await prepare(ensureAllMcpConnected());
     const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
 
     // When live tools are available, steer the model to use them rather than
     // leaning on the brief snapshot in `instructions`.
     const effectiveInstructions = withLiveToolInstructions(
       instructions,
-      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy))
+      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
+      { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
     );
 
     send("chat:streamStart", { requestId });
@@ -2043,49 +2447,6 @@ function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
   return run ? [...tools.filter((tool) => run.allow(tool.name)), ...run.extra] : tools;
 }
 
-/**
- * How a stream ended, as a sink hears it: `streamChat` reports an end through
- * events and never by throwing, so a caller that needs the outcome listens.
- */
-function watchStreamEnd(sink: ChatStreamSink): {
-  sink: ChatStreamSink;
-  heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } };
-} {
-  const heard: { end?: { kind: "done"; cancelled: boolean; text: string } | { kind: "error"; message: string } } = {};
-  return {
-    heard,
-    sink: {
-      emit(channel, payload) {
-        const event = payload as { finishReason?: string; fullText?: string; message?: string };
-        if (channel === "chat:streamDone") {
-          heard.end = { kind: "done", cancelled: event.finishReason === "cancelled", text: event.fullText ?? "" };
-        } else if (channel === "chat:streamError") {
-          heard.end = { kind: "error", message: event.message ?? "Training Coach stopped before it finished." };
-        }
-        sink.emit(channel, payload);
-      },
-      ...(sink.bindAbort ? { bindAbort: (controller: AbortController) => sink.bindAbort!(controller) } : {})
-    }
-  };
-}
-
-/** Tools a generation never needs: an outline turn writes nothing, and no turn writes a single workout. */
-const OUTLINE_WITHHELD_TOOLS = new Set(["draft_training_plan", "draft_workout"]);
-const SESSIONS_WITHHELD_TOOLS = new Set(["draft_workout"]);
-
-/**
- * A generation's reach, from the tools a phase never needs and the sources
- * the athlete withheld: a withheld source is behind no tool the turn is
- * offered, and in no part of the snapshot it starts from.
- */
-function generationReach(request: TrainingPlanGenerationRequest, withheldTools: ReadonlySet<string>): Pick<RunTools, "allow" | "context"> {
-  const sources = request.sources;
-  return {
-    allow: (name) => !withheldTools.has(name) && !toolReadsWithheldSource(name, sources),
-    ...(sources ? { context: { activities: sources.activities, zones: sources.zones } } : {})
-  };
-}
-
 /** What the simulated turn reads before it thinks, by the source each tool belongs to. */
 const SIMULATED_READS: readonly [tool: string, source: keyof import("./types").TrainingPlanDataSources][] = [
   ["list_recent_activities", "activities"],
@@ -2203,113 +2564,86 @@ async function simulatedPlanTurn(
 }
 
 /**
- * Plan generations in flight, by request id: what the athlete asked for, which
- * the draft tool checks every draft against, and the drafts it accepted.
+ * Sessions steps in flight (P2.3), by request id: the brief's request with
+ * its outline, which the draft tool checks every draft against, the drafts
+ * it accepted, and the brief whose first version they are.
  */
 const planGenerations = new Map<
   string,
-  { request: TrainingPlanGenerationRequest; drafts: PlanDraftPreview[] }
+  {
+    request: TrainingPlanGenerationRequest;
+    drafts: PlanDraftPreview[];
+    artifactId: string;
+  }
 >();
 
-/**
- * The AI plan generator's one turn.
- *
- * It streams like a chat turn — the generator draws its progress from the
- * same `chat:stream*` events — but it is not one, in three ways that used to
- * rest on a sentence in the prompt:
- *
- * - **It runs read-only.** `chat:send` offers every tool, so a generation could
- *   reach `upload_training_plan`, `delete_workout` and every MCP server the
- *   athlete connected, with "never call upload_training_plan" as the only
- *   guard. Read-only also answers `request_coach_input` with "assume and
- *   continue"; offered interactively, it ended the turn to wait for an answer
- *   the generator has nowhere to show, and the run failed with no plan.
- * - **A draft that breaks the request is refused inside the turn**, with the
- *   reasons, so the model fixes it and calls the tool again — the checks used
- *   to run only after the turn ended, throwing away the whole plan over one
- *   week with three sessions instead of four.
- * - **Its drafts never reach `chat_plan_drafts`**, and are let go when it ends.
- *
- * Cancelled through `chat:cancel`, like any stream.
- */
-export async function generateTrainingPlan(
-  sink: ChatStreamSink,
-  requestId: string,
-  request: TrainingPlanGenerationRequest,
-  options: { unitSystem?: UnitSystem } = {}
-): Promise<TrainingPlanGenerationResult> {
-  const invalid = generationRequestProblems(request, new Date())[0];
-  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
+/** What a pipeline step never needs: it writes nothing but its own step. */
+const PIPELINE_WITHHELD_TOOLS = new Set([
+  "draft_training_plan",
+  "draft_workout",
+  "revise_training_plan",
+  PLAN_BRIEF_TOOL
+]);
 
-  const run = { request, drafts: [] as PlanDraftPreview[] };
-  planGenerations.set(requestId, run);
-  runTools.set(requestId, { extra: [], ...generationReach(request, SESSIONS_WITHHELD_TOOLS) });
-  const { sink: watching, heard } = watchStreamEnd(sink);
-  try {
-    if (simulatePlanAi()) {
-      await simulatedPlanTurn(watching, requestId, "plan", request, normalizeUnitSystem(options.unitSystem));
-    } else {
-      await streamChat(
-        watching,
-        requestId,
-        [{ role: "user", content: trainingPlanGenerationPrompt(request) }],
-        {
-          unitSystem: normalizeUnitSystem(options.unitSystem),
-          toolPolicy: "read-only",
-          ...(request.runtime ? { runtime: request.runtime } : {})
-        }
-      );
-    }
-    const outcome = heard.end;
-    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
-    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
-    const accepted = run.drafts.at(-1);
-    const draft = accepted ? generatedPlanDraft(accepted.draftId) : undefined;
-    if (!draft) {
-      return {
-        ok: false,
-        reason: "no-plan",
-        message: outcome.text.trim()
-          ? "Training Coach answered but never handed over a plan that fits what you asked for."
-          : "Training Coach finished without writing a plan."
-      };
-    }
-    const plan = trainingPlanFromDraftPreview(draft.preview, request, {
-      description: draft.plan.description,
-      weekStages: draft.plan.weekStages
-    });
-    return { ok: true, plan };
-  } catch (cause) {
-    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
-  } finally {
-    planGenerations.delete(requestId);
-    runTools.delete(requestId);
-    forgetGeneratedPlanDrafts(run.drafts.map((preview) => preview.draftId));
-  }
+/** What the sessions step withholds: every writing tool but the one it writes the plan with. */
+const SESSIONS_STEP_WITHHELD_TOOLS = new Set(
+  [...PIPELINE_WITHHELD_TOOLS].filter((name) => name !== "draft_training_plan")
+);
+
+/** The pipeline step's reach: the conversation's sources, and none of the writing tools it has no use for. */
+function pipelineReach(
+  sources: import("./types").TrainingPlanDataSources,
+  withheld: ReadonlySet<string> = PIPELINE_WITHHELD_TOOLS
+): Pick<RunTools, "allow" | "context"> {
+  const everything = sources.activities && sources.sleep && sources.zones;
+  return {
+    allow: (name) => !withheld.has(name) && !toolReadsWithheldSource(name, sources),
+    ...(everything
+      ? {}
+      : { context: { activities: sources.activities, zones: sources.zones, sleep: sources.sleep, announce: true } })
+  };
 }
 
 /**
- * The generator's outline turn: the plan's shape, week by week, before any
- * session is written.
+ * "Draw the outline", as a turn of the conversation (P2.2). It is the
+ * generator's outline turn with the brief as its request and the
+ * conversation's sources and AI: read-only, offered `propose_plan_outline`
+ * and none of the writing tools, and checked inside the turn by
+ * `planOutlineProblems`. The athlete's visible words are replaced on the wire
+ * by the outline prompt, which carries the brief and — for a redraw — the
+ * outline there is and what to change in it. An accepted outline is written
+ * to the brief's artifact as its next version and announced as a
+ * `planOutline` anchor.
  *
- * Its tool, `propose_plan_outline`, is offered to this turn alone, and the
- * writing tools are withheld from it. Like the draft tool in the sessions
- * turn, it refuses an outline that breaks the request and hands the reasons
- * back, so the model fixes it in the same turn. A redraw carries the outline
- * already proposed and the athlete's words about what to change.
+ * A step that cannot run — no brief, a brief that became a plan, one still
+ * missing what an outline needs — rejects before anything is streamed, so the
+ * renderer undoes the turn as it does for any send that fails.
  */
-export async function outlineTrainingPlan(
+async function streamOutlineStep(
   sink: ChatStreamSink,
   requestId: string,
-  request: TrainingPlanGenerationRequest,
-  options: { unitSystem?: UnitSystem; revision?: TrainingPlanOutlineRevision } = {}
-): Promise<TrainingPlanOutlineResult> {
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForOutline(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
   const invalid = generationRequestProblems(request, new Date())[0];
-  if (invalid) return { ok: false, reason: "invalid", message: invalid.message };
-  let accepted: TrainingPlanOutline | undefined;
+  if (invalid) throw new Error(invalid.message);
+  const note = pipeline.note?.trim();
+  const revision = note && brief.outline ? { outline: brief.outline.outline, note } : undefined;
+
+  let written: number | undefined;
   runTools.set(requestId, {
     extra: [PLAN_OUTLINE_TOOL_DEFINITION],
-    ...generationReach(request, OUTLINE_WITHHELD_TOOLS),
+    ...pipelineReach(sources),
     handle: async (_name, args) => {
       const parsed = parsePlanOutline(args);
       const problems = parsed.outline ? planOutlineProblems(parsed.outline, request) : parsed.errors;
@@ -2321,44 +2655,92 @@ export async function outlineTrainingPlan(
           action: `Fix every problem listed and call ${PLAN_OUTLINE_TOOL} again with the whole outline. Do not ask the athlete.`
         });
       }
-      accepted = parsed.outline;
-      return JSON.stringify({ ok: true, message: "Outline accepted. Reply with one sentence and nothing else; the athlete reads the outline in the app." });
+      const saved = savePlanOutline(brief.artifactId, parsed.outline, "coach", written);
+      written = saved.outline?.version;
+      sink.emit("chat:streamInfo", { requestId, kind: "planOutline", brief: saved });
+      return JSON.stringify({
+        ok: true,
+        message:
+          "Outline accepted and shown to the athlete on a card under your reply. Reply with one sentence and nothing else: do not restate the weeks."
+      });
     }
   });
-  const { sink: watching, heard } = watchStreamEnd(sink);
   try {
     if (simulatePlanAi()) {
-      await simulatedPlanTurn(watching, requestId, "outline", request, normalizeUnitSystem(options.unitSystem), options.revision);
+      await simulatedPlanTurn(sink, requestId, "outline", request, unitSystem, revision);
     } else {
-      await streamChat(
-        watching,
-        requestId,
-        [{ role: "user", content: trainingPlanOutlinePrompt(request, options.revision) }],
-        {
-          unitSystem: normalizeUnitSystem(options.unitSystem),
-          toolPolicy: "read-only",
-          ...(request.runtime ? { runtime: request.runtime } : {})
-        }
-      );
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanOutlinePrompt(request, revision)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
     }
-    const outcome = heard.end;
-    if (!outcome || (outcome.kind === "done" && outcome.cancelled)) return { ok: false, reason: "cancelled" };
-    if (outcome.kind === "error") return { ok: false, reason: "failed", message: outcome.message };
-    if (!accepted) {
-      return {
-        ok: false,
-        reason: "no-outline",
-        message: outcome.text.trim()
-          ? "Training Coach answered but never handed over an outline that fits what you asked for."
-          : "Training Coach finished without drawing an outline."
-      };
-    }
-    return { ok: true, outline: accepted };
-  } catch (cause) {
-    return { ok: false, reason: "failed", message: cause instanceof Error ? cause.message : String(cause) };
   } finally {
     runTools.delete(requestId);
   }
+}
+
+/**
+ * "Write the sessions", as a turn of the conversation (P2.3). The generator's
+ * sessions turn, bound to the outline the brief holds: read-only, checked
+ * inside the turn by `generatedPlanProblems` against the brief, its week and
+ * the outline — each week's count, its hours and its stage. What it accepts
+ * is not held in memory as the generator's drafts are but written to
+ * `chat_plan_drafts` as version 1 of the brief's own artifact, so the brief,
+ * the outline and the plan are one creation from here on.
+ */
+async function streamSessionsStep(
+  sink: ChatStreamSink,
+  requestId: string,
+  messages: ChatMessage[],
+  unitSystem: UnitSystem,
+  pipeline: ChatPipelineStep,
+  sessionId: string | undefined,
+  settings: import("./types").ConversationSettings | undefined
+): Promise<void> {
+  const brief = briefForSessions(pipeline.artifactId);
+  const sources = settings?.sources ?? { activities: true, sleep: true, zones: true };
+  const request: TrainingPlanGenerationRequest = {
+    ...brief.request,
+    sources,
+    outline: brief.outline.outline,
+    ...(settings?.runtime ? { runtime: settings.runtime } : {})
+  };
+  const invalid = generationRequestProblems(request, new Date())[0];
+  if (invalid) throw new Error(invalid.message);
+  const outlineProblems = planOutlineProblems(brief.outline.outline, request);
+  if (outlineProblems.length) {
+    throw new Error(`The outline no longer fits the brief: ${outlineProblems[0]} Adjust or redraw it first.`);
+  }
+
+  planGenerations.set(requestId, { request, drafts: [], artifactId: brief.artifactId });
+  runTools.set(requestId, { extra: [], ...pipelineReach(sources, SESSIONS_STEP_WITHHELD_TOOLS) });
+  try {
+    if (simulatePlanAi()) {
+      await simulatedPlanTurn(sink, requestId, "plan", request, unitSystem);
+    } else {
+      await streamChat(sink, requestId, pipelineWire(messages, trainingPlanGenerationPrompt(request)), {
+        unitSystem,
+        ...(sessionId ? { sessionId } : {}),
+        toolPolicy: "read-only",
+        ...(request.runtime ? { runtime: request.runtime } : {})
+      });
+    }
+  } finally {
+    planGenerations.delete(requestId);
+    runTools.delete(requestId);
+  }
+}
+
+/** AI Plan (P2.5): the brief a new conversation opens on — the athlete's, or a blank one. */
+export function createPlanBriefForSession(sessionId: string, request?: PlanBriefRequest): PlanBrief {
+  return createPlanBrief(sessionId, request);
+}
+
+/** The athlete's adjustment of a brief's outline, from its own screen (P2.2). */
+export function adjustPlanOutline(artifactId: string, outline: unknown): PlanBrief {
+  return updatePlanOutline(artifactId, outline);
 }
 
 export function cancelChat(requestId: string): void {
@@ -2370,14 +2752,68 @@ export async function uploadTrainingPlanDraft(
   draftId: string,
   unitSystem: UnitSystem = "metric",
   destination: import("./types").TrainingPlanDestination = "workoutLibrary",
-  scheduleDate?: string
+  scheduleDate?: string,
+  keepInLibrary = false,
+  options?: import("./types").PlanDraftSaveOptions
 ): Promise<UploadPlanResult> {
   return uploadPlanDraftById(
     draftId,
     normalizeUnitSystem(unitSystem),
     destination,
-    scheduleDate
+    scheduleDate,
+    keepInLibrary === true,
+    {
+      ...(options?.asNew === true ? { asNew: true } : {}),
+      ...(options?.overwrite === true ? { overwrite: true } : {})
+    }
   );
+}
+
+export async function syncPlanFromCoros(
+  draftId: string,
+  unitSystem: UnitSystem,
+  cacheOnly = false
+): Promise<import("./types").PlanCorosSync> {
+  return syncPlanDraftFromCoros(draftId, normalizeUnitSystem(unitSystem), { cacheOnly: cacheOnly === true });
+}
+
+export function restorePlanVersion(draftId: string, unitSystem: UnitSystem): PlanVersionWritten {
+  return restorePlanDraftVersion(draftId, unitSystem);
+}
+
+export function findChatSessionForDraft(draftId: string): string | null {
+  return typeof draftId === "string" && draftId ? chatSessionForDraft(draftId) ?? null : null;
+}
+
+export function listPlanCalendarStates(draftIds: string[]): import("./types").PlanCalendarState[] {
+  return planCalendarStates(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
+}
+
+/** The briefs behind a conversation's `planBrief` anchors (P2.1). */
+export function listConversationPlanBriefs(artifactIds: string[]): PlanBrief[] {
+  return listPlanBriefs(Array.isArray(artifactIds) ? artifactIds.filter((id) => typeof id === "string") : []);
+}
+
+/** The athlete's edit of a brief, from its own screen. */
+export function editPlanBrief(artifactId: string, request: PlanBriefRequest): PlanBrief {
+  return updatePlanBrief(artifactId, request);
+}
+
+export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {
+  return planArtifacts(Array.isArray(draftIds) ? draftIds.filter((id) => typeof id === "string") : []);
+}
+
+export function removePlanDraft(draftId: string): void {
+  discardPlanDraft(draftId);
+}
+
+export function editWorkoutDraft(
+  draftId: string,
+  workout: PlanWorkoutEntryInput,
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): PlanVersionSave {
+  return saveWorkoutDraftEdit(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
 export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
@@ -2387,15 +2823,22 @@ export function getPlanDraftDocument(draftId: string): TrainingPlanDocument {
 export async function editPlanDraft(
   draftId: string,
   plan: TrainingPlanDocument,
-  unitSystem: UnitSystem = "metric"
-): Promise<PlanDraftPreview> {
-  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem));
+  unitSystem: UnitSystem = "metric",
+  replaceNewer = false
+): Promise<PlanVersionSave> {
+  return savePlanDraftEdit(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true);
 }
 
-export async function confirmWorkoutDelete(
-  requestId: string
-): Promise<DeleteWorkoutResult> {
-  return confirmWorkoutDeleteById(requestId);
+export function getScheduleChanges(changeSetIds: unknown): ScheduleChangeSet[] {
+  return readScheduleChanges(Array.isArray(changeSetIds) ? changeSetIds.filter((id): id is string => typeof id === "string") : []);
+}
+
+export function applyScheduleChangeLine(changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> {
+  return applyScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
+}
+
+export function dismissScheduleChangeLine(changeSetId: string, lineId?: string): ScheduleChangeSet {
+  return dismissScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
 }
 
 function getAllChatTools(): CorosMcpTool[] {
@@ -2479,12 +2922,8 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
 };
 
 /**
- * Section 6, decision 3: an auto run may draft and propose, never write.
- * `upload_training_plan` and `delete_workout` are the write surface today; any
- * future write tool must be added here as well.
- */
-/**
- * Section 6's read-only set, as an **allowlist**.
+ * Section 6, decision 3: an auto run may draft and propose, never write — and
+ * this is its read-only set, as an **allowlist**.
  *
  * It was a blocklist of the two known write tools, and that cannot deliver what
  * 6 promises — *"Blocked: `upload_training_plan`, `delete_workout`, and any
@@ -2501,7 +2940,10 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
  *
  * Drafting stays allowed because it is already non-destructive — the draft
  * tools return a preview and the real write only happens from the athlete's
- * confirmation card.
+ * confirmation card. Revising is not: `revise_training_plan` would change a
+ * card the athlete is following behind their back, so it stays off this list,
+ * and `executeChatTool` drops `draft_training_plan`'s `revises` for the same
+ * reason.
  */
 const READ_ONLY_ALLOWED_TOOLS = new Set([
   "list_recent_activities",
@@ -2513,6 +2955,11 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "search_coros_exercises",
   "draft_workout",
   "draft_training_plan",
+  "get_plan_draft",
+  "list_training_plans",
+  "get_training_plan",
+  // A proposal the athlete applies from its card; it writes nothing (P3.3).
+  "propose_schedule_changes",
   "request_coach_input"
 ]);
 
@@ -2582,15 +3029,20 @@ export function getClaudeCodeTools(
   const sleepTools = permissions.sleepData ? getChatSleepTools() : [];
   const workoutTools = getChatWorkoutTools().filter((tool) => {
     if (
-      tool.name === "upload_training_plan" ||
       tool.name === "list_scheduled_workouts" ||
-      tool.name === "delete_workout"
+      tool.name === "delete_workout" ||
+      tool.name === "propose_schedule_changes" ||
+      tool.name === "list_training_plans" ||
+      tool.name === "get_training_plan"
     ) {
       return permissions.upcomingWorkouts;
     }
     return (
       tool.name === "draft_workout" ||
       tool.name === "draft_training_plan" ||
+      tool.name === "revise_training_plan" ||
+      tool.name === "get_plan_draft" ||
+      tool.name === PLAN_BRIEF_TOOL ||
       tool.name === "search_coros_exercises"
     );
   });
@@ -2651,8 +3103,35 @@ async function executeChatTool(
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
-    return handleChatWorkoutTool(name as ChatWorkoutToolName, args, {
+    const counted = toolPolicy === "read-only" && !generation;
+    const cards = counted ? runCards.get(requestId) ?? new Set<string>() : undefined;
+    if (cards && CARD_TOOLS.has(name) && cards.size >= ANALYSIS_CARD_LIMIT) {
+      return JSON.stringify({
+        ok: false,
+        error_code: "card_limit",
+        errors: [`An analysis leaves at most ${ANALYSIS_CARD_LIMIT} cards; this run has. Say the rest in words.`]
+      });
+    }
+    /* Counted by the card's own id, read and never changed. */
+    const leaveCard = (card: PlanDraftPreview | ScheduleChangeSet) => {
+      if (!cards) return;
+      cards.add("changeSetId" in card ? card.changeSetId : card.draftId);
+      runCards.set(requestId, cards);
+    };
+    // A run that only reads may add a creation but not change one the athlete
+    // is following: `revises` would make its plan the next version of theirs,
+    // so here the draft is simply a new one.
+    const { revises: _revises, ...unrevised } = args;
+    return handleChatWorkoutTool(name as ChatWorkoutToolName, toolPolicy === "interactive" ? args : unrevised, {
+      onPlanEvent: (event) => {
+        send("chat:streamInfo", { requestId, kind: "planEvent", event });
+      },
+      onPlanBrief: (brief) => {
+        send("chat:streamInfo", { requestId, kind: "planBrief", brief });
+      },
+      sessionId: turnSessions.get(requestId),
       onPlanDraft: (preview: PlanDraftPreview) => {
+        leaveCard(preview);
         generation?.drafts.push(preview);
         send("chat:streamInfo", {
           requestId,
@@ -2661,14 +3140,13 @@ async function executeChatTool(
         });
       },
       planRequest: generation?.request,
-      onWorkoutDelete: (preview) => {
-        send("chat:streamInfo", {
-          requestId,
-          kind: "workoutDelete",
-          preview
-        });
+      ...(generation?.artifactId ? { planArtifactId: generation.artifactId } : {}),
+      onScheduleChange: (changeSet) => {
+        leaveCard(changeSet);
+        send("chat:streamInfo", { requestId, kind: "scheduleChange", changeSet });
       },
       allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
+      progress: run?.context?.activities !== false,
       unitSystem
     });
   }
@@ -2734,6 +3212,25 @@ async function executeChatTool(
   return reportingFailure(() => callMcpTool(name, args));
 }
 
+/**
+ * One tool call as a turn makes it, for suites: the run's card count (D4)
+ * lives here, and a suite driving it through a provider would be testing the
+ * provider. `end` lets the run go, as a finished turn does.
+ */
+export function callChatToolForTests(
+  name: string,
+  args: Record<string, unknown>,
+  { requestId, toolPolicy, sessionId }: { requestId: string; toolPolicy: ChatToolPolicy; sessionId?: string }
+): Promise<string> {
+  if (sessionId) turnSessions.set(requestId, sessionId);
+  return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
+}
+
+export function endRunForTests(requestId: string): void {
+  turnSessions.delete(requestId);
+  runCards.delete(requestId);
+}
+
 function findChatTool(name: string): CorosMcpTool | undefined {
   return (
     getAllChatTools().find((tool) => tool.name === name) ??
@@ -2760,7 +3257,10 @@ async function resolveModelAndOpenStream(
   { response: Response; model: string } | { error: string; authError: boolean }
 > {
   const cached = getSetting(SETTINGS.model);
-  const candidates = getChatGptModelCandidates(selectedModel, cached);
+  const listed = getChatSettings().modelCatalogs?.chatgpt?.models.map(
+    (entry) => entry.value
+  );
+  const candidates = getChatGptModelCandidates(selectedModel, cached, listed);
 
   let lastDetail = "";
   for (const model of candidates) {
@@ -2862,9 +3362,10 @@ function buildChatFunctionTools(tools: CorosMcpTool[] = getAllChatTools()): Reco
   }));
 }
 
-function withLiveToolInstructions(
+export function withLiveToolInstructions(
   instructions: string,
-  tools: CorosMcpTool[]
+  tools: CorosMcpTool[],
+  { inlineSuggestions = false }: { inlineSuggestions?: boolean } = {}
 ): string {
   if (tools.length === 0) {
     return instructions;
@@ -2957,11 +3458,43 @@ function withLiveToolInstructions(
         "(no value, run-until-lap) for by-feel warmups/cooldowns or fartlek surges. Put every " +
         "prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE, or grade in " +
         "the typed intensity field; do not leave it only in workout prose or the name. " +
-        "For draft_training_plan entries intended for calendar placement, include schedule_date " +
-        "(YYYYMMDD). A multi-workout draft is saved to COROS as one plan by default (give it a description and, for a periodised block, week_stages); the athlete may instead choose individual COROS workouts or Calendar, and may edit the plan before saving. " +
-        "The athlete must confirm the destination and any one-off workout date before saving. " +
-        "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-        "The athlete confirms via the Delete from COROS button in chat.",
+        "Place draft_training_plan sessions one way for the whole plan: sessions for this week " +
+        "or the next few days get a schedule_date (YYYYMMDD) each; a programme the athlete " +
+        "will start later gets a week (from 1) and a day (mon…sun) for each session instead. " +
+        "A dated plan within two weeks is offered first as sessions on the calendar; any other " +
+        "plan is offered first as one COROS plan (give it a description and, for a periodised " +
+        "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
+        "or schedules it from there — nothing you call writes to COROS. " +
+        "With a draft or a revision you may pass suggested_refinements: two to four follow-ups the athlete " +
+        "is likely to want next, each a few words, which appear as buttons under the card. " +
+        "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
+        "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
+        "its next version instead of a second card. " +
+        (planTools.some((tool) => tool.name === "delete_workout")
+          ? "Use list_scheduled_workouts + delete_workout to stage deletions. " +
+            "The athlete applies them from the card under your reply; nothing is deleted until they do. "
+          : "") +
+        (planTools.some((tool) => tool.name === "propose_schedule_changes")
+          ? "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
+            "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
+            "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way."
+          : ""),
+      ...(planTools.some((tool) => tool.name === "list_training_plans")
+        ? [
+            "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +
+              "list_training_plans and get_training_plan. A plan on the calendar is read as the calendar holds it: " +
+              "dates, and each session done, missed or ahead. A plan you made in this conversation is listed with " +
+              "its draft_id: change it with revise_training_plan, not by redrafting it."
+          ]
+        : []),
+      ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
+        ? [
+            "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +
+              "already know and stop, rather than asking question after question. The athlete corrects the brief on " +
+              "its card and asks for the outline from there. Draft a plan of two weeks or less straight away."
+          ]
+        : []),
+      ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
       "",
       "Supported workout capabilities (generated from the validator):",
       buildCoachSportCapabilityGuide(),
@@ -3030,6 +3563,13 @@ interface TrainingContextScope {
   activities: boolean;
   /** The threshold anchors in the athlete profile. */
   zones: boolean;
+  /** Nights and HRV — no part of the snapshot, so this only says so in the prompt. */
+  sleep?: boolean;
+  /**
+   * Say what is withheld in the prompt: a conversation's settings do (P2.0);
+   * a plan generation says it in its own prompt already.
+   */
+  announce?: boolean;
 }
 
 async function buildTrainingContext(
@@ -3042,7 +3582,10 @@ async function buildTrainingContext(
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
     customInstructions,
-    roleInstructions
+    roleInstructions,
+    scope?.announce
+      ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
+      : undefined
   );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +

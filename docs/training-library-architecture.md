@@ -208,9 +208,10 @@ does not list it. The card's **Training Plan** destination saves it to COROS as
 one plan (`origin: "coach"`), its description as the overview and its week
 stages as COROS's. **Edit plan first** opens the plan editor over the
 conversation (`CoachPlanEditor`) and saves back into the coach's own draft — the
-same card, marked `editedAt` — and the coach is shown that version in front of
-the athlete's next question (`withPlanEdits`). A conversation's drafts are
-deleted with it.
+same card, marked `editedAt` — and leaves a `planEvent` where it happened, which
+the coach is told on the athlete's next message; each turn also lists the
+conversation's creations (`creationIndex`), and the coach reads one back with
+`get_plan_draft`. A conversation's drafts are deleted with it.
 
 ## Verified COROS surface
 

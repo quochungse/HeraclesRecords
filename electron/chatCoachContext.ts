@@ -26,13 +26,19 @@ import {
 export function buildCoachInstructions(
   customInstructions?: string,
   /** An analysis's role/remit, injected for that run only. */
-  roleInstructions?: string
+  roleInstructions?: string,
+  /** What the conversation does not share (P2.0); app-written, so rules rather than data. */
+  withheld?: Partial<Record<"activities" | "sleep" | "zones", boolean>>
 ): string {
   const base = buildBaseCoachInstructions();
   const custom = sanitizeDelimitedBlock(customInstructions);
   const role = sanitizeDelimitedBlock(roleInstructions);
 
   let text = base;
+  const withheldLines = conversationWithheldLines(withheld);
+  if (withheldLines.length) {
+    text += "\n\n## What the athlete shares in this conversation\n" + withheldLines.join("\n");
+  }
   if (custom) {
     text +=
       "\n\n## Athlete's custom instructions\n" +
@@ -58,6 +64,28 @@ export function buildCoachInstructions(
       "</analysis_role>";
   }
   return text;
+}
+
+/**
+ * The sources a conversation keeps from Coach, said as rules (P2.0). The tools
+ * that read them are withheld too, and the snapshot is cut to match; this is
+ * what stops Coach assuming what it cannot see.
+ */
+export function conversationWithheldLines(
+  withheld: Partial<Record<"activities" | "sleep" | "zones", boolean>> | undefined
+): string[] {
+  if (!withheld) return [];
+  return [
+    withheld.activities
+      ? "- The athlete has not shared their training history in this conversation: do not read or assume their activities, fitness, records or predictions."
+      : undefined,
+    withheld.sleep
+      ? "- The athlete has not shared their sleep or HRV in this conversation: do not read or assume them."
+      : undefined,
+    withheld.zones
+      ? "- The athlete has not shared their COROS thresholds or zones in this conversation: prescribe by effort (RPE) or a generic target, and say so."
+      : undefined
+  ].filter((line): line is string => Boolean(line));
 }
 
 // `automation_role` is the pre-rename tag and is still stripped. Nothing emits
@@ -119,6 +147,26 @@ export function buildBaseCoachInstructions(): string {
     "delete_workout to stage a confirmation card. The athlete must click Delete from COROS — " +
     "never claim a workout was removed until they confirm via the button."
   );
+}
+
+/**
+ * Said when Coach may attach workout cards nobody asked for (P1.9, D4). A
+ * limit in words only: the cost of each answer is shown under it, which is
+ * where an answer that overdoes it would be seen.
+ */
+export const INLINE_SUGGESTIONS_GUIDE =
+  "When you recommend a specific session the athlete could do — today's run, a strength session for this week — " +
+  "you may attach it with draft_workout even though they did not ask for a workout, so it can be saved in one press. " +
+  "At most two such cards in one answer; more than two options belong in one plan, drafted with draft_training_plan " +
+  "only when the athlete asks for a plan. Do not attach a card to a general answer.";
+
+/**
+ * The lines the tool guide gains when unasked workout cards are on for the
+ * turn — and only when the turn can make one, since a promise of a tool it was
+ * not given would be something Coach could not keep.
+ */
+export function inlineSuggestionsSection(enabled: boolean, toolNames: readonly string[]): string[] {
+  return enabled && toolNames.includes("draft_workout") ? ["", INLINE_SUGGESTIONS_GUIDE] : [];
 }
 
 /**

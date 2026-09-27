@@ -403,6 +403,14 @@
   padding: 4px 2px 0;
 }
 
+/* Back to the list, and Ask Coach beside it — on the left, because the
+   cover's Full map holds the top right corner. */
+.run-detail-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .run-detail-header h1 {
   margin: 2px 0 0;
   color: var(--text-primary);
@@ -474,6 +482,7 @@
 }
 
 .run-detail-hero.has-cover .run-detail-back,
+.run-detail-hero.has-cover .activity-ask-coach,
 .run-detail-hero.has-cover .running-stat {
   pointer-events: auto;
   background: color-mix(in srgb, var(--bg-base) 76%, transparent);

@@ -22,7 +22,7 @@ import type {
   ChatSessionSummary,
   CoachAnalysisSessionAttention
 } from "../../electron/types";
-import { formatSessionRelativeTime } from "./chatSessionGroups";
+import { formatSessionRelativeTime, waitingLabel } from "./chatSessionGroups";
 
 const MENU_WIDTH = 180;
 const MENU_GAP = 6;
@@ -276,6 +276,7 @@ export function ChatSessionRow({
   active,
   disabled,
   compacting,
+  answering,
   attention,
   onSelect,
   onTogglePin,
@@ -289,6 +290,8 @@ export function ChatSessionRow({
   disabled?: boolean;
   /** A summariser turn is running for this conversation. */
   compacting?: boolean;
+  /** Coach is answering in this conversation (UAT): the row says so in place of its time. */
+  answering?: boolean;
   /** 9.3: whether a coach speaks here, and whether it has said something new. */
   attention?: CoachAnalysisSessionAttention;
   onSelect: () => void;
@@ -308,6 +311,7 @@ export function ChatSessionRow({
   // binding is gone: the answer is still sitting in the conversation.
   const unread = attention?.unread ?? 0;
   const attached = attention?.attached ?? false;
+  const waiting = waitingLabel(session);
 
   const commitRename = () => {
     if (draft === null) return;
@@ -406,6 +410,11 @@ export function ChatSessionRow({
         {session.preview ? (
           <span className="chat-session-row-preview">{session.preview}</span>
         ) : null}
+        {waiting ? (
+          <span className="chat-session-row-waiting" title="Waiting on you in this conversation">
+            {waiting}
+          </span>
+        ) : null}
       </span>
       <span className="chat-session-row-meta">
         <span className="chat-session-row-time-line">
@@ -419,9 +428,16 @@ export function ChatSessionRow({
               aria-label={`${unread} unread coach ${unread === 1 ? "run" : "runs"}`}
             />
           ) : null}
-          <span className="chat-session-row-time">
-            {formatSessionRelativeTime(session.updatedAt)}
-          </span>
+          {answering ? (
+            <span className="chat-session-row-answering" role="status">
+              <Loader2 className="chat-spinner" size={11} aria-hidden="true" />
+              Answering
+            </span>
+          ) : (
+            <span className="chat-session-row-time">
+              {formatSessionRelativeTime(session.updatedAt)}
+            </span>
+          )}
         </span>
         <ChatSessionRowMenu
           session={session}

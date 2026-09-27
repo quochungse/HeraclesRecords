@@ -55,7 +55,8 @@ export function ActivitiesView({
   onExportFile,
   onConnect,
   onRetry,
-  onOpenSportScreen
+  onOpenSportScreen,
+  onAskCoach
 }: ActivitiesViewProps) {
   const connected = Boolean(status?.authenticated);
   const [filters, setFilters] = useState<ActivityFilters>(
@@ -259,6 +260,7 @@ export function ActivitiesView({
       detailRequest={detailRequest}
       onRetry={onLoadDetail}
       onOpenSportScreen={onOpenSportScreen}
+      onAskCoach={onAskCoach}
     />
   );
 

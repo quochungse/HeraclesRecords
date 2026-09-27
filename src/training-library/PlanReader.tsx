@@ -32,6 +32,7 @@ import {
   FilePen,
   Heart,
   LoaderCircle,
+  MessageCircle,
   Pencil,
   Trash2,
   X
@@ -45,7 +46,8 @@ import {
 } from "react";
 import type {
   TrainingActivityMatch,
-  TrainingPlanDocument
+  TrainingPlanDocument,
+  TrainingPlanEntry
 } from "../../electron/types";
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
 import type { CorosLinkApi } from "../coroslink-api";
@@ -107,6 +109,10 @@ interface PlanReaderProps {
   onFavorite?: (plan: TrainingPlanDocument) => void;
   onArchive?: (plan: TrainingPlanDocument) => void;
   onDelete?: (plan: TrainingPlanDocument) => void;
+  /** Opens the conversation the plan came from, to ask about it (P1.7). */
+  onAskCoach?: (plan: TrainingPlanDocument) => void;
+  /** Opens Coach with one session of a COROS plan — any plan, not only Coach's — beside the composer (P3.5). */
+  onAskCoachAboutSession?: (plan: TrainingPlanDocument, entry: TrainingPlanEntry, label: string) => void;
   /** A kept session's activity, opened on the screen for its sport. */
   onOpenActivity?: (activityId: string) => void;
 }
@@ -134,6 +140,8 @@ export function PlanReader({
   onFavorite,
   onArchive,
   onDelete,
+  onAskCoach,
+  onAskCoachAboutSession,
   onOpenActivity
 }: PlanReaderProps) {
   const { unitSystem } = useUnitSystem();
@@ -288,6 +296,9 @@ export function PlanReader({
   };
 
   if (open) {
+    const openEntry = plan.entries.find((entry) => entry.id === open.entry.id);
+    /* Only a session COROS knows by id: Coach reads it with get_training_plan. */
+    const askable = onAskCoachAboutSession && plan.remoteId && openEntry?.idInPlan ? openEntry : undefined;
     return (
       <section
         ref={scroller}
@@ -300,13 +311,23 @@ export function PlanReader({
         <PlanSessionView
           key={open.entry.id}
           session={open}
-          entry={plan.entries.find((entry) => entry.id === open.entry.id)}
+          entry={openEntry}
           planName={plan.name}
           position={{ index: openIndex, of: sessions.length }}
           unitSystem={unitSystem}
           api={api}
           onOpenActivity={onOpenActivity}
           onBack={closeSession}
+          onAskCoach={
+            askable
+              ? () =>
+                  onAskCoachAboutSession!(
+                    plan,
+                    askable,
+                    [open.entry.title, `Week ${open.weekIndex + 1}`, open.dayLabel, plan.name].filter(Boolean).join(" · ")
+                  )
+              : undefined
+          }
           onStep={(direction) => {
             const next = sessions[openIndex + direction];
             if (next) {
@@ -383,6 +404,9 @@ export function PlanReader({
     : [];
   const planItems: PlanMenuItem[] = [
     ...editItems,
+    ...(onAskCoach
+      ? [{ label: "Ask Coach about this plan", icon: MessageCircle, onSelect: () => onAskCoach(plan) }]
+      : []),
     ...calendarItems,
     ...(onDuplicate
       ? [
@@ -646,7 +670,8 @@ export function WeekCard({
   todayKey = "",
   foldable = false,
   onFold,
-  onOpen
+  onOpen,
+  onAsk
 }: {
   week: PlanReaderWeek;
   current?: boolean;
@@ -654,6 +679,8 @@ export function WeekCard({
   foldable?: boolean;
   onFold?: () => void;
   onOpen?: (entryId: string) => void;
+  /** Ask Coach about this week — offered where a conversation can take the question. */
+  onAsk?: () => void;
 }) {
   const { unitSystem } = useUnitSystem();
   const hasAny = week.days.some((day) => day.entries.length);
@@ -677,6 +704,11 @@ export function WeekCard({
             onClick={onFold}
           >
             Fold
+          </button>
+        ) : null}
+        {onAsk ? (
+          <button type="button" className="plan-week-fold-again plan-week-ask" onClick={onAsk}>
+            Ask Coach
           </button>
         ) : null}
       </header>

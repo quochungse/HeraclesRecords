@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Settings2
 } from "lucide-react";
-import type { TrainingHubStatus } from "../../electron/types";
+import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
@@ -65,6 +65,8 @@ interface StrengthViewProps {
   openRequest?: SportScreenRequest | null;
   /** Taken, so the same session is not re-selected on the next render. */
   onOpenRequestHandled?: () => void;
+  /** Asks Coach about the session open, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
 const STRENGTH_PERIOD_OPTIONS = periodGroupOptions(STRENGTH_PERIOD_DAYS);
@@ -88,7 +90,8 @@ export function StrengthView({
   onOpenTraining,
   showDevelopmentTools = false,
   openRequest = null,
-  onOpenRequestHandled
+  onOpenRequestHandled,
+  onAskCoach
 }: StrengthViewProps) {
   const { unitSystem } = useUnitSystem();
   const corosConnected = Boolean(status?.authenticated);
@@ -508,6 +511,7 @@ export function StrengthView({
                   <StrengthSessionHeader
                     entry={selectedEntry}
                     showSource={source === "combined"}
+                    onAskCoach={onAskCoach}
                   />
                 ) : (
                   <StrengthAggregateHeader

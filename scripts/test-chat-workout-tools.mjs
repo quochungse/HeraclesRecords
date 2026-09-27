@@ -18,6 +18,7 @@ const { buildDraftTrainingPlanInputSchema, buildDraftWorkoutInputSchema } = awai
 const {
   buildTrainingPlanDestinationInput,
   buildTrainingPlanUploadInput,
+  buildRevisePlanInputSchema,
   isChatWorkoutTool
 } = await import(
   `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}`
@@ -161,7 +162,8 @@ for (const field of ["schedule_date", "save_to_library", "sort_no"]) {
 // and is 81% intensity variants. Collapsing that last copy needs `$defs`/`$ref`,
 // which not every provider resolves well when *writing* arguments, so it is
 // deliberately not done on the app's main write path.
-for (const [label, built] of [["plan", schema], ["workout", workoutSchema]]) {
+// The revision carries one workout schema, for replace_session and add_session.
+for (const [label, built] of [["plan", schema], ["workout", workoutSchema], ["revise", buildRevisePlanInputSchema()]]) {
   const size = JSON.stringify(built).length;
   assert.ok(
     size < 20_000,
@@ -205,6 +207,16 @@ const oneOffCalendarInput = buildTrainingPlanDestinationInput(
 );
 assert.equal(oneOffCalendarInput.workouts[0].schedule_date, "20991206");
 assert.equal(oneOffCalendarInput.workouts[0].save_to_library, false);
+// Put on the calendar, a workout can also be kept in the library — which the
+// calendar path used to rule out by clearing the flag.
+const keptCalendarInput = buildTrainingPlanDestinationInput(
+  heartRateDraft,
+  "calendar",
+  "2099-12-06",
+  true
+);
+assert.equal(keptCalendarInput.workouts[0].schedule_date, "20991206");
+assert.equal(keptCalendarInput.workouts[0].save_to_library, true);
 const oneOffLibraryInput = buildTrainingPlanDestinationInput(
   heartRateDraft,
   "workoutLibrary"
@@ -291,7 +303,7 @@ const mixedDraft = {
 assert.equal(validatePlanDraft(mixedDraft, { todayDay: "20260101" }).ok, true);
 const mixedPreview = buildPlanPreview("draft-mixed", mixedDraft);
 assert.equal(mixedPreview.entries.length, 4);
-assert.match(mixedPreview.summary, /1 Run \/ 1 Bike \/ 1 Pool Swim \/ 1 Strength/);
+assert.match(mixedPreview.summary, /Run, Bike, Pool Swim, Strength$/);
 assert.deepEqual(
   mixedPreview.entries.map((entry) => entry.sport),
   ["run", "bike", "swim", "strength"]
@@ -311,5 +323,22 @@ assert.deepEqual(mixedUploadInput.workouts[2].sport_options, {
   poolLength: { value: 25, unit: "m" }
 });
 assert.equal(mixedUploadInput.workouts[3].steps[0].target_type, "reps");
+
+// A calendar save names the sessions on a day gone by before anything is
+// written; COROS would refuse them one at a time after the rest went through.
+{
+  const { pastCalendarSessions } = await import(
+    `${distUrl("chatWorkoutTools.js")}?cacheBust=${Date.now()}-past`
+  );
+  const sessions = [
+    { name: "Yesterday", schedule_date: "20260925" },
+    { name: "Today", schedule_date: "20260926" },
+    { name: "Undated" }
+  ];
+  assert.deepEqual(
+    pastCalendarSessions(sessions, "20260926").map((item) => item.name),
+    ["Yesterday"]
+  );
+}
 
 console.log("test-chat-workout-tools: ok");

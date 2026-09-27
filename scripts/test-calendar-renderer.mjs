@@ -297,6 +297,42 @@ async function main() {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // 4. A day opens (UAT): its one thing directly, or the day as a whole
+  // -------------------------------------------------------------------------
+  {
+    await mountCalendar({ listScheduledWorkouts: [entry] });
+    assert.equal(await harness("count", ".calendar-day.is-openable"), 1, "only a day with something on it opens");
+    assert.equal(await harness("click", ".calendar-day.is-openable .calendar-day-open"), true);
+    await settle();
+    assert.equal(await harness("text", ".calendar-detail-header h3"), "Easy run", "a day with one thing opens that thing");
+    assert.equal(await harness("exists", ".calendar-day-overview"), false);
+    await pressOnDocument("Escape");
+    await settle();
+
+    const strides = { ...entry, idInPlan: "8", planProgramId: "program-2", name: "Strides", trainingLoad: 15 };
+    await mountCalendar({ listScheduledWorkouts: [entry, strides] });
+    assert.equal(await harness("click", ".calendar-day.is-openable .calendar-day-open"), true);
+    await settle();
+    assert.ok(await harness("exists", ".calendar-day-overview"), "a day with two things opens as a whole");
+    assert.equal(await harness("count", ".calendar-day-overview-item"), 2, "a row for each");
+
+    assert.equal(await harness("clickText", ".calendar-detail-action", "Ask Coach"), true);
+    const asked = (await harness("calls", "prop:onOpenCoach")).at(-1)?.args[0];
+    assert.equal(asked?.scheduleRefs?.[0]?.scope, "day", "Ask Coach asks about the day");
+    assert.equal(asked?.scheduleRefs?.[0]?.day, todayKey);
+
+    assert.equal(await harness("clickText", ".calendar-day-overview-item", "Strides"), true);
+    await settle();
+    assert.equal(await harness("text", ".calendar-detail-header h3"), "Strides", "a row opens its thing");
+    assert.ok(await harness("exists", ".calendar-detail-back"), "with a way back to the day");
+    assert.equal(await harness("click", ".calendar-detail-back"), true);
+    await settle();
+    assert.ok(await harness("exists", ".calendar-day-overview"), "back to the day");
+    await pressOnDocument("Escape");
+    await settle();
+  }
+
   assert.deepEqual(await harness("consoleErrors"), [], "the screen logged no errors");
 
   console.log(

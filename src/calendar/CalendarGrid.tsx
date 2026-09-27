@@ -27,6 +27,8 @@ interface CalendarGridProps {
   onSelectActivity: (day: CalendarDay, activity: TrainingHubActivity) => void;
   onToggleScheduled: (entry: TrainingHubScheduledWorkoutEntry) => void;
   onAdd: (dateKey: string) => void;
+  /** A press on a day's cell outside its chips (UAT). */
+  onSelectDay: (day: CalendarDay) => void;
   onDropEntry: (payload: CalendarDragPayload, targetDay: string) => void;
   onAskCoachWeek: (week: CalendarWeek) => void;
 }
@@ -43,6 +45,7 @@ export function CalendarGrid({
   onSelectActivity,
   onToggleScheduled,
   onAdd,
+  onSelectDay,
   onDropEntry,
   onAskCoachWeek
 }: CalendarGridProps) {
@@ -129,6 +132,7 @@ export function CalendarGrid({
                   }
                   onSelectScheduled={(entry) => onSelectScheduled(day, entry)}
                   onSelectActivity={(activity) => onSelectActivity(day, activity)}
+                  onSelectDay={() => onSelectDay(day)}
                   onToggleScheduled={onToggleScheduled}
                   onAdd={onAdd}
                   onDropEntry={onDropEntry}

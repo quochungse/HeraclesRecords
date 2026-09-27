@@ -176,6 +176,52 @@ export function placeDatedWorkouts(
   });
 }
 
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+] as const;
+
+function shortPlanDay(date: Date): string {
+  return `${SHORT_DAYS[date.getDay()]} ${date.getDate()} ${SHORT_MONTHS[date.getMonth()]}`;
+}
+
+/**
+ * The shape half of a coach plan card's one line. A plan with every session
+ * dated says when it runs ("3 sessions · Mon 25 Aug – Fri 29 Aug"); any other
+ * says how it is laid out ("10 weeks · 4–5 sessions a week"). An undated plan
+ * is the design — it is dated when it goes on the calendar — so "none
+ * scheduled" and "library-only" read as a fault it did not have.
+ */
+export function describePlanShape(
+  workouts: ReadonlyArray<{ key: string; name: string; source: PlanWorkoutEntryInput; date?: string }>,
+  layout?: Record<string, { weekIndex: number; dayIndex: number }>
+): string {
+  const count = workouts.length;
+  const sessions = `${count} session${count === 1 ? "" : "s"}`;
+  if (!count) return sessions;
+
+  const dates = workouts.map((workout) => parsePlanDay(workout.date));
+  if (dates.every((date): date is Date => Boolean(date))) {
+    const sorted = [...dates].sort((left, right) => left.valueOf() - right.valueOf());
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    return daysBetween(first, last) === 0
+      ? `${sessions} · ${shortPlanDay(first)}`
+      : `${sessions} · ${shortPlanDay(first)} – ${shortPlanDay(last)}`;
+  }
+
+  const entries = placeDatedWorkouts(workouts, "shape", undefined, layout);
+  const weekCount = Math.max(1, ...entries.map((entry) => entry.weekIndex + 1));
+  const perWeek = Array.from(
+    { length: weekCount },
+    (_, week) => entries.filter((entry) => entry.weekIndex === week).length
+  ).filter((value) => value > 0);
+  const low = Math.min(...perWeek);
+  const high = Math.max(...perWeek);
+  const band = low === high ? `${low}` : `${low}–${high}`;
+  return `${weekCount} week${weekCount === 1 ? "" : "s"} · ${band} session${high === 1 ? "" : "s"} a week`;
+}
+
 /** A Coach plan card as a plan document, for the editor and for a save to COROS. */
 export function trainingPlanFromCoachDraftPreview(
   preview: PlanDraftPreview,

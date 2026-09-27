@@ -5,10 +5,12 @@ import {
   Braces,
   CloudOff,
   Loader2,
+  MessageCircle,
   RefreshCw,
   X
 } from "lucide-react";
 import type {
+  CoachOpenRequest,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubSportType
@@ -40,6 +42,7 @@ import { ActivityRouteMap } from "./ActivityRouteMap";
 import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
+import { activityCoachRequest } from "../askCoachAbout";
 
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
@@ -50,6 +53,8 @@ interface ActivityDetailPaneProps {
   onRetry: (activity: TrainingHubActivity) => void;
   /** Hands a run or a lifting session to the screen built for that sport. */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
+  /** Asks Coach about this session, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
 interface Figure {
@@ -79,7 +84,8 @@ export function ActivityDetailPane({
   detailRequest,
   api = null,
   onRetry,
-  onOpenSportScreen
+  onOpenSportScreen,
+  onAskCoach
 }: ActivityDetailPaneProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   // A detail belonging to some other session is no detail at all — see
@@ -440,6 +446,18 @@ export function ActivityDetailPane({
         </div>
 
         <div className="activity-detail-pane-actions">
+          {onAskCoach && listActivity ? (
+            <button
+              type="button"
+              className="ghost-button activity-ask-coach"
+              onClick={() =>
+                onAskCoach(activityCoachRequest({ ...listActivity, ...(sportName ? { sportName } : {}) }, unitSystem))
+              }
+            >
+              <MessageCircle size={15} aria-hidden="true" />
+              Ask Coach
+            </button>
+          ) : null}
           {sportScreen && onOpenSportScreen && activityId !== undefined ? (
             <button
               type="button"

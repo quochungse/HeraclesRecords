@@ -65,11 +65,17 @@ import type {
   TrainingLibrarySnapshot,
   TrainingLibraryWorkout,
   TrainingPlanDocument,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineResult,
-  TrainingPlanOutlineRevision,
-  TrainingPlanGenerationResult,
-  PlanDraftPreview,
+  PlanArtifactVersion,
+  ConversationSettings,
+  PlanBrief,
+  PlanBriefRequest,
+  ChatPipelineStep,
+  TrainingPlanOutline,
+  PlanCalendarState,
+  PlanCorosSync,
+  PlanDraftSaveOptions,
+  PlanVersionSave,
+  PlanVersionWritten,
   TrainingPlanCalendarPreview,
   TrainingPlanDraftRecord,
   TrainingPlanMetadata,
@@ -122,6 +128,7 @@ import type {
   CoachAnalysisSummary,
   CoachAnalysisUpdate,
   ChatSettings,
+  ModelCatalogRefresh,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
@@ -147,7 +154,7 @@ import type {
   UploadPlanResult,
   IntervalsStatus,
   IntervalsActivityWithStatus,
-  DeleteWorkoutResult,
+  ScheduleChangeSet,
   ManualActivityInput
 } from "./types";
 const api = {
@@ -412,19 +419,6 @@ const api = {
     ipcRenderer.invoke("trainingLibrary:updatePlanMetadata", id, patch),
   saveTrainingPlanToCoros: (request: TrainingPlanSaveRequest): Promise<TrainingPlanSaveResult> =>
     ipcRenderer.invoke("trainingLibrary:savePlan", request),
-  generateTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem
-  ): Promise<TrainingPlanGenerationResult> =>
-    ipcRenderer.invoke("trainingLibrary:generatePlan", requestId, request, unitSystem),
-  outlineTrainingPlan: (
-    requestId: string,
-    request: TrainingPlanGenerationRequest,
-    unitSystem: UnitSystem,
-    revision?: TrainingPlanOutlineRevision
-  ): Promise<TrainingPlanOutlineResult> =>
-    ipcRenderer.invoke("trainingLibrary:outlinePlan", requestId, request, unitSystem, revision),
   duplicateTrainingPlan: (planId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("trainingLibrary:duplicatePlan", planId),
   deleteTrainingPlan: (
@@ -727,6 +721,11 @@ const api = {
     ipcRenderer.invoke("chat:getAuthStatus"),
   getChatSettings: (): Promise<ChatSettings> =>
     ipcRenderer.invoke("chat:getSettings"),
+  refreshChatModels: (options?: {
+    provider?: ChatProvider;
+    force?: boolean;
+  }): Promise<ModelCatalogRefresh> =>
+    ipcRenderer.invoke("chat:refreshModels", options),
   getBaseCoachInstructions: (): Promise<string> =>
     ipcRenderer.invoke("chat:getBaseCoachInstructions"),
   saveChatSettings: (settings: ChatSettings): Promise<ChatSettings> =>
@@ -775,8 +774,21 @@ const api = {
   sendChat: (
     requestId: string,
     messages: ChatMessage[],
-    unitSystem: UnitSystem
-  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem),
+    unitSystem: UnitSystem,
+    sessionId?: string,
+    pipeline?: ChatPipelineStep
+  ): Promise<void> => ipcRenderer.invoke("chat:send", requestId, messages, unitSystem, sessionId, pipeline),
+  getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
+  updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
+  createPlanBrief: (sessionId: string, request?: PlanBriefRequest): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:createPlanBrief", sessionId, request),
+  updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline): Promise<PlanBrief> =>
+    ipcRenderer.invoke("chat:updatePlanOutline", artifactId, outline),
+  getConversationSettings: (sessionId: string): Promise<ConversationSettings> =>
+    ipcRenderer.invoke("chat:conversationSettings", sessionId),
+  setConversationSettings: (settings: ConversationSettings): Promise<ConversationSettings> =>
+    ipcRenderer.invoke("chat:setConversationSettings", settings),
   cancelChat: (requestId: string): Promise<void> =>
     ipcRenderer.invoke("chat:cancel", requestId),
   compactChatContext: (
@@ -790,8 +802,8 @@ const api = {
     entries?: PersistedChatEntry[]
   ): Promise<ChatContextInspection> =>
     ipcRenderer.invoke("chat:inspectContext", sessionId, entries),
-  listChatSessions: (provider: ChatProvider): Promise<ChatSessionSummary[]> =>
-    ipcRenderer.invoke("chat:listSessions", provider),
+  listChatSessions: (): Promise<ChatSessionSummary[]> =>
+    ipcRenderer.invoke("chat:listSessions"),
   getChatSession: (sessionId: string): Promise<PersistedChatEntry[]> =>
     ipcRenderer.invoke("chat:getSession", sessionId),
   createChatSession: (provider: ChatProvider): Promise<ChatSessionSummary> =>
@@ -968,25 +980,53 @@ const api = {
     draftId: string,
     unitSystem: UnitSystem,
     destination?: TrainingPlanDestination,
-    scheduleDate?: string
+    scheduleDate?: string,
+    keepInLibrary?: boolean,
+    options?: PlanDraftSaveOptions
   ): Promise<UploadPlanResult> =>
     ipcRenderer.invoke(
       "chat:uploadPlanDraft",
       draftId,
       unitSystem,
       destination,
-      scheduleDate
+      scheduleDate,
+      keepInLibrary,
+      options
     ),
+  getPlanArtifacts: (draftIds: string[]): Promise<PlanArtifactVersion[]> =>
+    ipcRenderer.invoke("chat:planArtifacts", draftIds),
+  findChatSessionForDraft: (draftId: string): Promise<string | null> =>
+    ipcRenderer.invoke("chat:findDraftSession", draftId),
+  getPlanCalendarState: (draftIds: string[]): Promise<PlanCalendarState[]> =>
+    ipcRenderer.invoke("chat:planCalendarState", draftIds),
+  syncPlanFromCoros: (draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean): Promise<PlanCorosSync> =>
+    ipcRenderer.invoke("chat:syncPlanFromCoros", draftId, unitSystem, cacheOnly),
+  restorePlanVersion: (draftId: string, unitSystem: UnitSystem): Promise<PlanVersionWritten> =>
+    ipcRenderer.invoke("chat:restorePlanVersion", draftId, unitSystem),
+  removePlanDraft: (draftId: string): Promise<void> =>
+    ipcRenderer.invoke("chat:removePlanDraft", draftId),
+  editWorkoutDraft: (
+    draftId: string,
+    workout: PlanWorkoutEntryInput,
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ): Promise<PlanVersionSave> =>
+    ipcRenderer.invoke("chat:editWorkoutDraft", draftId, workout, unitSystem, replaceNewer),
   getPlanDraftDocument: (draftId: string): Promise<TrainingPlanDocument> =>
     ipcRenderer.invoke("chat:planDraftDocument", draftId),
   editPlanDraft: (
     draftId: string,
     plan: TrainingPlanDocument,
-    unitSystem?: UnitSystem
-  ): Promise<PlanDraftPreview> =>
-    ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem),
-  confirmWorkoutDelete: (requestId: string): Promise<DeleteWorkoutResult> =>
-    ipcRenderer.invoke("chat:confirmWorkoutDelete", requestId),
+    unitSystem?: UnitSystem,
+    replaceNewer?: boolean
+  ): Promise<PlanVersionSave> =>
+    ipcRenderer.invoke("chat:editPlanDraft", draftId, plan, unitSystem, replaceNewer),
+  getScheduleChanges: (changeSetIds: string[]): Promise<ScheduleChangeSet[]> =>
+    ipcRenderer.invoke("chat:scheduleChanges", changeSetIds),
+  applyScheduleChange: (changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> =>
+    ipcRenderer.invoke("chat:applyScheduleChange", changeSetId, lineId),
+  dismissScheduleChange: (changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> =>
+    ipcRenderer.invoke("chat:dismissScheduleChange", changeSetId, lineId),
   // ----- Sync -----
   chooseSyncFolder: (): Promise<string | null> =>
     ipcRenderer.invoke("sync:chooseFolder"),

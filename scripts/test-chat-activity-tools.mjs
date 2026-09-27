@@ -859,4 +859,124 @@ assert.equal(activitySportFamily(402), "strength");
 assert.equal(activitySportFamily(900), "walk_hike");
 assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
 
+// --- The chart card stores what it draws, and no more ---
+//
+// A card is a transcript entry, and a transcript is synced as a whole row on
+// every save. Each chart used to carry the full downsampled array — every
+// recorded channel — so four charts stored it four times, and the elevation
+// profile carried the whole GPS track, lat/lon included, which it never draws.
+// That was ~30k characters a card, 75% of the largest conversations.
+{
+  const { parseChatTranscriptJson } = await import(
+    `${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`
+  );
+  const samples = Array.from({ length: 3_600 }, (_, index) => ({
+    elapsed: index,
+    distance: index * 2.8,
+    hr: 140 + (index % 20),
+    pace: 350 + (index % 15),
+    power: 250 + (index % 30),
+    altitude: 10 + Math.sin(index / 300) * 5,
+    cadence: 170 + (index % 6),
+    strideLength: 1.1,
+    groundTime: 240,
+    verticalOscillation: 8.1,
+    verticalRatio: 7.4
+  }));
+  // A rolling course with one sharp summit and one sharp dip, each a single
+  // point: the samples a bucket mean or a bucket's last value would lose.
+  const track = Array.from({ length: 400 }, (_, index) => ({
+    lat: 10.7 + index / 10_000,
+    lon: 106.7 + index / 10_000,
+    distance: index * 25,
+    elevation: index === 137 ? 95 : index === 288 ? -12 : 20 + Math.sin(index / 25) * 8
+  }));
+  const fullDetail = {
+    activityId: "act-full-1",
+    name: "Long run",
+    sportType: 100,
+    distance: 10_000,
+    duration: 3_600,
+    avgHr: 150,
+    maxHr: 172,
+    laps: Array.from({ length: 10 }, (_, index) => ({
+      index: index + 1,
+      distance: 1_000,
+      duration: 360,
+      avgHr: 148,
+      maxHr: 160,
+      pace: 360,
+      avgCadence: 172
+    })),
+    series: samples,
+    track: { points: track },
+    raw: {}
+  };
+  const preview = buildActivityVisualPreview(fullDetail, "req-full");
+  const downsampledFull = downsampleActivitySeries(samples);
+
+  for (const channel of ["hr", "pace", "power", "cadence"]) {
+    const series = preview.sections[channel].series;
+    for (const point of series) {
+      assert.deepEqual(
+        Object.keys(point).filter((key) => key !== "distance" && key !== channel),
+        [],
+        `the ${channel} chart stores only distance and ${channel}`
+      );
+    }
+    // What the chart draws is unchanged: the same (distance, value) pairs the
+    // untrimmed array gave it.
+    assert.deepEqual(
+      series.map((point) => [point.distance, point[channel]]),
+      downsampledFull
+        .filter((point) => point[channel] !== undefined)
+        .map((point) => [point.distance, point[channel]]),
+      `the ${channel} chart draws the same points`
+    );
+  }
+
+  const profile = preview.sections.elevation.points;
+  assert.ok(profile.length <= 120, "the profile keeps what a 600px chart can show");
+  assert.ok(
+    profile.every((point) => point.lat === undefined && point.lon === undefined),
+    "no position reaches the transcript"
+  );
+  assert.deepEqual(profile[0], { distance: 0, elevation: track[0].elevation });
+  assert.deepEqual(profile.at(-1), { distance: 399 * 25, elevation: track[399].elevation });
+  assert.ok(profile.some((point) => point.elevation === 95), "the summit survives");
+  assert.ok(profile.some((point) => point.elevation === -12), "the dip survives");
+  assert.ok(
+    profile.every((point, index) => index === 0 || point.distance > profile[index - 1].distance),
+    "the profile stays in course order"
+  );
+
+  // The old shape: every section holding the whole array, the whole track.
+  const untrimmedSize = JSON.stringify({
+    ...preview,
+    sections: {
+      ...preview.sections,
+      hr: { chartKind: "series", series: downsampledFull },
+      pace: { series: downsampledFull },
+      power: { series: downsampledFull },
+      cadence: { chartKind: "series", series: downsampledFull },
+      elevation: { points: track }
+    }
+  }).length;
+  const trimmedSize = JSON.stringify(preview).length;
+  assert.ok(
+    trimmedSize * 3 < untrimmedSize,
+    `a card is a fraction of its old size (${trimmedSize} vs ${untrimmedSize})`
+  );
+
+  // A trimmed card survives a save and reload untouched, on this build's
+  // parser — which is also the parser an older build on another machine runs.
+  const [restored] = parseChatTranscriptJson(
+    JSON.stringify([{ kind: "activityVisual", preview }])
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(restored.preview)),
+    JSON.parse(JSON.stringify(preview))
+  );
+}
+
 console.log("test-chat-activity-tools: ok");

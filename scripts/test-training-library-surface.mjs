@@ -14,8 +14,8 @@
  * 2. A create action the index declares but never renders. `PlanIndex` took
  *    `onCreate` and `onGenerate` for a day and rendered neither — dropped as
  *    collateral when the layout switch moved to `OptionGroup` — so there was
- *    no way to make a plan or a template, and the whole plan generator was
- *    unreachable. Unused props and unused imports both typecheck.
+ *    no way to make a plan or a template, and AI Plan — the generator then,
+ *    a new plan conversation in Coach now — was unreachable. Unused props and unused imports both typecheck.
  *
  * 3. The "collection" concept is gone and must stay gone. COROS serves four
  *    training endpoints — program, plan, schedule and exercise — and not one
@@ -113,11 +113,13 @@ const tierOf = (policy, table) =>
     );
   }
 
-  // The generator is a whole screen behind that one button; nothing else opens it.
+  // AI Plan asks for the brief first, then opens Coach on it (P2.5): the
+  // generator dialog it used to open is gone, and must not come back.
   assert.ok(
-    view.includes("<TrainingPlanGenerator") && view.includes("setGeneratorOpen(true)"),
-    "the plan generator must be both rendered and openable"
+    /<CoachBriefEditor[\s\S]*?mode="new"[\s\S]*?onOpenCoach\(\{ newPlan: \{ request, sources: newPlanSources \} \}\)/.test(view),
+    "AI Plan must take the brief on its own screen and open a new plan conversation in Coach from it"
   );
+  assert.ok(!view.includes("TrainingPlanGenerator"), "the generator dialog is gone");
 }
 
 // ---------------------------------------------------------------------------

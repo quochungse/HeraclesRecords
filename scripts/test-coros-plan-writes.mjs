@@ -1086,14 +1086,369 @@ test("a coach plan is saved to COROS as one plan, with its overview and stages",
     /already uploaded/,
     "saved once"
   );
+  const edit = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, chatWorkoutTools.planDraftDocument(preview.draftId));
+  assert.equal(edit.kind, "written", "a saved plan is edited into its next version (P1.6)");
+  assert.ok(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, "and the saved one stays saved");
+});
+
+test("a coach plan on COROS is changed by a version that updates it (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+
+  // The saved version keeps the plan as COROS read it back, keyed as the coach keyed it.
+  const saved = chatWorkoutTools.planDraftDocument(preview.draftId);
+  assert.equal(saved.remoteId, "900");
+  assert.deepEqual(saved.entries.map((entry) => entry.workout.key).sort(), ["easy-monday", "long-sunday"]);
+  assert.ok(saved.entries.every((entry) => entry.idInPlan && entry.corosProgram), "each session's COROS identity");
+
+  // Coach moves the long run and rewrites the easy one.
+  const revised = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      {
+        draft_id: preview.draftId,
+        summary: "Long run to Saturday, easy run longer",
+        ops: [
+          { op: "move_session", key: "long-sunday", schedule_date: "20990815" },
+          { op: "replace_session", key: "easy-monday", workout: coachRun("Easy Monday", 2400) }
+        ]
+      },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(revised.ok, true, JSON.stringify(revised));
+  const next = chatWorkoutTools.planDraftDocument(revised.draft_id);
+  assert.equal(next.remoteId, "900", "the new version is a change to that plan");
+  const byKey = new Map(next.entries.map((entry) => [entry.workout.key, entry]));
+  const savedByKey = new Map(saved.entries.map((entry) => [entry.workout.key, entry]));
+  assert.equal(byKey.get("long-sunday").idInPlan, savedByKey.get("long-sunday").idInPlan);
+  assert.deepEqual(byKey.get("long-sunday").corosProgram, savedByKey.get("long-sunday").corosProgram, "moved, not rewritten");
+  assert.equal(byKey.get("easy-monday").idInPlan, savedByKey.get("easy-monday").idInPlan, "updated in place");
+  assert.equal(byKey.get("easy-monday").corosProgram, undefined, "its workout is written afresh");
+
+  const updated = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan");
+  assert.equal(coros.to("/training/plan/add").length, 1, "no second plan");
+  assert.equal(coros.to("/training/plan/update").length, 1, "the plan is updated");
+  assert.equal(updated.planId, "coros:900");
+  assert.deepEqual(updated.remoteWrites, ["Update plan Coach block"]);
+  const [update] = coros.to("/training/plan/update");
+  assert.deepEqual(
+    update.body.entities.map((entity) => entity.dayNo).sort((a, b) => a - b),
+    [0, 12],
+    "Saturday of week 2 is day 12"
+  );
+
+  // Changed on COROS meanwhile: the next update is refused until the athlete says.
+  const again = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: revised.draft_id, summary: "Rename", ops: [{ op: "rename", name: "Coach block, two" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(again.ok, true, JSON.stringify(again));
+  const elsewhere = await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(revised.draft_id), name: "Renamed in the COROS app" },
+    unitSystem: "metric"
+  });
+  assert.equal(elsewhere.ok, true);
+  const refused = await chatWorkoutTools.uploadPlanDraftById(again.draft_id, "metric", "nativePlan");
+  assert.ok(refused.conflict, "a conflict, not a write");
+  assert.equal(coros.to("/training/plan/update").length, 2, "only the change made elsewhere was written");
+  assert.equal(databaseModule.getChatPlanDraft(again.draft_id).uploadedAt, undefined, "and the version is not saved");
+
+  const asNew = await chatWorkoutTools.uploadPlanDraftById(again.draft_id, "metric", "nativePlan", undefined, false, { asNew: true });
+  assert.equal(asNew.planId, "coros:901", "saved as a plan of its own");
+  assert.equal(coros.to("/training/plan/add").length, 2);
+
+  // And a saved one-off workout is still not changed from the conversation.
+  let workout;
+  JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "draft_workout",
+      { workout: coachRun("Shakeout", 900), calendar_date: "20990805" },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { workout = drafted; } }
+    )
+  );
+  databaseModule.markChatPlanDraftUploaded(workout.draftId, Date.now());
+  const workoutRevision = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: workout.draftId, summary: "Longer", ops: [{ op: "replace_session", workout: coachRun("Shakeout", 1200) }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(workoutRevision.error_code, "draft_saved");
+});
+
+test("an update written over a change made on COROS replaces it (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const revised = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: preview.draftId, summary: "Rename", ops: [{ op: "rename", name: "Mine" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(preview.draftId), name: "Theirs" },
+    unitSystem: "metric"
+  });
+  const refused = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan");
+  assert.ok(refused.conflict);
+  const written = await chatWorkoutTools.uploadPlanDraftById(revised.draft_id, "metric", "nativePlan", undefined, false, { overwrite: true });
+  assert.equal(written.conflict, undefined);
+  assert.equal(written.planId, "coros:900");
+  assert.equal(coros.to("/training/plan/update").at(-1).body.name, "Mine");
+});
+
+test("a change made on COROS comes back as the creation's newest version (P1.6, D12)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+
+  // Nothing changed there: one read of the detail, and nothing written.
+  const reads = coros.to("/training/plan/detail").length;
+  assert.deepEqual(await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId), { kind: "current" });
+  assert.equal(coros.to("/training/plan/detail").length, reads + 1, "one request when nothing changed");
+  assert.deepEqual(
+    await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true }),
+    { kind: "current" }
+  );
+  assert.equal(coros.to("/training/plan/detail").length, reads + 1, "and none from the cache");
+
+  // Renamed, and the long run moved, in the Library.
+  const inLibrary = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const long = inLibrary.entries.find((entry) => entry.workout.key === "long-sunday");
+  await library.savePlanToCoros({
+    plan: {
+      ...inLibrary,
+      name: "Coach block, as I run it",
+      entries: inLibrary.entries.map((entry) => (entry === long ? { ...entry, dayIndex: 5 } : entry))
+    },
+    unitSystem: "metric"
+  });
+
+  const synced = await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true });
+  assert.equal(synced.kind, "imported", "the cache says COROS moved on");
+  assert.deepEqual([synced.written.fromVersion, synced.written.toVersion], [1, 2]);
+  assert.ok(synced.written.changes.includes('Renamed to "Coach block, as I run it"'), synced.written.changes.join(" | "));
+  assert.ok(synced.written.changes.some((line) => /^Moved Long Sunday: week 2 Sun → week 2 Sat/.test(line)), synced.written.changes.join(" | "));
+  const row = databaseModule.getChatPlanDraft(synced.written.preview.draftId);
+  assert.equal(row.author, "coros");
+  assert.equal(row.changeSummary, "Changed in the Library");
+  const imported = chatWorkoutTools.planDraftDocument(synced.written.preview.draftId);
+  assert.deepEqual(
+    imported.entries.map((entry) => entry.workout.key).sort(),
+    ["easy-monday", "long-sunday"],
+    "sessions keep the coach's keys, so Coach can still name them"
+  );
+  assert.equal(imported.remoteVersion, 1, "and the version COROS is at now");
+  assert.ok(row.uploadedAt, "it is what COROS holds, so it is saved there");
+  assert.equal(synced.written.preview.uploadResult.planId, "coros:900", "and its card says which plan it is");
+  // The imported version is what COROS holds, so it counts as saved there.
+  assert.deepEqual(await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId), { kind: "current" });
+});
+
+test("Coach's change to a plan changed on COROS goes onto COROS's version (P1.6)", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  await library.savePlanToCoros({
+    plan: { ...chatWorkoutTools.planDraftDocument(preview.draftId), name: "Renamed on COROS" },
+    unitSystem: "metric"
+  });
+  const cards = [];
+  const events = [];
+  const response = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      {
+        draft_id: preview.draftId,
+        summary: "Easy run longer",
+        ops: [{ op: "replace_session", key: "easy-monday", workout: coachRun("Easy Monday", 2700) }]
+      },
+      {
+        allowUpcomingWorkouts: false,
+        onPlanDraft: (card) => cards.push(card),
+        onPlanEvent: (event) => events.push(event)
+      }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(response.version, 3, "on top of the version COROS had");
+  assert.match(response.note, /changed on COROS/);
+  assert.deepEqual(events.map((event) => [event.action, event.author, event.toVersion]), [["imported", "coros", 2]]);
+  assert.equal(cards.length, 2, "COROS's version, then Coach's");
+  assert.equal(chatWorkoutTools.planDraftDocument(response.draft_id).name, "Renamed on COROS", "the rename is kept");
+});
+
+test("a plan deleted on COROS leaves a proposal, saved again as a new plan (P1.6)", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  await adapter.deleteNativeCorosPlan("900");
+  const synced = await chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId);
+  assert.equal(synced.kind, "removedOnCoros");
+  const detached = synced.written.preview.draftId;
+  assert.equal(chatWorkoutTools.planDraftDocument(detached).remoteId, undefined, "no plan on COROS any more");
+  const listed = chatWorkoutTools.planArtifacts([preview.draftId]);
+  assert.equal(listed.at(-1).detached, true, "and the version list says so");
+  const saved = await chatWorkoutTools.uploadPlanDraftById(detached, "metric", "nativePlan");
+  assert.equal(saved.planId, "coros:901");
+  assert.equal(coros.to("/training/plan/add").length, 2, "a plan of its own again");
+  assert.equal(coros.to("/training/plan/update").length, 0);
+});
+
+test("a Coach plan goes on the calendar from the conversation, and the card knows it (P1.6)", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+
+  // Before it is saved, the preview reads it through the chat.
+  const before = await library.previewPlanOnCalendar(`chat:${preview.draftId}`, "20990803");
+  assert.deepEqual(before.blockers, []);
+  assert.deepEqual(
+    before.entries.map((entry) => entry.happenDay),
+    ["20990803", "20990816"],
+    "each session on the day the coach dated it"
+  );
+  assert.deepEqual(chatWorkoutTools.planCalendarStates([preview.draftId]), [], "not on COROS, so nothing to say");
+
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const saved = chatWorkoutTools.planCalendarStates([preview.draftId]);
+  assert.deepEqual(saved.map((state) => [state.remotePlanId, Boolean(state.running)]), [["coros:900", false]]);
+
+  await library.putPlanOnCalendar("coros:900", "20990803");
+  const [running] = chatWorkoutTools.planCalendarStates([preview.draftId]);
+  assert.ok(running.running, "the running copy, from the plan cache");
+  assert.equal(running.running.sourcePlanId, "900");
+  assert.equal(running.running.calendar, "running");
+  assert.ok(Array.isArray(running.matches));
+});
+
+test("restoring a version of a plan on COROS takes the newest version's ids, not its own", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const first = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const firstIds = new Map(first.entries.map((entry) => [entry.workout.key, entry.idInPlan]));
+
+  // Version 2 drops the easy run, and COROS is updated to match.
+  const dropped = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: preview.draftId, summary: "No easy run", ops: [{ op: "remove_session", key: "easy-monday" }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(dropped.ok, true, JSON.stringify(dropped));
+  await chatWorkoutTools.uploadPlanDraftById(dropped.draft_id, "metric", "nativePlan");
+  const second = chatWorkoutTools.planDraftDocument(dropped.draft_id);
+
+  // Version 1 back, as version 3.
+  const restored = chatWorkoutTools.restorePlanDraftVersion(preview.draftId, "metric");
+  const third = chatWorkoutTools.planDraftDocument(restored.preview.draftId);
+  const byKey = new Map(third.entries.map((entry) => [entry.workout.key, entry]));
+  assert.equal(third.remoteId, "900", "still a change to that plan");
+  assert.equal(third.remoteVersion, second.remoteVersion, "checked against the plan as it is now");
+  assert.equal(byKey.get("easy-monday").idInPlan, undefined, "the easy run is gone from COROS, so it comes back as a new session");
+  assert.notEqual(firstIds.get("easy-monday"), undefined, "(it had an id in version 1)");
+  assert.equal(
+    byKey.get("long-sunday").idInPlan,
+    second.entries.find((entry) => entry.workout.key === "long-sunday").idInPlan,
+    "the session that stayed keeps the id COROS has for it"
+  );
+  const updated = await chatWorkoutTools.uploadPlanDraftById(restored.preview.draftId, "metric", "nativePlan");
+  assert.equal(updated.conflict, undefined, "and it updates the plan without a false conflict");
+  assert.equal(coros.to("/training/plan/add").length, 1, "no second plan");
+});
+
+test("two reads against COROS begun together bring its change back once", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const inLibrary = chatWorkoutTools.planDraftDocument(preview.draftId);
+  await library.savePlanToCoros({ plan: { ...inLibrary, name: "Renamed in the Library" }, unitSystem: "metric" });
+  // The canvas opening and an edit begun at the same moment.
+  const [first, second] = await Promise.all([
+    chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId, "metric", { cacheOnly: true }),
+    chatWorkoutTools.syncPlanDraftFromCoros(preview.draftId)
+  ]);
+  assert.equal(first.kind, "imported");
+  assert.equal(second.kind, "imported");
+  assert.equal(first.written.preview.draftId, second.written.preview.draftId, "one version, shared");
+  const artifact = databaseModule.getChatPlanDraft(preview.draftId).artifactId ?? preview.draftId;
+  assert.equal(databaseModule.listChatPlanDraftVersions(artifact).length, 2, "the saved one and COROS's change, nothing twice");
+});
+
+test("sessions put on the calendar before COROS stopped are not written again", async () => {
+  let failNext = false;
+  const coros = stubCoros({
+    "/training/program/calculate": () =>
+      ok({ planDuration: 1800, planDistance: 500000, planTrainingLoad: 40, planSets: 3, exerciseBarChart: [] }),
+    "/training/schedule/query": () => ok({ entities: [], programs: [] }),
+    "/training/schedule/update": () => {
+      if (failNext) {
+        failNext = false;
+        return { apiCode: "A1", message: "Service exceptions", result: "1001" };
+      }
+      return ok();
+    },
+    "/account/query": ok({}),
+    "coros-traininghub-v2": ok({})
+  });
+  const preview = await coachDraft(datedBlock);
+  // The first session lands, then COROS refuses the second.
+  const original = globalThis.fetch;
+  let scheduled = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/training/schedule/update") && ++scheduled === 2) failNext = true;
+    return original(url, init);
+  };
   await assert.rejects(
-    chatWorkoutTools.savePlanDraftEdit(preview.draftId, chatWorkoutTools.planDraftDocument(preview.draftId)),
-    /already been saved/,
-    "and a saved card is no longer edited"
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar"),
+    /COROS stopped part-way: "Easy Monday" was saved and stays there; the rest were not .*Saving again adds only the rest/
+  );
+  assert.equal(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, undefined, "not saved as a whole");
+  const writes = coros.to("/training/schedule/update").length;
+
+  const done = await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "calendar");
+  assert.equal(coros.to("/training/schedule/update").length, writes + 1, "only the session that did not land");
+  assert.equal(done.workoutsScheduled, 2, "and the result counts both");
+  assert.deepEqual(done.entries.map((entry) => entry.name), ["Easy Monday", "Long Sunday"]);
+  assert.ok(databaseModule.getChatPlanDraft(preview.draftId).uploadedAt, "now it is saved");
+  globalThis.fetch = original;
+});
+
+test("two saves of one creation begun together write one plan", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  const results = await Promise.allSettled([
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan"),
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan")
+  ]);
+  assert.deepEqual(results.map((result) => result.status).sort(), ["fulfilled", "rejected"]);
+  assert.match(results.find((result) => result.status === "rejected").reason.message, /already being saved/);
+  assert.equal(coros.to("/training/plan/add").length, 1);
+});
+
+test("a save made on another machine is seen here: the row, not a copy in memory, decides", async () => {
+  fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  chatWorkoutTools.planDraftDocument(preview.draftId); // read once, as the card does
+  // The other machine saved it; the pull marks the row.
+  databaseModule.markChatPlanDraftUploaded(preview.draftId, Date.now());
+  await assert.rejects(
+    chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan"),
+    /already uploaded/,
+    "not saved a second time"
   );
 });
 
-test("an edit in Coach rewrites the coach's draft, and the card keeps its id", async () => {
+test("an edit in Coach is the plan's next version, dated from the coach's Monday", async () => {
   fakeCoros();
   const preview = await coachDraft(datedBlock);
   const opened = chatWorkoutTools.planDraftDocument(preview.draftId);
@@ -1107,9 +1462,13 @@ test("an edit in Coach rewrites the coach's draft, and the card keeps its id", a
   edited.entries[0].dayIndex = 2;
   edited.entries[1].title = "Longer Sunday";
   edited.entries.push({ ...structuredClone(edited.entries[0]), id: "added", weekIndex: 1, dayIndex: 1, sortOrder: 9 });
-  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
-  assert.equal(next.draftId, preview.draftId, "the same card, not a new one");
-  assert.ok(next.editedAt, "marked edited, which is what shows it to the coach");
+  const written = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  assert.equal(written.kind, "written");
+  assert.deepEqual([written.fromVersion, written.toVersion], [1, 2]);
+  const next = written.preview;
+  assert.notEqual(next.draftId, preview.draftId, "a version of its own, beside the coach's");
+  assert.ok(next.editedAt, "marked edited, which is what the card and Coach's index read");
+  assert.ok(written.changes.includes("Easy Monday is now Longer Sunday") || written.changes.some((line) => /Longer Sunday/.test(line)), written.changes.join(" | "));
   assert.deepEqual(
     next.entries.map((entry) => [entry.name, entry.scheduleDate]),
     [
@@ -1121,11 +1480,16 @@ test("an edit in Coach rewrites the coach's draft, and the card keeps its id", a
   );
   assert.equal(new Set(next.entries.map((entry) => entry.key)).size, 3, "a copied session gets a key of its own");
 
-  const reopened = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const reopened = chatWorkoutTools.planDraftDocument(next.draftId);
   assert.deepEqual(
     reopened.entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
     [["Easy Monday", 0, 2], ["Easy Monday", 1, 1], ["Longer Sunday", 1, 6]],
     "opening it again shows the edit"
+  );
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(preview.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+    [[0, 0], [1, 6]],
+    "and the coach's version is still the coach's"
   );
 });
 
@@ -1140,13 +1504,128 @@ test("an undated coach plan keeps the weeks and days the athlete gave it", async
   const edited = structuredClone(opened);
   edited.entries[2].weekIndex = 1;
   edited.entries[2].dayIndex = 5;
-  const next = await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited);
+  const next = (await chatWorkoutTools.savePlanDraftEdit(preview.draftId, edited)).preview;
   assert.ok(next.entries.every((entry) => !entry.scheduleDate), "no date is invented");
   assert.deepEqual(
-    chatWorkoutTools.planDraftDocument(preview.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
+    chatWorkoutTools.planDraftDocument(next.draftId).entries.map((entry) => [entry.weekIndex, entry.dayIndex]),
     [[0, 0], [0, 1], [1, 5]],
     "and the arrangement survives, where the list would have put Three back on Wednesday"
   );
+});
+
+test("a coach's one-off workout is edited as its next version, keeping the day it was suggested for", async () => {
+  fakeCoros();
+  let preview;
+  const response = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "draft_workout",
+      { workout: coachRun("Recovery run", 2100), calendar_date: "20990805" },
+      { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { preview = drafted; } }
+    )
+  );
+  assert.equal(response.ok, true, JSON.stringify(response));
+  assert.equal(preview.artifactType, "workout");
+
+  const edited = {
+    ...coachRun("Shorter recovery", 1500),
+    key: "renamed-by-the-builder",
+    schedule_date: "20991231",
+    save_to_library: true
+  };
+  const next = chatWorkoutTools.saveWorkoutDraftEdit(preview.draftId, edited).preview;
+  assert.notEqual(next.draftId, preview.draftId, "the next version");
+  assert.equal(next.artifactType, "workout");
+  assert.ok(next.editedAt, "marked edited, so the coach is told");
+  assert.equal(next.entries.length, 1);
+  assert.equal(next.entries[0].name, "Shorter recovery");
+  assert.equal(next.entries[0].key, preview.entries[0].key, "the coach's key, not the builder's");
+  assert.equal(next.entries[0].scheduleDate, "2099-08-05", "the day the coach suggested, not one the builder carried");
+  assert.equal("source" in next.entries[0], false, "the card is light; the steps are in the draft");
+  assert.equal(
+    chatWorkoutTools.planDraftDocument(next.draftId).entries[0].workout.steps[0].target_duration_seconds,
+    1500
+  );
+  assert.equal(next.name, "Shorter recovery");
+
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit("not-a-draft", edited),
+    /not found/
+  );
+  const plan = await coachDraft(datedBlock);
+  assert.throws(
+    () => chatWorkoutTools.saveWorkoutDraftEdit(plan.draftId, edited),
+    /a plan, not a single workout/,
+    "a plan is edited in the plan editor"
+  );
+});
+
+test("a programme is placed by week and day, and the draft's answer is short", async () => {
+  fakeCoros();
+  assert.equal(
+    chatWorkoutTools.CHAT_WORKOUT_TOOL_NAMES.includes("upload_training_plan"),
+    false,
+    "the tool that never wrote anything is gone"
+  );
+  const draftTool = (args) =>
+    chatWorkoutTools.handleChatWorkoutTool("draft_training_plan", args, { allowUpcomingWorkouts: false });
+
+  const answer = JSON.parse(
+    await draftTool({
+      name: "Programme",
+      workouts: [
+        coachRun("Tue easy", 2400, { week: 1, day: "tue" }),
+        coachRun("Sat long", 4800, { week: 1, day: "sat" }),
+        coachRun("Wed tempo", 3000, { week: 2, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(answer.ok, true, JSON.stringify(answer));
+  assert.ok(
+    answer.preview.entries.every((entry) => entry.source === undefined),
+    "the steps the model just wrote are not echoed back to it"
+  );
+  assert.match(answer.message, /do not list every session/);
+  assert.match(answer.preview.summary, /^2 weeks · 1–2 sessions a week · Run$/);
+  assert.deepEqual(
+    chatWorkoutTools.planDraftDocument(answer.draft_id).entries.map((entry) => [entry.title, entry.weekIndex, entry.dayIndex]),
+    [["Tue easy", 0, 1], ["Sat long", 0, 5], ["Wed tempo", 1, 2]],
+    "each session sits on its week and day, where a list used to go one a day"
+  );
+
+  const mixed = JSON.parse(
+    await draftTool({
+      name: "Mixed",
+      workouts: [
+        coachRun("Dated", 1800, { schedule_date: "20990803" }),
+        coachRun("Placed", 1800, { week: 1, day: "wed" })
+      ]
+    })
+  );
+  assert.equal(mixed.ok, false, "dates and weeks in one plan have no single reading");
+  assert.match(mixed.errors.join(" "), /not a mix/);
+
+  const half = JSON.parse(
+    await draftTool({ name: "Half", workouts: [coachRun("Only a week", 1800, { week: 2 })] })
+  );
+  assert.equal(half.ok, false);
+  assert.match(half.errors.join(" "), /needs both week/);
+});
+
+test("removing an unsaved creation lets its draft go; a saved one is only hidden", async () => {
+  fakeCoros();
+  const unsaved = await coachDraft(datedBlock);
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+  assert.throws(() => chatWorkoutTools.planDraftDocument(unsaved.draftId), /not found/, "the draft is gone");
+  chatWorkoutTools.discardPlanDraft(unsaved.draftId);
+
+  const saved = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(saved.draftId, "metric", "nativePlan");
+  assert.throws(
+    () => chatWorkoutTools.discardPlanDraft(saved.draftId),
+    /hidden, not removed/,
+    "the plan on COROS names this draft"
+  );
+  assert.ok(chatWorkoutTools.planDraftDocument(saved.draftId), "and it stays");
 });
 
 test("deleting a conversation's drafts lets them go", async () => {

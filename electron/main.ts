@@ -133,7 +133,6 @@ import {
   scheduleLibraryWorkout,
   createAndScheduleWorkout,
   createLibraryWorkout,
-  rescheduleScheduledWorkout,
   removeScheduledWorkout,
   getWorkoutForEdit,
   previewWorkoutEdit,
@@ -163,8 +162,6 @@ import type {
   SaveChatSessionOptions,
   StrengthHistoryRequest,
   TrainingHubStatus,
-  TrainingPlanGenerationRequest,
-  TrainingPlanOutlineRevision,
   UnitSystem,
   WorkoutSport
 } from "./types";
@@ -325,37 +322,48 @@ import {
   getChatAuthStatus,
   getChatSessionEntries,
   getChatSettings,
-  listChatSessionsForProvider,
+  refreshModelCatalogs,
+  listAllChatSessions,
   loginChat,
   logoutChat,
   saveChatSessionEntries,
   saveChatSettings,
   setChatSessionPinnedById,
-  streamChat,
   testClaudeCodeConnection,
   testAnthropicApiConnection,
   testLocalChatConnection,
   testOpenRouterConnection,
   uploadTrainingPlanDraft,
+  editWorkoutDraft,
+  removePlanDraft,
+  listPlanArtifactVersions,
+  restorePlanVersion,
+  syncPlanFromCoros,
+  listPlanCalendarStates,
+  streamConversationTurn,
+  getConversationSettings,
+  setConversationSettings,
+  listConversationPlanBriefs,
+  editPlanBrief,
+  adjustPlanOutline,
+  createPlanBriefForSession,
+  findChatSessionForDraft,
   editPlanDraft,
-  generateTrainingPlan,
-  outlineTrainingPlan,
   getPlanDraftDocument,
-  confirmWorkoutDelete
+  applyScheduleChangeLine,
+  dismissScheduleChangeLine,
+  getScheduleChanges
 } from "./chatService";
 import {
   compactChatSessionContext,
   inspectChatSessionContext
 } from "./chatContextService";
 import { buildBaseCoachInstructions } from "./chatCoachContext";
+import { moveCalendarSession } from "./scheduleMoves";
 import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
-import {
-  hydratePlanDraftStoreFromDatabase,
-  pruneDeleteRequestStore
-} from "./chatWorkoutTools";
 import {
   connectCorosMcp,
   disconnectCorosMcp,
@@ -786,8 +794,6 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
-  hydratePlanDraftStoreFromDatabase();
-  pruneDeleteRequestStore();
   registerIpcHandlers();
   setJobListener((jobs) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1517,6 +1523,12 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("chat:getSettings", () => getChatSettings());
 
+  ipcMain.handle(
+    "chat:refreshModels",
+    (_event, options?: { provider?: ChatProvider; force?: boolean }) =>
+      refreshModelCatalogs(options)
+  );
+
   ipcMain.handle("chat:getBaseCoachInstructions", () =>
     buildBaseCoachInstructions()
   );
@@ -1589,10 +1601,45 @@ function registerIpcHandlers(): void {
   // Kicks off streaming; assistant text is pushed via chat:stream* events.
   ipcMain.handle(
     "chat:send",
-    (_event, requestId: string, messages: ChatMessage[], unitSystem?: UnitSystem) =>
-      streamChat(createWindowSink(mainWindow), requestId, messages, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
+    (
+      _event,
+      requestId: string,
+      messages: ChatMessage[],
+      unitSystem?: UnitSystem,
+      sessionId?: string,
+      pipeline?: import("./types").ChatPipelineStep
+    ) =>
+      streamConversationTurn(
+        createWindowSink(mainWindow),
+        requestId,
+        messages,
+        normalizeUnitSystem(unitSystem),
+        typeof sessionId === "string" && sessionId ? sessionId : undefined,
+        (pipeline?.step === "outline" || pipeline?.step === "sessions") && typeof pipeline.artifactId === "string"
+          ? {
+              step: pipeline.step,
+              artifactId: pipeline.artifactId,
+              ...(typeof pipeline.note === "string" && pipeline.note.trim() ? { note: pipeline.note.trim() } : {})
+            }
+          : undefined
+      )
+  );
+  ipcMain.handle("chat:planBriefs", (_event, artifactIds: string[]) => listConversationPlanBriefs(artifactIds));
+  ipcMain.handle(
+    "chat:updatePlanBrief",
+    (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
+  );
+  ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string, request?: import("./types").PlanBriefRequest) =>
+    createPlanBriefForSession(sessionId, request)
+  );
+  ipcMain.handle("chat:updatePlanOutline", (_event, artifactId: string, outline: unknown) =>
+    adjustPlanOutline(artifactId, outline)
+  );
+  ipcMain.handle("chat:conversationSettings", (_event, sessionId: string) =>
+    getConversationSettings(sessionId)
+  );
+  ipcMain.handle("chat:setConversationSettings", (_event, settings: import("./types").ConversationSettings) =>
+    setConversationSettings(settings)
   );
 
   ipcMain.handle("chat:cancel", (_event, requestId: string) =>
@@ -1621,9 +1668,7 @@ function registerIpcHandlers(): void {
       inspectChatSessionContext(sessionId, entries)
   );
 
-  ipcMain.handle("chat:listSessions", (_event, provider: ChatProvider) =>
-    listChatSessionsForProvider(provider)
-  );
+  ipcMain.handle("chat:listSessions", () => listAllChatSessions());
 
   ipcMain.handle("chat:getSession", (_event, sessionId: string) =>
     getChatSessionEntries(sessionId)
@@ -1851,20 +1896,46 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:planDraftDocument", (_event, draftId: string) => getPlanDraftDocument(draftId));
   ipcMain.handle(
     "chat:editPlanDraft",
-    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem) =>
-      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem))
+    (_event, draftId: string, plan: import("./types").TrainingPlanDocument, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+      editPlanDraft(draftId, plan, normalizeUnitSystem(unitSystem), replaceNewer === true)
   );
-  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string) =>
+  ipcMain.handle("chat:uploadPlanDraft", (_event, draftId: string, unitSystem?: UnitSystem, destination?: import("./types").TrainingPlanDestination, scheduleDate?: string, keepInLibrary?: boolean, options?: import("./types").PlanDraftSaveOptions) =>
     uploadTrainingPlanDraft(
       draftId,
       normalizeUnitSystem(unitSystem),
       destination,
-      scheduleDate
+      scheduleDate,
+      keepInLibrary === true,
+      options
     )
   );
+  ipcMain.handle("chat:planArtifacts", (_event, draftIds: string[]) =>
+    listPlanArtifactVersions(draftIds)
+  );
+  ipcMain.handle("chat:findDraftSession", (_event, draftId: string) => findChatSessionForDraft(draftId));
+  ipcMain.handle("chat:planCalendarState", (_event, draftIds: string[]) =>
+    listPlanCalendarStates(draftIds)
+  );
+  ipcMain.handle("chat:syncPlanFromCoros", (_event, draftId: string, unitSystem: UnitSystem, cacheOnly?: boolean) =>
+    syncPlanFromCoros(draftId, normalizeUnitSystem(unitSystem), cacheOnly === true)
+  );
+  ipcMain.handle("chat:restorePlanVersion", (_event, draftId: string, unitSystem: UnitSystem) =>
+    restorePlanVersion(draftId, normalizeUnitSystem(unitSystem))
+  );
+  ipcMain.handle("chat:removePlanDraft", (_event, draftId: string) =>
+    removePlanDraft(draftId)
+  );
+  ipcMain.handle("chat:editWorkoutDraft", (_event, draftId: string, workout: import("./types").PlanWorkoutEntryInput, unitSystem?: UnitSystem, replaceNewer?: boolean) =>
+    editWorkoutDraft(draftId, workout, normalizeUnitSystem(unitSystem), replaceNewer === true)
+  );
 
-  ipcMain.handle("chat:confirmWorkoutDelete", (_event, requestId: string) =>
-    confirmWorkoutDelete(requestId)
+  // Coach's proposals to the calendar and the library (P3.2–P3.3).
+  ipcMain.handle("chat:scheduleChanges", (_event, changeSetIds: string[]) => getScheduleChanges(changeSetIds));
+  ipcMain.handle("chat:applyScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    applyScheduleChangeLine(changeSetId, lineId)
+  );
+  ipcMain.handle("chat:dismissScheduleChange", (_event, changeSetId: string, lineId?: string) =>
+    dismissScheduleChangeLine(changeSetId, lineId)
   );
 
   ipcMain.handle(
@@ -2018,29 +2089,7 @@ function registerIpcHandlers(): void {
     updateTrainingPlanMetadata(id, patch)
   );
   ipcMain.handle("trainingLibrary:savePlan", (_event, request) => savePlanToCoros(request));
-  // Streams its progress on the chat:stream* channels; stopped with chat:cancel.
-  ipcMain.handle(
-    "trainingLibrary:generatePlan",
-    (_event, requestId: string, request: TrainingPlanGenerationRequest, unitSystem?: UnitSystem) =>
-      generateTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem)
-      })
-  );
-  // The plan's shape before its sessions; the same streams, the same cancel.
-  ipcMain.handle(
-    "trainingLibrary:outlinePlan",
-    (
-      _event,
-      requestId: string,
-      request: TrainingPlanGenerationRequest,
-      unitSystem?: UnitSystem,
-      revision?: TrainingPlanOutlineRevision
-    ) =>
-      outlineTrainingPlan(createWindowSink(mainWindow), requestId, request, {
-        unitSystem: normalizeUnitSystem(unitSystem),
-        ...(revision ? { revision } : {})
-      })
-  );
+
   ipcMain.handle("trainingLibrary:duplicatePlan", (_event, planId: string) =>
     duplicatePlanOnCoros(planId)
   );
@@ -2163,7 +2212,9 @@ function registerIpcHandlers(): void {
         happenDay: string;
       },
       newHappenDay: string
-    ) => rescheduleScheduledWorkout(entry, newHappenDay)
+    ) =>
+      // A plan's session moves through its running copy, or it leaves the plan (P3.0 D).
+      moveCalendarSession(entry, newHappenDay)
   );
 
   ipcMain.handle(

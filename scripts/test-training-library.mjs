@@ -19,7 +19,6 @@ const databaseModule = await import(distUrl("database.js"));
 const library = await import(distUrl("trainingLibraryService.js"));
 const planWorkoutEditor = await import(distUrl("planWorkoutEditor.js"));
 const chatWorkoutTools = await import(distUrl("chatWorkoutTools.js"));
-const generation = await import(distUrl("trainingPlanGeneration.js"));
 
 const makeWorkout = (name, load, seconds = 1_800) => ({
   key: name.toLowerCase().replaceAll(" ", "-"),
@@ -107,20 +106,6 @@ assert.match(trailing[0].message, /2 empty weeks at the end are not kept/, "CORO
 
 // --- the coach's plans ------------------------------------------------------
 
-const usualWeek = (...trainingDays) => ({
-  mode: "days",
-  days: Array.from({ length: 7 }, (_, day) => (trainingDays.includes(day) ? { kind: "train", minutes: 90 } : { kind: "rest" }))
-});
-const generationRequest = {
-  goalKind: "other",
-  goal: "Build durable mountain endurance",
-  sports: ["run", "strength", "swim"],
-  difficulty: "advanced",
-  weeks: 2,
-  startDate: "2026-08-03",
-  week: usualWeek(0, 2),
-  constraints: "Keep Wednesday joint-friendly."
-};
 const generatedDraft = {
   draftId: "typed-draft",
   name: "Mountain durability",
@@ -168,48 +153,6 @@ const generatedDraft = {
     }
   ]
 };
-const generated = generation.trainingPlanFromDraftPreview(generatedDraft, generationRequest);
-assert.equal(generated.origin, "coach");
-assert.equal(generated.coach, undefined, "a generation's draft is discarded, so nothing links back to it");
-assert.equal(generated.startDate, undefined, "a plan has no start date of its own");
-assert.equal(generated.weekCount, 2);
-assert.equal(generated.entries.length, 4);
-assert.equal(generated.entries[0].workout.steps[0].repeat, 4);
-assert.deepEqual(generated.entries[1].workout.steps[0].intensity, { type: "weight", mode: "weight", value: 24, unit: "kg" });
-assert.deepEqual(generated.entries[3].workout.sport_options, { poolLength: { value: 25, unit: "m" } });
-assert.equal(generated.description, "Build durable mountain endurance", "without the coach's own overview, the goal stands in");
-assert.doesNotMatch(generated.description, /Review loads|Two focused weeks|joint-friendly/, "the card's summary, its warnings and the constraints stay off COROS");
-assert.deepEqual(generated.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 0], [0, 2], [1, 0], [1, 2]]);
-
-/* Weeks run Monday to Sunday from the Monday asked for, which is where COROS
-   counts a plan's days from — so a Tuesday session is a Tuesday. */
-const tuesdayDraft = structuredClone(generatedDraft);
-tuesdayDraft.draftId = "tuesday-sessions";
-const tuesdayDates = ["20260804", "20260806", "20260811", "20260813"];
-tuesdayDraft.entries.forEach((entry, index) => {
-  entry.scheduleDate = tuesdayDates[index];
-  entry.source.schedule_date = tuesdayDates[index];
-});
-const tuesdayPlan = generation.trainingPlanFromDraftPreview(tuesdayDraft, {
-  ...generationRequest,
-  week: usualWeek(1, 3)
-});
-assert.deepEqual(tuesdayPlan.entries.map((entry) => [entry.weekIndex, entry.dayIndex]), [[0, 1], [0, 3], [1, 1], [1, 3]]);
-assert.throws(
-  () => generation.trainingPlanFromDraftPreview(tuesdayDraft, generationRequest),
-  /which is a rest day/i
-);
-/* A mid-week start used to be counted in seven-day blocks from that day, so
-   its weeks and COROS's disagreed; a generated plan starts on a Monday. */
-assert.throws(
-  () => generation.trainingPlanFromDraftPreview(tuesdayDraft, { ...generationRequest, startDate: "2026-08-05", week: usualWeek(1, 3) }),
-  /starts on a Monday/i
-);
-assert.throws(
-  () => generation.trainingPlanFromDraftPreview({ ...generatedDraft, entries: generatedDraft.entries.slice(0, 3) }, generationRequest),
-  /week 2 \(from 2026-08-10\) has 1 session; it needs exactly 2/i
-);
-
 const coachLibraryPlan = domain.trainingPlanFromCoachDraftPreview(generatedDraft);
 assert.equal(coachLibraryPlan.origin, "coach");
 assert.equal(coachLibraryPlan.startDate, undefined);

@@ -18,7 +18,8 @@ const {
   restoreChatPlanDraftSources,
   saveChatSession,
   setChatSessionPinned,
-  setChatSessionTitle
+  setChatSessionTitle,
+  setWaitingCounter
 } = await import(`${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`);
 
 /**
@@ -45,7 +46,7 @@ function createMemoryDatabase() {
   return {
     listSessions(provider) {
       return [...rows.values()]
-        .filter((row) => row.provider === provider)
+        .filter((row) => provider === undefined || row.provider === provider)
         .sort(
           (left, right) =>
             new Date(right.updated_at).getTime() -
@@ -519,18 +520,21 @@ for (const analysis of partialCases) {
   );
 }
 
-// An extra field on the marker is not carried through.
+// A field this build does not know rides along on the marker rather than
+// being dropped: a newer build on another machine may have written it, and
+// a save here must not take it away (docs/coach-plan-canvas.md §4, Q4). The
+// four known fields are still validated — the partial cases above.
 const extraFields = parseChatTranscriptJson(
   JSON.stringify([
     {
       kind: "message",
       role: "assistant",
       content: "hi",
-      automation: { ...marker, sessionId: "leaked" }
+      automation: { ...marker, analysisVersion: 2 }
     }
   ])
 );
-assert.deepEqual(extraFields[0].automation, marker);
+assert.deepEqual(extraFields[0].automation, { ...marker, analysisVersion: 2 });
 
 // The shape `runAnalysis` actually writes: four fields, no `bindingId`.
 //
@@ -664,8 +668,10 @@ assert.deepEqual(
 deleteChatSession(traced.id, db);
 
 // Both halves are required: the marker says who looked, `at` says when, and a
-// chip that can answer neither is not worth restoring. The entry is dropped
-// rather than half-rendered, and the turns around it are untouched.
+// chip that can answer neither is not worth restoring. The entry is not
+// half-rendered: it is carried verbatim as an opaque entry, drawn as nothing,
+// so this machine's next save does not take it out of the row (Q4) — it may be
+// a newer build's shape. The turns around it are untouched.
 const brokenTraces = [
   { kind: "automationSilent", at: lookedAt },
   { kind: "automationSilent", analysis: { ...marker, name: "" }, at: lookedAt },
@@ -677,18 +683,20 @@ for (const broken of brokenTraces) {
   const parsed = parseChatTranscriptJson(
     JSON.stringify([{ kind: "message", role: "user", content: "hi" }, broken])
   );
-  assert.equal(parsed.length, 1, `half-formed trace kept: ${JSON.stringify(broken)}`);
+  assert.equal(parsed.length, 2, `half-formed trace carried: ${JSON.stringify(broken)}`);
   assert.equal(parsed[0].kind, "message", "the surrounding turn survives it");
+  assert.equal(parsed[1].kind, "opaque", `not restored as a chip: ${JSON.stringify(broken)}`);
+  assert.deepEqual(parsed[1].raw, JSON.parse(JSON.stringify(broken)), "and kept exactly as the row held it");
 }
 
-// An extra field on the trace is not carried through either.
+// A field this build does not know rides along on the trace too (Q4).
 assert.deepEqual(
   parseChatTranscriptJson(
     JSON.stringify([
-      { kind: "automationSilent", automation: marker, at: lookedAt, note: "leaked" }
+      { kind: "automationSilent", automation: marker, at: lookedAt, note: "newer build" }
     ])
   ),
-  [{ kind: "automationSilent", automation: marker, at: lookedAt }]
+  [{ kind: "automationSilent", automation: marker, at: lookedAt, note: "newer build" }]
 );
 
 // --- append-on-save: the renderer and the runner racing (section 5.6b) -----
@@ -1044,6 +1052,9 @@ assert.deepEqual(restoredVisual[0].preview.sections.hr.series, [
   { elapsed: 300, distance: 1000, hr: 148, cadence: 172, groundTime: 246 }
 ]);
 assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
+// The card reads the sport to draw a ride as speed and a swim in pool units;
+// dropped here, every reopened ride charted its speed as a running pace.
+assert.equal(restoredVisual[0].preview.sportType, 100);
 
 // Removing a creation is a mark on the draft that survives a round trip, and
 // a save that keeps the array's length so `foreignTail` has no tail to put
@@ -1074,6 +1085,76 @@ assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
   assert.equal(
     listChatSessions("claude-code", removedDb)[0].preview,
     "Plan my week"
+  );
+
+  // A card after the words that introduced it does not speak for the
+  // conversation either: its summary ("Run · structured") says nothing.
+  const cardAfterWords = createChatSession("claude-code", removedDb);
+  saveChatSession(
+    cardAfterWords.id,
+    [keptMessage, { kind: "message", role: "assistant", content: "Here it is." }, structuredClone(oneOffWorkoutEntry)],
+    removedDb,
+    { knownEntryCount: 0 }
+  );
+  assert.equal(
+    listChatSessions("claude-code", removedDb).find((row) => row.id === cardAfterWords.id).preview,
+    "Here it is."
+  );
+  // What waits on the athlete (R3): an unanswered question counts from the
+  // transcript; changes and briefs are counted by the caller from their rows.
+  const asking = createChatSession("claude-code", removedDb);
+  saveChatSession(
+    asking.id,
+    [
+      keptMessage,
+      {
+        kind: "coachPrompt",
+        prompt: {
+          promptId: "q",
+          question: "Which day?",
+          choices: [
+            { id: "a", label: "Saturday", response: "Saturday" },
+            { id: "b", label: "Sunday", response: "Sunday" }
+          ],
+          allowCustom: true
+        }
+      },
+      { kind: "scheduleChange", changeSetId: "set-1" },
+      { kind: "planBrief", artifactId: "brief-1" }
+    ],
+    removedDb,
+    { knownEntryCount: 0 }
+  );
+  const seen = [];
+  const counted = listChatSessions(undefined, removedDb, (anchors) => {
+    seen.push(anchors);
+    return { decisions: 2, briefs: 1 };
+  }).find((row) => row.id === asking.id);
+  assert.deepEqual(counted.waiting, { questions: 1, decisions: 2, briefs: 1 });
+  assert.deepEqual(seen.find((anchors) => anchors.changeSetIds.length), { changeSetIds: ["set-1"], briefIds: ["brief-1"] });
+  assert.ok(listChatSessions(undefined, removedDb).length >= 3, "without a provider, every conversation");
+
+  // A registered counter is how every summary counts, not only the list's: a
+  // save answered without it, and the row's badge went out the moment its
+  // conversation was opened (opening saves the transcript back).
+  setWaitingCounter(() => ({ decisions: 2, briefs: 1 }));
+  try {
+    const expected = { questions: 1, decisions: 2, briefs: 1 };
+    assert.deepEqual(listChatSessions(undefined, removedDb).find((row) => row.id === asking.id).waiting, expected);
+    const reopened = saveChatSession(asking.id, readChatSession(asking.id, removedDb), removedDb, { knownEntryCount: 0 });
+    assert.deepEqual(reopened.waiting, expected, "a save answers with what waits, as the list does");
+    assert.deepEqual(setChatSessionTitle(asking.id, "Which day", removedDb).waiting, expected, "and so does a rename");
+    assert.deepEqual(setChatSessionPinned(asking.id, true, removedDb).waiting, expected, "and a pin");
+  } finally {
+    setWaitingCounter(undefined);
+  }
+
+  // With nothing said at all, the card names it.
+  const cardOnly = createChatSession("claude-code", removedDb);
+  saveChatSession(cardOnly.id, [structuredClone(oneOffWorkoutEntry)], removedDb, { knownEntryCount: 0 });
+  assert.equal(
+    listChatSessions("claude-code", removedDb).find((row) => row.id === cardOnly.id).preview,
+    oneOffWorkoutEntry.draft.name
   );
 
   // And a draft that was never removed keeps saying nothing about it, rather

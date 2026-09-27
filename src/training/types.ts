@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type {
+  CoachOpenRequest,
   McpAvailability,
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -214,6 +215,8 @@ export type ActivitiesViewProps = Pick<
    * is the door between them.
    */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
+  /** Asks Coach about the session open, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 };
 
 /**

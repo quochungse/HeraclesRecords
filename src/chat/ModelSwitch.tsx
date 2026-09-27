@@ -1,10 +1,11 @@
 import { KeyRound, Network, Sparkles, Terminal } from "lucide-react";
 import type { ChatProvider } from "../../electron/types";
 import {
-  getModelPickerOptions,
+  withCurrentModel,
   type ChatModelOption
 } from "../../electron/chatModels";
 import { SelectDropdown } from "../components/SelectDropdown";
+import { useModelOptions } from "./modelOptionsContext";
 
 function renderChatGptIcon() {
   return <Sparkles size={14} strokeWidth={2.1} aria-hidden="true" />;
@@ -25,34 +26,25 @@ function renderClaudeApiIcon() {
 export function ModelSwitch({
   provider,
   model,
-  defaultModel,
-  availableModels,
+  options: listed,
   disabled,
   onChange
 }: {
   provider: ChatProvider;
   model: string;
-  /** Model id Claude Code reported using when asked for none, if known. */
-  defaultModel?: string;
-  /** Account model list from the CLI; preferred over the static fallback. */
-  availableModels?: ChatModelOption[];
+  /** The provider's models; read from `ModelOptionsContext` when not given. */
+  options?: ChatModelOption[];
   disabled?: boolean;
   onChange: (model: string) => void;
 }) {
+  // The provider's own list where it has been read, with the chosen model kept
+  // in it even once the provider stops listing it.
+  const modelOptions = useModelOptions();
   if (provider === "local") {
     return null;
   }
 
-  // The CLI list already carries versions and its own "Default (…)" label, so
-  // it needs no relabelling; the static fallback does.
-  const baseOptions = availableModels?.length
-    ? availableModels
-    : getModelPickerOptions(provider, defaultModel);
-  const options: ChatModelOption[] = baseOptions.some(
-    (option) => option.value === model
-  )
-    ? baseOptions
-    : [...baseOptions, { value: model, label: model }];
+  const options: ChatModelOption[] = withCurrentModel(listed ?? modelOptions(provider), model);
   const isClaude = provider === "claude-code" || provider === "claude-api";
   const providerLabel = isClaude
     ? "Claude"

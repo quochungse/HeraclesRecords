@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
+  CoachOpenRequest,
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
@@ -75,6 +76,8 @@ export interface RunningViewProps {
   openRequest?: SportScreenRequest | null;
   /** Taken, so the same run is not re-opened when the athlete closes it. */
   onOpenRequestHandled?: () => void;
+  /** Asks Coach about the run open, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
 /**
@@ -158,7 +161,8 @@ export function RunningView({
   onRetryActivities,
   onOpenOverview,
   openRequest = null,
-  onOpenRequestHandled
+  onOpenRequestHandled,
+  onAskCoach
 }: RunningViewProps) {
   const { unitSystem } = useUnitSystem();
   const [surface, setSurface] = useState<RunSurface | null>(null);
@@ -405,6 +409,7 @@ export function RunningView({
         detailStatus={detailStatus}
         onBack={closeRun}
         onRetry={() => onSelectActivity(selectedRun)}
+        onAskCoach={onAskCoach}
       />
     );
   }
