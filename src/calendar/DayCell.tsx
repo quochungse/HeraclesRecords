@@ -35,6 +35,8 @@ interface DayCellProps {
   onToggleScheduled: (entry: TrainingHubScheduledWorkoutEntry) => void;
   isScheduledSelected: (entry: TrainingHubScheduledWorkoutEntry) => boolean;
   onAdd: (dateKey: string) => void;
+  /** Opens the day: the one thing on it, or the day as a whole (UAT). */
+  onSelectDay: () => void;
   onDropEntry: (payload: CalendarDragPayload, targetDay: string) => void;
   selectionMode: boolean;
   busy: boolean;
@@ -312,6 +314,7 @@ export function DayCell({
   onToggleScheduled,
   isScheduledSelected,
   onAdd,
+  onSelectDay,
   onDropEntry,
   selectionMode,
   busy
@@ -319,6 +322,9 @@ export function DayCell({
   const { unitSystem } = useUnitSystem();
   const [dropTarget, setDropTarget] = useState(false);
   const canReceiveDrop = !day.isPast && !busy && !selectionMode;
+  /* Only a day with something on it opens (UAT); an empty one has nothing to
+     show but its + button. */
+  const opens = !selectionMode && day.pairs.length + day.unplannedActivities.length > 0;
 
   return (
     <div
@@ -328,10 +334,16 @@ export function DayCell({
         !day.inMonth && "is-outside",
         day.isToday && "is-today",
         day.isPast && "is-past",
-        dropTarget && "is-drop-target"
+        dropTarget && "is-drop-target",
+        opens && "is-openable"
       ]
         .filter(Boolean)
         .join(" ")}
+      onClick={(event) => {
+        // A chip or a button inside the cell answers its own press.
+        if (!opens || (event.target as HTMLElement).closest("button")) return;
+        onSelectDay();
+      }}
       onDragOver={(event) => {
         if (
           !canReceiveDrop ||
@@ -369,9 +381,21 @@ export function DayCell({
       }}
     >
       <div className="calendar-day-head">
-        <span className="calendar-day-number">
-          {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}
-        </span>
+        {opens ? (
+          <button
+            type="button"
+            className="calendar-day-number calendar-day-open"
+            onClick={onSelectDay}
+            aria-label={`Open ${day.dateKey}`}
+            title="Open the day"
+          >
+            {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}
+          </button>
+        ) : (
+          <span className="calendar-day-number">
+            {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}
+          </span>
+        )}
         <button
           type="button"
           className="calendar-day-add"

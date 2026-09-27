@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CloudOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
+  CoachOpenRequest,
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
 import type { TrainingHubLoadStatus } from "../training/types";
+import { activityCoachRequest } from "../training/askCoachAbout";
 import {
   ActivityRouteCover,
   hasActivityRoute
@@ -42,6 +44,8 @@ interface RunDetailViewProps {
   onBack: () => void;
   /** Fetches this run's detail again after a failed load. */
   onRetry: () => void;
+  /** Asks Coach about this run, as the Calendar's Ask Coach does. */
+  onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
 /**
@@ -76,7 +80,8 @@ export function RunDetailView({
   detail,
   detailStatus,
   onBack,
-  onRetry
+  onRetry,
+  onAskCoach
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const surface = classifyRunSurface(activity.sportType);
@@ -256,10 +261,22 @@ export function RunDetailView({
       >
         <div className="run-detail-hero-content">
           <header className="run-detail-header">
-            <button type="button" className="run-detail-back" onClick={onBack}>
-              <ArrowLeft size={16} aria-hidden="true" />
-              <span>Running</span>
-            </button>
+            <div className="run-detail-header-bar">
+              <button type="button" className="run-detail-back" onClick={onBack}>
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>Running</span>
+              </button>
+              {onAskCoach ? (
+                <button
+                  type="button"
+                  className="ghost-button activity-ask-coach"
+                  onClick={() => onAskCoach(activityCoachRequest({ ...activity, sportName: activity.sportName ?? "Run" }, unitSystem))}
+                >
+                  <MessageCircle size={15} aria-hidden="true" />
+                  Ask Coach
+                </button>
+              ) : null}
+            </div>
             <div className="run-detail-title">
               <p className="running-eyebrow">
                 {surface ? RUN_SURFACE_LABELS[surface] : "Run"} ·{" "}

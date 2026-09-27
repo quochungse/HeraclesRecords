@@ -372,6 +372,12 @@ export default function App() {
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
   const [coachPrefill, setCoachPrefill] = useState<string | CoachOpenRequest | null>(null);
+  /* Ask Coach from a screen that shows a session (Calendar, Activities,
+     Running, Strength): Coach opens and asks where the question goes. */
+  const askCoach = useCallback((request: CoachOpenRequest) => {
+    setCoachPrefill(request);
+    setActiveView("coach");
+  }, []);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const [activeMediaTab, setActiveMediaTab] = useSelectionPreference(
     MEDIA_TAB_PREFERENCE,
@@ -2829,6 +2835,7 @@ export default function App() {
                     setSportScreenRequest(request);
                     setActiveView(request.view);
                   }}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -2895,6 +2902,7 @@ export default function App() {
                       : null
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -2913,6 +2921,7 @@ export default function App() {
                       : null
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onAskCoach={askCoach}
                 />
               </Suspense>
             ) : null}
@@ -3023,6 +3032,7 @@ export default function App() {
                     onActivityChange={setCoachStreaming}
                     pendingPrompt={coachPrefill}
                     onPendingPromptConsumed={() => setCoachPrefill(null)}
+                    onMessage={setMessage}
                     active={activeView === "coach"}
                   />
                 </Suspense>

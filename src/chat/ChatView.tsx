@@ -375,6 +375,8 @@ interface LiveAnalysisRun {
 interface ChatViewProps {
   api: CorosLinkApi | undefined;
   onError: (message: string | null) => void;
+  /** An informational toast (UAT): a send refused while another conversation answers. */
+  onMessage?: (message: string | null) => void;
   onPlanUploaded?: () => void;
   /** Fires when a coach request is in progress (streaming or exporting). */
   onActivityChange?: (active: boolean) => void;
@@ -686,6 +688,7 @@ function isAutomaticOutlineStep(timeline: readonly ChatEntry[], index: number): 
 export function ChatView({
   api,
   onError,
+  onMessage,
   onPlanUploaded,
   onActivityChange,
   pendingPrompt,
@@ -709,6 +712,9 @@ export function ChatView({
   const [analysesVersion, setAnalysesVersion] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [timeline, setTimeline] = useState<ChatEntry[]>([]);
+  // The timeline as last drawn, for parking a turn when its conversation is left.
+  const timelineRef = useRef<ChatEntry[]>([]);
+  timelineRef.current = timeline;
   /**
    * How many stored entries this window's timeline accounts for (5.6b). A run
    * writing from the main process appends past that point, and the store keeps
@@ -726,12 +732,26 @@ export function ChatView({
     Map<string, CoachAnalysisSessionAttention>
   >(new Map());
   const [streaming, setStreaming] = useState(false);
+  /*
+   * The conversation a running turn belongs to (UAT): the athlete may open
+   * another while Coach answers. The turn keeps writing to its own
+   * conversation — parked in `parkedTurnRef` while another is on screen —
+   * and only its conversation draws it.
+   */
+  const [turnSessionId, setTurnSessionId] = useState<string | null>(null);
+  const turnSessionIdRef = useRef<string | null>(null);
+  const parkedTurnRef = useRef<{ sessionId: string; timeline: ChatEntry[]; base: number } | null>(null);
   /** A pipeline step's turn while it runs, and its trail (P2.3). */
   const [stepRun, setStepRun] = useState<StepRun | null>(null);
   const advanceStep = (requestId: string, event: Parameters<typeof stepRunEvent>[1]) =>
     setStepRun((current) => (current?.requestId === requestId ? stepRunEvent(current, event) : current));
   useEffect(() => {
-    if (!streaming) setStepRun(null);
+    if (streaming) return;
+    setStepRun(null);
+    // The turn has ended, parked or not: its conversation holds it now.
+    turnSessionIdRef.current = null;
+    parkedTurnRef.current = null;
+    setTurnSessionId(null);
   }, [streaming]);
   /** A summariser turn is running ahead of the athlete's own. */
   const [compacting, setCompacting] = useState(false);
@@ -1201,8 +1221,10 @@ export function ChatView({
     setAskPending(null);
     if (!pending || !api) return;
     const { request, suggestedId } = pending;
-    if (streaming || exportingLatestActivity) {
-      onError("Coach is still answering. Ask again when it has finished.");
+    // Pointing at something waits by the composer and sends nothing, so it
+    // may land while Coach answers elsewhere; the send is what waits.
+    if (exportingLatestActivity) {
+      onError("Coach is still busy. Ask again when it has finished.");
       return;
     }
     if (sessionId === null) await handleNewChat();
@@ -1276,8 +1298,13 @@ export function ChatView({
     composerDraftRef.current = draft?.text ?? "";
     composerRef.current?.setDraft(draft?.text ?? "");
     setUploadedPlans({});
-    pendingCoachPromptsRef.current = [];
-    resumedCoachPromptRef.current = null;
+    // A turn still running keeps its own state: it may have been left for
+    // another conversation, and its question cards and the card it resumed
+    // belong to it, not to whatever is on screen (UAT).
+    if (!activeRequestIdRef.current) {
+      pendingCoachPromptsRef.current = [];
+      resumedCoachPromptRef.current = null;
+    }
   };
 
   const persistHistory = (
@@ -1329,6 +1356,57 @@ export function ChatView({
       return;
     }
     persistTimeoutRef.current = setTimeout(run, 300);
+  };
+
+  /**
+   * Where a running turn writes (UAT): the timeline on screen while its
+   * conversation is, and its parked copy while the athlete reads another.
+   * A parked turn is saved against its own conversation with its own base,
+   * never through `persistHistory`, whose base describes the one on screen.
+   */
+  const turnTimeline = (update: (prev: ChatEntry[]) => ChatEntry[]) => {
+    const parked = parkedTurnRef.current;
+    if (parked) {
+      parked.timeline = update(parked.timeline);
+      return;
+    }
+    setTimeline(update);
+  };
+  const persistTurn = (entries: ChatEntry[]) => {
+    const parked = parkedTurnRef.current;
+    if (!parked) {
+      persistHistory(activeSessionIdRef.current, entries, true);
+      return;
+    }
+    if (!api) return;
+    const persisted = toPersistedEntries(entries);
+    const knownEntryCount = parked.base;
+    parked.base = persisted.length;
+    const saved: Promise<void> = api
+      .saveChatSession(parked.sessionId, persisted, { knownEntryCount })
+      .then((summary) => {
+        if (!summary) return;
+        setSessions((current) =>
+          [summary, ...current.filter((session) => session.id !== summary.id)].sort(
+            (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+          )
+        );
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inFlightSavesRef.current.delete(saved);
+      });
+    inFlightSavesRef.current.add(saved);
+  };
+  /**
+   * Leaving the conversation a turn is running in parks the turn: its
+   * timeline goes with it, and what the stream says from here lands there.
+   */
+  const parkTurnIfLeaving = () => {
+    const turnSession = turnSessionIdRef.current;
+    if (!activeRequestIdRef.current || !turnSession || parkedTurnRef.current) return;
+    if (turnSession !== activeSessionIdRef.current) return;
+    parkedTurnRef.current = { sessionId: turnSession, timeline: timelineRef.current, base: persistedBaseRef.current };
   };
 
   /**
@@ -1390,6 +1468,21 @@ export function ChatView({
 
   const loadSession = async (sessionId: string) => {
     if (!api) return;
+    parkTurnIfLeaving();
+    // Coming back to the conversation a turn is running in: its own timeline,
+    // as the stream has kept it, rather than the row — which holds only the
+    // question until the turn ends.
+    const parked = parkedTurnRef.current;
+    if (parked && parked.sessionId === sessionId) {
+      parkedTurnRef.current = null;
+      await flushPendingSave();
+      persistedBaseRef.current = parked.base;
+      setTimeline(parked.timeline);
+      resetEphemeralChatState(sessionId);
+      setActiveSessionId(sessionId);
+      void markSessionRead(sessionId);
+      return;
+    }
     try {
       // The conversation being left may still owe the row a save, and that
       // save carries `persistedBaseRef` — which is about to start describing a
@@ -1768,9 +1861,12 @@ export function ChatView({
   }, [api]);
 
   useEffect(() => {
-    if (!api || checkingAuth || streaming || !activeSessionId) return;
+    // Held while the turn on screen runs; another conversation's turn does
+    // not hold this one's saves.
+    if (!api || checkingAuth || !activeSessionId) return;
+    if (streaming && turnSessionId === activeSessionId) return;
     persistHistory(activeSessionId, timeline);
-  }, [api, checkingAuth, streaming, timeline, activeSessionId]);
+  }, [api, checkingAuth, streaming, turnSessionId, timeline, activeSessionId]);
 
   useEffect(() => {
     onActivityChange?.(streaming || exportingLatestActivity);
@@ -1928,14 +2024,14 @@ export function ChatView({
       const originalPrompt = resumedCoachPromptRef.current;
       resumedCoachPromptRef.current = null;
       if (!originalPrompt) return;
-      setTimeline((prev) => {
+      turnTimeline((prev) => {
         const next = prev.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
             ? { ...entry, prompt: originalPrompt }
             : entry
         );
-        persistHistory(activeSessionIdRef.current, next, true);
+        persistTurn(next);
         return next;
       });
     };
@@ -1964,9 +2060,9 @@ export function ChatView({
         // A card the turn produced before Stop is on screen and has a draft
         // behind it; unsaved, it dropped out of the conversation on reload
         // while its draft stayed.
-        setTimeline((prev) => {
+        turnTimeline((prev) => {
           if (prev.length > turnStartRef.current) {
-            persistHistory(activeSessionIdRef.current, prev, true);
+            persistTurn(prev);
           }
           return prev;
         });
@@ -1974,7 +2070,7 @@ export function ChatView({
       }
       resumedCoachPromptRef.current = null;
       if (finalText || coachPrompts.length > 0) {
-        setTimeline((prev) => {
+        turnTimeline((prev) => {
           const closing: ChatEntry[] = [];
           if (source?.mcpError) {
             closing.push({ kind: "toolNotice", message: source.mcpError });
@@ -1999,7 +2095,7 @@ export function ChatView({
             next = upsertCoachPromptEntry(next, prompt);
           }
           markSettled(prev, next);
-          persistHistory(activeSessionIdRef.current, next, true);
+          persistTurn(next);
           return next;
         });
       }
@@ -2062,14 +2158,14 @@ export function ChatView({
           };
           setCurrentSource(sourceRef.current);
         } else if (payload.kind === "planDraft") {
-          setTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
+          turnTimeline((prev) => upsertPlanDraftEntry(prev, payload.draft));
         } else if (payload.kind === "planEvent") {
-          setTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
+          turnTimeline((prev) => [...prev, { kind: "planEvent", event: payload.event }]);
         } else if (payload.kind === "planBrief") {
           const brief = payload.brief;
           setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
           // Filling in a brief already on screen changes its card, not the timeline.
-          setTimeline((prev) =>
+          turnTimeline((prev) =>
             prev.some((entry) => entry.kind === "planBrief" && entry.artifactId === brief.artifactId)
               ? prev
               : [...prev, { kind: "planBrief", artifactId: brief.artifactId }]
@@ -2080,7 +2176,7 @@ export function ChatView({
           setPlanBriefs((current) => ({ ...current, [brief.artifactId]: brief }));
           if (outlineVersion !== undefined) {
             // A turn whose outline is accepted twice rewrites its version, not its anchor.
-            setTimeline((prev) =>
+            turnTimeline((prev) =>
               prev.some(
                 (entry) =>
                   entry.kind === "planOutline" &&
@@ -2094,22 +2190,22 @@ export function ChatView({
         } else if (payload.kind === "scheduleChange") {
           const changeSet = payload.changeSet;
           setScheduleChanges((current) => ({ ...current, [changeSet.changeSetId]: changeSet }));
-          setTimeline((prev) =>
+          turnTimeline((prev) =>
             prev.some((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSet.changeSetId)
               ? prev
               : [...prev, { kind: "scheduleChange", changeSetId: changeSet.changeSetId }]
           );
         } else if (payload.kind === "activityVisual") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertActivityVisualEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertActivityVisualEntry(prev, payload.preview));
           }
         } else if (payload.kind === "fitnessTrend") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertFitnessTrendEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertFitnessTrendEntry(prev, payload.preview));
           }
         } else if (payload.kind === "hrZoneSummary") {
           if (chatSettings.visualizationsEnabled) {
-            setTimeline((prev) => upsertHrZoneEntry(prev, payload.preview));
+            turnTimeline((prev) => upsertHrZoneEntry(prev, payload.preview));
           }
         } else if (payload.kind === "coachPrompt") {
           pendingCoachPromptsRef.current = [
@@ -2192,7 +2288,7 @@ export function ChatView({
           // next reload, and the athlete should not take a truncated answer
           // for a finished one.
           resumedCoachPromptRef.current = null;
-          setTimeline((prev) => {
+          turnTimeline((prev) => {
             let next = settleTurnEntries(
               prev,
               turnStartRef.current,
@@ -2218,7 +2314,7 @@ export function ChatView({
               message: `Coach stopped before finishing: ${payload.message}`
             });
             markSettled(prev, next);
-            persistHistory(activeSessionIdRef.current, next, true);
+            persistTurn(next);
             return next;
           });
         } else {
@@ -2407,12 +2503,13 @@ export function ChatView({
   };
 
   const handleNewChat = async () => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api || exportingLatestActivity) return;
     onError(null);
     if (openConversationIsBlank()) {
       requestAnimationFrame(() => composerRef.current?.focus());
       return;
     }
+    parkTurnIfLeaving();
     try {
       // The conversation being left may still owe its row a save; see loadSession.
       await flushPendingSave();
@@ -2428,7 +2525,9 @@ export function ChatView({
   };
 
   const handleSelectSession = async (sessionId: string) => {
-    if (!api || streaming || exportingLatestActivity || sessionId === activeSessionId) {
+    // Open while Coach answers elsewhere (UAT): the turn carries on in its own
+    // conversation. Only an activity export holds the list.
+    if (!api || exportingLatestActivity || sessionId === activeSessionId) {
       return;
     }
     onError(null);
@@ -2477,7 +2576,11 @@ export function ChatView({
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!api || streaming || exportingLatestActivity) return;
+    if (!api || exportingLatestActivity) return;
+    if (streaming && sessionId === turnSessionIdRef.current) {
+      onMessage?.("Coach is answering in that conversation. Delete it when it has finished.");
+      return;
+    }
     onError(null);
     try {
       await api.deleteChatSession(sessionId);
@@ -2760,7 +2863,18 @@ export function ChatView({
     /** A step of the plan pipeline (P2.2): the words shown, the step's turn sent. */
     pipeline?: ChatPipelineStep
   ): Promise<boolean> => {
-    if (!api || !trimmed || streaming || exportingLatestActivity) return false;
+    if (!api || !trimmed || exportingLatestActivity) return false;
+    if (streaming) {
+      // One turn at a time (UAT review): the view holds one turn's state, so a
+      // second conversation cannot answer while another does.
+      if (turnSessionIdRef.current !== activeSessionIdRef.current) {
+        const other = sessions.find((session) => session.id === turnSessionIdRef.current)?.title;
+        onMessage?.(
+          `Coach is still answering${other ? ` in "${other}"` : " in another conversation"}. Send this when it has finished.`
+        );
+      }
+      return false;
+    }
     if (isLatestActivityFileRequest(trimmed)) {
       await handleLatestActivityFileRequest(trimmed);
       return true;
@@ -2849,6 +2963,8 @@ export function ChatView({
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
+    turnSessionIdRef.current = activeSessionIdRef.current;
+    setTurnSessionId(activeSessionIdRef.current);
     setStepRun({ requestId, step: pipeline?.step ?? "turn", notes: EMPTY_NOTES, attempts: 0 });
     turnStartRef.current = nextEntries.length;
     resumedCoachPromptRef.current = originalPrompt;
@@ -2997,8 +3113,15 @@ export function ChatView({
     composerRef.current?.focus();
   };
 
+  /* Stop is asked of the main process and answered when the turn ends, which
+     can be a moment; the button says it heard in the meantime. */
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => {
+    if (!streaming) setStopping(false);
+  }, [streaming]);
   const handleStop = () => {
     if (!api || !activeRequestIdRef.current) return;
+    setStopping(true);
     void api.cancelChat(activeRequestIdRef.current);
     // A turn still being compacted has not reached a provider, so there is no
     // stream for the cancel above to find and no `chat:streamError` coming to
@@ -3329,6 +3452,9 @@ export function ChatView({
   const isChatGptProvider = chatSettings.provider === "chatgpt";
   const localModelConfigured = chatSettings.local.model.trim().length > 0;
   const isBusy = streaming || exportingLatestActivity;
+  /* A turn running in the conversation on screen, or in another one (UAT). */
+  const turnHere = streaming && turnSessionId === activeSessionId;
+  const turnElsewhere = streaming && turnSessionId !== activeSessionId;
   const waitingForCoachAnswer = [...timeline]
     .reverse()
     .some(
@@ -3671,7 +3797,9 @@ export function ChatView({
     overlay: false,
     sessions,
     activeSessionId,
-    busy: isBusy,
+    // The list stays open while Coach answers (UAT); the answering row says so.
+    busy: exportingLatestActivity,
+    answeringSessionId: streaming ? turnSessionId : null,
     attention: sessionAttention,
     compactingSessionId,
     onClose: () => void handleUpdateChatSettings({ sidebarOpen: false }),
@@ -4134,7 +4262,7 @@ function AnalysisSilentChip({
      own at the very end, under whatever the step has produced so far — above
      a chart the step drew, it read as finished while it was still working.
      The step's words, when it has any, still stand where the turn began. */
-  const runLive = Boolean(streaming && stepRun && stepRun.requestId === activeRequestIdRef.current);
+  const runLive = Boolean(turnHere && stepRun && stepRun.requestId === activeRequestIdRef.current);
   const stepActive = runLive && stepRun?.step !== "turn";
   /* An ordinary turn shows its trail — a line per read, in the athlete's
      words — until the answer's words arrive (R1): it used to be one line
@@ -4173,7 +4301,7 @@ function AnalysisSilentChip({
       <div className="chat-bubble chat-bubble-streaming">{children}</div>
     </div>
   );
-  const streamingRow = !streaming
+  const streamingRow = !turnHere
     ? null
     : stepActive
       ? streamedAnswer
@@ -4261,7 +4389,7 @@ function AnalysisSilentChip({
         <div className="chat-thread">
           {/* What waits on the athlete here (R3), as a bar that jumps to each
               in turn: a question, a change to decide, a brief not yet a plan. */}
-          {waitingIndices.length && !streaming ? (
+          {waitingIndices.length && !turnHere ? (
             <button
               type="button"
               className="chat-waiting-bar"
@@ -4279,7 +4407,7 @@ function AnalysisSilentChip({
               · Jump ↓
             </button>
           ) : null}
-          {timeline.length === 0 && !streaming ? (
+          {timeline.length === 0 && !turnHere ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">
                 <Sparkles size={28} aria-hidden="true" />
@@ -4898,7 +5026,17 @@ function AnalysisSilentChip({
             followUps={composerFollowUps}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
-            streaming={streaming}
+            streaming={turnHere}
+            blockedReason={
+              turnElsewhere
+                ? `Coach is answering in "${sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"}"`
+                : undefined
+            }
+            onBlocked={() =>
+              onMessage?.(
+                `Coach is still answering in "${sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"}". Send this when it has finished.`
+              )
+            }
             exportingLatestActivity={exportingLatestActivity}
             waitingForCoachAnswer={waitingForCoachAnswer}
             isLocalProvider={isLocalProvider}
@@ -4906,6 +5044,7 @@ function AnalysisSilentChip({
             onDraftChange={handleComposerDraftChange}
             onSend={sendMessage}
             onStop={handleStop}
+            stopping={stopping}
           />
         </div>
         {workbenchOpen ? (

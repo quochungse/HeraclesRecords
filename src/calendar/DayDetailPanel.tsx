@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { MessageCircle, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, MessageCircle, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -10,7 +10,12 @@ import type { CorosLinkApi } from "../coroslink-api";
 import { ActivityDetailPanel } from "../training/components/ActivityDetailPanel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { formatHappenDayLabel } from "../training/formatters";
-import { scheduledWorkoutKey, type CalendarSelection } from "./calendarTypes";
+import {
+  scheduledWorkoutKey,
+  type CalendarItemSelection,
+  type CalendarSelection
+} from "./calendarTypes";
+import { DayOverview } from "./DayOverview";
 import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
@@ -24,6 +29,10 @@ interface DayDetailPanelProps {
   /** Settles once the removal has been answered, whichever way. */
   onDelete: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => Promise<void>;
   onAskCoach: (selection: CalendarSelection) => void;
+  /** Opens one thing on a day read as a whole. */
+  onOpenItem: (item: CalendarItemSelection) => void;
+  /** Back to the day a thing was opened from, when it was. */
+  onBackToDay?: () => void;
   onEdit: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => void;
   /** Re-reads the range after a manual plan-status change. */
   onReload: () => void;
@@ -37,6 +46,8 @@ export function DayDetailPanel({
   onClose,
   onDelete,
   onAskCoach,
+  onOpenItem,
+  onBackToDay,
   onEdit,
   onReload,
   onError
@@ -79,8 +90,17 @@ export function DayDetailPanel({
   const selectionKey = selection
     ? selection.kind === "scheduled"
       ? `scheduled:${scheduledWorkoutKey(selection.entry)}`
-      : `activity:${selection.activity.activityId}`
+      : selection.kind === "activity"
+        ? `activity:${selection.activity.activityId}`
+        : `day:${selection.day.dateKey}`
     : "";
+  const selectionTitle = !selection
+    ? ""
+    : selection.kind === "scheduled"
+      ? selection.entry.name
+      : selection.kind === "activity"
+        ? (selection.activity.name ?? selection.activity.sportName ?? "Activity")
+        : formatHappenDayLabel(selection.day.dateKey);
 
   useEffect(() => {
     setConfirmDelete(false);
@@ -170,13 +190,7 @@ export function DayDetailPanel({
               className="calendar-detail-panel"
               role="dialog"
               aria-modal="true"
-              aria-label={
-                selection.kind === "scheduled"
-                  ? selection.entry.name
-                  : (selection.activity.name ??
-                    selection.activity.sportName ??
-                    "Activity")
-              }
+              aria-label={selectionTitle}
               tabIndex={-1}
               initial={{ x: "104%" }}
               animate={{ x: 0 }}
@@ -185,20 +199,30 @@ export function DayDetailPanel({
             >
               <header className="calendar-detail-header">
                 <div>
-                  <p className="eyebrow">
-                    {formatHappenDayLabel(
-                      selection.kind === "scheduled"
-                        ? selection.entry.happenDay
-                        : selection.day.dateKey
-                    )}
-                  </p>
-                  <h3>
-                    {selection.kind === "scheduled"
-                      ? selection.entry.name
-                      : selection.activity.name ??
-                        selection.activity.sportName ??
-                        "Activity"}
-                  </h3>
+                  {selection.kind !== "day" && onBackToDay ? (
+                    <button
+                      type="button"
+                      className="calendar-detail-back"
+                      onClick={onBackToDay}
+                      aria-label={`Back to ${formatHappenDayLabel(selection.day.dateKey)}`}
+                    >
+                      <ArrowLeft size={13} aria-hidden="true" />
+                      {formatHappenDayLabel(selection.day.dateKey)}
+                    </button>
+                  ) : (
+                    <p className="eyebrow">
+                      {selection.kind === "day"
+                        ? selection.day.isToday
+                          ? "Today"
+                          : "Day"
+                        : formatHappenDayLabel(
+                            selection.kind === "scheduled"
+                              ? selection.entry.happenDay
+                              : selection.day.dateKey
+                          )}
+                    </p>
+                  )}
+                  <h3>{selectionTitle}</h3>
                 </div>
                 <div className="calendar-detail-actions">
                   <button
@@ -250,7 +274,9 @@ export function DayDetailPanel({
               </header>
 
               <div className="calendar-detail-body">
-                {selection.kind === "scheduled" ? (
+                {selection.kind === "day" ? (
+                  <DayOverview day={selection.day} onOpen={onOpenItem} />
+                ) : selection.kind === "scheduled" ? (
                   <>
                     {planPair ? (
                       <PlanStatusBlock

@@ -1,4 +1,4 @@
-import { AtSign, Send, Square } from "lucide-react";
+import { AtSign, Loader2, Send, Square } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -53,6 +53,12 @@ interface ChatComposerProps {
   initialDraft: string;
   apiAvailable: boolean;
   streaming: boolean;
+  /** Stop was pressed and the turn has not ended yet. */
+  stopping?: boolean;
+  /** Why sending waits: another conversation's turn is running (UAT). */
+  blockedReason?: string;
+  /** A send tried while blocked: the view says why, as a toast. */
+  onBlocked?: () => void;
   exportingLatestActivity: boolean;
   waitingForCoachAnswer: boolean;
   isLocalProvider: boolean;
@@ -84,6 +90,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       initialDraft,
       apiAvailable,
       streaming,
+      stopping = false,
+      blockedReason,
+      onBlocked,
       exportingLatestActivity,
       waitingForCoachAnswer,
       isLocalProvider,
@@ -146,6 +155,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
     }, [aboutOpen]);
 
     const submitDraft = async () => {
+      if (blockedReason && trimmedDraft) {
+        // The words stay; only the send waits.
+        onBlocked?.();
+        return;
+      }
       if (
         !apiAvailable ||
         !trimmedDraft ||
@@ -270,26 +284,36 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
             {streaming ? (
               <button
                 type="button"
-                className="chat-send chat-stop"
+                className={`chat-send chat-stop${stopping ? " is-stopping" : ""}`}
                 onClick={onStop}
-                title="Stop"
-                aria-label="Stop"
+                disabled={stopping}
+                title={stopping ? "Stopping…" : "Stop"}
+                aria-label={stopping ? "Stopping" : "Stop"}
               >
-                <Square size={14} aria-hidden="true" />
+                {stopping ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <Square size={14} aria-hidden="true" />
+                )}
               </button>
             ) : (
               <button
                 type="button"
-                className="chat-send"
+                className={`chat-send${trimmedDraft && !localProviderBlocked && !blockedReason ? " is-ready" : ""}`}
                 onClick={() => void submitDraft()}
                 disabled={
                   !apiAvailable ||
+                  Boolean(blockedReason) ||
                   !trimmedDraft ||
                   exportingLatestActivity ||
                   localProviderBlocked
                 }
                 title={
-                  localProviderBlocked ? "Enter a local model first" : "Send"
+                  blockedReason
+                    ? `${blockedReason}. Send when it has finished.`
+                    : localProviderBlocked
+                      ? "Enter a local model first"
+                      : "Send"
                 }
                 aria-label="Send"
               >

@@ -111,7 +111,11 @@ function chatRowAnswer(method: string, args: unknown[]): unknown | undefined {
   if (!id) return undefined;
   if (method === "saveChatSession") {
     chatRows.set(id, (args[1] as unknown[]) ?? []);
-    return { id, title: "row", updatedAt: new Date().toISOString() };
+    // The conversation keeps its own title, as the real store's summary does.
+    const listed = Array.isArray(script.listChatSessions)
+      ? (script.listChatSessions as Array<{ id?: string; title?: string }>).find((session) => session.id === id)
+      : undefined;
+    return { id, title: listed?.title ?? "row", updatedAt: new Date().toISOString() };
   }
   if (method === "getChatSession") {
     return chatRows.get(id) ?? (scriptedAnswer(method, args) as unknown[]) ?? [];
@@ -547,6 +551,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       onActivityChange={spy("onActivityChange") as (active: boolean) => void}
       pendingPrompt={options.pendingPrompt as ComponentProps<typeof ChatView>["pendingPrompt"]}
       onPendingPromptConsumed={spy("onPendingPromptConsumed") as () => void}
+      onMessage={spy("onMessage") as (message: string | null) => void}
     />
     );
   },

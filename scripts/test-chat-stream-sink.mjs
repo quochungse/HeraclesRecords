@@ -26,7 +26,7 @@ Module._load = function patchedLoad(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 
-const { countableUsage, createCollectorSink, createWindowSink } = require(
+const { countableUsage, createCollectorSink, createWindowSink, untilAborted } = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
 );
 const { parseChatTranscriptJson } = require(
@@ -502,6 +502,38 @@ assert.deepEqual(persisted[0].automation, marker);
     /const addUsage = \([^)]*\) => \{\s*\n\s*const counted = countableUsage\(round\);/,
     "every tool round's report must go through the same rule"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Stop reaches a turn still being prepared (UAT #12)
+// ---------------------------------------------------------------------------
+// The status check, the MCP connections and the snapshot run before any
+// provider is asked, and a Stop pressed then was lost: nothing listened, and
+// a provider handed a signal already aborted never hears its event.
+{
+  const controller = new AbortController();
+  const slow = new Promise((resolve) => setTimeout(() => resolve("late"), 5000));
+  const started = Date.now();
+  const waiting = untilAborted(slow, controller.signal);
+  setTimeout(() => controller.abort(), 20);
+  await assert.rejects(waiting, /cancelled/);
+  assert.ok(Date.now() - started < 1000, "a step gives way when Stop is pressed, not when it finishes");
+
+  const already = new AbortController();
+  already.abort();
+  await assert.rejects(untilAborted(Promise.resolve(1), already.signal), /cancelled/, "an abort before the step starts counts too");
+
+  assert.equal(await untilAborted(Promise.resolve(7), new AbortController().signal), 7, "an untouched step passes through");
+  await assert.rejects(untilAborted(Promise.reject(new Error("boom")), new AbortController().signal), /boom/);
+
+  const whole = readSource(repoRoot, "electron", "chatService.ts");
+  const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
+  for (const step of ["inspectClaudeCodeStatus", "ensureAllMcpConnected", "buildTrainingContext", "getValidToken"]) {
+    assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
+    assert.match(turn, new RegExp(`await prepare\\(${step}\\(`), `${step} is prepared in a turn`);
+  }
+  const provider = readSource(repoRoot, "electron", "claudeCodeProvider.ts");
+  assert.match(provider, /if \(options\.signal\.aborted\)/, "the Claude provider checks a signal aborted before it was called");
 }
 
 Module._load = originalLoad;

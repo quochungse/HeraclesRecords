@@ -720,6 +720,12 @@ export async function streamClaudeCodeCompletion(
     controller.abort();
   };
   options.signal.addEventListener("abort", onAbort, { once: true });
+  // A signal aborted before this was called never fires its event, so a Stop
+  // pressed while the turn was being prepared would run the whole turn.
+  if (options.signal.aborted) {
+    options.signal.removeEventListener("abort", onAbort);
+    throw new ClaudeCodeProviderError("Claude request cancelled.", "cancelled");
+  }
   // Inactivity timeout: long agent turns (tool calls, plan drafting) are fine
   // as long as the stream keeps producing; only abort when it goes quiet.
   const idleTimeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;

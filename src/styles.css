@@ -17589,11 +17589,16 @@ tr.data-intervals-row-missing {
   background: var(--error-bg);
 }
 
-.chat-sidebar-busy {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  color: var(--accent-strong);
+/* The conversation Coach is answering in (UAT): the row says so in place of
+   its time, and the rest of the list stays open. */
+.chat-session-row-answering {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--chat-signal, var(--text-secondary));
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .chat-settings-panel {
@@ -24218,6 +24223,34 @@ tr.data-intervals-row-missing {
   color: var(--accent-strong);
 }
 
+/* A day with something on it opens as a whole (UAT); an empty one does not,
+   so only these take the pointer. Its number is the keyboard's way in. */
+.calendar-day.is-openable {
+  cursor: pointer;
+}
+
+.calendar-day-open {
+  padding: 0 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calendar-day-open:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.calendar-day-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .calendar-day-add {
   display: inline-flex;
   align-items: center;
@@ -24520,6 +24553,36 @@ tr.data-intervals-row-missing {
   border-color: var(--accent);
 }
 
+/* Ask Coach on a session's own screen (Activities, Running, Strength): the
+   Calendar's ghost button, which is scoped to the calendar's surfaces. */
+.activity-ask-coach {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.activity-ask-coach:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.activity-ask-coach:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* --- shared ghost button (scoped to calendar surfaces) --- */
 
 .calendar-view .ghost-button,
@@ -24617,6 +24680,134 @@ tr.data-intervals-row-missing {
   min-height: 0;
   overflow-y: auto;
   padding: 18px 20px;
+}
+
+/* Back to the day a thing was opened from, where the date would be. */
+.calendar-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 0 -4px;
+  padding: 2px 6px 2px 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.calendar-detail-back:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.calendar-detail-back:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A day read as a whole: its totals, then a row for each thing on it. */
+.calendar-day-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.calendar-day-overview-totals {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.calendar-day-overview-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-day-overview-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.calendar-day-overview-item:hover {
+  background: var(--glass-bg-hover);
+}
+
+.calendar-day-overview-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.calendar-day-overview-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--tl-sport, var(--text-muted)) 16%, transparent);
+  color: var(--tl-sport, var(--text-secondary));
+}
+
+.calendar-day-overview-text {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.calendar-day-overview-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-day-overview-text small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.calendar-day-overview-status {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.calendar-day-overview-status[data-tone="done"] {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.calendar-day-overview-status[data-tone="missed"] {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.calendar-day-overview-chevron {
+  flex: none;
+  color: var(--text-muted);
 }
 
 .calendar-detail-empty {

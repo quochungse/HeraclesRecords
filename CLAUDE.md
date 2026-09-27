@@ -846,7 +846,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   or Coach's first mount would switch away from the pick. A `CoachOpenRequest.scheduleRefs` puts
   chips beside the picked conversation's composer, sent as a
   `scheduleRefs` anchor (not a `PlanRef`, which names a Coach creation) that `toWireMessages` folds
-  into the question with the ids the read tools take. The Calendar's week and session asks used to
+  into the question with the ids the read tools take. **A calendar day opens as a whole** (UAT): pressing a day's cell or
+  its number opens nothing on an empty day, the one thing on it as its chip would
+  (`daySelection`), and otherwise the day panel (`DayOverview`: totals, a row per session
+  with its sport and status, Ask Coach for the day as a `scope: "day"` ref, and a way back to
+  the day from a row it opened). The Calendar's week and session asks used to
   paste figures into a prompt; the Library reader's open session offers Ask Coach for any COROS plan.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and
@@ -1101,6 +1105,28 @@ Overview, Media, Data, and Settings are in the main bundle.
   A blank conversation is reused or, when left, deleted — unless
   an analysis is attached to it. The input grows with its words (`field-sizing: content`)
   up to six lines and scrolls past that.
+  **Stop has to reach a turn that has not reached a provider yet.** The Claude status check,
+  the MCP connections and the snapshot read from COROS run first and take seconds; nothing
+  in that phase listened for the abort, and `streamClaudeCodeCompletion` subscribes to the
+  signal's `abort` *event*, which a signal aborted before the call never fires — so a Stop
+  pressed early ran the whole turn. Each of those steps is awaited through `prepare`
+  (`untilAborted`) inside `streamChatTurn`, the Claude provider checks `signal.aborted` on
+  entry, and the button shows "Stopping…" until the turn ends. `test:chat-stream-sink`
+  holds both.
+  **The list stays open while Coach answers, and a turn belongs to its conversation** (UAT).
+  The view holds one turn's state, so a turn is owned by the conversation it was asked in
+  (`turnSessionId`): leaving it mid-turn **parks** the turn (`parkedTurnRef` — its timeline and
+  its own save base), the stream's handlers write through `turnTimeline`/`persistTurn` into
+  whichever copy is live, a turn that ends parked is saved to its own row and never through
+  `persistHistory` (whose base describes the conversation on screen), and coming back
+  restores the parked timeline rather than the row, which holds only the question until the
+  turn ends. `resetEphemeralChatState` leaves a running turn's question cards alone. Only the
+  turn's conversation draws its bubble and Stop; its row says "Answering"; the autosave is
+  held only while the turn on screen runs. **Two turns at once are refused**, not queued: the
+  main process would stream both, but the renderer's turn state is single, so another
+  conversation's send button is disabled and Enter (or a follow-up chip) raises an
+  informational toast through `onMessage`. Deleting the answering conversation waits too.
+  `test:chat-transcript-race` drives the switch, the refused send and the parked save.
 - **Coach Analysis** (`coachAnalysisService/Scheduler/Store.ts`, `coachActivityWatcher.ts`) —
   headless coach runs. Tied to the `app` lifecycle, not `BrowserWindow`. Auto runs are
   **read-only**: the tool allowlist excludes every write tool, and drafts land as approval

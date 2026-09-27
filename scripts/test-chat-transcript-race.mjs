@@ -542,6 +542,79 @@ async function main() {
     assert.deepEqual(sizing, { grow: "1", width: true }, "the chart's bubble takes the row and its card fills it");
   }
 
+  // -------------------------------------------------------------------------
+  // Another conversation opens while Coach answers (UAT), and the turn still
+  // lands in the conversation it was asked in
+  // -------------------------------------------------------------------------
+  {
+    const asked = { ...SESSION, id: "t1", title: "Tuần này", updatedAt: "2026-09-12T06:00:00.000Z" };
+    const other = { ...SESSION, id: "t2", title: "Giấc ngủ", updatedAt: "2026-09-10T06:00:00.000Z" };
+    await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, listChatSessions: [asked, other] });
+    await waitFor(() => harness("exists", ".chat-composer textarea"), "the composer is drawn");
+    await waitFor(() => harness("callCount", "getChatSession"), "the newest conversation is open");
+    await harness("setValue", ".chat-composer textarea", "Tuần này thế nào?");
+    await harness("click", ".chat-send");
+    const turn = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the question goes");
+    const requestId = turn.args[0];
+    assert.equal(turn.args[3], "t1", "asked in the first conversation");
+    await harness("emit", "onChatStreamStart", { requestId });
+    await harness("emit", "onChatStreamToken", { requestId, delta: "Tuần này " });
+
+    // The list stays open; only the answering row says so.
+    await waitFor(() => harness("exists", ".chat-session-row.is-active .chat-session-row-answering"), "the answering row says so");
+    assert.equal(await harness("exists", ".chat-session-row.is-disabled"), false, "no row is locked");
+    assert.equal(await harness("clickText", ".chat-session-row", "Giấc ngủ"), true);
+    await waitFor(
+      async () => (await harness("text", ".chat-conversation-title")) === "Giấc ngủ",
+      "the other conversation opens mid-turn"
+    );
+    assert.equal(await harness("exists", ".chat-bubble-streaming"), false, "the turn is not drawn here");
+    assert.equal(await harness("exists", ".chat-stop"), false, "nor its Stop");
+
+    // One turn at a time: sending here waits, and Enter says why.
+    await harness("setValue", ".chat-composer textarea", "Ngủ thế nào?");
+    await settle();
+    assert.equal(
+      await win.webContents.executeJavaScript(`document.querySelector(".chat-send").disabled`, true),
+      true,
+      "send is disabled while another conversation answers"
+    );
+    await harness("keyDown", ".chat-composer textarea", "Enter");
+    await waitFor(async () => (await harness("callCount", "prop:onMessage")) > 0, "Enter says why, as a toast");
+    assert.match((await harness("calls", "prop:onMessage")).at(-1).args[0], /Coach is still answering in "Tuần này"/, "names the conversation that is answering");
+    assert.equal(await harness("callCount", "sendChat"), 1, "and nothing is sent");
+    assert.equal(await harness("value", ".chat-composer textarea"), "Ngủ thế nào?", "the words stay");
+
+    // The turn ends while its conversation is not on screen: saved to its own row.
+    await harness("emit", "onChatStreamToken", { requestId, delta: "ổn." });
+    await harness("emit", "onChatStreamDone", { requestId, fullText: "Tuần này ổn." });
+    await settle();
+    const savesOfAsked = (await harness("calls", "saveChatSession")).filter((call) => call.args[0] === "t1");
+    assert.ok(
+      JSON.stringify(savesOfAsked.at(-1)?.args[1] ?? []).includes("Tuần này ổn."),
+      "the answer is saved to the conversation it was asked in"
+    );
+    const savesOfOther = (await harness("calls", "saveChatSession")).filter((call) => call.args[0] === "t2");
+    assert.ok(
+      savesOfOther.every((call) => !JSON.stringify(call.args[1]).includes("Tuần này ổn.")),
+      "and never to the one on screen"
+    );
+    assert.equal(
+      await win.webContents.executeJavaScript(`document.querySelector(".chat-send").disabled`, true),
+      false,
+      "the other conversation may send once the turn has ended"
+    );
+
+    // Back to the first conversation: the answer is there.
+    assert.equal(await harness("clickText", ".chat-session-row", "Tuần này"), true);
+    await waitFor(
+      async () => /Tuần này ổn\./.test((await harness("text", ".chat-transcript")) ?? ""),
+      "the answer is in its conversation"
+    );
+    // The profile's localStorage outlives this run; leave no draft behind.
+    await win.webContents.executeJavaScript(`localStorage.removeItem("coroslink.coach.composerDrafts.v1")`, true);
+  }
+
   console.log("chat transcript race tests passed");
 }
 

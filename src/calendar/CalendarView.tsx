@@ -20,6 +20,8 @@ import type {
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatHappenDayLabel } from "../training/formatters";
+import { scheduledWorkoutSport } from "../training/workoutSport";
+import { activityWorkoutSport } from "../training/askCoachAbout";
 import { OptionGroup } from "../components/OptionGroup";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 /* For ConfirmDialog, which is drawn in the library's `tl-dialog` chrome. The
@@ -29,7 +31,10 @@ import "../training-library/trainingLibrary.css";
 import { AddWorkoutModal } from "./AddWorkoutModal";
 import { CalendarGrid } from "./CalendarGrid";
 import {
+  dayItems,
+  daySelection,
   scheduledWorkoutKey,
+  type CalendarDay,
   type CalendarMode,
   type CalendarSelection,
   type CalendarWeek
@@ -128,6 +133,8 @@ export function CalendarView({
   const [mode, setMode] = useSelectionPreference(CALENDAR_MODE_PREFERENCE);
   const [anchor, setAnchor] = useState(() => new Date());
   const [selection, setSelection] = useState<CalendarSelection | null>(null);
+  /* The day a thing was opened from, so its panel can step back to it. */
+  const [dayReturn, setDayReturn] = useState<CalendarDay | null>(null);
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -429,7 +436,29 @@ export function CalendarView({
 
   const handleAskCoachSelection = useCallback(
     (target: CalendarSelection) => {
+      if (target.kind === "day") {
+        // The day as a whole (UAT): what was planned and done on it, for the
+        // composer's header; Coach reads the day with its own tools.
+        const items = dayItems(target.day);
+        const names = items
+          .map((item) => (item.kind === "scheduled" ? item.entry.name : item.activity.name ?? item.activity.sportName))
+          .filter(Boolean);
+        onOpenCoach({
+          prompt: target.day.isPast ? "How did this day go?" : "How should I approach this day?",
+          scheduleRefs: [
+            {
+              scope: "day",
+              day: target.day.dateKey,
+              label: formatHappenDayLabel(target.day.dateKey),
+              ...(names.length ? { detail: names.join(", ") } : {})
+            }
+          ]
+        });
+        return;
+      }
       if (target.kind === "scheduled") {
+        // The sport is for the composer's icon only; it is not stored.
+        const scheduledSport = scheduledWorkoutSport(target.entry.sportType);
         onOpenCoach({
           prompt: "How should I approach it?",
           scheduleRefs: [
@@ -438,12 +467,14 @@ export function CalendarView({
               day: target.entry.happenDay,
               planId: target.entry.planId,
               idInPlan: target.entry.idInPlan,
-              label: `${formatHappenDayLabel(target.entry.happenDay)} · ${target.entry.name}`
+              label: `${formatHappenDayLabel(target.entry.happenDay)} · ${target.entry.name}`,
+              ...(scheduledSport ? { sport: scheduledSport } : {})
             }
           ]
         });
       } else {
         const activity = target.activity;
+        const activitySport = activityWorkoutSport(activity.sportType);
         onOpenCoach({
           prompt: "Can you review it?",
           scheduleRefs: [
@@ -451,7 +482,8 @@ export function CalendarView({
               scope: "session",
               day: target.day.dateKey,
               ...(activity.activityId ? { activityId: activity.activityId } : {}),
-              label: `${formatHappenDayLabel(target.day.dateKey)} · ${activity.name ?? activity.sportName ?? "Activity"}`
+              label: `${formatHappenDayLabel(target.day.dateKey)} · ${activity.name ?? activity.sportName ?? "Activity"}`,
+              ...(activitySport ? { sport: activitySport } : {})
             }
           ]
         });
@@ -641,10 +673,18 @@ export function CalendarView({
         busy={mutating}
         selectionMode={selectionMode}
         selectedWorkoutKeys={selectedWorkoutKeys}
-        onSelectScheduled={(day, entry) => setSelection({ kind: "scheduled", day, entry })}
-        onSelectActivity={(day, activity: TrainingHubActivity) =>
-          setSelection({ kind: "activity", day, activity })
-        }
+        onSelectScheduled={(day, entry) => {
+          setDayReturn(null);
+          setSelection({ kind: "scheduled", day, entry });
+        }}
+        onSelectActivity={(day, activity: TrainingHubActivity) => {
+          setDayReturn(null);
+          setSelection({ kind: "activity", day, activity });
+        }}
+        onSelectDay={(day) => {
+          setDayReturn(null);
+          setSelection(daySelection(day));
+        }}
         onToggleScheduled={toggleScheduledSelection}
         onAdd={setAddTarget}
         onDropEntry={handleDropEntry}
@@ -685,10 +725,25 @@ export function CalendarView({
         selection={selection}
         sportTypes={sportTypes}
         deleting={mutating}
-        onClose={() => setSelection(null)}
+        onClose={() => {
+          setDayReturn(null);
+          setSelection(null);
+        }}
         onDelete={handleDelete}
         onReload={reload}
         onAskCoach={handleAskCoachSelection}
+        onOpenItem={(item) => {
+          setDayReturn(item.day);
+          setSelection(item);
+        }}
+        onBackToDay={
+          dayReturn
+            ? () => {
+                setSelection({ kind: "day", day: dayReturn });
+                setDayReturn(null);
+              }
+            : undefined
+        }
         onEdit={(target) => {
           setSelection(null);
           setWorkoutRef({

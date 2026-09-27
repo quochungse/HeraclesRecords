@@ -13,6 +13,7 @@ export function ChatHistoryPanel({
   busy,
   attention,
   compactingSessionId,
+  answeringSessionId,
   onCollapse,
   onNewChat,
   onSelectSession,
@@ -29,6 +30,8 @@ export function ChatHistoryPanel({
   attention?: Map<string, CoachAnalysisSessionAttention>;
   /** The conversation a summariser turn is running for, if any. */
   compactingSessionId?: string | null;
+  /** The conversation Coach is answering in: its row says so, the list stays open (UAT). */
+  answeringSessionId?: string | null;
   onCollapse: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -172,6 +175,7 @@ export function ChatHistoryPanel({
                     disabled={busy}
                     attention={attention?.get(session.id)}
                     compacting={compactingSessionId === session.id}
+                    answering={answeringSessionId === session.id}
                     onSelect={() => onSelectSession(session.id)}
                     onTogglePin={() =>
                       onTogglePinSession(session.id, !session.pinnedAt)

@@ -1587,6 +1587,28 @@ export function conversationReach(
   };
 }
 
+/** `work`, or a rejection as soon as `signal` aborts, whichever is first. */
+export function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    work.catch(() => undefined);
+    return Promise.reject(new Error("Chat request cancelled."));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error("Chat request cancelled."));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
 async function streamChatTurn(
   sink: ChatStreamSink,
   requestId: string,
@@ -1670,6 +1692,14 @@ async function streamChatTurn(
 
   const controller = new AbortController();
   activeStreams.set(requestId, controller);
+  /*
+   * What a turn waits on before a provider is asked anything — the Claude
+   * status check, the MCP connections, the snapshot read from COROS — takes
+   * seconds, and a Stop pressed then used to be lost: nothing in that phase
+   * listened for the abort, and a provider handed a signal already aborted
+   * never hears the event. Each step gives way the moment Stop is pressed.
+   */
+  const prepare = <T,>(work: Promise<T>): Promise<T> => untilAborted(work, controller.signal);
   const releaseAbort = sink.bindAbort?.(controller);
 
   let fullText = "";
@@ -1680,10 +1710,10 @@ async function streamChatTurn(
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
       const claudeConfigDir = getClaudeCodeConfigDir(settings);
-      const status = await inspectClaudeCodeStatus(
+      const status = await prepare(inspectClaudeCodeStatus(
         settings.claudeCode.executablePath,
         claudeConfigDir
-      );
+      ));
       recordClaudeCodeStatus(status);
       if (!status.authenticated || !status.executablePath) {
         throw new ClaudeCodeProviderError(
@@ -1692,18 +1722,18 @@ async function streamChatTurn(
         );
       }
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         settings.claudeCode.permissions,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
         chatTools,
@@ -1798,15 +1828,15 @@ async function streamChatTurn(
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -1889,15 +1919,15 @@ async function streamChatTurn(
         );
       }
 
-      await ensureAllMcpConnected();
+      await prepare(ensureAllMcpConnected());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
         chatTools,
@@ -1964,20 +1994,20 @@ async function streamChatTurn(
     }
 
     if (provider === "local") {
-      const { text: instructions, hasData } = await buildTrainingContext(
+      const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
         unitSystem,
         settings.customInstructions,
         roleInstructions,
         runTools.get(requestId)?.context
-      );
+      ));
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
         ...(runtime.model ? { model: runtime.model } : {})
       };
 
       if (runtimeConfig.toolsEnabled) {
-        await ensureAllMcpConnected();
+        await prepare(ensureAllMcpConnected());
       }
       const chatTools = toolsForRun(
         requestId,
@@ -2061,18 +2091,18 @@ async function streamChatTurn(
       return;
     }
 
-    const token = await getValidToken();
-    const { text: instructions, hasData } = await buildTrainingContext(
+    const token = await prepare(getValidToken());
+    const { text: instructions, hasData } = await prepare(buildTrainingContext(
       undefined,
       unitSystem,
       settings.customInstructions,
       roleInstructions,
       runTools.get(requestId)?.context
-    );
+    ));
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
-    await ensureAllMcpConnected();
+    await prepare(ensureAllMcpConnected());
     const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
 
     // When live tools are available, steer the model to use them rather than
