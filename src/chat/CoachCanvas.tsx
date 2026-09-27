@@ -481,7 +481,7 @@ function ArtifactView({
       <header className="chat-canvas-head">
         <button
           type="button"
-          className="icon-button chat-canvas-back"
+          className="icon-button"
           data-action="workbenchBack"
           aria-label="All creations"
           title="All creations"

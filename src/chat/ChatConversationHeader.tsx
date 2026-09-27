@@ -102,7 +102,7 @@ export function ChatConversationHeader({
             title="What Coach reads in this conversation"
           >
             <BookOpen size={13} aria-hidden="true" />
-            <span className="chat-header-chip-label">Reads</span>
+            <span>Reads</span>
             <b>{reads || "nothing of yours"}</b>
           </button>
         ) : null}

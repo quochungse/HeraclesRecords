@@ -156,7 +156,7 @@ test("ChatView re-reads its own tables when a pull names them", () => {
   );
   assert.match(
     handler[0],
-    /refreshSessions\(provider\)/,
+    /refreshSessions\(\)/,
     "the sidebar list is the half that shows a conversation exists"
   );
   assert.match(

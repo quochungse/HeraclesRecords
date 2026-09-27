@@ -16161,7 +16161,7 @@ tr.data-intervals-row-missing {
 /* On a narrow window it is a sheet over the whole conversation, composer
    included (UAT): stopping at the composer left a strip of the transcript
    showing under its edge. Ask Coach closes it to show the chip it adds. */
-.chat-layout.is-workbench-sheet > .chat-plan-panel {
+.chat-layout.is-workbench-sheet > .chat-workbench {
   position: absolute;
   inset: 0;
   z-index: 20;
@@ -20820,8 +20820,11 @@ tr.data-intervals-row-missing {
   cursor: default;
 }
 
-/* Undo on the line an edit left: small, and after what it undoes. */
+/* View and Undo on a one-line record: small, and after what they act on. At
+   the pill's own 34px they made a line of text three lines tall. */
+.chat-plan-event-view,
 .chat-plan-event-undo {
+  min-height: 0;
   padding: 2px 8px;
   font-size: 11px;
 }
