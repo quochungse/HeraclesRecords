@@ -29,7 +29,12 @@ import {
   getMcpServerCachedTools
 } from "./mcpClientManager";
 import { prefixToolName, splitToolName } from "./mcpToolNames";
-import { applyScheduleChange, dismissScheduleChange, readScheduleChanges } from "./chatScheduleChanges";
+import {
+  applyScheduleChange,
+  dismissScheduleChange,
+  openLineCount,
+  readScheduleChanges
+} from "./chatScheduleChanges";
 import {
   getChatWorkoutTools,
   handleChatWorkoutTool,
@@ -165,6 +170,7 @@ import {
   listChatSessions,
   getChatSessionProvider,
   saveChatSession,
+  setWaitingCounter,
   setChatSessionPinned
 } from "./chatHistoryStore";
 import type {
@@ -609,26 +615,28 @@ function isSameClaudeCodeRecord(
   );
 }
 
-/**
- * Every conversation, each with what waits on the athlete in it (R3): the
- * calendar changes still to decide and the briefs not yet a plan, read from
- * their own rows, beside the unanswered questions the transcript holds.
+/*
+ * What waits on the athlete in a conversation (R3): the calendar changes
+ * still to decide and the briefs not yet a plan, read from their own rows,
+ * beside the unanswered questions the transcript holds. Every summary the
+ * store answers counts them this way. A row that cannot be read counts as
+ * nothing waiting rather than failing the whole list.
  */
-export function listAllChatSessions() {
-  return listChatSessions(undefined, undefined, ({ changeSetIds, briefIds }) => ({
-    decisions: changeSetIds.length
-      ? readScheduleChanges(changeSetIds).reduce(
-          (count, set) =>
-            count + set.lines.filter((line) => line.status === "proposed" && KNOWN_CHANGE_OPS.has(line.op)).length,
-          0
-        )
-      : 0,
-    briefs: briefIds.filter((artifactId) => briefWaiting(artifactId)).length
-  }));
-}
+setWaitingCounter(({ changeSetIds, briefIds }) => {
+  try {
+    return {
+      decisions: changeSetIds.length ? openLineCount(changeSetIds) : 0,
+      briefs: briefIds.filter((artifactId) => briefWaiting(artifactId)).length
+    };
+  } catch {
+    return { decisions: 0, briefs: 0 };
+  }
+});
 
-/** The ops a line this build can apply may have; a newer build's is not waiting on this one. */
-const KNOWN_CHANGE_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
+/** Every conversation, whichever AI answers it (Q1), with what waits in each. */
+export function listAllChatSessions() {
+  return listChatSessions();
+}
 
 export function getChatSessionEntries(id: string) {
   return getChatSession(id);

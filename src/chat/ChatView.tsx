@@ -686,6 +686,123 @@ function isAutomaticOutlineStep(timeline: readonly ChatEntry[], index: number): 
   );
 }
 
+/**
+ * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
+ * analyses, so every entry a run produced says which coach spoke.
+ */
+function AnalysisAttribution({
+  marker
+}: {
+  marker: ChatEntryAnalysisMarker;
+}) {
+  return (
+    <span className="chat-analysis-attribution">
+      <Zap size={12} aria-hidden="true" />
+      {marker.name}
+      <span className="chat-analysis-attribution-trigger">
+        · {marker.triggerLabel}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
+ * default — it is machinery, not conversation — but openable, because an
+ * athlete judging an analysis's answer needs to see what it was asked.
+ */
+function AnalysisPromptChip({
+  marker,
+  prompt,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAnalysisMarker;
+  prompt: string;
+  index: number;
+  highlighted: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      className={`chat-row chat-row-analysis${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <button
+        type="button"
+        className="chat-analysis-chip"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <Zap size={12} aria-hidden="true" />
+        {marker.name}
+        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
+      </button>
+      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
+    </div>
+  );
+}
+
+/**
+ * When the coach looked. Absolute, not relative: a transcript entry is read
+ * long after it was written, and "2h ago" becomes a lie the moment the
+ * conversation is reopened.
+ */
+function formatLookedAt(at: number): string {
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) {
+    return "";
+  }
+  const time = when.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  if (when.toDateString() === new Date().toDateString()) {
+    return time;
+  }
+  const day = when.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+  return `${day}, ${time}`;
+}
+
+/**
+ * 5.5: an analysis looked and had nothing to say. One line, the same pill as
+ * the playbook chip, but nothing to open — the whole point is that there is no
+ * content behind it.
+ */
+function AnalysisSilentChip({
+  marker,
+  at,
+  index,
+  highlighted
+}: {
+  marker: ChatEntryAnalysisMarker;
+  at: number;
+  index: number;
+  highlighted: boolean;
+}) {
+  return (
+    <div
+      className={`chat-row chat-row-analysis${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <span className="chat-analysis-chip chat-analysis-chip-static">
+        <Zap size={12} aria-hidden="true" />
+        {marker.name} looked, nothing new
+        <span className="chat-analysis-chip-trigger">
+          · {formatLookedAt(at)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function ChatView({
   api,
   onError,
@@ -2905,10 +3022,7 @@ export function ChatView({
       onError("Add an OpenRouter API key in Settings, under Connections.");
       return false;
     }
-    if (
-      turnProvider === "local" &&
-      !(conversationSettings?.runtime?.model?.trim() || chatSettings.local.model.trim())
-    ) {
+    if (turnProvider === "local" && !localModelConfigured) {
       onError("Enter a local model before starting the coach.");
       return false;
     }
@@ -3465,7 +3579,8 @@ export function ChatView({
   const isOpenRouterProvider = chatSettings.provider === "openrouter";
   const isClaudeApiProvider = chatSettings.provider === "claude-api";
   const isChatGptProvider = chatSettings.provider === "chatgpt";
-  const localModelConfigured = chatSettings.local.model.trim().length > 0;
+  // The conversation's own local model counts, not only Coach's.
+  const localModelConfigured = effectiveRuntime.model.trim().length > 0;
   const isBusy = streaming || exportingLatestActivity;
   /* A turn running in the conversation on screen, or in another one (UAT). */
   const turnHere = streaming && turnSessionId === activeSessionId;
@@ -4144,123 +4259,6 @@ export function ChatView({
       </div>
     );
   }
-
-/**
- * `\u26a1 <name> \u00b7 <triggerLabel>` — a conversation can host up to five
- * analyses, so every entry a run produced says which coach spoke.
- */
-function AnalysisAttribution({
-  marker
-}: {
-  marker: ChatEntryAnalysisMarker;
-}) {
-  return (
-    <span className="chat-analysis-attribution">
-      <Zap size={12} aria-hidden="true" />
-      {marker.name}
-      <span className="chat-analysis-attribution-trigger">
-        · {marker.triggerLabel}
-      </span>
-    </span>
-  );
-}
-
-/**
- * The playbook turn a run sent on the athlete's behalf. Collapsed to a chip by
- * default — it is machinery, not conversation — but openable, because an
- * athlete judging an analysis's answer needs to see what it was asked.
- */
-function AnalysisPromptChip({
-  marker,
-  prompt,
-  index,
-  highlighted
-}: {
-  marker: ChatEntryAnalysisMarker;
-  prompt: string;
-  index: number;
-  highlighted: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div
-      className={`chat-row chat-row-analysis${
-        highlighted ? " is-chat-jump-target" : ""
-      }`}
-      data-chat-entry-index={index}
-    >
-      <button
-        type="button"
-        className="chat-analysis-chip"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <Zap size={12} aria-hidden="true" />
-        {marker.name}
-        <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
-      </button>
-      {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
-    </div>
-  );
-}
-
-/**
- * When the coach looked. Absolute, not relative: a transcript entry is read
- * long after it was written, and "2h ago" becomes a lie the moment the
- * conversation is reopened.
- */
-function formatLookedAt(at: number): string {
-  const when = new Date(at);
-  if (Number.isNaN(when.getTime())) {
-    return "";
-  }
-  const time = when.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-  if (when.toDateString() === new Date().toDateString()) {
-    return time;
-  }
-  const day = when.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric"
-  });
-  return `${day}, ${time}`;
-}
-
-/**
- * 5.5: an analysis looked and had nothing to say. One line, the same pill as
- * the playbook chip, but nothing to open — the whole point is that there is no
- * content behind it.
- */
-function AnalysisSilentChip({
-  marker,
-  at,
-  index,
-  highlighted
-}: {
-  marker: ChatEntryAnalysisMarker;
-  at: number;
-  index: number;
-  highlighted: boolean;
-}) {
-  return (
-    <div
-      className={`chat-row chat-row-analysis${
-        highlighted ? " is-chat-jump-target" : ""
-      }`}
-      data-chat-entry-index={index}
-    >
-      <span className="chat-analysis-chip chat-analysis-chip-static">
-        <Zap size={12} aria-hidden="true" />
-        {marker.name} looked, nothing new
-        <span className="chat-analysis-chip-trigger">
-          · {formatLookedAt(at)}
-        </span>
-      </span>
-    </div>
-  );
-}
 
   /* The running turn's bubble sits where the turn began, above the cards it
      produces as it runs, so its answer reads before them — as it will once

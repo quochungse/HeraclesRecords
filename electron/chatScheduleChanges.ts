@@ -168,6 +168,18 @@ export function readScheduleChanges(changeSetIds: readonly string[]): ScheduleCh
   return getChatScheduleChanges(ids).map(fromRecord);
 }
 
+/**
+ * How many lines in these sets still wait on the athlete: proposed, with an
+ * op this build can apply. A newer build's line is not waiting on this one.
+ */
+export function openLineCount(changeSetIds: readonly string[]): number {
+  return readScheduleChanges(changeSetIds).reduce(
+    (count, set) =>
+      count + set.lines.filter((line) => line.status === "proposed" && OPS.includes(line.op)).length,
+    0
+  );
+}
+
 function requireSet(changeSetId: string): ScheduleChangeSet {
   const [set] = readScheduleChanges([changeSetId]);
   if (!set) throw new Error("This proposal is gone — its conversation may have been deleted on another device.");

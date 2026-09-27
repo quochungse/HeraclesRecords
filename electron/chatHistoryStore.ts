@@ -1481,11 +1481,26 @@ export interface SessionAnchors {
 /**
  * Counts what in a conversation's anchored rows waits on the athlete. The
  * store reads only the transcript; the rows are another module's, so the
- * caller that lists conversations says how to count them.
+ * chat service says how to count them (`setWaitingCounter`).
  */
 export type WaitingCounter = (anchors: SessionAnchors) => { decisions: number; briefs: number };
 
-function toSessionSummary(row: ChatSessionRow, countWaiting?: WaitingCounter): ChatSessionSummary {
+let registeredCounter: WaitingCounter | undefined;
+
+/**
+ * How every summary counts what waits in a conversation's rows. Registered
+ * once, so a summary answered by a save, a rename or a pin counts as the list
+ * does: a save used to answer without the counts, and the row's "2 to decide"
+ * went out the moment its conversation was opened.
+ */
+export function setWaitingCounter(counter: WaitingCounter | undefined): void {
+  registeredCounter = counter;
+}
+
+function toSessionSummary(
+  row: ChatSessionRow,
+  countWaiting: WaitingCounter | undefined = registeredCounter
+): ChatSessionSummary {
   const entries = parseChatTranscriptJson(row.messages_json);
   const questions = entries.filter(
     (entry) => entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined
@@ -1522,7 +1537,7 @@ function toSessionSummary(row: ChatSessionRow, countWaiting?: WaitingCounter): C
 export function listChatSessions(
   provider?: ChatProvider,
   database: ChatSessionDatabase = defaultDatabase,
-  countWaiting?: WaitingCounter
+  countWaiting: WaitingCounter | undefined = registeredCounter
 ): ChatSessionSummary[] {
   return database
     .listSessions(provider === undefined ? undefined : normalizeProvider(provider))

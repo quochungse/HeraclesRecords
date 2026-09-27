@@ -18,7 +18,8 @@ const {
   restoreChatPlanDraftSources,
   saveChatSession,
   setChatSessionPinned,
-  setChatSessionTitle
+  setChatSessionTitle,
+  setWaitingCounter
 } = await import(`${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`);
 
 /**
@@ -1132,6 +1133,21 @@ assert.equal(restoredVisual[0].preview.sportType, 100);
   assert.deepEqual(counted.waiting, { questions: 1, decisions: 2, briefs: 1 });
   assert.deepEqual(seen.find((anchors) => anchors.changeSetIds.length), { changeSetIds: ["set-1"], briefIds: ["brief-1"] });
   assert.ok(listChatSessions(undefined, removedDb).length >= 3, "without a provider, every conversation");
+
+  // A registered counter is how every summary counts, not only the list's: a
+  // save answered without it, and the row's badge went out the moment its
+  // conversation was opened (opening saves the transcript back).
+  setWaitingCounter(() => ({ decisions: 2, briefs: 1 }));
+  try {
+    const expected = { questions: 1, decisions: 2, briefs: 1 };
+    assert.deepEqual(listChatSessions(undefined, removedDb).find((row) => row.id === asking.id).waiting, expected);
+    const reopened = saveChatSession(asking.id, readChatSession(asking.id, removedDb), removedDb, { knownEntryCount: 0 });
+    assert.deepEqual(reopened.waiting, expected, "a save answers with what waits, as the list does");
+    assert.deepEqual(setChatSessionTitle(asking.id, "Which day", removedDb).waiting, expected, "and so does a rename");
+    assert.deepEqual(setChatSessionPinned(asking.id, true, removedDb).waiting, expected, "and a pin");
+  } finally {
+    setWaitingCounter(undefined);
+  }
 
   // With nothing said at all, the card names it.
   const cardOnly = createChatSession("claude-code", removedDb);

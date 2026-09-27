@@ -883,8 +883,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   models**; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
   clock (`availableModelsAt`). The shipped lists are what a picker shows before a list has
   ever been read, and **a failed or empty read never replaces a list held** — an offline
-  launch keeps yesterday's menu. `ChatSettings.modelCatalogs` is written by the main process
-  only; `saveChatSettingsToStore` never writes it back, or a window's older copy would. Clearing
+  launch keeps yesterday's menu. `ChatSettings.modelCatalogs` — and Claude Code's
+  `availableModelsAt`/`availableModelsFrom` — are written by the main process only;
+  `saveChatSettingsToStore` never writes them back, or a window's older copy would. Clearing
   a key or signing out of ChatGPT drops that provider's list. **A request follows the listed
   row, not a table**: adaptive thinking, the effort levels, the output ceiling and the refusal
   fallback of a Messages API model come from the API row field by field, with
@@ -920,7 +921,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   difference is stored; `requestRuntime` takes that provider as its base for the same reason.
   **What waits on the athlete** is on every summary (`ChatSessionSummary.waiting`, derived, never
   stored): unanswered questions from the transcript, open change-set lines and briefs not yet a
-  plan counted by `listAllChatSessions` from their rows. It drives the row's badge and the transcript's "N things waiting on you · Jump" bar. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
+  plan counted from their rows by the counter `chatService` registers with the store
+  (`setWaitingCounter`), so a summary answered by a save, a rename or a pin counts them as the
+  list does — a save used to answer without them, and a row's "2 to decide" went out the moment
+  its conversation was opened. It drives the row's badge and the transcript's "N things waiting
+  on you · Jump" bar, which counts a proposal by its open lines as the row does. `chat:send` carries the `sessionId` for this: `streamConversationTurn` reads the row
   and hands `streamChat` its `sources` and `runtime`, and `streamChat` turns withheld sources into
   a `runTools` reach (`conversationReach`) — withheld from every tool that reads them *and* from
   the snapshot, as the generator does — unless the run already brought a reach of its own. An

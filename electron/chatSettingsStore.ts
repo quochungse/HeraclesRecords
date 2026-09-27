@@ -244,21 +244,11 @@ export function saveChatSettingsToStore(
   } else {
     store.delete([CHAT_SETTINGS_KEYS.claudeAvailableModels]);
   }
-  if (settings.claudeCode?.availableModelsAt) {
-    store.set(
-      CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
-      settings.claudeCode.availableModelsAt
-    );
-  }
-  if (settings.claudeCode?.availableModelsFrom) {
-    store.set(
-      CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom,
-      settings.claudeCode.availableModelsFrom
-    );
-  }
-  // `modelCatalogs` is deliberately not written here: a window's copy of it
-  // is whatever it last read, and saving a setting must not put an older list
-  // back over one `refreshModelCatalogs` has just read.
+  // `modelCatalogs`, and when and from which CLI Claude Code's list was read,
+  // are deliberately not written here: a window's copy of them is whatever it
+  // last read, and saving a setting must not put an older answer back over one
+  // the main process has just read (`refreshModelCatalogs`,
+  // `readClaudeCodeModels`, which write them itself).
   const claudeDefaultModel = settings.claudeCode?.defaultModel?.trim();
   if (claudeDefaultModel) {
     store.set(CHAT_SETTINGS_KEYS.claudeDefaultModel, claudeDefaultModel);
