@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -25,7 +25,10 @@ const LOGIN_COMPLETION_TIMEOUT_MS = 10 * 60_000;
 const LOGIN_POLL_INTERVAL_MS = 2_000;
 
 // `claude --version` costs a process spawn per status read, and the answer only
-// changes when the CLI is upgraded, so it is resolved once per path per run.
+// changes when the CLI is upgraded — which rewrites the file, so the answer is
+// kept per path *and* modification time. Keyed by path alone, an upgrade in
+// place (npm, `claude update`) went on reporting the old version, and choosing
+// the newest install compared against it, until the app was restarted.
 // Failures are not cached: a binary that could not launch may launch later.
 const versionCache = new Map<string, string | undefined>();
 const REQUEST_TIMEOUT_MS = 3 * 60_000;
@@ -123,6 +126,13 @@ export function getClaudeExecutableCandidates(
         join(env.LOCALAPPDATA, "Claude", "claude.exe")
       );
     }
+    // `npm install -g` puts a shell shim and a .cmd on PATH, neither of which
+    // execFile can start; the binary they run is inside the package.
+    if (env.APPDATA) {
+      candidates.push(
+        join(env.APPDATA, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe")
+      );
+    }
     candidates.push(
       join(home, ".local", "bin", "claude.exe"),
       join(home, ".claude", "local", "claude.exe")
@@ -152,38 +162,135 @@ async function isExecutable(filePath: string): Promise<boolean> {
   }
 }
 
-async function findClaudeOnPath(): Promise<string | undefined> {
+// Status is read every few seconds while a sign-in is pending; asking the
+// shell where `claude` is costs a process each time, and PATH rarely changes.
+const PATH_LOOKUP_TTL_MS = 60_000;
+let pathLookup: { at: number; found: string[] } | undefined;
+
+/**
+ * Every `claude` on PATH that can be started directly. On Windows that is the
+ * `.exe` entries only: `where` also lists npm's extensionless shell shim and
+ * its `.cmd`, which execFile cannot run.
+ */
+async function findClaudeOnPath(platform = process.platform): Promise<string[]> {
+  if (pathLookup && Date.now() - pathLookup.at < PATH_LOOKUP_TTL_MS) return pathLookup.found;
+  let found: string[] = [];
   try {
-    const command = process.platform === "win32" ? "where.exe" : "which";
-    const { stdout } = await execFileAsync(command, ["claude"], {
+    const command = platform === "win32" ? "where.exe" : "which";
+    const { stdout } = await execFileAsync(command, platform === "win32" ? ["claude"] : ["-a", "claude"], {
       timeout: DETECTION_TIMEOUT_MS,
       windowsHide: true
     });
-    return stdout
+    found = stdout
       .split(/\r?\n/)
       .map((value) => value.trim())
-      .find(Boolean);
+      .filter(Boolean)
+      .filter((value) => platform !== "win32" || /\.exe$/i.test(value));
   } catch {
-    return undefined;
+    found = [];
   }
+  pathLookup = { at: Date.now(), found };
+  return found;
 }
 
+function samePath(a: string, b: string, platform = process.platform): boolean {
+  const normal = (value: string) =>
+    platform === "win32" ? path.win32.normalize(value).toLowerCase() : path.posix.normalize(value);
+  return normal(a) === normal(b);
+}
+
+/**
+ * Whether a path is one detection looks at on its own. A path stored there
+ * was not a choice: builds before this one saved whatever detection found
+ * into the setting, and from then on every read used that install — so a CLI
+ * upgraded somewhere else (npm, beside a native install) was never seen, and
+ * neither were the models it added. Only a path detection would not find is
+ * honoured as the athlete's.
+ */
+export function isStandardClaudeLocation(
+  filePath: string | undefined,
+  platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const value = filePath?.trim();
+  if (!value) return false;
+  return getClaudeExecutableCandidates(undefined, platform, env).some((candidate) =>
+    samePath(candidate, value, platform)
+  );
+}
+
+/** `2.1.283 (Claude Code)` → [2, 1, 283]; anything else → undefined. */
+export function parseClaudeVersion(output: string | undefined): number[] | undefined {
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(output ?? "");
+  return match ? match.slice(1, 4).map(Number) : undefined;
+}
+
+/** Positive when `a` is newer. An unreadable version sorts below any readable one. */
+export function compareClaudeVersions(a: string | undefined, b: string | undefined): number {
+  const left = parseClaudeVersion(a);
+  const right = parseClaudeVersion(b);
+  if (!left || !right) return left ? 1 : right ? -1 : 0;
+  for (let index = 0; index < 3; index++) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
+}
+
+/** `claude --version` for one install, cached per path and modification time. */
+async function readClaudeVersion(
+  executablePath: string,
+  configDir?: string
+): Promise<string | undefined> {
+  let key = executablePath;
+  try {
+    key = `${executablePath}@${(await stat(executablePath)).mtimeMs}`;
+  } catch {
+    // Unstattable yet executable: fall back to the path alone.
+  }
+  if (versionCache.has(key)) return versionCache.get(key);
+  const result = await execClaude(executablePath, ["--version"], {
+    timeout: DETECTION_TIMEOUT_MS,
+    configDir
+  });
+  const version = result.stdout.trim() || undefined;
+  versionCache.set(key, version);
+  return version;
+}
+
+/**
+ * The Claude Code to run. A path the athlete chose wins, as long as it is not
+ * one detection looks at anyway (`isStandardClaudeLocation`). Otherwise every
+ * install found — the usual places and PATH — is a candidate, and **the newest
+ * wins**: a machine with a native install and an npm one runs whichever was
+ * upgraded last, which is the one whose model list is current. One install is
+ * returned without asking its version.
+ */
 export async function detectClaudeCodeExecutable(
   customPath?: string
 ): Promise<string | undefined> {
   const explicitPath = customPath?.trim();
-  if (explicitPath) {
+  if (explicitPath && !isStandardClaudeLocation(explicitPath)) {
     return (await isExecutable(explicitPath)) ? explicitPath : undefined;
   }
 
-  for (const candidate of getClaudeExecutableCandidates(customPath)) {
-    if (await isExecutable(candidate)) {
-      return candidate;
-    }
+  const found: string[] = [];
+  for (const candidate of [
+    ...getClaudeExecutableCandidates(undefined),
+    ...(await findClaudeOnPath())
+  ]) {
+    if (found.some((known) => samePath(known, candidate))) continue;
+    if (await isExecutable(candidate)) found.push(candidate);
   }
+  if (found.length <= 1) return found[0];
 
-  const fromPath = await findClaudeOnPath();
-  return fromPath && (await isExecutable(fromPath)) ? fromPath : undefined;
+  const versions = await Promise.all(
+    found.map((candidate) => readClaudeVersion(candidate).catch(() => undefined))
+  );
+  let best = 0;
+  for (let index = 1; index < found.length; index++) {
+    if (compareClaudeVersions(versions[index], versions[best]) > 0) best = index;
+  }
+  return found[best];
 }
 
 /**
@@ -292,25 +399,18 @@ export async function getClaudeCodeStatus(
     };
   }
 
-  let version = versionCache.get(executablePath);
-  if (!versionCache.has(executablePath)) {
-    try {
-      const result = await execClaude(executablePath, ["--version"], {
-        timeout: DETECTION_TIMEOUT_MS,
-        configDir
-      });
-      version = result.stdout.trim() || undefined;
-      versionCache.set(executablePath, version);
-    } catch (caught) {
-      return {
-        state: "connection-failed",
-        installed: true,
-        authenticated: false,
-        executablePath,
-        checkedAt,
-        message: `Claude Code was found but could not launch: ${safeErrorMessage(caught)}`
-      };
-    }
+  let version: string | undefined;
+  try {
+    version = await readClaudeVersion(executablePath, configDir);
+  } catch (caught) {
+    return {
+      state: "connection-failed",
+      installed: true,
+      authenticated: false,
+      executablePath,
+      checkedAt,
+      message: `Claude Code was found but could not launch: ${safeErrorMessage(caught)}`
+    };
   }
 
   try {

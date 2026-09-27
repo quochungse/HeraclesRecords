@@ -1654,6 +1654,12 @@ export interface ClaudeCodeConfig {
   availableModels?: ModelCatalogEntry[];
   /** When that list was last read from the CLI; a list older than a day is read again. */
   availableModelsAt?: string;
+  /**
+   * Which CLI the list came from, as `<path>@<version>`. A list from another
+   * install or an older version is read again at once: an upgrade is exactly
+   * when the models change.
+   */
+  availableModelsFrom?: string;
   lastConnectionStatus?: ClaudeCodeConnectionState;
   lastCheckedAt?: string;
   permissions: ClaudeCodePermissions;

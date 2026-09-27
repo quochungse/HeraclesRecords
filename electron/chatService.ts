@@ -139,6 +139,7 @@ import {
 import {
   ClaudeCodeProviderError,
   getClaudeCodeStatus as inspectClaudeCodeStatus,
+  isStandardClaudeLocation,
   listClaudeCodeModels,
   logoutClaudeCode,
   startClaudeCodeLogin,
@@ -374,22 +375,26 @@ export async function getClaudeCodeConnectionStatus(
       status.availableModels || settings.claudeCode.availableModels
   };
   const configDir = getClaudeCodeConfigDir(settings);
-  // A list is read again when there is none or it is a day old, at most once
-  // per launch: a model the account gains then reaches the picker by the
-  // next day rather than only after someone presses Test connection.
+  // A list is read again when there is none, when it is a day old, or when it
+  // came from another CLI than the one now in use — an upgrade, or a newer
+  // install found beside the old one, is exactly when the models change. At
+  // most once per launch for each of those, so a status poll never respawns it.
+  const source = claudeListSource(merged);
   const listDue =
     options.forceModels ||
     !merged.availableModels?.length ||
-    isStale(settings.claudeCode.availableModelsAt);
+    isStale(settings.claudeCode.availableModelsAt) ||
+    settings.claudeCode.availableModelsFrom !== source;
+  const probeKey = `${configDir ?? "machine"}|${source}`;
   if (
     listDue &&
     merged.executablePath &&
     merged.authenticated &&
-    (options.forceModels || !probedModelDirs.has(configDir ?? "machine"))
+    (options.forceModels || !probedModelDirs.has(probeKey))
   ) {
-    probedModelDirs.add(configDir ?? "machine");
+    probedModelDirs.add(probeKey);
     merged.availableModels =
-      (await readClaudeCodeModels(merged.executablePath, configDir)) ??
+      (await readClaudeCodeModels(merged.executablePath, configDir, source)) ??
       merged.availableModels;
   }
   recordClaudeCodeStatus(merged);
@@ -401,9 +406,15 @@ export async function getClaudeCodeConnectionStatus(
 // store per run; Test connection forces a fresh read.
 const probedModelDirs = new Set<string>();
 
+/** Which CLI a list is read from: its path and the version it reports. */
+function claudeListSource(status: ClaudeCodeStatus): string {
+  return `${status.executablePath ?? ""}@${status.version ?? ""}`;
+}
+
 async function readClaudeCodeModels(
   executablePath: string,
-  configDir?: string
+  configDir: string | undefined,
+  source: string
 ): Promise<ClaudeCodeStatus["availableModels"]> {
   try {
     const models = await listClaudeCodeModels({ executablePath, configDir });
@@ -412,6 +423,7 @@ async function readClaudeCodeModels(
       CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
       new Date().toISOString()
     );
+    chatSettingsStore.set(CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom, source);
     return models;
   } catch {
     // The static list still covers the picker; retry on the next status read.
@@ -543,12 +555,13 @@ export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTe
     settings.claudeCode.executablePath,
     configDir
   );
-  // An explicit connection test is the one moment worth re-reading the list.
-  probedModelDirs.delete(configDir ?? "machine");
+  // An explicit connection test is always worth re-reading the list for.
+  const source = claudeListSource(result.status);
+  probedModelDirs.add(`${configDir ?? "machine"}|${source}`);
   const status: ClaudeCodeStatus = {
     ...result.status,
     availableModels: result.status.executablePath
-      ? ((await readClaudeCodeModels(result.status.executablePath, configDir)) ??
+      ? ((await readClaudeCodeModels(result.status.executablePath, configDir, source)) ??
         settings.claudeCode.availableModels)
       : settings.claudeCode.availableModels
   };
@@ -560,7 +573,13 @@ function recordClaudeCodeStatus(status: ClaudeCodeStatus): void {
   const current = getChatSettings();
   const next: ClaudeCodeConfig = {
     ...current.claudeCode,
-    executablePath: current.claudeCode.executablePath || status.executablePath,
+    // Only a path the athlete chose is kept. Detection used to be written in
+    // here, which pinned the first install found for good and hid every
+    // upgrade made to another one; a path at a standard location is exactly
+    // that leftover, so it is let go and detection answers again.
+    executablePath: isStandardClaudeLocation(current.claudeCode.executablePath)
+      ? undefined
+      : current.claudeCode.executablePath,
     // Sticky: a status read that did not observe a turn reports no model, and
     // forgetting it would blank the picker's "Default (…)" label.
     defaultModel: status.defaultModel || current.claudeCode.defaultModel,

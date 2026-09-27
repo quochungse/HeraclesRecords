@@ -33,6 +33,7 @@ export const CHAT_SETTINGS_KEYS = {
   claudeDefaultModel: "chat.claudeCode.defaultModel",
   claudeAvailableModels: "chat.claudeCode.availableModels",
   claudeAvailableModelsAt: "chat.claudeCode.availableModelsAt",
+  claudeAvailableModelsFrom: "chat.claudeCode.availableModelsFrom",
   claudeLastConnectionStatus: "chat.claudeCode.lastConnectionStatus",
   claudeLastCheckedAt: "chat.claudeCode.lastCheckedAt",
   claudeRecentActivities: "chat.claudeCode.permissions.recentActivities",
@@ -128,6 +129,8 @@ export function readChatSettingsFromStore(
       ),
       availableModelsAt:
         store.get(CHAT_SETTINGS_KEYS.claudeAvailableModelsAt) || undefined,
+      availableModelsFrom:
+        store.get(CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom) || undefined,
       lastConnectionStatus: normalizeClaudeConnectionStatus(
         store.get(CHAT_SETTINGS_KEYS.claudeLastConnectionStatus)
       ),
@@ -245,6 +248,12 @@ export function saveChatSettingsToStore(
     store.set(
       CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
       settings.claudeCode.availableModelsAt
+    );
+  }
+  if (settings.claudeCode?.availableModelsFrom) {
+    store.set(
+      CHAT_SETTINGS_KEYS.claudeAvailableModelsFrom,
+      settings.claudeCode.availableModelsFrom
     );
   }
   // `modelCatalogs` is deliberately not written here: a window's copy of it

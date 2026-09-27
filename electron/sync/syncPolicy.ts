@@ -244,6 +244,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   // Probed from the local Claude Code install; means nothing on another machine.
   "chat.claudeCode.availableModels": "device",
   "chat.claudeCode.availableModelsAt": "device",
+  "chat.claudeCode.availableModelsFrom": "device",
   // Each provider's model list, as read with the key or account signed in on
   // this machine (modelCatalog.ts). Another machine reads its own.
   "chat.modelCatalog.claudeApi": "device",

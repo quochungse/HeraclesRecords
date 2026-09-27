@@ -896,6 +896,17 @@ Overview, Media, Data, and Settings are in the main bundle.
   "not in the provider's list" (`withCurrentModel`); nothing switches a conversation's model
   behind its back. Pickers deep in a modal read the lists through `ModelOptionsContext`.
   `npm run test:model-catalog`.
+  **Claude Code's list is only as new as the CLI it comes from, so which CLI runs is decided
+  afresh** (`detectClaudeCodeExecutable`): with several installs found (the usual places, the
+  npm package's own `bin/claude.exe` — PATH on Windows holds only its shell shim and `.cmd` —
+  and PATH) **the newest `--version` wins**, cached per path *and* mtime so an upgrade in place
+  is seen. Earlier builds wrote the first install detected into `chat.claudeCode.executablePath`
+  and used it for good — hidden in app-scoped mode, so it could not even be changed — which is
+  how a native 2.1.266 kept an npm 2.1.283 and its Opus 5.5 out of the picker. So nothing
+  detected is stored any more, and a stored path at a standard location
+  (`isStandardClaudeLocation`) is read as that leftover and let go; only a path detection would
+  not find is the athlete's choice. The list remembers the CLI it was read from
+  (`availableModelsFrom`, `<path>@<version>`) and is read again as soon as that changes.
 
   **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
   P2.0 of docs/coach-plan-canvas.md). **A conversation keeps the provider it was started with**
