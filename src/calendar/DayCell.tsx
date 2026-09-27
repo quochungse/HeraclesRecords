@@ -9,6 +9,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
+  formatHappenDayLabel,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
 import { sportColorCategory } from "../training/sportColors";
@@ -386,7 +387,7 @@ export function DayCell({
             type="button"
             className="calendar-day-number calendar-day-open"
             onClick={onSelectDay}
-            aria-label={`Open ${day.dateKey}`}
+            aria-label={`Open ${formatHappenDayLabel(day.dateKey)}`}
             title="Open the day"
           >
             {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}

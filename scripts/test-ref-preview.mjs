@@ -167,6 +167,12 @@ const ref = (overrides) => ({
   assert.equal(refPlaceholder([week]), "Ask about this week…");
   assert.equal(refPlaceholder([whole]), "Ask about this plan…");
   assert.equal(refPlaceholder([week, whole]), "Ask about these…");
+  // A calendar week and an activity are named too, not left at "this".
+  assert.equal(refPlaceholder([scheduleRefPreview({ scope: "week", day: "20260921", label: "Week of Sep 21 – Sep 27" })]), "Ask about this week…");
+  assert.equal(
+    refPlaceholder([scheduleRefPreview({ scope: "session", day: "20260926", activityId: "a1", label: "Sat 26 Sep · Morning run" })]),
+    "Ask about this activity…"
+  );
 }
 
 assert.equal(formatSessionTime(25 * 60), "25m");

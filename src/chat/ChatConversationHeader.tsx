@@ -90,7 +90,10 @@ export function ChatConversationHeader({
             {title}
           </button>
         )}
-        {subtitle ? <span className="chat-conversation-subtitle">{subtitle}</span> : null}
+        {/* Always drawn, empty or not: a conversation with nothing under
+            its name made the head a line shorter, and switching to it moved
+            the list and the transcript up under the pointer. */}
+        <span className="chat-conversation-subtitle">{subtitle}</span>
       </div>
       <div className="chat-header-end">
         {reads !== null && onOpenReads ? (

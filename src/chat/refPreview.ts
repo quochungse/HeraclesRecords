@@ -159,8 +159,9 @@ export function scheduleRefPreview(ref: ScheduleRef): RefPreview {
 export function refPlaceholder(previews: readonly RefPreview[]): string | undefined {
   if (previews.length !== 1) return previews.length ? "Ask about these…" : undefined;
   const [only] = previews;
-  if (only.kind === "week") return "Ask about this week…";
+  if (only.kind === "week" || only.kind === "calendarWeek") return "Ask about this week…";
   if (only.kind === "session") return "Ask about this session…";
+  if (only.kind === "activity") return "Ask about this activity…";
   if (only.kind === "plan") return "Ask about this plan…";
   return "Ask about this…";
 }

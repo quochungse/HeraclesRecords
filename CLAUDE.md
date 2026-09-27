@@ -1143,7 +1143,12 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`.chat-plan-index-body`); each group's list used to sit straight in the clipping panel.
   A blank conversation is reused or, when left, deleted — unless
   an analysis is attached to it. The input grows with its words (`field-sizing: content`)
-  up to six lines and scrolls past that.
+  up to six lines and scrolls past that. **The transcript is held at its end while it
+  grows** (`stickToEndRef`): a `ResizeObserver` on the thread and the transcript keeps it there,
+  because cards grow after they mount — a plan's document, a brief's row — and a conversation
+  opened at its end used to settle with the last card under the composer. Only a move *up* from
+  where the view was last put lets go (a scroll event can land after the thread grew and read
+  as "not at the end"), so a streaming answer no longer drags an athlete reading above it.
   **Stop has to reach a turn that has not reached a provider yet.** The Claude status check,
   the MCP connections and the snapshot read from COROS run first and take seconds; nothing
   in that phase listened for the abort, and `streamClaudeCodeCompletion` subscribes to the

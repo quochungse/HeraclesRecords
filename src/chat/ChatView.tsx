@@ -2477,16 +2477,57 @@ export function ChatView({
     onError
   ]);
 
-  // Keep the transcript scrolled to the newest content.
+  /*
+   * Whether the transcript is read at its end, and so held there as it grows.
+   * Cards grow after they mount — a plan's figures and weeks arrive with its
+   * document, a brief with its row — so a conversation opened at its end used
+   * to settle with the last card cut off under the composer. The thread's size
+   * is watched instead of the state that grows it: streamed words, a live
+   * analysis and a late document all move it the same way. Scrolling up to
+   * read lets go, so a streaming answer no longer drags the athlete down.
+   */
+  const stickToEndRef = useRef(true);
+  /* Only a move up from where the view was last put lets go. A scroll event
+     can land after the thread has grown under it — a card's document arriving
+     between the jump to the end and the event — and read as "not at the end"
+     though nobody moved. */
+  const lastScrollTopRef = useRef(0);
+  const threadObserverRef = useRef<ResizeObserver | null>(null);
+  const observeThread = useCallback((thread: HTMLDivElement | null) => {
+    threadObserverRef.current?.disconnect();
+    threadObserverRef.current = null;
+    if (!thread || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const transcript = scrollRef.current;
+      if (transcript && stickToEndRef.current) {
+        transcript.scrollTo({ top: transcript.scrollHeight });
+        lastScrollTopRef.current = transcript.scrollTop;
+      }
+    });
+    observer.observe(thread);
+    // The transcript itself, too: the composer growing or a panel opening
+    // beside it changes how much of the thread shows without resizing it.
+    if (thread.parentElement) observer.observe(thread.parentElement);
+    threadObserverRef.current = observer;
+  }, []);
+  const handleTranscriptScroll = (event: { currentTarget: HTMLDivElement }) => {
+    const transcript = event.currentTarget;
+    if (transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40) {
+      stickToEndRef.current = true;
+    } else if (transcript.scrollTop < lastScrollTopRef.current) {
+      stickToEndRef.current = false;
+    }
+    lastScrollTopRef.current = transcript.scrollTop;
+  };
+
+  // A new entry, or another conversation, is read from its end.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [
-    timeline,
-    streamingText,
-    thinkingText,
-    liveAnalysis,
-    exportingLatestActivity
-  ]);
+    const transcript = scrollRef.current;
+    stickToEndRef.current = true;
+    if (!transcript) return;
+    transcript.scrollTo({ top: transcript.scrollHeight });
+    lastScrollTopRef.current = transcript.scrollTop;
+  }, [timeline]);
 
   const handleSignIn = async () => {
     if (!api) return;
@@ -3224,6 +3265,13 @@ export function ChatView({
     }
     return [];
   });
+  /* Counted as the conversation's row counts them — a proposal by its open
+     lines — so the bar and the list's "2 to decide" do not disagree. */
+  const waitingCount = waitingIndices.reduce((count, index) => {
+    const entry = timeline[index];
+    const set = entry?.kind === "scheduleChange" ? scheduleChanges[entry.changeSetId] : null;
+    return count + (set ? proposedLines(set).length : 1);
+  }, 0);
   const [waitingCursor, setWaitingCursor] = useState(0);
   /** The sources of a plan being started from the empty conversation, while its brief is open (R3). */
   const [newPlanSources, setNewPlanSources] = useState<TrainingPlanDataSources | null>(null);
@@ -4392,8 +4440,8 @@ export function ChatView({
       >
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
-          <div className="chat-transcript" ref={scrollRef}>
-        <div className="chat-thread">
+          <div className="chat-transcript" ref={scrollRef} onScroll={handleTranscriptScroll}>
+        <div className="chat-thread" ref={observeThread}>
           {/* What waits on the athlete here (R3), as a bar that jumps to each
               in turn: a question, a change to decide, a brief not yet a plan. */}
           {waitingIndices.length && !turnHere ? (
@@ -4408,10 +4456,8 @@ export function ChatView({
                   ?.scrollIntoView({ block: "center", behavior: "smooth" });
               }}
             >
-              {waitingIndices.length === 1
-                ? "1 thing waiting on you"
-                : `${waitingIndices.length} things waiting on you`}{" "}
-              · Jump ↓
+              {/* No arrow: what waits is as often above the reader as below. */}
+              {waitingCount === 1 ? "1 thing waiting on you" : `${waitingCount} things waiting on you`} · Jump
             </button>
           ) : null}
           {timeline.length === 0 && !turnHere ? (

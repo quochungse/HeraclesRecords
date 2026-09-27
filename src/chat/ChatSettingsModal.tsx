@@ -94,7 +94,9 @@ export function ChatSettingsModal({
         <header className="chat-settings-modal-header">
           <div className="chat-settings-modal-title">
             <Settings2 size={16} aria-hidden="true" />
-            <h2 id="chat-settings-title">Settings</h2>
+            {/* Coach's own, as the gear that opens it says: the app has a
+                Settings screen of its own, and this is not it. */}
+            <h2 id="chat-settings-title">Coach settings</h2>
           </div>
           <button
             type="button"

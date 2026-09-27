@@ -496,36 +496,40 @@ function ArtifactView({
           </span>
           <h2 title={title}>{title}</h2>
         </div>
-        <span
-          className="chat-creation-status"
-          data-saved={status.saved ? "true" : "false"}
-          data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
-        >
-          {calendar?.running && status.saved ? "On calendar" : status.label}
-        </span>
-        {onAsk ? (
+        <button type="button" className="icon-button chat-canvas-close" aria-label="Close the Workbench" onClick={onClose}>
+          <X size={18} aria-hidden="true" />
+        </button>
+        {/* Under the name rather than beside it: beside it, a plan's name was
+            cut to a dozen characters by the status and two links. */}
+        <div className="chat-canvas-head-meta">
+          <span
+            className="chat-creation-status"
+            data-saved={status.saved ? "true" : "false"}
+            data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
+          >
+            {calendar?.running && status.saved ? "On calendar" : status.label}
+          </span>
+          {onAsk ? (
+            <button
+              type="button"
+              className="chat-plan-panel-chat-link"
+              data-action="askPlan"
+              onClick={() => onAsk(refTo("plan"))}
+              title="Ask Coach about this"
+            >
+              Ask Coach
+            </button>
+          ) : null}
           <button
             type="button"
             className="chat-plan-panel-chat-link"
-            data-action="askPlan"
-            onClick={() => onAsk(refTo("plan"))}
-            title="Ask Coach about this"
+            onClick={() => onViewInChat(shownId)}
+            title="Show this in the conversation"
           >
-            Ask Coach
+            <MessageCircle size={14} aria-hidden="true" />
+            In chat
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="chat-plan-panel-chat-link"
-          onClick={() => onViewInChat(shownId)}
-          title="Show this in the conversation"
-        >
-          <MessageCircle size={14} aria-hidden="true" />
-          In chat
-        </button>
-        <button type="button" className="icon-button" aria-label="Close the Workbench" onClick={onClose}>
-          <X size={18} aria-hidden="true" />
-        </button>
+        </div>
       </header>
 
       {siblings.length > 1 ? (

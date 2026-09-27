@@ -1578,6 +1578,43 @@ async function main() {
   await waitFor(() => harness("exists", "#coach-brief-title"), "Start a training plan opens the brief");
   assert.equal(await harness("text", "#coach-brief-title"), "New plan");
 
+  // A conversation opened at its end stays there while its cards fill in: the
+  // plan's document arrives after the jump to the end, and the card it grows
+  // used to leave the view short of the end, the last card under the composer.
+  const LONG = [
+    ...Array.from({ length: 24 }, (_, index) => ({
+      kind: "message",
+      role: index % 2 ? "assistant" : "user",
+      content: `Earlier turn ${index + 1}: a line long enough to take up some room in the transcript.`
+    })),
+    TRANSCRIPT[1],
+    TRANSCRIPT[2]
+  ];
+  const gapToEnd = () =>
+    page(`(() => { const t = document.querySelector(".chat-transcript"); return Math.round(t.scrollHeight - t.scrollTop - t.clientHeight); })()`);
+  // A column that cannot grow, as the app gives Coach: the transcript scrolls.
+  await page(`document.getElementById("root").style.height = "700px"`);
+  await harness("mount", "ChatView", { styles: true }, { ...BASE_SCRIPT, getChatSession: LONG, getPlanDraftDocument: "__pending" });
+  await waitFor(() => harness("exists", ".chat-creation-card"), "the card is drawn before its document");
+  await settle();
+  assert.ok(
+    await page(`(() => { const t = document.querySelector(".chat-transcript"); return t.scrollHeight > t.clientHeight + 200; })()`),
+    "the conversation is longer than the transcript"
+  );
+  assert.ok((await gapToEnd()) <= 2, "it opens at its end");
+  assert.equal(await harness("resolvePending", "getPlanDraftDocument", DOCUMENT), true);
+  await waitFor(() => harness("exists", ".chat-creation-card .plan-ridge"), "the document arrives and the card grows");
+  await settle();
+  assert.ok((await gapToEnd()) <= 2, `and it is still at its end once the card has grown (${await gapToEnd()}px short)`);
+  // Reading further up is left alone while the thread grows under it.
+  await page(`document.querySelector(".chat-transcript").scrollTop -= 300`);
+  await settle();
+  const before = await gapToEnd();
+  await page(`document.querySelector(".chat-thread").appendChild(Object.assign(document.createElement("div"), { style: "height: 120px" }))`);
+  await settle();
+  assert.ok((await gapToEnd()) >= before, "a reader scrolled up is not pulled down");
+  await page(`document.getElementById("root").style.height = ""`);
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((line) => !/act\(|ReactDOMTestUtils/.test(line)), []);
 
