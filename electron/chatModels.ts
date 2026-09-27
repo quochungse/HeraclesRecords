@@ -1,10 +1,20 @@
-import type { AnthropicEffort } from "./types";
+import type {
+  AnthropicEffort,
+  ChatProvider,
+  ChatSettings,
+  ClaudeCodeStatus
+} from "./types";
 
 export interface ChatModelOption {
   value: string;
   label: string;
   /** Qualifier shown only in an open menu, never on the closed pill. */
   detail?: string;
+  /**
+   * Effort levels the model takes, where its provider says. Absent means not
+   * stated, and every level is offered; `[]` means it takes none.
+   */
+  efforts?: AnthropicEffort[];
 }
 
 export interface ChatEffortOption {
@@ -38,6 +48,16 @@ export function supportsReasoningEffort(provider: string): boolean {
   return provider === "claude-code" || provider === "claude-api";
 }
 
+/*
+ * The lists below are fallbacks, not the menu. Each provider's own list is
+ * read from it (`modelCatalog.ts`, `providerModelOptions`) and replaces these
+ * as soon as it has been read once; these are what a picker shows before that
+ * — a fresh install, no key yet, or a provider that has not answered. The
+ * Messages API rows are named without a ranking ("most capable" was on Fable 5
+ * and stayed there after Fable 5.1 shipped): a ranking is true the day it is
+ * written and wrong in a picker for as long as the build is installed.
+ */
+
 export const CHATGPT_MODEL_OPTIONS: ChatModelOption[] = [
   { value: "", label: "Auto" },
   { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
@@ -52,9 +72,10 @@ export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5";
 
 export const ANTHROPIC_MODEL_OPTIONS: ChatModelOption[] = [
   { value: "claude-opus-5", label: "Claude Opus 5" },
-  { value: "claude-fable-5", label: "Claude Fable 5 (most capable)" },
+  { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
+  { value: "claude-fable-5-1", label: "Claude Fable 5.1" },
   { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
-  { value: "claude-haiku-4-5", label: "Claude Haiku 4.5 (fastest)" }
+  { value: "claude-haiku-4-5", label: "Claude Haiku 4.5", efforts: [] }
 ];
 
 export const CLAUDE_MODEL_OPTIONS: ChatModelOption[] = [
@@ -69,6 +90,7 @@ export const OPENROUTER_MODEL_OPTIONS: ChatModelOption[] = [
   { value: "openrouter/free", label: "Free Router" }
 ];
 
+/** Tried in order by "Auto" when the account's own list has not been read. */
 const CHATGPT_AUTO_MODEL_IDS = [
   "gpt-5.6-sol",
   "gpt-5.6-terra",
@@ -79,9 +101,16 @@ const CHATGPT_AUTO_MODEL_IDS = [
   "gpt-5-codex"
 ];
 
+/**
+ * What "Auto" tries, in order: the model that last worked, then the
+ * account's own list as ChatGPT ranks it, then the shipped list — which is
+ * only reached when the account's list has not been read, or every model on
+ * it was turned away.
+ */
 export function getChatGptModelCandidates(
   selectedModel?: string,
-  cachedModel?: string
+  cachedModel?: string,
+  listedModels: readonly string[] = []
 ): string[] {
   const selected = selectedModel?.trim();
   if (selected) {
@@ -89,9 +118,12 @@ export function getChatGptModelCandidates(
   }
 
   const cached = cachedModel?.trim();
-  return cached
-    ? [cached, ...CHATGPT_AUTO_MODEL_IDS.filter((model) => model !== cached)]
-    : [...CHATGPT_AUTO_MODEL_IDS];
+  const ordered = [
+    ...(cached ? [cached] : []),
+    ...listedModels,
+    ...CHATGPT_AUTO_MODEL_IDS
+  ];
+  return [...new Set(ordered.filter(Boolean))];
 }
 
 const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
@@ -167,6 +199,7 @@ export function withNamedDefaultModel(
   );
 }
 
+/** The shipped fallback list for a provider; `providerModelOptions` is the menu. */
 export function getChatModelOptions(provider: string): ChatModelOption[] {
   if (provider === "claude-code") return CLAUDE_MODEL_OPTIONS;
   if (provider === "openrouter") return OPENROUTER_MODEL_OPTIONS;
@@ -188,4 +221,103 @@ export function getModelPickerOptions(
   return provider === "claude-code"
     ? withNamedDefaultModel(options, defaultModel)
     : options;
+}
+
+/**
+ * How many OpenRouter models a picker offers. Its list is every model with
+ * tool calling, most used first, and runs to hundreds; a menu of hundreds is
+ * not a choice. Settings still takes any slug typed or picked from the full
+ * list, and a model chosen there stays in the picker however far down it is.
+ */
+export const OPENROUTER_PICKER_LIMIT = 40;
+
+/**
+ * The models a provider offers, as its own list states it where that list has
+ * been read, and the shipped fallback where it has not. The one place a
+ * picker asks — Coach's composer, the AI sheet, Settings and an analysis all
+ * read this, so a model the provider adds reaches all of them at once.
+ */
+export function providerModelOptions(
+  provider: ChatProvider,
+  settings: Pick<ChatSettings, "claudeCode" | "modelCatalogs">,
+  claudeStatus?: Pick<ClaudeCodeStatus, "availableModels" | "defaultModel"> | null
+): ChatModelOption[] {
+  switch (provider) {
+    case "local":
+      return [];
+    case "claude-code": {
+      const listed = claudeStatus?.availableModels?.length
+        ? claudeStatus.availableModels
+        : settings.claudeCode.availableModels;
+      if (listed?.length) return listed;
+      return withNamedDefaultModel(
+        CLAUDE_MODEL_OPTIONS,
+        claudeStatus?.defaultModel ?? settings.claudeCode.defaultModel
+      );
+    }
+    case "claude-api": {
+      const listed = settings.modelCatalogs?.["claude-api"]?.models;
+      return listed?.length ? listed : ANTHROPIC_MODEL_OPTIONS;
+    }
+    case "openrouter": {
+      const listed = settings.modelCatalogs?.openrouter?.models;
+      if (!listed?.length) return OPENROUTER_MODEL_OPTIONS;
+      const routers = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
+      return [
+        ...OPENROUTER_MODEL_OPTIONS,
+        ...listed.filter((option) => !routers.has(option.value)).slice(0, OPENROUTER_PICKER_LIMIT)
+      ];
+    }
+    case "chatgpt": {
+      const listed = settings.modelCatalogs?.chatgpt?.models;
+      return listed?.length
+        ? [CHATGPT_MODEL_OPTIONS[0], ...listed.filter((option) => option.value)]
+        : CHATGPT_MODEL_OPTIONS;
+    }
+  }
+}
+
+/**
+ * The options with the chosen model kept in them. A model the provider no
+ * longer lists is still what a conversation is set to, and dropping it from
+ * the menu would show another model as chosen while this one keeps being
+ * sent — so it stays, named, and says why it is at the end.
+ */
+export function withCurrentModel(
+  options: readonly ChatModelOption[],
+  model: string
+): ChatModelOption[] {
+  const id = model.trim();
+  if (!id || options.some((option) => option.value === id)) return [...options];
+  return [...options, { value: id, label: describeChatModel(id), detail: "not in the provider\u2019s list" }];
+}
+
+/** The effort rows for a model: all of them unless its provider said which it takes. */
+export function effortOptionsFor(option?: Pick<ChatModelOption, "efforts">): ChatEffortOption[] {
+  const efforts = option?.efforts;
+  return efforts
+    ? REASONING_EFFORT_OPTIONS.filter((row) => efforts.includes(row.value))
+    : REASONING_EFFORT_OPTIONS;
+}
+
+const EFFORT_ORDER: AnthropicEffort[] = ["low", "medium", "high", "xhigh", "max"];
+
+/**
+ * The effort a request can carry for a model: the level asked for where the
+ * model takes it, else the highest it takes below that, else its lowest.
+ * `undefined` when the model takes none — sending one is a 400. A level a
+ * model does not list is also a 400, which is why this clamps rather than
+ * passes the choice through: a conversation set to "Max" moved onto a model
+ * that stops at "High" should answer at High, not fail.
+ */
+export function effortForModel(
+  effort: AnthropicEffort,
+  efforts?: readonly AnthropicEffort[]
+): AnthropicEffort | undefined {
+  if (!efforts) return effort;
+  if (efforts.length === 0) return undefined;
+  if (efforts.includes(effort)) return effort;
+  const asked = EFFORT_ORDER.indexOf(effort);
+  const below = EFFORT_ORDER.filter((level, index) => index < asked && efforts.includes(level));
+  return below.at(-1) ?? EFFORT_ORDER.find((level) => efforts.includes(level));
 }

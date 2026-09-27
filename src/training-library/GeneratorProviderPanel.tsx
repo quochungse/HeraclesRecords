@@ -1,7 +1,12 @@
 import { AlertTriangle, ArrowRight, Check, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ChatProvider, ChatSettings, ClaudeCodeStatus } from "../../electron/types";
-import { REASONING_EFFORT_OPTIONS, supportsReasoningEffort } from "../../electron/chatModels";
+import {
+  effortForModel,
+  effortOptionsFor,
+  supportsReasoningEffort,
+  withCurrentModel
+} from "../../electron/chatModels";
 import { OptionGroup } from "../components/OptionGroup";
 import { COACH_PROVIDER_LABELS } from "../chat/CoachModelsPanel";
 import {
@@ -11,6 +16,9 @@ import {
   runtimeModelOptions,
   type GeneratorRuntime
 } from "./planGeneratorRuntime";
+
+/** More models than this are offered as a menu rather than a row of chips. */
+const MODEL_CHIP_LIMIT = 6;
 
 /** Where to fix a provider that is not ready, per provider. */
 export const PROVIDER_FIX: Record<ChatProvider, string> = {
@@ -61,7 +69,13 @@ export function GeneratorProviderPanel({
   }, []);
 
   const ready = readiness[runtime.provider];
-  const models = runtimeModelOptions(runtime.provider, settings, claudeStatus);
+  const models = withCurrentModel(
+    runtimeModelOptions(runtime.provider, settings, claudeStatus),
+    runtime.model
+  );
+  const listedModel = models.find((option) => option.value === runtime.model);
+  const efforts = effortOptionsFor(listedModel);
+  const effort = effortForModel(runtime.effort, listedModel?.efforts);
   const pickProvider = (provider: ChatProvider) => {
     if (provider === runtime.provider) return;
     onChange(runtimeFromSettings(settings, provider));
@@ -137,6 +151,9 @@ export function GeneratorProviderPanel({
             <OptionGroup
               label="Model"
               className="plan-generator-sheet-models"
+              // A provider's own list can run to dozens (OpenRouter's is cut
+              // at 40); past a handful, chips are a wall rather than a choice.
+              mode={models.length > MODEL_CHIP_LIMIT ? "dropdown" : "expanded"}
               value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
               options={models.map((option) => ({ value: option.value, label: modelChipLabel(option.label), title: option.label }))}
               onChange={(model) => onChange({ ...runtime, model })}
@@ -144,15 +161,19 @@ export function GeneratorProviderPanel({
           )}
 
           <p className="tl-eyebrow">Reasoning effort</p>
-          {supportsReasoningEffort(runtime.provider) ? (
+          {supportsReasoningEffort(runtime.provider) && effort && efforts.length > 0 ? (
             <OptionGroup
               label="Reasoning effort"
-              value={runtime.effort}
-              options={REASONING_EFFORT_OPTIONS.map((option) => ({ value: option.value, label: option.label, title: option.detail }))}
-              onChange={(effort) => onChange({ ...runtime, effort })}
+              value={effort}
+              options={efforts.map((option) => ({ value: option.value, label: option.label, title: option.detail }))}
+              onChange={(next) => onChange({ ...runtime, effort: next })}
             />
           ) : (
-            <p className="plan-generator-sheet-note">{COACH_PROVIDER_LABELS[runtime.provider]} has no effort setting.</p>
+            <p className="plan-generator-sheet-note">
+              {supportsReasoningEffort(runtime.provider)
+                ? `${listedModel ? listedModel.label : "This model"} has no effort setting.`
+                : `${COACH_PROVIDER_LABELS[runtime.provider]} has no effort setting.`}
+            </p>
           )}
         </div>
 

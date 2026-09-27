@@ -95,6 +95,7 @@ export function AnalysisDefinitionForm({
             {showEffort ? (
               <EffortSwitch
                 provider={runtimeProvider}
+                model={draft.runtime?.model ?? ""}
                 effort={(draft.runtime?.effort ?? "low") as AnthropicEffort}
                 onChange={(effort) =>
                   onChange({ runtime: { ...draft.runtime, effort } })

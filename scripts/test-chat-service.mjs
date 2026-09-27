@@ -746,6 +746,9 @@ const {
   supportsReasoningEffort,
   withNamedDefaultModel
 } = await import(`${distUrl("chatModels.js")}?cacheBust=${Date.now()}`);
+const { MODEL_CATALOG_KEYS } = await import(
+  `${distUrl("modelCatalog.js")}?cacheBust=${Date.now()}`
+);
 
 // Effort reaches only the Claude backends; offering it elsewhere would send a
 // parameter those providers reject.
@@ -827,9 +830,15 @@ assert.equal(
   "Default model"
 );
 
+// The shipped Messages API list is only the fallback before the key's own
+// list is read (test:model-catalog); it names current models, unranked.
 assert.deepEqual(
   getChatModelOptions("claude-api").map((option) => option.value),
-  ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"]
+  ["claude-opus-5", "claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-haiku-4-5"]
+);
+assert.ok(
+  getChatModelOptions("claude-api").every((option) => !/\(/.test(option.label)),
+  "a fallback Messages API row ranks itself"
 );
 // Settings and the conversation header must offer the same Claude entries; they
 // used to hardcode two different label sets.
@@ -867,6 +876,12 @@ assert.deepEqual(
   getChatGptModelCandidates(undefined, "gpt-5.5").slice(0, 2),
   ["gpt-5.5", "gpt-5.6-sol"]
 );
+// Auto walks the account's own list before the shipped one, and never twice.
+{
+  const candidates = getChatGptModelCandidates(undefined, "gpt-5.5", ["gpt-6", "gpt-5.5"]);
+  assert.deepEqual(candidates.slice(0, 3), ["gpt-5.5", "gpt-6", "gpt-5.6-sol"]);
+  assert.equal(new Set(candidates).size, candidates.length);
+}
 
 const settingsValues = new Map();
 let storedApiKey = "";
@@ -1044,6 +1059,38 @@ const reScoped = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
 });
 assert.equal(reScoped.claudeCode.useAppScopedAuth, true);
 
+// A provider's model list is read with the settings, and a save from a
+// window never writes one back: the window's copy may be older than a list
+// refreshModelCatalogs has just read.
+fakeStore.set(
+  MODEL_CATALOG_KEYS["claude-api"],
+  JSON.stringify({
+    models: [
+      { value: "claude-opus-6", label: "Claude Opus 6", efforts: ["low", "high", "bogus"] },
+      { label: "no value" }
+    ],
+    fetchedAt: "2026-09-27T00:00:00.000Z"
+  })
+);
+fakeStore.set(
+  MODEL_CATALOG_KEYS.openrouter,
+  JSON.stringify({ models: [{ value: "a/b", label: "A B" }], fetchedAt: "2026-09-27T00:00:00.000Z" })
+);
+fakeStore.set(MODEL_CATALOG_KEYS.chatgpt, "{not json");
+const withCatalogs = readChatSettingsFromStore(fakeStore, fakeKeyStores);
+assert.deepEqual(withCatalogs.modelCatalogs["claude-api"].models, [
+  { value: "claude-opus-6", label: "Claude Opus 6", efforts: ["low", "high"] }
+]);
+assert.equal(withCatalogs.modelCatalogs.chatgpt, undefined, "an unreadable list reads as none");
+const savedFromStaleWindow = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...withCatalogs,
+  modelCatalogs: {
+    "claude-api": { models: [{ value: "old", label: "Old" }], fetchedAt: "2020-01-01T00:00:00.000Z" }
+  }
+});
+assert.equal(savedFromStaleWindow.modelCatalogs["claude-api"].models[0].value, "claude-opus-6");
+assert.equal(savedFromStaleWindow.modelCatalogs.openrouter.models[0].value, "a/b");
+
 const cleared = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   ...reScoped,
   openRouter: { ...loaded.openRouter, clearApiKey: true },
@@ -1053,6 +1100,9 @@ assert.equal(cleared.local.hasApiKey, false);
 assert.equal(storedApiKey, "");
 assert.equal(cleared.openRouter.hasApiKey, false);
 assert.equal(storedOpenRouterApiKey, "");
+// A list read with a key goes with the key.
+assert.equal(cleared.modelCatalogs.openrouter, undefined);
+assert.ok(cleared.modelCatalogs["claude-api"]);
 
 const clearedAnthropic = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   ...cleared,
@@ -1060,6 +1110,7 @@ const clearedAnthropic = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
 });
 assert.equal(clearedAnthropic.anthropic.hasApiKey, false);
 assert.equal(storedAnthropicKey, "");
+assert.equal(clearedAnthropic.modelCatalogs["claude-api"], undefined);
 
 // An unknown effort falls back to the default rather than reaching the API.
 const defaultedEffort = saveChatSettingsToStore(fakeStore, fakeKeyStores, {

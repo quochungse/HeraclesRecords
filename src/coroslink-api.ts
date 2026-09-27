@@ -125,6 +125,7 @@ import type {
   CoachAnalysisSummary,
   CoachAnalysisUpdate,
   ChatSettings,
+  ModelCatalogRefresh,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
@@ -511,6 +512,14 @@ export interface CorosLinkApi {
   ) => () => void;
   getChatAuthStatus: () => Promise<ChatAuthStatus>;
   getChatSettings: () => Promise<ChatSettings>;
+  /**
+   * Reads each provider's model list again where it is a day old (or, with
+   * `force`, the one named) and returns the settings holding them.
+   */
+  refreshChatModels: (options?: {
+    provider?: ChatProvider;
+    force?: boolean;
+  }) => Promise<ModelCatalogRefresh>;
   getBaseCoachInstructions: () => Promise<string>;
   saveChatSettings: (settings: ChatSettings) => Promise<ChatSettings>;
   testLocalChatConnection: (

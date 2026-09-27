@@ -146,6 +146,7 @@ import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
+import { ModelOptionsContext } from "./modelOptionsContext";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
   fromPersistedEntries,
@@ -1835,6 +1836,20 @@ export function ChatView({
             ? settingsResult.value
             : DEFAULT_CHAT_SETTINGS;
         setChatSettings(settings);
+        // Model lists a day old are read again in the background; only the
+        // lists are taken from the answer, so nothing changed meanwhile is lost.
+        // Started inside a promise so that no failure of it, synchronous or
+        // not, can stop the rest of this start-up from running.
+        void Promise.resolve()
+          .then(() => api.refreshChatModels())
+          .then((result) => {
+            // Read here, never inside the updater: a throw there is a throw
+            // in render, and it takes the whole screen with it.
+            const modelCatalogs = result?.settings?.modelCatalogs;
+            if (cancelled || !modelCatalogs) return;
+            setChatSettings((current) => ({ ...current, modelCatalogs }));
+          })
+          .catch(() => undefined);
         if (claudeResult.status === "fulfilled") {
           setClaudeStatus(claudeResult.value);
         }
@@ -3702,6 +3717,9 @@ export function ChatView({
    * is about Coach's provider, so a pick scoped to the conversation would
    * leave the athlete standing in front of it.
    */
+  /** Each provider's models as this screen last read them (`providerModelOptions`). */
+  const modelOptionsFor = (provider: ChatProvider) =>
+    runtimeModelOptions(provider, chatSettings, claudeStatus);
   const renderProviderControls = (
     runtime: GeneratorRuntime,
     change: (next: GeneratorRuntime) => void
@@ -3715,23 +3733,14 @@ export function ChatView({
       <ModelSwitch
         provider={runtime.provider}
         model={runtime.model}
-        defaultModel={
-          runtime.provider === "claude-code"
-            ? (claudeStatus?.defaultModel ??
-              chatSettings.claudeCode.defaultModel)
-            : undefined
-        }
-        availableModels={
-          runtime.provider === "claude-code"
-            ? (claudeStatus?.availableModels ??
-              chatSettings.claudeCode.availableModels)
-            : undefined
-        }
+        options={modelOptionsFor(runtime.provider)}
         disabled={savingSettings || isBusy}
         onChange={(model) => change({ ...runtime, model })}
       />
       <EffortSwitch
         provider={runtime.provider}
+        model={runtime.model}
+        modelOptions={modelOptionsFor(runtime.provider)}
         effort={runtime.effort}
         disabled={savingSettings || isBusy}
         onChange={(effort) => change({ ...runtime, effort })}
@@ -5271,19 +5280,23 @@ function AnalysisSilentChip({
           />
         </Suspense>
       ) : null}
-      <AnalysesModal
-        api={api}
-        target={analysisTarget}
-        provider={chatSettings.provider}
-        onChanged={() => setAnalysesVersion((value) => value + 1)}
-        onClose={() => {
-          setAnalysisTarget(null);
-          // Catch-all: anything the modal changed is reflected on close, even
-          // a path that forgot to report itself.
-          setAnalysesVersion((value) => value + 1);
-        }}
-        onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
-      />
+      {/* An analysis's model picker is three components down; the context
+          hands it the lists this screen has read. */}
+      <ModelOptionsContext.Provider value={modelOptionsFor}>
+        <AnalysesModal
+          api={api}
+          target={analysisTarget}
+          provider={chatSettings.provider}
+          onChanged={() => setAnalysesVersion((value) => value + 1)}
+          onClose={() => {
+            setAnalysisTarget(null);
+            // Catch-all: anything the modal changed is reflected on close, even
+            // a path that forgot to report itself.
+            setAnalysesVersion((value) => value + 1);
+          }}
+          onOpenConversation={(sessionId) => void openRunConversation(sessionId)}
+        />
+      </ModelOptionsContext.Provider>
     </div>
   );
 }

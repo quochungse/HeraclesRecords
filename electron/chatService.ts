@@ -117,15 +117,25 @@ import {
   type LocalChatRuntimeConfig
 } from "./localChatProvider";
 import {
+  listOpenRouterModelsRequest,
   streamOpenRouterChatCompletion,
   testOpenRouterConnectionRequest
 } from "./openRouterProvider";
 import {
   AnthropicProviderError,
+  listAnthropicModels,
   streamAnthropicChatCompletion,
   testAnthropicApiConnectionRequest,
   type AnthropicRuntimeConfig
 } from "./anthropicChatProvider";
+import {
+  MODEL_CATALOG_KEYS,
+  createCatalogRefresher,
+  isStale,
+  listChatGptModels,
+  openRouterEntries,
+  serializeCatalog
+} from "./modelCatalog";
 import {
   ClaudeCodeProviderError,
   getClaudeCodeStatus as inspectClaudeCodeStatus,
@@ -165,6 +175,8 @@ import type {
   ChatEntryAnalysisMarker,
   ChatSettings,
   ChatProvider,
+  ModelCatalogEntry,
+  ModelCatalogRefresh,
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
@@ -257,6 +269,65 @@ export function saveChatSettings(settings: ChatSettings): ChatSettings {
   return saveChatSettingsToStore(chatSettingsStore, chatApiKeyStores, settings);
 }
 
+// ----- Model lists -----
+
+/**
+ * Each provider's list, read where it is due (`createCatalogRefresher` holds
+ * the rules). Only the fetches and the keys live here.
+ */
+const refreshCatalogs = createCatalogRefresher({
+  fetchedAt: (provider) => getChatSettings().modelCatalogs?.[provider]?.fetchedAt,
+  list: async (provider) => {
+    if (provider === "claude-api") {
+      const apiKey = readEncryptedSecret(CHAT_SETTINGS_KEYS.anthropicApiKey);
+      return apiKey ? listAnthropicModels(apiKey) : undefined;
+    }
+    if (provider === "openrouter") {
+      const apiKey = readStoredOpenRouterApiKey();
+      return apiKey
+        ? openRouterEntries(await listOpenRouterModelsRequest(apiKey))
+        : undefined;
+    }
+    if (!getStoredToken()) return undefined;
+    const token = await getValidToken();
+    return listChatGptModels({
+      accessToken: token.access_token,
+      accountId: token.account_id,
+      originator: RESPONSES_ORIGINATOR
+    });
+  },
+  save: (provider, models) =>
+    chatSettingsStore.set(MODEL_CATALOG_KEYS[provider], serializeCatalog(models))
+});
+
+/**
+ * Reads the model lists that are due and returns the settings holding them.
+ * `claude-code` is read only when named: its list comes from spawning the
+ * CLI, which the status read already does on the same one-day clock.
+ */
+export async function refreshModelCatalogs(
+  options: { provider?: ChatProvider; force?: boolean } = {}
+): Promise<ModelCatalogRefresh> {
+  if (options.provider === "claude-code") {
+    const claudeStatus = await getClaudeCodeConnectionStatus({
+      forceModels: options.force
+    });
+    const errors: ModelCatalogRefresh["errors"] =
+      options.force && claudeStatus.authenticated && !claudeStatus.availableModels?.length
+        ? { "claude-code": "Claude Code did not list any models." }
+        : {};
+    return { settings: getChatSettings(), claudeStatus, errors };
+  }
+  if (options.provider === "local") {
+    return { settings: getChatSettings(), errors: {} };
+  }
+  const errors = await refreshCatalogs({
+    provider: options.provider,
+    force: options.force
+  });
+  return { settings: getChatSettings(), errors };
+}
+
 export async function testAnthropicApiConnection(
   config?: Partial<AnthropicApiConfig>
 ): Promise<AnthropicApiConnectionTest> {
@@ -282,7 +353,13 @@ function getClaudeCodeConfigDir(
   return dir;
 }
 
-export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus> {
+/**
+ * `forceModels` reads the account's model list again even when the one held
+ * is fresh — the refresh button's way in; everything else waits for the day.
+ */
+export async function getClaudeCodeConnectionStatus(
+  options: { forceModels?: boolean } = {}
+): Promise<ClaudeCodeStatus> {
   const settings = getChatSettings();
   const status = await inspectClaudeCodeStatus(
     settings.claudeCode.executablePath,
@@ -297,17 +374,23 @@ export async function getClaudeCodeConnectionStatus(): Promise<ClaudeCodeStatus>
       status.availableModels || settings.claudeCode.availableModels
   };
   const configDir = getClaudeCodeConfigDir(settings);
+  // A list is read again when there is none or it is a day old, at most once
+  // per launch: a model the account gains then reaches the picker by the
+  // next day rather than only after someone presses Test connection.
+  const listDue =
+    options.forceModels ||
+    !merged.availableModels?.length ||
+    isStale(settings.claudeCode.availableModelsAt);
   if (
-    !merged.availableModels?.length &&
+    listDue &&
     merged.executablePath &&
     merged.authenticated &&
-    !probedModelDirs.has(configDir ?? "machine")
+    (options.forceModels || !probedModelDirs.has(configDir ?? "machine"))
   ) {
     probedModelDirs.add(configDir ?? "machine");
-    merged.availableModels = await readClaudeCodeModels(
-      merged.executablePath,
-      configDir
-    );
+    merged.availableModels =
+      (await readClaudeCodeModels(merged.executablePath, configDir)) ??
+      merged.availableModels;
   }
   recordClaudeCodeStatus(merged);
   return merged;
@@ -324,7 +407,12 @@ async function readClaudeCodeModels(
 ): Promise<ClaudeCodeStatus["availableModels"]> {
   try {
     const models = await listClaudeCodeModels({ executablePath, configDir });
-    return models.length > 0 ? models : undefined;
+    if (models.length === 0) return undefined;
+    chatSettingsStore.set(
+      CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
+      new Date().toISOString()
+    );
+    return models;
   } catch {
     // The static list still covers the picker; retry on the next status read.
     return undefined;
@@ -738,6 +826,17 @@ function getAnthropicRuntimeConfig(
   };
 }
 
+/** The model's row in the key's own list, when that list has been read. */
+function listedAnthropicModel(
+  settings: ChatSettings,
+  model: string
+): ModelCatalogEntry | undefined {
+  const id = model.trim() || settings.anthropic.model;
+  return settings.modelCatalogs?.["claude-api"]?.models.find(
+    (entry) => entry.value === id
+  );
+}
+
 function storeEncryptedSecret(key: string, secret: string, label: string): void {
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error(`Secure ${label} storage is not available on this system.`);
@@ -859,7 +958,13 @@ export function logoutChat(): ChatAuthStatus {
     controller.abort();
   }
   activeStreams.clear();
-  deleteSettings([SETTINGS.token, SETTINGS.authUpdatedAt, SETTINGS.model]);
+  // The model list was the signed-out account's, like the model that last worked.
+  deleteSettings([
+    SETTINGS.token,
+    SETTINGS.authUpdatedAt,
+    SETTINGS.model,
+    MODEL_CATALOG_KEYS.chatgpt
+  ]);
   return { signedIn: false };
 }
 
@@ -1907,10 +2012,14 @@ async function streamChatTurn(
     }
 
     if (provider === "claude-api") {
-      const runtimeConfig = {
+      const baseConfig = {
         ...getAnthropicRuntimeConfig(settings.anthropic),
         ...(runtime.model ? { model: runtime.model } : {}),
         ...(runtime.effort ? { effort: runtime.effort } : {})
+      };
+      const runtimeConfig: AnthropicRuntimeConfig = {
+        ...baseConfig,
+        listed: listedAnthropicModel(settings, baseConfig.model)
       };
       if (!runtimeConfig.apiKey) {
         throw new AnthropicProviderError(
@@ -3121,7 +3230,10 @@ async function resolveModelAndOpenStream(
   { response: Response; model: string } | { error: string; authError: boolean }
 > {
   const cached = getSetting(SETTINGS.model);
-  const candidates = getChatGptModelCandidates(selectedModel, cached);
+  const listed = getChatSettings().modelCatalogs?.chatgpt?.models.map(
+    (entry) => entry.value
+  );
+  const candidates = getChatGptModelCandidates(selectedModel, cached, listed);
 
   let lastDetail = "";
   for (const model of candidates) {

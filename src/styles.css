@@ -16873,7 +16873,8 @@ tr.data-intervals-row-missing {
 .coach-models-panel .chat-local-settings-panel > .chat-settings-copy,
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools,
 .coach-models-panel .chat-local-settings-panel > .chat-local-actions,
-.coach-models-panel .chat-local-settings-panel > .chat-local-result {
+.coach-models-panel .chat-local-settings-panel > .chat-local-result,
+.coach-models-panel .chat-local-settings-panel > .chat-model-list-status {
   grid-column: 1 / -1;
 }
 
@@ -18390,6 +18391,23 @@ tr.data-intervals-row-missing {
 
 .chat-local-result.is-error {
   color: var(--error-text);
+}
+
+/* Where a provider's model list came from, and the button that reads it
+   again: one line under the model fields, the sentence taking what the
+   button leaves and wrapping above it on a narrow dialog. */
+.chat-model-list-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.chat-model-list-status > p {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
 }
 
 @media (max-width: 1080px) {

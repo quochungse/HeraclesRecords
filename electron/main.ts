@@ -322,6 +322,7 @@ import {
   getChatAuthStatus,
   getChatSessionEntries,
   getChatSettings,
+  refreshModelCatalogs,
   listAllChatSessions,
   loginChat,
   logoutChat,
@@ -1521,6 +1522,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:getAuthStatus", () => getChatAuthStatus());
 
   ipcMain.handle("chat:getSettings", () => getChatSettings());
+
+  ipcMain.handle(
+    "chat:refreshModels",
+    (_event, options?: { provider?: ChatProvider; force?: boolean }) =>
+      refreshModelCatalogs(options)
+  );
 
   ipcMain.handle("chat:getBaseCoachInstructions", () =>
     buildBaseCoachInstructions()

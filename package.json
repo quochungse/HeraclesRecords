@@ -53,6 +53,7 @@
     "test:chat-stream-sink": "npm run build:electron && node scripts/test-chat-stream-sink.mjs",
     "test:claude-code": "npm run build:electron && node scripts/test-claude-code-provider.mjs",
     "test:anthropic-provider": "npm run build:electron && node scripts/test-anthropic-provider.mjs",
+    "test:model-catalog": "npm run build:electron && node scripts/test-model-catalog.mjs",
     "test:chat-history-store": "npm run build:electron && node scripts/test-chat-history-store.mjs",
     "test:chat-transcript-compat": "npm run build:electron && node scripts/test-chat-transcript-compat.mjs",
     "test:ref-preview": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-ref-preview.mjs",

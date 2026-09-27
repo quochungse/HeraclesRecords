@@ -600,16 +600,28 @@ export async function listClaudeCodeModels(options: {
 /**
  * `default` is the CLI's name for "you choose"; ours is the empty string, which
  * is what the settings store and both pickers already persist.
+ *
+ * The effort levels come with the row: the CLI says which a model takes, so a
+ * picker can stop offering "Max" to one that silently serves "High".
  */
 export function toClaudeModelOption(model: {
   value: string;
   displayName: string;
   description?: string;
   resolvedModel?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: AnthropicEffort[];
 }): ChatModelOption {
+  const efforts =
+    model.supportsEffort === false
+      ? []
+      : model.supportedEffortLevels?.length
+        ? [...model.supportedEffortLevels]
+        : undefined;
   return {
     value: model.value === "default" ? "" : model.value,
-    ...claudeModelLabel(model)
+    ...claudeModelLabel(model),
+    ...(efforts ? { efforts } : {})
   };
 }
 

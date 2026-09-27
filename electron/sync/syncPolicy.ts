@@ -243,6 +243,12 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.claudeCode.executablePath": "device",
   // Probed from the local Claude Code install; means nothing on another machine.
   "chat.claudeCode.availableModels": "device",
+  "chat.claudeCode.availableModelsAt": "device",
+  // Each provider's model list, as read with the key or account signed in on
+  // this machine (modelCatalog.ts). Another machine reads its own.
+  "chat.modelCatalog.claudeApi": "device",
+  "chat.modelCatalog.openRouter": "device",
+  "chat.modelCatalog.chatgpt": "device",
   "chat.claudeCode.defaultModel": "device",
   "chat.claudeCode.lastConnectionStatus": "device",
   "chat.claudeCode.lastCheckedAt": "device",

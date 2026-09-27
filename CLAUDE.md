@@ -874,6 +874,29 @@ Overview, Media, Data, and Settings are in the main bundle.
   which is why the badge once said "MCP" for a turn that only read the Training Hub API; an
   unlisted local tool would fall back to that label.
 
+  **Every model picker reads the provider's own list, not the build's** (`modelCatalog.ts`,
+  `providerModelOptions` in `chatModels.ts`). Anthropic's `/v1/models` (asked under the
+  `server-side-fallback-2026-06-01` beta, which is what makes each row carry
+  `allowed_fallback_models`), OpenRouter's `/models/user` and the Codex backend's
+  `/codex/models` are read into `chat.modelCatalog.*` (`device`) and read again once a day
+  (`chat:refreshModels`, fired in the background by Coach and Coach settings) or on **Refresh
+  models**; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
+  clock (`availableModelsAt`). The shipped lists are what a picker shows before a list has
+  ever been read, and **a failed or empty read never replaces a list held** — an offline
+  launch keeps yesterday's menu. `ChatSettings.modelCatalogs` is written by the main process
+  only; `saveChatSettingsToStore` never writes it back, or a window's older copy would. Clearing
+  a key or signing out of ChatGPT drops that provider's list. **A request follows the listed
+  row, not a table**: adaptive thinking, the effort levels, the output ceiling and the refusal
+  fallback of a Messages API model come from the API row field by field, with
+  `MODEL_CAPABILITIES` answering only a field the API left out; an effort a model does not take
+  is clamped down (`effortForModel`), never sent — that is a 400. The Codex list is asked with
+  the **latest Codex release** (read from GitHub once a day, `CODEX_CLIENT_VERSION_FLOOR` when
+  that fails), because the server hides every model whose `minimal_client_version` is newer
+  than the version asked with. A model a provider stops listing stays chosen and is marked
+  "not in the provider's list" (`withCurrentModel`); nothing switches a conversation's model
+  behind its back. Pickers deep in a modal read the lists through `ModelOptionsContext`.
+  `npm run test:model-catalog`.
+
   **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
   P2.0 of docs/coach-plan-canvas.md). **A conversation keeps the provider it was started with**
   (Coach Workbench review, Q1): `chat_sessions.provider` is that provider, `getConversationSettings`

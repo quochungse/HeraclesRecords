@@ -1651,7 +1651,9 @@ export interface ClaudeCodeConfig {
   /** Last observed CLI default model, cached so the picker can name it. */
   defaultModel?: string;
   /** Cached account model list, so the picker does not probe on every render. */
-  availableModels?: Array<{ value: string; label: string }>;
+  availableModels?: ModelCatalogEntry[];
+  /** When that list was last read from the CLI; a list older than a day is read again. */
+  availableModelsAt?: string;
   lastConnectionStatus?: ClaudeCodeConnectionState;
   lastCheckedAt?: string;
   permissions: ClaudeCodePermissions;
@@ -1668,7 +1670,7 @@ export interface ClaudeCodeStatus {
   /** Model Claude Code picks when none is requested, as reported by the CLI. */
   defaultModel?: string;
   /** Models this account can use, named with the versions the CLI reports. */
-  availableModels?: Array<{ value: string; label: string }>;
+  availableModels?: ModelCatalogEntry[];
   /** Signed-in Claude account, read live from the CLI and never persisted. */
   email?: string;
   /** Organisation the account belongs to, when Claude reports one. */
@@ -1696,6 +1698,49 @@ export interface ClaudeCodeLoginStart {
  * option for the subscription path.
  */
 export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * One model a provider offers, as its own list states it. A picker row, and
+ * — for the Messages API — what a request to it may carry.
+ *
+ * Every capability is optional because only some providers say: an absent
+ * field is "not stated", never "no". `efforts` is the exception worth
+ * reading twice: absent means every level is offered, `[]` means the model
+ * takes none.
+ */
+export interface ModelCatalogEntry {
+  value: string;
+  label: string;
+  /** Qualifier shown only in an open menu, never on the closed pill. */
+  detail?: string;
+  efforts?: AnthropicEffort[];
+  /** Accepts `thinking: { type: "adaptive" }` (Messages API). */
+  adaptiveThinking?: boolean;
+  /** The model's own ceiling for `max_tokens` (Messages API). */
+  maxOutputTokens?: number;
+  /**
+   * The model a declined turn is retried on server-side, picked from the
+   * model's own `allowed_fallback_models`; `""` when it has none.
+   */
+  fallbackModel?: string;
+}
+
+/** A provider's model list as last read from it (`modelCatalog.ts`). */
+export interface ModelCatalog {
+  models: ModelCatalogEntry[];
+  fetchedAt: string;
+}
+
+/** Providers whose list lives in `ChatSettings.modelCatalogs`; Claude Code keeps its own. */
+export type CatalogProvider = "claude-api" | "openrouter" | "chatgpt";
+
+export interface ModelCatalogRefresh {
+  settings: ChatSettings;
+  /** Present when Claude Code's list was read again, so its status can be replaced whole. */
+  claudeStatus?: ClaudeCodeStatus;
+  /** Why a provider's list could not be read, by provider; absent providers were fine or skipped. */
+  errors: Partial<Record<ChatProvider, string>>;
+}
 
 /** Direct Claude access with the athlete's own Anthropic API key. */
 export interface AnthropicApiConfig {
@@ -1800,6 +1845,12 @@ export interface ChatSettings {
   claudeCode: ClaudeCodeConfig;
   openRouter: OpenRouterConfig;
   local: LocalChatConfig;
+  /**
+   * Each provider's model list as last read from it. Written only by the main
+   * process (`refreshModelCatalogs`); a save from the renderer never carries
+   * it back, so a stale copy in a window cannot overwrite a fresher list.
+   */
+  modelCatalogs?: Partial<Record<CatalogProvider, ModelCatalog>>;
   sidebarOpen?: boolean;
   /** When true, show activity/fitness/HR chart cards in the transcript. Default false. */
   visualizationsEnabled?: boolean;

@@ -11,6 +11,12 @@ import {
   DEFAULT_ANTHROPIC_EFFORT,
   DEFAULT_ANTHROPIC_MODEL
 } from "./anthropicChatProvider";
+import {
+  CATALOG_PROVIDERS,
+  MODEL_CATALOG_KEYS,
+  parseCatalogEntries,
+  parseStoredCatalog
+} from "./modelCatalog";
 
 export const CHAT_SETTINGS_KEYS = {
   provider: "chat.provider",
@@ -26,6 +32,7 @@ export const CHAT_SETTINGS_KEYS = {
   claudeEffort: "chat.claudeCode.effort",
   claudeDefaultModel: "chat.claudeCode.defaultModel",
   claudeAvailableModels: "chat.claudeCode.availableModels",
+  claudeAvailableModelsAt: "chat.claudeCode.availableModelsAt",
   claudeLastConnectionStatus: "chat.claudeCode.lastConnectionStatus",
   claudeLastCheckedAt: "chat.claudeCode.lastCheckedAt",
   claudeRecentActivities: "chat.claudeCode.permissions.recentActivities",
@@ -119,6 +126,8 @@ export function readChatSettingsFromStore(
       availableModels: parseModelOptions(
         store.get(CHAT_SETTINGS_KEYS.claudeAvailableModels)
       ),
+      availableModelsAt:
+        store.get(CHAT_SETTINGS_KEYS.claudeAvailableModelsAt) || undefined,
       lastConnectionStatus: normalizeClaudeConnectionStatus(
         store.get(CHAT_SETTINGS_KEYS.claudeLastConnectionStatus)
       ),
@@ -144,6 +153,7 @@ export function readChatSettingsFromStore(
       hasApiKey: apiKeyStores.local.hasApiKey(),
       toolsEnabled: store.get(CHAT_SETTINGS_KEYS.localToolsEnabled) !== "false"
     },
+    modelCatalogs: readModelCatalogs(store),
     sidebarOpen: store.get(CHAT_SETTINGS_KEYS.sidebarOpen) !== "false",
     visualizationsEnabled:
       store.get(CHAT_SETTINGS_KEYS.visualizationsEnabled) === "true",
@@ -164,6 +174,16 @@ export function readChatSettingsFromStore(
       })
     }
   };
+}
+
+/** Every provider list that has been read and can still be parsed. */
+function readModelCatalogs(store: ChatSettingsStore): ChatSettings["modelCatalogs"] {
+  const catalogs: NonNullable<ChatSettings["modelCatalogs"]> = {};
+  for (const provider of CATALOG_PROVIDERS) {
+    const catalog = parseStoredCatalog(store.get(MODEL_CATALOG_KEYS[provider]));
+    if (catalog) catalogs[provider] = catalog;
+  }
+  return catalogs;
 }
 
 /** Undefined rather than NaN, so `normalizeContextWindow` falls back cleanly. */
@@ -221,6 +241,15 @@ export function saveChatSettingsToStore(
   } else {
     store.delete([CHAT_SETTINGS_KEYS.claudeAvailableModels]);
   }
+  if (settings.claudeCode?.availableModelsAt) {
+    store.set(
+      CHAT_SETTINGS_KEYS.claudeAvailableModelsAt,
+      settings.claudeCode.availableModelsAt
+    );
+  }
+  // `modelCatalogs` is deliberately not written here: a window's copy of it
+  // is whatever it last read, and saving a setting must not put an older list
+  // back over one `refreshModelCatalogs` has just read.
   const claudeDefaultModel = settings.claudeCode?.defaultModel?.trim();
   if (claudeDefaultModel) {
     store.set(CHAT_SETTINGS_KEYS.claudeDefaultModel, claudeDefaultModel);
@@ -324,8 +353,10 @@ export function saveChatSettingsToStore(
     apiKeyStores.local.saveApiKey(settings.local.apiKey.trim());
   }
 
+  // A list read with a key describes that key's account, so it goes with it.
   if (settings.anthropic.clearApiKey) {
     apiKeyStores.anthropic.clearApiKey();
+    store.delete([MODEL_CATALOG_KEYS["claude-api"]]);
   } else if (
     typeof settings.anthropic.apiKey === "string" &&
     settings.anthropic.apiKey.trim()
@@ -335,6 +366,7 @@ export function saveChatSettingsToStore(
 
   if (settings.openRouter?.clearApiKey) {
     apiKeyStores.openRouter.clearApiKey();
+    store.delete([MODEL_CATALOG_KEYS.openrouter]);
   } else if (
     typeof settings.openRouter?.apiKey === "string" &&
     settings.openRouter.apiKey.trim()
@@ -348,18 +380,12 @@ export function saveChatSettingsToStore(
 /** Tolerates a corrupt or older payload by falling back to the static list. */
 function parseModelOptions(
   raw: string | undefined
-): Array<{ value: string; label: string }> | undefined {
+): ChatSettings["claudeCode"]["availableModels"] {
   if (!raw) return undefined;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return undefined;
-    const rows = parsed.filter(
-      (row): row is { value: string; label: string } =>
-        typeof row === "object" &&
-        row !== null &&
-        typeof (row as { value?: unknown }).value === "string" &&
-        typeof (row as { label?: unknown }).label === "string"
-    );
+    // The CLI's `default` row is the empty value, so an empty id is kept
+    // here where the other lists drop it.
+    const rows = parseCatalogEntries(JSON.parse(raw), { keepEmptyValue: true });
     return rows.length > 0 ? rows : undefined;
   } catch {
     return undefined;

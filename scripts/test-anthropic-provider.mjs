@@ -10,6 +10,7 @@ const providerUrl = pathToFileURL(
 
 const {
   DEFAULT_ANTHROPIC_MODEL,
+  anthropicModelEntry,
   buildAnthropicMessages,
   buildAnthropicRequestTuning,
   buildAnthropicTools,
@@ -62,7 +63,97 @@ assert.equal(
 const unknown = getAnthropicModelCapabilities("claude-opus-9");
 assert.equal(unknown.adaptiveThinking, true);
 assert.equal(unknown.effort, true);
-assert.equal(unknown.refusalFallback, false);
+assert.equal(unknown.fallbackModel, "");
+
+// ----- The key's own model list outranks the table, field by field -----
+
+const supported = { supported: true };
+const unsupported = { supported: false };
+const effortLevels = (levels) => ({
+  supported: levels.length > 0,
+  ...Object.fromEntries(
+    ["low", "medium", "high", "xhigh", "max"].map((level) => [
+      level,
+      levels.includes(level) ? supported : unsupported
+    ])
+  )
+});
+const modelInfo = (overrides) => ({
+  id: "claude-opus-6",
+  display_name: "Claude Opus 6",
+  max_tokens: 128_000,
+  allowed_fallback_models: ["claude-opus-5", "claude-opus-4-8"],
+  capabilities: {
+    effort: effortLevels(["low", "medium", "high"]),
+    thinking: { supported: true, types: { adaptive: supported, enabled: unsupported } }
+  },
+  ...overrides
+});
+
+// A model released after this build is listed with what it takes.
+const opus6 = anthropicModelEntry(modelInfo({}));
+assert.deepEqual(opus6, {
+  value: "claude-opus-6",
+  label: "Claude Opus 6",
+  efforts: ["low", "medium", "high"],
+  adaptiveThinking: true,
+  maxOutputTokens: 128_000,
+  // The rescue it had stays while the model still allows it.
+  fallbackModel: "claude-opus-4-8"
+});
+// A retired fallback does not strand the model: its first allowed target is taken.
+assert.equal(
+  anthropicModelEntry(modelInfo({ allowed_fallback_models: ["claude-opus-5"] })).fallbackModel,
+  "claude-opus-5"
+);
+assert.equal(
+  anthropicModelEntry(modelInfo({ allowed_fallback_models: [] })).fallbackModel,
+  ""
+);
+// What the API leaves out stays unstated, so the table can still answer.
+const bare = anthropicModelEntry(
+  modelInfo({ capabilities: null, allowed_fallback_models: null, max_tokens: null, display_name: "" })
+);
+assert.deepEqual(bare, { value: "claude-opus-6", label: "Opus 6" });
+// A model with no effort at all lists none, rather than every level.
+assert.deepEqual(
+  anthropicModelEntry(modelInfo({ capabilities: { effort: effortLevels([]), thinking: { supported: false, types: { adaptive: unsupported, enabled: supported } } } })).efforts,
+  []
+);
+
+// The request follows the listed row: the effort clamps to the highest level
+// the model takes at or below the one chosen, rather than a 400.
+const listedTuning = buildAnthropicRequestTuning({
+  model: "claude-opus-6",
+  effort: "max",
+  listed: opus6
+});
+assert.deepEqual(listedTuning.output_config, { effort: "high" });
+assert.deepEqual(listedTuning.fallbacks, [{ model: "claude-opus-4-8" }]);
+assert.deepEqual(listedTuning.betas, ["server-side-fallback-2026-06-01"]);
+// The API's output ceiling replaces the unknown-model guess, held to the app's cap.
+assert.equal(getAnthropicModelCapabilities("claude-opus-6", opus6).maxOutputTokens, 64_000);
+assert.equal(
+  getAnthropicModelCapabilities("claude-opus-6", { ...opus6, maxOutputTokens: 8_192 }).maxOutputTokens,
+  8_192
+);
+// A row that says a model takes no effort sends none, even for a known id.
+const noEffort = buildAnthropicRequestTuning({
+  model: "claude-opus-5",
+  effort: "high",
+  listed: { value: "claude-opus-5", label: "Claude Opus 5", efforts: [], fallbackModel: "" }
+});
+assert.equal(noEffort.output_config, undefined);
+assert.equal(noEffort.fallbacks, undefined);
+// A row that leaves thinking unstated keeps the table's answer.
+assert.deepEqual(
+  buildAnthropicRequestTuning({
+    model: "claude-haiku-4-5",
+    effort: "high",
+    listed: { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" }
+  }).thinking,
+  undefined
+);
 
 // An empty model resolves to the default before capabilities are read.
 assert.deepEqual(

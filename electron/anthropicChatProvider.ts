@@ -12,10 +12,16 @@ import type {
   AnthropicEffort,
   ChatMessage,
   ChatTokenUsage,
-  CorosMcpTool
+  CorosMcpTool,
+  ModelCatalogEntry
 } from "./types";
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  effortForModel,
+  formatClaudeModelName
+} from "./chatModels";
 
-export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5";
+export { DEFAULT_ANTHROPIC_MODEL };
 export const DEFAULT_ANTHROPIC_EFFORT: AnthropicEffort = "high";
 
 // Pinned so a stray ANTHROPIC_BASE_URL in the user's environment can never
@@ -26,9 +32,14 @@ const MAX_OUTPUT_TOKENS = 64_000;
 // Used for model ids this build does not know: over-asking is a hard 400, while
 // a lower ceiling only risks truncating an unusually long plan.
 const CONSERVATIVE_OUTPUT_TOKENS = 32_000;
-// Server-side rescue when a safety classifier declines a turn.
+// Server-side rescue when a safety classifier declines a turn. The same beta
+// is what makes `/v1/models` publish each model's `allowed_fallback_models`,
+// so the list is asked for under it too.
 const REFUSAL_FALLBACK_BETA = "server-side-fallback-2026-06-01";
-const REFUSAL_FALLBACK_MODEL = "claude-opus-4-8";
+// Preferred while a model still allows it, which keeps the rescue what it was
+// before the list was read from the API; otherwise the model's first allowed
+// target is taken, so a retired fallback does not strand the ones that named it.
+const PREFERRED_FALLBACK_MODEL = "claude-opus-4-8";
 
 export type AnthropicFailureKind =
   | "no-key"
@@ -54,35 +65,57 @@ export interface AnthropicModelCapabilities {
   adaptiveThinking: boolean;
   /** Accepts output_config.effort. */
   effort: boolean;
-  /** Refusals on this model can be rescued by a server-side fallback. */
-  refusalFallback: boolean;
+  /** The levels it accepts, where known; absent means every level. */
+  efforts?: AnthropicEffort[];
+  /** Model a refusal is retried on server-side; `""` for none. */
+  fallbackModel: string;
   /** Ceiling for max_tokens; asking for more than a model allows is a 400. */
   maxOutputTokens: number;
 }
 
+/*
+ * What this build knew about the models it shipped with. The account's own
+ * list (`listAnthropicModels`, cached in `modelCatalogs`) outranks every row
+ * here field by field; this table answers only before that list has been
+ * read, or for a field the API left out.
+ */
 const MODEL_CAPABILITIES: Record<string, AnthropicModelCapabilities> = {
   "claude-opus-5": {
     adaptiveThinking: true,
     effort: true,
-    refusalFallback: true,
+    fallbackModel: PREFERRED_FALLBACK_MODEL,
+    maxOutputTokens: MAX_OUTPUT_TOKENS
+  },
+  "claude-opus-5-5": {
+    adaptiveThinking: true,
+    effort: true,
+    // Its permitted targets were still open at launch; the API's list says.
+    fallbackModel: "",
     maxOutputTokens: MAX_OUTPUT_TOKENS
   },
   "claude-fable-5": {
     adaptiveThinking: true,
     effort: true,
-    refusalFallback: true,
+    fallbackModel: PREFERRED_FALLBACK_MODEL,
+    maxOutputTokens: MAX_OUTPUT_TOKENS
+  },
+  "claude-fable-5-1": {
+    adaptiveThinking: true,
+    effort: true,
+    fallbackModel: PREFERRED_FALLBACK_MODEL,
     maxOutputTokens: MAX_OUTPUT_TOKENS
   },
   "claude-sonnet-5": {
     adaptiveThinking: true,
     effort: true,
-    refusalFallback: false,
+    fallbackModel: "",
     maxOutputTokens: MAX_OUTPUT_TOKENS
   },
   "claude-haiku-4-5": {
     adaptiveThinking: false,
     effort: false,
-    refusalFallback: false,
+    efforts: [],
+    fallbackModel: "",
     maxOutputTokens: MAX_OUTPUT_TOKENS
   }
 };
@@ -93,14 +126,33 @@ const MODEL_CAPABILITIES: Record<string, AnthropicModelCapabilities> = {
 const ASSUMED_CAPABILITIES: AnthropicModelCapabilities = {
   adaptiveThinking: true,
   effort: true,
-  refusalFallback: false,
+  fallbackModel: "",
   maxOutputTokens: CONSERVATIVE_OUTPUT_TOKENS
 };
 
+/**
+ * What a request to `model` may carry: the account's list where it states a
+ * field (`listed`), this build's table where it does not, and the assumed
+ * modern shape for an id neither knows. The output ceiling is the API's own
+ * figure, held to this app's cap — a request streams, so the cap costs
+ * nothing, and the figure is what keeps a new model from a 400.
+ */
 export function getAnthropicModelCapabilities(
-  model: string
+  model: string,
+  listed?: ModelCatalogEntry
 ): AnthropicModelCapabilities {
-  return MODEL_CAPABILITIES[model.trim()] ?? ASSUMED_CAPABILITIES;
+  const known = MODEL_CAPABILITIES[model.trim()] ?? ASSUMED_CAPABILITIES;
+  if (!listed) return known;
+  const efforts = listed.efforts ?? known.efforts;
+  return {
+    adaptiveThinking: listed.adaptiveThinking ?? known.adaptiveThinking,
+    effort: efforts ? efforts.length > 0 : known.effort,
+    ...(efforts ? { efforts } : {}),
+    fallbackModel: listed.fallbackModel ?? known.fallbackModel,
+    maxOutputTokens: listed.maxOutputTokens
+      ? Math.min(MAX_OUTPUT_TOKENS, listed.maxOutputTokens)
+      : known.maxOutputTokens
+  };
 }
 
 export function resolveAnthropicModel(model?: string): string {
@@ -111,6 +163,8 @@ export interface AnthropicRuntimeConfig {
   apiKey?: string;
   model: string;
   effort: AnthropicEffort;
+  /** The model's row in the account's list, when that list has been read. */
+  listed?: ModelCatalogEntry;
 }
 
 interface AnthropicRequestTuning {
@@ -128,7 +182,7 @@ export function buildAnthropicRequestTuning(
   config: AnthropicRuntimeConfig
 ): AnthropicRequestTuning {
   const model = resolveAnthropicModel(config.model);
-  const capabilities = getAnthropicModelCapabilities(model);
+  const capabilities = getAnthropicModelCapabilities(model, config.listed);
   const tuning: AnthropicRequestTuning = {};
 
   if (capabilities.adaptiveThinking) {
@@ -136,12 +190,15 @@ export function buildAnthropicRequestTuning(
     // omits it and reads as a long pause before the answer appears.
     tuning.thinking = { type: "adaptive", display: "summarized" };
   }
-  if (capabilities.effort) {
-    tuning.output_config = { effort: config.effort };
+  const effort = capabilities.effort
+    ? effortForModel(config.effort, capabilities.efforts)
+    : undefined;
+  if (effort) {
+    tuning.output_config = { effort };
   }
-  if (capabilities.refusalFallback) {
+  if (capabilities.fallbackModel) {
     tuning.betas = [REFUSAL_FALLBACK_BETA];
-    tuning.fallbacks = [{ model: REFUSAL_FALLBACK_MODEL }];
+    tuning.fallbacks = [{ model: capabilities.fallbackModel }];
   }
   return tuning;
 }
@@ -232,7 +289,8 @@ export async function streamAnthropicChatCompletion(
       const stream = client.beta.messages.stream(
         {
           model,
-          max_tokens: getAnthropicModelCapabilities(model).maxOutputTokens,
+          max_tokens: getAnthropicModelCapabilities(model, options.config.listed)
+            .maxOutputTokens,
           system: options.instructions,
           messages: conversation,
           ...(tools.length > 0 ? { tools } : {}),
@@ -347,6 +405,75 @@ export async function testAnthropicApiConnectionRequest(
           : error.message
     };
   }
+}
+
+const EFFORT_LEVELS: AnthropicEffort[] = ["low", "medium", "high", "xhigh", "max"];
+
+/**
+ * One model as `/v1/models` describes it, as a picker row that also carries
+ * what a request to it may hold. A capability the API left out (`null`
+ * capabilities, an absent fallback list) stays absent, so the build's own
+ * table can still answer for it — absent is "not stated", never "no".
+ */
+export function anthropicModelEntry(info: {
+  id: string;
+  display_name?: string | null;
+  max_tokens?: number | null;
+  allowed_fallback_models?: string[] | null;
+  capabilities?: Anthropic.Beta.BetaModelCapabilities | null;
+}): ModelCatalogEntry {
+  const capabilities = info.capabilities;
+  const efforts = capabilities?.effort
+    ? capabilities.effort.supported
+      ? EFFORT_LEVELS.filter((level) => capabilities.effort[level]?.supported === true)
+      : []
+    : undefined;
+  const allowed = Array.isArray(info.allowed_fallback_models)
+    ? info.allowed_fallback_models.filter((id) => typeof id === "string" && id.trim())
+    : undefined;
+  return {
+    value: info.id,
+    label: info.display_name?.trim() || formatClaudeModelName(info.id),
+    ...(efforts ? { efforts } : {}),
+    ...(capabilities?.thinking
+      ? { adaptiveThinking: capabilities.thinking.types?.adaptive?.supported === true }
+      : {}),
+    ...(typeof info.max_tokens === "number" && info.max_tokens > 0
+      ? { maxOutputTokens: info.max_tokens }
+      : {}),
+    ...(allowed
+      ? {
+          fallbackModel: allowed.includes(PREFERRED_FALLBACK_MODEL)
+            ? PREFERRED_FALLBACK_MODEL
+            : (allowed[0] ?? "")
+        }
+      : {})
+  };
+}
+
+/**
+ * Every model this key can use, newest first, as the API lists them. Costs
+ * no tokens. The fallback beta is sent so each row carries its
+ * `allowed_fallback_models`; without it the field is absent and every model
+ * would read as having no rescue.
+ */
+export async function listAnthropicModels(
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<ModelCatalogEntry[]> {
+  const client = createAnthropicClient(apiKey);
+  const entries: ModelCatalogEntry[] = [];
+  try {
+    for await (const info of client.beta.models.list(
+      { betas: [REFUSAL_FALLBACK_BETA], limit: 100 },
+      { signal: signal ?? AbortSignal.timeout(15_000) }
+    )) {
+      if (info.id?.trim()) entries.push(anthropicModelEntry(info));
+    }
+  } catch (caught) {
+    throw normalizeAnthropicError(caught);
+  }
+  return entries;
 }
 
 export function normalizeAnthropicError(

@@ -21,7 +21,8 @@ import type {
 import {
   REASONING_EFFORT_OPTIONS,
   describeChatModel,
-  getModelPickerOptions,
+  effortForModel,
+  providerModelOptions,
   supportsReasoningEffort,
   type ChatModelOption
 } from "../../electron/chatModels";
@@ -108,19 +109,13 @@ export function settingsWithRuntime(settings: ChatSettings, runtime: GeneratorRu
   return next;
 }
 
-/** The models a provider offers, the account's own list first where Claude Code reported one. */
+/** The models a provider offers: its own list where it has been read, the shipped one where not. */
 export function runtimeModelOptions(
   provider: ChatProvider,
   settings: ChatSettings,
   claudeStatus: ClaudeCodeStatus | null
 ): ChatModelOption[] {
-  if (provider === "local") return [];
-  if (provider === "claude-code") {
-    const listed = claudeStatus?.availableModels ?? settings.claudeCode.availableModels;
-    if (listed?.length) return listed;
-    return getModelPickerOptions(provider, claudeStatus?.defaultModel ?? settings.claudeCode.defaultModel);
-  }
-  return getModelPickerOptions(provider);
+  return providerModelOptions(provider, settings, claudeStatus);
 }
 
 /**
@@ -144,6 +139,10 @@ export function runtimeSummary(runtime: GeneratorRuntime, options: readonly Chat
       ? modelChipLabel(listed.label)
       : describeChatModel(runtime.model) || "Default model";
   if (!supportsReasoningEffort(runtime.provider)) return model;
-  const effort = REASONING_EFFORT_OPTIONS.find((option) => option.value === runtime.effort)?.label ?? runtime.effort;
+  // The level a request will carry, which is not always the one chosen: a
+  // model that stops at High answers a "Max" conversation at High.
+  const level = effortForModel(runtime.effort, listed?.efforts);
+  if (!level) return model;
+  const effort = REASONING_EFFORT_OPTIONS.find((option) => option.value === level)?.label ?? level;
   return `${model} · ${effort} effort`;
 }
