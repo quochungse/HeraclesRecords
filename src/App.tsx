@@ -3585,18 +3585,23 @@ function MediaOverviewTab({
           <p className="dashboard-subtitle">{subtitle}</p>
         </div>
         <button
-          className="secondary-button dashboard-welcome-action"
+          className="icon-button dashboard-welcome-action"
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          title="Refresh COROS data, the watch and the library"
+          title={
+            refreshing
+              ? "Refreshing…"
+              : "Refresh COROS data, the watch and the library"
+          }
+          aria-label={refreshing ? "Refreshing" : "Refresh"}
+          aria-busy={refreshing}
         >
-          {refreshing ? (
-            <Loader2 className="spin" size={16} aria-hidden="true" />
-          ) : (
-            <RefreshCw size={16} aria-hidden="true" />
-          )}
-          {refreshing ? "Refreshing" : "Refresh"}
+          <RefreshCw
+            size={16}
+            aria-hidden="true"
+            className={refreshing ? "spin" : ""}
+          />
         </button>
       </header>
 

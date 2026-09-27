@@ -2554,13 +2554,15 @@ input::placeholder {
 }
 
 /* The greeting block is the first flex child and the action the second, so the
-   button lands right. Nudged down a little: aligned to the top of a 42px
-   display line it reads as floating above the header rather than sitting in
-   it. */
+   button lands right. An icon alone — the title names what it refreshes — at
+   32px, a step under the 36px icon button, so it sits in the header rather
+   than competing with the greeting. Nudged down a little: aligned to the top
+   of a 42px display line it reads as floating above the header. */
 .dashboard-welcome-action {
   flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   margin-top: 6px;
-  white-space: nowrap;
 }
 
 /*
