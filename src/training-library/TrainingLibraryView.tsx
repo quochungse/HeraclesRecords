@@ -11,7 +11,7 @@ import {
   Sparkles,
   Zap
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
   CoachOpenRequest,
@@ -29,7 +29,6 @@ import {
 } from "../../electron/trainingPlanDomain";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
-import CoachBriefEditor from "../chat/CoachBriefEditor";
 import type { CorosLinkApi } from "../coroslink-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -112,6 +111,9 @@ interface TrainingLibraryViewProps {
  * template is a plan with no start date, so it is one now.
  */
 type LibrarySection = "workouts" | "plans";
+
+/* AI Plan's brief (P2.5), the screen Coach edits a brief on: loaded when pressed. */
+const CoachBriefEditor = lazy(() => import("../chat/CoachBriefEditor"));
 
 const SECTIONS: Array<{ id: LibrarySection; label: string; icon: typeof Zap }> = [
   { id: "workouts", label: "Workouts", icon: Zap },
@@ -973,18 +975,20 @@ export function TrainingLibraryView({
       ) : null}
 
       {newPlanSources ? (
-        <CoachBriefEditor
-          mode="new"
-          request={defaultPlanBriefRequest(firstPlanMonday())}
-          firstMonday={firstPlanMonday()}
-          sources={newPlanSources}
-          onSourcesChange={setNewPlanSources}
-          onSave={(request) => {
-            setNewPlanSources(null);
-            onOpenCoach({ newPlan: { request, sources: newPlanSources } });
-          }}
-          onClose={() => setNewPlanSources(null)}
-        />
+        <Suspense fallback={null}>
+          <CoachBriefEditor
+            mode="new"
+            request={defaultPlanBriefRequest(firstPlanMonday())}
+            firstMonday={firstPlanMonday()}
+            sources={newPlanSources}
+            onSourcesChange={setNewPlanSources}
+            onSave={(request) => {
+              setNewPlanSources(null);
+              onOpenCoach({ newPlan: { request, sources: newPlanSources } });
+            }}
+            onClose={() => setNewPlanSources(null)}
+          />
+        </Suspense>
       ) : null}
 
       {pendingPlanDelete ? (

@@ -457,12 +457,9 @@ export function planTranscriptContext(
   };
 }
 
-/**
- * How the summary reaches the model. A plain user turn, labelled, rather than
- * anything provider-specific: it has to read the same way to four providers,
- * and it has to be obvious to the model that this is a compression of the
- * conversation rather than something the athlete just said.
- */
+/** How a summary turn begins, and so how one is recognised. */
+const SUMMARY_HEADER = "[Earlier in this conversation, summarised]";
+
 /** How many messages before its own a pipeline step's turn carries (P2.4). */
 export const PIPELINE_RECENT_MESSAGES = 6;
 
@@ -488,18 +485,24 @@ export function pipelineWire(
 ): ChatMessage[] {
   const last = messages.map((message) => message.role).lastIndexOf("user");
   const before = (last < 0 ? messages : messages.slice(0, last)).filter(
-    (message) => !(message.role === "user" && message.content.startsWith("[Earlier in this conversation, summarised]"))
+    (message) => !(message.role === "user" && message.content.startsWith(SUMMARY_HEADER))
   );
   const kept = before.slice(Math.max(0, before.length - recent));
   while (kept.length && kept[0]!.role !== "user") kept.shift();
   return [...kept, { role: "user", content: prompt }];
 }
 
+/**
+ * How the summary reaches the model. A plain user turn, labelled, rather than
+ * anything provider-specific: it has to read the same way to four providers,
+ * and it has to be obvious to the model that this is a compression of the
+ * conversation rather than something the athlete just said.
+ */
 export function summaryContextMessage(summary: string): ChatMessage {
   return {
     role: "user",
     content: [
-      "[Earlier in this conversation, summarised]",
+      SUMMARY_HEADER,
       summary,
       "[End of summary. The messages that follow are the recent turns in full.]"
     ].join("\n\n")

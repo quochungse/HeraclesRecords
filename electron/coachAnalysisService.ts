@@ -455,13 +455,6 @@ export function isOverBudget(spent: number, budget: number | null): boolean {
 }
 
 /**
- * The same question, asked of the deps — and asked in the order that matters.
- *
- * The ceiling is read first because the total is a SUM over the whole run log
- * and no ceiling is the default: without this, every athlete who never set a
- * budget pays for that scan on every run to discard the answer.
- */
-/**
  * 13: what a run cost is the sum of every provider turn it took, and the
  * rolling summariser (5.7) is one of those turns. Undefined stays undefined —
  * "nobody reported" is a different fact from "it was free", and adding a
@@ -481,6 +474,13 @@ function addTokenUsage(
   };
 }
 
+/**
+ * The same question, asked of the deps — and asked in the order that matters.
+ *
+ * The ceiling is read first because the total is a SUM over the whole run log
+ * and no ceiling is the default: without this, every athlete who never set a
+ * budget pays for that scan on every run to discard the answer.
+ */
 function overBudget(deps: CoachAnalysisRunnerDeps): boolean {
   const budget = deps.getBudget();
   if (budget === null || budget <= 0) {

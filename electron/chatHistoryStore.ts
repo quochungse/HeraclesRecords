@@ -1680,12 +1680,6 @@ function foreignTail(
 }
 
 /**
- * `options` sits after the injectable database rather than before it, against
- * this file's usual "seam goes last" shape. Deliberate: every caller that
- * passes a database is a test, and moving the seam would put an `undefined`
- * placeholder in a dozen of them to spare one production call site.
- */
-/**
  * A timestamp for `mid` and `mrev`: monotonic, unique to this machine, and
  * lexicographically ordered.
  *
@@ -1853,6 +1847,12 @@ function stampEntries(
   });
 }
 
+/**
+ * `options` sits after the injectable database rather than before it, against
+ * this file's usual "seam goes last" shape. Deliberate: every caller that
+ * passes a database is a test, and moving the seam would put an `undefined`
+ * placeholder in a dozen of them to spare one production call site.
+ */
 export function saveChatSession(
   id: string,
   entries: PersistedChatEntry[],

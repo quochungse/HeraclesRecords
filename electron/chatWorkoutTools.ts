@@ -1425,6 +1425,14 @@ export function corosEvent(action: "imported" | "removedOnCoros", written: PlanV
 }
 
 /**
+ * Reads against COROS in flight, by creation. The canvas opening and an edit
+ * begun at the same moment both ask, and two reads that each find COROS newer
+ * would each write the same "Changed in the Library" version; the second
+ * caller shares the first one's answer instead.
+ */
+const corosSyncsInFlight = new Map<string, Promise<PlanCorosSync>>();
+
+/**
  * A creation on COROS read against COROS (P1.6, D12). Only when its newest
  * version is the one saved there: a newer version not saved yet is a change
  * the athlete has not sent, and it is checked against COROS when it is sent —
@@ -1434,14 +1442,6 @@ export function corosEvent(action: "imported" | "removedOnCoros", written: PlanV
  * canvas does on opening. Otherwise it is one request (the raw detail and its
  * version), and a second only when COROS is newer, to read it as a plan.
  */
-/**
- * Reads against COROS in flight, by creation. The canvas opening and an edit
- * begun at the same moment both ask, and two reads that each find COROS newer
- * would each write the same "Changed in the Library" version; the second
- * caller shares the first one's answer instead.
- */
-const corosSyncsInFlight = new Map<string, Promise<PlanCorosSync>>();
-
 export async function syncPlanDraftFromCoros(
   draftId: string,
   unitSystem: UnitSystem = "metric",
@@ -1514,7 +1514,6 @@ async function readPlanDraftFromCoros(
   };
 }
 
-/** `draft_training_plan`'s schema, with the one field a rewrite adds. */
 /** The optional follow-ups field (P1.8), the same on every tool that makes a version. */
 const SUGGESTED_REFINEMENTS = {
   type: "array",

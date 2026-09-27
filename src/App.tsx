@@ -372,10 +372,10 @@ export default function App() {
   );
   const [coachMounted, setCoachMounted] = useState(activeView === "coach");
   const [coachPrefill, setCoachPrefill] = useState<string | CoachOpenRequest | null>(null);
-  /* Ask Coach from a screen that shows a session (Calendar, Activities,
-     Running, Strength): Coach opens and asks where the question goes. */
-  const askCoach = useCallback((request: CoachOpenRequest) => {
-    setCoachPrefill(request);
+  /* Ask Coach from another screen (Calendar, Library, Activities, Running,
+     Strength): Coach opens and asks where the question goes. */
+  const askCoach = useCallback((request?: string | CoachOpenRequest) => {
+    setCoachPrefill(request ?? null);
     setActiveView("coach");
   }, []);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
@@ -2846,10 +2846,7 @@ export default function App() {
                     api={api}
                     status={trainingHubStatus}
                     onOpenTraining={() => setActiveView("overview")}
-                    onOpenCoach={(prompt) => {
-                      setCoachPrefill(prompt ?? null);
-                      setActiveView("coach");
-                    }}
+                    onOpenCoach={askCoach}
                     onMessage={setMessage}
                     onError={setError}
                     onScheduleChanged={handleExternalScheduleChange}
@@ -3001,10 +2998,7 @@ export default function App() {
                   onMessage={setMessage}
                   onError={setError}
                   onOpenTraining={() => setActiveView("overview")}
-                  onOpenCoach={(prompt) => {
-                    setCoachPrefill(prompt);
-                    setActiveView("coach");
-                  }}
+                  onOpenCoach={askCoach}
                   onScheduleChanged={refreshUpcomingWorkouts}
                 />
               </Suspense>

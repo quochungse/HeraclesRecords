@@ -26,7 +26,8 @@ import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { planSessions, readPlan } from "../training-library/planReaderModel";
 import { sportTheme } from "../training-library/sportTheme";
 import "../training-library/trainingLibrary.css";
-import { creationFigures, datedForReading } from "./CoachCreationCard";
+import { creationFigures } from "./CoachCreationCard";
+import { datedForReading } from "./planDating";
 import { CreationActions } from "./CreationActions";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
@@ -258,45 +259,43 @@ function CreationRows({
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
   return (
-    <>
-      <ol className="chat-plan-list">
-        {creations.map((draft, index) => {
-          const status = creationStatus(draft, onCorosOf(draft.draftId));
-          const isWorkout = draft.artifactType === "workout";
-          const primarySport = draft.entries[0]?.sport;
-          const SportIcon = sportTheme(primarySport).icon;
-          return (
-            <li key={draft.draftId}>
-              <button
-                type="button"
-                className="chat-plan-list-item"
-                onClick={() => onOpen(draft.draftId)}
-                aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-              >
-                <span className="chat-plan-list-sport" style={planSportStyle(primarySport)}>
-                  <SportIcon size={15} strokeWidth={2} aria-hidden="true" />
+    <ol className="chat-plan-list">
+      {creations.map((draft, index) => {
+        const status = creationStatus(draft, onCorosOf(draft.draftId));
+        const isWorkout = draft.artifactType === "workout";
+        const primarySport = draft.entries[0]?.sport;
+        const SportIcon = sportTheme(primarySport).icon;
+        return (
+          <li key={draft.draftId}>
+            <button
+              type="button"
+              className="chat-plan-list-item"
+              onClick={() => onOpen(draft.draftId)}
+              aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
+            >
+              <span className="chat-plan-list-sport" style={planSportStyle(primarySport)}>
+                <SportIcon size={15} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <span className="chat-plan-list-copy">
+                <span className="chat-plan-list-kicker">
+                  {isWorkout ? "One-off workout" : "Training plan"}
                 </span>
-                <span className="chat-plan-list-copy">
-                  <span className="chat-plan-list-kicker">
-                    {isWorkout ? "One-off workout" : "Training plan"}
-                  </span>
-                  <strong>{draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}</strong>
-                  <span className="chat-plan-list-meta">
-                    {!isWorkout ? (
-                      <span>
-                        {draft.entries.length} {draft.entries.length === 1 ? "session" : "sessions"}
-                      </span>
-                    ) : null}
-                    <span data-status={status.saved ? "saved" : "draft"}>{status.label}</span>
-                  </span>
+                <strong>{draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}</strong>
+                <span className="chat-plan-list-meta">
+                  {!isWorkout ? (
+                    <span>
+                      {draft.entries.length} {draft.entries.length === 1 ? "session" : "sessions"}
+                    </span>
+                  ) : null}
+                  <span data-status={status.saved ? "saved" : "draft"}>{status.label}</span>
                 </span>
-                <ChevronRight size={15} aria-hidden="true" />
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </>
+              </span>
+              <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

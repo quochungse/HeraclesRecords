@@ -55,7 +55,7 @@ interface ChatComposerProps {
   streaming: boolean;
   /** Stop was pressed and the turn has not ended yet. */
   stopping?: boolean;
-  /** Why sending waits: another conversation's turn is running (UAT). */
+  /** Why sending waits, as a sentence: another conversation's turn is running (UAT). */
   blockedReason?: string;
   /** A send tried while blocked: the view says why, as a toast. */
   onBlocked?: () => void;
@@ -310,7 +310,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
                 }
                 title={
                   blockedReason
-                    ? `${blockedReason}. Send when it has finished.`
+                    ? blockedReason
                     : localProviderBlocked
                       ? "Enter a local model first"
                       : "Send"

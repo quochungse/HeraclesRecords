@@ -559,7 +559,6 @@ export interface CorosLinkApi {
   getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;
   /** The athlete's edit of a brief; a field changed loses its "from chat" or "from data". */
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest) => Promise<PlanBrief>;
-  /** A conversation's blank brief, for AI Plan to open Coach on (P2.5); no model is asked. */
   /** A new conversation's brief (P2.5): the athlete's, or the defaults when absent. */
   createPlanBrief: (sessionId: string, request?: PlanBriefRequest) => Promise<PlanBrief>;
   /** The athlete's adjustment of a brief's outline; refused when it breaks the brief (P2.2). */

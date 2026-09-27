@@ -15,7 +15,7 @@ import { readPlan, ridgeMeasure, weekRidgeValues } from "../training-library/pla
 
 export interface RefPreview {
   kind: "plan" | "week" | "session" | "calendar" | "calendarWeek" | "activity";
-  /** What it belongs to, after "Asking about ·": the plan's name, or "your calendar". */
+  /** What it belongs to, for the header's tooltip: the plan's name, or "your calendar". */
   context: string;
   /** What it is: "Week 3 · Base", "Sat · Long run 1:10". */
   title: string;

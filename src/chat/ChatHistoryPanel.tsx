@@ -191,8 +191,6 @@ export function ChatHistoryPanel({
           ))
         )}
       </div>
-
-
     </div>
   );
 }

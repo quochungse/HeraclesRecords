@@ -199,16 +199,16 @@ export function CreationActions({
             </button>
           ) : null}
           {edit ? (
-          <button
-            type="button"
-            className="chat-plan-review"
-            data-action="edit"
-            onClick={onEdit}
-            disabled={uploading}
-          >
-            <PencilLine size={14} aria-hidden="true" />
-            Edit
-          </button>
+            <button
+              type="button"
+              className="chat-plan-review"
+              data-action="edit"
+              onClick={onEdit}
+              disabled={uploading}
+            >
+              <PencilLine size={14} aria-hidden="true" />
+              Edit
+            </button>
           ) : null}
         </div>
       </div>

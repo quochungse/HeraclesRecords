@@ -21,7 +21,6 @@ import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
 import { datedForReading } from "./planDating";
-export { datedForReading };
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 
@@ -260,13 +259,13 @@ export function CoachCreationCard({
         <p className="chat-plan-success">
           <CircleCheck size={15} aria-hidden="true" />
           <span>
-            {calendar?.running && status.saved
+            {calendar?.running
               ? `On your COROS calendar${calendar.line ? ` · ${calendar.line}` : ""}.`
               : status.label === "On COROS"
-              ? `Saved to your COROS plans as “${draft.name}”.`
-              : status.label === "In library"
-                ? "Saved to your COROS Workout Library."
-                : `${status.label}.`}
+                ? `Saved to your COROS plans as “${draft.name}”.`
+                : status.label === "In library"
+                  ? "Saved to your COROS Workout Library."
+                  : `${status.label}.`}
           </span>
         </p>
       ) : null}
@@ -284,7 +283,6 @@ export function CoachCreationCard({
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
       />
-
     </article>
   );
 }

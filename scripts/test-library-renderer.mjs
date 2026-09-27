@@ -871,6 +871,8 @@ async function main() {
         `Array.from(document.querySelectorAll(".coach-sheet button")).find((b) => b.textContent.trim().startsWith(${JSON.stringify(label)})).click()`
       );
     await evaluate(`Array.from(document.querySelectorAll("button")).find((b) => b.textContent.trim() === "AI Plan").click()`);
+    // The brief's screen is loaded when AI Plan is first pressed.
+    await waitForCount(".coach-sheet", 1);
     await settle();
     assert.deepEqual(await footer(), ["Cancel", "Next"], "the goal step leads on to the week, and cannot start the plan");
     await press("Build a base");

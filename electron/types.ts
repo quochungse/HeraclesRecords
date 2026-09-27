@@ -1812,7 +1812,6 @@ export interface OpenRouterConnectionTest {
   keyLabel?: string;
 }
 
-/** Hard cap on custom coach instructions so a pasted document cannot crowd out the coach prompt. */
 /**
  * The answer a run gives when it looked and found nothing worth saying. A
  * control token, not prose: it decides `silent` vs `success`, and the athlete
@@ -1821,6 +1820,7 @@ export interface OpenRouterConnectionTest {
  */
 export const NOTHING_TO_REPORT = "NOTHING_TO_REPORT";
 
+/** Hard cap on custom coach instructions so a pasted document cannot crowd out the coach prompt. */
 export const MAX_CUSTOM_COACH_INSTRUCTIONS = 4000;
 
 /**
@@ -1961,10 +1961,6 @@ export interface ChatSessionSummary {
   waiting?: { questions: number; decisions: number; briefs: number };
 }
 
-/**
- * What a turn is allowed to do. Analysis runs are `read-only` (decision 3):
- * they may read, analyse and draft, but never write to COROS.
- */
 /**
  * What one turn cost, summed across its tool rounds — a tool-using answer is
  * several provider calls and the athlete pays for all of them.
@@ -3383,11 +3379,6 @@ export interface PlanVersionConflict {
 export type PlanVersionSave = PlanVersionWritten | PlanVersionConflict;
 
 /**
- * A creation on COROS read against COROS (P1.6, D12): unchanged there, or
- * changed — then its COROS form is the creation's newest version — or
- * deleted there, which leaves it a proposal to save again.
- */
-/**
  * Where a Coach plan on COROS stands on the calendar (P1.6): COROS's running
  * copy of it, as the plan cache holds it, and the matches of what was done
  * against it — read from this machine, at no cost.
@@ -3399,6 +3390,11 @@ export interface PlanCalendarState {
   matches: TrainingActivityMatch[];
 }
 
+/**
+ * A creation on COROS read against COROS (P1.6, D12): unchanged there, or
+ * changed — then its COROS form is the creation's newest version — or
+ * deleted there, which leaves it a proposal to save again.
+ */
 export type PlanCorosSync =
   | { kind: "current" }
   | { kind: "imported" | "removedOnCoros"; written: PlanVersionWritten };

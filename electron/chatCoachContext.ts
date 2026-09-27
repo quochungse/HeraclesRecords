@@ -150,16 +150,6 @@ export function buildBaseCoachInstructions(): string {
 }
 
 /**
- * Per-sport rules as prose.
- *
- * This carries more weight than it looks: the draft tools' JSON Schema used to
- * branch over every sport to say the same thing, at tens of thousands of tokens
- * a round. Now the schema takes any step and the server validates it, so this
- * guide — a few hundred tokens, sent once per turn — is where the coach learns
- * which kinds, targets and intensities a sport actually accepts. Keep it in
- * step with `WORKOUT_SPORT_CAPABILITIES`, which is also what the validator reads.
- */
-/**
  * Said when Coach may attach workout cards nobody asked for (P1.9, D4). A
  * limit in words only: the cost of each answer is shown under it, which is
  * where an answer that overdoes it would be seen.
@@ -179,6 +169,16 @@ export function inlineSuggestionsSection(enabled: boolean, toolNames: readonly s
   return enabled && toolNames.includes("draft_workout") ? ["", INLINE_SUGGESTIONS_GUIDE] : [];
 }
 
+/**
+ * Per-sport rules as prose.
+ *
+ * This carries more weight than it looks: the draft tools' JSON Schema used to
+ * branch over every sport to say the same thing, at tens of thousands of tokens
+ * a round. Now the schema takes any step and the server validates it, so this
+ * guide — a few hundred tokens, sent once per turn — is where the coach learns
+ * which kinds, targets and intensities a sport actually accepts. Keep it in
+ * step with `WORKOUT_SPORT_CAPABILITIES`, which is also what the validator reads.
+ */
 export function buildCoachSportCapabilityGuide(): string {
   return WORKOUT_SPORTS.map((sport) => {
     const capability = WORKOUT_SPORT_CAPABILITIES[sport];

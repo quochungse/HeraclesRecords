@@ -61,6 +61,18 @@ export const defaultScheduleMoveDeps: ScheduleMoveDeps = {
 };
 
 /**
+ * Calendar `planId`s COROS has said are not a running plan — in practice the
+ * athlete's own schedule, whose id never changes. `plan/query` is the heaviest
+ * thing COROS serves, and without this every drag of one of the athlete's own
+ * sessions paid for it. The answer is held for minutes, not for the process:
+ * a plan put on the calendar from the COROS app can show on the calendar
+ * before the plan list carries it, and a "no" held for good would detach every
+ * session of it dragged for the rest of the launch.
+ */
+const notRunning = new Map<string, number>();
+const NOT_RUNNING_TTL_MS = 10 * 60_000;
+
+/**
  * Whether a calendar `planId` is a plan running on the calendar, rather than
  * the athlete's own schedule. The Library's cache answers for a plan it has
  * seen; anything else is asked of COROS, because a plan put on the calendar
@@ -78,18 +90,6 @@ export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = def
   else notRunning.set(planId, Date.now() + NOT_RUNNING_TTL_MS);
   return running;
 }
-
-/**
- * Calendar `planId`s COROS has said are not a running plan — in practice the
- * athlete's own schedule, whose id never changes. `plan/query` is the heaviest
- * thing COROS serves, and without this every drag of one of the athlete's own
- * sessions paid for it. The answer is held for minutes, not for the process:
- * a plan put on the calendar from the COROS app can show on the calendar
- * before the plan list carries it, and a "no" held for good would detach every
- * session of it dragged for the rest of the launch.
- */
-const notRunning = new Map<string, number>();
-const NOT_RUNNING_TTL_MS = 10 * 60_000;
 
 /** The day a running copy counts `dayNo` from: the Monday of its start day's week. */
 function copyAnchor(raw: Record<string, unknown>): Date {

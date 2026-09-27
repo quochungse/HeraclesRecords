@@ -4,7 +4,7 @@ import type { CorosLinkApi } from "../coroslink-api";
 import { remoteErrorMessage } from "./remoteError";
 import { TrainingPlanCalendarDialog } from "../training-library/TrainingPlanCalendarDialog";
 import "../training-library/trainingLibrary.css";
-import { datedForReading } from "./CoachCreationCard";
+import { datedForReading } from "./planDating";
 
 /**
  * "Add to calendar…" for a Coach plan (docs/coach-plan-canvas.md, P1.6):

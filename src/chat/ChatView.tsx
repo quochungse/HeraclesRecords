@@ -598,14 +598,6 @@ function SourceBadge({ source }: { source: SourceInfo }) {
 }
 
 /**
- * What the answer above cost, bottom-right under the bubble.
- *
- * Drawn only when a provider actually reported: an absent count means nobody
- * said, and a footer reading "0 Tokens" there would be a claim the app cannot
- * make. Every answer written before this shipped has no count either, so old
- * conversations stay as they were rather than growing a row of zeroes.
- */
-/**
  * A transcript row that decides once, when it mounts, whether to play the
  * entrance animation.
  *
@@ -642,6 +634,14 @@ function ChatRow({
   );
 }
 
+/**
+ * What the answer above cost, bottom-right under the bubble.
+ *
+ * Drawn only when a provider actually reported: an absent count means nobody
+ * said, and a footer reading "0 Tokens" there would be a claim the app cannot
+ * make. Every answer written before this shipped has no count either, so old
+ * conversations stay as they were rather than growing a row of zeroes.
+ */
 function TurnCostFooter({
   usage,
   model
@@ -2601,8 +2601,6 @@ export function ChatView({
     }
   };
 
-
-
   const handleUpdateClaudeCode = async (
     patch: Partial<ChatSettings["claudeCode"]>
   ) => {
@@ -2640,10 +2638,6 @@ export function ChatView({
       );
     }
   };
-
-
-
-
 
   /**
    * Whether the open conversation holds nothing and nothing hangs off it: no
@@ -2868,11 +2862,6 @@ export function ChatView({
     }
   };
 
-
-
-
-
-
   const handleUpdateChatSettings = async (patch: Partial<ChatSettings>) => {
     const nextSettings = { ...chatSettings, ...patch };
     setChatSettings(nextSettings);
@@ -2884,9 +2873,6 @@ export function ChatView({
       // keep local state even if persistence fails
     }
   };
-
-
-
 
   // First run on the local provider with no model chosen: pick one silently so
   // Coach is usable without a trip to Settings. The Coach Models dialog runs the
@@ -2909,7 +2895,6 @@ export function ChatView({
       })
       .catch(() => undefined);
   }, [api, checkingAuth, chatSettings, chatSettings.provider, chatSettings.local.model]);
-
 
   /**
    * Rolls the conversation's summary forward when the window says it is time,
@@ -3040,12 +3025,7 @@ export function ChatView({
     if (streaming) {
       // One turn at a time (UAT review): the view holds one turn's state, so a
       // second conversation cannot answer while another does.
-      if (turnSessionIdRef.current !== activeSessionIdRef.current) {
-        const other = sessions.find((session) => session.id === turnSessionIdRef.current)?.title;
-        onMessage?.(
-          `Coach is still answering${other ? ` in "${other}"` : " in another conversation"}. Send this when it has finished.`
-        );
-      }
+      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
       return false;
     }
     if (isLatestActivityFileRequest(trimmed)) {
@@ -3633,6 +3613,10 @@ export function ChatView({
   /* A turn running in the conversation on screen, or in another one (UAT). */
   const turnHere = streaming && turnSessionId === activeSessionId;
   const turnElsewhere = streaming && turnSessionId !== activeSessionId;
+  /** Why a send waits while Coach answers in another conversation (UAT). */
+  const answeringElsewhere = `Coach is still answering in "${
+    sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"
+  }". Send this when it has finished.`;
   const waitingForCoachAnswer = [...timeline]
     .reverse()
     .some(
@@ -3874,15 +3858,15 @@ export function ChatView({
       void api.getClaudeCodeStatus().then(setClaudeStatus).catch(() => undefined);
     }
   };
-  /*
-   * The same three pickers for two subjects: the composer's change this
-   * conversation, and a sign-in gate's change Coach's own settings — the gate
-   * is about Coach's provider, so a pick scoped to the conversation would
-   * leave the athlete standing in front of it.
-   */
   /** Each provider's models as this screen last read them (`providerModelOptions`). */
   const modelOptionsFor = (provider: ChatProvider) =>
     runtimeModelOptions(provider, chatSettings, claudeStatus);
+  /*
+   * The three pickers, for the sign-in gates: a gate is about Coach's own
+   * provider, so its picks change Coach's settings — one scoped to the
+   * conversation would leave the athlete standing in front of it. The
+   * composer states the conversation's AI as one chip instead.
+   */
   const renderProviderControls = (
     runtime: GeneratorRuntime,
     change: (next: GeneratorRuntime) => void
@@ -5080,16 +5064,8 @@ export function ChatView({
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
             streaming={turnHere}
-            blockedReason={
-              turnElsewhere
-                ? `Coach is answering in "${sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"}"`
-                : undefined
-            }
-            onBlocked={() =>
-              onMessage?.(
-                `Coach is still answering in "${sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"}". Send this when it has finished.`
-              )
-            }
+            blockedReason={turnElsewhere ? answeringElsewhere : undefined}
+            onBlocked={() => onMessage?.(answeringElsewhere)}
             exportingLatestActivity={exportingLatestActivity}
             waitingForCoachAnswer={waitingForCoachAnswer}
             isLocalProvider={isLocalProvider}
