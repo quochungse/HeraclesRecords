@@ -96,6 +96,30 @@ const ROUTE_COLOR_PAPER = "#0f7f5f";
 const START_COLOR = "#4da3ff";
 const END_COLOR = "#d89b22";
 
+/**
+ * The start and finish have a pane of their own, above the route's lines and
+ * the heatmap's glow. In the overlay pane they shared one SVG with the route,
+ * where the element added last is on top — so every redraw (a new colouring,
+ * a new metric) laid its lines over both markers.
+ */
+const ROUTE_ENDS_PANE = "heraclesRouteEnds";
+
+/** A disc in the marker's colour inside a white ring, so it stands off any route colour. */
+function routeEndMarker(map: L.Map, at: [number, number], color: string): L.CircleMarker {
+  if (!map.getPane(ROUTE_ENDS_PANE)) {
+    map.createPane(ROUTE_ENDS_PANE).style.zIndex = "450";
+  }
+  return L.circleMarker(at, {
+    pane: ROUTE_ENDS_PANE,
+    radius: 6,
+    color: "#ffffff",
+    weight: 2,
+    fillColor: color,
+    fillOpacity: 1,
+    interactive: false
+  });
+}
+
 const ROUTE_COLOR_MODES = ["route", "performance", "heatmap"] as const;
 const ROUTE_METRICS = ["pace", "hr", "elevation"] as const;
 
@@ -340,7 +364,7 @@ class LinePainter implements Painter {
   }
 }
 
-/** Below Leaflet's overlay pane, so the start and finish markers sit on the glow. */
+/** Below Leaflet's overlay pane and the start and finish (`ROUTE_ENDS_PANE`). */
 const GLOW_PANE = "heraclesRouteGlow";
 
 /**
@@ -684,13 +708,7 @@ function RouteMapCanvas({
     const start = route.latLngs[0]!;
     const end = route.latLngs[route.latLngs.length - 1]!;
 
-    const startMarker = L.circleMarker(start, {
-      radius: 6,
-      color: START_COLOR,
-      fillColor: START_COLOR,
-      fillOpacity: 1,
-      weight: 2
-    }).addTo(map);
+    const startMarker = routeEndMarker(map, start, START_COLOR).addTo(map);
 
     const fitRoute = () => {
       const band =
@@ -711,13 +729,9 @@ function RouteMapCanvas({
     // The replay: a still half second when the map opens, then the line grows
     // at the pace the activity was done (sped up, linear, so a slow stretch
     // reads as slow) with the finish marker riding its head to the finish.
-    const endMarker = L.circleMarker(end, {
-      radius: 6,
-      color: END_COLOR,
-      fillColor: END_COLOR,
-      fillOpacity: 1,
-      weight: 2
-    });
+    // Added after the start, so it is the one on top where a loop finishes
+    // on its start.
+    const endMarker = routeEndMarker(map, end, END_COLOR);
 
     let animationFrame = 0;
     const replayMs = replayDurationMs(route.meters);
