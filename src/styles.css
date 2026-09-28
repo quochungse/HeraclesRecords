@@ -14499,19 +14499,43 @@ tr.data-intervals-row-missing {
   gap: 8px;
 }
 
+/* The start and finish: on the map as Leaflet div icons (16px, from the
+   icon) with the disc drawn by the span inside, in the legend at 10px. The
+   colour whitens out to the edge; the hairline ring keeps that white edge
+   from vanishing on a daylight map. */
+.activity-route-end > span,
+.activity-route-dot {
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
 .activity-route-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
+  width: 10px;
+  height: 10px;
 }
 
+/* Sized to the zoom by the map (`--route-end-scale`). The span is scaled,
+   never the icon: Leaflet places the icon with `transform`, and `scale`
+   composes with it, so a scaled icon had its position scaled too and slid
+   off the route towards the map's corner. It changes as a zoom starts, so it
+   eases alongside Leaflet's own zoom animation. */
+.activity-route-end > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  scale: var(--route-end-scale, 1);
+  transition: scale var(--dur-base) var(--ease);
+}
+
+.activity-route-end.is-start > span,
 .activity-route-dot.is-start {
-  background: #4da3ff;
+  background: radial-gradient(circle closest-side, #4da3ff 45%, #ffffff 100%);
 }
 
+.activity-route-end.is-end > span,
 .activity-route-dot.is-end {
-  background: #d89b22;
+  background: radial-gradient(circle closest-side, #d89b22 45%, #ffffff 100%);
 }
 
 .activity-route-empty,

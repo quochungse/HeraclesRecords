@@ -93,9 +93,6 @@ type RouteGeometry = RouteReplay;
 
 const ROUTE_COLOR = "#74c08f";
 const ROUTE_COLOR_PAPER = "#0f7f5f";
-const START_COLOR = "#4da3ff";
-const END_COLOR = "#d89b22";
-
 /**
  * The start and finish have a pane of their own, above the route's lines and
  * the heatmap's glow. In the overlay pane they shared one SVG with the route,
@@ -104,19 +101,60 @@ const END_COLOR = "#d89b22";
  */
 const ROUTE_ENDS_PANE = "heraclesRouteEnds";
 
-/** A disc in the marker's colour inside a white ring, so it stands off any route colour. */
-function routeEndMarker(map: L.Map, at: [number, number], color: string): L.CircleMarker {
+/**
+ * How large the start and finish are drawn at a zoom: full size from street
+ * level (16) in, half size from a city's width (12) out, and in between by
+ * the level. The route's line keeps its width, but the route itself shrinks
+ * as the map zooms out, and a full-size disc then sat over a stretch of it.
+ */
+function routeEndScale(zoom: number): number {
+  return Math.min(1, Math.max(0.5, 1 - (16 - zoom) * 0.125));
+}
+
+/**
+ * The pane the start and finish live in, scaled to the zoom — as the zoom
+ * animation starts, so they shrink with the route rather than after it — and
+ * hidden through a zoom whenever the route is: Leaflet hides the heatmap's
+ * canvas while it animates a zoom (`leaflet-zoom-hide`), and two discs left
+ * sliding over no line read as a glitch.
+ */
+function bindRouteEnds(map: L.Map): { hideWhileZooming: (hide: boolean) => void } {
+  const pane = map.getPane(ROUTE_ENDS_PANE)!;
+  const scaleTo = (zoom: number) =>
+    pane.style.setProperty("--route-end-scale", String(routeEndScale(zoom)));
+  map.on("zoomanim", (event) => scaleTo((event as L.ZoomAnimEvent).zoom));
+  map.on("zoomend", () => scaleTo(map.getZoom()));
+  scaleTo(map.getZoom());
+  return {
+    hideWhileZooming: (hide) => pane.classList.toggle("leaflet-zoom-hide", hide)
+  };
+}
+
+/**
+ * A disc in the marker's colour whitening out to its edge, so it stands off
+ * any route colour. HTML rather than a Leaflet circle, which fills with one
+ * flat colour; the look is `.activity-route-end` and the legend's
+ * `.activity-route-dot`, which share it.
+ */
+function routeEndMarker(map: L.Map, at: [number, number], kind: "start" | "end"): L.Marker {
   if (!map.getPane(ROUTE_ENDS_PANE)) {
     map.createPane(ROUTE_ENDS_PANE).style.zIndex = "450";
   }
-  return L.circleMarker(at, {
+  return L.marker(at, {
     pane: ROUTE_ENDS_PANE,
-    radius: 6,
-    color: "#ffffff",
-    weight: 2,
-    fillColor: color,
-    fillOpacity: 1,
-    interactive: false
+    icon: L.divIcon({
+      className: `activity-route-end is-${kind}`,
+      // The disc is the inner element: it is the one scaled to the zoom, since
+      // a scale on the icon itself would scale Leaflet's positioning with it.
+      html: "<span></span>",
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    }),
+    interactive: false,
+    keyboard: false,
+    // A marker is stacked by its latitude; the finish is always the one on
+    // top where a loop finishes on its start.
+    zIndexOffset: kind === "end" ? 1000 : 0
   });
 }
 
@@ -708,7 +746,7 @@ function RouteMapCanvas({
     const start = route.latLngs[0]!;
     const end = route.latLngs[route.latLngs.length - 1]!;
 
-    const startMarker = routeEndMarker(map, start, START_COLOR).addTo(map);
+    const startMarker = routeEndMarker(map, start, "start").addTo(map);
 
     const fitRoute = () => {
       const band =
@@ -722,6 +760,11 @@ function RouteMapCanvas({
       });
     };
     fitRoute();
+    const routeEnds = bindRouteEnds(map);
+    // The heatmap's canvas is hidden through a zoom; the lines are not.
+    const endsHideWithRoute = (next: RouteDrawing | undefined) =>
+      routeEnds.hideWhileZooming(next?.kind === "glow");
+    endsHideWithRoute(drawingRef.current);
     mapRef.current = map;
     tileLayerRef.current = tileLayer;
     appliedBaseLayerRef.current = initialLayer;
@@ -729,9 +772,7 @@ function RouteMapCanvas({
     // The replay: a still half second when the map opens, then the line grows
     // at the pace the activity was done (sped up, linear, so a slow stretch
     // reads as slow) with the finish marker riding its head to the finish.
-    // Added after the start, so it is the one on top where a loop finishes
-    // on its start.
-    const endMarker = routeEndMarker(map, end, END_COLOR);
+    const endMarker = routeEndMarker(map, end, "end");
 
     let animationFrame = 0;
     const replayMs = replayDurationMs(route.meters);
@@ -794,6 +835,7 @@ function RouteMapCanvas({
         window.cancelAnimationFrame(animationFrame);
         painter.remove();
         painter = createPainter(map, route, curve, currentRouteColor, next);
+        endsHideWithRoute(next);
         ghostLine.setStyle({ opacity: ghostShown(next) ? currentGhostOpacity : 0 });
         showWhole();
       },
