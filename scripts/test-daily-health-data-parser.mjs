@@ -122,4 +122,30 @@ assert.equal(hrOnly.length, 1);
 assert.equal(hrOnly[0].sleepAvgHr, 48);
 assert.equal(hrOnly[0].steps, undefined);
 
+// Exercise minutes and average stress, which Coach's fitness trends read in
+// place of COROS MCP's own daily-health, stress-level and average-HR tools.
+// Verbatim from the live feed, probed 2026-09-28.
+const wellnessLive = [
+  "Daily Health Data — Last 3 days | Resting HR: 54 bpm | HRV Baseline: 42 ms",
+  "Note: sleep entries are dated by their wake-up day.",
+  "",
+  "--- 20260926 ---",
+  "Steps: 23,316 | Calories: 1,649 kcal | Exercise: 1h 47min",
+  "Stress: Avg 40",
+  "Sleep Summary:",
+  "  Total: 4h 58min | Deep: 40 min | Light: 3h 3min | REM: 59 min | Awake: 16 min",
+  "  Sleep HR: Avg 50 bpm | Min 46 bpm | Max 74 bpm",
+  "",
+  "--- 20260708 ---",
+  "Steps: 220 | Calories: 29 kcal | Exercise: 3 min",
+  "Stress: Avg 39"
+].join("\n");
+const wellness = new Map(parseDailyHealthDataResponse(wellnessLive).map((record) => [record.happenDay, record]));
+assert.equal(wellness.get("20260926").exerciseMinutes, 107);
+assert.equal(wellness.get("20260926").stressAvg, 40);
+assert.equal(wellness.get("20260926").steps, 23316);
+assert.equal(wellness.get("20260926").sleepAvgHr, 50, "the sleep line is still read");
+assert.equal(wellness.get("20260708").exerciseMinutes, 3);
+assert.equal(wellness.get("20260708").stressAvg, 39);
+
 console.log("daily health data parser tests passed");

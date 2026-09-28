@@ -9,6 +9,7 @@ const distUrl = (file) =>
 const {
   formatSleepSummaryForChat,
   formatSleepNightForChat,
+  formatStressDayForChat,
   parseSleepNights,
   parseSleepNightArgument
 } = await import(`${distUrl("chatSleepTools.js")}?cacheBust=${Date.now()}`);
@@ -294,5 +295,31 @@ assert.match(
   /4h38 \(naps only\)/,
   "a day with no main sleep says so instead of reading as a short night"
 );
+
+// --- stress_day: a whole day's stress, summarised rather than handed over -----
+{
+  // 2026-09-27 00:00 local (UTC+7, COROS timezone 28 = 28 quarter-hours).
+  const midnightLocal = Date.UTC(2026, 8, 27) - 7 * 3600_000;
+  const point = (minutes, value) => {
+    const at = midnightLocal + minutes * 60_000;
+    const localAt = at + 7 * 3600_000;
+    const shifted = new Date(localAt);
+    return {
+      at,
+      localAt,
+      clock: `${String(shifted.getUTCHours()).padStart(2, "0")}:${String(shifted.getUTCMinutes()).padStart(2, "0")}`,
+      value
+    };
+  };
+  const points = [point(0, 10), point(5, 20), point(10, 30), point(60, 80), point(65, 60)];
+  const text = formatStressDayForChat("20260927", points);
+  assert.match(text, /^Stress on 09-27 Sun \(COROS, 0–100, 5 samples every ~5 min, 00:00–01:05; sleep is included\):/);
+  assert.match(text, /- Average 40, peak 80 at 01:00/);
+  // 10 and 20 are rest, 30 low, 60 medium, 80 high — five minutes a sample.
+  assert.match(text, /- Time in COROS's bands: rest 0h10, low 0h05, medium 0h05, high 0h05/);
+  assert.match(text, /Hour \| Avg \| Peak\n00 \| 20 \| 30\n01 \| 70 \| 80$/);
+  assert.match(formatStressDayForChat("20260927", []), /^No stress samples for 09-27 Sun/);
+  assert.throws(() => parseSleepNightArgument("27/09", "stress_day"), /stress_day must be YYYYMMDD/);
+}
 
 console.log("test-chat-sleep-tools: ok");

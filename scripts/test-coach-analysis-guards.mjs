@@ -191,6 +191,8 @@ assert.equal(
     // The athlete's COROS plans, read only (P3.1).
     "list_training_plans",
     "get_training_plan",
+    // The COROS workout library, read only.
+    "get_workout_library",
     // A proposal the athlete applies; it writes nothing (P3.3).
     "propose_schedule_changes",
     "request_coach_input"
@@ -346,6 +348,33 @@ assert.deepEqual(
     ),
     ["get_sleep_summary", "list_scheduled_workouts", "list_training_plans", "get_training_plan"]
   );
+}
+
+// --- With the local tools on offer, COROS MCP is left only what it alone has --
+// SpO2 and respiration, and — for an account COROS knows as female — the
+// menstrual cycle. Everything else has a local tool or the snapshot behind it.
+{
+  const remoteReads = [
+    "querySleepOverview", "querySleepHrv", "queryStressTimeSeries", "queryStressLevel",
+    "getActivityDetail", "queryActivityLapData", "queryCustomActivityLapData", "querySportRecords",
+    "queryTrainingSchedule", "queryScheduledWorkoutDetails", "queryTrainingPlanLibrary",
+    "queryTrainingPlanDetails", "queryWorkoutLibrary", "queryWorkoutDetails",
+    "queryDailyHealthData", "queryAvgHeartRate", "queryRestingHeartRate", "queryTrainingLoadAssessment",
+    "queryFitnessAssessmentOverview", "queryRecoveryStatus", "queryUserInfo",
+    "queryHealthCheckTimeSeries", "queryMenstruationCycles"
+  ].map((name) => `coros__${name}`);
+  const locals = [
+    "get_sleep_summary", "get_activity_detail", "list_recent_activities", "list_scheduled_workouts",
+    "list_training_plans", "get_training_plan", "get_workout_library", "get_fitness_trends"
+  ];
+  const remoteLeft = (sex) =>
+    namesOf(narrowCorosMcpTools(named(...remoteReads, ...locals), sex)).filter((name) => name.startsWith("coros__"));
+  assert.deepEqual(remoteLeft(1), ["coros__queryHealthCheckTimeSeries", "coros__queryMenstruationCycles"]);
+  assert.deepEqual(remoteLeft(0), ["coros__queryHealthCheckTimeSeries"], "not offered to an account COROS knows as male");
+  assert.deepEqual(remoteLeft(undefined), ["coros__queryHealthCheckTimeSeries"], "nor while the profile is unread");
+  // Signed out of Training Hub the local tools are gone, and the remote reads
+  // are the only route — every one of them but the gated cycle stays.
+  assert.equal(namesOf(narrowCorosMcpTools(named(...remoteReads), 0)).length, remoteReads.length - 1);
 }
 
 // --- the per-name predicate, which executeChatTool enforces --------------

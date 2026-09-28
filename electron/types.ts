@@ -1414,6 +1414,10 @@ export interface TrainingHubDailyHealthRecord {
   sleepAvgHr?: number;
   sleepMinHr?: number;
   sleepMaxHr?: number;
+  /** "Exercise: 1h 47min" — the day's active minutes as COROS counts them. */
+  exerciseMinutes?: number;
+  /** "Stress: Avg 40" — the day's average stress, 0–100. */
+  stressAvg?: number;
 }
 
 export interface TrainingHubDailyHealthSummary {

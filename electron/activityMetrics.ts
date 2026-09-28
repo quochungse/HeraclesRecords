@@ -288,3 +288,117 @@ export function summarizeActivityDetail(
     computedAt: now ?? Date.now()
   };
 }
+
+/**
+ * A stretch of an activity, measured from its start in minutes of activity time
+ * or kilometres; a negative `from` counts back from the end, so `{ unit: "km",
+ * from: -5 }` is the last five kilometres.
+ */
+export interface ActivityWindow {
+  unit: "minutes" | "km";
+  from: number;
+  to?: number;
+}
+
+export interface ActivityWindowSummary {
+  /** Activity time, pauses taken out, where the stretch starts and ends. */
+  startSeconds: number;
+  endSeconds: number;
+  startMeters?: number;
+  endMeters?: number;
+  durationSeconds: number;
+  distanceMeters?: number;
+  paceSecondsPerKm?: number;
+  adjustedPaceSecondsPerKm?: number;
+  avgHr?: number;
+  maxHr?: number;
+  avgCadence?: number;
+  avgPower?: number;
+  ascentMeters?: number;
+  descentMeters?: number;
+  samples: number;
+}
+
+function meanOf(values: (number | undefined)[]): number | undefined {
+  const present = values.filter((value): value is number => value !== undefined && Number.isFinite(value) && value > 0);
+  return present.length > 0 ? present.reduce((total, value) => total + value, 0) / present.length : undefined;
+}
+
+/**
+ * The figures of one stretch of an activity, read off its recorded samples on
+ * activity time — the answer to "how was my last 5 km", which the lap table
+ * only gives when a lap happens to end there. Undefined when the samples do not
+ * cover the stretch (no series, or no distance channel for a `km` window).
+ */
+export function summarizeActivityWindow(
+  series: readonly TrainingHubActivitySeriesPoint[],
+  pauses: readonly TrainingHubActivityPause[] | undefined,
+  window: ActivityWindow
+): ActivityWindowSummary | undefined {
+  const byKm = window.unit === "km";
+  const scale = byKm ? 1000 : 60;
+  const axis = (point: TrainingHubActivitySeriesPoint) => (byKm ? point.distance : point.elapsed);
+  const points = withPausesRemoved(series, pauses).filter(
+    (point) => point.elapsed !== undefined && axis(point) !== undefined
+  );
+  if (points.length < 2) {
+    return undefined;
+  }
+
+  const total = axis(points[points.length - 1]!)!;
+  const edge = (value: number) => Math.min(Math.max(value < 0 ? total + value * scale : value * scale, 0), total);
+  const from = edge(window.from);
+  const to = window.to === undefined ? total : edge(window.to);
+  const inside = points.filter((point) => axis(point)! >= Math.min(from, to) && axis(point)! <= Math.max(from, to));
+  if (inside.length < 2) {
+    return undefined;
+  }
+
+  const first = inside[0]!;
+  const last = inside[inside.length - 1]!;
+  const durationSeconds = last.elapsed! - first.elapsed!;
+  const distanceMeters =
+    first.distance !== undefined && last.distance !== undefined ? last.distance - first.distance : undefined;
+  let ascentMeters = 0;
+  let descentMeters = 0;
+  let climbKnown = false;
+  for (let index = 1; index < inside.length; index += 1) {
+    const before = inside[index - 1]!.altitude;
+    const after = inside[index]!.altitude;
+    if (before === undefined || after === undefined) continue;
+    climbKnown = true;
+    if (after > before) ascentMeters += after - before;
+    else descentMeters += before - after;
+  }
+  const hrs = inside.map((point) => point.hr).filter((value): value is number => value !== undefined && value > 0);
+
+  return {
+    startSeconds: first.elapsed!,
+    endSeconds: last.elapsed!,
+    ...(first.distance !== undefined ? { startMeters: first.distance } : {}),
+    ...(last.distance !== undefined ? { endMeters: last.distance } : {}),
+    durationSeconds,
+    ...(distanceMeters !== undefined ? { distanceMeters } : {}),
+    ...(distanceMeters !== undefined && distanceMeters > 0 && durationSeconds > 0
+      ? { paceSecondsPerKm: durationSeconds / (distanceMeters / 1000) }
+      : {}),
+    // Paces average by their speeds: the mean of seconds-per-km over samples
+    // even in time weighs the slow ones up, and read 11:17 against a 9:50 pace.
+    ...optional("adjustedPaceSecondsPerKm", harmonicMeanOf(inside.map((point) => point.adjustedPace))),
+    ...optional("avgHr", meanOf(hrs)),
+    ...(hrs.length > 0 ? { maxHr: Math.max(...hrs) } : {}),
+    ...optional("avgCadence", meanOf(inside.map((point) => point.cadence))),
+    ...optional("avgPower", meanOf(inside.map((point) => point.power))),
+    ...(climbKnown ? { ascentMeters, descentMeters } : {}),
+    samples: inside.length
+  };
+}
+
+function harmonicMeanOf(values: (number | undefined)[]): number | undefined {
+  const speeds = meanOf(values.map((value) => (value !== undefined && value > 0 ? 1 / value : undefined)));
+  return speeds === undefined ? undefined : 1 / speeds;
+}
+
+function optional<Key extends string>(key: Key, value: number | undefined): Partial<Record<Key, number>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<Key, number>);
+}

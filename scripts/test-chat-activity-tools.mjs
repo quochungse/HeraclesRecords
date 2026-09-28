@@ -15,6 +15,9 @@ const {
   formatActivitySpan,
   parseActivityListWindow,
   parseActivityDetailSections,
+  parseActivityWindow,
+  parseActivityLengthFilter,
+  formatActivityWindowForChat,
   activitySportFamily,
   DEFAULT_ACTIVITY_DETAIL_SECTIONS
 } = await import(`${distUrl("chatActivityTools.js")}?cacheBust=${Date.now()}`);
@@ -977,6 +980,61 @@ assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
     JSON.parse(JSON.stringify(restored.preview)),
     JSON.parse(JSON.stringify(preview))
   );
+}
+
+// --- window: one stretch of an activity, on activity time ----------------------
+{
+  const { summarizeActivityWindow } = await import(`${distUrl("activityMetrics.js")}?cacheBust=${Date.now()}`);
+  // Ten minutes at 4:00/km, sampled each minute, with a two-minute stop after
+  // minute 5: the wall clock runs to 12 min, the activity clock to 10.
+  const series = Array.from({ length: 11 }, (_, minute) => ({
+    elapsed: (minute <= 5 ? minute : minute + 2) * 60,
+    distance: minute * 250,
+    hr: 140 + minute,
+    cadence: 180,
+    altitude: 10 + (minute % 2)
+  }));
+  const pauses = [{ start: 300, duration: 120 }];
+
+  const last1km = summarizeActivityWindow(series, pauses, { unit: "km", from: -1 });
+  assert.equal(last1km.startMeters, 1500);
+  assert.equal(last1km.endMeters, 2500);
+  assert.equal(last1km.durationSeconds, 240, "the pause is not in the stretch's time");
+  assert.equal(last1km.paceSecondsPerKm, 240);
+  assert.equal(last1km.maxHr, 150);
+  assert.equal(last1km.avgHr, 148);
+
+  const firstMinutes = summarizeActivityWindow(series, pauses, { unit: "minutes", from: 0, to: 6 });
+  assert.equal(firstMinutes.endSeconds, 360, "activity minute 6 is wall-clock minute 8");
+  assert.equal(firstMinutes.distanceMeters, 1500);
+  assert.equal(summarizeActivityWindow([], pauses, { unit: "km", from: -1 }), undefined);
+
+  const detail = { sportType: 100, sportName: "Run", series, pauses, laps: [] };
+  assert.equal(
+    formatActivityWindowForChat(detail, { unit: "km", from: -1 }, "metric"),
+    "Stretch (km -1 to the end: 1.50 km–2.50 km, 6:00–10:00 activity time; 5 samples): " +
+      "1.00 km in 4:00 · pace 4:00/km · HR 148 avg / 150 max · cadence 180 · +2 m / −2 m"
+  );
+  assert.match(
+    formatActivityWindowForChat({ ...detail, series: [] }, { unit: "km", from: -1 }, "metric"),
+    /do not cover it — this activity has no distance channel/
+  );
+  assert.deepEqual(parseActivityWindow({ unit: "km", from: -5 }), { unit: "km", from: -5 });
+  assert.equal(parseActivityWindow(undefined), undefined);
+  assert.throws(() => parseActivityWindow({ unit: "miles", from: 1 }), /window needs unit/);
+}
+
+// --- min/max_km and min/max_minutes: sessions by length -------------------------
+{
+  assert.equal(parseActivityLengthFilter({}), undefined);
+  assert.deepEqual(parseActivityLengthFilter({ min_km: 15, max_minutes: 90 }), { minMeters: 15000, maxSeconds: 5400 });
+  const runs = [
+    { activityId: "a", sportType: 100, name: "Long", distance: 21000, duration: 6000, startTime: "2026-09-20T06:00:00" },
+    { activityId: "b", sportType: 100, name: "Easy", distance: 8000, duration: 2700, startTime: "2026-09-21T06:00:00" }
+  ];
+  const long = formatActivityListForChat(runs, "metric", { length: { minMeters: 15000 }, limit: 10 });
+  assert.match(long, /^Activities \(most recent, ≥ 15\.0 km\): 1/);
+  assert.doesNotMatch(long, /Easy/);
 }
 
 console.log("test-chat-activity-tools: ok");

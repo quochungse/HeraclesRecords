@@ -121,6 +121,17 @@ assert.match(
   weekText,
   /^Fitness trends, last 7 days \(09-05 Sat → 09-11 Fri; days without any reading are omitted\):/
 );
+{
+  const wellness = new Map([
+    [key(0), { happenDay: key(0), steps: 12000, exerciseMinutes: 60, stressAvg: 40 }],
+    [key(1), { happenDay: key(1), steps: 8000, exerciseMinutes: 30, stressAvg: 30 }]
+  ]);
+  const withWellness = formatFitnessTrendsForChat(week, 7, today, wellness);
+  assert.match(withWellness, /- Last 7 days: steps 10000\/day; exercise 90 min; average stress 35 \(0–100\)/);
+  assert.match(withWellness, /\| Steps \| Exercise min \| Stress avg\n/, "the wellness columns close the daily table");
+  assert.match(withWellness, /09-11 Fri \|.*\| 12000 \| 60 \| 40$/m);
+  assert.doesNotMatch(weekText, /Steps|Stress avg/, "without the feed the table is what it was");
+}
 assert.match(weekText, /- Training load: last 7 days 350\n/);
 assert.match(weekText, /- Resting HR: 55 bpm on 09-11 Fri; 7-day average 52\n/);
 assert.match(

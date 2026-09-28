@@ -31,6 +31,10 @@ import {
   listTrainingPlanMetadata
 } from "./database";
 import { getNativeTrainingPlan, getTrainingLibrarySnapshot } from "./trainingLibraryService";
+import { getWorkoutForEdit, listLibraryWorkouts, listWorkoutExercises } from "./trainingHubService";
+import { corosText } from "./corosLocale";
+import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
+import { WORKOUT_SPORTS, workoutSportFromType } from "./workoutCapabilities";
 import { formatEntryStepsSummary, type PlanWorkoutEntry } from "./corosWorkoutBuilder";
 import { planCompliance, type PlanCompliance } from "./planCompliance";
 import {
@@ -45,13 +49,14 @@ import {
 import { formatDistanceValue } from "./unitSystem.js";
 import type {
   CorosMcpTool,
+  RunWorkoutEditorDraft,
   TrainingActivityMatch,
   TrainingPlanDocument,
   TrainingPlanEntry,
   UnitSystem
 } from "./types";
 
-export const CHAT_PLAN_TOOL_NAMES = ["list_training_plans", "get_training_plan"] as const;
+export const CHAT_PLAN_TOOL_NAMES = ["list_training_plans", "get_training_plan", "get_workout_library"] as const;
 export type ChatPlanToolName = (typeof CHAT_PLAN_TOOL_NAMES)[number];
 
 export function isChatPlanTool(name: string): name is ChatPlanToolName {
@@ -62,6 +67,8 @@ export function isChatPlanTool(name: string): name is ChatPlanToolName {
 const WHOLE_PLAN_WEEKS = 8;
 /** Sessions whose whole workout one call may ask for. */
 const MAX_WHOLE_SESSIONS = 5;
+/** Library workouts one call may read whole. */
+const MAX_WHOLE_WORKOUTS = 5;
 
 export function getChatPlanTools(): CorosMcpTool[] {
   return [
@@ -105,6 +112,25 @@ export function getChatPlanTools(): CorosMcpTool[] {
         },
         required: ["plan_id"]
       }
+    },
+    {
+      name: "get_workout_library",
+      description:
+        "The athlete's COROS workout library — saved workouts not tied to a day: each workout_id, name, sport, " +
+        "time, exercises and sets. Pass workout_ids for those workouts' steps. To reuse one, draft_workout from its steps.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sport: { type: "string", enum: [...WORKOUT_SPORTS] },
+          query: { type: "string", description: "Part of the name." },
+          workout_ids: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: MAX_WHOLE_WORKOUTS,
+            description: "workout_id of workouts to return with their steps."
+          }
+        }
+      }
     }
   ];
 }
@@ -123,7 +149,100 @@ export async function handleChatPlanTool(
   args: Record<string, unknown>,
   options: ChatPlanToolOptions = {}
 ): Promise<string> {
+  if (name === "get_workout_library") return getWorkoutLibrary(args, options);
   return name === "list_training_plans" ? listTrainingPlans(args, options) : getTrainingPlan(args, options);
+}
+
+// ---------------------------------------------------------------------------
+// get_workout_library
+// ---------------------------------------------------------------------------
+
+/**
+ * A strength step's own name is what COROS stores, and it stores "Training"
+ * for nearly every movement: the movement's name is the catalogue's, found by
+ * the step's exercise id (verified on the live library, 2026-09-28). A
+ * catalogue that does not answer leaves the names as they came.
+ */
+async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
+  const steps = draft.nodes.flatMap((node) => (node.nodeType === "repeat" ? node.steps : [node]));
+  let catalog = new Map<string, string>();
+  if (steps.some((step) => step.exerciseId)) {
+    try {
+      catalog = new Map((await listWorkoutExercises(draft.sport)).map((option) => [option.id, option.name]));
+    } catch {
+      /* the stored names stand */
+    }
+  }
+  for (const step of steps) {
+    const name = (step.exerciseId && catalog.get(step.exerciseId)) || corosText(step.exerciseName ?? step.name);
+    if (name) {
+      step.name = name;
+      step.exerciseName = name;
+    }
+  }
+  for (const node of draft.nodes) if (node.nodeType === "repeat") node.name = corosText(node.name);
+}
+
+/**
+ * The library as the Training Library reads it — `/training/program/query`,
+ * cached — and each workout asked for through `getWorkoutForEdit`, the
+ * builder's own read. COROS MCP's `queryWorkoutDetails` answers a strength
+ * workout with no exercises at all and drops a %Max HR target, which is why
+ * it is not offered beside this.
+ */
+async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPlanToolOptions): Promise<string> {
+  const unitSystem = options.unitSystem ?? "metric";
+  const sport = typeof args.sport === "string" && (WORKOUT_SPORTS as readonly string[]).includes(args.sport) ? args.sport : undefined;
+  const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
+  const wanted = Array.isArray(args.workout_ids)
+    ? args.workout_ids.map(String).filter(Boolean).slice(0, MAX_WHOLE_WORKOUTS)
+    : [];
+
+  const all = await listLibraryWorkouts();
+  const shown = all.filter(
+    (workout) =>
+      (!sport || workoutSportFromType(workout.sportType) === sport) &&
+      (!query || workout.name.toLowerCase().includes(query))
+  );
+  const lines = [
+    `Workout library: ${shown.length}${shown.length !== all.length ? ` of ${all.length}` : ""} workouts, newest first.`,
+    ...shown.map((workout) =>
+      [
+        `workout_id ${workout.id}`,
+        workout.name,
+        workoutSportFromType(workout.sportType) ?? "other",
+        workout.durationSeconds ? `${Math.round(workout.durationSeconds / 60)} min` : undefined,
+        workout.exerciseCount ? `${workout.exerciseCount} exercises` : undefined,
+        workout.setCount ? `${workout.setCount} sets` : undefined
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    )
+  ];
+
+  if (wanted.length === 0) return lines.join("\n");
+
+  const whole = await Promise.all(
+    wanted.map(async (id) => {
+      try {
+        const document = await getWorkoutForEdit({ kind: "library", programId: id }, unitSystem);
+        await nameExercises(document.draft);
+        const workout = editorDraftToPlanWorkoutInput(document.draft, { key: id, name: document.draft.name });
+        const steps = formatEntryStepsSummary(workout as PlanWorkoutEntry, unitSystem);
+        return {
+          workout_id: id,
+          name: workout.name,
+          sport: workout.sport ?? "run",
+          ...(workout.description ? { description: workout.description } : {}),
+          ...(steps ? { steps } : {}),
+          ...(workout.steps ? { workout_steps: workout.steps } : {})
+        };
+      } catch (error) {
+        return { workout_id: id, error: message(error) };
+      }
+    })
+  );
+  return [...lines, "", "Workouts asked for:", JSON.stringify(whole)].join("\n");
 }
 
 // ---------------------------------------------------------------------------

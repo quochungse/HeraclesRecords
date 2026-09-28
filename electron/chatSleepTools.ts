@@ -1,8 +1,9 @@
 import { dateFromDayKey, dayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
 import { SLEEP_TARGET_MINUTES } from "./coachThresholdMetrics";
-import { isCorosMcpUsable } from "./corosMcpService";
+import { callCorosMcpTool, getCorosMcpTools, isCorosMcpUsable } from "./corosMcpService";
 import { getCachedSleepNight, getSleepHistory } from "./sleepHistoryService";
 import { getSleepNightSeries } from "./sleepSeriesService";
+import { parseStressSeries } from "./sleepSeriesParser";
 import {
   isNapOnlyRecord,
   isSleepDayRecord,
@@ -60,7 +61,8 @@ export function getChatSleepTools(): CorosMcpTool[] {
         "sleep cache, which keeps nights COROS drops after ~9 weeks. Nights are " +
         "dated by wake-up day, so today's date is last night. Windows over 14 " +
         "nights are rolled up by week with the last 7 nights listed. Pass night " +
-        "for one night's HRV and stress detail instead.",
+        "for one night's HRV and stress detail instead, or stress_day for a whole " +
+        "day's stress by hour.",
       inputSchema: {
         type: "object",
         properties: {
@@ -76,6 +78,12 @@ export function getChatSleepTools(): CorosMcpTool[] {
               "One night as YYYYMMDD (its wake-up day) for that night's HRV " +
               "course, COROS's own HRV assessment and sleeping stress. COROS " +
               "keeps these samples about a week; older nights have none."
+          },
+          stress_day: {
+            type: "string",
+            description:
+              "One calendar day as YYYYMMDD for its stress course, sleep included: " +
+              "average, peak, time in COROS's bands and hour by hour. About a week back."
           }
         }
       }
@@ -91,13 +99,18 @@ export function parseSleepNights(value: unknown): number {
 }
 
 /** The night asked for, as `yyyyMMdd`, or undefined when the window was asked for. */
-export function parseSleepNightArgument(value: unknown): string | undefined {
+export function parseSleepNightArgument(
+  value: unknown,
+  field: "night" | "stress_day" = "night"
+): string | undefined {
   const night = String(value ?? "").trim().replace(/-/g, "");
   if (!night) {
     return undefined;
   }
   if (!/^\d{8}$/.test(night)) {
-    throw new Error("night must be YYYYMMDD (the wake-up day).");
+    throw new Error(
+      field === "night" ? "night must be YYYYMMDD (the wake-up day)." : "stress_day must be YYYYMMDD."
+    );
   }
   return night;
 }
@@ -141,7 +154,11 @@ export async function handleChatSleepTool(
     // Parsed inside the try, so a malformed night reads as this tool's failure
     // like every other one rather than as a bare message with no tool named.
     const night = parseSleepNightArgument(args.night);
+    const stressDay = parseSleepNightArgument(args.stress_day, "stress_day");
     const nights = parseSleepNights(args.days);
+    if (stressDay) {
+      return formatStressDayForChat(stressDay, await readStressDay(stressDay));
+    }
     if (night) {
       const today = new Date();
       // The night's own row and its samples are two different caches, and
@@ -157,6 +174,84 @@ export async function handleChatSleepTool(
     const detail = caught instanceof Error ? caught.message : String(caught);
     throw new Error(`get_sleep_summary failed: ${detail}`);
   }
+}
+
+const STRESS_TOOL = "queryStressTimeSeries";
+
+/**
+ * One day's stress samples. The remote tool answers with every 5-minute point
+ * of the day — ~21k characters a day handed to the model — so it is not
+ * offered to Coach, and this reads it and hands back the shape instead.
+ */
+async function readStressDay(day: string): Promise<SleepSeriesPoint[]> {
+  if (!getCorosMcpTools().some((tool) => tool.name === STRESS_TOOL)) {
+    throw new Error("the COROS MCP server offers no stress series.");
+  }
+  const response = await callCorosMcpTool(STRESS_TOOL, { startDate: day, endDate: day, days: 1 });
+  return parseStressSeries(response).filter((point) => localDayKey(point.localAt) === day);
+}
+
+function localDayKey(localAt: number): string {
+  const date = new Date(localAt);
+  return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(
+    date.getUTCDate()
+  ).padStart(2, "0")}`;
+}
+
+/** COROS's stress bands, as its app draws them: 0–25, 26–50, 51–75, 76–100. */
+const STRESS_BANDS = [
+  { label: "rest", max: 25 },
+  { label: "low", max: 50 },
+  { label: "medium", max: 75 },
+  { label: "high", max: Number.POSITIVE_INFINITY }
+] as const;
+
+/** The spacing COROS samples at, from the samples themselves. */
+function sampleSeconds(points: SleepSeriesPoint[]): number {
+  const gaps = points
+    .slice(1)
+    .map((point, index) => (point.at - points[index]!.at) / 1000)
+    .filter((gap) => gap > 0)
+    .sort((left, right) => left - right);
+  return gaps.length > 0 ? gaps[Math.floor(gaps.length / 2)]! : 300;
+}
+
+export function formatStressDayForChat(day: string, points: SleepSeriesPoint[]): string {
+  if (points.length === 0) {
+    return `No stress samples for ${dayLabel(day)}. COROS keeps them about a week, and a day the watch was off has none.`;
+  }
+
+  const step = sampleSeconds(points);
+  const values = points.map((point) => point.value);
+  const average = values.reduce((total, value) => total + value, 0) / values.length;
+  const peak = points.reduce((best, point) => (point.value > best.value ? point : best), points[0]!);
+  const bands = STRESS_BANDS.map((band, index) => {
+    const floor = index === 0 ? Number.NEGATIVE_INFINITY : STRESS_BANDS[index - 1]!.max;
+    const count = values.filter((value) => value > floor && value <= band.max).length;
+    return count > 0 ? `${band.label} ${formatSleepMinutes((count * step) / 60)}` : undefined;
+  }).filter(Boolean);
+
+  const hours = new Map<number, number[]>();
+  for (const point of points) {
+    const hour = new Date(point.localAt).getUTCHours();
+    hours.set(hour, [...(hours.get(hour) ?? []), point.value]);
+  }
+  const hourly = [...hours.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([hour, readings]) => {
+      const mean = readings.reduce((total, value) => total + value, 0) / readings.length;
+      return `${String(hour).padStart(2, "0")} | ${Math.round(mean)} | ${Math.max(...readings)}`;
+    });
+
+  return [
+    `Stress on ${dayLabel(day)} (COROS, 0–100, ${points.length} samples every ~${Math.round(step / 60)} min, ` +
+      `${points[0]!.clock}–${points[points.length - 1]!.clock}; sleep is included):`,
+    `- Average ${Math.round(average)}, peak ${Math.round(peak.value)} at ${peak.clock}`,
+    `- Time in COROS's bands: ${bands.join(", ")}`,
+    "",
+    "Hour | Avg | Peak",
+    ...hourly
+  ].join("\n");
 }
 
 // ----- Formatting -----------------------------------------------------------

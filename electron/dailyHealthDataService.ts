@@ -253,7 +253,9 @@ function mergeDailyHealthRecord(
     calories: incoming.calories ?? existing.calories,
     sleepAvgHr: incoming.sleepAvgHr ?? existing.sleepAvgHr,
     sleepMinHr: incoming.sleepMinHr ?? existing.sleepMinHr,
-    sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr
+    sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr,
+    exerciseMinutes: incoming.exerciseMinutes ?? existing.exerciseMinutes,
+    stressAvg: incoming.stressAvg ?? existing.stressAvg
   };
 }
 
@@ -330,6 +332,15 @@ function parseLabeledNumber(text: string, patterns: RegExp[]): number | undefine
   return undefined;
 }
 
+/** "1h 47min", "3 min", "2h" — a duration line's minutes. */
+function parseDurationLineMinutes(value: string | undefined): number | undefined {
+  const match = value?.match(/^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*min)?/i);
+  if (!match || (match[1] === undefined && match[2] === undefined)) {
+    return undefined;
+  }
+  return Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0);
+}
+
 function parseProseDailyHealthSection(
   section: string,
   fallbackDay?: string
@@ -363,6 +374,13 @@ function parseProseDailyHealthSection(
     ? parseLabeledNumber(sleepHrLine, [/\bmax(?:imum)?\b\s*[:=]?\s*([\d,.]+)/i])
     : undefined;
 
+  // "Steps: 23,316 | Calories: 1,649 kcal | Exercise: 1h 47min" and
+  // "Stress: Avg 40", which Coach's fitness trends read beside the load.
+  const exerciseMinutes = parseDurationLineMinutes(
+    section.match(/\bExercise\s*:\s*([^|\n]+)/i)?.[1]
+  );
+  const stressAvg = parseLabeledNumber(section, [/\bStress\s*:\s*Avg\s*([\d.]+)/i]);
+
   // A day whose only news is the night's heart rate is still news: the Sleep
   // screen reads this feed for that line and nothing else.
   if (
@@ -370,7 +388,9 @@ function parseProseDailyHealthSection(
     calories === undefined &&
     sleepAvgHr === undefined &&
     sleepMinHr === undefined &&
-    sleepMaxHr === undefined
+    sleepMaxHr === undefined &&
+    exerciseMinutes === undefined &&
+    stressAvg === undefined
   ) {
     return undefined;
   }
@@ -381,7 +401,9 @@ function parseProseDailyHealthSection(
     calories,
     sleepAvgHr,
     sleepMinHr,
-    sleepMaxHr
+    sleepMaxHr,
+    ...(exerciseMinutes !== undefined ? { exerciseMinutes } : {}),
+    ...(stressAvg !== undefined ? { stressAvg } : {})
   };
 }
 

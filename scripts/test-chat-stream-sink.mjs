@@ -528,10 +528,15 @@ assert.deepEqual(persisted[0].automation, marker);
 
   const whole = readSource(repoRoot, "electron", "chatService.ts");
   const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
-  for (const step of ["inspectClaudeCodeStatus", "ensureAllMcpConnected", "buildTrainingContext", "getValidToken"]) {
+  for (const step of ["inspectClaudeCodeStatus", "prepareToolSurface", "buildTrainingContext", "getValidToken"]) {
     assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
     assert.match(turn, new RegExp(`await prepare\\(${step}\\(`), `${step} is prepared in a turn`);
   }
+  // The MCP connections ride inside prepareToolSurface, with the profile read
+  // that decides the tool list, so Stop reaches them through the same prepare().
+  assert.doesNotMatch(turn, /await ensureAllMcpConnected\(/, "the MCP connections are not awaited bare in a turn");
+  const surface = whole.slice(whole.indexOf("async function prepareToolSurface("), whole.indexOf("function getAllChatTools("));
+  assert.match(surface, /ensureAllMcpConnected\(\)/, "prepareToolSurface connects the MCP servers");
   const provider = readSource(repoRoot, "electron", "claudeCodeProvider.ts");
   assert.match(provider, /if \(options\.signal\.aborted\)/, "the Claude provider checks a signal aborted before it was called");
 }

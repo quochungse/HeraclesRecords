@@ -815,10 +815,23 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,
   `chatInteractionTools`) and MCP servers.
   The read tools are built to fetch only what a question is about: the activity list takes a
-  date window and a sport family and returns per-sport totals, `get_activity_detail` takes a
-  `sections` list, trends and sleep take `days` and roll up by week past 14, and
-  `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
-  own totals and deltas so the model reads them rather than doing the arithmetic.
+  date window, a sport family and length bounds (`min_km`…) and returns per-sport totals,
+  `get_activity_detail` takes a `sections` list and a `window` (one stretch — "the last 5 km" —
+  on activity time, `summarizeActivityWindow` in `activityMetrics.ts`), trends and sleep take
+  `days` and roll up by week past 14 — trends with steps, exercise minutes and average stress
+  from the daily-health feed beside the load — `get_sleep_summary` takes a `night` for one
+  night's HRV course and a `stress_day` for a day's stress by hour, and `get_workout_library`
+  reads the library the Training Library reads, with a movement's name from the exercise
+  catalogue (COROS stores "Training" for nearly every strength step). Each formatter computes
+  its own totals and deltas so the model reads them rather than doing the arithmetic.
+  **COROS MCP is left only what it alone has** (September 2026): every remote read with a
+  local answer — a tool, or the snapshot, keyed to `get_fitness_trends` — is in
+  `SUPERSEDED_COROS_MCP_TOOLS`, which on the live account leaves `queryHealthCheckTimeSeries`
+  (SpO2, respiration): ~270 tokens a round where the 16 reads cost ~4.8k.
+  `queryMenstruationCycles` is offered only to an account whose COROS `sex` is female
+  (`lastKnownCorosProfileSex`, read before the tool list by `prepareToolSurface`), and not while
+  it is unknown. `CLAUDE_REMOTE_READ_TOOLS` names the server's real tools per Claude Code
+  permission — it named tools that never existed, so Claude Code had been offered none.
   **Coach's proposals to the calendar and the library are change sets** (P3.2, `chatScheduleChanges.ts`):
   rows of `chat_schedule_changes` (`personal`), a `scheduleChange` anchor in the transcript, and a
   card (`CoachScheduleChangeCard`) whose lines are applied or dismissed one at a time or all at once

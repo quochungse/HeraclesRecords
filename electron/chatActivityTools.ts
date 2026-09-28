@@ -1,3 +1,4 @@
+import { summarizeActivityWindow, type ActivityWindow } from "./activityMetrics";
 import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { getStoredTrainingActivity } from "./database";
 import {
@@ -126,7 +127,8 @@ export function getChatActivityTools(): CorosMcpTool[] {
         "duration, HR, training load and climb. With start_date (and optionally " +
         "end_date) it returns every activity in that period plus per-sport totals — " +
         "use this for a week or block review instead of paging. Without dates it " +
-        "returns the most recent ones; the snapshot already lists the latest 8.",
+        "returns the most recent ones; the snapshot already lists the latest 8. " +
+        "min/max_km and min/max_minutes find sessions by length (e.g. every run over 15 km).",
       inputSchema: {
         type: "object",
         properties: {
@@ -155,7 +157,11 @@ export function getChatActivityTools(): CorosMcpTool[] {
             description:
               "Page of the plain most-recent list (default 1). Ignored with " +
               "dates or sport — narrow those with start_date/end_date."
-          }
+          },
+          min_km: { type: "number" },
+          max_km: { type: "number" },
+          min_minutes: { type: "number" },
+          max_minutes: { type: "number" }
         }
       }
     },
@@ -170,7 +176,8 @@ export function getChatActivityTools(): CorosMcpTool[] {
         "phase), zones (this activity's HR zone time), trend (first → last third " +
         "drift of pace, HR and form), elevation (8-segment profile), strength " +
         "(sets × reps × load), series (~60-sample table; large). Default: every " +
-        "section except series. Request only the sections the question needs.",
+        "section except series. Request only the sections the question needs. " +
+        "Pass window for one stretch's pace, HR, cadence, power and climb.",
       inputSchema: {
         type: "object",
         properties: {
@@ -190,6 +197,16 @@ export function getChatActivityTools(): CorosMcpTool[] {
             items: { type: "string", enum: [...ACTIVITY_DETAIL_SECTIONS] },
             description:
               "Sections to include besides the summary. Omit for all but series."
+          },
+          window: {
+            type: "object",
+            properties: {
+              unit: { type: "string", enum: ["minutes", "km"] },
+              from: { type: "number", description: "From the start; negative counts from the end (-5 = the last 5)." },
+              to: { type: "number", description: "Omit for the end." }
+            },
+            required: ["unit", "from"],
+            description: "A stretch on activity time (pauses out) or distance, e.g. the last 5 km."
           }
         },
         required: ["activity_id"]
@@ -257,6 +274,61 @@ export function parseActivityListWindow(
   return { startDay, endDay };
 }
 
+/** Bounds on an activity's length. Distances in metres, times in seconds. */
+export interface ActivityLengthFilter {
+  minMeters?: number;
+  maxMeters?: number;
+  minSeconds?: number;
+  maxSeconds?: number;
+}
+
+export function parseActivityLengthFilter(args: Record<string, unknown>): ActivityLengthFilter | undefined {
+  const bound = (value: unknown, scale: number) => {
+    if (value === undefined || value === null || String(value).trim() === "") return undefined;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number * scale : undefined;
+  };
+  const filter: ActivityLengthFilter = {
+    minMeters: bound(args.min_km, 1000),
+    maxMeters: bound(args.max_km, 1000),
+    minSeconds: bound(args.min_minutes, 60),
+    maxSeconds: bound(args.max_minutes, 60)
+  };
+  const set = Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined));
+  return Object.keys(set).length > 0 ? (set as ActivityLengthFilter) : undefined;
+}
+
+function matchesLength(activity: TrainingHubActivity, filter: ActivityLengthFilter): boolean {
+  const within = (value: number | undefined, min?: number, max?: number) =>
+    (min === undefined && max === undefined) ||
+    (value !== undefined && (min === undefined || value >= min) && (max === undefined || value <= max));
+  return (
+    within(activity.distance, filter.minMeters, filter.maxMeters) &&
+    within(activity.duration, filter.minSeconds, filter.maxSeconds)
+  );
+}
+
+function describeLength(filter: ActivityLengthFilter, unitSystem: UnitSystem): string {
+  const range = (min: string | undefined, max: string | undefined) =>
+    min && max ? `${min}–${max}` : min ? `≥ ${min}` : `≤ ${max}`;
+  return [
+    filter.minMeters !== undefined || filter.maxMeters !== undefined
+      ? range(
+          filter.minMeters !== undefined ? formatDistanceValue(filter.minMeters, unitSystem) : undefined,
+          filter.maxMeters !== undefined ? formatDistanceValue(filter.maxMeters, unitSystem) : undefined
+        )
+      : undefined,
+    filter.minSeconds !== undefined || filter.maxSeconds !== undefined
+      ? range(
+          filter.minSeconds !== undefined ? `${Math.round(filter.minSeconds / 60)} min` : undefined,
+          filter.maxSeconds !== undefined ? `${Math.round(filter.maxSeconds / 60)} min` : undefined
+        )
+      : undefined
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 export function parseActivitySportFamily(value: unknown): ActivitySportFamily | undefined {
   const family = String(value ?? "").trim().toLowerCase();
   return (ACTIVITY_SPORT_FAMILIES as readonly string[]).includes(family)
@@ -315,23 +387,25 @@ async function handleListRecentActivities(
 ): Promise<string> {
   const window = parseActivityListWindow(args);
   const sport = parseActivitySportFamily(args.sport);
+  const length = parseActivityLengthFilter(args);
   const limit = window
     ? Math.min(Math.max(Number(args.limit) || DEFAULT_DATED_LIMIT, 1), MAX_DATED_LIMIT)
     : Math.min(Math.max(Number(args.limit) || DEFAULT_UNDATED_LIMIT, 1), MAX_UNDATED_LIMIT);
   // A sport filter has no page. The filter is applied here, over one COROS
   // page, so "page 2" would hand back activities 101–200 rather than the next
   // ten of that sport — dates are how a filtered list is moved.
-  const page = window || sport ? 1 : Math.max(Number(args.page) || 1, 1);
+  const page = window || sport || length ? 1 : Math.max(Number(args.page) || 1, 1);
 
   try {
     // A sport filter is applied here, not by COROS, so an undated filtered list
     // reads one full page to have enough of that sport to fill `limit`.
     const fetched = window
       ? await listTrainingHubActivities(1, MAX_DATED_LIMIT, window.startDay, window.endDay)
-      : await listTrainingHubActivities(page, sport ? MAX_DATED_LIMIT : limit);
+      : await listTrainingHubActivities(page, sport || length ? MAX_DATED_LIMIT : limit);
     return formatActivityListForChat(fetched, unitSystem, {
       ...(window ? { window } : {}),
       ...(sport ? { sport } : {}),
+      ...(length ? { length } : {}),
       limit,
       truncatedAtSource: window !== undefined && fetched.length >= MAX_DATED_LIMIT
     });
@@ -343,6 +417,7 @@ async function handleListRecentActivities(
 export interface ActivityListFormatOptions {
   window?: ActivityListWindow;
   sport?: ActivitySportFamily;
+  length?: ActivityLengthFilter;
   limit: number;
   /** COROS returned a full page for the period, so there may be more. */
   truncatedAtSource?: boolean;
@@ -358,19 +433,20 @@ export function formatActivityListForChat(
   unitSystem: UnitSystem,
   options: ActivityListFormatOptions
 ): string {
-  const matching = options.sport
-    ? fetched.filter(
-        (activity) =>
-          activitySportFamily(activity.sportType, activity.sportName) === options.sport
-      )
-    : fetched;
+  const matching = fetched.filter(
+    (activity) =>
+      (!options.sport ||
+        activitySportFamily(activity.sportType, activity.sportName) === options.sport) &&
+      (!options.length || matchesLength(activity, options.length))
+  );
   const shown = matching.slice(0, options.limit);
 
   const scope = [
     options.window
       ? `${isoFromDayKey(options.window.startDay)} → ${isoFromDayKey(options.window.endDay)}`
       : "most recent",
-    options.sport ? `${SPORT_FAMILY_LABELS[options.sport]} only` : undefined
+    options.sport ? `${SPORT_FAMILY_LABELS[options.sport]} only` : undefined,
+    options.length ? describeLength(options.length, unitSystem) : undefined
   ]
     .filter(Boolean)
     .join(", ");
@@ -552,15 +628,81 @@ async function handleGetActivityDetail(
       }
     }
 
-    return formatActivityDetailForChat(
-      detail,
-      sections.has("series"),
-      callbacks?.unitSystem ?? "metric",
-      sections
-    );
+    const unitSystem = callbacks?.unitSystem ?? "metric";
+    const text = formatActivityDetailForChat(detail, sections.has("series"), unitSystem, sections);
+    const window = parseActivityWindow(args.window);
+    return window ? `${formatActivityWindowForChat(detail, window, unitSystem)}\n\n${text}` : text;
   } catch (caught) {
     throw formatActivityToolError("get_activity_detail", caught);
   }
+}
+
+/** An elevation that may be 0, which `formatElevationValue` reads as absent. */
+function elevation(meters: number, unitSystem: UnitSystem): string {
+  return meters > 0 ? formatElevationValue(meters, unitSystem) : unitSystem === "imperial" ? "0 ft" : "0 m";
+}
+
+export function parseActivityWindow(value: unknown): ActivityWindow | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  const unit = raw.unit === "km" || raw.unit === "minutes" ? raw.unit : undefined;
+  const from = Number(raw.from);
+  if (!unit || !Number.isFinite(from)) {
+    throw new Error('window needs unit ("minutes" or "km") and a number from.');
+  }
+  const to = raw.to === undefined || raw.to === null || raw.to === "" ? undefined : Number(raw.to);
+  if (to !== undefined && !Number.isFinite(to)) {
+    throw new Error("window.to must be a number.");
+  }
+  return { unit, from, ...(to !== undefined ? { to } : {}) };
+}
+
+/**
+ * One stretch, read off the recorded samples. Put before the summary because
+ * it is the answer the call was made for.
+ */
+export function formatActivityWindowForChat(
+  detail: TrainingHubActivityDetail,
+  window: ActivityWindow,
+  unitSystem: UnitSystem
+): string {
+  const asked = `${window.unit === "km" ? "km" : "min"} ${window.from}${window.to !== undefined ? ` to ${window.to}` : " to the end"}`;
+  const stretch = summarizeActivityWindow(detail.series ?? [], detail.pauses, window);
+  if (!stretch) {
+    return `Stretch (${asked}): the recorded samples do not cover it${
+      window.unit === "km" ? " — this activity has no distance channel" : ""
+    }. Use the laps instead.`;
+  }
+  const swim = isSwimActivity(detail.sportType, detail.sportName);
+  const cycling = isCyclingActivity(detail.sportType, detail.sportName);
+  const where = [
+    stretch.startMeters !== undefined && stretch.endMeters !== undefined
+      ? `${formatDistanceValue(stretch.startMeters, unitSystem, { swim })}–${formatDistanceValue(stretch.endMeters, unitSystem, { swim })}`
+      : undefined,
+    `${formatDurationSeconds(stretch.startSeconds)}–${formatDurationSeconds(stretch.endSeconds)} activity time`
+  ].filter(Boolean);
+  const figures = [
+    stretch.distanceMeters !== undefined
+      ? `${formatDistanceValue(stretch.distanceMeters, unitSystem, { swim })} in ${formatDurationSeconds(stretch.durationSeconds)}`
+      : formatDurationSeconds(stretch.durationSeconds),
+    stretch.paceSecondsPerKm !== undefined
+      ? cycling
+        ? `speed ${formatSpeedValue(3600 / stretch.paceSecondsPerKm, unitSystem)}`
+        : `pace ${formatPaceSeconds(stretch.paceSecondsPerKm, unitSystem)}`
+      : undefined,
+    stretch.adjustedPaceSecondsPerKm !== undefined && !cycling
+      ? `GAP ${formatPaceSeconds(stretch.adjustedPaceSecondsPerKm, unitSystem)}`
+      : undefined,
+    stretch.avgHr !== undefined ? `HR ${Math.round(stretch.avgHr)} avg / ${stretch.maxHr} max` : undefined,
+    stretch.avgCadence !== undefined ? `cadence ${Math.round(stretch.avgCadence)}` : undefined,
+    stretch.avgPower !== undefined ? `power ${Math.round(stretch.avgPower)} W` : undefined,
+    stretch.ascentMeters !== undefined
+      ? `+${elevation(stretch.ascentMeters, unitSystem)} / −${elevation(stretch.descentMeters ?? 0, unitSystem)}`
+      : undefined
+  ].filter(Boolean);
+  return `Stretch (${asked}: ${where.join(", ")}; ${stretch.samples} samples): ${figures.join(" · ")}`;
 }
 
 function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] {
