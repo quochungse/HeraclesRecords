@@ -29250,6 +29250,20 @@ tr.data-intervals-row-missing {
   font-size: 13px;
 }
 
+/* The measure picker is a column of its own now, so every picker on this line
+   carries the height of the figures beside it rather than sitting as a chip
+   half their size — the columns read as one line of controls, and their labels
+   sit on one line because the cells are then the same height. */
+.calendar-builder-row .set-line .set-line-cell.is-measure .set-line-select {
+  min-width: 96px;
+}
+
+.calendar-builder-row .set-line .set-line-select .app-select-trigger {
+  min-height: 40px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
 /* Stands where an input would be, so it takes that input's height and centres
    in it — which a 2.1 leading used to do by inflating the line box. */
 .set-line-open {
