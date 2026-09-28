@@ -1298,9 +1298,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   **COROS sends a window per nap but nothing at all about an individual
   wake-up** (probed 2026-09-16: `querySleepData`, since renamed `querySleepOverview`, has only `Awake Time` and
   `Awake Count (>5 min)`, `querySleepHrv`'s `status` is 4 all night, and the
-  stress series' `score` is a stress band). The nap windows sum to the day's
-  reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its
-  hover note from them.
+  stress series' `score` is a stress band). Since `querySleepOverview` a nap
+  window is a *period* (`Naps Period (incl. awake)`) and the total is time asleep
+  (`Naps Total (asleep)`), so the windows sum to a little more than the total;
+  `napSummary.ts` builds the Naps tile from the total and its hover from the
+  windows. **The daily-health "Sleep Summary" line is one episode's**: the main
+  sleep's, or on a day of naps only the first nap's (2026-08-22, 09-15), so its
+  heart rate and minutes fold onto a night only where its `Total` is that
+  episode's window (`dailyHealthEpisode`). A day with no sleep window asks for no
+  HRV or stress series — COROS has none for it ("No data").
   **An MCP failure is one of two things and never one boolean.** Every payload MCP
   serves carries `mcpState: McpAvailability` — `"ready"`, `"disconnected"` (no COROS MCP
   server set up here, so connect it) or `"unreachable"` (one that *is* set up and did not

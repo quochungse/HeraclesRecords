@@ -909,4 +909,14 @@ assert.equal(overviewNapOnly.kind, "nap-only", "a score of -1 is no score");
 assert.equal(overviewNapOnly.score, undefined);
 assert.equal(overviewNapOnly.napMinutes, 103);
 
+// COROS's "not available" block is COROS saying it has nothing — not a night
+// still syncing. Kept as one, it read "Main sleep duration is still syncing."
+// for weeks (2026-08-10 and 09-04 on the live feed).
+assert.deepEqual(
+  parseSleepDataResponse(
+    ["Sleep Overview", "", "2026-09-04", "Sleep Score: 0", "Sleep detail for this day is not available yet."].join("\n")
+  ),
+  []
+);
+
 console.log("test-sleep-data-parser: ok");

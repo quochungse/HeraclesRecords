@@ -436,4 +436,19 @@ clearSleepSeriesCache();
   );
 }
 
+// --- A day of naps only has no window, so it asks COROS nothing --------------
+// Both series are clipped to the night's window; without one nothing fetched
+// could be kept, and COROS has no HRV for such a day either ("No data").
+clearSleepSeriesCache();
+{
+  const day = dayKey(-6);
+  const { state, deps } = harness({
+    nights: [{ happenDay: day, kind: "nap-only", napMinutes: 262, napWindows: [{ start: "00:19", end: "02:20" }] }]
+  });
+  const series = await getSleepNightSeries({ happenDay: day }, deps);
+  assert.equal(state.calls.length, 0, "no HRV or stress request for a day without a sleep window");
+  assert.deepEqual([series.hrv, series.stress], [[], []]);
+  assert.match(series.error, /no sleep window/);
+}
+
 console.log("sleep series cache: all assertions passed");

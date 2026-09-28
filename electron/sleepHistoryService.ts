@@ -7,6 +7,7 @@ import {
 import { corosMcpAvailability } from "./corosMcpService";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
+import { napWindowsOf, windowDurationMinutes } from "./sleepMetrics";
 import type {
   McpAvailability,
   SleepHistorySnapshot,
@@ -207,27 +208,46 @@ async function readDailyHealth(
 }
 
 /**
- * The night's stage minutes as COROS counts them, when the daily-health line
- * is certainly about this night.
+ * Which of the day's episodes the daily-health "Sleep Summary" line describes:
+ * `main`, the one nap of a nap-only day, or none it can be pinned to.
  *
- * The sleep feed states the stages as whole percentages of the period, which
- * put each stage a minute or two off the COROS app. The daily-health feed —
- * the same response the heart rate comes from — states the minutes. Its
- * `Total` is the main sleep's period, awake included, so it is taken only for
- * a main sleep whose own window is that long: on a day of naps only it is one
- * nap of several (2026-09-15: two naps, one "Total" of the first), and a
- * mismatch anywhere else means the two feeds are not describing one episode.
+ * Its `Total` is one episode's period, awake included — the main sleep when
+ * there is one, and otherwise **one nap of the day**: 2026-08-22 and 09-15 had
+ * two naps each and a Total equal to the first alone. So the line is this
+ * night's only where the lengths agree, and its heart rate and its minutes go
+ * nowhere else — HR from the first nap was being shown as the whole day's.
+ * A line with no Total (older feeds) is still the main sleep's, as it was.
+ */
+function dailyHealthEpisode(
+  record: TrainingHubSleepRecord,
+  health: TrainingHubDailyHealthRecord
+): "main" | "nap" | undefined {
+  const matches = (minutes: number | undefined) =>
+    minutes !== undefined &&
+    health.sleepTotalMinutes !== undefined &&
+    Math.abs(health.sleepTotalMinutes - minutes) <= 1;
+
+  if (record.kind === "main") {
+    return health.sleepTotalMinutes === undefined || matches(record.windowMinutes) ? "main" : undefined;
+  }
+  if (record.kind === "nap-only") {
+    const windows = napWindowsOf(record);
+    return windows.length === 1 && matches(windowDurationMinutes(windows[0]!)) ? "nap" : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The night's stage minutes as COROS counts them. The sleep feed states them
+ * as whole percentages of the period, a minute or two off the COROS app; the
+ * daily-health line — the one the heart rate comes from — states the minutes.
+ * Taken for a main sleep only: a nap-only day has no stages on its record.
  */
 function exactStages(
   record: TrainingHubSleepRecord,
   health: TrainingHubDailyHealthRecord
 ): Partial<TrainingHubSleepRecord> {
-  if (
-    record.kind !== "main" ||
-    record.windowMinutes === undefined ||
-    health.sleepTotalMinutes === undefined ||
-    Math.abs(health.sleepTotalMinutes - record.windowMinutes) > 1
-  ) {
+  if (record.kind !== "main" || health.sleepTotalMinutes === undefined) {
     return {};
   }
   const stages = {
@@ -249,7 +269,7 @@ function withDailyHealth(
 
   return records.map((record) => {
     const health = byDay.get(record.happenDay);
-    if (!health) {
+    if (!health || !dailyHealthEpisode(record, health)) {
       return record;
     }
 
@@ -261,6 +281,15 @@ function withDailyHealth(
       maxHr: record.maxHr ?? health.sleepMaxHr
     };
   });
+}
+
+function isEmptyReading(record: TrainingHubSleepRecord): boolean {
+  return (
+    isMainEntry(record) &&
+    record.totalMinutes === undefined &&
+    !((record.napMinutes ?? 0) > 0) &&
+    !((record.score ?? 0) > 0)
+  );
 }
 
 function isMainEntry(record: TrainingHubSleepRecord): boolean {
@@ -281,7 +310,10 @@ function isMainEntry(record: TrainingHubSleepRecord): boolean {
  * `kind: "nap"` row — a nap of the day, not a reading of the day — may fill in
  * what it does not carry.
  */
-function foldSleepDay(entries: CacheEntry[]): CacheEntry | undefined {
+function foldSleepDay(all: CacheEntry[]): CacheEntry | undefined {
+  // A row that says nothing is no reading of the day — what an older parser
+  // kept of COROS's "not available" block. Left in, it held the day "partial".
+  const entries = all.filter((entry) => !isEmptyReading(entry.record));
   if (entries.length === 0) {
     return undefined;
   }

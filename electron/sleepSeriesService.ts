@@ -276,7 +276,10 @@ export async function getSleepNightSeries(
   }
 
   const bounds = sleepWindowBounds(record);
-  const fetched = await fetchSeries(deps, record);
+  // Without a window nothing fetched could be kept — both series are clipped to
+  // it — so a day of naps only costs no request. COROS has no HRV for one
+  // either: "No data" on 2026-09-06 and 09-15, probed 2026-09-28.
+  const fetched = bounds ? await fetchSeries(deps, record) : { hrv: [], stress: [] };
 
   // Without a window there is nothing to clip to, and an unclipped day of
   // stress readings drawn under a "night" heading would be a lie of framing.

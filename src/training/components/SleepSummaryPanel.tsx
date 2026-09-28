@@ -110,11 +110,10 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
       label: stage.label,
       className: stage.className,
       value: stage.weight,
-      // The legend stays a share: four percentages down one row compare at a
-      // glance in a way four durations do not.
-      detail: percent ?? duration ?? "\u2013",
-      // Hover answers the question the share raises — 25% of what — so the
-      // duration leads and the share stays beside it.
+      // The legend states time: the minutes are COROS's own where the
+      // daily-health feed has them, and the bar's widths already show the share.
+      detail: duration ?? percent ?? "\u2013",
+      // Hover gives both, the duration leading.
       hover:
         duration !== undefined && percent !== undefined
           ? `${duration} (${percent})`
