@@ -2,16 +2,24 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Info, MapPin, Maximize2, X } from "lucide-react";
+import { MapPin, Maximize2, X } from "lucide-react";
 import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
   BASE_LAYERS,
   TRAIL_OVERLAY_LAYERS,
+  TRAIL_OVERLAY_ORDER,
+  isLightBaseLayer,
   type BaseLayerConfig,
   type BaseLayerId,
   type TrailOverlayId
 } from "../../mapBase/constants";
 import { createBaseLayer } from "../../mapBase/baseLayers";
+import {
+  defineBaseLayerPreference,
+  themeBaseLayer,
+  useBaseLayerPreference
+} from "../../mapBase/baseLayerPreference";
+import { MapCreditButton, useFoldingCredit } from "../../mapBase/MapCredit";
 import { MapLayerControl } from "../../mapBase/MapLayerControl";
 import { useTheme } from "../../theme/ThemeProvider";
 import {
@@ -35,26 +43,17 @@ const START_COLOR = "#4da3ff";
 const END_COLOR = "#d89b22";
 const ROUTE_ANIMATION_MS = 2200;
 
-const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE =
-  defineSelectionPreference<BaseLayerId>({
-    key: "training.activityRoute.baseLayer",
-    defaultValue: "outdoors",
-    validate: selectionIsOneOf([
-      "street",
-      "outdoors",
-      "light",
-      "dark",
-      "topo",
-      "satellite"
-    ])
-  });
+/** Shared by the side-panel map and the full map, so a pick in one is the other's. */
+const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
+  "training.activityRoute.baseLayer"
+);
 
 const ACTIVITY_ROUTE_OVERLAYS_PREFERENCE =
   defineSelectionPreference<TrailOverlayId[]>({
     key: "training.activityRoute.overlays",
     defaultValue: [],
     validate: selectionIsArrayOf(
-      selectionIsOneOf(["hiking", "cycling", "mtb"]),
+      selectionIsOneOf(TRAIL_OVERLAY_ORDER),
       { unique: true }
     )
   });
@@ -146,14 +145,9 @@ interface MapStyle {
   ghostOpacity: number;
 }
 
-/** The theme-matched layer used when no explicit layer is chosen. */
-function themeBaseLayer(theme: string): BaseLayerId {
-  return theme === "paper" ? "light" : "dark";
-}
-
 function resolveMapStyle(theme: string, baseLayer?: BaseLayerId): MapStyle {
   const layer = baseLayer ?? themeBaseLayer(theme);
-  const isDarkGround = layer === "dark" || layer === "satellite";
+  const isDarkGround = !isLightBaseLayer(layer);
   return {
     tile: BASE_LAYERS[layer],
     routeColor: isDarkGround ? ROUTE_COLOR : ROUTE_COLOR_PAPER,
@@ -418,51 +412,71 @@ function RouteLegend() {
   );
 }
 
-/**
- * How long the tile credit stays spelled out before folding into its (i)
- * button. The OSM Foundation's attribution guidelines allow a credit to
- * collapse after five seconds provided it can still be found from an (i) in
- * the corner — which is what this does. It cannot be left out altogether:
- * OpenStreetMap, OpenMapTiles and OpenFreeMap all require it.
- */
-const CREDIT_VISIBLE_MS = 5000;
-
-/** Credit shown for five seconds from `key` changing, then toggled by an (i). */
-function useFoldingCredit(key: unknown): [boolean, () => void] {
-  const [open, setOpen] = useState(true);
-
-  useEffect(() => {
-    setOpen(true);
-    const timer = window.setTimeout(() => setOpen(false), CREDIT_VISIBLE_MS);
-    return () => window.clearTimeout(timer);
-  }, [key]);
-
-  const toggle = useCallback(() => setOpen((current) => !current), []);
-  return [open, toggle];
+interface RouteMapLayers {
+  baseLayer: BaseLayerId;
+  setBaseLayer: (layer: BaseLayerId) => void;
+  overlays: TrailOverlayId[];
+  toggleOverlay: (overlay: TrailOverlayId) => void;
 }
 
-function CreditButton({
-  open,
-  onToggle,
-  className
+/**
+ * The layer choice, held by whatever owns both the small map and the full map
+ * it opens, so a pick made in one shows in the other without a remount.
+ */
+function useRouteMapLayers(): RouteMapLayers {
+  const [baseLayer, setBaseLayer] = useBaseLayerPreference(
+    ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE
+  );
+  const [overlays, setOverlays] = useSelectionPreference(
+    ACTIVITY_ROUTE_OVERLAYS_PREFERENCE
+  );
+  const toggleOverlay = useCallback(
+    (id: TrailOverlayId) =>
+      setOverlays((prev) =>
+        prev.includes(id)
+          ? prev.filter((overlay) => overlay !== id)
+          : [...prev, id]
+      ),
+    [setOverlays]
+  );
+  return { baseLayer, setBaseLayer, overlays, toggleOverlay };
+}
+
+/**
+ * An interactive route map with its layer picker and folding tile credit — the
+ * side-panel map and the full map alike.
+ */
+function RouteMapFrame({
+  route,
+  layers,
+  className,
+  scrollWheelZoom,
+  ariaLabel
 }: {
-  open: boolean;
-  onToggle: () => void;
+  route: RouteGeometry;
+  layers: RouteMapLayers;
   className: string;
+  scrollWheelZoom?: boolean;
+  ariaLabel: string;
 }) {
+  const [creditOpen, toggleCredit] = useFoldingCredit();
   return (
-    <button
-      type="button"
-      className={className}
-      aria-label="Map data credits"
-      aria-expanded={open}
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle();
-      }}
-    >
-      <Info size={13} aria-hidden="true" />
-    </button>
+    <div className={`${className} map-frame${creditOpen ? " is-credit-open" : ""}`}>
+      <RouteMapCanvas
+        route={route}
+        scrollWheelZoom={scrollWheelZoom}
+        baseLayer={layers.baseLayer}
+        overlays={layers.overlays}
+        ariaLabel={ariaLabel}
+      />
+      <MapLayerControl
+        value={layers.baseLayer}
+        onChange={layers.setBaseLayer}
+        overlays={layers.overlays}
+        onToggleOverlay={layers.toggleOverlay}
+      />
+      <MapCreditButton open={creditOpen} onToggle={toggleCredit} />
+    </div>
   );
 }
 
@@ -473,20 +487,13 @@ function CreditButton({
  */
 function RouteMapModal({
   route,
+  layers,
   onClose
 }: {
   route: RouteGeometry;
+  layers: RouteMapLayers;
   onClose: () => void;
 }) {
-  const { theme } = useTheme();
-  const [baseLayer, setBaseLayer] = useSelectionPreference(
-    ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE,
-    themeBaseLayer(theme)
-  );
-  const [overlays, setOverlays] = useSelectionPreference(
-    ACTIVITY_ROUTE_OVERLAYS_PREFERENCE
-  );
-  const [creditOpen, toggleCredit] = useFoldingCredit(route);
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -530,34 +537,13 @@ function RouteMapModal({
           </button>
         </header>
         <div className="activity-route-modal-body">
-          <div
-            className={`activity-route-modal-map${creditOpen ? " is-credit-open" : ""}`}
-          >
-            <RouteMapCanvas
-              route={route}
-              scrollWheelZoom
-              baseLayer={baseLayer}
-              overlays={overlays}
-              ariaLabel="Expanded activity route map"
-            />
-            <MapLayerControl
-              value={baseLayer}
-              onChange={setBaseLayer}
-              overlays={overlays}
-              onToggleOverlay={(id) =>
-                setOverlays((prev) =>
-                  prev.includes(id)
-                    ? prev.filter((overlay) => overlay !== id)
-                    : [...prev, id]
-                )
-              }
-            />
-            <CreditButton
-              open={creditOpen}
-              onToggle={toggleCredit}
-              className="activity-route-credit-toggle"
-            />
-          </div>
+          <RouteMapFrame
+            route={route}
+            layers={layers}
+            className="activity-route-modal-map"
+            scrollWheelZoom
+            ariaLabel="Expanded activity route map"
+          />
           <div className="activity-route-footer">
             <RouteLegend />
           </div>
@@ -584,6 +570,7 @@ export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
 }
 
 export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
+  const layers = useRouteMapLayers();
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
   const route = useMemo(
@@ -602,7 +589,12 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
 
   return (
     <div className="activity-route-map">
-      <RouteMapCanvas route={route} ariaLabel="Activity route map" />
+      <RouteMapFrame
+        route={route}
+        layers={layers}
+        className="activity-route-map-frame"
+        ariaLabel="Activity route map"
+      />
       <div className="activity-route-footer">
         <RouteLegend />
         <button
@@ -614,7 +606,9 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
           Expand
         </button>
       </div>
-      {expanded ? <RouteMapModal route={route} onClose={closeExpanded} /> : null}
+      {expanded ? (
+        <RouteMapModal route={route} layers={layers} onClose={closeExpanded} />
+      ) : null}
     </div>
   );
 }
@@ -636,18 +630,33 @@ export function ActivityRouteCover({
   className,
   visibleBand
 }: ActivityRouteCoverProps) {
-  const [expanded, setExpanded] = useState(false);
-  const closeExpanded = useCallback(() => setExpanded(false), []);
   const route = useMemo(
     () => (track?.points ? buildRouteGeometry(track.points) : null),
     [track]
   );
 
-  const [creditOpen, toggleCredit] = useFoldingCredit(route);
+  return route ? (
+    <RouteCover route={route} className={className} visibleBand={visibleBand} />
+  ) : null;
+}
 
-  if (!route) {
-    return null;
-  }
+/**
+ * The cover once there is a route to draw. Its own component so the credit's
+ * session clock starts with a map on screen, not with a run still loading.
+ */
+function RouteCover({
+  route,
+  className,
+  visibleBand
+}: {
+  route: RouteGeometry;
+  className?: string;
+  visibleBand?: number;
+}) {
+  const layers = useRouteMapLayers();
+  const [expanded, setExpanded] = useState(false);
+  const closeExpanded = useCallback(() => setExpanded(false), []);
+  const [creditOpen, toggleCredit] = useFoldingCredit();
 
   return (
     <>
@@ -678,7 +687,7 @@ export function ActivityRouteCover({
           <Maximize2 size={13} aria-hidden="true" />
           Full map
         </button>
-        <CreditButton
+        <MapCreditButton
           open={creditOpen}
           onToggle={toggleCredit}
           className="activity-route-cover-credit"
@@ -687,7 +696,9 @@ export function ActivityRouteCover({
       {/* A sibling, not a child: a portal still bubbles React events through
           its parent, and a backdrop click that closed the map would reach the
           cover's own click and open it again. */}
-      {expanded ? <RouteMapModal route={route} onClose={closeExpanded} /> : null}
+      {expanded ? (
+        <RouteMapModal route={route} layers={layers} onClose={closeExpanded} />
+      ) : null}
     </>
   );
 }

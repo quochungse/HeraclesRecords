@@ -935,6 +935,32 @@
   border-radius: var(--radius-md);
 }
 
+/* The panel lays its own pills over the street map's corners — the helper and
+   Back to globe along the top, the counts and the legend along the bottom — so
+   the map's controls sit inside them: zoom under the helper, the layer picker
+   under Back to globe, the credit and its (i) above the legend. Without this the
+   legend covered the tile credit and the helper sat on the zoom buttons. */
+.training-map-globe-stage .activity-globe-street-map .leaflet-top.leaflet-left {
+  top: 46px;
+  left: 6px;
+}
+
+.training-map-globe-stage .activity-globe-street-map .basemap-control {
+  top: 58px;
+  right: 16px;
+  bottom: 76px;
+}
+
+.training-map-globe-stage .activity-globe-street-map .leaflet-bottom.leaflet-right {
+  right: 44px;
+  bottom: 44px;
+}
+
+.training-map-globe-stage .activity-globe-street-map .map-credit-toggle {
+  right: 16px;
+  bottom: 44px;
+}
+
 .training-map-globe-helper,
 .training-map-reset,
 .training-map-globe-meta,

@@ -618,12 +618,16 @@
    first five seconds and folds away after — the (i) brings it back. */
 .run-detail-cover .leaflet-top.leaflet-right {
   top: 46px;
-  right: 42px;
+  right: 40px;
 }
 
+/* Level with the (i): the same 24px and the same top edge, 4px to its left. */
 .run-detail-cover .leaflet-control-attribution.leaflet-control {
+  box-sizing: border-box;
+  min-height: 24px;
   margin: 0;
-  padding: 3px 8px;
+  padding: 4px 8px;
+  line-height: 1.6;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--bg-base) 70%, transparent);
   color: var(--text-muted);

@@ -3148,6 +3148,12 @@ input::placeholder {
   animation: activity-globe-street-in 360ms var(--ease) forwards;
 }
 
+.activity-globe-street-map-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 .activity-globe-street-map .leaflet-container {
   width: 100%;
   height: 100%;
@@ -3157,22 +3163,6 @@ input::placeholder {
 
 .activity-globe-heat-canvas {
   pointer-events: none;
-}
-
-.activity-globe-street-map .leaflet-control-attribution {
-  background: rgba(10, 12, 14, 0.82);
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.activity-globe-street-map .leaflet-control-attribution a {
-  color: #74c08f;
-}
-
-.activity-globe-street-map .leaflet-control-zoom a {
-  background: rgba(10, 12, 14, 0.88);
-  color: var(--text-secondary);
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
 @keyframes activity-globe-street-in {
@@ -3255,16 +3245,6 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.55);
 }
 
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution,
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--text-muted);
-  border-color: rgba(20, 28, 36, 0.12);
-}
-
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a {
-  color: var(--accent-strong);
-}
 
 .activity-globe-status,
 .activity-globe-legend {
@@ -14211,7 +14191,13 @@ tr.data-intervals-row-missing {
   background: rgba(0, 0, 0, 0.22);
 }
 
-.activity-route-map-canvas .leaflet-control-attribution {
+/* The tile credit and the zoom buttons, one look on every map: the route maps
+   and the globe's street map. The credit is named with both of its classes
+   because leaflet.css spells it `.leaflet-container .leaflet-control-attribution`
+   and arrives later, in the map's lazy chunk — at equal weight its white ground
+   won, and the dark theme drew a white credit. */
+.activity-route-map-canvas .leaflet-control-attribution.leaflet-control,
+.activity-globe-street-map .leaflet-control-attribution.leaflet-control {
   margin: 0;
   padding: 2px 6px;
   border-radius: var(--radius-sm) 0 0 0;
@@ -14220,24 +14206,35 @@ tr.data-intervals-row-missing {
   font-size: 10px;
 }
 
-.activity-route-map-canvas .leaflet-control-attribution a {
+.activity-route-map-canvas .leaflet-control-attribution a,
+.activity-globe-street-map .leaflet-control-attribution a {
   color: #74c08f;
 }
 
-.activity-route-map-canvas .leaflet-control-zoom {
+.activity-route-map-canvas .leaflet-control-zoom,
+.activity-globe-street-map .leaflet-control-zoom {
   border: 0;
   box-shadow: none;
 }
 
-.activity-route-map-canvas .leaflet-control-zoom a {
+.activity-route-map-canvas .leaflet-control-zoom a,
+.activity-globe-street-map .leaflet-control-zoom a {
   background: rgba(10, 12, 14, 0.88);
   color: var(--text-secondary);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.activity-route-map-canvas .leaflet-control-zoom a:hover {
+.activity-route-map-canvas .leaflet-control-zoom a:hover,
+.activity-globe-street-map .leaflet-control-zoom a:hover {
   background: rgba(20, 24, 28, 0.95);
   color: var(--text-primary);
+}
+
+.activity-route-map-frame {
+  position: relative;
+  /* Hugs the canvas even when the grid row is stretched, or the (i) and the
+     layer menu would be placed against empty space below the map. */
+  align-self: start;
 }
 
 .activity-route-footer {
@@ -14329,38 +14326,93 @@ tr.data-intervals-row-missing {
   height: 100%;
 }
 
-.activity-route-modal-map .basemap-control {
+/*
+ * `.map-frame` — an interactive map with its two corner controls: the layer
+ * picker top-right and the tile credit's (i) bottom-right. The side-panel route
+ * map, the full route map and the globe's street map all wear it, so the three
+ * cannot drift apart. The frame itself is positioned by whoever owns it.
+ */
+.map-frame {
+  /* The controls' z-indexes are for stacking over Leaflet's panes, not over the
+     page: without a context of its own, a side-panel map's picker and (i) drew
+     on top of the full-map dialog opened from it. */
+  isolation: isolate;
+}
+
+.map-frame .basemap-control {
   top: 12px;
   right: 12px;
+  /* Clear of the (i) in the corner below, so an open menu never covers it. */
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  /* The control spans the frame's height only to bound its menu; the empty
+     column under the button must not swallow a drag on the map. */
+  pointer-events: none;
+}
+
+.map-frame .basemap-toggle,
+.map-frame .basemap-menu {
+  pointer-events: auto;
+}
+
+.map-frame .basemap-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+}
+
+/* A short map scrolls the menu rather than letting it run off the frame. */
+.map-frame .basemap-menu {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* Neutral dark glass — the route studio's green-tinted glass clashes with
    the training area's graphite look. */
-.activity-route-modal-map .basemap-menu,
-.activity-route-modal-map .basemap-toggle {
+.map-frame .basemap-menu,
+.map-frame .basemap-toggle {
   background: rgba(13, 16, 20, 0.88);
 }
 
 /* The tile credit shows for five seconds, then folds into the (i) in the
    bottom-right corner — the collapse the OSM attribution guidelines allow. */
-.activity-route-modal-map .leaflet-bottom.leaflet-right {
+/* The credit stands level with its (i): the same 24px, the same bottom edge,
+   4px to its left. */
+.map-frame .leaflet-bottom.leaflet-right {
   right: 34px;
+  bottom: 4px;
 }
 
-.activity-route-modal-map .leaflet-control-attribution {
-  margin-bottom: 4px;
+/* A route map's canvas carries a 1px border and Leaflet places its corner
+   inside it, while the (i) is placed on the frame outside it. */
+.map-frame .activity-route-map-canvas .leaflet-bottom.leaflet-right {
+  right: 33px;
+  bottom: 3px;
+}
+
+/* 24px tall from its own leading, not a flex box: flex drops the spaces
+   between Leaflet's links and the credit ran together. A credit too long for
+   the map wraps upward from the same bottom edge. */
+.map-frame .leaflet-control-attribution.leaflet-control {
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 4px 8px;
+  line-height: 1.6;
   border-radius: var(--radius-sm);
   transition:
     opacity var(--dur-base) var(--ease),
     visibility var(--dur-base) var(--ease);
 }
 
-.activity-route-modal-map:not(.is-credit-open) .leaflet-control-attribution {
+.map-frame:not(.is-credit-open) .leaflet-control-attribution {
   opacity: 0;
   visibility: hidden;
 }
 
-.activity-route-credit-toggle {
+.map-credit-toggle {
   position: absolute;
   right: 6px;
   bottom: 4px;
@@ -14377,12 +14429,17 @@ tr.data-intervals-row-missing {
   cursor: pointer;
 }
 
-.activity-route-credit-toggle:hover,
-.activity-route-credit-toggle[aria-expanded="true"] {
+.map-credit-toggle:hover,
+.map-credit-toggle[aria-expanded="true"] {
   color: var(--text-primary);
 }
 
-:root[data-theme="paper"] .activity-route-credit-toggle {
+.map-credit-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-theme="paper"] .map-credit-toggle {
   background: rgba(255, 255, 255, 0.86);
 }
 
@@ -22836,16 +22893,20 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution,
-:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a {
+:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a {
   background: rgba(255, 255, 255, 0.86);
   border-color: var(--glass-border);
 }
 
-:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a:hover {
+:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a:hover,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a:hover {
   background: rgba(255, 255, 255, 0.95);
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution a,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a,
 :root[data-theme="paper"] .activity-route-expand {
   color: var(--accent);
 }

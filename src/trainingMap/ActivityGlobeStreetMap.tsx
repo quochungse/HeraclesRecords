@@ -1,12 +1,14 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
-import {
-  BASE_LAYERS,
-  type BaseLayerId,
-} from "../mapBase/constants";
+import { BASE_LAYERS, isLightBaseLayer } from "../mapBase/constants";
 import { createBaseLayer } from "../mapBase/baseLayers";
-import { useTheme } from "../theme/ThemeProvider";
+import {
+  defineBaseLayerPreference,
+  useBaseLayerPreference,
+} from "../mapBase/baseLayerPreference";
+import { MapCreditButton, useFoldingCredit } from "../mapBase/MapCredit";
+import { MapLayerControl } from "../mapBase/MapLayerControl";
 import type {
   ActivityRoutePolyline,
   ActivityVisitPoint,
@@ -58,9 +60,9 @@ type HeatLayerInstance = L.Layer & {
   setLightBasemap: (light: boolean) => void;
 };
 
-function themeBaseLayer(theme: string): BaseLayerId {
-  return theme === "paper" ? "light" : "dark";
-}
+const STREET_MAP_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
+  "trainingMap.streetMap.baseLayer",
+);
 
 function heatVisibility(zoom: number): number {
   if (zoom >= HEAT_HIDE_ZOOM) {
@@ -293,26 +295,35 @@ export function ActivityGlobeStreetMap({
   routes,
   onRequestExit,
 }: ActivityGlobeStreetMapProps) {
-  const { theme } = useTheme();
+  const [baseLayer, setBaseLayer] = useBaseLayerPreference(
+    STREET_MAP_BASE_LAYER_PREFERENCE,
+  );
+  const [creditOpen, toggleCredit] = useFoldingCredit();
   const containerRef = useRef<HTMLDivElement>(null);
   const onExitRef = useRef(onRequestExit);
   const heatLayerRef = useRef<HeatLayerInstance | null>(null);
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.Layer | null>(null);
   const lightBasemapRef = useRef(false);
+  // Read by the mount effect without retriggering it: a layer switch swaps the
+  // base map in place so the view the athlete zoomed to survives it.
+  const baseLayerRef = useRef(baseLayer);
+  const appliedBaseLayerRef = useRef(baseLayer);
   onExitRef.current = onRequestExit;
+  baseLayerRef.current = baseLayer;
 
-  // Mount map once per focus/theme — normal Training Hub basemap (no dark restyle).
+  // Mount the map once per focus.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
 
-    const layer = themeBaseLayer(theme);
-    const tile = BASE_LAYERS[layer];
-    const lightBasemap = layer === "light" || layer === "street";
+    const layer = baseLayerRef.current;
+    const lightBasemap = isLightBaseLayer(layer);
     lightBasemapRef.current = lightBasemap;
+    appliedBaseLayerRef.current = layer;
     const map = L.map(container, {
       zoomControl: true,
       attributionControl: true,
@@ -320,9 +331,12 @@ export function ActivityGlobeStreetMap({
       zoomSnap: 0.25,
       zoomDelta: 0.5,
     });
+    // No "Leaflet" prefix: that link is a courtesy, not a licence term. The
+    // tile credits after it are required and stay.
+    map.attributionControl.setPrefix(false);
     mapRef.current = map;
 
-    createBaseLayer(map, tile).addTo(map);
+    tileLayerRef.current = createBaseLayer(map, BASE_LAYERS[layer]).addTo(map);
 
     const initialHeat: GlobePoint[] =
       visits.length > 0
@@ -376,12 +390,39 @@ export function ActivityGlobeStreetMap({
       resizeObserver.disconnect();
       heatLayerRef.current = null;
       routeGroupRef.current = null;
+      tileLayerRef.current = null;
       mapRef.current = null;
       map.remove();
     };
     // Intentionally omit visits/routes — updated via the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus.lat, focus.lon, theme]);
+  }, [focus.lat, focus.lon]);
+
+  // Swap the base map in place, and recolour what is drawn over it for the new
+  // ground — the glow is tuned per light or dark map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || appliedBaseLayerRef.current === baseLayer) {
+      return;
+    }
+    const next = createBaseLayer(map, BASE_LAYERS[baseLayer]).addTo(map);
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+    tileLayerRef.current = next;
+    appliedBaseLayerRef.current = baseLayer;
+
+    const lightBasemap = isLightBaseLayer(baseLayer);
+    if (lightBasemap !== lightBasemapRef.current) {
+      lightBasemapRef.current = lightBasemap;
+      heatLayerRef.current?.setLightBasemap(lightBasemap);
+      if (routeGroupRef.current) {
+        syncRouteGroup(map, routeGroupRef.current, routes, lightBasemap);
+      }
+    }
+    // Routes are read, not watched — the effect below owns their changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLayer]);
 
   useEffect(() => {
     const heatPoints: GlobePoint[] =
@@ -403,10 +444,16 @@ export function ActivityGlobeStreetMap({
 
   return (
     <div
-      ref={containerRef}
-      className="activity-globe-street-map"
-      role="img"
-      aria-label="Street map with activity routes. Zoom out or reset to return to the globe."
-    />
+      className={`activity-globe-street-map map-frame${creditOpen ? " is-credit-open" : ""}`}
+    >
+      <div
+        ref={containerRef}
+        className="activity-globe-street-map-canvas"
+        role="img"
+        aria-label="Street map with activity routes. Zoom out or reset to return to the globe."
+      />
+      <MapLayerControl value={baseLayer} onChange={setBaseLayer} />
+      <MapCreditButton open={creditOpen} onToggle={toggleCredit} />
+    </div>
   );
 }

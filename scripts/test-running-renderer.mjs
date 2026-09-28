@@ -667,7 +667,8 @@ async function main() {
     assert.equal(hit, true, "the top of the cover is not covered by the heading");
     await waitFor(() => harness("exists", ".activity-route-modal"), "the full map opens");
 
-    // The full map folds its credit the same way the cover does.
+    // The five seconds are the session's, not each map's: the full map opens
+    // after the cover's credit folded, so it opens folded too, with its (i).
     await waitFor(
       () => harness("exists", ".activity-route-modal .leaflet-control-attribution"),
       "the full map credits its tiles"
@@ -677,13 +678,12 @@ async function main() {
       false,
       "no Leaflet prefix on the full map either"
     );
-    assert.equal(await harness("exists", ".activity-route-modal-map.is-credit-open"), true);
-    await waitFor(
-      async () => !(await harness("exists", ".activity-route-modal-map.is-credit-open")),
-      "the full map's credit folds away",
-      7_000
+    assert.equal(
+      await harness("exists", ".activity-route-modal-map.is-credit-open"),
+      false,
+      "a map opened after the first five seconds of the session starts folded"
     );
-    await harness("click", ".activity-route-credit-toggle");
+    await harness("click", ".activity-route-modal .map-credit-toggle");
     assert.equal(await harness("exists", ".activity-route-modal-map.is-credit-open"), true, "its (i) brings it back");
     assert.equal(await harness("exists", ".activity-route-modal"), true, "and leaves the map open");
 

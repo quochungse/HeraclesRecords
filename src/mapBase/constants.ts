@@ -118,6 +118,15 @@ export const BASE_LAYER_ORDER: BaseLayerId[] = [
   "dark"
 ];
 
+/**
+ * Whether a style is a daylight map, so what is drawn over it — a route line, a
+ * glow — can pick colours that read on it. `dark` and `satellite` are the two
+ * dark grounds.
+ */
+export function isLightBaseLayer(id: BaseLayerId): boolean {
+  return id !== "dark" && id !== "satellite";
+}
+
 /** A discoverable-routes overlay (the "Explore" / Strava-like layer). */
 export type TrailOverlayId = "hiking" | "cycling" | "mtb";
 
