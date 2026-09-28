@@ -3021,7 +3021,6 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
     "queryDailyHealthData",
     "queryAvgHeartRate",
     "queryRestingHeartRate",
-    "queryHealthCheckTimeSeries",
     "queryUserInfo",
     // Offered only to an account COROS knows as female (`narrowCorosMcpTools`).
     "queryMenstruationCycles"
@@ -3039,7 +3038,10 @@ const CLAUDE_REMOTE_READ_TOOLS: Record<
     "querySleepData",
     "querySleepHrv",
     "queryStressLevel",
-    "queryStressTimeSeries"
+    "queryStressTimeSeries",
+    // A wellness check's HRV, stress, SpO2 and respiration: the recovery
+    // readings the sleep permission and the sleep source cover.
+    "queryHealthCheckTimeSeries"
   ],
   fullActivityFiles: []
 };

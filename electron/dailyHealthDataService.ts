@@ -2,8 +2,7 @@ import {
   callCorosMcpTool,
   corosMcpFailureState,
   ensureCorosMcpConnected,
-  getCorosMcpTools,
-  listCorosMcpTools
+  corosMcpToolsHaving
 } from "./corosMcpService";
 import { recentTrainingHubDateList } from "./trainingTrendUtils";
 import type {
@@ -648,13 +647,9 @@ export async function getTrainingDailyHealthData(
     };
   }
 
-  try {
-    await listCorosMcpTools();
-  } catch {
-    // fall back to cached tool list
-  }
-
-  const dailyHealthTool = resolveDailyHealthTool(getCorosMcpTools());
+  const dailyHealthTool = resolveDailyHealthTool(
+    await corosMcpToolsHaving((tools) => resolveDailyHealthTool(tools) !== undefined)
+  );
   if (!dailyHealthTool) {
     // Connected, and it offers nothing that reads daily health. Connecting it
     // again is not the fix, so it must not be what the copy asks for.

@@ -32,7 +32,7 @@ import {
 } from "./database";
 import { getNativeTrainingPlan, getTrainingLibrarySnapshot } from "./trainingLibraryService";
 import { getWorkoutForEdit, listLibraryWorkouts, listWorkoutExercises } from "./trainingHubService";
-import { corosText } from "./corosLocale";
+import { corosText, loadCorosLocale } from "./corosLocale";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
 import { WORKOUT_SPORTS, workoutSportFromType } from "./workoutCapabilities";
 import { formatEntryStepsSummary, type PlanWorkoutEntry } from "./corosWorkoutBuilder";
@@ -173,12 +173,11 @@ async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
       /* the stored names stand */
     }
   }
+  // The display name only. `exerciseName` stays what COROS stores, as the
+  // Library keeps it (`nativeProgramSteps`): it is what an exercise is looked
+  // up by, and a run step has none to be given.
   for (const step of steps) {
-    const name = (step.exerciseId && catalog.get(step.exerciseId)) || corosText(step.exerciseName ?? step.name);
-    if (name) {
-      step.name = name;
-      step.exerciseName = name;
-    }
+    step.name = (step.exerciseId && catalog.get(step.exerciseId)) || corosText(step.name);
   }
   for (const node of draft.nodes) if (node.nodeType === "repeat") node.name = corosText(node.name);
 }
@@ -198,7 +197,10 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
     ? args.workout_ids.map(String).filter(Boolean).slice(0, MAX_WHOLE_WORKOUTS)
     : [];
 
-  const all = await listLibraryWorkouts();
+  // A workout saved from COROS's catalogue is named by a localization key
+  // ("P10281"), which the Library resolves; so does this, before it searches.
+  await loadCorosLocale().catch(() => undefined);
+  const all = (await listLibraryWorkouts()).map((workout) => ({ ...workout, name: corosText(workout.name) }));
   const shown = all.filter(
     (workout) =>
       (!sport || workoutSportFromType(workout.sportType) === sport) &&
@@ -221,6 +223,8 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
   ];
 
   if (wanted.length === 0) return lines.join("\n");
+  // Asked for workouts by id, without a filter, the list was already read.
+  const listed = sport || query ? [...lines, ""] : [];
 
   const whole = await Promise.all(
     wanted.map(async (id) => {
@@ -231,7 +235,7 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
         const steps = formatEntryStepsSummary(workout as PlanWorkoutEntry, unitSystem);
         return {
           workout_id: id,
-          name: workout.name,
+          name: corosText(workout.name),
           sport: workout.sport ?? "run",
           ...(workout.description ? { description: workout.description } : {}),
           ...(steps ? { steps } : {}),
@@ -242,7 +246,7 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
       }
     })
   );
-  return [...lines, "", "Workouts asked for:", JSON.stringify(whole)].join("\n");
+  return [...listed, "Workouts asked for:", JSON.stringify(whole)].join("\n");
 }
 
 // ---------------------------------------------------------------------------

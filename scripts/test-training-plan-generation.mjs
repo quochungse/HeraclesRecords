@@ -445,6 +445,9 @@ await test("a withheld source is behind no tool, local or COROS's own", () => {
   assert.equal(withheld("get_sleep_summary", off({ sleep: false })), true);
   assert.equal(withheld("coros__querySleepData", off({ sleep: false })), true);
   assert.equal(withheld("coros__querySleepHrv", off({ sleep: false })), true);
+  // A wellness check is HRV, stress, SpO2 and respiration — the one COROS MCP
+  // read still offered beside the local tools, and it is sleep data.
+  assert.equal(withheld("coros__queryHealthCheckTimeSeries", off({ sleep: false })), true);
   assert.equal(withheld("get_fitness_trends", off({ sleep: false })), true, "the trends carry overnight HRV");
   assert.equal(withheld("get_fitness_trends", off({ activities: false })), true, "and the training load");
   assert.equal(withheld("list_recent_activities", off({ sleep: false })), false);

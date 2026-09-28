@@ -1307,6 +1307,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   heart rate and minutes fold onto a night only where its `Total` is that
   episode's window (`dailyHealthEpisode`). A day with no sleep window asks for no
   HRV or stress series — COROS has none for it ("No data").
+  **The COROS tool list is read on connect and not again unless a caller's tool
+  is missing from it** (`corosMcpToolsHaving`): a `tools/list` is ~185 KB since
+  the server grew to 34 tools, and the sleep fill, the daily-health read and the
+  night series each used to ask for it on every call.
   **An MCP failure is one of two things and never one boolean.** Every payload MCP
   serves carries `mcpState: McpAvailability` — `"ready"`, `"disconnected"` (no COROS MCP
   server set up here, so connect it) or `"unreachable"` (one that *is* set up and did not

@@ -472,9 +472,14 @@ function trendSummary(
     );
   }
 
-  const week = [...wellness.values()].filter(
-    (record) => record.happenDay >= since(6) && record.happenDay <= since(0)
-  );
+  // The feed runs to yesterday (it is a day behind), so "the last 7 days" of
+  // it end on its newest day, and the line says which day that is.
+  const newest = [...wellness.keys()].filter((day) => day <= since(0)).sort().at(-1);
+  const newestDate = newest ? dateFromDayKey(newest) : undefined;
+  const weekFrom = newestDate ? dayKeyDaysAgo(newestDate, 6) : undefined;
+  const week = newest
+    ? [...wellness.values()].filter((record) => record.happenDay >= weekFrom! && record.happenDay <= newest)
+    : [];
   const steps = meanOf(week.map((record) => record.steps));
   const exercise = sumOf(week.map((record) => record.exerciseMinutes));
   const stress = meanOf(week.map((record) => record.stressAvg));
@@ -484,7 +489,7 @@ function trendSummary(
     stress !== undefined ? `average stress ${Math.round(stress)} (0–100)` : undefined
   ].filter(Boolean);
   if (wellnessParts.length > 0) {
-    lines.push(`- Last 7 days: ${wellnessParts.join("; ")}`);
+    lines.push(`- 7 days to ${dayLabel(newest!)}: ${wellnessParts.join("; ")}`);
   }
 
   return lines;

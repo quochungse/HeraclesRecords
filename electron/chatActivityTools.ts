@@ -388,7 +388,8 @@ async function handleListRecentActivities(
   const window = parseActivityListWindow(args);
   const sport = parseActivitySportFamily(args.sport);
   const length = parseActivityLengthFilter(args);
-  const limit = window
+  // A search by length reads as a period does: the rows that match, not a page.
+  const limit = window || length
     ? Math.min(Math.max(Number(args.limit) || DEFAULT_DATED_LIMIT, 1), MAX_DATED_LIMIT)
     : Math.min(Math.max(Number(args.limit) || DEFAULT_UNDATED_LIMIT, 1), MAX_UNDATED_LIMIT);
   // A sport filter has no page. The filter is applied here, over one COROS
@@ -406,6 +407,9 @@ async function handleListRecentActivities(
       ...(window ? { window } : {}),
       ...(sport ? { sport } : {}),
       ...(length ? { length } : {}),
+      ...(!window && (sport || length) && fetched.length >= MAX_DATED_LIMIT
+        ? { searchedLatest: fetched.length }
+        : {}),
       limit,
       truncatedAtSource: window !== undefined && fetched.length >= MAX_DATED_LIMIT
     });
@@ -421,6 +425,8 @@ export interface ActivityListFormatOptions {
   limit: number;
   /** COROS returned a full page for the period, so there may be more. */
   truncatedAtSource?: boolean;
+  /** An undated filter searched only this many of the latest activities. */
+  searchedLatest?: number;
 }
 
 /**
@@ -460,6 +466,12 @@ export function formatActivityListForChat(
       (matching.length > shown.length ? ` of ${matching.length} shown` : ""),
     ...shown.map((activity) => formatActivityListLine(activity, unitSystem))
   ];
+
+  if (options.searchedLatest) {
+    lines.push(
+      `Searched the latest ${options.searchedLatest} activities only; pass start_date to search further back.`
+    );
+  }
 
   if (options.truncatedAtSource) {
     lines.push(
@@ -687,12 +699,13 @@ export function formatActivityWindowForChat(
     stretch.distanceMeters !== undefined
       ? `${formatDistanceValue(stretch.distanceMeters, unitSystem, { swim })} in ${formatDurationSeconds(stretch.durationSeconds)}`
       : formatDurationSeconds(stretch.durationSeconds),
-    stretch.paceSecondsPerKm !== undefined
+    // No per-km pace for a swim, as the summary below leaves it out.
+    stretch.paceSecondsPerKm !== undefined && !swim
       ? cycling
         ? `speed ${formatSpeedValue(3600 / stretch.paceSecondsPerKm, unitSystem)}`
         : `pace ${formatPaceSeconds(stretch.paceSecondsPerKm, unitSystem)}`
       : undefined,
-    stretch.adjustedPaceSecondsPerKm !== undefined && !cycling
+    stretch.adjustedPaceSecondsPerKm !== undefined && !cycling && !swim
       ? `GAP ${formatPaceSeconds(stretch.adjustedPaceSecondsPerKm, unitSystem)}`
       : undefined,
     stretch.avgHr !== undefined ? `HR ${Math.round(stretch.avgHr)} avg / ${stretch.maxHr} max` : undefined,

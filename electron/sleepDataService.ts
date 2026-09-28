@@ -2,8 +2,7 @@ import {
   callCorosMcpTool,
   corosMcpFailureState,
   ensureCorosMcpConnected,
-  getCorosMcpTools,
-  listCorosMcpTools
+  corosMcpToolsHaving
 } from "./corosMcpService";
 import {
   sleepWindowDurationMinutes,
@@ -1981,13 +1980,9 @@ export async function getTrainingSleepData(
     };
   }
 
-  try {
-    await listCorosMcpTools();
-  } catch {
-    // fall back to cached tool list
-  }
-
-  const sleepTool = resolveSleepTool(getCorosMcpTools());
+  const sleepTool = resolveSleepTool(
+    await corosMcpToolsHaving((tools) => resolveSleepTool(tools) !== undefined)
+  );
   if (!sleepTool) {
     // Connected, and it offers nothing that reads sleep. Nothing in Settings
     // fixes that, so it reads as a server that could not serve rather than one

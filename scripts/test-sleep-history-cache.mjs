@@ -706,6 +706,19 @@ clearSleepHistoryCache();
   assert.equal(byDay.get(dayKey(-3)).deepMinutes, undefined, "a nap-only day takes no stages");
 }
 
+// A main night whose window did not parse cannot be compared: it keeps the
+// heart rate it always took, and takes no minutes it cannot place.
+clearSleepHistoryCache();
+{
+  const { deps } = harness({
+    records: [night(0, { windowMinutes: undefined })],
+    heartRate: [{ happenDay: dayKey(0), sleepTotalMinutes: 460, sleepAvgHr: 50, sleepDeepMinutes: 1 }]
+  });
+  const [record] = (await getSleepHistory({ days: 30 }, deps)).records;
+  assert.equal(record.avgHr, 50);
+  assert.equal(record.deepMinutes, 90);
+}
+
 // --- A reading that says nothing is no day ------------------------------------
 // What an older parser kept of COROS's "not available" block: a main row with
 // no duration, no naps and a score of 0. It held the day "partial" for good.

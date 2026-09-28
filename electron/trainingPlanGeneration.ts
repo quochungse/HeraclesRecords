@@ -222,7 +222,9 @@ const LOCAL_TOOL_SOURCES: Readonly<Record<string, readonly PlanDataSource[]>> = 
  * it adds later is withheld by what it is about rather than slipping through.
  */
 const REMOTE_TOOL_SOURCES: readonly [RegExp, PlanDataSource][] = [
-  [/sleep|hrv|stress/i, "sleep"],
+  // A wellness check (`queryHealthCheckTimeSeries`) is HRV, stress, SpO2 and
+  // respiration — the same readings, by another name.
+  [/sleep|hrv|stress|healthcheck/i, "sleep"],
   [/zone|threshold/i, "zones"],
   [/activit|lap|record|load|fitness|metric|trend|vo2|recovery|workout/i, "activities"]
 ];

@@ -228,7 +228,13 @@ function dailyHealthEpisode(
     Math.abs(health.sleepTotalMinutes - minutes) <= 1;
 
   if (record.kind === "main") {
-    return health.sleepTotalMinutes === undefined || matches(record.windowMinutes) ? "main" : undefined;
+    // A night whose window did not parse cannot be compared, and keeps the
+    // heart rate it always took; only a window of another length refuses it.
+    return health.sleepTotalMinutes === undefined ||
+      record.windowMinutes === undefined ||
+      matches(record.windowMinutes)
+      ? "main"
+      : undefined;
   }
   if (record.kind === "nap-only") {
     const windows = napWindowsOf(record);
@@ -247,7 +253,11 @@ function exactStages(
   record: TrainingHubSleepRecord,
   health: TrainingHubDailyHealthRecord
 ): Partial<TrainingHubSleepRecord> {
-  if (record.kind !== "main" || health.sleepTotalMinutes === undefined) {
+  if (
+    record.kind !== "main" ||
+    health.sleepTotalMinutes === undefined ||
+    record.windowMinutes === undefined
+  ) {
     return {};
   }
   const stages = {

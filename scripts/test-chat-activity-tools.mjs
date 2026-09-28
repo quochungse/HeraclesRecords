@@ -1024,6 +1024,18 @@ assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
   assert.throws(() => parseActivityWindow({ unit: "miles", from: 1 }), /window needs unit/);
 }
 
+// A swim has no per-km pace, as its summary has none.
+{
+  const series = Array.from({ length: 11 }, (_, minute) => ({ elapsed: minute * 60, distance: minute * 50, hr: 130 }));
+  const swim = formatActivityWindowForChat(
+    { sportType: 200, sportName: "Pool Swim", series, pauses: [], laps: [] },
+    { unit: "minutes", from: -5 },
+    "metric"
+  );
+  assert.doesNotMatch(swim, /pace|GAP/);
+  assert.match(swim, /HR 130 avg/);
+}
+
 // --- min/max_km and min/max_minutes: sessions by length -------------------------
 {
   assert.equal(parseActivityLengthFilter({}), undefined);
@@ -1035,6 +1047,11 @@ assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
   const long = formatActivityListForChat(runs, "metric", { length: { minMeters: 15000 }, limit: 10 });
   assert.match(long, /^Activities \(most recent, ≥ 15\.0 km\): 1/);
   assert.doesNotMatch(long, /Easy/);
+  // An undated search reads the latest page only, and says where it stopped.
+  assert.match(
+    formatActivityListForChat(runs, "metric", { length: { minMeters: 15000 }, limit: 10, searchedLatest: 100 }),
+    /Searched the latest 100 activities only; pass start_date to search further back\./
+  );
 }
 
 console.log("test-chat-activity-tools: ok");
