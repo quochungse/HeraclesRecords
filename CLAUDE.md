@@ -863,9 +863,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   prescribed target is read off the athlete's thresholds rather than inferred from recent
   activities; the snapshot carries the thresholds themselves, the body metrics and the
   all-time personal records, all of which were already being fetched every turn and dropped.
-  `narrowCorosMcpTools` hides two kinds of COROS MCP tool: one a local tool supersedes (only
-  while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
-  devices, COROS's own activity write-up). A new local tool must be placed on one side of
+  `narrowCorosMcpTools` hides three kinds of COROS MCP tool: one a local tool supersedes (only
+  while that local tool is on offer), one no chat turn can act on at all (FIT downloads,
+  devices, COROS's own activity write-up) and **every COROS MCP write** (`COROS_MCP_WRITE_TOOLS`:
+  the seven workout, schedule and plan writes the server added in September 2026). Coach writes
+  through drafts and change sets, never past them, so `executeChatTool` refuses those by name
+  too; and a read-only run takes a `coros__` tool only when its verb is `query`/`get`
+  (`isCorosMcpRead`). The read-only policy used to let every `coros__` tool through on the
+  theory that the server only read — an unattended analysis could have written a plan the
+  day it stopped being true. A new local tool must be placed on one side of
   `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails, and must be given a
   source in `LOCAL_CHAT_TOOL_SOURCES` (`chatToolSources.ts`) or `test:chat-tool-sources`
   fails. The badge under an answer groups the tools a turn called by that source — **DB**
@@ -1270,7 +1276,7 @@ Overview, Media, Data, and Settings are in the main bundle.
   samples. `npm run test:sleep-renderer` mounts the screen in a real window and
   fails on either shortcut.
   **COROS sends a window per nap but nothing at all about an individual
-  wake-up** (probed 2026-09-16: `querySleepData` has only `Awake Time` and
+  wake-up** (probed 2026-09-16: `querySleepData`, since renamed `querySleepOverview`, has only `Awake Time` and
   `Awake Count (>5 min)`, `querySleepHrv`'s `status` is 4 all night, and the
   stress series' `score` is a stress band). The nap windows sum to the day's
   reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its

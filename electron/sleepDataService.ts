@@ -1348,7 +1348,9 @@ function parseProseSleepSection(
   const windowLineMatch = section.match(
     /(?:Main\s+)?Sleep\s+(?:window|period|range)\s*:\s*([^\n]+)/i
   );
-  const napLineMatch = section.match(/\bNaps?(?:\s+Total)?:\s*([^\n]+)/i);
+  // "Naps Total (asleep)" on a day with naps, beside "Naps Period (incl.
+  // awake)"; a day without keeps the bare "Naps Total: 0 min".
+  const napLineMatch = section.match(/\bNaps?(?:\s+Total)?(?:\s*\(asleep\))?:\s*([^\n]+)/i);
   const napText = napLineMatch?.[1]?.trim();
   // COROS puts each nap's clock on a line of its own — "Nap Window: 2026-08-12
   // 07:24 - 2026-08-12 08:00" — while "Naps Total" carries only a duration.

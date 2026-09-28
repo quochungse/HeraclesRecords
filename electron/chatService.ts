@@ -2869,6 +2869,38 @@ const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * COROS MCP's own writes, added to the server in September 2026 — hidden from
+ * every chat turn and refused by name in `executeChatTool`.
+ *
+ * Coach writes to COROS through the app, never past it: a plan is a draft the
+ * athlete saves, a change to the calendar is a change set applied line by
+ * line, and every write reads COROS again first and is checked after. These
+ * write straight to the account with none of that — nothing in the transcript,
+ * no card, no plan cache, no running-copy rules — and an analysis run, which
+ * may never write, reached them because the read-only policy let every
+ * `coros__` tool through. They are also the heaviest schemas the server has:
+ * the seven cost ~160k characters, some 40k tokens, on every request round.
+ */
+const COROS_MCP_WRITE_TOOLS: ReadonlySet<string> = new Set([
+  "createScheduledWorkout",
+  "updateScheduledWorkout",
+  "createSingleWorkout",
+  "updateWorkoutDetails",
+  "scheduleWorkout",
+  "createTrainingPlan",
+  "updateTrainingPlan"
+]);
+
+/**
+ * Whether a COROS MCP tool only reads, by its name. The server names its
+ * reads `query…` and `get…`; anything else — the writes above, and whatever it
+ * adds tomorrow — is not assumed to be one.
+ */
+function isCorosMcpRead(toolName: string): boolean {
+  return /^(?:query|get)/.test(toolName) && !COROS_MCP_WRITE_TOOLS.has(toolName);
+}
+
+/**
  * COROS MCP tools a local tool answers better, keyed to that local tool.
  *
  * Each remote tool costs its schema on every request round and hands the model
@@ -2884,7 +2916,10 @@ const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
   querySleepData: "get_sleep_summary",
   getActivityDetail: "get_activity_detail",
   queryActivityLapData: "get_activity_detail",
-  queryTrainingSchedule: "list_scheduled_workouts"
+  queryTrainingSchedule: "list_scheduled_workouts",
+  queryScheduledWorkoutDetails: "list_scheduled_workouts",
+  queryTrainingPlanLibrary: "list_training_plans",
+  queryTrainingPlanDetails: "get_training_plan"
 };
 
 export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
@@ -2894,7 +2929,7 @@ export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
     if (remote?.serverId !== "coros") {
       return true;
     }
-    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName)) {
+    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName) || COROS_MCP_WRITE_TOOLS.has(remote.toolName)) {
       return false;
     }
     const local = SUPERSEDED_COROS_MCP_TOOLS[remote.toolName];
@@ -2981,10 +3016,10 @@ export function isToolAllowedUnderPolicy(
   }
   const remote = splitToolName(name);
   // A remote tool's write surface is its server's business, and only the COROS
-  // one is known — those are already permission-gated by name before they get
-  // here (6).
+  // one is known. It used to be let through whole, on the theory that its
+  // tools were all reads — true until the server added seven writes.
   if (remote) {
-    return remote.serverId === "coros";
+    return remote.serverId === "coros" && isCorosMcpRead(remote.toolName);
   }
   // A local tool the app owns. Not on the list means not decided, and not
   // decided means not reachable from a run nobody is watching.
@@ -3085,6 +3120,12 @@ async function executeChatTool(
   if (!isToolAllowedUnderPolicy(name, toolPolicy)) {
     throw new Error(
       `${name} is not available to an analysis run; it may only read, analyse and draft.`
+    );
+  }
+  const remote = splitToolName(name);
+  if (remote?.serverId === "coros" && COROS_MCP_WRITE_TOOLS.has(remote.toolName)) {
+    throw new Error(
+      `${name} is not available: Coach writes to COROS through draft_workout, draft_training_plan and propose_schedule_changes, which the athlete applies.`
     );
   }
 

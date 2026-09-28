@@ -306,6 +306,46 @@ assert.deepEqual(
     ["coros__queryStressLevel", "freddy__queryDevices"],
     "another server's tool of the same name is not ours to judge"
   );
+
+  // COROS MCP's own writes (added September 2026) go whatever is on offer:
+  // Coach writes through drafts and change sets, never straight to the account.
+  const writes = [
+    "coros__createScheduledWorkout",
+    "coros__updateScheduledWorkout",
+    "coros__createSingleWorkout",
+    "coros__updateWorkoutDetails",
+    "coros__scheduleWorkout",
+    "coros__createTrainingPlan",
+    "coros__updateTrainingPlan"
+  ];
+  assert.deepEqual(
+    namesOf(narrowCorosMcpTools(named(...writes, "coros__queryWorkoutLibrary"))),
+    ["coros__queryWorkoutLibrary"],
+    "a COROS MCP write is never offered; a read with no local counterpart is"
+  );
+  for (const name of writes) {
+    assert.equal(isToolAllowedUnderPolicy(name, "read-only"), false, `${name} must not reach an analysis run`);
+  }
+
+  // The renamed sleep tool and the new plan and schedule reads step aside for
+  // the local tools that already answer them.
+  assert.deepEqual(
+    namesOf(
+      narrowCorosMcpTools(
+        named(
+          "coros__querySleepOverview",
+          "coros__queryScheduledWorkoutDetails",
+          "coros__queryTrainingPlanLibrary",
+          "coros__queryTrainingPlanDetails",
+          "get_sleep_summary",
+          "list_scheduled_workouts",
+          "list_training_plans",
+          "get_training_plan"
+        )
+      )
+    ),
+    ["get_sleep_summary", "list_scheduled_workouts", "list_training_plans", "get_training_plan"]
+  );
 }
 
 // --- the per-name predicate, which executeChatTool enforces --------------
@@ -316,6 +356,10 @@ assert.equal(isToolAllowedUnderPolicy("delete_workout", "read-only"), false);
 assert.equal(isToolAllowedUnderPolicy("freddy__anything", "read-only"), false);
 assert.equal(isToolAllowedUnderPolicy("draft_training_plan", "read-only"), true);
 assert.equal(isToolAllowedUnderPolicy("coros__get_training_load", "read-only"), true);
+// A COROS MCP tool is a read only by its verb; one the server adds under any
+// other name is not assumed to be.
+assert.equal(isToolAllowedUnderPolicy("coros__querySleepOverview", "read-only"), true);
+assert.equal(isToolAllowedUnderPolicy("coros__deleteEverything", "read-only"), false);
 // Interactive runs are unaffected, including by default.
 assert.equal(isToolAllowedUnderPolicy("upload_training_plan", "interactive"), true);
 assert.equal(isToolAllowedUnderPolicy("upload_training_plan"), true);
