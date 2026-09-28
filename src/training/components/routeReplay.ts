@@ -8,6 +8,10 @@ import type { TrainingHubTrackPoint } from "../../../electron/types";
  */
 export interface RouteReplay {
   latLngs: [number, number][];
+  /** The located track points `latLngs` was read from, one for one. */
+  points: TrainingHubTrackPoint[];
+  /** Metres from the start to each point along the route. */
+  distances: number[];
   /** Where each point falls on the replay, 0 at the start and 1 at the finish. */
   clock: number[];
   /** Length of the route in metres, which sets how long the replay runs. */
@@ -100,23 +104,29 @@ export function buildRouteReplay(points: TrainingHubTrackPoint[]): RouteReplay |
   const total = clock[clock.length - 1]!;
   return {
     latLngs,
+    points: located,
+    distances,
     // A route that never moves has nothing to replay; it is drawn whole.
     clock: total > 0 ? clock.map((value) => value / total) : clock.map(() => 1),
     meters
   };
 }
 
-/** The line drawn so far at `progress` (0–1), ending at the replay's head. */
-export function replayPath(
+/**
+ * Where the replay's head is at `progress` (0–1): the last point it has
+ * passed, how far it is towards the next, and the spot on the chord between.
+ */
+export function replayHead(
   replay: RouteReplay,
   progress: number
-): [number, number][] {
+): { index: number; fraction: number; point: [number, number] } {
   const { latLngs, clock } = replay;
+  const last = latLngs.length - 1;
   if (progress >= 1) {
-    return latLngs;
+    return { index: last, fraction: 0, point: latLngs[last]! };
   }
   if (progress <= 0) {
-    return [latLngs[0]!];
+    return { index: 0, fraction: 0, point: latLngs[0]! };
   }
 
   // The last point at or before `progress`.
@@ -131,16 +141,31 @@ export function replayPath(
     }
   }
 
-  const path = latLngs.slice(0, low + 1);
+  const from = latLngs[low]!;
   const next = latLngs[low + 1];
-  if (next) {
-    const span = clock[low + 1]! - clock[low]!;
-    const fraction = span > 0 ? (progress - clock[low]!) / span : 1;
-    const from = latLngs[low]!;
-    path.push([
+  if (!next) {
+    return { index: low, fraction: 0, point: from };
+  }
+  const span = clock[low + 1]! - clock[low]!;
+  const fraction = span > 0 ? (progress - clock[low]!) / span : 1;
+  return {
+    index: low,
+    fraction,
+    point: [
       from[0] + (next[0] - from[0]) * fraction,
       from[1] + (next[1] - from[1]) * fraction
-    ]);
+    ]
+  };
+}
+
+/** The line drawn so far at `progress` (0–1), ending at the replay's head. */
+export function replayPath(
+  replay: RouteReplay,
+  progress: number
+): [number, number][] {
+  if (progress >= 1) {
+    return replay.latLngs;
   }
-  return path;
+  const { index, point } = replayHead(replay, progress);
+  return [...replay.latLngs.slice(0, index + 1), point];
 }

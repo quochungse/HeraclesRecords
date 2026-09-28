@@ -793,10 +793,9 @@
 }
 
 /*
- * Cool to hot across the six bands. Scoped like the sport colours above,
- * because renderer CSS has no scope.
+ * Cool to hot across COROS's six zones, Z1 to Z6. Scoped like the sport
+ * colours above, because renderer CSS has no scope.
  */
-.activities-view [data-zone="0"] { --zone-color: #6b7280; }
 .activities-view [data-zone="1"] { --zone-color: #7fb0d8; }
 .activities-view [data-zone="2"] { --zone-color: #3fb27f; }
 .activities-view [data-zone="3"] { --zone-color: #d8b13a; }

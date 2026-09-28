@@ -3,7 +3,18 @@ import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
-import type { TrainingHubActivityTrack } from "../../../electron/types";
+import type {
+  TrainingHubActivityDetail,
+  TrainingHubActivityTrack
+} from "../../../electron/types";
+import { OptionGroup } from "../../components/OptionGroup";
+import {
+  defineSelectionPreference,
+  selectionIsOneOf,
+  useSelectionPreference
+} from "../../preferences/selectionPreferences";
+import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { formatElevationMeters, formatPaceSecondsPerKm } from "../formatters";
 import {
   BASE_LAYERS,
   isLightBaseLayer,
@@ -19,17 +30,50 @@ import {
 import { MapCreditButton, useFoldingCredit } from "../../mapBase/MapCredit";
 import { MapLayerControl } from "../../mapBase/MapLayerControl";
 import { useTheme } from "../../theme/ThemeProvider";
+import { SMOOTH_STEPS, smoothPath, smoothPathTo, type SmoothPath } from "./routeSmoothing";
 import {
   REPLAY_DELAY_MS,
   buildRouteReplay,
   replayDurationMs,
-  replayPath,
+  replayHead,
   type RouteReplay
 } from "./routeReplay";
+import {
+  ZONE_COLORS,
+  ZONE_COUNT,
+  heatShare,
+  passesBy,
+  performanceColoring,
+  rampColorAt,
+  routeHeat,
+  routeRamp,
+  zoneColoring,
+  type RouteColorMode,
+  type RouteColoring,
+  type RouteHeat,
+  type RouteMetric,
+  type RouteZoneColoring,
+  type ZoneRange
+} from "./routeColoring";
+
+/** What the full map colours a route by: the samples and COROS's zones. */
+type RouteDetail = Partial<
+  Pick<TrainingHubActivityDetail, "series" | "hrZones" | "paceZones">
+>;
 
 interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
+  /** The activity's detail, for colouring the full map by pace, heart rate or elevation. */
+  detail?: RouteDetail;
 }
+
+/**
+ * What Performance shows for one metric: the activity's own zones where COROS
+ * scored it against some, else a ramp from its slowest stretch to its fastest.
+ */
+type PerformanceView =
+  | { kind: "zones"; coloring: RouteZoneColoring }
+  | { kind: "ramp"; coloring: RouteColoring };
 
 type RouteGeometry = RouteReplay;
 
@@ -37,6 +81,28 @@ const ROUTE_COLOR = "#74c08f";
 const ROUTE_COLOR_PAPER = "#0f7f5f";
 const START_COLOR = "#4da3ff";
 const END_COLOR = "#d89b22";
+
+const ROUTE_COLOR_MODES = ["route", "performance", "heatmap"] as const;
+const ROUTE_METRICS = ["pace", "hr", "elevation"] as const;
+
+/** How the full map colours the route, remembered like the base map. */
+const ROUTE_COLOR_MODE_PREFERENCE = defineSelectionPreference<RouteColorMode>({
+  key: "training.activityRoute.colorMode",
+  defaultValue: "route",
+  validate: selectionIsOneOf(ROUTE_COLOR_MODES)
+});
+
+const ROUTE_METRIC_PREFERENCE = defineSelectionPreference<RouteMetric>({
+  key: "training.activityRoute.metric",
+  defaultValue: "pace",
+  validate: selectionIsOneOf(ROUTE_METRICS)
+});
+
+const ROUTE_METRIC_LABELS: Record<RouteMetric, string> = {
+  pace: "Pace",
+  hr: "Heart rate",
+  elevation: "Elevation"
+};
 
 /** Shared by the side-panel map and the full map, so a pick in one is the other's. */
 const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
@@ -59,6 +125,315 @@ function resolveMapStyle(theme: string, baseLayer?: BaseLayerId): MapStyle {
   };
 }
 
+/**
+ * One stretch of the route drawn in one colour: points `from` to `to`.
+ * `color` undefined is the route's own colour; null is a stretch with nothing
+ * recorded, left to the faint ghost line under it.
+ */
+interface RouteRun {
+  from: number;
+  to: number;
+  color: string | null | undefined;
+}
+
+function routeRuns(
+  pointCount: number,
+  stretchColors: readonly (string | null)[] | undefined
+): RouteRun[] {
+  if (!stretchColors) {
+    return [{ from: 0, to: pointCount - 1, color: undefined }];
+  }
+  const runs: RouteRun[] = [];
+  stretchColors.forEach((color, index) => {
+    const last = runs[runs.length - 1];
+    if (last && last.color === color) {
+      last.to = index + 1;
+    } else {
+      runs.push({ from: index, to: index + 1, color });
+    }
+  });
+  return runs;
+}
+
+/** How a route map draws its route: runs of flat colour, or a heatmap's glow. */
+type RouteDrawing =
+  | { kind: "lines"; stretchColors?: readonly (string | null)[] }
+  | {
+      kind: "glow";
+      heat: RouteHeat;
+      ramp: readonly string[];
+      /** A dark ground takes a wider, brighter halo; a daylight one a faint one. */
+      darkGround: boolean;
+    };
+
+interface Painter {
+  /** Draws the route up to `progress` (0–1) and returns where its head is. */
+  paint(progress: number): [number, number];
+  setRouteColor(color: string): void;
+  remove(): void;
+}
+
+/**
+ * Where the replay's head is as a position along the route's points — 12.5 is
+ * half way along the thirteenth stretch — which is what the curve is indexed
+ * by.
+ */
+function headPosition(route: RouteGeometry, progress: number): number {
+  const { index, fraction } = replayHead(route, progress);
+  return progress >= 1 ? route.latLngs.length - 1 : index + fraction;
+}
+
+/** The curve from point `from` to position `to` (see `headPosition`). */
+function curveBetween(curve: SmoothPath, from: number, to: number): [number, number][] {
+  const start = from * SMOOTH_STEPS;
+  const { points } = smoothPathTo(curve, to);
+  return points.slice(start);
+}
+
+/**
+ * Draws the route as runs of one colour each, up to the replay's head, along
+ * the smoothed curve. A frame touches only the run under the head and the runs
+ * whose state just changed — a route coloured by zone can be hundreds of runs,
+ * and resetting every one of them on every frame is what would make the
+ * replay stutter.
+ */
+class LinePainter implements Painter {
+  private readonly group: L.LayerGroup;
+  private readonly lines: {
+    run: RouteRun;
+    line: L.Polyline;
+    state: "empty" | "partial" | "full";
+  }[];
+
+  constructor(
+    map: L.Map,
+    private readonly route: RouteGeometry,
+    private readonly curve: SmoothPath,
+    routeColor: string,
+    stretchColors: readonly (string | null)[] | undefined
+  ) {
+    this.group = L.layerGroup().addTo(map);
+    this.lines = routeRuns(route.latLngs.length, stretchColors)
+      .filter((run) => run.color !== null)
+      .map((run) => ({
+        run,
+        line: L.polyline([], {
+          color: run.color ?? routeColor,
+          weight: 4,
+          opacity: 0.95,
+          lineCap: "round",
+          lineJoin: "round"
+        }).addTo(this.group),
+        state: "empty" as const
+      }));
+  }
+
+  setRouteColor(color: string): void {
+    for (const { run, line } of this.lines) {
+      if (run.color === undefined) {
+        line.setStyle({ color });
+      }
+    }
+  }
+
+  paint(progress: number): [number, number] {
+    const position = headPosition(this.route, progress);
+    for (const entry of this.lines) {
+      const { from, to } = entry.run;
+      if (to <= position) {
+        if (entry.state !== "full") {
+          entry.line.setLatLngs(curveBetween(this.curve, from, to));
+          entry.state = "full";
+        }
+      } else if (from <= position) {
+        entry.line.setLatLngs(curveBetween(this.curve, from, position));
+        entry.state = "partial";
+      } else if (entry.state !== "empty") {
+        entry.line.setLatLngs([]);
+        entry.state = "empty";
+      }
+    }
+    return smoothPathTo(this.curve, position).head;
+  }
+
+  remove(): void {
+    this.group.remove();
+  }
+}
+
+/** Below Leaflet's overlay pane, so the start and finish markers sit on the glow. */
+const GLOW_PANE = "heraclesRouteGlow";
+
+/**
+ * The heatmap's line, drawn the way Strava draws its heat: on a canvas, along
+ * the smoothed curve, each piece a gradient from the colour at one end to the
+ * colour at the other, over a soft blurred halo, and the more passes the
+ * hotter and the wider.
+ *
+ * Ground is drawn once: a pass over ground the route already covered adds no
+ * line beside the first — it makes the first one hotter (`RouteHeat.drawn`).
+ * And the heat is counted as the replay goes (`passesBy`): a lapped route
+ * starts as one pass everywhere and warms lap by lap, rather than arriving
+ * already at its final colour.
+ *
+ * Laid over, never added: the colour already says how many times a stretch was
+ * passed, and adding thirteen laps' worth of light on top of it burnt every
+ * lapped route to the same white. The halo is drawn opaque on a canvas of its
+ * own and then laid on faintly, so it is as wide once as it is thirteen times.
+ *
+ * The canvas covers the map's viewport and is redrawn when the view settles;
+ * Leaflet hides it during a zoom animation (`leaflet-zoom-hide`), as it does
+ * its own canvas renderer.
+ */
+class GlowPainter implements Painter {
+  private readonly canvas: HTMLCanvasElement;
+  private readonly halo = document.createElement("canvas");
+  private progress = 0;
+  private readonly redraw = () => this.draw();
+
+  constructor(
+    private readonly map: L.Map,
+    private readonly route: RouteGeometry,
+    private readonly curve: SmoothPath,
+    private readonly drawing: Extract<RouteDrawing, { kind: "glow" }>
+  ) {
+    if (!map.getPane(GLOW_PANE)) {
+      map.createPane(GLOW_PANE).style.zIndex = "390";
+    }
+    this.canvas = L.DomUtil.create("canvas", "activity-route-glow leaflet-zoom-hide");
+    map.getPane(GLOW_PANE)!.appendChild(this.canvas);
+    map.on("moveend zoomend resize viewreset", this.redraw);
+  }
+
+  setRouteColor(): void {
+    // The heat is coloured by its ramp; the route's own colour is not used.
+  }
+
+  paint(progress: number): [number, number] {
+    this.progress = progress;
+    this.draw();
+    return smoothPathTo(this.curve, headPosition(this.route, progress)).head;
+  }
+
+  remove(): void {
+    this.map.off("moveend zoomend resize viewreset", this.redraw);
+    this.canvas.remove();
+  }
+
+  private draw(): void {
+    const { map, canvas, route, curve, drawing } = this;
+    const { heat } = drawing;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+    const size = map.getSize();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint([0, 0]));
+    canvas.width = Math.max(1, Math.floor(size.x * ratio));
+    canvas.height = Math.max(1, Math.floor(size.y * ratio));
+    canvas.style.width = `${size.x}px`;
+    canvas.style.height = `${size.y}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, size.x, size.y);
+
+    const position = headPosition(route, this.progress);
+    const head = Math.min(route.latLngs.length - 2, Math.floor(position));
+
+    // The heat of each stretch the head has reached, counting only the passes
+    // it has made so far.
+    const share = (stretch: number) =>
+      heatShare(heat, passesBy(heat, stretch, head));
+
+    // Runs of drawn ground, each a stretch of the curve with its heat.
+    const pieces: { points: [number, number][]; shares: number[] }[] = [];
+    let stretch = 0;
+    while (stretch <= head) {
+      if (!heat.drawn[stretch]) {
+        stretch += 1;
+        continue;
+      }
+      const from = stretch;
+      while (stretch + 1 <= head && heat.drawn[stretch + 1]) {
+        stretch += 1;
+      }
+      const to = Math.min(stretch + 1, position);
+      const points = curveBetween(curve, from, to);
+      const shares = points.map((_, k) => {
+        const at = from + k / SMOOTH_STEPS;
+        const lower = Math.min(stretch, Math.floor(at));
+        const t = at - Math.floor(at);
+        const here = share(lower);
+        const next = lower + 1 <= stretch ? share(lower + 1) : here;
+        // A point is shared by the stretches either side of it; blend across
+        // the second half of each stretch so the colour turns at the joins.
+        return t < 0.5 ? here : here + (next - here) * (t - 0.5) * 2;
+      });
+      pieces.push({ points, shares });
+      stretch += 1;
+    }
+
+    const stroke = (target: CanvasRenderingContext2D, extra: number) => {
+      target.lineCap = "round";
+      target.lineJoin = "round";
+      for (const piece of pieces) {
+        const projected = piece.points.map((latLng) => map.latLngToContainerPoint(latLng));
+        for (let k = 0; k < projected.length - 1; k += 1) {
+          const a = projected[k]!;
+          const b = projected[k + 1]!;
+          const shareA = piece.shares[k]!;
+          const shareB = piece.shares[k + 1] ?? shareA;
+          const gradient = target.createLinearGradient(a.x, a.y, b.x, b.y);
+          gradient.addColorStop(0, rampColorAt(drawing.ramp, shareA));
+          gradient.addColorStop(1, rampColorAt(drawing.ramp, shareB));
+          target.strokeStyle = gradient;
+          // Wider with heat: 3 px for a single pass, 7 px for the most.
+          target.lineWidth = 3 + 4 * ((shareA + shareB) / 2) + extra;
+          target.beginPath();
+          target.moveTo(a.x, a.y);
+          target.lineTo(b.x, b.y);
+          target.stroke();
+        }
+      }
+    };
+
+    const halo = this.halo.getContext("2d");
+    if (halo) {
+      this.halo.width = canvas.width;
+      this.halo.height = canvas.height;
+      halo.setTransform(ratio, 0, 0, ratio, 0, 0);
+      stroke(halo, drawing.darkGround ? 7 : 5);
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.globalAlpha = drawing.darkGround ? 0.45 : 0.2;
+      context.filter = `blur(${(drawing.darkGround ? 5 : 3) * ratio}px)`;
+      context.drawImage(this.halo, 0, 0);
+      context.restore();
+    }
+    stroke(context, 0);
+  }
+}
+
+function createPainter(
+  map: L.Map,
+  route: RouteGeometry,
+  curve: SmoothPath,
+  routeColor: string,
+  drawing: RouteDrawing | undefined
+): Painter {
+  return drawing?.kind === "glow"
+    ? new GlowPainter(map, route, curve, drawing)
+    : new LinePainter(map, route, curve, routeColor, drawing?.stretchColors);
+}
+
+/** What the map's owner can ask of a route map once it is built. */
+interface RouteMapControl {
+  replay: () => void;
+  redraw: (drawing: RouteDrawing | undefined) => void;
+  /** The route's own colour and its ghost's opacity, for the ground under them. */
+  setRouteColor: (color: string, ghostOpacity: number) => void;
+}
+
 function RouteMapCanvas({
   route,
   scrollWheelZoom = false,
@@ -67,9 +442,15 @@ function RouteMapCanvas({
   baseLayer,
   animate = true,
   replayToken = 0,
+  drawing,
   ariaLabel
 }: {
   route: RouteGeometry;
+  /**
+   * How the route is drawn when it is coloured by what happened along it.
+   * Absent, it is one line in the route's own colour.
+   */
+  drawing?: RouteDrawing;
   scrollWheelZoom?: boolean;
   /**
    * Replay the route when the map opens. False for a map that is only a quick
@@ -97,9 +478,10 @@ function RouteMapCanvas({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.Layer | null>(null);
-  const ghostLineRef = useRef<L.Polyline | null>(null);
-  const routeLineRef = useRef<L.Polyline | null>(null);
-  const replayRef = useRef<(() => void) | null>(null);
+  const controlRef = useRef<RouteMapControl | null>(null);
+  // Read when the map is built; a later change redraws in place.
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
   const baseLayerPropRef = useRef(baseLayer);
@@ -142,21 +524,21 @@ function RouteMapCanvas({
 
     const tileLayer = createBaseLayer(map, tile).addTo(map);
 
-    const ghostLine = L.polyline(route.latLngs, {
+    const curve = smoothPath(route.latLngs);
+    // The faint whole route under the replay. The heatmap hides it: it would
+    // draw again every strand the heat merges into one.
+    const ghostShown = (next: RouteDrawing | undefined) => next?.kind !== "glow";
+    let currentGhostOpacity = ghostOpacity;
+    const ghostLine = L.polyline(curve.points, {
       color: routeColor,
       weight: 4,
-      opacity: ghostOpacity,
+      opacity: ghostShown(drawingRef.current) ? ghostOpacity : 0,
       lineCap: "round",
       lineJoin: "round"
     }).addTo(map);
 
-    const routeLine = L.polyline(animate ? [route.latLngs[0]!] : route.latLngs, {
-      color: routeColor,
-      weight: 4,
-      opacity: 0.95,
-      lineCap: "round",
-      lineJoin: "round"
-    }).addTo(map);
+    let currentRouteColor = routeColor;
+    let painter = createPainter(map, route, curve, routeColor, drawingRef.current);
 
     const start = route.latLngs[0]!;
     const end = route.latLngs[route.latLngs.length - 1]!;
@@ -183,30 +565,31 @@ function RouteMapCanvas({
     fitRoute();
     mapRef.current = map;
     tileLayerRef.current = tileLayer;
-    ghostLineRef.current = ghostLine;
-    routeLineRef.current = routeLine;
     appliedBaseLayerRef.current = initialLayer;
 
     // The replay: a still half second when the map opens, then the line grows
     // at the pace the activity was done (sped up, linear, so a slow stretch
     // reads as slow) with the finish marker riding its head to the finish.
-    const endMarker = L.circleMarker(animate ? start : end, {
+    const endMarker = L.circleMarker(end, {
       radius: 6,
       color: END_COLOR,
       fillColor: END_COLOR,
       fillOpacity: 1,
       weight: 2
     });
-    if (!animate) {
-      endMarker.addTo(map);
-    }
 
     let animationFrame = 0;
     const replayMs = replayDurationMs(route.meters);
 
+    const showWhole = () => {
+      window.cancelAnimationFrame(animationFrame);
+      painter.paint(1);
+      endMarker.setLatLng(end).addTo(map);
+    };
+
     const play = (delayMs: number) => {
       window.cancelAnimationFrame(animationFrame);
-      routeLine.setLatLngs([start]);
+      painter.paint(0);
       endMarker.remove();
       let animationStart: number | undefined;
 
@@ -219,9 +602,7 @@ function RouteMapCanvas({
         }
 
         const progress = Math.min(elapsed / replayMs, 1);
-        const path = replayPath(route, progress);
-        routeLine.setLatLngs(path);
-        endMarker.setLatLng(progress >= 1 ? end : path[path.length - 1]!);
+        endMarker.setLatLng(painter.paint(progress));
         if (!map.hasLayer(endMarker)) {
           endMarker.addTo(map);
         }
@@ -235,9 +616,35 @@ function RouteMapCanvas({
 
     if (animate) {
       play(REPLAY_DELAY_MS);
-      // A replay asked for starts at once: the eye is already on the map.
-      replayRef.current = () => play(0);
+    } else {
+      showWhole();
     }
+    controlRef.current = {
+      // A replay asked for starts at once: the eye is already on the map.
+      replay: () => {
+        if (animate) {
+          play(0);
+        }
+      },
+      // A new colouring is shown whole: it answers a question about the whole
+      // route, and replaying it would make the answer wait.
+      redraw: (next) => {
+        window.cancelAnimationFrame(animationFrame);
+        painter.remove();
+        painter = createPainter(map, route, curve, currentRouteColor, next);
+        ghostLine.setStyle({ opacity: ghostShown(next) ? currentGhostOpacity : 0 });
+        showWhole();
+      },
+      setRouteColor: (color, opacity) => {
+        currentRouteColor = color;
+        currentGhostOpacity = opacity;
+        painter.setRouteColor(color);
+        ghostLine.setStyle({
+          color,
+          opacity: ghostShown(drawingRef.current) ? opacity : 0
+        });
+      }
+    };
 
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
@@ -249,21 +656,31 @@ function RouteMapCanvas({
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
-      replayRef.current = null;
+      controlRef.current = null;
+      painter.remove();
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
-      ghostLineRef.current = null;
-      routeLineRef.current = null;
     };
   }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
 
   useEffect(() => {
     if (replayToken > 0) {
-      replayRef.current?.();
+      controlRef.current?.replay();
     }
   }, [replayToken]);
+
+  // Redraw in place. The first run is the build's own, which already drew
+  // this.
+  const drawnRef = useRef(drawing);
+  useEffect(() => {
+    if (drawnRef.current === drawing) {
+      return;
+    }
+    drawnRef.current = drawing;
+    controlRef.current?.redraw(drawing);
+  }, [drawing]);
 
   // Swap the base tile layer in place so zoom/pan and the route animation
   // survive a layer change.
@@ -285,8 +702,7 @@ function RouteMapCanvas({
       map.removeLayer(tileLayerRef.current);
     }
     tileLayerRef.current = next;
-    ghostLineRef.current?.setStyle({ color: routeColor, opacity: ghostOpacity });
-    routeLineRef.current?.setStyle({ color: routeColor });
+    controlRef.current?.setRouteColor(routeColor, ghostOpacity);
     appliedBaseLayerRef.current = baseLayer;
   }, [baseLayer, theme]);
 
@@ -306,6 +722,121 @@ function RouteLegend() {
       Start
       <span className="activity-route-dot is-end" aria-hidden="true" />
       Finish
+    </span>
+  );
+}
+
+/** The ramp under a route coloured without zones, with what its two ends stand for. */
+function RouteColorLegend({
+  metric,
+  coloring,
+  ramp
+}: {
+  metric: RouteMetric;
+  coloring: RouteColoring;
+  ramp: readonly string[];
+}) {
+  const { unitSystem } = useUnitSystem();
+  const label = (value: number) =>
+    metric === "pace"
+      ? formatPaceSecondsPerKm(value, unitSystem)
+      : metric === "hr"
+        ? `${Math.round(value)} bpm`
+        : formatElevationMeters(value, unitSystem);
+
+  return (
+    <span
+      className="activity-route-color-legend"
+      aria-label={`${ROUTE_METRIC_LABELS[metric]} from ${label(coloring.low)} to ${label(coloring.high)}`}
+    >
+      <span>{label(coloring.low)}</span>
+      <span className="activity-route-color-ramp" aria-hidden="true">
+        {ramp.map((color) => (
+          <i key={color} style={{ background: color }} />
+        ))}
+      </span>
+      <span>{label(coloring.high)}</span>
+    </span>
+  );
+}
+
+/**
+ * The six zones in the zone bar's colours, laid out like the elevation ramp —
+ * Z1 at one end, Z6 at the other — whether or not this activity reached them,
+ * so the key reads the same on every run. Each zone's bounds are on hover, as
+ * COROS scored the activity.
+ */
+function RouteZoneLegend({
+  metric,
+  coloring
+}: {
+  metric: "pace" | "hr";
+  coloring: RouteZoneColoring;
+}) {
+  const { unitSystem } = useUnitSystem();
+  const pace = (value: number) => formatPaceSecondsPerKm(value, unitSystem);
+  // The first zone has no floor and the last no honest ceiling — COROS fills
+  // it with a sentinel (401 bpm, 2:42/km) — so both read open-ended.
+  const bounds = ({ low, high }: ZoneRange, zone: number) => {
+    const first = zone === 1;
+    const last = zone === ZONE_COUNT;
+    if (metric === "hr") {
+      if (first) return high !== undefined ? `under ${Math.round(high)} bpm` : undefined;
+      if (last) return low !== undefined ? `over ${Math.round(low)} bpm` : undefined;
+      return low !== undefined && high !== undefined
+        ? `${Math.round(low)}–${Math.round(high)} bpm`
+        : undefined;
+    }
+    if (first) return low !== undefined ? `slower than ${pace(low)}` : undefined;
+    if (last) return high !== undefined ? `faster than ${pace(high)}` : undefined;
+    return low !== undefined && high !== undefined
+      ? `${pace(low).replace(/\s*\/\s*\w+$/, "")}–${pace(high)}`
+      : undefined;
+  };
+
+  return (
+    <span
+      className="activity-route-color-legend"
+      aria-label={`${metric === "hr" ? "Heart rate" : "Pace"} zones, Z1 to Z${ZONE_COUNT}`}
+    >
+      <span>Z1</span>
+      <span className="activity-route-color-ramp">
+        {ZONE_COLORS.map((color, position) => {
+          const zone = position + 1;
+          const range = bounds(coloring.ranges[position] ?? {}, zone);
+          return (
+            <i
+              key={zone}
+              style={{ background: color }}
+              title={range ? `Z${zone} · ${range}` : `Z${zone}`}
+            />
+          );
+        })}
+      </span>
+      <span>Z{ZONE_COUNT}</span>
+    </span>
+  );
+}
+
+/** The heatmap's scale: how many passes its dimmest and brightest colour stand for. */
+function RouteHeatLegend({ heat, ramp }: { heat: RouteHeat; ramp: readonly string[] }) {
+  if (heat.most <= 1) {
+    return (
+      <span className="activity-route-color-legend">Every stretch was covered once</span>
+    );
+  }
+  return (
+    <span
+      className="activity-route-color-legend"
+      aria-label={`Times passed, from once to ${heat.most} times`}
+    >
+      <span>1×</span>
+      <span
+        className="activity-route-color-gradient"
+        aria-hidden="true"
+        style={{ background: `linear-gradient(to right, ${ramp.join(", ")})` }}
+      />
+      <span>{heat.most}×</span>
     </span>
   );
 }
@@ -337,6 +868,7 @@ function RouteMapFrame({
   scrollWheelZoom,
   animate,
   replayToken,
+  drawing,
   ariaLabel,
   onReplay
 }: {
@@ -346,6 +878,7 @@ function RouteMapFrame({
   scrollWheelZoom?: boolean;
   animate?: boolean;
   replayToken?: number;
+  drawing?: RouteDrawing;
   ariaLabel: string;
   /** Present on a map that replays its route: a button under the layer picker. */
   onReplay?: () => void;
@@ -358,6 +891,7 @@ function RouteMapFrame({
         scrollWheelZoom={scrollWheelZoom}
         animate={animate}
         replayToken={replayToken}
+        drawing={drawing}
         baseLayer={layers.baseLayer}
         ariaLabel={ariaLabel}
       />
@@ -386,14 +920,80 @@ function RouteMapFrame({
  */
 function RouteMapModal({
   route,
+  detail,
   layers,
   onClose
 }: {
   route: RouteGeometry;
+  detail?: RouteDetail;
   layers: RouteMapLayers;
   onClose: () => void;
 }) {
   const [replayToken, setReplayToken] = useState(0);
+  const [storedMode, setMode] = useSelectionPreference(ROUTE_COLOR_MODE_PREFERENCE);
+  const [storedMetric, setMetric] = useSelectionPreference(ROUTE_METRIC_PREFERENCE);
+
+  const performance = useMemo(() => {
+    const series = detail?.series ?? [];
+    const view = (metric: RouteMetric): PerformanceView | null => {
+      if (metric !== "elevation") {
+        const zones = zoneColoring(
+          route,
+          series,
+          metric,
+          metric === "hr" ? detail?.hrZones : detail?.paceZones
+        );
+        if (zones) {
+          return { kind: "zones", coloring: zones };
+        }
+      }
+      const ramp = performanceColoring(route, series, metric);
+      return ramp ? { kind: "ramp", coloring: ramp } : null;
+    };
+    return Object.fromEntries(ROUTE_METRICS.map((metric) => [metric, view(metric)])) as Record<
+      RouteMetric,
+      PerformanceView | null
+    >;
+  }, [route, detail]);
+  const heat = useMemo(() => routeHeat(route), [route]);
+
+  // A choice this activity cannot show falls back rather than drawing nothing:
+  // a metric it did not record to the first one it did, and Performance with
+  // nothing recorded at all to the plain route.
+  const metric =
+    performance[storedMetric] !== null
+      ? storedMetric
+      : ROUTE_METRICS.find((candidate) => performance[candidate] !== null) ??
+        storedMetric;
+  const mode =
+    storedMode === "performance" && performance[metric] === null
+      ? "route"
+      : storedMode;
+  const view = mode === "performance" ? performance[metric] : null;
+  const lightGround = isLightBaseLayer(layers.baseLayer);
+
+  const drawing = useMemo((): RouteDrawing | undefined => {
+    if (mode === "heatmap") {
+      return {
+        kind: "glow",
+        heat,
+        ramp: routeRamp("heatmap", lightGround),
+        darkGround: !lightGround
+      };
+    }
+    if (!view) {
+      return undefined;
+    }
+    // A zone is numbered from 1; a ramp step from 0.
+    const colorOf =
+      view.kind === "zones"
+        ? (step: number) => ZONE_COLORS[step - 1]!
+        : (step: number) => routeRamp("performance", lightGround)[step]!;
+    return {
+      kind: "lines",
+      stretchColors: view.coloring.steps.map((step) => (step === null ? null : colorOf(step)))
+    };
+  }, [mode, view, heat, lightGround]);
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -444,9 +1044,60 @@ function RouteMapModal({
             scrollWheelZoom
             replayToken={replayToken}
             onReplay={() => setReplayToken((token) => token + 1)}
+            drawing={drawing}
             ariaLabel="Expanded activity route map"
           />
           <div className="activity-route-footer">
+            <div className="activity-route-coloring">
+              <OptionGroup
+                label="Colour the route by"
+                value={mode}
+                options={[
+                  { value: "route", label: "Route" },
+                  {
+                    value: "performance",
+                    label: "Performance",
+                    disabled: ROUTE_METRICS.every((m) => performance[m] === null),
+                    title: "Pace, heart rate or elevation along the route"
+                  },
+                  {
+                    value: "heatmap",
+                    label: "Heatmap",
+                    title: "Brighter where the activity passed more often"
+                  }
+                ]}
+                onChange={setMode}
+              />
+              {mode === "performance" ? (
+                <OptionGroup
+                  label="Performance metric"
+                  value={metric}
+                  options={ROUTE_METRICS.map((m) => ({
+                    value: m,
+                    label: ROUTE_METRIC_LABELS[m],
+                    disabled: performance[m] === null,
+                    ...(performance[m] === null
+                      ? { title: `No ${ROUTE_METRIC_LABELS[m].toLowerCase()} recorded` }
+                      : {})
+                  }))}
+                  onChange={setMetric}
+                />
+              ) : null}
+              {mode === "heatmap" ? (
+                <RouteHeatLegend heat={heat} ramp={routeRamp("heatmap", lightGround)} />
+              ) : view?.kind === "zones" ? (
+                <RouteZoneLegend
+                  metric={metric === "pace" ? "pace" : "hr"}
+                  coloring={view.coloring}
+                />
+              ) : view ? (
+                <RouteColorLegend
+                  metric={metric}
+                  coloring={view.coloring}
+                  ramp={routeRamp("performance", lightGround)}
+                />
+              ) : null}
+            </div>
             <RouteLegend />
           </div>
         </div>
@@ -471,7 +1122,7 @@ export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
   return false;
 }
 
-export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
+export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
   const layers = useRouteMapLayers();
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
@@ -511,7 +1162,12 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
         </button>
       </div>
       {expanded ? (
-        <RouteMapModal route={route} layers={layers} onClose={closeExpanded} />
+        <RouteMapModal
+          route={route}
+          detail={detail}
+          layers={layers}
+          onClose={closeExpanded}
+        />
       ) : null}
     </div>
   );
@@ -519,6 +1175,8 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
 
 interface ActivityRouteCoverProps {
   track?: TrainingHubActivityTrack;
+  /** The activity's detail, for colouring the full map it opens. */
+  detail?: RouteDetail;
   className?: string;
   /** See `RouteMapCanvas`: the band at the top the page leaves clear. */
   visibleBand?: number;
@@ -531,6 +1189,7 @@ interface ActivityRouteCoverProps {
  */
 export function ActivityRouteCover({
   track,
+  detail,
   className,
   visibleBand
 }: ActivityRouteCoverProps) {
@@ -540,7 +1199,12 @@ export function ActivityRouteCover({
   );
 
   return route ? (
-    <RouteCover route={route} className={className} visibleBand={visibleBand} />
+    <RouteCover
+      route={route}
+      detail={detail}
+      className={className}
+      visibleBand={visibleBand}
+    />
   ) : null;
 }
 
@@ -550,10 +1214,12 @@ export function ActivityRouteCover({
  */
 function RouteCover({
   route,
+  detail,
   className,
   visibleBand
 }: {
   route: RouteGeometry;
+  detail?: RouteDetail;
   className?: string;
   visibleBand?: number;
 }) {
@@ -601,7 +1267,12 @@ function RouteCover({
           its parent, and a backdrop click that closed the map would reach the
           cover's own click and open it again. */}
       {expanded ? (
-        <RouteMapModal route={route} layers={layers} onClose={closeExpanded} />
+        <RouteMapModal
+          route={route}
+          detail={detail}
+          layers={layers}
+          onClose={closeExpanded}
+        />
       ) : null}
     </>
   );

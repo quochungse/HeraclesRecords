@@ -7180,6 +7180,7 @@ export function mergeActivityDetailWithList(
 
 /** COROS's HR zone channel in `zoneList`. 130 is pace, 134 power. */
 const COROS_HR_ZONE_TYPE = 126;
+const COROS_PACE_ZONE_TYPE = 130;
 
 // A weather temperature arrives in tenths of a degree. Anything outside this
 // band is a sentinel rather than a reading (`sweatLoss: 65535` in the same
@@ -7391,6 +7392,61 @@ export function parseActivityHrZones(
   return [];
 }
 
+/**
+ * The pace zones of `zoneList` (type 130). Each bucket runs from `leftScope`,
+ * its slow edge, to `rightScope`, its fast one, in milliseconds per kilometre
+ * — a live run reads zone 1 as 468000 to 397000. Bucket 0 repeats zone 1's
+ * scopes the way the heart-rate list does, and only its slow edge means
+ * anything: it is everything slower. The top bucket's fast edge is a sentinel
+ * (162000, 2:42/km).
+ */
+export function parseActivityPaceZones(
+  raw: Record<string, unknown>
+): TrainingHubActivityZoneBucket[] {
+  const seconds = (value: unknown) => {
+    const scope = positiveNumber(value);
+    return scope === undefined ? undefined : scope / 1000;
+  };
+  for (const entry of pickArray(raw, ["zoneList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const group = entry as Record<string, unknown>;
+    if (toOptionalNumber(group.type) !== COROS_PACE_ZONE_TYPE) {
+      continue;
+    }
+
+    const buckets = (pickArray(group, ["zoneItemList"]) ?? [])
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object"
+      )
+      .map((item, position): TrainingHubActivityZoneBucket => {
+        const index = toOptionalNumber(item.zoneIndex) ?? position;
+        return index > 0
+          ? {
+              index,
+              low: seconds(item.rightScope),
+              high: seconds(item.leftScope),
+              seconds: positiveNumber(item.second),
+              percent: toOptionalNumber(item.percent)
+            }
+          : {
+              index,
+              low: seconds(item.leftScope),
+              seconds: positiveNumber(item.second),
+              percent: toOptionalNumber(item.percent)
+            };
+      });
+
+    if (buckets.some((bucket) => bucket.seconds !== undefined)) {
+      return buckets;
+    }
+  }
+
+  return [];
+}
+
 export function parseActivityEffect(
   summary: Record<string, unknown>
 ): TrainingHubActivityEffect | undefined {
@@ -7563,6 +7619,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     laps,
     dynamics: parseActivityDynamics(raw, summary),
     hrZones: parseActivityHrZones(raw),
+    paceZones: parseActivityPaceZones(raw),
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,

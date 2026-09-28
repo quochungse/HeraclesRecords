@@ -302,6 +302,7 @@ export function RunDetailView({
         {hasRoute ? (
           <ActivityRouteCover
             track={detail?.track}
+            detail={detail ?? undefined}
             className="run-detail-cover"
             visibleBand={COVER_VISIBLE_BAND}
           />

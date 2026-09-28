@@ -1183,6 +1183,13 @@ export interface TrainingHubActivityDetail {
   dynamics?: TrainingHubActivityDynamics;
   /** This activity's own HR zone distribution, empty when COROS sent none. */
   hrZones: TrainingHubActivityZoneBucket[];
+  /**
+   * The pace zones COROS scored this activity against, in seconds per
+   * kilometre: `low` is a zone's fast edge and `high` its slow one. Index 0 is
+   * slower than zone 1 and carries only `low`. Absent on an activity COROS kept
+   * no pace zones for.
+   */
+  paceZones?: TrainingHubActivityZoneBucket[];
   effect?: TrainingHubActivityEffect;
   weather?: TrainingHubActivityWeather;
   track?: TrainingHubActivityTrack;

@@ -529,7 +529,7 @@ export function ActivityDetailPane({
           {gpsPoints > 1 ? (
             <section className="activity-detail-block">
               <h3>Route</h3>
-              <ActivityRouteMap track={detail.track} />
+              <ActivityRouteMap track={detail.track} detail={detail} />
             </section>
           ) : null}
 

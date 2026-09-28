@@ -14239,11 +14239,52 @@ tr.data-intervals-row-missing {
 
 .activity-route-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* The full map's colouring: the mode, the metric under Performance, and the
+   ramp with what its two ends stand for. */
+.activity-route-coloring {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-route-color-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-route-color-ramp {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.activity-route-color-ramp i {
+  width: 16px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+}
+
+.activity-route-color-gradient {
+  width: 88px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+}
+
+/* The heatmap's canvas: a picture of the route, never the target of a drag. */
+.activity-route-glow {
+  pointer-events: none;
 }
 
 .activity-route-expand {
