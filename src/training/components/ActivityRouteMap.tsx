@@ -2,7 +2,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Maximize2, X } from "lucide-react";
+import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
   BASE_LAYERS,
@@ -23,6 +23,13 @@ import { MapCreditButton, useFoldingCredit } from "../../mapBase/MapCredit";
 import { MapLayerControl } from "../../mapBase/MapLayerControl";
 import { useTheme } from "../../theme/ThemeProvider";
 import {
+  REPLAY_DELAY_MS,
+  buildRouteReplay,
+  replayDurationMs,
+  replayPath,
+  type RouteReplay
+} from "./routeReplay";
+import {
   defineSelectionPreference,
   selectionIsArrayOf,
   selectionIsOneOf,
@@ -33,15 +40,12 @@ interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
 }
 
-interface RouteGeometry {
-  latLngs: [number, number][];
-}
+type RouteGeometry = RouteReplay;
 
 const ROUTE_COLOR = "#74c08f";
 const ROUTE_COLOR_PAPER = "#0f7f5f";
 const START_COLOR = "#4da3ff";
 const END_COLOR = "#d89b22";
-const ROUTE_ANIMATION_MS = 2200;
 
 /** Shared by the side-panel map and the full map, so a pick in one is the other's. */
 const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
@@ -57,87 +61,6 @@ const ACTIVITY_ROUTE_OVERLAYS_PREFERENCE =
       { unique: true }
     )
   });
-
-function easeOutCubic(progress: number): number {
-  return 1 - (1 - progress) ** 3;
-}
-
-function getPartialRoute(
-  latLngs: [number, number][],
-  progress: number
-): [number, number][] {
-  if (latLngs.length === 0) {
-    return [];
-  }
-
-  if (progress <= 0) {
-    return [latLngs[0]!];
-  }
-
-  if (progress >= 1) {
-    return latLngs;
-  }
-
-  let totalDistance = 0;
-  const cumulativeDistances = [0];
-
-  for (let index = 1; index < latLngs.length; index += 1) {
-    totalDistance += L.latLng(latLngs[index - 1]!).distanceTo(
-      L.latLng(latLngs[index]!)
-    );
-    cumulativeDistances.push(totalDistance);
-  }
-
-  if (totalDistance === 0) {
-    return latLngs;
-  }
-
-  const targetDistance = totalDistance * progress;
-  const partialRoute: [number, number][] = [latLngs[0]!];
-
-  for (let index = 1; index < latLngs.length; index += 1) {
-    const segmentEnd = cumulativeDistances[index]!;
-
-    if (segmentEnd <= targetDistance) {
-      partialRoute.push(latLngs[index]!);
-      continue;
-    }
-
-    const segmentStart = cumulativeDistances[index - 1]!;
-    const segmentLength = segmentEnd - segmentStart;
-    const segmentProgress =
-      segmentLength > 0 ? (targetDistance - segmentStart) / segmentLength : 1;
-    const from = latLngs[index - 1]!;
-    const to = latLngs[index]!;
-
-    partialRoute.push([
-      from[0] + (to[0] - from[0]) * segmentProgress,
-      from[1] + (to[1] - from[1]) * segmentProgress
-    ]);
-    break;
-  }
-
-  return partialRoute;
-}
-
-function buildRouteGeometry(
-  points: TrainingHubActivityTrack["points"]
-): RouteGeometry | null {
-  const routePoints = points.filter(
-    (point) => point.lat !== undefined && point.lon !== undefined
-  );
-
-  if (routePoints.length < 2) {
-    return null;
-  }
-
-  // No bounds here: the map fits `L.latLngBounds(latLngs)`, and the
-  // `Math.min(...lats)` this used to carry was both unread and the one spread
-  // over a whole track in this file — past the argument limit on an ultra.
-  return {
-    latLngs: routePoints.map((point) => [point.lat!, point.lon!])
-  };
-}
 
 interface MapStyle {
   tile: BaseLayerConfig;
@@ -162,10 +85,19 @@ function RouteMapCanvas({
   visibleBand,
   baseLayer,
   overlays,
+  animate = true,
+  replayToken = 0,
   ariaLabel
 }: {
   route: RouteGeometry;
   scrollWheelZoom?: boolean;
+  /**
+   * Replay the route when the map opens. False for a map that is only a quick
+   * look (the side panel): the route is drawn whole, finish marker in place.
+   */
+  animate?: boolean;
+  /** Raised to replay the route again, without rebuilding the map. */
+  replayToken?: number;
   /**
    * False for a map that is only a picture: no panning, zooming or controls,
    * and the route is fitted again whenever the box changes size, since nobody
@@ -189,6 +121,7 @@ function RouteMapCanvas({
   const ghostLineRef = useRef<L.Polyline | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
   const overlayLayersRef = useRef(new Map<TrailOverlayId, L.TileLayer>());
+  const replayRef = useRef<(() => void) | null>(null);
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
   const baseLayerPropRef = useRef(baseLayer);
@@ -239,7 +172,7 @@ function RouteMapCanvas({
       lineJoin: "round"
     }).addTo(map);
 
-    const routeLine = L.polyline([route.latLngs[0]!], {
+    const routeLine = L.polyline(animate ? [route.latLngs[0]!] : route.latLngs, {
       color: routeColor,
       weight: 4,
       opacity: 0.95,
@@ -276,38 +209,57 @@ function RouteMapCanvas({
     routeLineRef.current = routeLine;
     appliedBaseLayerRef.current = initialLayer;
 
+    // The replay: a still half second when the map opens, then the line grows
+    // at the pace the activity was done (sped up, linear, so a slow stretch
+    // reads as slow) with the finish marker riding its head to the finish.
+    const endMarker = L.circleMarker(animate ? start : end, {
+      radius: 6,
+      color: END_COLOR,
+      fillColor: END_COLOR,
+      fillOpacity: 1,
+      weight: 2
+    });
+    if (!animate) {
+      endMarker.addTo(map);
+    }
+
     let animationFrame = 0;
-    let animationStart: number | undefined;
-    let endMarker: L.CircleMarker | undefined;
+    const replayMs = replayDurationMs(route.meters);
 
-    const animateRoute = (timestamp: number) => {
-      if (animationStart === undefined) {
-        animationStart = timestamp;
-      }
+    const play = (delayMs: number) => {
+      window.cancelAnimationFrame(animationFrame);
+      routeLine.setLatLngs([start]);
+      endMarker.remove();
+      let animationStart: number | undefined;
 
-      const elapsed = timestamp - animationStart;
-      const progress = Math.min(elapsed / ROUTE_ANIMATION_MS, 1);
-      routeLine.setLatLngs(
-        getPartialRoute(route.latLngs, easeOutCubic(progress))
-      );
+      const animateRoute = (timestamp: number) => {
+        animationStart ??= timestamp;
+        const elapsed = timestamp - animationStart - delayMs;
+        if (elapsed < 0) {
+          animationFrame = window.requestAnimationFrame(animateRoute);
+          return;
+        }
 
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(animateRoute);
-        return;
-      }
+        const progress = Math.min(elapsed / replayMs, 1);
+        const path = replayPath(route, progress);
+        routeLine.setLatLngs(path);
+        endMarker.setLatLng(progress >= 1 ? end : path[path.length - 1]!);
+        if (!map.hasLayer(endMarker)) {
+          endMarker.addTo(map);
+        }
 
-      if (!endMarker) {
-        endMarker = L.circleMarker(end, {
-          radius: 6,
-          color: END_COLOR,
-          fillColor: END_COLOR,
-          fillOpacity: 1,
-          weight: 2
-        }).addTo(map);
-      }
+        if (progress < 1) {
+          animationFrame = window.requestAnimationFrame(animateRoute);
+        }
+      };
+      animationFrame = window.requestAnimationFrame(animateRoute);
     };
 
-    animationFrame = window.requestAnimationFrame(animateRoute);
+    if (animate) {
+      play(REPLAY_DELAY_MS);
+      // A replay asked for starts at once: the eye is already on the map.
+      replayRef.current = () => play(0);
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
@@ -319,6 +271,7 @@ function RouteMapCanvas({
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
+      replayRef.current = null;
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
@@ -327,7 +280,13 @@ function RouteMapCanvas({
       routeLineRef.current = null;
       overlayLayersRef.current.clear();
     };
-  }, [route, theme, scrollWheelZoom, interactive, visibleBand]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
+
+  useEffect(() => {
+    if (replayToken > 0) {
+      replayRef.current?.();
+    }
+  }, [replayToken]);
 
   // Swap the base tile layer in place so zoom/pan and the route animation
   // survive a layer change.
@@ -390,7 +349,7 @@ function RouteMapCanvas({
       layer.addTo(map);
       active.set(id, layer);
     }
-  }, [overlays, route, theme, scrollWheelZoom, interactive, visibleBand]);
+  }, [overlays, route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
 
   return (
     <div
@@ -451,13 +410,20 @@ function RouteMapFrame({
   layers,
   className,
   scrollWheelZoom,
-  ariaLabel
+  animate,
+  replayToken,
+  ariaLabel,
+  onReplay
 }: {
   route: RouteGeometry;
   layers: RouteMapLayers;
   className: string;
   scrollWheelZoom?: boolean;
+  animate?: boolean;
+  replayToken?: number;
   ariaLabel: string;
+  /** Present on a map that replays its route: a button under the layer picker. */
+  onReplay?: () => void;
 }) {
   const [creditOpen, toggleCredit] = useFoldingCredit();
   return (
@@ -465,6 +431,8 @@ function RouteMapFrame({
       <RouteMapCanvas
         route={route}
         scrollWheelZoom={scrollWheelZoom}
+        animate={animate}
+        replayToken={replayToken}
         baseLayer={layers.baseLayer}
         overlays={layers.overlays}
         ariaLabel={ariaLabel}
@@ -475,6 +443,18 @@ function RouteMapFrame({
         overlays={layers.overlays}
         onToggleOverlay={layers.toggleOverlay}
       />
+      {onReplay ? (
+        // The layer picker's own look: one kind of button in that corner.
+        <button
+          type="button"
+          className="basemap-toggle map-replay"
+          onClick={onReplay}
+          title="Replay route"
+          aria-label="Replay route"
+        >
+          <RotateCcw size={16} aria-hidden="true" />
+        </button>
+      ) : null}
       <MapCreditButton open={creditOpen} onToggle={toggleCredit} />
     </div>
   );
@@ -494,6 +474,7 @@ function RouteMapModal({
   layers: RouteMapLayers;
   onClose: () => void;
 }) {
+  const [replayToken, setReplayToken] = useState(0);
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -542,6 +523,8 @@ function RouteMapModal({
             layers={layers}
             className="activity-route-modal-map"
             scrollWheelZoom
+            replayToken={replayToken}
+            onReplay={() => setReplayToken((token) => token + 1)}
             ariaLabel="Expanded activity route map"
           />
           <div className="activity-route-footer">
@@ -556,7 +539,7 @@ function RouteMapModal({
 
 /**
  * Whether a track has enough located points to draw a route at all — the same
- * test `buildRouteGeometry` applies, without building the geometry the cover
+ * test `buildRouteReplay` applies, without building the geometry the cover
  * is about to build anyway.
  */
 export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
@@ -574,7 +557,7 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
   const route = useMemo(
-    () => (track?.points ? buildRouteGeometry(track.points) : null),
+    () => (track?.points ? buildRouteReplay(track.points) : null),
     [track]
   );
 
@@ -593,6 +576,8 @@ export function ActivityRouteMap({ track }: ActivityRouteMapProps) {
         route={route}
         layers={layers}
         className="activity-route-map-frame"
+        // A quick look: the whole route at once. The full map replays it.
+        animate={false}
         ariaLabel="Activity route map"
       />
       <div className="activity-route-footer">
@@ -631,7 +616,7 @@ export function ActivityRouteCover({
   visibleBand
 }: ActivityRouteCoverProps) {
   const route = useMemo(
-    () => (track?.points ? buildRouteGeometry(track.points) : null),
+    () => (track?.points ? buildRouteReplay(track.points) : null),
     [track]
   );
 

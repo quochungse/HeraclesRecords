@@ -14357,6 +14357,15 @@ tr.data-intervals-row-missing {
   pointer-events: auto;
 }
 
+/* Replay sits under the layer picker, in its look. Below the picker's own
+   layer, so an open layer menu covers it rather than the other way round. */
+.map-frame .map-replay {
+  position: absolute;
+  top: 54px;
+  right: 12px;
+  z-index: 1100;
+}
+
 .map-frame .basemap-toggle {
   width: 34px;
   height: 34px;

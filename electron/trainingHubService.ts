@@ -6100,14 +6100,24 @@ function parseTrackFromFrequencyList(raw: unknown): TrainingHubTrackPoint[] {
   }
 
   const points: TrainingHubTrackPoint[] = [];
+  let firstStamp: number | undefined;
 
   for (const item of raw) {
     if (!item || typeof item !== "object") {
       continue;
     }
 
-    const point = parseTrackPointObject(item as Record<string, unknown>);
+    const sample = item as Record<string, unknown>;
+    const point = parseTrackPointObject(sample);
     if (point) {
+      // An absolute wall clock in hundredths of a second, rebased on the first
+      // stamped sample. `checkTrackElapsed` confirms the unit against the
+      // activity's length before anything reads it.
+      const stamp = toOptionalNumber(sample.timestamp);
+      if (stamp !== undefined) {
+        firstStamp ??= stamp;
+        point.elapsed = (stamp - firstStamp) / 100;
+      }
       points.push(point);
     }
   }
@@ -6186,6 +6196,7 @@ async function fetchActivityTrackFromGpx(
 
 function parseGpxTrack(gpx: string): TrainingHubActivityTrack | undefined {
   const points: TrainingHubTrackPoint[] = [];
+  let firstTime: number | undefined;
   const trackPointPattern =
     /<trkpt[^>]*\blat="([^"]+)"[^>]*\blon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/gi;
 
@@ -6200,6 +6211,11 @@ function parseGpxTrack(gpx: string): TrainingHubActivityTrack | undefined {
     const body = match[3] ?? "";
     const elevationMatch = /<ele>([^<]+)<\/ele>/i.exec(body);
     const elevation = elevationMatch ? Number(elevationMatch[1]) : undefined;
+    const timeMatch = /<time>([^<]+)<\/time>/i.exec(body);
+    const time = timeMatch ? Date.parse(timeMatch[1]!.trim()) : Number.NaN;
+    if (Number.isFinite(time)) {
+      firstTime ??= time;
+    }
 
     points.push({
       lat,
@@ -6207,7 +6223,10 @@ function parseGpxTrack(gpx: string): TrainingHubActivityTrack | undefined {
       elevation:
         elevation !== undefined && Number.isFinite(elevation)
           ? elevation
-          : undefined
+          : undefined,
+      ...(Number.isFinite(time) && firstTime !== undefined
+        ? { elapsed: (time - firstTime) / 1000 }
+        : {})
     });
   }
 
@@ -6351,11 +6370,14 @@ function combineTrackCandidates(
       continue;
     }
 
+    // The time of the fix, so it comes from the candidate the fix came from.
+    const elapsed = gpsPoint ? gpsPoint.elapsed : basePoint?.elapsed;
     combined.push({
       lat: gpsPoint?.lat ?? basePoint?.lat,
       lon: gpsPoint?.lon ?? basePoint?.lon,
       elevation: elevationPoint?.elevation ?? basePoint?.elevation,
-      distance: elevationPoint?.distance ?? basePoint?.distance ?? gpsPoint?.distance
+      distance: elevationPoint?.distance ?? basePoint?.distance ?? gpsPoint?.distance,
+      ...(elapsed !== undefined ? { elapsed } : {})
     });
   }
 
@@ -6386,7 +6408,34 @@ function collectGraphListCandidates(graphList: unknown): TrainingHubTrackPoint[]
   return candidates;
 }
 
-function parseActivityTrack(raw: Record<string, unknown>): TrainingHubActivityTrack | undefined {
+/**
+ * Keep the track's clock only where it adds up: its last reading has to land
+ * within 10% of the activity's wall-clock length. Nothing else in a payload
+ * says what unit a stamp was in, and a clock off by a factor of a hundred would
+ * replay a run at the wrong pace rather than fail.
+ */
+function checkTrackElapsed(
+  points: TrainingHubTrackPoint[],
+  durationSeconds: number | undefined
+): TrainingHubTrackPoint[] {
+  const last = [...points].reverse().find((point) => point.elapsed !== undefined);
+  if (last?.elapsed === undefined) {
+    return points;
+  }
+  if (
+    durationSeconds &&
+    durationSeconds > 0 &&
+    Math.abs(last.elapsed - durationSeconds) <= durationSeconds * 0.1
+  ) {
+    return points;
+  }
+  return points.map(({ elapsed: _dropped, ...point }) => point);
+}
+
+function parseActivityTrack(
+  raw: Record<string, unknown>,
+  durationSeconds?: number
+): TrainingHubActivityTrack | undefined {
   const candidates: TrainingHubTrackPoint[][] = [];
 
   if (Array.isArray(raw.frequencyList)) {
@@ -6404,7 +6453,10 @@ function parseActivityTrack(raw: Record<string, unknown>): TrainingHubActivityTr
     );
   }
 
-  const points = combineTrackCandidates(candidates);
+  const points = checkTrackElapsed(
+    combineTrackCandidates(candidates),
+    durationSeconds
+  );
 
   if (!hasRoutePoints(points) && !hasElevationPoints(points)) {
     return undefined;
@@ -7454,7 +7506,6 @@ function parseActivityPauses(
 export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubActivityDetail {
   const summary = pickObject(raw, ["summaryInfo", "summary", "activitySummary"]) ?? raw;
   const laps = extractActivityLaps(raw);
-  const track = parseActivityTrack(raw);
 
   const elapsedRaw = pickActivityNumber(raw, summary, ["totalTime", "duration"]);
   const distanceRaw = pickActivityNumber(raw, summary, ["distance", "totalDistance"]);
@@ -7475,6 +7526,7 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     normalizeCorosDetailDurationSeconds(pickActivityNumber(raw, summary, ["workoutTime"])) ??
     elapsedDuration;
   const pauses = parseActivityPauses(raw, summary);
+  const track = parseActivityTrack(raw, elapsedDuration);
 
   return {
     activityId:

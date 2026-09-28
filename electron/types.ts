@@ -941,6 +941,13 @@ export interface TrainingHubTrackPoint {
   lon?: number;
   elevation?: number;
   distance?: number;
+  /**
+   * Seconds of wall clock since the track's first sample. A pause is a gap in
+   * it, not a run of samples: COROS records nothing while paused. Absent where
+   * the source stamps no time, or where the stamps do not add up to the
+   * activity's own length.
+   */
+  elapsed?: number;
 }
 
 export interface TrainingHubActivityTrack {
