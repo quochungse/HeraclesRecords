@@ -438,9 +438,9 @@ function BuilderStrengthStepFields({
   const perSet = Number(row.targetValue);
 
   const measureLabels: Partial<Record<BuilderRow["targetType"], string>> = {
-    reps: "reps",
-    time: "seconds",
-    open: "to lap button"
+    reps: "Reps",
+    time: "Time",
+    open: "Open"
   };
 
   // Only worth saying once the sets multiply into something you can't read
@@ -541,35 +541,38 @@ function BuilderStrengthStepFields({
 
             <span className="set-line-operator" aria-hidden="true">×</span>
 
-            <div className="set-line-cell">
+            {/* The measure is picked first and the figure follows it, so the
+                column that disappears on "Open" is the last one rather than a
+                gap in the middle of the line. */}
+            <div className="set-line-cell is-measure">
               <span>Per set</span>
-              <div className="set-line-compound">
-                {row.targetType === "open" ? (
-                  <span className="set-line-open">Ends on the lap button</span>
-                ) : (
-                  <input
-                    type="number"
-                    min="1"
-                    max={row.targetType === "reps" ? 500 : undefined}
-                    aria-label={row.targetType === "reps" ? "Repetitions per set" : "Seconds per set"}
-                    value={row.targetValue}
-                    placeholder={row.targetType === "time" ? "30" : "10"}
-                    onChange={(event) => onChange({ targetValue: event.target.value })}
-                  />
-                )}
-                <SelectDropdown<BuilderRow["targetType"]>
-                  className="set-line-select"
-                  label="Measure each set by"
-                  value={row.targetType}
-                  options={targetTypes.map((target) => ({
-                    value: target,
-                    label: measureLabels[target] ?? builderTargetTypeLabel(target)
-                  }))}
-                  portal
-                  onChange={changeMeasure}
-                />
-              </div>
+              <SelectDropdown<BuilderRow["targetType"]>
+                className="set-line-select"
+                label="Measure each set by"
+                value={row.targetType}
+                options={targetTypes.map((target) => ({
+                  value: target,
+                  label: measureLabels[target] ?? builderTargetTypeLabel(target)
+                }))}
+                portal
+                onChange={changeMeasure}
+              />
             </div>
+
+            {row.targetType === "open" ? null : (
+              <label className="set-line-cell">
+                <span>{row.targetType === "reps" ? "Reps" : "Seconds"}</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={row.targetType === "reps" ? 500 : undefined}
+                  aria-label={row.targetType === "reps" ? "Repetitions per set" : "Seconds per set"}
+                  value={row.targetValue}
+                  placeholder={row.targetType === "time" ? "30" : "10"}
+                  onChange={(event) => onChange({ targetValue: event.target.value })}
+                />
+              </label>
+            )}
 
             <span className="set-line-operator" aria-hidden="true">@</span>
 
@@ -1165,7 +1168,13 @@ export function useWorkoutBuilder(api: CorosLinkApi, options: UseWorkoutBuilderO
       ? editorDraftToBuilderRows(seed, unitSystem)
       : seedBuilderRows(options.initialSport ?? "run", { unitSystem })
   );
-  const [activeBuilderRowId, setActiveBuilderRowId] = useState<number | null>(rows[0]?.id ?? null);
+  /* A new workout opens on its first step, because that is where the writing
+     starts. An edit does not: the steps are already written, and opening one
+     of them pushes the rest of a workout the athlete came to read down the
+     sheet. */
+  const [activeBuilderRowId, setActiveBuilderRowId] = useState<number | null>(
+    seed ? null : rows[0]?.id ?? null
+  );
   const [activeBuilderChildId, setActiveBuilderChildId] = useState<number | null>(null);
   const [draggedBuilderRowId, setDraggedBuilderRowId] = useState<number | null>(null);
   const [dropTargetBuilderRowId, setDropTargetBuilderRowId] = useState<number | null>(null);
