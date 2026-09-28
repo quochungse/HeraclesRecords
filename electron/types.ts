@@ -1418,6 +1418,18 @@ export interface TrainingHubDailyHealthRecord {
   exerciseMinutes?: number;
   /** "Stress: Avg 40" — the day's average stress, 0–100. */
   stressAvg?: number;
+  /**
+   * "Sleep Summary: Total: 4h 58min | Deep: 40 min | Light: 3h 3min | REM: 59
+   * min | Awake: 16 min" — the night's stages in whole minutes, which the sleep
+   * feed only gives as rounded percentages. `sleepTotalMinutes` is the sleep
+   * *period*, awake included, and describes the main sleep — except on a day
+   * of naps only, where it is one nap of them (see `withDailyHealth`).
+   */
+  sleepTotalMinutes?: number;
+  sleepDeepMinutes?: number;
+  sleepLightMinutes?: number;
+  sleepRemMinutes?: number;
+  sleepAwakeMinutes?: number;
 }
 
 export interface TrainingHubDailyHealthSummary {

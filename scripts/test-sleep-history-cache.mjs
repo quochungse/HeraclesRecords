@@ -640,6 +640,41 @@ clearSleepHistoryCache();
   );
 }
 
+// --- ...and so do the night's stage minutes, when they are this night's -------
+//
+// The sleep feed states stages as whole percentages of the period, a minute or
+// two off the COROS app; the daily-health line states the minutes. Its Total
+// is the main sleep's period, so it is taken only where the night's own window
+// is that long — on a day of naps only it is one nap of several.
+clearSleepHistoryCache();
+{
+  const exact = { sleepTotalMinutes: 460, sleepDeepMinutes: 88, sleepLightMinutes: 253, sleepRemMinutes: 61, sleepAwakeMinutes: 29 };
+  const { deps } = harness({
+    records: [
+      night(0),
+      night(-1, { windowMinutes: 400 }),
+      { happenDay: dayKey(-2), kind: "nap-only", completeness: "complete", napMinutes: 278 }
+    ],
+    heartRate: [
+      { happenDay: dayKey(0), ...exact },
+      { happenDay: dayKey(-1), ...exact },
+      { happenDay: dayKey(-2), ...exact, sleepTotalMinutes: 121 }
+    ]
+  });
+
+  const byDay = new Map((await getSleepHistory({ days: 30 }, deps)).records.map((record) => [record.happenDay, record]));
+  const matched = byDay.get(dayKey(0));
+  assert.deepEqual(
+    [matched.deepMinutes, matched.lightMinutes, matched.remMinutes, matched.awakeMinutes],
+    [88, 253, 61, 29],
+    "a main sleep whose window is the line's Total takes its minutes"
+  );
+  assert.equal(matched.totalMinutes, 430, "and keeps its own asleep figure");
+  const mismatched = byDay.get(dayKey(-1));
+  assert.equal(mismatched.deepMinutes, 90, "a window of another length is another episode: kept as it was");
+  assert.equal(byDay.get(dayKey(-2)).deepMinutes, undefined, "a day of naps takes none");
+}
+
 clearSleepHistoryCache();
 {
   // Heart rate is one line on a card; the nights are the card.

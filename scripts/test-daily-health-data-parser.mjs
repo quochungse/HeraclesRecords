@@ -148,4 +148,16 @@ assert.equal(wellness.get("20260926").sleepAvgHr, 50, "the sleep line is still r
 assert.equal(wellness.get("20260708").exerciseMinutes, 3);
 assert.equal(wellness.get("20260708").stressAvg, 39);
 
+// The night's stages in whole minutes, off the "Sleep Summary" line of the
+// same feed — the sleep feed has them only as rounded percentages.
+{
+  const night = wellness.get("20260926");
+  assert.equal(night.sleepTotalMinutes, 298, "the period, awake included");
+  assert.equal(night.sleepDeepMinutes, 40);
+  assert.equal(night.sleepLightMinutes, 183);
+  assert.equal(night.sleepRemMinutes, 59);
+  assert.equal(night.sleepAwakeMinutes, 16);
+  assert.equal(wellness.get("20260708").sleepTotalMinutes, undefined, "a day with no sleep line has none");
+}
+
 console.log("daily health data parser tests passed");

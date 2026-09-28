@@ -255,7 +255,12 @@ function mergeDailyHealthRecord(
     sleepMinHr: incoming.sleepMinHr ?? existing.sleepMinHr,
     sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr,
     exerciseMinutes: incoming.exerciseMinutes ?? existing.exerciseMinutes,
-    stressAvg: incoming.stressAvg ?? existing.stressAvg
+    stressAvg: incoming.stressAvg ?? existing.stressAvg,
+    sleepTotalMinutes: incoming.sleepTotalMinutes ?? existing.sleepTotalMinutes,
+    sleepDeepMinutes: incoming.sleepDeepMinutes ?? existing.sleepDeepMinutes,
+    sleepLightMinutes: incoming.sleepLightMinutes ?? existing.sleepLightMinutes,
+    sleepRemMinutes: incoming.sleepRemMinutes ?? existing.sleepRemMinutes,
+    sleepAwakeMinutes: incoming.sleepAwakeMinutes ?? existing.sleepAwakeMinutes
   };
 }
 
@@ -381,6 +386,20 @@ function parseProseDailyHealthSection(
   );
   const stressAvg = parseLabeledNumber(section, [/\bStress\s*:\s*Avg\s*([\d.]+)/i]);
 
+  // "Total: 4h 58min | Deep: 40 min | Light: 3h 3min | REM: 59 min | Awake: 16 min"
+  const stageLine = section.match(/^\s*Total\s*:[^\n]*\bDeep\s*:[^\n]*/im)?.[0];
+  const stage = (label: string) =>
+    stageLine ? parseDurationLineMinutes(stageLine.match(new RegExp(`\\b${label}\\s*:\\s*([^|\\n]+)`, "i"))?.[1]) : undefined;
+  const sleepStages = stageLine
+    ? {
+        sleepTotalMinutes: stage("Total"),
+        sleepDeepMinutes: stage("Deep"),
+        sleepLightMinutes: stage("Light"),
+        sleepRemMinutes: stage("REM"),
+        sleepAwakeMinutes: stage("Awake")
+      }
+    : {};
+
   // A day whose only news is the night's heart rate is still news: the Sleep
   // screen reads this feed for that line and nothing else.
   if (
@@ -390,7 +409,8 @@ function parseProseDailyHealthSection(
     sleepMinHr === undefined &&
     sleepMaxHr === undefined &&
     exerciseMinutes === undefined &&
-    stressAvg === undefined
+    stressAvg === undefined &&
+    sleepStages.sleepTotalMinutes === undefined
   ) {
     return undefined;
   }
@@ -403,7 +423,8 @@ function parseProseDailyHealthSection(
     sleepMinHr,
     sleepMaxHr,
     ...(exerciseMinutes !== undefined ? { exerciseMinutes } : {}),
-    ...(stressAvg !== undefined ? { stressAvg } : {})
+    ...(stressAvg !== undefined ? { stressAvg } : {}),
+    ...Object.fromEntries(Object.entries(sleepStages).filter(([, value]) => value !== undefined))
   };
 }
 

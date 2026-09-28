@@ -72,9 +72,10 @@ export interface SleepHistoryDeps {
     mcpState: McpAvailability;
   }>;
   /**
-   * The night's heart rate, which `querySleepData` does not carry. COROS puts
+   * The night's heart rate, which the sleep feed does not carry. COROS puts
    * it in the daily-health feed instead — "Sleep HR: Avg 50 bpm | Min 44 | Max
-   * 71" — dated by wake-up day, so it folds straight onto the night.
+   * 71" — dated by wake-up day, so it folds straight onto the night. The same
+   * lines carry the stages in whole minutes (`exactStages`).
    */
   fetchHeartRate: (days: number) => Promise<TrainingHubDailyHealthRecord[]>;
   readCache: (fromDay: string) => SleepNightRow[];
@@ -185,12 +186,14 @@ function store(deps: SleepHistoryDeps, records: TrainingHubSleepRecord[], now: n
 }
 
 /**
- * The heart rate for each night in the window, or nothing.
+ * The daily-health line for each night in the window — heart rate and stage
+ * minutes — or nothing.
  *
  * A failure here must not cost the nights themselves: heart rate is one line on
- * a card, the sleep totals are the card.
+ * a card and the minutes refine what the percentages already say; the sleep
+ * totals are the card.
  */
-async function readHeartRate(
+async function readDailyHealth(
   deps: SleepHistoryDeps,
   days: number
 ): Promise<Map<string, TrainingHubDailyHealthRecord>> {
@@ -203,7 +206,40 @@ async function readHeartRate(
   }
 }
 
-function withHeartRate(
+/**
+ * The night's stage minutes as COROS counts them, when the daily-health line
+ * is certainly about this night.
+ *
+ * The sleep feed states the stages as whole percentages of the period, which
+ * put each stage a minute or two off the COROS app. The daily-health feed —
+ * the same response the heart rate comes from — states the minutes. Its
+ * `Total` is the main sleep's period, awake included, so it is taken only for
+ * a main sleep whose own window is that long: on a day of naps only it is one
+ * nap of several (2026-09-15: two naps, one "Total" of the first), and a
+ * mismatch anywhere else means the two feeds are not describing one episode.
+ */
+function exactStages(
+  record: TrainingHubSleepRecord,
+  health: TrainingHubDailyHealthRecord
+): Partial<TrainingHubSleepRecord> {
+  if (
+    record.kind !== "main" ||
+    record.windowMinutes === undefined ||
+    health.sleepTotalMinutes === undefined ||
+    Math.abs(health.sleepTotalMinutes - record.windowMinutes) > 1
+  ) {
+    return {};
+  }
+  const stages = {
+    deepMinutes: health.sleepDeepMinutes,
+    lightMinutes: health.sleepLightMinutes,
+    remMinutes: health.sleepRemMinutes,
+    awakeMinutes: health.sleepAwakeMinutes
+  };
+  return Object.fromEntries(Object.entries(stages).filter(([, value]) => value !== undefined));
+}
+
+function withDailyHealth(
   records: TrainingHubSleepRecord[],
   byDay: Map<string, TrainingHubDailyHealthRecord>
 ): TrainingHubSleepRecord[] {
@@ -219,6 +255,7 @@ function withHeartRate(
 
     return {
       ...record,
+      ...exactStages(record, health),
       avgHr: record.avgHr ?? health.sleepAvgHr,
       minHr: record.minHr ?? health.sleepMinHr,
       maxHr: record.maxHr ?? health.sleepMaxHr
@@ -471,7 +508,7 @@ export async function getSleepHistory(
       // of the stamp is "we asked", not "we got something".
       cache.lastNetworkAt = now;
       if (answer.records.length > 0) {
-        store(deps, withHeartRate(answer.records, await readHeartRate(deps, days)), now);
+        store(deps, withDailyHealth(answer.records, await readDailyHealth(deps, days)), now);
         filled = true;
       }
     } catch (caught) {

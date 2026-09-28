@@ -1268,6 +1268,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   (COROS has said all it will), and is unsettled for one day past its own so a late watch
   sync can still turn it into a night. `Naps Total: 0 min` with no main sleep is **not** a
   record: nothing was slept.
+  **A night's stage minutes are COROS's own where the daily-health line is this night's.**
+  The sleep feed states stages as whole percentages of the period (a minute or two off the
+  COROS app); `queryDailyHealthData` — already read for the night's heart rate, so no request
+  more — states them in minutes. `exactStages` (`sleepHistoryService.ts`) takes them only for a
+  `main` night whose `windowMinutes` equals that line's `Total` (the period, awake included):
+  on a day of naps only the line is **one nap of several**. Both feeds keep ~63 nights, so an
+  older night keeps the minutes worked out from its percentages.
   `kind` therefore has three values, and the filter that means "a day" is
   `isSleepDayRecord` (`kind !== "nap"`), not a bare comparison — a single `nap` is a
   component folded into its day, never listed beside it. `selectWindow` does that folding
