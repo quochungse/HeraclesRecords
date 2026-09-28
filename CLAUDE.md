@@ -1389,6 +1389,23 @@ Overview, Media, Data, and Settings are in the main bundle.
   "non-JavaScript MIME type text/html". `import workerUrl from
   "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"` is what makes it emit; do not remove
   that import because it looks unused.
+
+  **The route map draws `track.route`, and nothing else reads it.** `track.points` is every
+  other reader's copy — the coach's tools, the elevation chart, the globe — decimated to 400
+  by sample and without a clock, exactly as before the map needed one; a change there moves
+  what the coach is told. `route` (`electron/routeSimplification.ts`) is as many located
+  points as the line needs: Douglas–Peucker at 3 m, never a gap longer than the old 400 left
+  (10–100 m), both loosened together into a 2 000-point budget. Its `elapsed` is the series'
+  own clock — `readFrequencyElapsed` and `pickElapsedDivisor` are shared with the series
+  parser — because Performance joins a stretch to its samples by the second. The line is a
+  B-spline **bounded** to 2 m of the recorded one (`routeSmoothing.ts`: a control 6 m in from
+  each end of every longer chord), since a simplified route runs long chords into junctions
+  and an unbounded spline cut those by a sixth of the chord. Zones are coloured and named
+  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`, bucket 0 "Below Z1"), so
+  the map, the bar beside it and the coach call a stretch the same thing; renumbering them to
+  COROS's own zone 1–6 is one change across all three, not a map change.
+  `test:route-coloring` holds the arithmetic, `test:activity-detail` the clock and the
+  untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
   visit coordinates and names each cluster through `places:reverseGeocode`.
   **It asks more than one geocoder, because one host is a single point of failure the app

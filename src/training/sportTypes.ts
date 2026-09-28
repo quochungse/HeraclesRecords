@@ -100,6 +100,15 @@ export function isCyclingSportType(sportType?: number): boolean {
   return sportType !== undefined && sportType >= 200 && sportType <= 299;
 }
 
+/**
+ * Whether an activity is read in speed rather than pace: a ride, by its COROS
+ * code or, for a custom sport, its name — the rule the activity panes apply to
+ * their own "Avg speed".
+ */
+export function isSpeedSport(sportType?: number, sportName?: string): boolean {
+  return isCyclingSportType(sportType) || /bike|cycl|ride/i.test(sportName ?? "");
+}
+
 export function resolveSportName(
   activity: {
     sportType?: number;

@@ -14195,12 +14195,12 @@ tr.data-intervals-row-missing {
    and the globe's street map. The credit is named with both of its classes
    because leaflet.css spells it `.leaflet-container .leaflet-control-attribution`
    and arrives later, in the map's lazy chunk — at equal weight its white ground
-   won, and the dark theme drew a white credit. */
+   won, and the dark theme drew a white credit. Its box — padding, corners, the
+   24px it stands level with its (i) at — is the `.map-frame` rule's, and the
+   route cover's own in running.css. */
 .activity-route-map-canvas .leaflet-control-attribution.leaflet-control,
 .activity-globe-street-map .leaflet-control-attribution.leaflet-control {
   margin: 0;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm) 0 0 0;
   background: rgba(10, 12, 14, 0.82);
   color: var(--text-muted);
   font-size: 10px;

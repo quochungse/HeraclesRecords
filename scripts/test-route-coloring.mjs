@@ -1,8 +1,10 @@
 // The route replay and the full map's colouring: the arithmetic under the
-// animation, Performance's zones, ramps and elevation stops, and the
-// Heatmap's pass count, bands and averaged line. None of it
+// animation, Performance's zones, ramps and elevation stops, the Heatmap's
+// pass count, bands and averaged line, the bounded curve the line is drawn
+// along and the route the main process simplifies for it. None of it
 // type-checks into correctness — a replay at the wrong pace, a ramp flattened
-// by one stop, a lap counted as one pass all draw a perfectly good map.
+// by one stop, a lap counted as one pass, a corner cut by 20 m all draw a
+// perfectly good map.
 //
 // Mode: renderer TypeScript whose imports carry explicit extensions or are
 // type-only. Run through Electron because a distro Node built without Amaro
@@ -22,6 +24,7 @@ const load = (file) =>
 const replayModule = await load("src/training/components/routeReplay.ts");
 const smoothing = await load("src/training/components/routeSmoothing.ts");
 const coloring = await load("src/training/components/routeColoring.ts");
+const simplification = await load("electron/routeSimplification.ts");
 const { buildRouteReplay, replayDurationMs, replayHead, replayPath } = replayModule;
 
 const METERS_PER_DEGREE_LAT = 111_195;
@@ -91,8 +94,13 @@ assert.equal(replayDurationMs(42_195), 4000, "a marathon hits the 4 s ceiling");
     hr: 140 + Math.floor(t / 400)
   }));
   const replay = buildRouteReplay(points);
+  const valuesOf = (metric, from = replay, samples = series) => {
+    const result = coloring.stretchValues(from, samples, metric);
+    assert.ok("values" in result, `${metric} has values: ${JSON.stringify(result)}`);
+    return result.values;
+  };
 
-  const pace = coloring.performanceColoring(replay, series, "pace");
+  const pace = coloring.performanceColoring(valuesOf("pace"), "pace");
   assert.equal(pace.low, 360, "the weak end is the slower pace");
   assert.equal(pace.high, 300, "the strong end is the faster pace");
   assert.equal(pace.steps[10], 0, "the slow half takes the weakest step");
@@ -102,19 +110,50 @@ assert.equal(replayDurationMs(42_195), 4000, "a marathon hits the 4 s ceiling");
     "a stop's absurd pace is dropped, not a hole or a new end of the ramp"
   );
 
-  const hr = coloring.performanceColoring(replay, series, "hr");
+  const hr = coloring.performanceColoring(valuesOf("hr"), "hr");
   assert.ok(hr.steps[0] < hr.steps[398], "heart rate climbs the ramp as it rises");
+  // A steady run is not painted as intervals: a spread under the least span
+  // lands in the middle steps.
+  const steady = coloring.performanceColoring(
+    valuesOf("hr", replay, series.map((sample) => ({ ...sample, hr: 150 + (sample.elapsed % 3) }))),
+    "hr"
+  );
+  assert.ok(
+    steady.steps.every((step) => step >= 1 && step <= 3),
+    `a 3 bpm wobble stays mid-ramp: ${[...new Set(steady.steps)]}`
+  );
 
   const heights = coloring.elevationColoring(replay);
   assert.equal(heights[10], 10, "a stretch's height is its points' mean");
   assert.equal(heights[300], 10.5);
 
-  assert.equal(coloring.performanceColoring(replay, [], "pace"), null, "no pace recorded, no colouring");
+  // Why there is nothing is said, because the map says it: a metric never
+  // recorded is not the same as one recorded with no clock to place it by.
+  assert.deepEqual(coloring.stretchValues(replay, [], "pace"), { missing: "unrecorded" });
+  assert.deepEqual(
+    coloring.stretchValues(replay, series.map(({ hr, ...sample }) => sample), "hr"),
+    { missing: "unrecorded" },
+    "no heart rate on any sample"
+  );
   const untimed = buildRouteReplay(points.map(({ elapsed, ...point }) => point));
-  assert.equal(
-    coloring.performanceColoring(untimed, series, "hr"),
-    null,
+  assert.deepEqual(
+    coloring.stretchValues(untimed, series, "hr"),
+    { missing: "untimed" },
     "a track with no clock cannot be joined to the series"
+  );
+  assert.deepEqual(
+    coloring.stretchValues(replay, series.map(({ elapsed, ...sample }) => sample), "pace"),
+    { missing: "untimed" },
+    "nor can a series with none"
+  );
+  assert.deepEqual(
+    coloring.stretchValues(
+      replay,
+      series.map((sample) => ({ ...sample, elapsed: sample.elapsed + 100_000 })),
+      "hr"
+    ),
+    { missing: "untimed" },
+    "two clocks that never overlap place nothing"
   );
   assert.notEqual(coloring.elevationColoring(untimed), null, "elevation needs no clock");
   assert.equal(
@@ -273,29 +312,37 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
   const points = northward([[101, 30, 10]]);
   const series = Array.from({ length: 1001 }, (_, t) => ({ elapsed: t, hr: t < 500 ? 150 : 178, pace: t < 500 ? 420 : 300 }));
   const replay = buildRouteReplay(points);
-  // COROS's numbering: heart-rate bucket n is zone n + 1; pace's seven buckets
-  // are six zones, the two halves of Threshold being zone 4.
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map((bucket) => coloring.zoneNumber("hr", bucket, 6)), [1, 2, 3, 4, 5, 6]);
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map((bucket) => coloring.zoneNumber("pace", bucket, 7)), [1, 2, 3, 4, 4, 5, 6]);
+  const valuesOf = (metric) => coloring.stretchValues(replay, series, metric).values;
 
-  const hr = coloring.zoneColoring(replay, series, "hr", hrZones);
-  assert.equal(hr.steps[10], 2, "150 bpm is zone 2");
-  assert.equal(hr.steps[90], 5, "178 bpm is zone 5");
-  assert.deepEqual(hr.ranges[0], { high: 134 }, "zone 1 has only a ceiling");
-  assert.deepEqual(hr.ranges[1], { low: 134, high: 155 });
-  const pace = coloring.zoneColoring(replay, series, "pace", paceZones);
-  assert.equal(pace.steps[10], 2, "7:00/km is zone 2");
-  assert.equal(pace.steps[90], 5, "5:00/km is zone 5");
-  assert.deepEqual(pace.ranges[3], { low: 318, high: 354 }, "pace zone 4 spans both Threshold buckets");
-  assert.deepEqual(pace.ranges[0], { low: 468 }, "pace zone 1 is everything slower than 7:48");
-  assert.equal(coloring.zoneColoring(replay, series, "pace", []), null, "no zones, no zone colouring");
+  // Bucket for bucket, the zone bar's numbering: bucket 0 is "Below Z1",
+  // bucket n is "Zn", heart rate and pace alike, so the map and the bar
+  // beside it call a stretch the same thing.
+  assert.deepEqual([0, 1, 5].map(coloring.zoneLabel), ["Below Z1", "Z1", "Z5"]);
+  const hr = coloring.zoneColoring(valuesOf("hr"), "hr", [...hrZones].reverse());
+  assert.equal(hr.steps[10], 1, "150 bpm is bucket 1");
+  assert.equal(hr.steps[90], 4, "178 bpm is bucket 4");
+  assert.deepEqual(hr.buckets.map((bucket) => bucket.index), [0, 1, 2, 3, 4, 5], "in order, whatever COROS sent");
+  const pace = coloring.zoneColoring(valuesOf("pace"), "pace", paceZones);
+  assert.equal(pace.steps[10], 1, "7:00/km is bucket 1");
+  assert.equal(pace.steps[90], 5, "5:00/km is bucket 5");
+  assert.equal(pace.buckets.length, 7, "every pace bucket keeps its own colour");
+  assert.equal(coloring.zoneColoring(valuesOf("pace"), "pace", []), null, "no zones, no zone colouring");
+  assert.equal(
+    coloring.zoneColoring(valuesOf("hr"), "hr", hrZones.slice(0, 2)),
+    null,
+    "one bucket with a floor is not a scale"
+  );
 
-  // The map's copy of the zone colours is the zone bar's.
+  // The map's copy of the zone colours is the zone bar's, bucket 0's grey
+  // included, and a bucket past the last takes the last colour as the bar's
+  // clamped `data-zone` does.
   const css = fs.readFileSync(path.join(repoRoot, "src/training/activities.css"), "utf8");
-  const barColors = [...css.matchAll(/\[data-zone="([1-6])"\] \{ --zone-color: (#[0-9a-f]{6}); \}/g)]
+  const barColors = [...css.matchAll(/\[data-zone="([0-9])"\] \{ --zone-color: (#[0-9a-f]{6}); \}/g)]
     .sort((a, b) => Number(a[1]) - Number(b[1]))
     .map((match) => match[2]);
   assert.deepEqual([...coloring.ZONE_COLORS], barColors, "ZONE_COLORS mirrors activities.css [data-zone]");
+  assert.equal(coloring.zoneColor(9), coloring.ZONE_COLORS.at(-1));
+  assert.equal(coloring.zoneColor(0), coloring.ZONE_COLORS[0]);
 }
 
 // --- Heat bands ------------------------------------------------------------
@@ -339,33 +386,145 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
 
 // --- Smoothing -------------------------------------------------------------
 {
-  const zigzag = Array.from({ length: 12 }, (_, index) => [index, index % 2 === 0 ? 0 : 1]);
-  const curve = smoothing.smoothPath(zigzag);
-  assert.equal(curve.points.length, (zigzag.length - 1) * smoothing.SMOOTH_STEPS + 1);
-  assert.deepEqual(curve.points[0], zigzag[0], "the curve starts on the first point");
-  assert.deepEqual(curve.points.at(-1), zigzag.at(-1), "and ends on the last");
+  const M_LAT = 110_540;
+  const M_LON = 111_320 * Math.cos((21 * Math.PI) / 180);
+  const toXY = ([lat, lon]) => [lon * M_LON, lat * M_LAT];
+  const segmentGap = (p, a, b) => {
+    const [px, py] = toXY(p);
+    const [ax, ay] = toXY(a);
+    const [bx, by] = toXY(b);
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+  };
+  const gapToLine = (p, line) =>
+    Math.min(...line.slice(0, -1).map((a, index) => segmentGap(p, a, line[index + 1])));
+  const at = (east, north) => [21 + north / M_LAT, 105 + east / M_LON];
+
+  // A junction reached down a long chord: what a simplified route looks like.
+  // An unbounded B-spline cut this corner by a sixth of 100 m either side.
+  const corner = [at(0, 0), at(0, 100), at(100, 100)];
+  const curve = smoothing.smoothPath(corner);
+  assert.deepEqual(curve.points[0], corner[0], "the curve starts on the first point");
+  assert.deepEqual(curve.points.at(-1), corner.at(-1), "and ends on the last");
+  const worst = Math.max(...curve.points.map((point) => gapToLine(point, corner)));
   assert.ok(
-    curve.points.every(([, y]) => y >= 0 && y <= 1),
-    "no overshoot: the curve stays inside its points"
+    worst <= smoothing.CORNER_METERS / 3 + 0.01,
+    `the corner is rounded within ${smoothing.CORNER_METERS / 3} m of the recorded line: ${worst.toFixed(2)} m`
   );
-  const peak = curve.points[5 * smoothing.SMOOTH_STEPS];
-  assert.ok(Math.abs(peak[1] - 2 / 3) < 1e-9, "a wobble is eased by a sixth of the bend either side");
-  // Smooth at the joins: across a recorded point the heading turns by about as
-  // much as it does one sample either side, rather than all at once there.
-  const heading = (a, b) => Math.atan2(b[1] - a[1], b[0] - a[0]);
-  const turn = (k) =>
-    Math.abs(heading(curve.points[k], curve.points[k + 1]) - heading(curve.points[k - 1], curve.points[k]));
-  for (let knot = 2; knot < zigzag.length - 2; knot += 1) {
-    const at = knot * smoothing.SMOOTH_STEPS;
-    assert.ok(
-      turn(at) <= 1.5 * Math.min(turn(at - 1), turn(at + 1)),
-      `no kink where two stretches meet, at point ${knot}: ${turn(at - 1).toFixed(3)} ${turn(at).toFixed(3)} ${turn(at + 1).toFixed(3)}`
-    );
+  assert.ok(worst > 0.5, "and it is rounded, not left as a kink");
+  // Round at any zoom: where two samples meet, the chord times the turn —
+  // about eight times how far the samples stray from the true curve — stays
+  // under 15 cm, so no facet is ever two centimetres deep. A hairpin too.
+  const heading = (a, b) => {
+    const [ax, ay] = toXY(a);
+    const [bx, by] = toXY(b);
+    return Math.atan2(by - ay, bx - ax);
+  };
+  const chord = (a, b) => Math.hypot(toXY(b)[0] - toXY(a)[0], toXY(b)[1] - toXY(a)[1]);
+  for (const shape of [corner, [at(0, 0), at(0, 100), at(10, 0)], [at(0, 0), at(0, 100), at(30, 160)]]) {
+    const { points: samples } = smoothing.smoothPath(shape);
+    for (let k = 1; k < samples.length - 1; k += 1) {
+      let turn = Math.abs(heading(samples[k], samples[k + 1]) - heading(samples[k - 1], samples[k]));
+      turn = Math.min(turn, 2 * Math.PI - turn);
+      const facet = turn * Math.max(chord(samples[k - 1], samples[k]), chord(samples[k], samples[k + 1]));
+      assert.ok(facet < 0.15, `sample ${k} of ${samples.length}: ${facet.toFixed(3)}`);
+    }
   }
-  const halfway = smoothing.smoothPathTo(curve, 2.5);
-  assert.equal(halfway.points.at(-1), halfway.head);
-  assert.equal(halfway.points.length, 2.5 * smoothing.SMOOTH_STEPS + 2);
-  assert.deepEqual(smoothing.smoothPath([[0, 0], [1, 1]]).points.length, smoothing.SMOOTH_STEPS + 1, "two points still map by multiplication");
+  assert.ok(curve.points.length < 40, `the straight legs cost no samples: ${curve.points.length}`);
+
+  // A straight chord is its ends and the two controls in from them.
+  assert.equal(smoothing.smoothPath([at(0, 0), at(0, 200)]).points.length, 4);
+
+  // The position a replay reads: rising, and a whole number is its point.
+  assert.ok(curve.along.every((value, index) => index === 0 || value > curve.along[index - 1]), "along rises");
+  assert.equal(curve.along[0], 0);
+  assert.equal(curve.along.at(-1), corner.length - 1);
+  assert.ok(curve.along.includes(1), "the corner has a sample of its own");
+  // Half way through the second stretch is half way along its curve: the
+  // head keeps the replay's pace through a corner rather than speeding up.
+  const east = (point) => toXY(point)[0] - toXY(corner[0])[0];
+  const head = smoothing.curveHead(curve, 1.5);
+  assert.ok(gapToLine(head, corner) < 0.01 && Math.abs(east(head) - 50) < 1.5, `half way along the second leg: ${east(head).toFixed(2)} m`);
+  const quarters = [1.25, 1.5, 1.75].map((position) => east(smoothing.curveHead(curve, position)));
+  assert.ok(
+    Math.abs(quarters[1] - quarters[0] - (quarters[2] - quarters[1])) < 0.5,
+    `even going: ${quarters.map((value) => value.toFixed(1))}`
+  );
+  const between = smoothing.curveBetween(curve, 1, 1.5);
+  assert.deepEqual(between.at(-1), head, "a run ends at the head");
+  assert.deepEqual(between[0], curve.points[curve.along.indexOf(1)], "and starts on its first point's sample");
+  assert.deepEqual(smoothing.curveBetween(curve, 0, 2), curve.points, "the whole curve at the end");
+
+  // A GPS wobble between close readings is eased, not traced: readings 3 m
+  // apart swinging 1 m either way leave the curve within a third of that.
+  const wobble = Array.from({ length: 20 }, (_, index) => at(index % 2 === 0 ? -1 : 1, index * 3));
+  const eased = smoothing.smoothPath(wobble);
+  const inner = eased.points.filter((_, k) => eased.along[k] >= 2 && eased.along[k] <= 17);
+  assert.ok(
+    inner.every((point) => Math.abs(toXY(point)[0] - 105 * M_LON) < 0.4),
+    "the wobble is a third of what was recorded"
+  );
+}
+
+// --- Route simplification -----------------------------------------------------
+{
+  const { simplifyRoute, MAX_ROUTE_POINTS, TOLERANCE_METERS } = simplification;
+  const M_LAT = 110_540;
+  const M_LON = 111_320 * Math.cos((21 * Math.PI) / 180);
+  const at = (east, north, extra = {}) => ({ lat: 21 + north / M_LAT, lon: 105 + east / M_LON, ...extra });
+  const meters = (a, b) => Math.hypot((b.lon - a.lon) * M_LON, (b.lat - a.lat) * M_LAT);
+  const gapToLine = (p, line) => {
+    let best = Infinity;
+    for (let index = 0; index < line.length - 1; index += 1) {
+      const a = line[index];
+      const b = line[index + 1];
+      const [ax, ay] = [a.lon * M_LON, a.lat * M_LAT];
+      const [bx, by] = [b.lon * M_LON, b.lat * M_LAT];
+      const [px, py] = [p.lon * M_LON, p.lat * M_LAT];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+      best = Math.min(best, Math.hypot(px - (ax + dx * t), py - (ay + dy * t)));
+    }
+    return best;
+  };
+
+  assert.equal(simplifyRoute([{ elevation: 3 }, at(0, 0)]), undefined, "one located point is no route");
+
+  // 10 km straight north, a reading every 3 m wobbling 1 m either side: the
+  // wobble goes, and what is left is the spacing the side panel had.
+  const straight = Array.from({ length: 3334 }, (_, index) =>
+    at(index % 2 === 0 ? -1 : 1, index * 3, { elapsed: index, elevation: 10 })
+  );
+  const kept = simplifyRoute(straight);
+  assert.equal(kept[0], straight[0], "the start is kept, as it was");
+  assert.equal(kept.at(-1), straight.at(-1), "and the finish");
+  assert.ok(kept.length > 350 && kept.length < 450, `a point every 25 m or so: ${kept.length}`);
+  const gaps = kept.slice(1).map((point, index) => meters(kept[index], point));
+  assert.ok(Math.max(...gaps) < 25 + 4, `no gap past the spacing: ${Math.max(...gaps).toFixed(1)} m`);
+  assert.ok(kept.every((point) => point.elapsed !== undefined && point.elevation === 10), "every field travels");
+
+  // Shape: a 50 m circle read every metre keeps what it needs to stay within
+  // the tolerance of every reading.
+  const circle = Array.from({ length: 315 }, (_, index) => {
+    const angle = index / 50;
+    return at(50 * Math.cos(angle), 50 * Math.sin(angle));
+  });
+  const round = simplifyRoute(circle);
+  const stray = Math.max(...circle.map((point) => gapToLine(point, round)));
+  assert.ok(stray <= TOLERANCE_METERS + 1e-6, `within ${TOLERANCE_METERS} m of every reading: ${stray.toFixed(2)} m`);
+  assert.ok(round.length < circle.length / 3, `and drops the rest: ${round.length} of ${circle.length}`);
+
+  // Budget: 200 km of a winding road read every 3 m fits, both limits
+  // loosened together rather than the line thrown away.
+  const winding = Array.from({ length: 66_667 }, (_, index) =>
+    at(20 * Math.sin((index * 3 * 2 * Math.PI) / 200), index * 3)
+  );
+  const long = simplifyRoute(winding);
+  assert.ok(long.length <= MAX_ROUTE_POINTS && long.length > MAX_ROUTE_POINTS / 3, `fits the budget: ${long.length}`);
+  assert.equal(long.at(-1), winding.at(-1));
 }
 
 // --- Ramps -----------------------------------------------------------------
@@ -375,4 +534,4 @@ for (const light of [true, false]) {
   assert.equal(new Set(ramp).size, ramp.length, "and no step repeats");
 }
 
-console.log("route coloring OK — replay pace and length, zones, ramps, elevation stops, heat bands, passes, averaged positions, neon widths, smoothing");
+console.log("route coloring OK — replay pace and length, stretch values, zones, ramps, elevation stops, heat bands, passes, averaged positions, neon widths, bounded smoothing, route simplification");

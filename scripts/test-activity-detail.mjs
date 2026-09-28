@@ -764,6 +764,47 @@ assert.equal(live[2]?.distance, 5955, "centimetres to metres");
 assert.equal(live[1]?.pace, undefined);
 assert.equal(live[1]?.adjustedPace, undefined);
 
+// The route map joins the track to the series by the second, so the two read
+// one clock. The first stamped sample here carries no position and no
+// distance — nothing a track point is made of — and rebasing the track on its
+// own first point put every point 25 s early against the samples.
+const alignedDetail = parseActivityDetail({
+  summary: { totalTime: 6000, distance: 30000 },
+  frequencyList: [
+    { timestamp: STAMP_BASE, heart: 100 },
+    { timestamp: STAMP_BASE + 2500, distance: 10000, gpsLat: 107476389, gpsLon: 1067228648, heart: 120 },
+    { timestamp: STAMP_BASE + 4000, distance: 20000, gpsLat: 107477389, gpsLon: 1067228648, heart: 130 },
+    { timestamp: STAMP_BASE + 6000, distance: 30000, gpsLat: 107478389, gpsLon: 1067228648, heart: 140 }
+  ]
+});
+assert.deepEqual(
+  alignedDetail.series?.map((point) => point.elapsed),
+  [0, 25, 40, 60]
+);
+assert.deepEqual(
+  alignedDetail.track?.route?.map((point) => point.elapsed),
+  [25, 40, 60],
+  "a route point sits at its own sample's second"
+);
+// `points` is every other reader's copy — the coach's tools, the elevation
+// chart, the globe — and stays as it was before the map needed a clock.
+assert.equal(alignedDetail.track?.points.length, 3);
+assert.ok(
+  alignedDetail.track?.points.every((point) => !("elapsed" in point)),
+  "the shared points carry no clock"
+);
+// A clock that does not add up to the activity's length is dropped, not
+// rescaled into a replay at the wrong pace.
+const offClock = parseActivityDetail({
+  summary: { totalTime: 90000, distance: 30000 },
+  frequencyList: [
+    { timestamp: STAMP_BASE, distance: 0, gpsLat: 107476389, gpsLon: 1067228648 },
+    { timestamp: STAMP_BASE + 6000, distance: 30000, gpsLat: 107478389, gpsLon: 1067228648 }
+  ]
+});
+assert.ok(offClock.track?.route?.length === 2);
+assert.ok(offClock.track?.route?.every((point) => point.elapsed === undefined));
+
 // ---------------------------------------------------------------------------
 // Pauses, recorded from a live road run paused twice (2026-09-14). `totalTime`
 // is start to finish, `workoutTime` is the running, and `pauseList` places each

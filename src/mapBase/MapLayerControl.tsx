@@ -1,5 +1,5 @@
 import { Layers, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./constants";
 
 /**
@@ -14,6 +14,15 @@ export interface MapLayerSection<T extends string> {
   onChange: (value: T) => void;
 }
 
+/**
+ * Whether a layer menu is open inside `root`. A dialog that closes on Escape
+ * from the window asks this first and lets that Escape through to the menu,
+ * which is what should close: one key closes one thing.
+ */
+export function hasOpenLayerMenu(root: ParentNode): boolean {
+  return root.querySelector(".basemap-control.is-open") !== null;
+}
+
 /** Floating layer switcher (top-right of the map): the base map, then the map's own choices. */
 export function MapLayerControl<T extends string = never>({
   value,
@@ -25,23 +34,45 @@ export function MapLayerControl<T extends string = never>({
   section?: MapLayerSection<T>;
 }) {
   const [open, setOpen] = useState(false);
-  const close = (
-    <button
-      type="button"
-      className="icon-button"
-      onClick={() => setOpen(false)}
-      aria-label="Close"
-    >
-      <X size={15} aria-hidden="true" />
-    </button>
-  );
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const refocusRef = useRef(false);
+
+  // Escape closes the menu and hands focus back to its button. Caught on the
+  // way down and stopped there, for the reason `OptionGroup` does: the screen
+  // under a map answers Escape from its own `document` listener — a run's page
+  // goes back to the list on it.
+  useEffect(() => {
+    if (!open) {
+      if (refocusRef.current) {
+        refocusRef.current = false;
+        toggleRef.current?.focus();
+      }
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      refocusRef.current = true;
+      setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open]);
+
   return (
     <div className={`basemap-control${open ? " is-open" : ""}`}>
       {open ? (
         <div className="basemap-menu">
           <div className="basemap-head">
             <span>Base map</span>
-            {close}
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
           </div>
           {BASE_LAYER_ORDER.map((id) => {
             const config = BASE_LAYERS[id];
@@ -50,6 +81,7 @@ export function MapLayerControl<T extends string = never>({
                 key={id}
                 type="button"
                 className={`basemap-option${id === value ? " is-active" : ""}`}
+                aria-pressed={id === value}
                 onClick={() => {
                   onChange(id);
                   setOpen(false);
@@ -87,6 +119,7 @@ export function MapLayerControl<T extends string = never>({
         </div>
       ) : (
         <button
+          ref={toggleRef}
           type="button"
           className="basemap-toggle"
           onClick={() => setOpen(true)}

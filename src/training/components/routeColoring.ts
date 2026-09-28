@@ -55,7 +55,7 @@ export function elevationColor(meters: number, lightGround: boolean): string {
   const colors = elevationColors(lightGround);
   const last = ELEVATION_STOPS.length - 1;
   if (meters <= ELEVATION_STOPS[0]) {
-    return mixColor(colors[0]!, colors[0]!, 0);
+    return rgb(hexChannels(colors[0]!));
   }
   for (let index = 0; index < last; index += 1) {
     const low = ELEVATION_STOPS[index]!;
@@ -64,7 +64,7 @@ export function elevationColor(meters: number, lightGround: boolean): string {
       return mixColor(colors[index]!, colors[index + 1]!, (meters - low) / (high - low));
     }
   }
-  return mixColor(colors[last]!, colors[last]!, 0);
+  return rgb(hexChannels(colors[last]!));
 }
 
 /**
@@ -125,25 +125,30 @@ export interface RouteColoring {
 /** A pace slower than this is standing still, not running slowly. */
 const SLOWEST_PACE_S_PER_KM = 30 * 60;
 
-function stretchValues(
+/**
+ * A metric's reading on each stretch between point i and i + 1, null where
+ * nothing was recorded there — or why there are none at all: the activity did
+ * not record the metric, or recorded it with no way to place it on the route
+ * (a track without a clock, or one that never overlaps the samples').
+ */
+export type StretchValues =
+  | { values: (number | null)[] }
+  | { missing: "unrecorded" | "untimed" };
+
+/**
+ * Pace (seconds per km) or heart rate on each stretch. They live on the
+ * series, one sample a second, on the same clock as the track's `elapsed`. A
+ * stretch takes the mean of the samples inside it, or the one nearest its
+ * middle when it is shorter than a sample.
+ */
+export function stretchValues(
   replay: RouteReplay,
-  series: TrainingHubActivitySeriesPoint[],
-  metric: RouteMetric
-): (number | null)[] {
+  series: readonly TrainingHubActivitySeriesPoint[],
+  metric: "pace" | "hr"
+): StretchValues {
   const { points } = replay;
   const stretches = points.length - 1;
 
-  if (metric === "elevation") {
-    return Array.from({ length: stretches }, (_, index) => {
-      const a = points[index]!.elevation;
-      const b = points[index + 1]!.elevation;
-      return a !== undefined && b !== undefined ? (a + b) / 2 : a ?? b ?? null;
-    });
-  }
-
-  // Pace and heart rate live on the series, one sample a second, on the same
-  // clock as the track's `elapsed`. A stretch takes the mean of the samples
-  // inside it, or the one nearest its middle when it is shorter than a sample.
   const read = (sample: TrainingHubActivitySeriesPoint): number | undefined => {
     const value = metric === "pace" ? sample.pace : sample.hr;
     if (value === undefined || value <= 0) {
@@ -151,11 +156,15 @@ function stretchValues(
     }
     return metric === "pace" && value > SLOWEST_PACE_S_PER_KM ? undefined : value;
   };
-  const samples = series
-    .filter((sample) => sample.elapsed !== undefined && read(sample) !== undefined)
+  const recorded = series.filter((sample) => read(sample) !== undefined);
+  if (recorded.length === 0) {
+    return { missing: "unrecorded" };
+  }
+  const samples = recorded
+    .filter((sample) => sample.elapsed !== undefined)
     .sort((a, b) => a.elapsed! - b.elapsed!);
   if (samples.length === 0 || points.some((point) => point.elapsed === undefined)) {
-    return Array.from({ length: stretches }, () => null);
+    return { missing: "untimed" };
   }
 
   const values: (number | null)[] = [];
@@ -184,7 +193,7 @@ function stretchValues(
       )[0];
     values.push(near && Math.abs(near.elapsed! - middle) <= 30 ? read(near)! : null);
   }
-  return values;
+  return values.some((value) => value !== null) ? { values } : { missing: "untimed" };
 }
 
 /**
@@ -203,22 +212,18 @@ function percentile(sorted: number[], fraction: number): number {
 }
 
 /**
- * Each stretch's ramp step for one metric, or null when the activity recorded
- * none of it. The ramp spans the 5th to the 95th percentile, so a stop or a
- * sensor spike does not flatten everything else into one step. Faster pace is
- * "more", so the fastest stretch takes the strongest step.
+ * Each stretch's ramp step for one metric's `stretchValues`. The ramp spans
+ * the 5th to the 95th percentile, so a stop or a sensor spike does not flatten
+ * everything else into one step. Faster pace is "more", so the fastest stretch
+ * takes the strongest step.
  */
 export function performanceColoring(
-  replay: RouteReplay,
-  series: TrainingHubActivitySeriesPoint[],
+  values: readonly (number | null)[],
   metric: "pace" | "hr"
-): RouteColoring | null {
-  const values = stretchValues(replay, series, metric);
-  const known = values.filter((value): value is number => value !== null);
-  if (known.length === 0) {
-    return null;
-  }
-  const sorted = [...known].sort((a, b) => a - b);
+): RouteColoring {
+  const sorted = values
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => a - b);
   let p5 = percentile(sorted, 0.05);
   let p95 = percentile(sorted, 0.95);
   if (p95 - p5 < LEAST_SPAN[metric]) {
@@ -229,12 +234,10 @@ export function performanceColoring(
   const span = p95 - p5;
   const fasterIsMore = metric === "pace";
 
+  // The span is at least `LEAST_SPAN`, so never zero.
   const steps = values.map((value) => {
     if (value === null) {
       return null;
-    }
-    if (span <= 0) {
-      return Math.floor(RAMP_STEPS / 2);
     }
     const share = Math.min(1, Math.max(0, (value - p5) / span));
     const strength = fasterIsMore ? 1 - share : share;
@@ -251,17 +254,23 @@ export function performanceColoring(
  * carries none, and null as a whole when no point has one.
  */
 export function elevationColoring(replay: RouteReplay): (number | null)[] | null {
-  const values = stretchValues(replay, [], "elevation");
+  const { points } = replay;
+  const values = points.slice(0, -1).map((point, index) => {
+    const a = point.elevation;
+    const b = points[index + 1]!.elevation;
+    return a !== undefined && b !== undefined ? (a + b) / 2 : a ?? b ?? null;
+  });
   return values.some((value) => value !== null) ? values : null;
 }
 
 /**
- * The zone colours, Z1 first — the activity pane's zone bar's, mirrored from
- * `[data-zone]` in activities.css, which is scoped to that screen while the
- * full map is portalled to <body>. `test:route-coloring` holds the two copies
- * equal.
+ * A zone bucket's colour, bucket 0 — below zone 1 — first: the activity pane's
+ * zone bar's, mirrored from `[data-zone]` in activities.css, which is scoped to
+ * that screen while the full map is portalled to <body>. `test:route-coloring`
+ * holds the two copies equal.
  */
 export const ZONE_COLORS = [
+  "#6b7280",
   "#7fb0d8",
   "#3fb27f",
   "#d8b13a",
@@ -270,35 +279,25 @@ export const ZONE_COLORS = [
   "#b4405c"
 ] as const;
 
-/** COROS's six zones, for heart rate and for pace alike. */
-export const ZONE_COUNT = 6;
-
 /**
- * The COROS zone (1–6) a `zoneList` bucket stands for. Heart rate has six
- * buckets and bucket n is zone n + 1: bucket 0, "under 134 bpm", is the band
- * COROS draws as zone 1, Recovery. Pace has seven, because COROS splits its
- * Threshold zone at 100% of threshold pace — on a real run, 354–324 and
- * 324–318 s/km against a threshold of 324 — and the two halves are one zone,
- * zone 4, in the six `PACE_PRESETS` name.
+ * A bucket's colour and name, numbered as the zone bar numbers them — bucket 0
+ * "Below Z1", bucket n "Zn" — so the map and the bar beside it read a stretch
+ * the same way, heart rate and pace alike. Clamped like the bar's
+ * `data-zone`, for a list longer than seven.
  */
-export function zoneNumber(metric: "pace" | "hr", bucket: number, bucketCount: number): number {
-  if (metric === "pace" && bucketCount === 7) {
-    return [1, 2, 3, 4, 4, 5, 6][bucket] ?? ZONE_COUNT;
-  }
-  return Math.min(ZONE_COUNT, Math.max(1, bucket + 1));
+export function zoneColor(bucket: number): string {
+  return ZONE_COLORS[Math.min(ZONE_COLORS.length - 1, Math.max(0, bucket))]!;
 }
 
-/** One zone's bounds: bpm for heart rate; seconds per km for pace, `low` the fast edge. */
-export interface ZoneRange {
-  low?: number;
-  high?: number;
+export function zoneLabel(bucket: number): string {
+  return bucket <= 0 ? "Below Z1" : `Z${bucket}`;
 }
 
 export interface RouteZoneColoring {
-  /** The zone (1–6) of each stretch; null where nothing was recorded. */
+  /** The bucket of each stretch; null where nothing was recorded. */
   steps: (number | null)[];
-  /** Each zone's bounds, as COROS scored the activity; index 0 is zone 1. */
-  ranges: ZoneRange[];
+  /** COROS's buckets for the metric, in order, with their bounds. */
+  buckets: TrainingHubActivityZoneBucket[];
 }
 
 /**
@@ -329,42 +328,22 @@ export function zoneOf(
 }
 
 /**
- * Each stretch's zone, by the zones COROS scored this activity against — the
- * same bounds its zone bar is drawn from, so the map and the bar agree. Null
- * when the activity has no zones for the metric, or recorded none of it.
+ * Each stretch's bucket, by the zones COROS scored this activity against — the
+ * same buckets its zone bar is drawn from, so the map and the bar agree. Null
+ * when the activity has no zones for the metric.
  */
 export function zoneColoring(
-  replay: RouteReplay,
-  series: TrainingHubActivitySeriesPoint[],
+  values: readonly (number | null)[],
   metric: "pace" | "hr",
   zones: readonly TrainingHubActivityZoneBucket[] | undefined
 ): RouteZoneColoring | null {
-  const ordered = [...(zones ?? [])].sort((a, b) => a.index - b.index);
-  if (ordered.filter((zone) => zone.index > 0).length < 2) {
+  const buckets = [...(zones ?? [])].sort((a, b) => a.index - b.index);
+  if (buckets.filter((zone) => zone.index > 0).length < 2) {
     return null;
   }
-  const values = stretchValues(replay, series, metric);
-  if (values.every((value) => value === null)) {
-    return null;
-  }
-
-  // A zone's bounds are its buckets' outer edges — zone 4 of pace spans two.
-  const ranges: ZoneRange[] = Array.from({ length: ZONE_COUNT }, () => ({}));
-  for (const bucket of ordered) {
-    const range = ranges[zoneNumber(metric, bucket.index, ordered.length) - 1]!;
-    if (bucket.low !== undefined) {
-      range.low = range.low === undefined ? bucket.low : Math.min(range.low, bucket.low);
-    }
-    if (bucket.high !== undefined) {
-      range.high = range.high === undefined ? bucket.high : Math.max(range.high, bucket.high);
-    }
-  }
-
   return {
-    steps: values.map((value) =>
-      value === null ? null : zoneNumber(metric, zoneOf(metric, ordered, value), ordered.length)
-    ),
-    ranges
+    steps: values.map((value) => (value === null ? null : zoneOf(metric, buckets, value))),
+    buckets
   };
 }
 
@@ -624,7 +603,11 @@ export function routeHeat(replay: RouteReplay): RouteHeat {
       : [{ arrival: Math.max(0, index - 1), latLng, weight: 1 }];
   });
 
-  return { passes, arrivals, positions, most: Math.max(...passes) };
+  let most = 0;
+  for (const count of passes) {
+    most = Math.max(most, count);
+  }
+  return { passes, arrivals, positions, most };
 }
 
 function hexChannels(hex: string): [number, number, number] {

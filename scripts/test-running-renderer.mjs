@@ -687,9 +687,32 @@ async function main() {
     assert.equal(await harness("exists", ".activity-route-modal-map.is-credit-open"), true, "its (i) brings it back");
     assert.equal(await harness("exists", ".activity-route-modal"), true, "and leaves the map open");
 
-    // One Escape closes the map and leaves the run open.
-    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
-    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+    // One Escape closes one thing: an open layer menu first, handing focus
+    // back to its button, and only then the map.
+    const pressEscape = () => {
+      win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+      win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+    };
+    await harness("click", ".activity-route-modal .basemap-toggle:not(.map-replay)");
+    await waitFor(() => harness("exists", ".activity-route-modal .basemap-control.is-open"), "the layer menu opens");
+    pressEscape();
+    await waitFor(
+      async () => !(await harness("exists", ".activity-route-modal .basemap-control.is-open")),
+      "Escape closes the layer menu"
+    );
+    await settle();
+    assert.equal(await harness("exists", ".activity-route-modal"), true, "and leaves the map open");
+    assert.equal(
+      await win.webContents.executeJavaScript(
+        `document.activeElement?.matches(".activity-route-modal .basemap-toggle:not(.map-replay)") ?? false`,
+        true
+      ),
+      true,
+      "focus returns to the layer button"
+    );
+
+    // The next Escape closes the map and leaves the run open.
+    pressEscape();
     await waitFor(async () => !(await harness("exists", ".activity-route-modal")), "Escape closes the map");
     await settle();
     assert.equal(await harness("exists", ".run-detail"), true, "and only the map");

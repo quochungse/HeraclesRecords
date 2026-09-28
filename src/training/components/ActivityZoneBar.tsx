@@ -5,18 +5,8 @@ interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
 }
 
-/**
- * COROS's zone for a bucket: bucket n is zone n + 1. Bucket 0 — "under 134 bpm"
- * — is the band COROS draws as zone 1, Recovery, not something below the zones;
- * this bar used to call it "Below Z1" and number the rest one short, so its Z1
- * was COROS's Z2 and the map's Z2.
- */
-function zoneNumber(index: number): number {
-  return Math.min(6, Math.max(1, index + 1));
-}
-
-function zoneCaption(zone: number): string {
-  switch (zone) {
+function zoneCaption(index: number): string {
+  switch (index) {
     case 1:
       return "Recovery & warm-up";
     case 2:
@@ -30,19 +20,15 @@ function zoneCaption(zone: number): string {
     case 6:
       return "Anaerobic";
     default:
-      return "Zone";
+      return "Below zone 1";
   }
 }
 
 function bounds(zone: TrainingHubActivityZoneBucket): string | undefined {
-  // Bucket 0, zone 1, repeats the next zone's scopes rather than carrying its
-  // own, so only its ceiling means anything; the top bucket's ceiling is a
-  // sentinel (401 bpm), so only its floor does.
+  // Index 0 is COROS's below-zone-1 bucket: it repeats zone 1's bounds rather
+  // than carrying its own, so only the ceiling means anything there.
   if (zone.index === 0) {
     return zone.high === undefined ? undefined : `under ${Math.round(zone.high)} bpm`;
-  }
-  if (zoneNumber(zone.index) === 6) {
-    return zone.low === undefined ? undefined : `over ${Math.round(zone.low)} bpm`;
   }
 
   if (zone.low === undefined || zone.high === undefined) {
@@ -77,9 +63,9 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
         {ordered.map((zone) => (
           <i
             key={zone.index}
-            data-zone={zoneNumber(zone.index)}
+            data-zone={Math.min(6, Math.max(0, zone.index))}
             style={{ flexGrow: (zone.seconds ?? 0) / total }}
-            title={`${zoneCaption(zoneNumber(zone.index))} — ${formatDurationSpan(zone.seconds)}`}
+            title={`${zoneCaption(zone.index)} — ${formatDurationSpan(zone.seconds)}`}
           />
         ))}
       </div>
@@ -90,10 +76,12 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
           return (
             <li
               key={zone.index}
-              title={[zoneCaption(zoneNumber(zone.index)), span].filter(Boolean).join(" — ")}
+              title={[zoneCaption(zone.index), span].filter(Boolean).join(" — ")}
             >
-              <i data-zone={zoneNumber(zone.index)} aria-hidden="true" />
-              <span className="activity-zones-name">{`Z${zoneNumber(zone.index)}`}</span>
+              <i data-zone={Math.min(6, Math.max(0, zone.index))} aria-hidden="true" />
+              <span className="activity-zones-name">
+                {zone.index === 0 ? "Below Z1" : `Z${zone.index}`}
+              </span>
               <strong>{formatDurationSpan(seconds)}</strong>
               <span className="activity-zones-share">
                 {Math.round((seconds / total) * 100)}%

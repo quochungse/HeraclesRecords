@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type {
   TrainingHubActivityDetail,
-  TrainingHubActivityTrack
+  TrainingHubActivityTrack,
+  TrainingHubTrackPoint
 } from "../../../electron/types";
 import { OptionGroup } from "../../components/OptionGroup";
 import {
@@ -14,7 +15,9 @@ import {
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { kmhToDisplaySpeed, speedUnit } from "../../units/units";
 import { formatElevationMeters, formatPaceSecondsPerKm } from "../formatters";
+import { isSpeedSport } from "../sportTypes";
 import {
   BASE_LAYERS,
   isLightBaseLayer,
@@ -28,9 +31,13 @@ import {
   useBaseLayerPreference
 } from "../../mapBase/baseLayerPreference";
 import { MapCreditButton, useFoldingCredit } from "../../mapBase/MapCredit";
-import { MapLayerControl, type MapLayerSection } from "../../mapBase/MapLayerControl";
+import {
+  MapLayerControl,
+  hasOpenLayerMenu,
+  type MapLayerSection
+} from "../../mapBase/MapLayerControl";
 import { useTheme } from "../../theme/ThemeProvider";
-import { SMOOTH_STEPS, smoothPath, smoothPathTo, type SmoothPath } from "./routeSmoothing";
+import { curveBetween, curveHead, smoothPath, type SmoothPath } from "./routeSmoothing";
 import {
   REPLAY_DELAY_MS,
   buildRouteReplay,
@@ -41,8 +48,6 @@ import {
 import {
   ELEVATION_STOPS,
   HEAT_BANDS,
-  ZONE_COLORS,
-  ZONE_COUNT,
   elevationColor,
   elevationColoring,
   elevationColors,
@@ -56,18 +61,23 @@ import {
   rampColorAt,
   routeHeat,
   routeRamp,
+  stretchValues,
+  zoneColor,
   zoneColoring,
+  zoneLabel,
   type RouteColorMode,
   type RouteColoring,
   type RouteHeat,
   type RouteMetric,
-  type RouteZoneColoring,
-  type ZoneRange
+  type RouteZoneColoring
 } from "./routeColoring";
 
-/** What the full map colours a route by: the samples and COROS's zones. */
+/** What the full map colours a route by: the samples, COROS's zones and the sport. */
 type RouteDetail = Partial<
-  Pick<TrainingHubActivityDetail, "series" | "hrZones" | "paceZones">
+  Pick<
+    TrainingHubActivityDetail,
+    "series" | "hrZones" | "paceZones" | "sportType" | "sportName"
+  >
 >;
 
 interface ActivityRouteMapProps {
@@ -79,17 +89,19 @@ interface ActivityRouteMapProps {
 /**
  * What Performance shows for one metric: pace and heart rate by the activity's
  * own zones where COROS scored it against some, else a ramp from its slowest
- * stretch to its fastest; elevation by fixed heights.
+ * stretch to its fastest; elevation by fixed heights. Or why it shows nothing
+ * — `recorded` when the metric was recorded but cannot be placed on the route.
  */
 type PerformanceView =
   | { kind: "zones"; coloring: RouteZoneColoring }
   | { kind: "ramp"; coloring: RouteColoring }
-  | { kind: "elevation"; heights: (number | null)[] };
+  | { kind: "elevation"; heights: (number | null)[] }
+  | { kind: "none"; reason: string; recorded: boolean };
+
+type ShownView = Exclude<PerformanceView, { kind: "none" }>;
 
 /** Heights are coloured to the nearest 5 m, so a flat road is one line, not hundreds. */
 const ELEVATION_COLOR_STEP_M = 5;
-
-type RouteGeometry = RouteReplay;
 
 const ROUTE_COLOR = "#74c08f";
 const ROUTE_COLOR_PAPER = "#0f7f5f";
@@ -174,11 +186,10 @@ const ROUTE_METRIC_PREFERENCE = defineSelectionPreference<RouteMetric>({
   validate: selectionIsOneOf(ROUTE_METRICS)
 });
 
-const ROUTE_METRIC_LABELS: Record<RouteMetric, string> = {
-  pace: "Pace",
-  hr: "Heart rate",
-  elevation: "Elevation"
-};
+/** A metric's name. On a ride the pace channel is read out as speed. */
+function metricLabel(metric: RouteMetric, speed: boolean): string {
+  return metric === "pace" ? (speed ? "Speed" : "Pace") : metric === "hr" ? "Heart rate" : "Elevation";
+}
 
 /** Shared by the side-panel map and the full map, so a pick in one is the other's. */
 const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
@@ -314,16 +325,9 @@ interface Painter {
  * half way along the thirteenth stretch — which is what the curve is indexed
  * by.
  */
-function headPosition(route: RouteGeometry, progress: number): number {
+function headPosition(route: RouteReplay, progress: number): number {
   const { index, fraction } = replayHead(route, progress);
   return progress >= 1 ? route.latLngs.length - 1 : index + fraction;
-}
-
-/** The curve from point `from` to position `to` (see `headPosition`). */
-function curveBetween(curve: SmoothPath, from: number, to: number): [number, number][] {
-  const start = from * SMOOTH_STEPS;
-  const { points } = smoothPathTo(curve, to);
-  return points.slice(start);
 }
 
 /**
@@ -343,7 +347,7 @@ class LinePainter implements Painter {
 
   constructor(
     map: L.Map,
-    private readonly route: RouteGeometry,
+    private readonly route: RouteReplay,
     private readonly curve: SmoothPath,
     routeColor: string,
     stretchColors: readonly (string | null)[] | undefined
@@ -393,7 +397,7 @@ class LinePainter implements Painter {
     }
     return {
       start: this.curve.points[0]!,
-      head: smoothPathTo(this.curve, position).head
+      head: curveHead(this.curve, position)
     };
   }
 
@@ -404,6 +408,30 @@ class LinePainter implements Painter {
 
 /** Below Leaflet's overlay pane and the start and finish (`ROUTE_ENDS_PANE`). */
 const GLOW_PANE = "heraclesRouteGlow";
+
+/**
+ * How far past the viewport the heatmap's canvas reaches on each side, as a
+ * share of it: a drag shows what is already drawn at the edge it uncovers,
+ * for the frame before the redraw catches up.
+ */
+const GLOW_PADDING = 0.1;
+
+/**
+ * The halo is drawn and blurred at this share of the canvas's resolution — a
+ * quarter of the pixels, and a blur has no detail to lose — then laid on
+ * scaled back up. The blur is the one costly step of a frame.
+ */
+const HALO_SCALE = 0.5;
+
+/** Sizes a canvas's backing store, which clears and reallocates it — so only when it changes. */
+function fitCanvas(canvas: HTMLCanvasElement, width: number, height: number): void {
+  const w = Math.max(1, Math.floor(width));
+  const h = Math.max(1, Math.floor(height));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+}
 
 /**
  * The heatmap's line, drawn as neon on a canvas along the smoothed curve: a
@@ -426,21 +454,31 @@ const GLOW_PANE = "heraclesRouteGlow";
  * lapped route to the same white. The halo is drawn opaque on a canvas of its
  * own and then laid on faintly, so it is as wide once as it is thirteen times.
  *
- * The canvas covers the map's viewport and is redrawn when the view settles;
- * Leaflet hides it during a zoom animation (`leaflet-zoom-hide`), as it does
- * its own canvas renderer.
+ * The canvas covers the viewport and `GLOW_PADDING` around it, and is redrawn
+ * once a frame while the map moves — a drag included, so the line is never
+ * cut off at the edge of where the view was. Leaflet hides it during a zoom
+ * animation (`leaflet-zoom-hide`), as it does its own canvas renderer.
  */
 class GlowPainter implements Painter {
   private readonly canvas: HTMLCanvasElement;
   private readonly halo = document.createElement("canvas");
+  private readonly haloBlurred = document.createElement("canvas");
   private progress = 0;
-  private readonly redraw = () => this.draw();
+  private frame = 0;
+  private readonly schedule = () => {
+    if (this.frame === 0) {
+      this.frame = window.requestAnimationFrame(() => {
+        this.frame = 0;
+        this.draw();
+      });
+    }
+  };
   /** The heat's curve for the passes up to `head`, kept until the head moves on. */
   private shaped?: { head: number; curve: SmoothPath };
 
   constructor(
     private readonly map: L.Map,
-    private readonly route: RouteGeometry,
+    private readonly route: RouteReplay,
     private readonly drawing: Extract<RouteDrawing, { kind: "glow" }>
   ) {
     if (!map.getPane(GLOW_PANE)) {
@@ -448,7 +486,7 @@ class GlowPainter implements Painter {
     }
     this.canvas = L.DomUtil.create("canvas", "activity-route-glow leaflet-zoom-hide");
     map.getPane(GLOW_PANE)!.appendChild(this.canvas);
-    map.on("moveend zoomend resize viewreset", this.redraw);
+    map.on("move moveend zoomend resize viewreset", this.schedule);
   }
 
   setRouteColor(): void {
@@ -457,19 +495,19 @@ class GlowPainter implements Painter {
 
   paint(progress: number): PaintedEnds {
     this.progress = progress;
-    this.draw();
-    const position = headPosition(this.route, progress);
-    const curve = this.heatCurve(this.headStretch(position));
-    return { start: curve.points[0]!, head: smoothPathTo(curve, position).head };
+    window.cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    return this.draw();
+  }
+
+  remove(): void {
+    window.cancelAnimationFrame(this.frame);
+    this.map.off("move moveend zoomend resize viewreset", this.schedule);
+    this.canvas.remove();
   }
 
   private headStretch(position: number): number {
     return Math.min(this.route.latLngs.length - 2, Math.floor(position));
-  }
-
-  remove(): void {
-    this.map.off("moveend zoomend resize viewreset", this.redraw);
-    this.canvas.remove();
   }
 
   private heatCurve(head: number): SmoothPath {
@@ -482,26 +520,35 @@ class GlowPainter implements Painter {
     return this.shaped.curve;
   }
 
-  private draw(): void {
+  /** Draws the heat up to the head and returns where the line it drew starts and ends. */
+  private draw(): PaintedEnds {
     const { map, canvas, route, drawing } = this;
     const { heat } = drawing;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return;
-    }
-    const size = map.getSize();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint([0, 0]));
-    canvas.width = Math.max(1, Math.floor(size.x * ratio));
-    canvas.height = Math.max(1, Math.floor(size.y * ratio));
-    canvas.style.width = `${size.x}px`;
-    canvas.style.height = `${size.y}px`;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, size.x, size.y);
-
     const position = headPosition(route, this.progress);
     const head = this.headStretch(position);
     const curve = this.heatCurve(head);
+    const ends = { start: curve.points[0]!, head: curveHead(curve, position) };
+
+    const context = canvas.getContext("2d");
+    const halo = this.halo.getContext("2d");
+    const blurred = this.haloBlurred.getContext("2d");
+    if (!context || !halo || !blurred) {
+      return ends;
+    }
+    const size = map.getSize();
+    const pad = size.multiplyBy(GLOW_PADDING).round();
+    const width = size.x + 2 * pad.x;
+    const height = size.y + 2 * pad.y;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const haloRatio = ratio * HALO_SCALE;
+    L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint([-pad.x, -pad.y]));
+    fitCanvas(canvas, width * ratio, height * ratio);
+    fitCanvas(this.halo, width * haloRatio, height * haloRatio);
+    fitCanvas(this.haloBlurred, width * haloRatio, height * haloRatio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
 
     // The band of each stretch the head has reached, counting only the passes
     // it has made so far, as a share of the top band for the colours and width.
@@ -516,10 +563,11 @@ class GlowPainter implements Painter {
       return value;
     };
 
-    // The whole route up to the head, each curve point with its heat.
+    // The whole route up to the head, each curve point with its heat. The
+    // last point is the head itself, which falls short of the next sample.
     const points = curveBetween(curve, 0, position);
     const shares = points.map((_, k) => {
-      const at = k / SMOOTH_STEPS;
+      const at = Math.min(curve.along[k] ?? position, position);
       const lower = Math.min(head, Math.floor(at));
       const t = at - Math.floor(at);
       const here = share(lower);
@@ -528,25 +576,22 @@ class GlowPainter implements Painter {
       // the second half of each stretch so the colour turns at the joins.
       return t < 0.5 ? here : here + (next - here) * (t - 0.5) * 2;
     });
-    const pieces = [{ points, shares }];
 
-    // Consecutive pieces of one heat become one path, stroked once: fewer
+    // Consecutive points of one heat become one path, stroked once: fewer
     // strokes, and the curve's joins are the path's own round joins rather than
     // caps laid over each other. Where the heat turns, a piece stands alone
     // with a gradient along it.
     type Run = { points: L.Point[]; from: number; to: number };
     const runs: Run[] = [];
-    for (const piece of pieces) {
-      const projected = piece.points.map((latLng) => subpixelContainerPoint(map, latLng));
-      for (let k = 0; k < projected.length - 1; k += 1) {
-        const from = piece.shares[k]!;
-        const to = piece.shares[k + 1] ?? from;
-        const last = runs[runs.length - 1];
-        if (from === to && last && last.from === from && last.to === from) {
-          last.points.push(projected[k + 1]!);
-        } else {
-          runs.push({ points: [projected[k]!, projected[k + 1]!], from, to });
-        }
+    const projected = points.map((latLng) => subpixelContainerPoint(map, latLng).add(pad));
+    for (let k = 0; k < projected.length - 1; k += 1) {
+      const from = shares[k]!;
+      const to = shares[k + 1] ?? from;
+      const last = runs[runs.length - 1];
+      if (from === to && last && last.from === from && last.to === from) {
+        last.points.push(projected[k + 1]!);
+      } else {
+        runs.push({ points: [projected[k]!, projected[k + 1]!], from, to });
       }
     }
 
@@ -579,19 +624,20 @@ class GlowPainter implements Painter {
       }
     };
 
-    const halo = this.halo.getContext("2d");
-    if (halo) {
-      this.halo.width = canvas.width;
-      this.halo.height = canvas.height;
-      halo.setTransform(ratio, 0, 0, ratio, 0, 0);
-      stroke(halo, (share) => neonWidths(share).body + (drawing.darkGround ? 10 : 6), 0);
-      context.save();
-      context.setTransform(1, 0, 0, 1, 0, 0);
-      context.globalAlpha = drawing.darkGround ? 0.35 : 0.18;
-      context.filter = `blur(${(drawing.darkGround ? 7 : 4) * ratio}px)`;
-      context.drawImage(this.halo, 0, 0);
-      context.restore();
-    }
+    halo.setTransform(haloRatio, 0, 0, haloRatio, 0, 0);
+    halo.clearRect(0, 0, width, height);
+    stroke(halo, (share) => neonWidths(share).body + (drawing.darkGround ? 10 : 6), 0);
+    blurred.setTransform(1, 0, 0, 1, 0, 0);
+    blurred.clearRect(0, 0, this.haloBlurred.width, this.haloBlurred.height);
+    blurred.filter = `blur(${(drawing.darkGround ? 7 : 4) * haloRatio}px)`;
+    blurred.drawImage(this.halo, 0, 0);
+    blurred.filter = "none";
+    context.save();
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalAlpha = drawing.darkGround ? 0.35 : 0.18;
+    context.drawImage(this.haloBlurred, 0, 0, canvas.width, canvas.height);
+    context.restore();
+
     // The tube: the heat's colour at its edge, whitening layer by layer to a
     // white core — the core is what grows with the passes. The middle layers
     // sit nearer the core than an even split would put them, or the whitened
@@ -606,6 +652,7 @@ class GlowPainter implements Painter {
         whiten
       )
     );
+    return ends;
   }
 }
 
@@ -619,7 +666,7 @@ const NEON_LAYERS = [0, 0.25, 0.45, 0.65] as const;
 
 function createPainter(
   map: L.Map,
-  route: RouteGeometry,
+  route: RouteReplay,
   curve: SmoothPath,
   routeColor: string,
   drawing: RouteDrawing | undefined
@@ -648,7 +695,7 @@ function RouteMapCanvas({
   drawing,
   ariaLabel
 }: {
-  route: RouteGeometry;
+  route: RouteReplay;
   /**
    * How the route is drawn when it is coloured by what happened along it.
    * Absent, it is one line in the route's own colour.
@@ -685,6 +732,9 @@ function RouteMapCanvas({
   // Read when the map is built; a later change redraws in place.
   const drawingRef = useRef(drawing);
   drawingRef.current = drawing;
+  // What the map on screen is drawn with, so the redraw effect below can tell
+  // a change from what a rebuild has just drawn.
+  const drawnRef = useRef(drawing);
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
   const baseLayerPropRef = useRef(baseLayer);
@@ -742,6 +792,10 @@ function RouteMapCanvas({
 
     let currentRouteColor = routeColor;
     let painter = createPainter(map, route, curve, routeColor, drawingRef.current);
+    // A rebuild — a theme switch — can change the drawing in the same render;
+    // it is drawn here, and must not be drawn again by the redraw effect, which
+    // would also cut short the replay just begun.
+    drawnRef.current = drawingRef.current;
 
     const start = route.latLngs[0]!;
     const end = route.latLngs[route.latLngs.length - 1]!;
@@ -875,9 +929,7 @@ function RouteMapCanvas({
     }
   }, [replayToken]);
 
-  // Redraw in place. The first run is the build's own, which already drew
-  // this.
-  const drawnRef = useRef(drawing);
+  // Redraw in place, unless the build just drew this.
   useEffect(() => {
     if (drawnRef.current === drawing) {
       return;
@@ -930,34 +982,51 @@ function RouteLegend() {
   );
 }
 
+/**
+ * How a reading is written: pace as a clock per km or mile or, on a ride, as
+ * speed; heart rate in bpm. `unit` false leaves the unit off, for the first
+ * half of a range.
+ */
+function useReadout(metric: "pace" | "hr", speed: boolean) {
+  const { unitSystem } = useUnitSystem();
+  return (value: number, unit = true): string => {
+    if (metric === "hr") {
+      return unit ? `${Math.round(value)} bpm` : `${Math.round(value)}`;
+    }
+    if (speed) {
+      const figure = kmhToDisplaySpeed(3600 / value, unitSystem).toFixed(1);
+      return unit ? `${figure} ${speedUnit(unitSystem)}` : figure;
+    }
+    const pace = formatPaceSecondsPerKm(value, unitSystem);
+    return unit ? pace : pace.replace(/\s*\/\s*\S+$/, "");
+  };
+}
+
 /** The ramp under a route coloured without zones, with what its two ends stand for. */
 function RouteColorLegend({
   metric,
+  speed,
   coloring,
   ramp
 }: {
   metric: "pace" | "hr";
+  speed: boolean;
   coloring: RouteColoring;
   ramp: readonly string[];
 }) {
-  const { unitSystem } = useUnitSystem();
-  const label = (value: number) =>
-    metric === "pace"
-      ? formatPaceSecondsPerKm(value, unitSystem)
-      : `${Math.round(value)} bpm`;
-
+  const read = useReadout(metric, speed);
   return (
     <span
       className="activity-route-color-legend"
-      aria-label={`${ROUTE_METRIC_LABELS[metric]} from ${label(coloring.low)} to ${label(coloring.high)}`}
+      aria-label={`${metricLabel(metric, speed)} from ${read(coloring.low)} to ${read(coloring.high)}`}
     >
-      <span>{label(coloring.low)}</span>
+      <span>{read(coloring.low)}</span>
       <span className="activity-route-color-ramp" aria-hidden="true">
         {ramp.map((color) => (
           <i key={color} style={{ background: color }} />
         ))}
       </span>
-      <span>{label(coloring.high)}</span>
+      <span>{read(coloring.high)}</span>
     </span>
   );
 }
@@ -990,59 +1059,67 @@ function RouteElevationLegend({ lightGround }: { lightGround: boolean }) {
 }
 
 /**
- * The six zones in the zone bar's colours, laid out like the elevation ramp —
- * Z1 at one end, Z6 at the other — whether or not this activity reached them,
- * so the key reads the same on every run. Each zone's bounds are on hover, as
- * COROS scored the activity.
+ * COROS's buckets for the metric in the zone bar's colours and names, slowest
+ * or lowest first, each one's bounds on hover as COROS scored the activity.
  */
 function RouteZoneLegend({
   metric,
+  speed,
   coloring
 }: {
   metric: "pace" | "hr";
+  speed: boolean;
   coloring: RouteZoneColoring;
 }) {
-  const { unitSystem } = useUnitSystem();
-  const pace = (value: number) => formatPaceSecondsPerKm(value, unitSystem);
-  // The first zone has no floor and the last no honest ceiling — COROS fills
-  // it with a sentinel (401 bpm, 2:42/km) — so both read open-ended.
-  const bounds = ({ low, high }: ZoneRange, zone: number) => {
-    const first = zone === 1;
-    const last = zone === ZONE_COUNT;
+  const read = useReadout(metric, speed);
+  const { buckets } = coloring;
+  // Bucket 0 has no floor and the top bucket no honest ceiling — COROS fills
+  // it with a sentinel (404 bpm, 2:42/km) — so both read open-ended. A pace
+  // bucket's `low` is its fast edge.
+  const bounds = ({ index, low, high }: (typeof buckets)[number], position: number) => {
+    const bottom = index === 0;
+    const top = position === buckets.length - 1;
     if (metric === "hr") {
-      if (first) return high !== undefined ? `under ${Math.round(high)} bpm` : undefined;
-      if (last) return low !== undefined ? `over ${Math.round(low)} bpm` : undefined;
+      if (bottom) return high !== undefined ? `under ${read(high)}` : undefined;
+      if (top) return low !== undefined ? `over ${read(low)}` : undefined;
       return low !== undefined && high !== undefined
-        ? `${Math.round(low)}–${Math.round(high)} bpm`
+        ? `${read(low, false)}–${read(high)}`
         : undefined;
     }
-    if (first) return low !== undefined ? `slower than ${pace(low)}` : undefined;
-    if (last) return high !== undefined ? `faster than ${pace(high)}` : undefined;
-    return low !== undefined && high !== undefined
-      ? `${pace(low).replace(/\s*\/\s*\w+$/, "")}–${pace(high)}`
-      : undefined;
+    if (bottom) {
+      return low === undefined ? undefined : speed ? `under ${read(low)}` : `slower than ${read(low)}`;
+    }
+    if (top) {
+      return high === undefined ? undefined : speed ? `over ${read(high)}` : `faster than ${read(high)}`;
+    }
+    if (low === undefined || high === undefined) {
+      return undefined;
+    }
+    return speed ? `${read(high, false)}–${read(low)}` : `${read(low, false)}–${read(high)}`;
   };
+  const first = zoneLabel(buckets[0]!.index);
+  const last = zoneLabel(buckets[buckets.length - 1]!.index);
 
   return (
     <span
       className="activity-route-color-legend"
-      aria-label={`${metric === "hr" ? "Heart rate" : "Pace"} zones, Z1 to Z${ZONE_COUNT}`}
+      aria-label={`${metricLabel(metric, speed)} zones, ${first} to ${last}`}
     >
-      <span>Z1</span>
+      <span>{first}</span>
       <span className="activity-route-color-ramp">
-        {ZONE_COLORS.map((color, position) => {
-          const zone = position + 1;
-          const range = bounds(coloring.ranges[position] ?? {}, zone);
+        {buckets.map((bucket, position) => {
+          const range = bounds(bucket, position);
+          const name = zoneLabel(bucket.index);
           return (
             <i
-              key={zone}
-              style={{ background: color }}
-              title={range ? `Z${zone} · ${range}` : `Z${zone}`}
+              key={bucket.index}
+              style={{ background: zoneColor(bucket.index) }}
+              title={range ? `${name} · ${range}` : name}
             />
           );
         })}
       </span>
-      <span>Z{ZONE_COUNT}</span>
+      <span>{last}</span>
     </span>
   );
 }
@@ -1073,61 +1150,116 @@ function useRouteMapLayers(): RouteMapLayers {
 }
 
 /**
- * How a route is drawn under the layer choices: what Performance can show for
- * each metric, the mode and metric after falling back to what this activity
- * recorded, the drawing itself, and the layer menu's section for picking the
- * mode. Shared by the small map, the cover and the full map, so all three
- * draw the route the same way.
+ * What a route can be coloured by under the layer choices, worked out once by
+ * whatever owns a map and the full map it opens, and read by both: what
+ * Performance can show for each metric, the mode and metric after falling back
+ * to what this activity recorded, the heat, and the layer menu's section.
  */
-function useRouteColoring(
-  route: RouteGeometry,
+interface RouteAnalysis {
+  performance: Record<RouteMetric, PerformanceView>;
+  metric: RouteMetric;
+  mode: RouteColorMode;
+  /** What Performance draws, when it is the mode. */
+  view: ShownView | null;
+  /** The pass count, when the heatmap is the mode. */
+  heat: RouteHeat | null;
+  /** A ride: its pace is read out as speed. */
+  speed: boolean;
+  layerSection: MapLayerSection<RouteColorMode>;
+}
+
+function useRouteAnalysis(
+  route: RouteReplay,
   detail: RouteDetail | undefined,
-  layers: RouteMapLayers,
-  lightGround: boolean
-) {
-  const performance = useMemo(() => {
+  layers: RouteMapLayers
+): RouteAnalysis {
+  const speed = isSpeedSport(detail?.sportType, detail?.sportName);
+  const performance = useMemo((): Record<RouteMetric, PerformanceView> => {
     const series = detail?.series ?? [];
-    const view = (metric: RouteMetric): PerformanceView | null => {
-      if (metric === "elevation") {
-        const heights = elevationColoring(route);
-        return heights ? { kind: "elevation", heights } : null;
+    const timed = (metric: "pace" | "hr"): PerformanceView => {
+      const label = metricLabel(metric, speed);
+      const stretches = stretchValues(route, series, metric);
+      if ("missing" in stretches) {
+        return stretches.missing === "unrecorded"
+          ? { kind: "none", reason: `No ${label.toLowerCase()} recorded`, recorded: false }
+          : {
+              kind: "none",
+              reason: `${label} was recorded, but the GPS track has no timing to place it along the route`,
+              recorded: true
+            };
       }
       const zones = zoneColoring(
-        route,
-        series,
+        stretches.values,
         metric,
         metric === "hr" ? detail?.hrZones : detail?.paceZones
       );
-      if (zones) {
-        return { kind: "zones", coloring: zones };
-      }
-      const ramp = performanceColoring(route, series, metric);
-      return ramp ? { kind: "ramp", coloring: ramp } : null;
+      return zones
+        ? { kind: "zones", coloring: zones }
+        : { kind: "ramp", coloring: performanceColoring(stretches.values, metric) };
     };
-    return Object.fromEntries(ROUTE_METRICS.map((metric) => [metric, view(metric)])) as Record<
-      RouteMetric,
-      PerformanceView | null
-    >;
-  }, [route, detail]);
+    const heights = elevationColoring(route);
+    return {
+      pace: timed("pace"),
+      hr: timed("hr"),
+      elevation: heights
+        ? { kind: "elevation", heights }
+        : { kind: "none", reason: "No elevation recorded", recorded: false }
+    };
+  }, [route, detail, speed]);
 
   // A choice this activity cannot show falls back rather than drawing nothing:
   // a metric it did not record to the first one it did, and Performance with
   // nothing recorded at all to the plain route.
-  const metric =
-    performance[layers.metric] !== null
-      ? layers.metric
-      : ROUTE_METRICS.find((candidate) => performance[candidate] !== null) ??
-        layers.metric;
+  const shows = (candidate: RouteMetric) => performance[candidate].kind !== "none";
+  const metric = shows(layers.metric)
+    ? layers.metric
+    : ROUTE_METRICS.find(shows) ?? layers.metric;
   const mode =
-    layers.colorMode === "performance" && performance[metric] === null
-      ? "route"
-      : layers.colorMode;
-  const view = mode === "performance" ? performance[metric] : null;
+    layers.colorMode === "performance" && !shows(metric) ? "route" : layers.colorMode;
+  const current = performance[metric];
+  const view = mode === "performance" && current.kind !== "none" ? current : null;
   // Counted only once the heatmap is asked for: it samples the route every 2 m.
   const heatmapShown = mode === "heatmap";
   const heat = useMemo(() => (heatmapShown ? routeHeat(route) : null), [route, heatmapShown]);
 
-  const drawing = useMemo((): RouteDrawing | undefined => {
+  const nothingShown = !ROUTE_METRICS.some(shows);
+  const somethingRecorded = ROUTE_METRICS.some((candidate) => {
+    const entry = performance[candidate];
+    return entry.kind === "none" && entry.recorded;
+  });
+  const layerSection: MapLayerSection<RouteColorMode> = {
+    title: "Route",
+    value: mode,
+    onChange: layers.setColorMode,
+    options: [
+      { value: "route", label: "Route", description: "One line in the route's colour" },
+      {
+        value: "performance",
+        label: "Performance",
+        description: !nothingShown
+          ? `${metricLabel("pace", speed)}, heart rate or elevation`
+          : somethingRecorded
+            ? "Nothing recorded can be placed along this route"
+            : "Nothing recorded along this route",
+        disabled: nothingShown
+      },
+      {
+        value: "heatmap",
+        label: "Heatmap",
+        description: "Hotter where it was passed more often"
+      }
+    ]
+  };
+
+  return { performance, metric, mode, view, heat, speed, layerSection };
+}
+
+/** How one map draws the analysed route on its ground: the colours read on it. */
+function useRouteDrawing(
+  { view, heat }: RouteAnalysis,
+  lightGround: boolean
+): RouteDrawing | undefined {
+  return useMemo((): RouteDrawing | undefined => {
     if (heat) {
       return {
         kind: "glow",
@@ -1153,41 +1285,14 @@ function useRouteColoring(
         )
       };
     }
-    // A zone is numbered from 1; a ramp step from 0.
+    const ramp = routeRamp(lightGround);
     const colorOf =
-      view.kind === "zones"
-        ? (step: number) => ZONE_COLORS[step - 1]!
-        : (step: number) => routeRamp(lightGround)[step]!;
+      view.kind === "zones" ? zoneColor : (step: number) => ramp[step]!;
     return {
       kind: "lines",
       stretchColors: view.coloring.steps.map((step) => (step === null ? null : colorOf(step)))
     };
   }, [view, heat, lightGround]);
-
-  const nothingRecorded = ROUTE_METRICS.every((m) => performance[m] === null);
-  const layerSection: MapLayerSection<RouteColorMode> = {
-    title: "Route",
-    value: mode,
-    onChange: layers.setColorMode,
-    options: [
-      { value: "route", label: "Route", description: "One line in the route's colour" },
-      {
-        value: "performance",
-        label: "Performance",
-        description: nothingRecorded
-          ? "Nothing recorded along this route"
-          : "Pace, heart rate or elevation",
-        disabled: nothingRecorded
-      },
-      {
-        value: "heatmap",
-        label: "Heatmap",
-        description: "Hotter where it was passed more often"
-      }
-    ]
-  };
-
-  return { performance, metric, mode, view, drawing, layerSection };
 }
 
 /**
@@ -1206,7 +1311,7 @@ function RouteMapFrame({
   onReplay,
   layerSection
 }: {
-  route: RouteGeometry;
+  route: RouteReplay;
   layers: RouteMapLayers;
   /** How the route is coloured, offered in the layer menu below the base maps. */
   layerSection?: MapLayerSection<RouteColorMode>;
@@ -1256,37 +1361,39 @@ function RouteMapFrame({
 /**
  * The route on the whole window, with the layer picker. One component for
  * every way in — the Expand link under the side-panel map and a route cover —
- * so the two cannot drift apart.
+ * so the two cannot drift apart. It reads the analysis its opener already made.
  */
 function RouteMapModal({
   route,
-  detail,
+  analysis,
   layers,
   onClose
 }: {
-  route: RouteGeometry;
-  detail?: RouteDetail;
+  route: RouteReplay;
+  analysis: RouteAnalysis;
   layers: RouteMapLayers;
   onClose: () => void;
 }) {
   const [replayToken, setReplayToken] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const lightGround = isLightBaseLayer(layers.baseLayer);
-  const { performance, metric, mode, view, drawing, layerSection } = useRouteColoring(
-    route,
-    detail,
-    layers,
-    lightGround
-  );
+  const drawing = useRouteDrawing(analysis, lightGround);
+  const { performance, metric, mode, view, speed, layerSection } = analysis;
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
     // answer Escape itself — a run's page goes back to the list on it — and one
-    // key press should close one thing.
+    // key press should close one thing. An open layer menu is that one thing:
+    // the Escape is left to it.
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
+      if (event.key !== "Escape") {
+        return;
       }
+      if (dialogRef.current && hasOpenLayerMenu(dialogRef.current)) {
+        return;
+      }
+      event.stopPropagation();
+      onClose();
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
@@ -1295,6 +1402,7 @@ function RouteMapModal({
 
   return createPortal(
     <div
+      ref={dialogRef}
       className="activity-route-modal-backdrop"
       role="dialog"
       aria-modal="true"
@@ -1337,27 +1445,30 @@ function RouteMapModal({
                 <OptionGroup
                   label="Performance metric"
                   value={metric}
-                  options={ROUTE_METRICS.map((m) => ({
-                    value: m,
-                    label: ROUTE_METRIC_LABELS[m],
-                    disabled: performance[m] === null,
-                    ...(performance[m] === null
-                      ? { title: `No ${ROUTE_METRIC_LABELS[m].toLowerCase()} recorded` }
-                      : {})
-                  }))}
+                  options={ROUTE_METRICS.map((candidate) => {
+                    const entry = performance[candidate];
+                    return {
+                      value: candidate,
+                      label: metricLabel(candidate, speed),
+                      disabled: entry.kind === "none",
+                      ...(entry.kind === "none" ? { title: entry.reason } : {})
+                    };
+                  })}
                   onChange={layers.setMetric}
                 />
               ) : null}
-              {mode === "heatmap" ? null : view?.kind === "elevation" ? (
+              {view?.kind === "elevation" ? (
                 <RouteElevationLegend lightGround={lightGround} />
               ) : view?.kind === "zones" ? (
                 <RouteZoneLegend
                   metric={metric === "pace" ? "pace" : "hr"}
+                  speed={speed}
                   coloring={view.coloring}
                 />
-              ) : view ? (
+              ) : view?.kind === "ramp" ? (
                 <RouteColorLegend
                   metric={metric === "pace" ? "pace" : "hr"}
+                  speed={speed}
                   coloring={view.coloring}
                   ramp={routeRamp(lightGround)}
                 />
@@ -1373,13 +1484,21 @@ function RouteMapModal({
 }
 
 /**
+ * The points a route map draws: the track's own route where the main process
+ * made one, else the shared points — a track merged from two sources.
+ */
+function routePoints(track?: TrainingHubActivityTrack): TrainingHubTrackPoint[] {
+  return track?.route ?? track?.points ?? [];
+}
+
+/**
  * Whether a track has enough located points to draw a route at all — the same
  * test `buildRouteReplay` applies, without building the geometry the cover
  * is about to build anyway.
  */
 export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
   let located = 0;
-  for (const point of track?.points ?? []) {
+  for (const point of routePoints(track)) {
     if (point.lat !== undefined && point.lon !== undefined && ++located >= 2) {
       return true;
     }
@@ -1387,11 +1506,12 @@ export function hasActivityRoute(track?: TrainingHubActivityTrack): boolean {
   return false;
 }
 
+function useRouteReplay(track?: TrainingHubActivityTrack): RouteReplay | null {
+  return useMemo(() => buildRouteReplay(routePoints(track)), [track]);
+}
+
 export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
-  const route = useMemo(
-    () => (track?.points ? buildRouteReplay(track.points) : null),
-    [track]
-  );
+  const route = useRouteReplay(track);
 
   if (!route) {
     return (
@@ -1406,16 +1526,12 @@ export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
 }
 
 /** The side-panel map once there is a route, drawn the way the layer menu says. */
-function RoutePreviewMap({ route, detail }: { route: RouteGeometry; detail?: RouteDetail }) {
+function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: RouteDetail }) {
   const layers = useRouteMapLayers();
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
-  const { drawing, layerSection } = useRouteColoring(
-    route,
-    detail,
-    layers,
-    isLightBaseLayer(layers.baseLayer)
-  );
+  const analysis = useRouteAnalysis(route, detail, layers);
+  const drawing = useRouteDrawing(analysis, isLightBaseLayer(layers.baseLayer));
 
   return (
     <div className="activity-route-map">
@@ -1426,7 +1542,7 @@ function RoutePreviewMap({ route, detail }: { route: RouteGeometry; detail?: Rou
         // A quick look: the whole route at once. The full map replays it.
         animate={false}
         drawing={drawing}
-        layerSection={layerSection}
+        layerSection={analysis.layerSection}
         ariaLabel="Activity route map"
       />
       <div className="activity-route-footer">
@@ -1443,7 +1559,7 @@ function RoutePreviewMap({ route, detail }: { route: RouteGeometry; detail?: Rou
       {expanded ? (
         <RouteMapModal
           route={route}
-          detail={detail}
+          analysis={analysis}
           layers={layers}
           onClose={closeExpanded}
         />
@@ -1472,10 +1588,7 @@ export function ActivityRouteCover({
   className,
   visibleBand
 }: ActivityRouteCoverProps) {
-  const route = useMemo(
-    () => (track?.points ? buildRouteReplay(track.points) : null),
-    [track]
-  );
+  const route = useRouteReplay(track);
 
   return route ? (
     <RouteCover
@@ -1497,7 +1610,7 @@ function RouteCover({
   className,
   visibleBand
 }: {
-  route: RouteGeometry;
+  route: RouteReplay;
   detail?: RouteDetail;
   className?: string;
   visibleBand?: number;
@@ -1506,14 +1619,10 @@ function RouteCover({
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
   const [creditOpen, toggleCredit] = useFoldingCredit();
+  const analysis = useRouteAnalysis(route, detail, layers);
   // The cover draws on the theme's own base map, whatever the full map shows.
   const { theme } = useTheme();
-  const { drawing } = useRouteColoring(
-    route,
-    detail,
-    layers,
-    isLightBaseLayer(themeBaseLayer(theme))
-  );
+  const drawing = useRouteDrawing(analysis, isLightBaseLayer(themeBaseLayer(theme)));
 
   return (
     <>
@@ -1557,7 +1666,7 @@ function RouteCover({
       {expanded ? (
         <RouteMapModal
           route={route}
-          detail={detail}
+          analysis={analysis}
           layers={layers}
           onClose={closeExpanded}
         />
