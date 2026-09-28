@@ -14172,8 +14172,8 @@ tr.data-intervals-row-missing {
  * Every keyless raster style is a daylight one, so a machine without WebGL was
  * handed a bright white map in a dark app. Inverting and rotating the hue back
  * turns it into a serviceable dark map — land dark, water blue, labels light.
- * Only the base map's own pane is touched, so the route line, the markers and
- * the trail overlays above it keep their real colours.
+ * Only the base map's own pane is touched, so the route line and the markers
+ * above it keep their real colours.
  */
 :root:not([data-theme="paper"]) .is-basemap-fallback .leaflet-heraclesBasemap-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.86) contrast(1.06)
@@ -22567,19 +22567,6 @@ tr.data-intervals-row-missing {
 }
 .basemap-option.is-active strong {
   color: var(--accent-strong);
-}
-.basemap-divider {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--glass-border);
-}
-.basemap-swatch {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 6px;
-  border-radius: var(--radius-pill);
-  vertical-align: baseline;
 }
 /* ==========================================================================
  * PAPER THEME OVERRIDES

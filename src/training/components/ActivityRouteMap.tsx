@@ -6,12 +6,9 @@ import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type { TrainingHubActivityTrack } from "../../../electron/types";
 import {
   BASE_LAYERS,
-  TRAIL_OVERLAY_LAYERS,
-  TRAIL_OVERLAY_ORDER,
   isLightBaseLayer,
   type BaseLayerConfig,
-  type BaseLayerId,
-  type TrailOverlayId
+  type BaseLayerId
 } from "../../mapBase/constants";
 import { createBaseLayer } from "../../mapBase/baseLayers";
 import {
@@ -29,12 +26,6 @@ import {
   replayPath,
   type RouteReplay
 } from "./routeReplay";
-import {
-  defineSelectionPreference,
-  selectionIsArrayOf,
-  selectionIsOneOf,
-  useSelectionPreference
-} from "../../preferences/selectionPreferences";
 
 interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
@@ -51,16 +42,6 @@ const END_COLOR = "#d89b22";
 const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
   "training.activityRoute.baseLayer"
 );
-
-const ACTIVITY_ROUTE_OVERLAYS_PREFERENCE =
-  defineSelectionPreference<TrailOverlayId[]>({
-    key: "training.activityRoute.overlays",
-    defaultValue: [],
-    validate: selectionIsArrayOf(
-      selectionIsOneOf(TRAIL_OVERLAY_ORDER),
-      { unique: true }
-    )
-  });
 
 interface MapStyle {
   tile: BaseLayerConfig;
@@ -84,7 +65,6 @@ function RouteMapCanvas({
   interactive = true,
   visibleBand,
   baseLayer,
-  overlays,
   animate = true,
   replayToken = 0,
   ariaLabel
@@ -112,7 +92,6 @@ function RouteMapCanvas({
    */
   visibleBand?: number;
   baseLayer?: BaseLayerId;
-  overlays?: TrailOverlayId[];
   ariaLabel: string;
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -120,7 +99,6 @@ function RouteMapCanvas({
   const tileLayerRef = useRef<L.Layer | null>(null);
   const ghostLineRef = useRef<L.Polyline | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
-  const overlayLayersRef = useRef(new Map<TrailOverlayId, L.TileLayer>());
   const replayRef = useRef<(() => void) | null>(null);
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
@@ -278,7 +256,6 @@ function RouteMapCanvas({
       tileLayerRef.current = null;
       ghostLineRef.current = null;
       routeLineRef.current = null;
-      overlayLayersRef.current.clear();
     };
   }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
 
@@ -313,44 +290,6 @@ function RouteMapCanvas({
     appliedBaseLayerRef.current = baseLayer;
   }, [baseLayer, theme]);
 
-  // Sync Waymarked Trails overlays with the selection. The dependency list
-  // carries every one of the init effect's, because that effect's cleanup
-  // empties `overlayLayersRef`: a rebuild this one did not follow would leave
-  // the overlays gone with nothing to put them back.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) {
-      return;
-    }
-
-    const wanted = overlays ?? [];
-    const active = overlayLayersRef.current;
-
-    for (const [id, layer] of active) {
-      if (!wanted.includes(id)) {
-        map.removeLayer(layer);
-        active.delete(id);
-      }
-    }
-
-    for (const id of wanted) {
-      if (active.has(id)) {
-        continue;
-      }
-      const config = TRAIL_OVERLAY_LAYERS[id];
-      const layer = L.tileLayer(config.url, {
-        // `maxZoom` is the base map's to set, not an overlay's: an overlay
-        // that ran out of tiles used to drag the whole map's zoom limit down
-        // with it. `maxNativeZoom` stretches its last real tile instead.
-        maxNativeZoom: config.maxZoom,
-        attribution: config.attribution,
-        opacity: 0.85
-      });
-      layer.addTo(map);
-      active.set(id, layer);
-    }
-  }, [overlays, route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
-
   return (
     <div
       ref={mapContainerRef}
@@ -374,8 +313,6 @@ function RouteLegend() {
 interface RouteMapLayers {
   baseLayer: BaseLayerId;
   setBaseLayer: (layer: BaseLayerId) => void;
-  overlays: TrailOverlayId[];
-  toggleOverlay: (overlay: TrailOverlayId) => void;
 }
 
 /**
@@ -386,19 +323,7 @@ function useRouteMapLayers(): RouteMapLayers {
   const [baseLayer, setBaseLayer] = useBaseLayerPreference(
     ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE
   );
-  const [overlays, setOverlays] = useSelectionPreference(
-    ACTIVITY_ROUTE_OVERLAYS_PREFERENCE
-  );
-  const toggleOverlay = useCallback(
-    (id: TrailOverlayId) =>
-      setOverlays((prev) =>
-        prev.includes(id)
-          ? prev.filter((overlay) => overlay !== id)
-          : [...prev, id]
-      ),
-    [setOverlays]
-  );
-  return { baseLayer, setBaseLayer, overlays, toggleOverlay };
+  return { baseLayer, setBaseLayer };
 }
 
 /**
@@ -434,15 +359,9 @@ function RouteMapFrame({
         animate={animate}
         replayToken={replayToken}
         baseLayer={layers.baseLayer}
-        overlays={layers.overlays}
         ariaLabel={ariaLabel}
       />
-      <MapLayerControl
-        value={layers.baseLayer}
-        onChange={layers.setBaseLayer}
-        overlays={layers.overlays}
-        onToggleOverlay={layers.toggleOverlay}
-      />
+      <MapLayerControl value={layers.baseLayer} onChange={layers.setBaseLayer} />
       {onReplay ? (
         // The layer picker's own look: one kind of button in that corner.
         <button

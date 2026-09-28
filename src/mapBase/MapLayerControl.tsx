@@ -1,25 +1,14 @@
 import { Layers, X } from "lucide-react";
 import { useState } from "react";
-import {
-  BASE_LAYERS,
-  BASE_LAYER_ORDER,
-  TRAIL_OVERLAY_LAYERS,
-  TRAIL_OVERLAY_ORDER,
-  type BaseLayerId,
-  type TrailOverlayId
-} from "./constants";
+import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./constants";
 
-/** Floating base-map switcher (bottom-right of the map). */
+/** Floating base-map switcher (top-right of the map). */
 export function MapLayerControl({
   value,
-  onChange,
-  overlays,
-  onToggleOverlay
+  onChange
 }: {
   value: BaseLayerId;
   onChange: (layer: BaseLayerId) => void;
-  overlays?: TrailOverlayId[];
-  onToggleOverlay?: (overlay: TrailOverlayId) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -54,37 +43,6 @@ export function MapLayerControl({
               </button>
             );
           })}
-          {overlays && onToggleOverlay && (
-            <>
-              <div className="basemap-divider" />
-              <div className="basemap-head">
-                <span>Trail overlays</span>
-              </div>
-              {TRAIL_OVERLAY_ORDER.map((id) => {
-                const config = TRAIL_OVERLAY_LAYERS[id];
-                const active = overlays.includes(id);
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`basemap-option${active ? " is-active" : ""}`}
-                    aria-pressed={active}
-                    onClick={() => onToggleOverlay(id)}
-                  >
-                    <strong>
-                      <span
-                        className="basemap-swatch"
-                        style={{ background: config.swatch }}
-                        aria-hidden="true"
-                      />
-                      {config.label}
-                    </strong>
-                    <em>{config.description}</em>
-                  </button>
-                );
-              })}
-            </>
-          )}
         </div>
       ) : (
         <button

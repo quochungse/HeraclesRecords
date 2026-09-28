@@ -1333,8 +1333,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`ActivityRouteMap`) and the globe's street view (`ActivityGlobeStreetMap`). What they need
   is `constants.ts` (the styles), `baseLayers.ts` (`createBaseLayer`), `onewayArrows.ts` and
   `MapLayerControl.tsx`, and that is the whole of the directory. The route-flavoured names
-  went with the screen: `BASE_LAYERS`, `BASE_LAYER_ORDER`, `BaseLayerId`,
-  `TRAIL_OVERLAY_LAYERS`, `TrailOverlayId`, and `.basemap-*` in the CSS.
+  went with the screen: `BASE_LAYERS`, `BASE_LAYER_ORDER`, `BaseLayerId`, and `.basemap-*`
+  in the CSS. **There are no trail overlays** (removed 2026-09-28): the Waymarked Trails
+  hiking/cycle/MTB layers draw only routes someone has mapped as OSM route relations, and a
+  probe of their tiles found none at all around Hanoi, Ba Vì or Đà Lạt — a switch that turned
+  on nothing, with nothing to say so.
   **Base map styles all live in `BASE_LAYERS` (`src/mapBase/constants.ts`) and must
   stay keyless** — the app holds no map provider key, offers no field to enter one, and bakes
   none into the build, so a style that needs one is not a degraded map, it is no map.
@@ -1350,8 +1353,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   Three things hold the vector path up, and all are load-bearing:
   **`createBaseLayer` (`baseLayers.ts`) is the only way to build a base layer** — raster or
   vector — so no screen has to know which kind it asked for, and every base map lands in the
-  `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where trail overlays and
-  track lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
+  `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where track lines and
+  markers always draw on top. That pane replaced the `bringToBack()` calls the raster-only
   code needed on every swap; a vector layer has no `bringToBack()` to call.
   **It also binds the map's max zoom, and that is not decoration.** Leaflet reads a zoom limit
   off a layer in exactly one place — `GridLayer.beforeAdd` — so a raster base map bounded the
@@ -1360,8 +1363,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   `getMaxZoom()`, so a track whose points share one spot resolves to zoom `Infinity`, the
   pixel origin goes infinite with it, and every polyline collapses to `M0 0` — a blank map on
   the two screens whose *default* style is vector. `createBaseLayer` calls `setMaxZoom` for
-  both kinds, which is also why the trail overlays carry `maxNativeZoom` rather than
-  `maxZoom`: an overlay must stretch its last tile, not drag the base map's zoom limit down.
+  both kinds. Any tile layer added over a base map must carry `maxNativeZoom` rather than
+  `maxZoom`: it has to stretch its last tile, not drag the base map's zoom limit down.
   **One-way arrows are corrected here, not taken as given** (`onewayArrows.ts`). OpenFreeMap's
   `oneway` sprite icon is drawn pointing up, while MapLibre rotates a line-placed icon so the
   icon's *horizontal* axis follows the line — so an unrotated icon lands across the road
