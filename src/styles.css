@@ -22609,6 +22609,18 @@ tr.data-intervals-row-missing {
 .basemap-option.is-active strong {
   color: var(--accent-strong);
 }
+.basemap-option:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.basemap-option:disabled:hover {
+  background: transparent;
+}
+.basemap-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--glass-border);
+}
 /* ==========================================================================
  * PAPER THEME OVERRIDES
  * Hardcoded hex/rgba values that bypass the token system and would otherwise

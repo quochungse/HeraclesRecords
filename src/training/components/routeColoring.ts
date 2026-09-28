@@ -19,36 +19,99 @@ export type RouteMetric = "pace" | "hr" | "elevation";
 export const RAMP_STEPS = 5;
 
 /**
- * Sequential ramps, weakest step first, each with a version for either ground.
- * Validated with the dataviz skill's `validate_palette.js --ordinal` against
- * light and dark surfaces: monotone lightness, every step ≥ 0.06 ΔL from the
- * next, the weak end ≥ 2:1 on its ground.
- *
- * Performance's elevation ramp is one hue, blue, and "more" is the step that
- * stands out from the ground — darker on a daylight map, lighter on a dark one.
- *
- * Heatmap is a multi-hue ramp on purpose, light yellow → deep yellow → orange →
- * red → deep red (ColorBrewer's YlOrRd on a dark ground), because a count read
- * off one hue in five shades was too hard to tell apart — so it fails only the
- * validator's single-hue check, which is the point. On a daylight map the pale
- * yellow vanished (1.01:1), so that ramp starts at a deeper yellow.
+ * The ramp pace and heart rate fall back to on an activity COROS scored against
+ * no zones, weakest step first, with a version for either ground: one hue,
+ * blue, and "more" is the step that stands out from the ground — darker on a
+ * daylight map, lighter on a dark one. It spans that activity's own range,
+ * because without zones there is nothing fixed to measure against.
  */
-const RAMPS = {
-  performance: {
-    light: ["#86b6ef", "#3987e5", "#256abf", "#184f95", "#0d366b"],
-    dark: ["#184f95", "#2a78d6", "#6da7ec", "#9ec5f4", "#cde2fb"]
-  },
-  heatmap: {
-    light: ["#d9a800", "#e07a00", "#d9531a", "#bf2420", "#7e0a1a"],
-    dark: ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]
-  }
+const PERFORMANCE_RAMP = {
+  light: ["#86b6ef", "#3987e5", "#256abf", "#184f95", "#0d366b"],
+  dark: ["#184f95", "#2a78d6", "#6da7ec", "#9ec5f4", "#cde2fb"]
 } as const;
 
-export function routeRamp(
-  mode: Exclude<RouteColorMode, "route">,
-  lightGround: boolean
-): readonly string[] {
-  return RAMPS[mode][lightGround ? "light" : "dark"];
+export function routeRamp(lightGround: boolean): readonly string[] {
+  return PERFORMANCE_RAMP[lightGround ? "light" : "dark"];
+}
+
+/**
+ * Elevation is coloured against fixed heights, green → yellow → orange → red,
+ * and blended between them — so a height is the same colour on every activity,
+ * and a run along the Red River reads green beside a Da Lat run's orange rather
+ * than both being stretched over the whole ramp. Past the last stop is red.
+ */
+export const ELEVATION_STOPS = [0, 250, 750, 1500] as const;
+const ELEVATION_COLORS = {
+  light: ["#2f9e44", "#e6a700", "#f76707", "#e03131"],
+  dark: ["#51cf66", "#ffd43b", "#ff922b", "#fa5252"]
+} as const;
+
+export function elevationColors(lightGround: boolean): readonly string[] {
+  return ELEVATION_COLORS[lightGround ? "light" : "dark"];
+}
+
+/** The colour of a height in metres, on the fixed stops. */
+export function elevationColor(meters: number, lightGround: boolean): string {
+  const colors = elevationColors(lightGround);
+  const last = ELEVATION_STOPS.length - 1;
+  if (meters <= ELEVATION_STOPS[0]) {
+    return mixColor(colors[0]!, colors[0]!, 0);
+  }
+  for (let index = 0; index < last; index += 1) {
+    const low = ELEVATION_STOPS[index]!;
+    const high = ELEVATION_STOPS[index + 1]!;
+    if (meters <= high) {
+      return mixColor(colors[index]!, colors[index + 1]!, (meters - low) / (high - low));
+    }
+  }
+  return mixColor(colors[last]!, colors[last]!, 0);
+}
+
+/**
+ * The heatmap's bands, by how many times a stretch was passed — fixed counts,
+ * not a share of this activity's most, so twelve laps of a track read the same
+ * red on every session.
+ */
+export const HEAT_BANDS = [
+  { most: 1 },
+  { most: 4 },
+  { most: 8 },
+  { most: 12 },
+  { most: Number.POSITIVE_INFINITY }
+] as const;
+
+/**
+ * Green, yellow, orange, red, deep red — the order heat rises in, so the
+ * colours read cool to hot without a key. Deeper on a daylight map so the
+ * yellow shows. The reds lean warm (little blue in them): a cool crimson
+ * whitened towards the neon's core turns pink.
+ */
+const HEAT_COLORS = {
+  light: ["#2f9e44", "#e6a700", "#f76707", "#e03131", "#a51d0f"],
+  dark: ["#51cf66", "#ffd43b", "#ff922b", "#f03e3e", "#c81d11"]
+} as const;
+
+/**
+ * What each band's neon core whitens towards. White, but for the reds a pale
+ * orange: red mixed with white is pink, which reads as nothing that glows,
+ * where a red-hot line has a hotter, yellower core.
+ */
+const HEAT_CORE = "#ffffff";
+const HEAT_CORE_RED = "#ffc88c";
+const HEAT_CORES = [HEAT_CORE, HEAT_CORE, HEAT_CORE, HEAT_CORE_RED, HEAT_CORE_RED] as const;
+
+export function heatColors(lightGround: boolean): readonly string[] {
+  return HEAT_COLORS[lightGround ? "light" : "dark"];
+}
+
+export function heatCores(): readonly string[] {
+  return HEAT_CORES;
+}
+
+/** The band (0 to `HEAT_BANDS.length - 1`) a pass count falls in. */
+export function heatBand(count: number): number {
+  const band = HEAT_BANDS.findIndex((entry) => count <= entry.most);
+  return band < 0 ? HEAT_BANDS.length - 1 : band;
 }
 
 export interface RouteColoring {
@@ -126,14 +189,13 @@ function stretchValues(
 
 /**
  * The least spread a ramp may stretch over. Below it the differences are noise
- * — a flat run's elevation moves a metre or two — and five steps over them
- * would paint a flat road as hills. A narrower range is widened around its
+ * — a steady run's heart rate moves a few beats — and five steps over them
+ * would paint a steady run as intervals. A narrower range is widened around its
  * middle, so it lands in the middle steps.
  */
-const LEAST_SPAN: Record<RouteMetric, number> = {
+const LEAST_SPAN: Record<"pace" | "hr", number> = {
   pace: 20,
-  hr: 8,
-  elevation: 10
+  hr: 8
 };
 
 function percentile(sorted: number[], fraction: number): number {
@@ -149,7 +211,7 @@ function percentile(sorted: number[], fraction: number): number {
 export function performanceColoring(
   replay: RouteReplay,
   series: TrainingHubActivitySeriesPoint[],
-  metric: RouteMetric
+  metric: "pace" | "hr"
 ): RouteColoring | null {
   const values = stretchValues(replay, series, metric);
   const known = values.filter((value): value is number => value !== null);
@@ -182,6 +244,15 @@ export function performanceColoring(
   return fasterIsMore
     ? { steps, low: p95, high: p5 }
     : { steps, low: p5, high: p95 };
+}
+
+/**
+ * Each stretch's height in metres, for `elevationColor`; null where the track
+ * carries none, and null as a whole when no point has one.
+ */
+export function elevationColoring(replay: RouteReplay): (number | null)[] | null {
+  const values = stretchValues(replay, [], "elevation");
+  return values.some((value) => value !== null) ? values : null;
 }
 
 /**
@@ -308,23 +379,46 @@ const SAMPLE_EVERY_METERS = 2;
 const REJOIN_METERS = SAME_SPOT_METERS;
 /** How far in from each end a loop's heading is read. */
 const LOOP_LOOK_METERS = 50;
+/**
+ * A pass this close to a point counts in full towards where the line is laid;
+ * from here out to `SAME_SPOT_METERS` it counts for less and less, so a road
+ * leaving a lapped loop eases away from it instead of jumping the moment it is
+ * out of reach.
+ */
+const FULL_WEIGHT_METERS = 5;
+
+function passWeight(gap: number): number {
+  if (gap <= FULL_WEIGHT_METERS) {
+    return 1;
+  }
+  const t = Math.min(1, (gap - FULL_WEIGHT_METERS) / (SAME_SPOT_METERS - FULL_WEIGHT_METERS));
+  return 1 - t * t * (3 - 2 * t);
+}
 
 export interface RouteHeat {
   /** How many times the activity passed over each stretch, all told. */
   passes: number[];
   /**
-   * Whether a stretch is drawn: only the first time the route covered some
-   * ground. A later pass over it is not a second line beside the first but the
-   * first line getting hotter — that is what a heatmap says.
-   */
-  drawn: boolean[];
-  /**
    * For each stretch, the stretch at which each pass over its ground arrived,
    * in order — so a replay can count only the passes it has reached.
    */
   arrivals: number[][];
+  /**
+   * For each point, where each pass over its spot ran — the nearest reading of
+   * that pass, the stretch at which the pass arrived, and how much it counts.
+   * Every pass is laid at the mean of these, so passes over one spot land on
+   * one line: a later lap is not a second line beside the first but the same
+   * line, hotter, wider and moved to where the laps ran on average.
+   */
+  positions: HeatPosition[][];
   /** The most passes any stretch had. */
   most: number;
+}
+
+export interface HeatPosition {
+  arrival: number;
+  latLng: [number, number];
+  weight: number;
 }
 
 /** How many passes over a stretch the route had made by the time it reached `head`. */
@@ -338,9 +432,38 @@ export function passesBy(heat: RouteHeat, stretch: number, head: number): number
   return count;
 }
 
-/** A pass count as a share of the most, 0–1, for the ramp. */
-export function heatShare(heat: RouteHeat, count: number): number {
-  return heat.most <= 1 ? 0 : Math.min(1, Math.max(0, (count - 1) / (heat.most - 1)));
+/**
+ * The route's points as the heatmap lays them once the replay has reached
+ * `head`: each at the weighted mean of the passes over its spot that have
+ * arrived, so a lap run a few metres wide of the last pulls the line towards
+ * it rather than drawing beside it. A point no pass has reached yet stays where
+ * it was.
+ */
+export function heatPositions(
+  heat: RouteHeat,
+  latLngs: readonly [number, number][],
+  head: number
+): [number, number][] {
+  return latLngs.map((latLng, index) => {
+    let lat = 0;
+    let lon = 0;
+    let weight = 0;
+    for (const position of heat.positions[index] ?? []) {
+      if (position.arrival <= head) {
+        lat += position.latLng[0] * position.weight;
+        lon += position.latLng[1] * position.weight;
+        weight += position.weight;
+      }
+    }
+    return weight > 0 ? [lat / weight, lon / weight] : latLng;
+  });
+}
+
+interface HeatSample {
+  x: number;
+  y: number;
+  along: number;
+  latLng: [number, number];
 }
 
 /**
@@ -360,11 +483,11 @@ export function routeHeat(replay: RouteReplay): RouteHeat {
   ];
   const total = distances[distances.length - 1]!;
 
-  const grid = new Map<string, { x: number; y: number; along: number }[]>();
+  const grid = new Map<string, HeatSample[]>();
   const add = (latLng: [number, number], along: number) => {
     const [x, y] = toXY(latLng);
     const key = `${Math.floor(x / SAME_SPOT_METERS)}:${Math.floor(y / SAME_SPOT_METERS)}`;
-    const sample = { x, y, along };
+    const sample = { x, y, along, latLng };
     const cell = grid.get(key);
     if (cell) {
       cell.push(sample);
@@ -429,69 +552,146 @@ export function routeHeat(replay: RouteReplay): RouteHeat {
     return low;
   };
 
-  const drawn: boolean[] = [];
-  const arrivals: number[][] = [];
-  const passes = latLngs.slice(0, -1).map((a, index) => {
-    const b = latLngs[index + 1]!;
-    const [x, y] = toXY([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+  // Each stay near a spot — the readings of one pass over it, in route order.
+  const staysAt = (x: number, y: number): HeatSample[][] => {
     const cx = Math.floor(x / SAME_SPOT_METERS);
     const cy = Math.floor(y / SAME_SPOT_METERS);
-    const along: number[] = [];
+    const near: HeatSample[] = [];
     for (let dx = -1; dx <= 1; dx += 1) {
       for (let dy = -1; dy <= 1; dy += 1) {
         for (const sample of grid.get(`${cx + dx}:${cy + dy}`) ?? []) {
           if (Math.hypot(sample.x - x, sample.y - y) <= SAME_SPOT_METERS) {
-            along.push(sample.along);
+            near.push(sample);
           }
         }
       }
     }
-    along.sort((p, q) => p - q);
-    // Each stay near the spot, as the distance along the route it began at.
-    const stays: number[] = along.length > 0 ? [along[0]!] : [];
-    for (let at = 1; at < along.length; at += 1) {
-      if (along[at]! - along[at - 1]! > REJOIN_METERS) {
-        stays.push(along[at]!);
+    near.sort((p, q) => p.along - q.along);
+    const stays: HeatSample[][] = [];
+    for (const sample of near) {
+      const current = stays[stays.length - 1];
+      const previous = current?.[current.length - 1];
+      if (current && previous && sample.along - previous.along <= REJOIN_METERS) {
+        current.push(sample);
+      } else {
+        stays.push([sample]);
       }
     }
+    // The loop's last stay is its first, cut at the line.
     if (
       closedLoop &&
       stays.length > 1 &&
-      along[0]! + (total - along[along.length - 1]!) <= REJOIN_METERS * 2
+      near[0]!.along + (total - near[near.length - 1]!.along) <= REJOIN_METERS * 2
     ) {
-      stays.pop();
+      stays[0]!.push(...stays.pop()!);
     }
-    const own = (distances[index]! + distances[index + 1]!) / 2;
-    const starts = stays.map(stretchAt);
+    return stays;
+  };
+
+  const arrivals: number[][] = [];
+  const passes = latLngs.slice(0, -1).map((a, index) => {
+    const b = latLngs[index + 1]!;
+    const [x, y] = toXY([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    const stays = staysAt(x, y);
+    const starts = stays.map((stay) => stretchAt(stay[0]!.along));
     if (starts.length === 0) {
       starts.push(index);
     }
     arrivals.push(starts);
-    // Drawn when its own stay is the first: nothing earlier covered this ground.
-    const firstStayEnds = stays.length > 1 ? stays[1]! : Number.POSITIVE_INFINITY;
-    drawn.push(own < firstStayEnds);
     return starts.length;
   });
 
-  return { passes, drawn, arrivals, most: Math.max(...passes) };
+  const positions = latLngs.map((latLng, index): HeatPosition[] => {
+    const [x, y] = toXY(latLng);
+    const found = staysAt(x, y).map((stay): HeatPosition => {
+      let nearest = stay[0]!;
+      let best = Number.POSITIVE_INFINITY;
+      for (const sample of stay) {
+        const gap = Math.hypot(sample.x - x, sample.y - y);
+        if (gap < best) {
+          best = gap;
+          nearest = sample;
+        }
+      }
+      return {
+        arrival: stretchAt(stay[0]!.along),
+        latLng: nearest.latLng,
+        weight: passWeight(best)
+      };
+    });
+    return found.length > 0
+      ? found
+      : [{ arrival: Math.max(0, index - 1), latLng, weight: 1 }];
+  });
+
+  return { passes, arrivals, positions, most: Math.max(...passes) };
 }
 
-/**
- * A colour on a ramp at `t` (0–1), blended between its stops — the heatmap's
- * line runs smoothly rather than in five bands.
- */
-export function rampColorAt(ramp: readonly string[], t: number): string {
+function hexChannels(hex: string): [number, number, number] {
+  return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(1 + offset, 3 + offset), 16)) as [
+    number,
+    number,
+    number
+  ];
+}
+
+function mixChannels(
+  from: readonly number[],
+  to: readonly number[],
+  mix: number
+): [number, number, number] {
+  return [0, 1, 2].map((index) => from[index]! + (to[index]! - from[index]!) * mix) as [
+    number,
+    number,
+    number
+  ];
+}
+
+function rgb(channels: readonly number[]): string {
+  return `rgb(${channels.map((channel) => Math.round(channel)).join(", ")})`;
+}
+
+function mixColor(from: string, to: string, mix: number): string {
+  return rgb(mixChannels(hexChannels(from), hexChannels(to), mix));
+}
+
+function rampChannels(ramp: readonly string[], t: number): [number, number, number] {
   const clamped = Math.min(1, Math.max(0, t));
   const position = clamped * (ramp.length - 1);
   const from = Math.floor(position);
   const to = Math.min(ramp.length - 1, from + 1);
-  const mix = position - from;
-  const channel = (hex: string, offset: number) =>
-    Number.parseInt(hex.slice(1 + offset, 3 + offset), 16);
-  const blend = [0, 2, 4].map((offset) =>
-    Math.round(
-      channel(ramp[from]!, offset) + (channel(ramp[to]!, offset) - channel(ramp[from]!, offset)) * mix
-    )
-  );
-  return `rgb(${blend[0]}, ${blend[1]}, ${blend[2]})`;
+  return mixChannels(hexChannels(ramp[from]!), hexChannels(ramp[to]!), position - from);
+}
+
+/**
+ * A colour on a ramp at `t` (0–1), blended between its stops — the heatmap's
+ * line turns from one band's colour to the next along a stretch rather than
+ * stepping at a join — and taken `whiten` (0–1) of the way to its core, for
+ * the layers of its neon tube: white, or the matching stop of `cores`.
+ */
+export function rampColorAt(
+  ramp: readonly string[],
+  t: number,
+  whiten = 0,
+  cores?: readonly string[]
+): string {
+  const color = rampChannels(ramp, t);
+  if (whiten <= 0) {
+    return rgb(color);
+  }
+  const core = cores ? rampChannels(cores, t) : [255, 255, 255];
+  return rgb(mixChannels(color, core, Math.min(1, whiten)));
+}
+
+/**
+ * How wide the heatmap's neon is at a heat `share` (0 once, 1 past twelve
+ * passes), in pixels: the whole tube, and its white core. Both grow with the
+ * passes, and the core grows faster — an eighth of a single pass's tube, a
+ * third of the hottest — so the more a stretch was run the more of it is
+ * white.
+ */
+export function neonWidths(share: number): { body: number; core: number } {
+  const clamped = Math.min(1, Math.max(0, share));
+  const body = 4 + 5 * clamped;
+  return { body, core: body * (0.12 + 0.23 * clamped) };
 }
