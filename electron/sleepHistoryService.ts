@@ -7,6 +7,7 @@ import {
 import { corosMcpAvailability } from "./corosMcpService";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { getTrainingSleepData } from "./sleepDataService";
+import { napWindowsOf, windowDurationMinutes } from "./sleepMetrics";
 import type {
   McpAvailability,
   SleepHistorySnapshot,
@@ -72,9 +73,10 @@ export interface SleepHistoryDeps {
     mcpState: McpAvailability;
   }>;
   /**
-   * The night's heart rate, which `querySleepData` does not carry. COROS puts
+   * The night's heart rate, which the sleep feed does not carry. COROS puts
    * it in the daily-health feed instead — "Sleep HR: Avg 50 bpm | Min 44 | Max
-   * 71" — dated by wake-up day, so it folds straight onto the night.
+   * 71" — dated by wake-up day, so it folds straight onto the night. The same
+   * lines carry the stages in whole minutes (`exactStages`).
    */
   fetchHeartRate: (days: number) => Promise<TrainingHubDailyHealthRecord[]>;
   readCache: (fromDay: string) => SleepNightRow[];
@@ -185,12 +187,14 @@ function store(deps: SleepHistoryDeps, records: TrainingHubSleepRecord[], now: n
 }
 
 /**
- * The heart rate for each night in the window, or nothing.
+ * The daily-health line for each night in the window — heart rate and stage
+ * minutes — or nothing.
  *
  * A failure here must not cost the nights themselves: heart rate is one line on
- * a card, the sleep totals are the card.
+ * a card and the minutes refine what the percentages already say; the sleep
+ * totals are the card.
  */
-async function readHeartRate(
+async function readDailyHealth(
   deps: SleepHistoryDeps,
   days: number
 ): Promise<Map<string, TrainingHubDailyHealthRecord>> {
@@ -203,7 +207,69 @@ async function readHeartRate(
   }
 }
 
-function withHeartRate(
+/**
+ * Which of the day's episodes the daily-health "Sleep Summary" line describes:
+ * `main`, the one nap of a nap-only day, or none it can be pinned to.
+ *
+ * Its `Total` is one episode's period, awake included — the main sleep when
+ * there is one, and otherwise **one nap of the day**: 2026-08-22 and 09-15 had
+ * two naps each and a Total equal to the first alone. So the line is this
+ * night's only where the lengths agree, and its heart rate and its minutes go
+ * nowhere else — HR from the first nap was being shown as the whole day's.
+ * A line with no Total (older feeds) is still the main sleep's, as it was.
+ */
+function dailyHealthEpisode(
+  record: TrainingHubSleepRecord,
+  health: TrainingHubDailyHealthRecord
+): "main" | "nap" | undefined {
+  const matches = (minutes: number | undefined) =>
+    minutes !== undefined &&
+    health.sleepTotalMinutes !== undefined &&
+    Math.abs(health.sleepTotalMinutes - minutes) <= 1;
+
+  if (record.kind === "main") {
+    // A night whose window did not parse cannot be compared, and keeps the
+    // heart rate it always took; only a window of another length refuses it.
+    return health.sleepTotalMinutes === undefined ||
+      record.windowMinutes === undefined ||
+      matches(record.windowMinutes)
+      ? "main"
+      : undefined;
+  }
+  if (record.kind === "nap-only") {
+    const windows = napWindowsOf(record);
+    return windows.length === 1 && matches(windowDurationMinutes(windows[0]!)) ? "nap" : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The night's stage minutes as COROS counts them. The sleep feed states them
+ * as whole percentages of the period, a minute or two off the COROS app; the
+ * daily-health line — the one the heart rate comes from — states the minutes.
+ * Taken for a main sleep only: a nap-only day has no stages on its record.
+ */
+function exactStages(
+  record: TrainingHubSleepRecord,
+  health: TrainingHubDailyHealthRecord
+): Partial<TrainingHubSleepRecord> {
+  if (
+    record.kind !== "main" ||
+    health.sleepTotalMinutes === undefined ||
+    record.windowMinutes === undefined
+  ) {
+    return {};
+  }
+  const stages = {
+    deepMinutes: health.sleepDeepMinutes,
+    lightMinutes: health.sleepLightMinutes,
+    remMinutes: health.sleepRemMinutes,
+    awakeMinutes: health.sleepAwakeMinutes
+  };
+  return Object.fromEntries(Object.entries(stages).filter(([, value]) => value !== undefined));
+}
+
+function withDailyHealth(
   records: TrainingHubSleepRecord[],
   byDay: Map<string, TrainingHubDailyHealthRecord>
 ): TrainingHubSleepRecord[] {
@@ -213,17 +279,27 @@ function withHeartRate(
 
   return records.map((record) => {
     const health = byDay.get(record.happenDay);
-    if (!health) {
+    if (!health || !dailyHealthEpisode(record, health)) {
       return record;
     }
 
     return {
       ...record,
+      ...exactStages(record, health),
       avgHr: record.avgHr ?? health.sleepAvgHr,
       minHr: record.minHr ?? health.sleepMinHr,
       maxHr: record.maxHr ?? health.sleepMaxHr
     };
   });
+}
+
+function isEmptyReading(record: TrainingHubSleepRecord): boolean {
+  return (
+    isMainEntry(record) &&
+    record.totalMinutes === undefined &&
+    !((record.napMinutes ?? 0) > 0) &&
+    !((record.score ?? 0) > 0)
+  );
 }
 
 function isMainEntry(record: TrainingHubSleepRecord): boolean {
@@ -244,7 +320,10 @@ function isMainEntry(record: TrainingHubSleepRecord): boolean {
  * `kind: "nap"` row — a nap of the day, not a reading of the day — may fill in
  * what it does not carry.
  */
-function foldSleepDay(entries: CacheEntry[]): CacheEntry | undefined {
+function foldSleepDay(all: CacheEntry[]): CacheEntry | undefined {
+  // A row that says nothing is no reading of the day — what an older parser
+  // kept of COROS's "not available" block. Left in, it held the day "partial".
+  const entries = all.filter((entry) => !isEmptyReading(entry.record));
   if (entries.length === 0) {
     return undefined;
   }
@@ -471,7 +550,7 @@ export async function getSleepHistory(
       // of the stamp is "we asked", not "we got something".
       cache.lastNetworkAt = now;
       if (answer.records.length > 0) {
-        store(deps, withHeartRate(answer.records, await readHeartRate(deps, days)), now);
+        store(deps, withDailyHealth(answer.records, await readDailyHealth(deps, days)), now);
         filled = true;
       }
     } catch (caught) {

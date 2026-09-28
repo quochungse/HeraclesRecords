@@ -4,7 +4,7 @@ import {
   corosMcpFailureState,
   ensureCorosMcpConnected,
   getCorosMcpTools,
-  listCorosMcpTools
+  corosMcpToolsHaving
 } from "./corosMcpService";
 import {
   listSleepNightSeries,
@@ -91,11 +91,9 @@ export function createDefaultSleepSeriesDeps(): SleepSeriesDeps {
     now: () => Date.now(),
     ensureConnected: ensureCorosMcpConnected,
     listTools: async () => {
-      try {
-        await listCorosMcpTools();
-      } catch {
-        // Fall back to the cached tool list, as the sleep service does.
-      }
+      await corosMcpToolsHaving((tools) =>
+        tools.some((tool) => tool.name === HRV_TOOL || tool.name === STRESS_TOOL)
+      );
     },
     toolNames: () => getCorosMcpTools().map((tool) => tool.name),
     callTool: callCorosMcpTool,
@@ -276,7 +274,12 @@ export async function getSleepNightSeries(
   }
 
   const bounds = sleepWindowBounds(record);
-  const fetched = await fetchSeries(deps, record);
+  // A day of naps only has no window, so both series would be clipped to
+  // nothing, and COROS has no HRV for it either — "No data" on 2026-09-06 and
+  // 09-15, probed 2026-09-28 — so it costs no request. A main night whose
+  // window did not parse still asks: its HRV assessment needs no window.
+  const fetched =
+    record.kind === "nap-only" ? { hrv: [], stress: [] } : await fetchSeries(deps, record);
 
   // Without a window there is nothing to clip to, and an unclipped day of
   // stress readings drawn under a "night" heading would be a lie of framing.

@@ -191,6 +191,8 @@ assert.equal(
     // The athlete's COROS plans, read only (P3.1).
     "list_training_plans",
     "get_training_plan",
+    // The COROS workout library, read only.
+    "get_workout_library",
     // A proposal the athlete applies; it writes nothing (P3.3).
     "propose_schedule_changes",
     "request_coach_input"
@@ -306,6 +308,73 @@ assert.deepEqual(
     ["coros__queryStressLevel", "freddy__queryDevices"],
     "another server's tool of the same name is not ours to judge"
   );
+
+  // COROS MCP's own writes (added September 2026) go whatever is on offer:
+  // Coach writes through drafts and change sets, never straight to the account.
+  const writes = [
+    "coros__createScheduledWorkout",
+    "coros__updateScheduledWorkout",
+    "coros__createSingleWorkout",
+    "coros__updateWorkoutDetails",
+    "coros__scheduleWorkout",
+    "coros__createTrainingPlan",
+    "coros__updateTrainingPlan"
+  ];
+  assert.deepEqual(
+    namesOf(narrowCorosMcpTools(named(...writes, "coros__queryWorkoutLibrary"))),
+    ["coros__queryWorkoutLibrary"],
+    "a COROS MCP write is never offered; a read with no local counterpart is"
+  );
+  for (const name of writes) {
+    assert.equal(isToolAllowedUnderPolicy(name, "read-only"), false, `${name} must not reach an analysis run`);
+  }
+
+  // The renamed sleep tool and the new plan and schedule reads step aside for
+  // the local tools that already answer them.
+  assert.deepEqual(
+    namesOf(
+      narrowCorosMcpTools(
+        named(
+          "coros__querySleepOverview",
+          "coros__queryScheduledWorkoutDetails",
+          "coros__queryTrainingPlanLibrary",
+          "coros__queryTrainingPlanDetails",
+          "get_sleep_summary",
+          "list_scheduled_workouts",
+          "list_training_plans",
+          "get_training_plan"
+        )
+      )
+    ),
+    ["get_sleep_summary", "list_scheduled_workouts", "list_training_plans", "get_training_plan"]
+  );
+}
+
+// --- With the local tools on offer, COROS MCP is left only what it alone has --
+// SpO2 and respiration, and — for an account COROS knows as female — the
+// menstrual cycle. Everything else has a local tool or the snapshot behind it.
+{
+  const remoteReads = [
+    "querySleepOverview", "querySleepHrv", "queryStressTimeSeries", "queryStressLevel",
+    "getActivityDetail", "queryActivityLapData", "queryCustomActivityLapData", "querySportRecords",
+    "queryTrainingSchedule", "queryScheduledWorkoutDetails", "queryTrainingPlanLibrary",
+    "queryTrainingPlanDetails", "queryWorkoutLibrary", "queryWorkoutDetails",
+    "queryDailyHealthData", "queryAvgHeartRate", "queryRestingHeartRate", "queryTrainingLoadAssessment",
+    "queryFitnessAssessmentOverview", "queryRecoveryStatus", "queryUserInfo",
+    "queryHealthCheckTimeSeries", "queryMenstruationCycles"
+  ].map((name) => `coros__${name}`);
+  const locals = [
+    "get_sleep_summary", "get_activity_detail", "list_recent_activities", "list_scheduled_workouts",
+    "list_training_plans", "get_training_plan", "get_workout_library", "get_fitness_trends"
+  ];
+  const remoteLeft = (sex) =>
+    namesOf(narrowCorosMcpTools(named(...remoteReads, ...locals), sex)).filter((name) => name.startsWith("coros__"));
+  assert.deepEqual(remoteLeft(1), ["coros__queryHealthCheckTimeSeries", "coros__queryMenstruationCycles"]);
+  assert.deepEqual(remoteLeft(0), ["coros__queryHealthCheckTimeSeries"], "not offered to an account COROS knows as male");
+  assert.deepEqual(remoteLeft(undefined), ["coros__queryHealthCheckTimeSeries"], "nor while the profile is unread");
+  // Signed out of Training Hub the local tools are gone, and the remote reads
+  // are the only route — every one of them but the gated cycle stays.
+  assert.equal(namesOf(narrowCorosMcpTools(named(...remoteReads), 0)).length, remoteReads.length - 1);
 }
 
 // --- the per-name predicate, which executeChatTool enforces --------------
@@ -316,6 +385,10 @@ assert.equal(isToolAllowedUnderPolicy("delete_workout", "read-only"), false);
 assert.equal(isToolAllowedUnderPolicy("freddy__anything", "read-only"), false);
 assert.equal(isToolAllowedUnderPolicy("draft_training_plan", "read-only"), true);
 assert.equal(isToolAllowedUnderPolicy("coros__get_training_load", "read-only"), true);
+// A COROS MCP tool is a read only by its verb; one the server adds under any
+// other name is not assumed to be.
+assert.equal(isToolAllowedUnderPolicy("coros__querySleepOverview", "read-only"), true);
+assert.equal(isToolAllowedUnderPolicy("coros__deleteEverything", "read-only"), false);
 // Interactive runs are unaffected, including by default.
 assert.equal(isToolAllowedUnderPolicy("upload_training_plan", "interactive"), true);
 assert.equal(isToolAllowedUnderPolicy("upload_training_plan"), true);

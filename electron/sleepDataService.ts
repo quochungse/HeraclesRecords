@@ -2,8 +2,7 @@ import {
   callCorosMcpTool,
   corosMcpFailureState,
   ensureCorosMcpConnected,
-  getCorosMcpTools,
-  listCorosMcpTools
+  corosMcpToolsHaving
 } from "./corosMcpService";
 import {
   sleepWindowDurationMinutes,
@@ -1348,7 +1347,9 @@ function parseProseSleepSection(
   const windowLineMatch = section.match(
     /(?:Main\s+)?Sleep\s+(?:window|period|range)\s*:\s*([^\n]+)/i
   );
-  const napLineMatch = section.match(/\bNaps?(?:\s+Total)?:\s*([^\n]+)/i);
+  // "Naps Total (asleep)" on a day with naps, beside "Naps Period (incl.
+  // awake)"; a day without keeps the bare "Naps Total: 0 min".
+  const napLineMatch = section.match(/\bNaps?(?:\s+Total)?(?:\s*\(asleep\))?:\s*([^\n]+)/i);
   const napText = napLineMatch?.[1]?.trim();
   // COROS puts each nap's clock on a line of its own — "Nap Window: 2026-08-12
   // 07:24 - 2026-08-12 08:00" — while "Naps Total" carries only a duration.
@@ -1405,6 +1406,14 @@ function parseProseSleepSection(
   const napsOnly = (napTotalMinutes ?? 0) > 0 || napWindows.length > 0;
 
   if (!scoreMatch && !mainSleepMatch && !napsOnly) {
+    return undefined;
+  }
+
+  // "Sleep Score: 0" over "Sleep detail for this day is not available yet."
+  // and nothing else: COROS saying it has nothing, not a night still syncing.
+  // Stored, it read "Main sleep duration is still syncing." for good (2026-08-10
+  // and 09-04 on the live feed, weeks after the fact).
+  if (!mainSleepMatch && !napsOnly && Number(scoreMatch?.[1] ?? 0) <= 0) {
     return undefined;
   }
 
@@ -1971,13 +1980,9 @@ export async function getTrainingSleepData(
     };
   }
 
-  try {
-    await listCorosMcpTools();
-  } catch {
-    // fall back to cached tool list
-  }
-
-  const sleepTool = resolveSleepTool(getCorosMcpTools());
+  const sleepTool = resolveSleepTool(
+    await corosMcpToolsHaving((tools) => resolveSleepTool(tools) !== undefined)
+  );
   if (!sleepTool) {
     // Connected, and it offers nothing that reads sleep. Nothing in Settings
     // fixes that, so it reads as a server that could not serve rather than one

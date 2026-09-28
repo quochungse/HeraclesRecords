@@ -839,4 +839,84 @@ assert.deepEqual(
   ["13:00-13:40", "17:05-17:30"]
 );
 
+// --- querySleepOverview (September 2026) ---------------------------------
+//
+// COROS renamed `querySleepData` and rewrote its lines: "Main Sleep (asleep)"
+// beside "Main Sleep Period (incl. awake)", and on a day with naps "Naps Total
+// (asleep)" beside "Naps Period (incl. awake)". The old `Main sleep:` pattern
+// missed the first, so every night arrived with no duration and read "Main
+// sleep duration is still syncing."; missing the second summed the windows,
+// awake minutes included. Verbatim from the live feed, probed 2026-09-28.
+const overviewLive = [
+  "Sleep Overview",
+  "========================",
+  "Note: each record below is dated by its wake-up day.",
+  "",
+  "2026-08-08",
+  "Sleep Score: -1",
+  "Daily Sleep: 1h 43min (incl. naps)",
+  "Sleep metrics scope: daily",
+  "Naps Total (asleep): 1h 43min",
+  "Naps Period (incl. awake): 1h 47min",
+  "Nap Window: 2026-08-08 07:01 - 2026-08-08 08:48",
+  "",
+  "2026-08-12",
+  "Sleep Score: 47",
+  "Daily Sleep: 4h 45min (incl. naps)",
+  "Main Sleep (asleep): 4h 13min",
+  "Main Sleep Period (incl. awake): 5h 59min",
+  "Sleep metrics scope: daily",
+  "Deep Sleep Ratio: 10%",
+  "Light Sleep Ratio: 40%",
+  "REM Ratio: 20%",
+  "Awake Ratio: 30%",
+  "Awake Time: 1h 46min",
+  "Awake Count (>5 min): 2",
+  "Main Sleep Window: 2026-08-12 00:20 - 2026-08-12 06:19",
+  "Naps Total (asleep): 32 min",
+  "Naps Period (incl. awake): 36 min",
+  "Nap Window: 2026-08-12 07:24 - 2026-08-12 08:00",
+  "",
+  "2026-09-27",
+  "Sleep Score: 79",
+  "Daily Sleep: 6h 29min (incl. naps)",
+  "Main Sleep (asleep): 6h 29min",
+  "Main Sleep Period (incl. awake): 6h 52min",
+  "Sleep metrics scope: daily",
+  "Deep Sleep Ratio: 10%",
+  "Light Sleep Ratio: 60%",
+  "REM Ratio: 24%",
+  "Awake Ratio: 6%",
+  "Awake Time: 23 min",
+  "Awake Count (>5 min): 1",
+  "Main Sleep Window: 2026-09-26 23:25 - 2026-09-27 06:17",
+  "Naps Total: 0 min"
+].join("\n");
+const overview = new Map(
+  parseSleepDataResponse(overviewLive).map((record) => [record.happenDay, record])
+);
+assert.equal(overview.size, 3);
+const overviewNight = overview.get("20260927");
+assert.equal(overviewNight.totalMinutes, 389, "\"Main Sleep (asleep)\" is the main sleep");
+assert.equal(overviewNight.windowMinutes, 412, "and the period is the window, awake included");
+assert.equal(overviewNight.completeness, "complete");
+assert.equal(overviewNight.partialReason, undefined);
+const overviewWithNap = overview.get("20260812");
+assert.equal(overviewWithNap.totalMinutes, 253);
+assert.equal(overviewWithNap.napMinutes, 32, "the nap asleep, not its 36-minute window");
+const overviewNapOnly = overview.get("20260808");
+assert.equal(overviewNapOnly.kind, "nap-only", "a score of -1 is no score");
+assert.equal(overviewNapOnly.score, undefined);
+assert.equal(overviewNapOnly.napMinutes, 103);
+
+// COROS's "not available" block is COROS saying it has nothing — not a night
+// still syncing. Kept as one, it read "Main sleep duration is still syncing."
+// for weeks (2026-08-10 and 09-04 on the live feed).
+assert.deepEqual(
+  parseSleepDataResponse(
+    ["Sleep Overview", "", "2026-09-04", "Sleep Score: 0", "Sleep detail for this day is not available yet."].join("\n")
+  ),
+  []
+);
+
 console.log("test-sleep-data-parser: ok");

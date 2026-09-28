@@ -100,6 +100,27 @@ export function getCorosMcpTools(): CorosMcpTool[] {
   return getMcpServerCachedTools(COROS);
 }
 
+/**
+ * The COROS tool list, asked of the server again only when the list held
+ * lacks what the caller needs. It is read on every connect, and a
+ * `tools/list` is ~185 KB since the server grew to 34 tools — which every
+ * sleep fill, daily-health read and night series used to pay, three times on
+ * one visit to the Sleep screen.
+ */
+export async function corosMcpToolsHaving(
+  has: (tools: CorosMcpTool[]) => boolean
+): Promise<CorosMcpTool[]> {
+  const cached = getCorosMcpTools();
+  if (has(cached)) {
+    return cached;
+  }
+  try {
+    return await listCorosMcpTools();
+  } catch {
+    return cached;
+  }
+}
+
 export async function callCorosMcpTool(
   name: string,
   args: Record<string, unknown>

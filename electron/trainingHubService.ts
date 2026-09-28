@@ -1329,6 +1329,16 @@ function cachedCorosProfile(): CorosProfile | null {
     : null;
 }
 
+/**
+ * The account's `sex` as last read, however long ago — it does not change, and
+ * what reads it (whether Coach is offered COROS's menstrual-cycle tool) is
+ * decided before a turn has read anything. Undefined until a profile has been
+ * read since sign-in; `invalidateCorosProfileCache` forgets it with the account.
+ */
+export function lastKnownCorosProfileSex(): number | undefined {
+  return corosProfileCache?.snapshot.profile.sex ?? coachProfileCache?.profile.sex;
+}
+
 function storeCorosProfileSnapshot(
   profile: CorosProfile,
   dashboard: TrainingHubDashboard | null

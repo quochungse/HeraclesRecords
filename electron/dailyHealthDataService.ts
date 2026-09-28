@@ -2,8 +2,7 @@ import {
   callCorosMcpTool,
   corosMcpFailureState,
   ensureCorosMcpConnected,
-  getCorosMcpTools,
-  listCorosMcpTools
+  corosMcpToolsHaving
 } from "./corosMcpService";
 import { recentTrainingHubDateList } from "./trainingTrendUtils";
 import type {
@@ -253,7 +252,14 @@ function mergeDailyHealthRecord(
     calories: incoming.calories ?? existing.calories,
     sleepAvgHr: incoming.sleepAvgHr ?? existing.sleepAvgHr,
     sleepMinHr: incoming.sleepMinHr ?? existing.sleepMinHr,
-    sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr
+    sleepMaxHr: incoming.sleepMaxHr ?? existing.sleepMaxHr,
+    exerciseMinutes: incoming.exerciseMinutes ?? existing.exerciseMinutes,
+    stressAvg: incoming.stressAvg ?? existing.stressAvg,
+    sleepTotalMinutes: incoming.sleepTotalMinutes ?? existing.sleepTotalMinutes,
+    sleepDeepMinutes: incoming.sleepDeepMinutes ?? existing.sleepDeepMinutes,
+    sleepLightMinutes: incoming.sleepLightMinutes ?? existing.sleepLightMinutes,
+    sleepRemMinutes: incoming.sleepRemMinutes ?? existing.sleepRemMinutes,
+    sleepAwakeMinutes: incoming.sleepAwakeMinutes ?? existing.sleepAwakeMinutes
   };
 }
 
@@ -330,6 +336,15 @@ function parseLabeledNumber(text: string, patterns: RegExp[]): number | undefine
   return undefined;
 }
 
+/** "1h 47min", "3 min", "2h" — a duration line's minutes. */
+function parseDurationLineMinutes(value: string | undefined): number | undefined {
+  const match = value?.match(/^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*min)?/i);
+  if (!match || (match[1] === undefined && match[2] === undefined)) {
+    return undefined;
+  }
+  return Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0);
+}
+
 function parseProseDailyHealthSection(
   section: string,
   fallbackDay?: string
@@ -363,6 +378,27 @@ function parseProseDailyHealthSection(
     ? parseLabeledNumber(sleepHrLine, [/\bmax(?:imum)?\b\s*[:=]?\s*([\d,.]+)/i])
     : undefined;
 
+  // "Steps: 23,316 | Calories: 1,649 kcal | Exercise: 1h 47min" and
+  // "Stress: Avg 40", which Coach's fitness trends read beside the load.
+  const exerciseMinutes = parseDurationLineMinutes(
+    section.match(/\bExercise\s*:\s*([^|\n]+)/i)?.[1]
+  );
+  const stressAvg = parseLabeledNumber(section, [/\bStress\s*:\s*Avg\s*([\d.]+)/i]);
+
+  // "Total: 4h 58min | Deep: 40 min | Light: 3h 3min | REM: 59 min | Awake: 16 min"
+  const stageLine = section.match(/^\s*Total\s*:[^\n]*\bDeep\s*:[^\n]*/im)?.[0];
+  const stage = (label: string) =>
+    stageLine ? parseDurationLineMinutes(stageLine.match(new RegExp(`\\b${label}\\s*:\\s*([^|\\n]+)`, "i"))?.[1]) : undefined;
+  const sleepStages = stageLine
+    ? {
+        sleepTotalMinutes: stage("Total"),
+        sleepDeepMinutes: stage("Deep"),
+        sleepLightMinutes: stage("Light"),
+        sleepRemMinutes: stage("REM"),
+        sleepAwakeMinutes: stage("Awake")
+      }
+    : {};
+
   // A day whose only news is the night's heart rate is still news: the Sleep
   // screen reads this feed for that line and nothing else.
   if (
@@ -370,7 +406,10 @@ function parseProseDailyHealthSection(
     calories === undefined &&
     sleepAvgHr === undefined &&
     sleepMinHr === undefined &&
-    sleepMaxHr === undefined
+    sleepMaxHr === undefined &&
+    exerciseMinutes === undefined &&
+    stressAvg === undefined &&
+    sleepStages.sleepTotalMinutes === undefined
   ) {
     return undefined;
   }
@@ -381,7 +420,10 @@ function parseProseDailyHealthSection(
     calories,
     sleepAvgHr,
     sleepMinHr,
-    sleepMaxHr
+    sleepMaxHr,
+    ...(exerciseMinutes !== undefined ? { exerciseMinutes } : {}),
+    ...(stressAvg !== undefined ? { stressAvg } : {}),
+    ...Object.fromEntries(Object.entries(sleepStages).filter(([, value]) => value !== undefined))
   };
 }
 
@@ -605,13 +647,9 @@ export async function getTrainingDailyHealthData(
     };
   }
 
-  try {
-    await listCorosMcpTools();
-  } catch {
-    // fall back to cached tool list
-  }
-
-  const dailyHealthTool = resolveDailyHealthTool(getCorosMcpTools());
+  const dailyHealthTool = resolveDailyHealthTool(
+    await corosMcpToolsHaving((tools) => resolveDailyHealthTool(tools) !== undefined)
+  );
   if (!dailyHealthTool) {
     // Connected, and it offers nothing that reads daily health. Connecting it
     // again is not the fix, so it must not be what the copy asks for.

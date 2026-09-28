@@ -640,6 +640,96 @@ clearSleepHistoryCache();
   );
 }
 
+// --- ...and so do the night's stage minutes, when they are this night's -------
+//
+// The sleep feed states stages as whole percentages of the period, a minute or
+// two off the COROS app; the daily-health line states the minutes. Its Total
+// is the main sleep's period, so it is taken only where the night's own window
+// is that long — on a day of naps only it is one nap of several.
+clearSleepHistoryCache();
+{
+  const exact = { sleepTotalMinutes: 460, sleepDeepMinutes: 88, sleepLightMinutes: 253, sleepRemMinutes: 61, sleepAwakeMinutes: 29 };
+  const { deps } = harness({
+    records: [
+      night(0),
+      night(-1, { windowMinutes: 400 }),
+      { happenDay: dayKey(-2), kind: "nap-only", completeness: "complete", napMinutes: 278 }
+    ],
+    heartRate: [
+      { happenDay: dayKey(0), ...exact },
+      { happenDay: dayKey(-1), ...exact },
+      { happenDay: dayKey(-2), ...exact, sleepTotalMinutes: 121 }
+    ]
+  });
+
+  const byDay = new Map((await getSleepHistory({ days: 30 }, deps)).records.map((record) => [record.happenDay, record]));
+  const matched = byDay.get(dayKey(0));
+  assert.deepEqual(
+    [matched.deepMinutes, matched.lightMinutes, matched.remMinutes, matched.awakeMinutes],
+    [88, 253, 61, 29],
+    "a main sleep whose window is the line's Total takes its minutes"
+  );
+  assert.equal(matched.totalMinutes, 430, "and keeps its own asleep figure");
+  const mismatched = byDay.get(dayKey(-1));
+  assert.equal(mismatched.deepMinutes, 90, "a window of another length is another episode: kept as it was");
+  assert.equal(byDay.get(dayKey(-2)).deepMinutes, undefined, "a day of naps takes none");
+}
+
+// --- The daily-health line is one episode's, and folds onto that one only -----
+// On a day of naps only its Total is one nap of several (2026-08-22, 09-15), so
+// its heart rate is that nap's, not the day's. It is taken for a day of one nap
+// whose window is the Total, and for a main sleep whose window is.
+clearSleepHistoryCache();
+{
+  const napOnly = (offset, windows, napMinutes) => ({
+    happenDay: dayKey(offset), kind: "nap-only", completeness: "complete", napMinutes, napWindows: windows
+  });
+  const { deps } = harness({
+    records: [
+      night(0, { windowMinutes: 460 }),
+      night(-1, { windowMinutes: 460 }),
+      napOnly(-2, [{ start: "16:50", end: "17:47" }, { start: "22:12", end: "22:46" }], 82),
+      napOnly(-3, [{ start: "06:29", end: "08:49" }], 121)
+    ],
+    heartRate: [
+      { happenDay: dayKey(0), sleepTotalMinutes: 460, sleepAvgHr: 50 },
+      { happenDay: dayKey(-1), sleepTotalMinutes: 300, sleepAvgHr: 51 },
+      { happenDay: dayKey(-2), sleepTotalMinutes: 57, sleepAvgHr: 56 },
+      { happenDay: dayKey(-3), sleepTotalMinutes: 140, sleepAvgHr: 57 }
+    ]
+  });
+  const byDay = new Map((await getSleepHistory({ days: 30 }, deps)).records.map((record) => [record.happenDay, record]));
+  assert.equal(byDay.get(dayKey(0)).avgHr, 50, "the main sleep whose window is the Total");
+  assert.equal(byDay.get(dayKey(-1)).avgHr, undefined, "a Total of another length is another episode");
+  assert.equal(byDay.get(dayKey(-2)).avgHr, undefined, "two naps: the line is the first nap's alone");
+  assert.equal(byDay.get(dayKey(-3)).avgHr, 57, "one nap, and the Total is its window");
+  assert.equal(byDay.get(dayKey(-3)).deepMinutes, undefined, "a nap-only day takes no stages");
+}
+
+// A main night whose window did not parse cannot be compared: it keeps the
+// heart rate it always took, and takes no minutes it cannot place.
+clearSleepHistoryCache();
+{
+  const { deps } = harness({
+    records: [night(0, { windowMinutes: undefined })],
+    heartRate: [{ happenDay: dayKey(0), sleepTotalMinutes: 460, sleepAvgHr: 50, sleepDeepMinutes: 1 }]
+  });
+  const [record] = (await getSleepHistory({ days: 30 }, deps)).records;
+  assert.equal(record.avgHr, 50);
+  assert.equal(record.deepMinutes, 90);
+}
+
+// --- A reading that says nothing is no day ------------------------------------
+// What an older parser kept of COROS's "not available" block: a main row with
+// no duration, no naps and a score of 0. It held the day "partial" for good.
+clearSleepHistoryCache();
+{
+  const empty = { happenDay: dayKey(-5), kind: "main", completeness: "partial", score: 0, partialReason: "Main sleep duration is still syncing." };
+  const { deps } = harness({ records: [night(0)], rows: [rowFor(empty, NOW - 3_600_000)] });
+  const snapshot = await getSleepHistory({ days: 30 }, deps);
+  assert.equal(snapshot.records.some((record) => record.happenDay === dayKey(-5)), false);
+}
+
 clearSleepHistoryCache();
 {
   // Heart rate is one line on a card; the nights are the card.

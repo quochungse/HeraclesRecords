@@ -5,6 +5,7 @@ import {
   getTrainingDashboard,
   getTrainingHubStatus
 } from "./trainingHubService";
+import { getTrainingDailyHealthData } from "./dailyHealthDataService";
 import { buildTrendPoints, mergeTrainingDayLists, recentTrainingHubDateList } from "./trainingTrendUtils";
 import { formatDurationSeconds, formatPaceSeconds } from "./chatActivityTools";
 import { dateFromDayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
@@ -15,6 +16,7 @@ import type {
   CorosProfileZoneFamily,
   FitnessTrendPreview,
   HrZonePreview,
+  TrainingHubDailyHealthRecord,
   TrainingHubDailyMetric,
   TrainingHubDashboard,
   TrainingHubThresholdZone,
@@ -62,7 +64,8 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
         "COROS load and recovery markers per day: training load (and RPE load), " +
         "resting HR, overnight HRV vs baseline, Load Impact, load ratio " +
         "(acute:chronic, ~1.0 = steady), Base Fitness and VO2max (recorded on run " +
-        "days only), led by a summary of the latest values and 7-day load totals. " +
+        "days only), plus daily steps, exercise minutes and average stress, led by " +
+        "a summary of the latest values and 7-day totals. " +
         "Windows over 14 days are rolled up by week with the last 7 days kept " +
         "daily. Pick days to fit the question: 7 for this week, 28 for a block.",
       inputSchema: {
@@ -128,9 +131,10 @@ async function handleGetFitnessTrends(
   try {
     // The dashboard used to be a third read here, for the latest resting HR and
     // recovery — both already in the snapshot every turn carries.
-    const [analytics, dailyMetrics] = await Promise.all([
+    const [analytics, dailyMetrics, wellness] = await Promise.all([
       getTrainingAnalytics(),
-      getDailyMetrics(recentTrainingHubDateList(days))
+      getDailyMetrics(recentTrainingHubDateList(days)),
+      readDailyWellness(days)
     ]);
 
     const window = trendWindow(mergeTrainingDayLists(dailyMetrics, analytics), days);
@@ -144,9 +148,24 @@ async function handleGetFitnessTrends(
       callbacks.onFitnessTrend(preview);
     }
 
-    return formatFitnessTrendsForChat(window, days);
+    return formatFitnessTrendsForChat(window, days, new Date(), wellness);
   } catch (caught) {
     throw formatAnalyticsToolError("get_fitness_trends", caught);
+  }
+}
+
+/**
+ * Steps, exercise minutes and average stress by day, from the COROS MCP
+ * daily-health feed — the one place they exist, and the reason the remote
+ * `queryDailyHealthData`, `queryStressLevel` and `queryAvgHeartRate` are not
+ * offered beside this tool. Optional: without MCP the trend is what it was.
+ */
+async function readDailyWellness(days: number): Promise<Map<string, TrainingHubDailyHealthRecord>> {
+  try {
+    const { records } = await getTrainingDailyHealthData(days);
+    return new Map(records.map((record) => [record.happenDay, record]));
+  } catch {
+    return new Map();
   }
 }
 
@@ -276,13 +295,19 @@ function statusColumns<Row>(
   ];
 }
 
-function dailyTable(window: TrainingHubDailyMetric[]): string[] {
+type Wellness = ReadonlyMap<string, TrainingHubDailyHealthRecord>;
+
+function dailyTable(window: TrainingHubDailyMetric[], wellness: Wellness): string[] {
+  const of = (day: TrainingHubDailyMetric) => wellness.get(day.happenDay);
   return pipeTable(window, { header: "Day", value: (day) => dayLabel(day.happenDay) }, [
     { header: "Load", value: (day) => rounded(day.trainingLoad) },
     { header: "RPE load", value: (day) => rounded(day.rpeLoad) },
     { header: "RHR", value: (day) => rounded(day.rhr) },
     { header: "HRV (baseline)", value: (day) => hrvCell(day.avgSleepHrv, day.sleepHrvBase) },
-    ...statusColumns((day: TrainingHubDailyMetric) => day)
+    ...statusColumns((day: TrainingHubDailyMetric) => day),
+    { header: "Steps", value: (day) => rounded(of(day)?.steps) },
+    { header: "Exercise min", value: (day) => rounded(of(day)?.exerciseMinutes) },
+    { header: "Stress avg", value: (day) => rounded(of(day)?.stressAvg) }
   ]);
 }
 
@@ -317,7 +342,17 @@ function weeksOf(
   return [...weeks.values()].sort((left, right) => left.start.localeCompare(right.start));
 }
 
-function weeklyTable(window: TrainingHubDailyMetric[], windowStart: string, windowEnd: string): string[] {
+function weeklyTable(
+  window: TrainingHubDailyMetric[],
+  windowStart: string,
+  windowEnd: string,
+  wellness: Wellness
+): string[] {
+  const wellnessMean = (week: TrendWeek, pick: (record: TrainingHubDailyHealthRecord) => number | undefined) =>
+    meanOf(week.days.map((day) => {
+      const record = wellness.get(day.happenDay);
+      return record ? pick(record) : undefined;
+    }));
   const lastValue = (week: TrendWeek, pick: (day: TrainingHubDailyMetric) => number | undefined) =>
     latestOf(week.days, pick)?.value;
   return pipeTable(
@@ -350,7 +385,9 @@ function weeklyTable(window: TrainingHubDailyMetric[], windowStart: string, wind
         trainingLoadRatio: lastValue(week, (day) => day.trainingLoadRatio),
         staminaLevel: lastValue(week, (day) => day.staminaLevel),
         vo2max: lastValue(week, (day) => day.vo2max)
-      }))
+      })),
+      { header: "Steps/day", value: (week) => rounded(wellnessMean(week, (record) => record.steps)) },
+      { header: "Stress avg", value: (week) => rounded(wellnessMean(week, (record) => record.stressAvg)) }
     ]
   );
 }
@@ -360,7 +397,12 @@ function weeklyTable(window: TrainingHubDailyMetric[], windowStart: string, wind
  * the model: summing fourteen rows of load or counting nights under baseline is
  * arithmetic a model gets wrong often enough to matter.
  */
-function trendSummary(window: TrainingHubDailyMetric[], days: number, today: Date): string[] {
+function trendSummary(
+  window: TrainingHubDailyMetric[],
+  days: number,
+  today: Date,
+  wellness: Wellness
+): string[] {
   const since = (offset: number) => dayKeyDaysAgo(today, offset);
   const between = (from: string, to: string) =>
     window.filter((day) => day.happenDay >= from && day.happenDay <= to);
@@ -430,6 +472,26 @@ function trendSummary(window: TrainingHubDailyMetric[], days: number, today: Dat
     );
   }
 
+  // The feed runs to yesterday (it is a day behind), so "the last 7 days" of
+  // it end on its newest day, and the line says which day that is.
+  const newest = [...wellness.keys()].filter((day) => day <= since(0)).sort().at(-1);
+  const newestDate = newest ? dateFromDayKey(newest) : undefined;
+  const weekFrom = newestDate ? dayKeyDaysAgo(newestDate, 6) : undefined;
+  const week = newest
+    ? [...wellness.values()].filter((record) => record.happenDay >= weekFrom! && record.happenDay <= newest)
+    : [];
+  const steps = meanOf(week.map((record) => record.steps));
+  const exercise = sumOf(week.map((record) => record.exerciseMinutes));
+  const stress = meanOf(week.map((record) => record.stressAvg));
+  const wellnessParts = [
+    steps !== undefined ? `steps ${Math.round(steps)}/day` : undefined,
+    exercise !== undefined ? `exercise ${Math.round(exercise)} min` : undefined,
+    stress !== undefined ? `average stress ${Math.round(stress)} (0–100)` : undefined
+  ].filter(Boolean);
+  if (wellnessParts.length > 0) {
+    lines.push(`- 7 days to ${dayLabel(newest!)}: ${wellnessParts.join("; ")}`);
+  }
+
   return lines;
 }
 
@@ -441,7 +503,8 @@ function trendSummary(window: TrainingHubDailyMetric[], days: number, today: Dat
 export function formatFitnessTrendsForChat(
   window: TrainingHubDailyMetric[],
   days: number,
-  today: Date = new Date()
+  today: Date = new Date(),
+  wellness: Wellness = new Map()
 ): string {
   if (window.length === 0) {
     return `No fitness trend data for the last ${days} days.`;
@@ -452,20 +515,20 @@ export function formatFitnessTrendsForChat(
   const lines = [
     `Fitness trends, last ${days} days (${dayLabel(windowStart)} → ${dayLabel(windowEnd)}; ` +
       "days without any reading are omitted):",
-    ...trendSummary(window, days, today)
+    ...trendSummary(window, days, today, wellness)
   ];
 
   if (days <= DAILY_TABLE_MAX_DAYS) {
-    lines.push("", "Daily:", ...dailyTable(window));
+    lines.push("", "Daily:", ...dailyTable(window, wellness));
   } else {
     const tailStart = dayKeyDaysAgo(today, DAILY_TAIL_DAYS - 1);
     lines.push(
       "",
       "Weekly (Mon–Sun; load and time summed, RHR and HRV averaged, COROS status as of the week's last reading):",
-      ...weeklyTable(window, windowStart, windowEnd),
+      ...weeklyTable(window, windowStart, windowEnd, wellness),
       "",
       `Daily, last ${DAILY_TAIL_DAYS} days:`,
-      ...dailyTable(window.filter((day) => day.happenDay >= tailStart))
+      ...dailyTable(window.filter((day) => day.happenDay >= tailStart), wellness)
     );
   }
 

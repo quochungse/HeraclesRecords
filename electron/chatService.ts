@@ -18,6 +18,7 @@ import {
   formatScheduledExercisesForChat,
   getCoachCorosProfile,
   getTrainingHubStatus,
+  lastKnownCorosProfileSex,
   listTrainingHubActivities,
   getTrainingDashboard,
   getUpcomingWorkouts
@@ -1854,7 +1855,7 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(ensureAllMcpConnected());
+      await prepare(prepareToolSurface());
       const chatTools = toolsForRun(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
@@ -1968,7 +1969,7 @@ async function streamChatTurn(
         runTools.get(requestId)?.context
       ));
 
-      await prepare(ensureAllMcpConnected());
+      await prepare(prepareToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const effectiveInstructions = withLiveToolInstructions(
         instructions,
@@ -2055,7 +2056,7 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(ensureAllMcpConnected());
+      await prepare(prepareToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const { text: instructions, hasData } = await prepare(buildTrainingContext(
         undefined,
@@ -2143,7 +2144,7 @@ async function streamChatTurn(
       };
 
       if (runtimeConfig.toolsEnabled) {
-        await prepare(ensureAllMcpConnected());
+        await prepare(prepareToolSurface());
       }
       const chatTools = toolsForRun(
         requestId,
@@ -2238,7 +2239,7 @@ async function streamChatTurn(
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
-    await prepare(ensureAllMcpConnected());
+    await prepare(prepareToolSurface());
     const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
 
     // When live tools are available, steer the model to use them rather than
@@ -2841,6 +2842,21 @@ export function dismissScheduleChangeLine(changeSetId: string, lineId?: string):
   return dismissScheduleChange(changeSetId, typeof lineId === "string" && lineId ? lineId : undefined);
 }
 
+/**
+ * What the tool list is decided from, settled before a turn builds it: the MCP
+ * connections, and the account's profile — whose `sex` decides whether COROS's
+ * menstrual-cycle tool is offered (`narrowCorosMcpTools`). The profile is the
+ * one the turn's snapshot reads a moment later, on the same cache, so a warm
+ * cache costs nothing and a cold one costs the request the snapshot would
+ * have made anyway.
+ */
+async function prepareToolSurface(): Promise<void> {
+  await Promise.all([
+    ensureAllMcpConnected(),
+    getTrainingHubStatus().authenticated ? getCoachCorosProfile() : undefined
+  ]);
+}
+
 function getAllChatTools(): CorosMcpTool[] {
   return narrowCorosMcpTools([
     ...getAllMcpTools(),
@@ -2869,6 +2885,38 @@ const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * COROS MCP's own writes, added to the server in September 2026 — hidden from
+ * every chat turn and refused by name in `executeChatTool`.
+ *
+ * Coach writes to COROS through the app, never past it: a plan is a draft the
+ * athlete saves, a change to the calendar is a change set applied line by
+ * line, and every write reads COROS again first and is checked after. These
+ * write straight to the account with none of that — nothing in the transcript,
+ * no card, no plan cache, no running-copy rules — and an analysis run, which
+ * may never write, reached them because the read-only policy let every
+ * `coros__` tool through. They are also the heaviest schemas the server has:
+ * the seven cost ~160k characters, some 40k tokens, on every request round.
+ */
+const COROS_MCP_WRITE_TOOLS: ReadonlySet<string> = new Set([
+  "createScheduledWorkout",
+  "updateScheduledWorkout",
+  "createSingleWorkout",
+  "updateWorkoutDetails",
+  "scheduleWorkout",
+  "createTrainingPlan",
+  "updateTrainingPlan"
+]);
+
+/**
+ * Whether a COROS MCP tool only reads, by its name. The server names its
+ * reads `query…` and `get…`; anything else — the writes above, and whatever it
+ * adds tomorrow — is not assumed to be one.
+ */
+function isCorosMcpRead(toolName: string): boolean {
+  return /^(?:query|get)/.test(toolName) && !COROS_MCP_WRITE_TOOLS.has(toolName);
+}
+
+/**
  * COROS MCP tools a local tool answers better, keyed to that local tool.
  *
  * Each remote tool costs its schema on every request round and hands the model
@@ -2878,23 +2926,67 @@ const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
  * sleep, shorter-sighted (COROS keeps ~9 weeks; the local cache keeps 400
  * days). A remote tool is hidden only while its local counterpart is actually
  * on offer, so a COROS MCP connection with Training Hub signed out keeps them.
+ *
+ * The counterpart is sometimes the snapshot rather than a tool — recovery, the
+ * race predictions and the body metrics ride on every turn — and then the key
+ * is `get_fitness_trends`, which is on offer exactly when the snapshot has
+ * them: both need Training Hub, and both ride with the training-metrics
+ * permission for Claude Code. What is left for COROS MCP alone is SpO2 and
+ * respiration (`queryHealthCheckTimeSeries`) and the menstrual cycle.
  */
 const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
   querySleepOverview: "get_sleep_summary",
   querySleepData: "get_sleep_summary",
+  querySleepHrv: "get_sleep_summary",
+  // A day's stress by hour (`stress_day`), not 21k characters of samples.
+  queryStressTimeSeries: "get_sleep_summary",
   getActivityDetail: "get_activity_detail",
   queryActivityLapData: "get_activity_detail",
-  queryTrainingSchedule: "list_scheduled_workouts"
+  // A stretch of one activity (`window`), read off the cached detail.
+  queryCustomActivityLapData: "get_activity_detail",
+  // Sessions by length (`min_km`…); COROS's location filter has no counterpart.
+  querySportRecords: "list_recent_activities",
+  queryTrainingSchedule: "list_scheduled_workouts",
+  queryScheduledWorkoutDetails: "list_scheduled_workouts",
+  queryTrainingPlanLibrary: "list_training_plans",
+  queryTrainingPlanDetails: "get_training_plan",
+  queryWorkoutLibrary: "get_workout_library",
+  queryWorkoutDetails: "get_workout_library",
+  // Steps, exercise minutes and average stress are columns of the trend.
+  queryDailyHealthData: "get_fitness_trends",
+  queryStressLevel: "get_fitness_trends",
+  queryAvgHeartRate: "get_fitness_trends",
+  queryRestingHeartRate: "get_fitness_trends",
+  queryTrainingLoadAssessment: "get_fitness_trends",
+  // In the snapshot: VO2max and threshold pace, the race predictions, recovery.
+  queryFitnessAssessmentOverview: "get_fitness_trends",
+  queryRecoveryStatus: "get_fitness_trends",
+  // In the snapshot's athlete profile.
+  queryUserInfo: "get_fitness_trends"
 };
 
-export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
+/** COROS encodes `sex` as 0 = male, 1 = female. */
+const COROS_SEX_FEMALE = 1;
+
+/**
+ * `profileSex` is the account's `sex`, read before the turn by
+ * `prepareToolSurface`. COROS's menstrual-cycle tool is offered only to an
+ * account COROS knows as female, and not while that is unknown.
+ */
+export function narrowCorosMcpTools(
+  tools: CorosMcpTool[],
+  profileSex: number | undefined = lastKnownCorosProfileSex()
+): CorosMcpTool[] {
   const offered = new Set(tools.map((tool) => tool.name));
   return tools.filter((tool) => {
     const remote = splitToolName(tool.name);
     if (remote?.serverId !== "coros") {
       return true;
     }
-    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName)) {
+    if (UNUSABLE_COROS_MCP_TOOLS.has(remote.toolName) || COROS_MCP_WRITE_TOOLS.has(remote.toolName)) {
+      return false;
+    }
+    if (remote.toolName === "queryMenstruationCycles" && profileSex !== COROS_SEX_FEMALE) {
       return false;
     }
     const local = SUPERSEDED_COROS_MCP_TOOLS[remote.toolName];
@@ -2902,23 +2994,55 @@ export function narrowCorosMcpTools(tools: CorosMcpTool[]): CorosMcpTool[] {
   });
 }
 
+/**
+ * The COROS MCP reads each Claude Code permission lets through, by the server's
+ * own names. Until September 2026 this listed names the server never had
+ * (`get_training_load`, `get_sleep_data`…), so Claude Code was offered no COROS
+ * MCP tool whatever was switched on. Most of these are then hidden again by
+ * `narrowCorosMcpTools` while the local tool that answers them is on offer —
+ * they are here for a machine where it is not (Training Hub signed out), and so
+ * that each permission covers the remote reads of its kind as well as the local.
+ * A write is never listed: `COROS_MCP_WRITE_TOOLS` refuses them regardless.
+ */
 const CLAUDE_REMOTE_READ_TOOLS: Record<
   keyof ClaudeCodePermissions,
   readonly string[]
 > = {
   recentActivities: [
-    "get_recent_activities",
-    "get_activity_details",
-    "get_activity_detail"
+    "getActivityDetail",
+    "queryActivityLapData",
+    "queryCustomActivityLapData",
+    "querySportRecords"
   ],
   trainingMetrics: [
-    "get_training_metrics",
-    "get_fitness_metrics",
-    "get_recovery_metrics",
-    "get_training_load"
+    "queryFitnessAssessmentOverview",
+    "queryTrainingLoadAssessment",
+    "queryRecoveryStatus",
+    "queryDailyHealthData",
+    "queryAvgHeartRate",
+    "queryRestingHeartRate",
+    "queryUserInfo",
+    // Offered only to an account COROS knows as female (`narrowCorosMcpTools`).
+    "queryMenstruationCycles"
   ],
-  upcomingWorkouts: ["get_upcoming_workouts", "get_training_calendar"],
-  sleepData: ["get_sleep_summary", "get_sleep_data"],
+  upcomingWorkouts: [
+    "queryTrainingSchedule",
+    "queryScheduledWorkoutDetails",
+    "queryTrainingPlanLibrary",
+    "queryTrainingPlanDetails",
+    "queryWorkoutLibrary",
+    "queryWorkoutDetails"
+  ],
+  sleepData: [
+    "querySleepOverview",
+    "querySleepData",
+    "querySleepHrv",
+    "queryStressLevel",
+    "queryStressTimeSeries",
+    // A wellness check's HRV, stress, SpO2 and respiration: the recovery
+    // readings the sleep permission and the sleep source cover.
+    "queryHealthCheckTimeSeries"
+  ],
   fullActivityFiles: []
 };
 
@@ -2959,6 +3083,7 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "get_plan_draft",
   "list_training_plans",
   "get_training_plan",
+  "get_workout_library",
   // A proposal the athlete applies from its card; it writes nothing (P3.3).
   "propose_schedule_changes",
   "request_coach_input"
@@ -2981,10 +3106,10 @@ export function isToolAllowedUnderPolicy(
   }
   const remote = splitToolName(name);
   // A remote tool's write surface is its server's business, and only the COROS
-  // one is known — those are already permission-gated by name before they get
-  // here (6).
+  // one is known. It used to be let through whole, on the theory that its
+  // tools were all reads — true until the server added seven writes.
   if (remote) {
-    return remote.serverId === "coros";
+    return remote.serverId === "coros" && isCorosMcpRead(remote.toolName);
   }
   // A local tool the app owns. Not on the list means not decided, and not
   // decided means not reachable from a run nobody is watching.
@@ -3034,7 +3159,8 @@ export function getClaudeCodeTools(
       tool.name === "delete_workout" ||
       tool.name === "propose_schedule_changes" ||
       tool.name === "list_training_plans" ||
-      tool.name === "get_training_plan"
+      tool.name === "get_training_plan" ||
+      tool.name === "get_workout_library"
     ) {
       return permissions.upcomingWorkouts;
     }
@@ -3085,6 +3211,12 @@ async function executeChatTool(
   if (!isToolAllowedUnderPolicy(name, toolPolicy)) {
     throw new Error(
       `${name} is not available to an analysis run; it may only read, analyse and draft.`
+    );
+  }
+  const remote = splitToolName(name);
+  if (remote?.serverId === "coros" && COROS_MCP_WRITE_TOOLS.has(remote.toolName)) {
+    throw new Error(
+      `${name} is not available: Coach writes to COROS through draft_workout, draft_training_plan and propose_schedule_changes, which the athlete applies.`
     );
   }
 

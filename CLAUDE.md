@@ -815,10 +815,23 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`chatActivityTools`, `chatAnalyticsTools`, `chatSleepTools`, `chatWorkoutTools`,
   `chatInteractionTools`) and MCP servers.
   The read tools are built to fetch only what a question is about: the activity list takes a
-  date window and a sport family and returns per-sport totals, `get_activity_detail` takes a
-  `sections` list, trends and sleep take `days` and roll up by week past 14, and
-  `get_sleep_summary` takes a `night` for one night's HRV course. Each formatter computes its
-  own totals and deltas so the model reads them rather than doing the arithmetic.
+  date window, a sport family and length bounds (`min_km`…) and returns per-sport totals,
+  `get_activity_detail` takes a `sections` list and a `window` (one stretch — "the last 5 km" —
+  on activity time, `summarizeActivityWindow` in `activityMetrics.ts`), trends and sleep take
+  `days` and roll up by week past 14 — trends with steps, exercise minutes and average stress
+  from the daily-health feed beside the load — `get_sleep_summary` takes a `night` for one
+  night's HRV course and a `stress_day` for a day's stress by hour, and `get_workout_library`
+  reads the library the Training Library reads, with a movement's name from the exercise
+  catalogue (COROS stores "Training" for nearly every strength step). Each formatter computes
+  its own totals and deltas so the model reads them rather than doing the arithmetic.
+  **COROS MCP is left only what it alone has** (September 2026): every remote read with a
+  local answer — a tool, or the snapshot, keyed to `get_fitness_trends` — is in
+  `SUPERSEDED_COROS_MCP_TOOLS`, which on the live account leaves `queryHealthCheckTimeSeries`
+  (SpO2, respiration): ~270 tokens a round where the 16 reads cost ~4.8k.
+  `queryMenstruationCycles` is offered only to an account whose COROS `sex` is female
+  (`lastKnownCorosProfileSex`, read before the tool list by `prepareToolSurface`), and not while
+  it is unknown. `CLAUDE_REMOTE_READ_TOOLS` names the server's real tools per Claude Code
+  permission — it named tools that never existed, so Claude Code had been offered none.
   **Coach's proposals to the calendar and the library are change sets** (P3.2, `chatScheduleChanges.ts`):
   rows of `chat_schedule_changes` (`personal`), a `scheduleChange` anchor in the transcript, and a
   card (`CoachScheduleChangeCard`) whose lines are applied or dismissed one at a time or all at once
@@ -863,9 +876,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   prescribed target is read off the athlete's thresholds rather than inferred from recent
   activities; the snapshot carries the thresholds themselves, the body metrics and the
   all-time personal records, all of which were already being fetched every turn and dropped.
-  `narrowCorosMcpTools` hides two kinds of COROS MCP tool: one a local tool supersedes (only
-  while that local tool is on offer) and one no chat turn can act on at all (FIT downloads,
-  devices, COROS's own activity write-up). A new local tool must be placed on one side of
+  `narrowCorosMcpTools` hides three kinds of COROS MCP tool: one a local tool supersedes (only
+  while that local tool is on offer), one no chat turn can act on at all (FIT downloads,
+  devices, COROS's own activity write-up) and **every COROS MCP write** (`COROS_MCP_WRITE_TOOLS`:
+  the seven workout, schedule and plan writes the server added in September 2026). Coach writes
+  through drafts and change sets, never past them, so `executeChatTool` refuses those by name
+  too; and a read-only run takes a `coros__` tool only when its verb is `query`/`get`
+  (`isCorosMcpRead`). The read-only policy used to let every `coros__` tool through on the
+  theory that the server only read — an unattended analysis could have written a plan the
+  day it stopped being true. A new local tool must be placed on one side of
   `READ_ONLY_ALLOWED_TOOLS` or `test:coach-analysis-guards` fails, and must be given a
   source in `LOCAL_CHAT_TOOL_SOURCES` (`chatToolSources.ts`) or `test:chat-tool-sources`
   fails. The badge under an answer groups the tools a turn called by that source — **DB**
@@ -1249,6 +1268,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   (COROS has said all it will), and is unsettled for one day past its own so a late watch
   sync can still turn it into a night. `Naps Total: 0 min` with no main sleep is **not** a
   record: nothing was slept.
+  **A night's stage minutes are COROS's own where the daily-health line is this night's.**
+  The sleep feed states stages as whole percentages of the period (a minute or two off the
+  COROS app); `queryDailyHealthData` — already read for the night's heart rate, so no request
+  more — states them in minutes. `exactStages` (`sleepHistoryService.ts`) takes them only for a
+  `main` night whose `windowMinutes` equals that line's `Total` (the period, awake included):
+  on a day of naps only the line is **one nap of several**. Both feeds keep ~63 nights, so an
+  older night keeps the minutes worked out from its percentages.
   `kind` therefore has three values, and the filter that means "a day" is
   `isSleepDayRecord` (`kind !== "nap"`), not a bare comparison — a single `nap` is a
   component folded into its day, never listed beside it. `selectWindow` does that folding
@@ -1270,11 +1296,21 @@ Overview, Media, Data, and Settings are in the main bundle.
   samples. `npm run test:sleep-renderer` mounts the screen in a real window and
   fails on either shortcut.
   **COROS sends a window per nap but nothing at all about an individual
-  wake-up** (probed 2026-09-16: `querySleepData` has only `Awake Time` and
+  wake-up** (probed 2026-09-16: `querySleepData`, since renamed `querySleepOverview`, has only `Awake Time` and
   `Awake Count (>5 min)`, `querySleepHrv`'s `status` is 4 all night, and the
-  stress series' `score` is a stress band). The nap windows sum to the day's
-  reported `Naps Total` exactly; `napSummary.ts` builds the Naps tile and its
-  hover note from them.
+  stress series' `score` is a stress band). Since `querySleepOverview` a nap
+  window is a *period* (`Naps Period (incl. awake)`) and the total is time asleep
+  (`Naps Total (asleep)`), so the windows sum to a little more than the total;
+  `napSummary.ts` builds the Naps tile from the total and its hover from the
+  windows. **The daily-health "Sleep Summary" line is one episode's**: the main
+  sleep's, or on a day of naps only the first nap's (2026-08-22, 09-15), so its
+  heart rate and minutes fold onto a night only where its `Total` is that
+  episode's window (`dailyHealthEpisode`). A day with no sleep window asks for no
+  HRV or stress series — COROS has none for it ("No data").
+  **The COROS tool list is read on connect and not again unless a caller's tool
+  is missing from it** (`corosMcpToolsHaving`): a `tools/list` is ~185 KB since
+  the server grew to 34 tools, and the sleep fill, the daily-health read and the
+  night series each used to ask for it on every call.
   **An MCP failure is one of two things and never one boolean.** Every payload MCP
   serves carries `mcpState: McpAvailability` — `"ready"`, `"disconnected"` (no COROS MCP
   server set up here, so connect it) or `"unreachable"` (one that *is* set up and did not
