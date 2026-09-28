@@ -2880,6 +2880,7 @@ const UNUSABLE_COROS_MCP_TOOLS: ReadonlySet<string> = new Set([
  * on offer, so a COROS MCP connection with Training Hub signed out keeps them.
  */
 const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
+  querySleepOverview: "get_sleep_summary",
   querySleepData: "get_sleep_summary",
   getActivityDetail: "get_activity_detail",
   queryActivityLapData: "get_activity_detail",

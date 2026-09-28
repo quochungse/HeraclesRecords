@@ -16,7 +16,10 @@ import type {
   TrainingHubSleepSummary
 } from "./types";
 
-const PREFERRED_SLEEP_TOOL = "querySleepData";
+// COROS renamed `querySleepData` to `querySleepOverview` in September 2026;
+// the old name stays as a fallback for a server that still offers it.
+const PREFERRED_SLEEP_TOOL = "querySleepOverview";
+const LEGACY_SLEEP_TOOL = "querySleepData";
 const FALLBACK_SLEEP_TOOL = "get_sleep_data";
 
 function toOptionalNumber(value: unknown): number | undefined {
@@ -1333,7 +1336,9 @@ function parseProseSleepSection(
   const isoDateMatch = section.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   const compactDateMatch = section.match(/\b(20\d{6})\b/);
   const scoreMatch = section.match(/Sleep score:\s*(\d+(?:\.\d+)?)/i);
-  const mainSleepMatch = section.match(/Main sleep:\s*([^\n]+)/i);
+  // `querySleepOverview` writes "Main Sleep (asleep): 5h 48min" beside
+  // "Main Sleep Period (incl. awake)"; the older tool wrote "Main Sleep:".
+  const mainSleepMatch = section.match(/Main sleep(?:\s*\(asleep\))?:\s*([^\n]+)/i);
   const awakeMatch = section.match(/Awake time:\s*([^\n]+)/i);
   const awakePercentMatch = section.match(/Awake (?:ratio|percent(?:age)?):\s*(\d+(?:\.\d+)?)\s*%/i);
   const awakeCountMatch = section.match(/(?:Awake count|Wake-ups?|Wakeups?)\s*(?:\(?\s*>?\s*5\s*min(?:utes?)?\s*\)?)?:\s*(\d+)/i);
@@ -1730,7 +1735,9 @@ export function parseSleepDataResponse(
 }
 
 function resolveSleepTool(tools: CorosMcpTool[]): CorosMcpTool | undefined {
-  const preferred = tools.find((tool) => tool.name === PREFERRED_SLEEP_TOOL);
+  const preferred = tools.find(
+    (tool) => tool.name === PREFERRED_SLEEP_TOOL || tool.name === LEGACY_SLEEP_TOOL
+  );
   if (preferred) {
     return preferred;
   }
