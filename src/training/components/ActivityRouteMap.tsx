@@ -1162,45 +1162,30 @@ function RouteZoneLegend({
   );
 }
 
-/**
- * The key to what Performance is colouring: the ramp, the zones or the heights.
- * `named` puts the metric's name in front, for a map with no metric picker
- * beside it to say which one it is.
- */
+/** The key to what Performance is colouring: the ramp, the zones or the heights. */
 function RouteColoringKey({
   analysis,
-  lightGround,
-  named = false
+  lightGround
 }: {
   analysis: RouteAnalysis;
   lightGround: boolean;
-  named?: boolean;
 }) {
   const { view, metric, speed } = analysis;
   if (!view) {
     return null;
   }
   const timed = metric === "pace" ? "pace" : "hr";
-  const legend =
-    view.kind === "elevation" ? (
-      <RouteElevationLegend lightGround={lightGround} />
-    ) : view.kind === "zones" ? (
-      <RouteZoneLegend metric={timed} speed={speed} coloring={view.coloring} />
-    ) : (
-      <RouteColorLegend
-        metric={timed}
-        speed={speed}
-        coloring={view.coloring}
-        ramp={routeRamp(lightGround)}
-      />
-    );
-  return named ? (
-    <span className="activity-route-coloring-key">
-      <span className="activity-route-coloring-name">{metricLabel(metric, speed)}</span>
-      {legend}
-    </span>
+  return view.kind === "elevation" ? (
+    <RouteElevationLegend lightGround={lightGround} />
+  ) : view.kind === "zones" ? (
+    <RouteZoneLegend metric={timed} speed={speed} coloring={view.coloring} />
   ) : (
-    legend
+    <RouteColorLegend
+      metric={timed}
+      speed={speed}
+      coloring={view.coloring}
+      ramp={routeRamp(lightGround)}
+    />
   );
 }
 
@@ -1388,6 +1373,7 @@ function RouteMapFrame({
   replayToken,
   drawing,
   ariaLabel,
+  onExpand,
   onReplay,
   layerSection
 }: {
@@ -1401,6 +1387,8 @@ function RouteMapFrame({
   replayToken?: number;
   drawing?: RouteDrawing;
   ariaLabel: string;
+  /** Present on a map that opens a bigger one: a button over the layer picker. */
+  onExpand?: () => void;
   /** Present on a map that replays its route: a button under the layer picker. */
   onReplay?: () => void;
 }) {
@@ -1416,6 +1404,19 @@ function RouteMapFrame({
         baseLayer={layers.baseLayer}
         ariaLabel={ariaLabel}
       />
+      {onExpand ? (
+        // The layer picker's own look, like Replay, and before it in the tab
+        // order as it is on screen.
+        <button
+          type="button"
+          className="basemap-toggle map-expand"
+          onClick={onExpand}
+          title="Expand map"
+          aria-label="Expand map"
+        >
+          <Maximize2 size={16} aria-hidden="true" />
+        </button>
+      ) : null}
       <MapLayerControl
         value={layers.baseLayer}
         onChange={layers.setBaseLayer}
@@ -1440,7 +1441,7 @@ function RouteMapFrame({
 
 /**
  * The route on the whole window, with the layer picker. One component for
- * every way in — the Expand link under the side-panel map and a route cover —
+ * every way in — the side-panel map's Expand button and a route cover —
  * so the two cannot drift apart. It reads the analysis its opener already made.
  */
 function RouteMapModal({
@@ -1610,19 +1611,8 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
         drawing={drawing}
         layerSection={analysis.layerSection}
         ariaLabel="Activity route map"
+        onExpand={() => setExpanded(true)}
       />
-      <div className="activity-route-footer">
-        <RouteLegend />
-        <RouteColoringKey analysis={analysis} lightGround={lightGround} named />
-        <button
-          type="button"
-          className="activity-route-expand"
-          onClick={() => setExpanded(true)}
-        >
-          <Maximize2 size={13} aria-hidden="true" />
-          Expand
-        </button>
-      </div>
       {expanded ? (
         <RouteMapModal
           route={route}

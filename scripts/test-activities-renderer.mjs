@@ -365,6 +365,8 @@ async function main() {
   // menu listening there too could not stop the key reaching the panel, so one
   // press closed the menu and the panel with it. And a map 200-300px tall
   // held its menu in a box that scrolled, the route's colouring out of sight.
+  // Expand is a button on the map above the layer picker, with nothing under
+  // the map.
   // -------------------------------------------------------------------------
   {
     const selectionKeys = [
@@ -395,13 +397,39 @@ async function main() {
       detail: { series, hrZones, sportType: 100 }
     });
     await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
-    await waitFor(() => harness("exists", ".activity-route-map .basemap-toggle"), "the map renders");
+    const layerButton = ".activity-route-map .basemap-control .basemap-toggle";
+    await waitFor(() => harness("exists", layerButton), "the map renders");
     await settle();
 
-    assert.equal(
-      await harness("text", ".activity-route-map .activity-route-coloring-name"),
-      "Heart rate",
-      "the pane's map says what it is coloured by"
+    const corner = await win.webContents.executeJavaScript(
+      `(() => {
+        const root = document.querySelector(".activity-route-map");
+        const box = (selector) => {
+          const rect = root.querySelector(selector)?.getBoundingClientRect();
+          return rect && { top: rect.top, bottom: rect.bottom, right: rect.right, width: rect.width, height: rect.height };
+        };
+        return {
+          children: [...root.children].map((child) => child.matches(".activity-route-map-frame")),
+          map: box(".activity-route-map-canvas"),
+          expand: box(".map-frame > .map-expand.basemap-toggle"),
+          layer: box(${JSON.stringify(layerButton.replace(".activity-route-map ", ""))}),
+          label: root.querySelector(".map-expand")?.getAttribute("aria-label")
+        };
+      })()`,
+      true
+    );
+    assert.deepEqual(corner.children, [true], `the map and nothing under it: ${corner.children}`);
+    assert.ok(corner.expand && corner.layer, `Expand and the layer picker are on the map: ${JSON.stringify(corner)}`);
+    assert.equal(corner.label, "Expand map", "Expand is named for a screen reader");
+    assert.ok(
+      corner.expand.top >= corner.map.top && corner.expand.bottom < corner.layer.top,
+      `Expand sits inside the map, above the layer picker: ${JSON.stringify(corner)}`
+    );
+    assert.ok(
+      corner.expand.right === corner.layer.right &&
+        corner.expand.width === corner.layer.width &&
+        corner.expand.height === corner.layer.height,
+      `in the layer picker's look: ${JSON.stringify(corner)}`
     );
 
     // The line's neon: the line keeps its 4px, a whitened core runs down its
@@ -434,7 +462,7 @@ async function main() {
     };
     const menuOpen = () => harness("exists", ".activity-route-map .basemap-control.is-open");
 
-    await harness("click", ".activity-route-map .basemap-toggle");
+    await harness("click", layerButton);
     await waitFor(menuOpen, "the layer menu opens");
     const menu = await win.webContents.executeJavaScript(
       `(() => {
@@ -460,7 +488,7 @@ async function main() {
     assert.equal(await harness("callCount", "prop:onPanelEscape"), 0, "and only the menu");
     assert.equal(
       await win.webContents.executeJavaScript(
-        `document.activeElement?.matches(".activity-route-map .basemap-toggle") ?? false`,
+        `document.activeElement?.matches(${JSON.stringify(layerButton)}) ?? false`,
         true
       ),
       true,
@@ -473,14 +501,21 @@ async function main() {
     );
 
     // A press anywhere else closes the menu too: it must not be left open
-    // under the full map the Expand link opens.
-    await harness("click", ".activity-route-map .basemap-toggle");
+    // under the full map Expand opens.
+    await harness("click", layerButton);
     await waitFor(menuOpen, "the layer menu opens again");
     await win.webContents.executeJavaScript(
-      `document.querySelector(".activity-route-expand").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))`,
+      `document.querySelector(".activity-route-map .map-expand").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))`,
       true
     );
     await waitFor(async () => !(await menuOpen()), "a press outside closes the menu");
+
+    // Expand opens the full map, and Escape closes that and nothing else.
+    await harness("click", ".activity-route-map .map-expand");
+    await waitFor(() => harness("exists", ".activity-route-modal"), "Expand opens the full map");
+    pressEscape();
+    await waitFor(async () => !(await harness("exists", ".activity-route-modal")), "Escape closes the full map");
+    assert.equal(await harness("callCount", "prop:onPanelEscape"), 1, "and not the panel under it");
 
     await win.webContents.executeJavaScript(
       selectionKeys.map((key) => `localStorage.removeItem(${JSON.stringify(key)});`).join(""),

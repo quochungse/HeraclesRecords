@@ -14265,19 +14265,6 @@ tr.data-intervals-row-missing {
   font-variant-numeric: tabular-nums;
 }
 
-/* The side-panel map's key: which metric, then its scale. */
-.activity-route-coloring-key {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.activity-route-coloring-name {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .activity-route-color-ramp {
   display: inline-flex;
   gap: 2px;
@@ -14306,23 +14293,6 @@ tr.data-intervals-row-missing {
 .leaflet-heraclesRouteHalo-pane {
   filter: blur(4px);
   pointer-events: none;
-}
-
-.activity-route-expand {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #74c08f;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activity-route-expand:hover {
-  text-decoration: underline;
 }
 
 .activity-route-modal-backdrop {
@@ -14392,7 +14362,9 @@ tr.data-intervals-row-missing {
  * `.map-frame` — an interactive map with its two corner controls: the layer
  * picker top-right and the tile credit's (i) bottom-right. The side-panel route
  * map, the full route map and the globe's street map all wear it, so the three
- * cannot drift apart. The frame itself is positioned by whoever owns it.
+ * cannot drift apart. The frame itself is positioned by whoever owns it. The
+ * side-panel map puts Expand above the picker and the full map Replay below it,
+ * both in the picker's look.
  */
 .map-frame {
   /* The controls' z-indexes are for stacking over Leaflet's panes, not over the
@@ -14426,6 +14398,19 @@ tr.data-intervals-row-missing {
   top: 54px;
   right: 12px;
   z-index: 1100;
+}
+
+/* Expand takes the corner and the picker moves down a place under it, so its
+   menu still opens below its own button. */
+.map-frame .map-expand {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+}
+
+.map-frame:has(> .map-expand) .basemap-control {
+  top: 54px;
 }
 
 .map-frame .basemap-toggle {
@@ -23017,8 +23002,7 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution a,
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a,
-:root[data-theme="paper"] .activity-route-expand {
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a {
   color: var(--accent);
 }
 
