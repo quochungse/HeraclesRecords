@@ -233,9 +233,34 @@ export function buildAnthropicMessages(
       }));
 }
 
+/**
+ * The system prompt as two blocks, the first carrying a cache marker.
+ *
+ * A tool-using answer is several requests, each re-sending the tools, the
+ * system prompt and the conversation so far — ~20k tokens before the athlete's
+ * words, most of it tool schemas — and nothing was cached, so every round paid
+ * for all of it again. The marker sits on the end of what does not change
+ * within a conversation (tools render before the system prompt, so it covers
+ * them too); `live`, the date and the COROS snapshot, comes after it, so a new
+ * recovery figure costs only itself. The request's top-level `cache_control`
+ * does the rest, moving a second marker along the growing conversation.
+ */
+export function buildAnthropicSystem(
+  instructions: string,
+  live?: string
+): Anthropic.Beta.BetaTextBlockParam[] {
+  return [
+    { type: "text", text: instructions, cache_control: { type: "ephemeral" } },
+    ...(live?.trim() ? [{ type: "text" as const, text: live }] : [])
+  ];
+}
+
 export interface StreamAnthropicChatOptions {
   config: AnthropicRuntimeConfig;
+  /** What stays the same across a conversation; cached. */
   instructions: string;
+  /** What this turn read (the date, the snapshot); sent after the cache marker. */
+  liveInstructions?: string;
   messages: ChatMessage[];
   tools: CorosMcpTool[];
   maxToolRounds: number;
@@ -291,7 +316,8 @@ export async function streamAnthropicChatCompletion(
           model,
           max_tokens: getAnthropicModelCapabilities(model, options.config.listed)
             .maxOutputTokens,
-          system: options.instructions,
+          system: buildAnthropicSystem(options.instructions, options.liveInstructions),
+          cache_control: { type: "ephemeral" },
           messages: conversation,
           ...(tools.length > 0 ? { tools } : {}),
           ...tuning

@@ -236,6 +236,63 @@ assert.doesNotMatch(
   "and says nothing of charts to a turn that cannot draw one"
 );
 
+// --- the tool guide says each rule once, beside its tool -------------------
+const tool = (name) => ({ name, description: "", inputSchema: {} });
+const everyWorkoutTool = [
+  "search_coros_exercises", "draft_workout", "draft_training_plan", "revise_training_plan",
+  "get_plan_draft", "list_scheduled_workouts", "delete_workout", "propose_schedule_changes",
+  "request_plan_brief", "list_training_plans", "get_training_plan", "request_coach_input"
+].map(tool);
+const fullGuide = withLiveToolInstructions("Coach.", everyWorkoutTool, { inlineSuggestions: true });
+for (const rule of [
+  /One standalone workout[^\n]*→ draft_workout/,
+  /Workout Library or the Calendar/,
+  /Never wrap a one-off workout in a plan/,
+  /Longer than two weeks → request_plan_brief/,
+  /revise_training_plan with its newest draft_id/,
+  /propose_schedule_changes once/,
+  /list_scheduled_workouts, then delete_workout/,
+  /call search_coros_exercises first/,
+  /naming mismatch alone is never a reason/,
+  /exercise_resolution_required/,
+  /call the same draft tool again in the same response/,
+  /typed intensity field/,
+  /request_coach_input — at most once per turn/,
+  /Nothing you call writes to COROS/,
+  /Every sport takes step kinds/
+]) {
+  assert.match(fullGuide, rule);
+}
+for (const [rule, times] of [[/typed intensity/g, 1], [/search_coros_exercises first/g, 1], [/request_coach_input/g, 1]]) {
+  assert.equal((fullGuide.match(rule) ?? []).length, times, `${rule} is said once`);
+}
+assert.doesNotMatch(fullGuide, /Authoring tools:/, "the model has the tool list already");
+assert.doesNotMatch(fullGuide, /Delete from COROS/);
+
+// A read-only turn without the writing tools is told nothing about them.
+const readOnlyGuide = withLiveToolInstructions(
+  "Coach.",
+  ["get_plan_draft", "list_scheduled_workouts", "list_training_plans", "get_training_plan"].map(tool)
+);
+for (const absent of [/draft_workout/, /delete_workout/, /propose_schedule_changes/, /search_coros_exercises/, /Writing a workout/, /request_coach_input/]) {
+  assert.doesNotMatch(readOnlyGuide, absent, `a turn without the tool hears nothing of ${absent}`);
+}
+assert.match(readOnlyGuide, /list_training_plans and get_training_plan/);
+// Every provider sends the rules, then the tool guide, then what the turn read;
+// the Anthropic one keeps the last apart so the cache marker falls before it.
+{
+  const service = readSource(repoRoot, "electron", "chatService.ts");
+  assert.equal((service.match(/const systemPrompt = coachSystemPrompt\(/g) ?? []).length, 5, "all five providers");
+  assert.doesNotMatch(service, /text: instructions, hasData/, "no provider sends the old snapshot-in-the-middle prompt");
+  assert.match(service, /instructions: systemPrompt\.stable,\s*liveInstructions: systemPrompt\.live,/);
+  assert.match(service, /const sections: string\[\] = \[today, ""\];/, "the date heads the part that changes");
+}
+// A plan with no brief tool is drafted at any length.
+assert.match(
+  withLiveToolInstructions("Coach.", [tool("draft_training_plan")]),
+  /A multi-day or multi-week schedule → draft_training_plan\./
+);
+
 // --- a re-emitted card replaces the first rather than appending ------------
 const upserts = createCollectorSink();
 runStream(upserts, [

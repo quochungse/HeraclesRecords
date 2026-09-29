@@ -1141,7 +1141,27 @@ Overview, Media, Data, and Settings are in the main bundle.
   `test:chat-workout-tools` guards the size (< 20 kB per schema) and `test:workout-intensity-codec`
   asserts the refusals come from the validator. Collapsing the step's last copy needs
   `$defs`/`$ref`, deliberately not used on the main write path: not every provider resolves a
-  `$ref` well when *writing* arguments.
+  `$ref` well when *writing* arguments. **`revise_training_plan` carries no copy at all**: its
+  `ops[].workout` is an open object (`additionalProperties: true` — Claude Code's bridge rebuilds
+  each property through `z.fromJSONSchema`, and a stripping object would arrive empty), named in
+  words against the two draft tools it is always offered beside; a revised plan is validated as
+  a new draft. That was a third 15 kB copy, ~3.8k tokens a round.
+
+  **The system prompt is three parts in a fixed order, and the order is for the cache.**
+  `buildBaseCoachInstructions` is who the coach is and how it coaches, and **names no tool** — it
+  is sent whatever a turn holds (an analysis is read-only, a pipeline step gets one writing
+  tool) and it is what Settings shows the athlete, so a tool rule there promised a tool the turn
+  might not have; `test:chat-service` fails on a tool name in it. Every tool rule is written once
+  in `withLiveToolInstructions`, each only when its tool is on offer (`test:chat-stream-sink`).
+  Then `buildTrainingContext`'s `live` part — **today's date** (`formatCoachToday`: day and time
+  zone, never the time, which would change the prompt every turn) and the COROS snapshot — comes
+  **last**, through `coachSystemPrompt`. Nothing else tells the model the date: Claude Code is
+  given a system prompt of our own, which replaces the one that would carry it. The snapshot
+  used to sit between the rules and the tool guide, so a new recovery figure invalidated the
+  ~2k-token guide behind it in any prefix cache. The Anthropic provider sends the parts as two
+  blocks, a cache marker on the first (`buildAnthropicSystem`), plus top-level `cache_control`
+  for the conversation — it cached nothing before, so every round of a tool loop paid for
+  ~20k tokens of tools and prompt again.
 
   **The screen's frame follows the Coach Workbench review** (2026-09-26). The head is the
   open conversation's (`ChatConversationHeader`: its name, renamed in place, a Reads chip

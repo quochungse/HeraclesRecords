@@ -46,6 +46,7 @@ const {
   buildCoachSportCapabilityGuide,
   formatAthleteProfile,
   formatCoachDashboard,
+  formatCoachToday,
   formatPersonalRecords,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport,
@@ -134,15 +135,30 @@ assert.match(coachInstructions, /multi-sport endurance and strength-training coa
 assert.match(coachInstructions, /Honor every sport the athlete explicitly requests/);
 assert.match(coachInstructions, /Never add an unfamiliar sport merely for variety/);
 assert.match(coachInstructions, /Open Water Swim is not Pool Swim/);
-assert.match(coachInstructions, /exactly one standalone workout/);
-assert.match(coachInstructions, /call draft_workout/);
-assert.match(coachInstructions, /Workout Library or Calendar/);
-assert.match(coachInstructions, /never disguise it as a one-workout training plan/);
-assert.match(coachInstructions, /exercise_resolution_required/);
-assert.match(coachInstructions, /call search_coros_exercises first/);
-assert.match(coachInstructions, /naming mismatch alone is never a reason/);
-assert.match(coachInstructions, /call the same draft tool again in the same response/);
-assert.match(coachInstructions, /request_coach_input/);
+assert.match(coachInstructions, /concise, practical advice/);
+assert.match(coachInstructions, /Answer in the language the athlete writes in/, "the prompt and snapshot are English; the athlete may not be");
+assert.doesNotMatch(coachInstructions, /friendly|encouraging|knowledgeable/i, "form that changes the answer, not temperament");
+assert.match(coachInstructions, /belong with a professional/);
+// The base block is sent whatever tools a turn holds, and shown to the athlete
+// in Settings: a rule naming a tool belongs beside that tool, in the guide
+// `withLiveToolInstructions` writes (held by test:chat-stream-sink).
+for (const tool of [
+  "draft_workout",
+  "draft_training_plan",
+  "revise_training_plan",
+  "search_coros_exercises",
+  "request_coach_input",
+  "list_scheduled_workouts",
+  "delete_workout",
+  "exercise_resolution_required"
+]) {
+  assert.doesNotMatch(coachInstructions, new RegExp(tool), `the base prompt names no tool (${tool})`);
+}
+assert.doesNotMatch(coachInstructions, /Delete from COROS/, "a button that no longer exists");
+
+const todayLine = formatCoachToday(new Date(2026, 8, 29, 23, 30));
+assert.match(todayLine, /^Today is Tuesday 2026-09-29 \(20260929\), local time zone \S+\.$/);
+assert.doesNotMatch(todayLine, /23:30|23\b/, "the day, not the time: the time would change the prompt every turn");
 
 const { MAX_CUSTOM_COACH_INSTRUCTIONS } = await import(
   `${distUrl("types.js")}?cacheBust=${Date.now()}`
@@ -267,6 +283,9 @@ for (const sport of [
 ]) {
   assert.match(capabilityGuide, new RegExp(`sport=${sport}(?:\\)|;)`));
 }
+assert.match(capabilityGuide, /^Every sport takes step kinds warmup, training, rest, cooldown, interval\./);
+assert.match(capabilityGuide, /\(sport=swim\): [^\n]*also step kind sendOff/, "a sport's own kinds are still said");
+assert.equal((capabilityGuide.match(/warmup/g) ?? []).length, 1, "the shared kinds are said once, not once per sport");
 
 const activityMix = formatRecentActivityMix(
   [

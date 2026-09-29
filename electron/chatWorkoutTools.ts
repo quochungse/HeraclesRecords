@@ -1547,9 +1547,29 @@ function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * `ops[].workout` is an open object, not the workout schema again.
+ *
+ * The full schema is ~15 kB, and it was the third copy in every request —
+ * `draft_workout` and `draft_training_plan` carry it already, and they are
+ * offered wherever this tool is — so ~3.8k tokens went out on every round of
+ * every conversation to describe a field most revisions never touch (a move,
+ * a rename, a stage). The shape is named in words instead, and nothing about
+ * it goes unchecked: a revised plan is validated as a new draft
+ * (`prepareDraft` after `applyPlanRevision`), and a refusal hands every
+ * problem back. `additionalProperties: true` is load-bearing for Claude Code,
+ * whose tool bridge rebuilds each property through `z.fromJSONSchema`; an
+ * object that stripped unknown keys would arrive empty.
+ */
+const REVISION_WORKOUT_FIELD = {
+  type: "object",
+  additionalProperties: true,
+  description:
+    "The whole new workout, in exactly the shape draft_workout and draft_training_plan take one (name, sport, steps…). " +
+    "Its key is kept from the session it replaces."
+};
+
 export function buildRevisePlanInputSchema(): Record<string, unknown> {
-  const workout = (buildDraftWorkoutInputSchema() as { properties: { workout: Record<string, unknown> } })
-    .properties.workout;
   return {
     type: "object",
     properties: {
@@ -1573,7 +1593,7 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
             week: { type: "integer", minimum: 1, maximum: 52 },
             day: { type: "string", enum: [...PLAN_DAYS] },
             schedule_date: { type: "string", pattern: "^\\d{8}$" },
-            workout: { ...workout, description: "The whole new workout; its key is kept from the session it replaces." },
+            workout: REVISION_WORKOUT_FIELD,
             stage: { type: "string", enum: COROS_WEEK_STAGES.map((stage) => stage.slug) },
             name: { type: "string" },
             description: { type: "string" }
