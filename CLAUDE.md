@@ -1199,6 +1199,18 @@ Overview, Media, Data, and Settings are in the main bundle.
   opened at its end used to settle with the last card under the composer. Only a move *up* from
   where the view was last put lets go (a scroll event can land after the thread grew and read
   as "not at the end"), so a streaming answer no longer drags an athlete reading above it.
+  **Only the tail of a conversation is drawn, and a chart only near the screen** (measured on a
+  110-entry transcript: 2.3 s of main-thread work to open, ~440 ms to collapse the list, up to
+  340 ms per resize step, most of it charts and rows nobody could see). A conversation opens on
+  its last `TRANSCRIPT_TAIL` (40) entries; `TranscriptEarlier` brings forty more as the
+  transcript is scrolled up to it, held in place by scroll anchoring. The window is fixed per
+  conversation and only lowered, and a row above it is a `null` in the mapped list, so a row's
+  index is still its entry's — **anything that scrolls to an entry goes through `withEntryRow`**,
+  which draws the entries down to it first; a `querySelector` on `data-chat-entry-index` alone
+  finds nothing above the window. Every recharts chart in a card sits in `ChartWhenNear`, which
+  mounts it once its fixed-height shell is within 800px of the transcript's visible part (so a
+  renderer suite in a hidden window, where no observer fires, sees the card and not the chart),
+  and the three chart cards are `memo`'d on their entry's `preview`.
   **Stop has to reach a turn that has not reached a provider yet.** The Claude status check,
   the MCP connections and the snapshot read from COROS run first and take seconds; nothing
   in that phase listened for the abort, and `streamClaudeCodeCompletion` subscribes to the
