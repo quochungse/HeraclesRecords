@@ -14265,6 +14265,19 @@ tr.data-intervals-row-missing {
   font-variant-numeric: tabular-nums;
 }
 
+/* The side-panel map's key: which metric, then its scale. */
+.activity-route-coloring-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-route-coloring-name {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .activity-route-color-ramp {
   display: inline-flex;
   gap: 2px;
@@ -14284,6 +14297,14 @@ tr.data-intervals-row-missing {
 
 /* The heatmap's canvas: a picture of the route, never the target of a drag. */
 .activity-route-glow {
+  pointer-events: none;
+}
+
+/* The route lines' halo: a wide, faint copy of each line, blurred as one
+   layer — the pane is a single composited layer, so this is one blur of the
+   whole map's glow, not one per path. */
+.leaflet-heraclesRouteHalo-pane {
+  filter: blur(4px);
   pointer-events: none;
 }
 
@@ -14418,6 +14439,23 @@ tr.data-intervals-row-missing {
   max-height: 100%;
   overflow-y: auto;
   scrollbar-width: thin;
+}
+
+/* A side-panel map is too short to hold its menu at all — the base maps alone
+   are taller than the Calendar's 200px map, which left the route's colouring a
+   scroll away in a box two options tall — so there the menu hangs below the
+   map, over what follows it, and the frame is lifted above the blocks after it
+   while it does. The panels around it scroll, so nothing clips it. */
+.activity-route-map-frame .basemap-control {
+  bottom: auto;
+}
+
+.activity-route-map-frame .basemap-menu {
+  max-height: none;
+}
+
+.activity-route-map-frame:has(> .basemap-control.is-open) {
+  z-index: 2;
 }
 
 /* Neutral dark glass — the route studio's green-tinted glass clashes with

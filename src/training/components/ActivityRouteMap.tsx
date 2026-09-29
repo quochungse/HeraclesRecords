@@ -55,7 +55,12 @@ import {
   heatColors,
   heatCores,
   heatPositions,
+  heatWeight,
   neonWidths,
+  ROUTE_LINE_WIDTHS,
+  ROUTE_NEON,
+  routeNeon,
+  whitenColor,
   passesBy,
   performanceColoring,
   rampColorAt,
@@ -196,19 +201,25 @@ const ACTIVITY_ROUTE_BASE_LAYER_PREFERENCE = defineBaseLayerPreference(
   "training.activityRoute.baseLayer"
 );
 
-interface MapStyle {
-  tile: BaseLayerConfig;
+/** How a route is drawn on one ground: its own colour, its ghost, and which ground. */
+interface RouteStyle {
   routeColor: string;
   ghostOpacity: number;
+  lightGround: boolean;
+}
+
+interface MapStyle extends RouteStyle {
+  tile: BaseLayerConfig;
 }
 
 function resolveMapStyle(theme: string, baseLayer?: BaseLayerId): MapStyle {
   const layer = baseLayer ?? themeBaseLayer(theme);
-  const isDarkGround = !isLightBaseLayer(layer);
+  const lightGround = isLightBaseLayer(layer);
   return {
     tile: BASE_LAYERS[layer],
-    routeColor: isDarkGround ? ROUTE_COLOR : ROUTE_COLOR_PAPER,
-    ghostOpacity: isDarkGround ? 0.18 : 0.28
+    routeColor: lightGround ? ROUTE_COLOR_PAPER : ROUTE_COLOR,
+    ghostOpacity: lightGround ? 0.28 : 0.18,
+    lightGround
   };
 }
 
@@ -270,22 +281,29 @@ interface RouteRun {
   color: string | null | undefined;
 }
 
+/**
+ * The most stretches one run holds. A replay rewrites the run under its head
+ * every frame, so a route in one colour drawn as a single run rewrote the whole
+ * curve so far — thousands of samples — sixty times a second. Two runs of one
+ * colour meet on a shared sample under opaque round caps, so the cut is not
+ * seen.
+ */
+const MAX_RUN_STRETCHES = 32;
+
 function routeRuns(
   pointCount: number,
   stretchColors: readonly (string | null)[] | undefined
 ): RouteRun[] {
-  if (!stretchColors) {
-    return [{ from: 0, to: pointCount - 1, color: undefined }];
-  }
   const runs: RouteRun[] = [];
-  stretchColors.forEach((color, index) => {
+  for (let index = 0; index < pointCount - 1; index += 1) {
+    const color = stretchColors ? (stretchColors[index] ?? null) : undefined;
     const last = runs[runs.length - 1];
-    if (last && last.color === color) {
+    if (last && last.color === color && last.to - last.from < MAX_RUN_STRETCHES) {
       last.to = index + 1;
     } else {
       runs.push({ from: index, to: index + 1, color });
     }
-  });
+  }
   return runs;
 }
 
@@ -299,7 +317,7 @@ type RouteDrawing =
       colors: readonly string[];
       /** What each band's neon core whitens towards. */
       cores: readonly string[];
-      /** A dark ground takes a wider, brighter halo; a daylight one a faint one. */
+      /** A daylight ground takes the quieter neon (`routeNeon`). */
       darkGround: boolean;
     };
 
@@ -316,7 +334,8 @@ interface Painter {
    * its line off the recorded points.
    */
   paint(progress: number): PaintedEnds;
-  setRouteColor(color: string): void;
+  /** The ground changed under the route: a new base map. */
+  restyle(style: RouteStyle): void;
   remove(): void;
 }
 
@@ -330,18 +349,23 @@ function headPosition(route: RouteReplay, progress: number): number {
   return progress >= 1 ? route.latLngs.length - 1 : index + fraction;
 }
 
+/** Below the route's lines, above the heatmap's pane (which never shows with them). */
+const LINE_HALO_PANE = "heraclesRouteHalo";
+
 /**
  * Draws the route as runs of one colour each, up to the replay's head, along
- * the smoothed curve. A frame touches only the run under the head and the runs
- * whose state just changed — a route coloured by zone can be hundreds of runs,
- * and resetting every one of them on every frame is what would make the
- * replay stutter.
+ * the smoothed curve, each run three paths: halo, body and core. A frame
+ * touches only the run under the head and the runs whose state just changed —
+ * a route coloured by zone can be hundreds of runs, and resetting every one of
+ * them on every frame is what would make the replay stutter.
  */
 class LinePainter implements Painter {
   private readonly group: L.LayerGroup;
   private readonly lines: {
     run: RouteRun;
-    line: L.Polyline;
+    halo: L.Polyline;
+    body: L.Polyline;
+    core: L.Polyline;
     state: "empty" | "partial" | "full";
   }[];
 
@@ -349,32 +373,59 @@ class LinePainter implements Painter {
     map: L.Map,
     private readonly route: RouteReplay,
     private readonly curve: SmoothPath,
-    routeColor: string,
+    style: RouteStyle,
     stretchColors: readonly (string | null)[] | undefined
   ) {
+    if (!map.getPane(LINE_HALO_PANE)) {
+      map.createPane(LINE_HALO_PANE).style.zIndex = "395";
+    }
     this.group = L.layerGroup().addTo(map);
-    this.lines = routeRuns(route.latLngs.length, stretchColors)
-      .filter((run) => run.color !== null)
-      .map((run) => ({
-        run,
-        line: new SubpixelPolyline([], {
-          color: run.color ?? routeColor,
-          weight: 4,
-          // Opaque, or the round caps where two runs meet overlap into a
-          // darker dot at every join.
-          opacity: 1,
-          lineCap: "round",
-          lineJoin: "round"
-        }).addTo(this.group),
-        state: "empty" as const
-      }));
+    const neon = routeNeon(style.lightGround);
+    const line = (options: L.PolylineOptions) =>
+      new SubpixelPolyline([], {
+        // Opaque, or the round caps where two runs meet overlap into a darker
+        // dot at every join. Nothing here answers the pointer either, so none
+        // of it should wear the pointer cursor.
+        opacity: 1,
+        lineCap: "round",
+        lineJoin: "round",
+        interactive: false,
+        ...options
+      }).addTo(this.group);
+    const runs = routeRuns(route.latLngs.length, stretchColors).filter(
+      (run) => run.color !== null
+    );
+    const colorOf = (run: RouteRun) => run.color ?? style.routeColor;
+    // Every body before every core: a later run's body laid over an earlier
+    // run's core would cut the core at each join, under its round cap.
+    const halos = runs.map((run) =>
+      line({
+        pane: LINE_HALO_PANE,
+        color: colorOf(run),
+        weight: ROUTE_LINE_WIDTHS.halo,
+        opacity: neon.haloOpacity
+      })
+    );
+    const bodies = runs.map((run) => line({ color: colorOf(run), weight: ROUTE_LINE_WIDTHS.body }));
+    const cores = runs.map((run) =>
+      line({ color: whitenColor(colorOf(run), neon.coreWhiten), weight: ROUTE_LINE_WIDTHS.core })
+    );
+    this.lines = runs.map((run, index) => ({
+      run,
+      halo: halos[index]!,
+      body: bodies[index]!,
+      core: cores[index]!,
+      state: "empty" as const
+    }));
   }
 
-  setRouteColor(color: string): void {
-    for (const { run, line } of this.lines) {
-      if (run.color === undefined) {
-        line.setStyle({ color });
-      }
+  restyle(style: RouteStyle): void {
+    const neon = routeNeon(style.lightGround);
+    for (const { run, halo, body, core } of this.lines) {
+      const color = run.color ?? style.routeColor;
+      halo.setStyle({ color, opacity: neon.haloOpacity });
+      body.setStyle({ color });
+      core.setStyle({ color: whitenColor(color, neon.coreWhiten) });
     }
   }
 
@@ -384,14 +435,14 @@ class LinePainter implements Painter {
       const { from, to } = entry.run;
       if (to <= position) {
         if (entry.state !== "full") {
-          entry.line.setLatLngs(curveBetween(this.curve, from, to));
+          this.draw(entry, curveBetween(this.curve, from, to));
           entry.state = "full";
         }
       } else if (from <= position) {
-        entry.line.setLatLngs(curveBetween(this.curve, from, position));
+        this.draw(entry, curveBetween(this.curve, from, position));
         entry.state = "partial";
       } else if (entry.state !== "empty") {
-        entry.line.setLatLngs([]);
+        this.draw(entry, []);
         entry.state = "empty";
       }
     }
@@ -399,6 +450,15 @@ class LinePainter implements Painter {
       start: this.curve.points[0]!,
       head: curveHead(this.curve, position)
     };
+  }
+
+  private draw(
+    entry: (typeof this.lines)[number],
+    points: [number, number][]
+  ): void {
+    entry.halo.setLatLngs(points);
+    entry.body.setLatLngs(points);
+    entry.core.setLatLngs(points);
   }
 
   remove(): void {
@@ -434,10 +494,10 @@ function fitCanvas(canvas: HTMLCanvasElement, width: number, height: number): vo
 }
 
 /**
- * The heatmap's line, drawn as neon on a canvas along the smoothed curve: a
- * white core whitening out from the heat's colour at the edge, over a soft
- * blurred halo, and the more passes the hotter, the wider and the wider the
- * white core (`neonWidths`).
+ * The heatmap's line, drawn on a canvas along the smoothed curve in the neon
+ * every route line wears (`ROUTE_NEON`) — a whitened core down its middle over
+ * a faint blurred halo — and the more passes the hotter and the wider
+ * (`heatWeight`), in the same proportions at every width.
  *
  * Ground is drawn once: every pass is laid at the mean of the passes over its
  * spot (`heatPositions`), so a later lap lands on the earlier one rather than
@@ -489,8 +549,9 @@ class GlowPainter implements Painter {
     map.on("move moveend zoomend resize viewreset", this.schedule);
   }
 
-  setRouteColor(): void {
-    // The heat is coloured by its ramp; the route's own colour is not used.
+  restyle(): void {
+    // The heat is coloured by its ramp and drawn for the ground it was made
+    // for; a new ground is a new drawing (`useRouteDrawing`).
   }
 
   paint(progress: number): PaintedEnds {
@@ -624,64 +685,48 @@ class GlowPainter implements Painter {
       }
     };
 
+    const neon = routeNeon(!drawing.darkGround);
     halo.setTransform(haloRatio, 0, 0, haloRatio, 0, 0);
     halo.clearRect(0, 0, width, height);
-    stroke(halo, (share) => neonWidths(share).body + (drawing.darkGround ? 10 : 6), 0);
+    stroke(halo, (share) => neonWidths(heatWeight(share)).halo, 0);
     blurred.setTransform(1, 0, 0, 1, 0, 0);
     blurred.clearRect(0, 0, this.haloBlurred.width, this.haloBlurred.height);
-    blurred.filter = `blur(${(drawing.darkGround ? 7 : 4) * haloRatio}px)`;
+    blurred.filter = `blur(${ROUTE_NEON.haloBlur * haloRatio}px)`;
     blurred.drawImage(this.halo, 0, 0);
     blurred.filter = "none";
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
-    context.globalAlpha = drawing.darkGround ? 0.35 : 0.18;
+    context.globalAlpha = neon.haloOpacity;
     context.drawImage(this.haloBlurred, 0, 0, canvas.width, canvas.height);
     context.restore();
 
-    // The tube: the heat's colour at its edge, whitening layer by layer to a
-    // white core — the core is what grows with the passes. The middle layers
-    // sit nearer the core than an even split would put them, or the whitened
-    // rings take the tube and a single pass reads pale rather than green.
-    NEON_LAYERS.forEach((whiten) =>
-      stroke(
-        context,
-        (share) => {
-          const { body, core } = neonWidths(share);
-          return core + (body - core) * (1 - whiten) ** 1.6;
-        },
-        whiten
-      )
-    );
+    // The line in the heat's colour, then its core over every run of it — a
+    // later run's line laid over an earlier run's core would cut the core at
+    // each join.
+    stroke(context, heatWeight, 0);
+    stroke(context, (share) => neonWidths(heatWeight(share)).core, neon.coreWhiten);
     return ends;
   }
 }
-
-/**
- * The neon tube's layers, edge to core, by how far each is whitened. Four keep
- * the step from one to the next under a pixel at the widest line, so the tube
- * reads as a gradient rather than as rings. The core stops short of white — a
- * pure white core glared off the map — and keeps a tint of the heat's colour.
- */
-const NEON_LAYERS = [0, 0.25, 0.45, 0.65] as const;
 
 function createPainter(
   map: L.Map,
   route: RouteReplay,
   curve: SmoothPath,
-  routeColor: string,
+  style: RouteStyle,
   drawing: RouteDrawing | undefined
 ): Painter {
   return drawing?.kind === "glow"
     ? new GlowPainter(map, route, drawing)
-    : new LinePainter(map, route, curve, routeColor, drawing?.stretchColors);
+    : new LinePainter(map, route, curve, style, drawing?.stretchColors);
 }
 
 /** What the map's owner can ask of a route map once it is built. */
 interface RouteMapControl {
   replay: () => void;
   redraw: (drawing: RouteDrawing | undefined) => void;
-  /** The route's own colour and its ghost's opacity, for the ground under them. */
-  setRouteColor: (color: string, ghostOpacity: number) => void;
+  /** The route's own colour, its ghost and its glow, for a new ground under them. */
+  restyle: (style: RouteStyle) => void;
 }
 
 function RouteMapCanvas({
@@ -750,10 +795,8 @@ function RouteMapCanvas({
     }
 
     const initialLayer = baseLayerPropRef.current;
-    const { tile, routeColor, ghostOpacity } = resolveMapStyle(
-      theme,
-      initialLayer
-    );
+    const { tile, ...initialStyle } = resolveMapStyle(theme, initialLayer);
+    let style: RouteStyle = initialStyle;
 
     const map = L.map(container, {
       zoomControl: interactive,
@@ -781,17 +824,16 @@ function RouteMapCanvas({
     // The faint whole route under the replay. The heatmap hides it: it would
     // draw again every strand the heat merges into one.
     const ghostShown = (next: RouteDrawing | undefined) => next?.kind !== "glow";
-    let currentGhostOpacity = ghostOpacity;
     const ghostLine = new SubpixelPolyline(curve.points, {
-      color: routeColor,
-      weight: 4,
-      opacity: ghostShown(drawingRef.current) ? ghostOpacity : 0,
+      color: style.routeColor,
+      weight: ROUTE_NEON.weight,
+      opacity: ghostShown(drawingRef.current) ? style.ghostOpacity : 0,
       lineCap: "round",
-      lineJoin: "round"
+      lineJoin: "round",
+      interactive: false
     }).addTo(map);
 
-    let currentRouteColor = routeColor;
-    let painter = createPainter(map, route, curve, routeColor, drawingRef.current);
+    let painter = createPainter(map, route, curve, style, drawingRef.current);
     // A rebuild — a theme switch — can change the drawing in the same render;
     // it is drawn here, and must not be drawn again by the redraw effect, which
     // would also cut short the replay just begun.
@@ -888,18 +930,17 @@ function RouteMapCanvas({
       redraw: (next) => {
         window.cancelAnimationFrame(animationFrame);
         painter.remove();
-        painter = createPainter(map, route, curve, currentRouteColor, next);
+        painter = createPainter(map, route, curve, style, next);
         endsHideWithRoute(next);
-        ghostLine.setStyle({ opacity: ghostShown(next) ? currentGhostOpacity : 0 });
+        ghostLine.setStyle({ opacity: ghostShown(next) ? style.ghostOpacity : 0 });
         showWhole();
       },
-      setRouteColor: (color, opacity) => {
-        currentRouteColor = color;
-        currentGhostOpacity = opacity;
-        painter.setRouteColor(color);
+      restyle: (next) => {
+        style = next;
+        painter.restyle(next);
         ghostLine.setStyle({
-          color,
-          opacity: ghostShown(drawingRef.current) ? opacity : 0
+          color: next.routeColor,
+          opacity: ghostShown(drawingRef.current) ? next.ghostOpacity : 0
         });
       }
     };
@@ -946,10 +987,7 @@ function RouteMapCanvas({
       return;
     }
 
-    const { tile, routeColor, ghostOpacity } = resolveMapStyle(
-      theme,
-      baseLayer
-    );
+    const { tile, ...style } = resolveMapStyle(theme, baseLayer);
     // The base map has its own pane below every other layer, so the new one
     // cannot cover the route however late it is added, and `createBaseLayer`
     // rebinds the map's max zoom to the style it just built.
@@ -958,7 +996,7 @@ function RouteMapCanvas({
       map.removeLayer(tileLayerRef.current);
     }
     tileLayerRef.current = next;
-    controlRef.current?.setRouteColor(routeColor, ghostOpacity);
+    controlRef.current?.restyle(style);
     appliedBaseLayerRef.current = baseLayer;
   }, [baseLayer, theme]);
 
@@ -1121,6 +1159,48 @@ function RouteZoneLegend({
       </span>
       <span>{last}</span>
     </span>
+  );
+}
+
+/**
+ * The key to what Performance is colouring: the ramp, the zones or the heights.
+ * `named` puts the metric's name in front, for a map with no metric picker
+ * beside it to say which one it is.
+ */
+function RouteColoringKey({
+  analysis,
+  lightGround,
+  named = false
+}: {
+  analysis: RouteAnalysis;
+  lightGround: boolean;
+  named?: boolean;
+}) {
+  const { view, metric, speed } = analysis;
+  if (!view) {
+    return null;
+  }
+  const timed = metric === "pace" ? "pace" : "hr";
+  const legend =
+    view.kind === "elevation" ? (
+      <RouteElevationLegend lightGround={lightGround} />
+    ) : view.kind === "zones" ? (
+      <RouteZoneLegend metric={timed} speed={speed} coloring={view.coloring} />
+    ) : (
+      <RouteColorLegend
+        metric={timed}
+        speed={speed}
+        coloring={view.coloring}
+        ramp={routeRamp(lightGround)}
+      />
+    );
+  return named ? (
+    <span className="activity-route-coloring-key">
+      <span className="activity-route-coloring-name">{metricLabel(metric, speed)}</span>
+      {legend}
+    </span>
+  ) : (
+    legend
   );
 }
 
@@ -1378,7 +1458,7 @@ function RouteMapModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const lightGround = isLightBaseLayer(layers.baseLayer);
   const drawing = useRouteDrawing(analysis, lightGround);
-  const { performance, metric, mode, view, speed, layerSection } = analysis;
+  const { performance, metric, mode, speed, layerSection } = analysis;
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
@@ -1457,22 +1537,7 @@ function RouteMapModal({
                   onChange={layers.setMetric}
                 />
               ) : null}
-              {view?.kind === "elevation" ? (
-                <RouteElevationLegend lightGround={lightGround} />
-              ) : view?.kind === "zones" ? (
-                <RouteZoneLegend
-                  metric={metric === "pace" ? "pace" : "hr"}
-                  speed={speed}
-                  coloring={view.coloring}
-                />
-              ) : view?.kind === "ramp" ? (
-                <RouteColorLegend
-                  metric={metric === "pace" ? "pace" : "hr"}
-                  speed={speed}
-                  coloring={view.coloring}
-                  ramp={routeRamp(lightGround)}
-                />
-              ) : null}
+              <RouteColoringKey analysis={analysis} lightGround={lightGround} />
             </div>
             <RouteLegend />
           </div>
@@ -1531,7 +1596,8 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
   const [expanded, setExpanded] = useState(false);
   const closeExpanded = useCallback(() => setExpanded(false), []);
   const analysis = useRouteAnalysis(route, detail, layers);
-  const drawing = useRouteDrawing(analysis, isLightBaseLayer(layers.baseLayer));
+  const lightGround = isLightBaseLayer(layers.baseLayer);
+  const drawing = useRouteDrawing(analysis, lightGround);
 
   return (
     <div className="activity-route-map">
@@ -1547,6 +1613,7 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
       />
       <div className="activity-route-footer">
         <RouteLegend />
+        <RouteColoringKey analysis={analysis} lightGround={lightGround} named />
         <button
           type="button"
           className="activity-route-expand"

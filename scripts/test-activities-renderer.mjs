@@ -358,7 +358,138 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Nothing to mix, nothing drawn
+  // 7. The detail pane's route map: its layer menu inside a panel
+  //
+  // The map sits in panels that close on Escape from a capturing listener on
+  // `document` — the Calendar's day panel — attached before the map's own. A
+  // menu listening there too could not stop the key reaching the panel, so one
+  // press closed the menu and the panel with it. And a map 200-300px tall
+  // held its menu in a box that scrolled, the route's colouring out of sight.
+  // -------------------------------------------------------------------------
+  {
+    const selectionKeys = [
+      "coroslink.selection.v1.training.activityRoute.colorMode",
+      "coroslink.selection.v1.training.activityRoute.metric"
+    ];
+    await win.webContents.executeJavaScript(
+      `localStorage.setItem(${JSON.stringify(selectionKeys[0])}, '"performance"');
+       localStorage.setItem(${JSON.stringify(selectionKeys[1])}, '"hr"');`,
+      true
+    );
+    const route = Array.from({ length: 60 }, (_, index) => ({
+      lat: 21 + index * 0.0004,
+      lon: 105 + Math.sin(index / 8) * 0.001,
+      elapsed: index * 10
+    }));
+    const series = Array.from({ length: 600 }, (_, t) => ({ elapsed: t, hr: 120 + Math.round(t / 12) }));
+    const hrZones = [
+      { index: 0, high: 133 },
+      { index: 1, low: 133, high: 154 },
+      { index: 2, low: 155, high: 168 },
+      { index: 3, low: 169, high: 173 },
+      { index: 4, low: 174, high: 183 },
+      { index: 5, low: 183, high: 404 }
+    ];
+    await harness("mount", "ActivityRouteMap", {
+      track: { points: route.map(({ elapsed, ...point }) => point), route },
+      detail: { series, hrZones, sportType: 100 }
+    });
+    await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+    await waitFor(() => harness("exists", ".activity-route-map .basemap-toggle"), "the map renders");
+    await settle();
+
+    assert.equal(
+      await harness("text", ".activity-route-map .activity-route-coloring-name"),
+      "Heart rate",
+      "the pane's map says what it is coloured by"
+    );
+
+    // The line's neon: the line keeps its 4px, a whitened core runs down its
+    // middle, and a faint halo sits in a pane of its own that is blurred as
+    // one layer. None of it wears the pointer cursor: it answers no click.
+    const neon = await win.webContents.executeJavaScript(
+      `(() => {
+        const map = document.querySelector(".activity-route-map");
+        const widths = [...map.querySelectorAll(".leaflet-overlay-pane path")].map((path) => path.getAttribute("stroke-width"));
+        const halo = map.querySelector(".leaflet-heraclesRouteHalo-pane");
+        const haloPaths = halo ? [...halo.querySelectorAll("path")] : [];
+        return {
+          widths: [...new Set(widths)].sort(),
+          haloPaths: haloPaths.length,
+          haloWidth: haloPaths[0]?.getAttribute("stroke-width"),
+          haloBlur: halo ? getComputedStyle(halo).filter : "",
+          interactive: map.querySelectorAll(".leaflet-interactive").length
+        };
+      })()`,
+      true
+    );
+    assert.deepEqual(neon.widths, ["1.6", "4"], `the body stays 4px with a 1.6px core: ${neon.widths}`);
+    assert.ok(neon.haloPaths > 0 && neon.haloWidth === "8", `a halo under every run: ${JSON.stringify(neon)}`);
+    assert.ok(neon.haloBlur.includes("blur"), `the halo is blurred: ${neon.haloBlur}`);
+    assert.equal(neon.interactive, 0, "no route path wears the pointer cursor");
+
+    const pressEscape = () => {
+      win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+      win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+    };
+    const menuOpen = () => harness("exists", ".activity-route-map .basemap-control.is-open");
+
+    await harness("click", ".activity-route-map .basemap-toggle");
+    await waitFor(menuOpen, "the layer menu opens");
+    const menu = await win.webContents.executeJavaScript(
+      `(() => {
+        const menu = document.querySelector(".activity-route-map .basemap-menu");
+        const map = document.querySelector(".activity-route-map .activity-route-map-canvas").getBoundingClientRect();
+        const last = [...menu.querySelectorAll(".basemap-option")].at(-1);
+        return {
+          scrolls: menu.scrollHeight > menu.clientHeight + 1,
+          lastLabel: last.textContent,
+          menuBottom: menu.getBoundingClientRect().bottom,
+          mapBottom: map.bottom
+        };
+      })()`,
+      true
+    );
+    assert.equal(menu.scrolls, false, "the menu shows every option without scrolling");
+    assert.ok(menu.lastLabel.includes("Heatmap"), `the route's colouring is in it: ${menu.lastLabel}`);
+    assert.ok(menu.menuBottom > menu.mapBottom, "by hanging below a map too short to hold it");
+
+    pressEscape();
+    await waitFor(async () => !(await menuOpen()), "Escape closes the menu");
+    await settle();
+    assert.equal(await harness("callCount", "prop:onPanelEscape"), 0, "and only the menu");
+    assert.equal(
+      await win.webContents.executeJavaScript(
+        `document.activeElement?.matches(".activity-route-map .basemap-toggle") ?? false`,
+        true
+      ),
+      true,
+      "focus returns to the layer button"
+    );
+    pressEscape();
+    await waitFor(
+      async () => (await harness("callCount", "prop:onPanelEscape")) === 1,
+      "the next Escape reaches the panel"
+    );
+
+    // A press anywhere else closes the menu too: it must not be left open
+    // under the full map the Expand link opens.
+    await harness("click", ".activity-route-map .basemap-toggle");
+    await waitFor(menuOpen, "the layer menu opens again");
+    await win.webContents.executeJavaScript(
+      `document.querySelector(".activity-route-expand").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))`,
+      true
+    );
+    await waitFor(async () => !(await menuOpen()), "a press outside closes the menu");
+
+    await win.webContents.executeJavaScript(
+      selectionKeys.map((key) => `localStorage.removeItem(${JSON.stringify(key)});`).join(""),
+      true
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // 8. Nothing to mix, nothing drawn
   // -------------------------------------------------------------------------
   {
     await harness("mount", "ActivitiesSummary", {

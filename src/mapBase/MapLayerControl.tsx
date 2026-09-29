@@ -17,7 +17,8 @@ export interface MapLayerSection<T extends string> {
 /**
  * Whether a layer menu is open inside `root`. A dialog that closes on Escape
  * from the window asks this first and lets that Escape through to the menu,
- * which is what should close: one key closes one thing.
+ * which is what should close: one key closes one thing. (The dialog's
+ * listener is the older of the two on the window, so it hears the key first.)
  */
 export function hasOpenLayerMenu(root: ParentNode): boolean {
   return root.querySelector(".basemap-control.is-open") !== null;
@@ -34,13 +35,17 @@ export function MapLayerControl<T extends string = never>({
   section?: MapLayerSection<T>;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const refocusRef = useRef(false);
 
-  // Escape closes the menu and hands focus back to its button. Caught on the
-  // way down and stopped there, for the reason `OptionGroup` does: the screen
-  // under a map answers Escape from its own `document` listener — a run's page
-  // goes back to the list on it.
+  // Escape closes the menu and hands focus back to its button; a press
+  // anywhere else closes it too. Escape is caught on the window, on the way
+  // down, and stopped there: the screen under a map answers Escape from its
+  // own capturing listener on `document` — the Calendar's day panel closes on
+  // it — and a listener on the same node would hear the key whatever this one
+  // did. A dialog above the map that also listens on the window asks
+  // `hasOpenLayerMenu` and lets the key through.
   useEffect(() => {
     if (!open) {
       if (refocusRef.current) {
@@ -55,12 +60,19 @@ export function MapLayerControl<T extends string = never>({
       refocusRef.current = true;
       setOpen(false);
     };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [open]);
 
   return (
-    <div className={`basemap-control${open ? " is-open" : ""}`}>
+    <div ref={rootRef} className={`basemap-control${open ? " is-open" : ""}`}>
       {open ? (
         <div className="basemap-menu">
           <div className="basemap-head">

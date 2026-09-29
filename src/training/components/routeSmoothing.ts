@@ -19,17 +19,18 @@
  * recorded line however long the chords around it. The controls in the middle
  * of a chord are in line with it, so the curve is straight there.
  *
- * Samples follow the bend: a stretch of the curve is cut by how far it turns,
- * so a straight one is its two ends and a corner's samples sit within a couple
- * of centimetres of the true curve — round at any zoom.
+ * Samples follow the bend: a stretch of the curve is cut into as few chords
+ * as keep them within `FACET_METERS` of the true curve — a fifth of a pixel at
+ * the closest zoom — so a straight one is its two ends and a corner is round
+ * at any zoom, without paying for samples nobody can see.
  */
 
 /** How far from a corner the curve begins to round it; it strays a third of this at most. */
 export const CORNER_METERS = 6;
+/** How far a chord between two samples may sag from the true curve. */
+const FACET_METERS = 0.05;
 /** The most samples one stretch of the curve takes. */
 const MAX_STEPS = 16;
-/** The average turn a stretch's samples split it into: 5°. */
-const TURN_PER_STEP = Math.PI / 36;
 
 export interface SmoothPath {
   points: [number, number][];
@@ -124,13 +125,17 @@ export function smoothPath(points: readonly [number, number][]): SmoothPath {
     const p2 = at(index + 1);
     const p3 = at(index + 2);
     // The curve heads along p0→p2 where this stretch begins and p1→p3 where
-    // it ends; what it turns through in between is what it is sampled by —
-    // twice as finely as the average asks, because even steps in t bunch up
-    // where the curve is tightest, at the recorded corner, and turn most there.
+    // it ends. An arc of length L turning θ, cut into n chords, sags about
+    // Lθ / 8n² from each — four times that where even steps in t bunch up at
+    // the recorded corner, the curve's tightest — so n = √(Lθ / 2·FACET).
     const [ax, ay] = toMeters(p0, p2);
     const [bx, by] = toMeters(p1, p3);
     const turn = Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
-    const steps = Math.min(MAX_STEPS, Math.max(1, Math.ceil((2 * turn) / TURN_PER_STEP)));
+    const length = Math.hypot(...toMeters(p1, p2));
+    const steps = Math.min(
+      MAX_STEPS,
+      Math.max(1, Math.ceil(Math.sqrt((length * turn) / (2 * FACET_METERS))))
+    );
     const from = positions[index]!;
     const span = positions[index + 1]! - from;
     for (let step = 0; step < steps; step += 1) {

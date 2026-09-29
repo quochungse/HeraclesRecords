@@ -438,11 +438,9 @@ export function heatPositions(
   });
 }
 
-interface HeatSample {
-  x: number;
-  y: number;
-  along: number;
-  latLng: [number, number];
+/** A grid cell's key: the cell's column and row packed into one number. */
+function cellKey(column: number, row: number): number {
+  return column * 4_194_304 + row;
 }
 
 /**
@@ -455,36 +453,57 @@ interface HeatSample {
  */
 export function routeHeat(replay: RouteReplay): RouteHeat {
   const { latLngs, distances } = replay;
-  const lat0 = latLngs[0]![0] * (Math.PI / 180);
+  // Metres from the first point, so a cell's column and row stay small.
+  const lat0 = latLngs[0]![0];
+  const lon0 = latLngs[0]![1];
+  const kx = 111_320 * Math.cos(lat0 * (Math.PI / 180));
   const toXY = ([lat, lon]: [number, number]): [number, number] => [
-    lon * 111_320 * Math.cos(lat0),
-    lat * 110_540
+    (lon - lon0) * kx,
+    (lat - lat0) * 110_540
   ];
   const total = distances[distances.length - 1]!;
+  const stretches = latLngs.length - 1;
 
-  const grid = new Map<string, HeatSample[]>();
-  const add = (latLng: [number, number], along: number) => {
-    const [x, y] = toXY(latLng);
-    const key = `${Math.floor(x / SAME_SPOT_METERS)}:${Math.floor(y / SAME_SPOT_METERS)}`;
-    const sample = { x, y, along, latLng };
+  // The route sampled every 2 m, in route order, as flat columns: sample i is
+  // at (x[i], y[i]), `along[i]` metres in, on stretch `stretch[i]`. Each cell
+  // lists its samples' indexes, which therefore rise with `along`.
+  const x: number[] = [];
+  const y: number[] = [];
+  const along: number[] = [];
+  const stretch: number[] = [];
+  const sampleLatLng: [number, number][] = [];
+  const grid = new Map<number, number[]>();
+  const add = (latLng: [number, number], distance: number, onStretch: number) => {
+    const [px, py] = toXY(latLng);
+    const index = x.length;
+    x.push(px);
+    y.push(py);
+    along.push(distance);
+    stretch.push(onStretch);
+    sampleLatLng.push(latLng);
+    const key = cellKey(Math.floor(px / SAME_SPOT_METERS), Math.floor(py / SAME_SPOT_METERS));
     const cell = grid.get(key);
     if (cell) {
-      cell.push(sample);
+      cell.push(index);
     } else {
-      grid.set(key, [sample]);
+      grid.set(key, [index]);
     }
   };
-  for (let index = 0; index < latLngs.length - 1; index += 1) {
+  for (let index = 0; index < stretches; index += 1) {
     const a = latLngs[index]!;
     const b = latLngs[index + 1]!;
     const length = distances[index + 1]! - distances[index]!;
     const samples = Math.max(1, Math.ceil(length / SAMPLE_EVERY_METERS));
     for (let step = 0; step < samples; step += 1) {
       const t = step / samples;
-      add([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], distances[index]! + length * t);
+      add(
+        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+        distances[index]! + length * t,
+        index
+      );
     }
   }
-  add(latLngs[latLngs.length - 1]!, total);
+  add(latLngs[stretches]!, total, Math.max(0, stretches - 1));
 
   // A loop that finishes where it started, heading the way it set off, is one
   // pass cut in two at the line: the start of lap one and the end of the last
@@ -492,7 +511,7 @@ export function routeHeat(replay: RouteReplay): RouteHeat {
   // and those are two passes.
   const closedLoop = (() => {
     const first = toXY(latLngs[0]!);
-    const last = toXY(latLngs[latLngs.length - 1]!);
+    const last = toXY(latLngs[stretches]!);
     if (Math.hypot(first[0] - last[0], first[1] - last[1]) > LOOP_LOOK_METERS) {
       return false;
     }
@@ -516,88 +535,108 @@ export function routeHeat(replay: RouteReplay): RouteHeat {
     );
   })();
 
-  // The stretch a distance along the route falls in.
-  const stretchAt = (along: number) => {
-    let low = 0;
-    let high = distances.length - 2;
-    while (low < high) {
-      const mid = Math.ceil((low + high) / 2);
-      if (distances[mid]! <= along) {
-        low = mid;
-      } else {
-        high = mid - 1;
-      }
-    }
-    return low;
-  };
-
-  // Each stay near a spot — the readings of one pass over it, in route order.
-  const staysAt = (x: number, y: number): HeatSample[][] => {
-    const cx = Math.floor(x / SAME_SPOT_METERS);
-    const cy = Math.floor(y / SAME_SPOT_METERS);
-    const near: HeatSample[] = [];
+  // Each stay near a spot — the samples of one pass over it, in route order —
+  // handed to `visit` as its first sample and the one nearest the spot. The
+  // samples near a spot are gathered as indexes and sorted as numbers, which
+  // is route order: this runs twice per point, and sorting objects by a key
+  // was most of what the heatmap cost to open.
+  let near = new Int32Array(256);
+  const reach = SAME_SPOT_METERS * SAME_SPOT_METERS;
+  const staysAt = (
+    px: number,
+    py: number,
+    visit: (first: number, nearest: number, gap: number) => void
+  ) => {
+    const column = Math.floor(px / SAME_SPOT_METERS);
+    const row = Math.floor(py / SAME_SPOT_METERS);
+    let count = 0;
     for (let dx = -1; dx <= 1; dx += 1) {
       for (let dy = -1; dy <= 1; dy += 1) {
-        for (const sample of grid.get(`${cx + dx}:${cy + dy}`) ?? []) {
-          if (Math.hypot(sample.x - x, sample.y - y) <= SAME_SPOT_METERS) {
-            near.push(sample);
+        for (const sample of grid.get(cellKey(column + dx, row + dy)) ?? []) {
+          const ex = x[sample]! - px;
+          const ey = y[sample]! - py;
+          if (ex * ex + ey * ey <= reach) {
+            if (count === near.length) {
+              const grown = new Int32Array(near.length * 2);
+              grown.set(near);
+              near = grown;
+            }
+            near[count] = sample;
+            count += 1;
           }
         }
       }
     }
-    near.sort((p, q) => p.along - q.along);
-    const stays: HeatSample[][] = [];
-    for (const sample of near) {
-      const current = stays[stays.length - 1];
-      const previous = current?.[current.length - 1];
-      if (current && previous && sample.along - previous.along <= REJOIN_METERS) {
-        current.push(sample);
-      } else {
-        stays.push([sample]);
+    if (count === 0) {
+      return;
+    }
+    const ordered = near.subarray(0, count).sort();
+
+    // The stays as runs of `ordered`: a new one wherever the route left the
+    // spot for longer than a wobble.
+    const starts = [0];
+    for (let k = 1; k < count; k += 1) {
+      if (along[ordered[k]!]! - along[ordered[k - 1]!]! > REJOIN_METERS) {
+        starts.push(k);
       }
     }
     // The loop's last stay is its first, cut at the line.
-    if (
+    const joinEnds =
       closedLoop &&
-      stays.length > 1 &&
-      near[0]!.along + (total - near[near.length - 1]!.along) <= REJOIN_METERS * 2
-    ) {
-      stays[0]!.push(...stays.pop()!);
-    }
-    return stays;
-  };
+      starts.length > 1 &&
+      along[ordered[0]!]! + (total - along[ordered[count - 1]!]!) <= REJOIN_METERS * 2;
+    const stays = joinEnds ? starts.length - 1 : starts.length;
 
-  const arrivals: number[][] = [];
-  const passes = latLngs.slice(0, -1).map((a, index) => {
-    const b = latLngs[index + 1]!;
-    const [x, y] = toXY([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
-    const stays = staysAt(x, y);
-    const starts = stays.map((stay) => stretchAt(stay[0]!.along));
-    if (starts.length === 0) {
-      starts.push(index);
-    }
-    arrivals.push(starts);
-    return starts.length;
-  });
-
-  const positions = latLngs.map((latLng, index): HeatPosition[] => {
-    const [x, y] = toXY(latLng);
-    const found = staysAt(x, y).map((stay): HeatPosition => {
-      let nearest = stay[0]!;
+    for (let k = 0; k < stays; k += 1) {
+      const from = starts[k]!;
+      const to = k + 1 < starts.length ? starts[k + 1]! : count;
+      let nearest = ordered[from]!;
       let best = Number.POSITIVE_INFINITY;
-      for (const sample of stay) {
-        const gap = Math.hypot(sample.x - x, sample.y - y);
+      const consider = (index: number) => {
+        const sample = ordered[index]!;
+        const gap = Math.hypot(x[sample]! - px, y[sample]! - py);
         if (gap < best) {
           best = gap;
           nearest = sample;
         }
-      }
-      return {
-        arrival: stretchAt(stay[0]!.along),
-        latLng: nearest.latLng,
-        weight: passWeight(best)
       };
-    });
+      for (let index = from; index < to; index += 1) {
+        consider(index);
+      }
+      if (joinEnds && k === 0) {
+        for (let index = starts[starts.length - 1]!; index < count; index += 1) {
+          consider(index);
+        }
+      }
+      visit(ordered[from]!, nearest, best);
+    }
+  };
+
+  const arrivals: number[][] = [];
+  const passes: number[] = [];
+  for (let index = 0; index < stretches; index += 1) {
+    const a = latLngs[index]!;
+    const b = latLngs[index + 1]!;
+    const [px, py] = toXY([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    const starts: number[] = [];
+    staysAt(px, py, (first) => starts.push(stretch[first]!));
+    if (starts.length === 0) {
+      starts.push(index);
+    }
+    arrivals.push(starts);
+    passes.push(starts.length);
+  }
+
+  const positions = latLngs.map((latLng, index): HeatPosition[] => {
+    const [px, py] = toXY(latLng);
+    const found: HeatPosition[] = [];
+    staysAt(px, py, (first, nearest, gap) =>
+      found.push({
+        arrival: stretch[first]!,
+        latLng: sampleLatLng[nearest]!,
+        weight: passWeight(gap)
+      })
+    );
     return found.length > 0
       ? found
       : [{ arrival: Math.max(0, index - 1), latLng, weight: 1 }];
@@ -638,6 +677,19 @@ function mixColor(from: string, to: string, mix: number): string {
   return rgb(mixChannels(hexChannels(from), hexChannels(to), mix));
 }
 
+/**
+ * A colour — `#rrggbb`, or `rgb(r, g, b)` as the elevation stops are written —
+ * taken `amount` (0–1) of the way to white: a route line's neon core.
+ */
+export function whitenColor(color: string, amount: number): string {
+  const channels = color.startsWith("#")
+    ? hexChannels(color)
+    : (color.match(/\d+(?:\.\d+)?/g) ?? []).slice(0, 3).map(Number);
+  return channels.length === 3
+    ? rgb(mixChannels(channels, [255, 255, 255], Math.min(1, Math.max(0, amount))))
+    : color;
+}
+
 function rampChannels(ramp: readonly string[], t: number): [number, number, number] {
   const clamped = Math.min(1, Math.max(0, t));
   const position = clamped * (ramp.length - 1);
@@ -667,14 +719,58 @@ export function rampColorAt(
 }
 
 /**
- * How wide the heatmap's neon is at a heat `share` (0 once, 1 past twelve
- * passes), in pixels: the whole tube, and its white core. Both grow with the
- * passes, and the core grows faster — an eighth of a single pass's tube, a
- * third of the hottest — so the more a stretch was run the more of it is
- * white.
+ * The neon every route line wears, the heatmap's included: a core whitened
+ * towards white down its middle between two edges of the line's own colour,
+ * and under it a halo in that colour, faint and blurred 4 px, reaching 2 px
+ * past a route line on each side and three quarters of its width past the
+ * heatmap's.
+ * The edges keep a route line's 1.2 px at any width, so the heatmap's line,
+ * which widens with its passes, widens in its core: a stretch run many times
+ * burns brighter rather than growing two thick borders. Its glow is a share of
+ * the width, so it widens with it. A daylight map takes less of both: a white core and a glow
+ * read louder on it. The halo pane's CSS blur
+ * (`.leaflet-heraclesRouteHalo-pane`) is `haloBlur` written out, and
+ * `test:route-coloring` holds the two equal.
  */
-export function neonWidths(share: number): { body: number; core: number } {
-  const clamped = Math.min(1, Math.max(0, share));
-  const body = 4 + 5 * clamped;
-  return { body, core: body * (0.12 + 0.23 * clamped) };
+export const ROUTE_NEON = {
+  /** A route line's width, in pixels. */
+  weight: 4,
+  /** Each edge of the line, outside its core, in pixels. */
+  edge: 1.2,
+  /** How far the heatmap's halo reaches past its line on each side, as a share of the line's width. */
+  haloShare: 0.75,
+  /** How far a route line's halo reaches past it on each side, in pixels. */
+  lineHalo: 2,
+  haloBlur: 4,
+  dark: { coreWhiten: 0.45, haloOpacity: 0.3 },
+  light: { coreWhiten: 0.3, haloOpacity: 0.16 }
+} as const;
+
+export function routeNeon(lightGround: boolean): { coreWhiten: number; haloOpacity: number } {
+  return ROUTE_NEON[lightGround ? "light" : "dark"];
+}
+
+/** A route line's widths, in the route and performance modes. */
+export const ROUTE_LINE_WIDTHS = {
+  ...neonWidths(ROUTE_NEON.weight),
+  halo: ROUTE_NEON.weight + 2 * ROUTE_NEON.lineHalo
+};
+
+/** A heatmap line of `weight` pixels with its core and halo, in the neon's proportions at any width. */
+export function neonWidths(weight: number): { body: number; core: number; halo: number } {
+  return {
+    body: weight,
+    core: Math.max(0, weight - 2 * ROUTE_NEON.edge),
+    halo: weight * (1 + 2 * ROUTE_NEON.haloShare)
+  };
+}
+
+/**
+ * How wide the heatmap's line is at a heat `share` (0 once, 1 past twelve
+ * passes), in pixels: a route line's own width for a single pass, growing to
+ * 9 — the more a stretch was run the wider its line and its glow, in the
+ * same neon.
+ */
+export function heatWeight(share: number): number {
+  return ROUTE_NEON.weight + 5 * Math.min(1, Math.max(0, share));
 }

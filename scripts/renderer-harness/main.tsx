@@ -19,7 +19,7 @@
  * kind a real browser has: effects, event order, and a console nobody read.
  */
 import type { ComponentProps } from "react";
-import { StrictMode, useState, type ReactElement } from "react";
+import { StrictMode, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { UnitSystemProvider } from "../../src/units/UnitSystemProvider";
 import { ThemeProvider } from "../../src/theme/ThemeProvider";
@@ -29,6 +29,7 @@ import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
 import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { RunningView } from "../../src/running/RunningView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
+import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
 import { PromptDialog } from "../../src/training-library/PromptDialog";
 import { clampTagInput } from "../../src/training-library/tagInput";
@@ -256,6 +257,20 @@ function PlanEditorHarness({ options }: { options: Record<string, unknown> }) {
       </div>
     </div>
   );
+}
+
+function EscapeClosingPanel({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        spy("onPanelEscape")();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+  return <>{children}</>;
 }
 
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
@@ -489,6 +504,30 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         onOpenCoach={spy("onOpenCoach")}
         onScheduleChanged={spy("onScheduleChanged")}
       />
+    );
+  },
+  /*
+   * The side-panel route map, in a panel that closes on Escape the way the
+   * Calendar's day panel does: a capturing listener on `document`, attached
+   * when the panel opens and so before any the map attaches. The driver reads
+   * `prop:onPanelEscape` to tell which of the two a key closed.
+   */
+  ActivityRouteMap: (options) => {
+    loadActivitiesStyles();
+    return (
+      <EscapeClosingPanel>
+        <div
+          className="activities-view"
+          style={{ width: `${(options.width as number | undefined) ?? 480}px` }}
+        >
+          <section className="activity-detail-block">
+            <ActivityRouteMap
+              track={options.track as never}
+              detail={options.detail as never}
+            />
+          </section>
+        </div>
+      </EscapeClosingPanel>
     );
   },
   ActivitiesSummary: (options) => {

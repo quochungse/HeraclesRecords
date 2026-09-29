@@ -360,21 +360,52 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
 
 // --- Neon ------------------------------------------------------------------
 {
+  const { ROUTE_NEON } = coloring;
+  // One neon for every line: the heatmap's is a route line's, wider, and its
+  // glow reaches further.
+  assert.deepEqual(coloring.ROUTE_LINE_WIDTHS, { body: 4, core: 1.6, halo: 8 }, "a route line");
+  assert.ok(
+    coloring.neonWidths(coloring.heatWeight(0)).halo > coloring.ROUTE_LINE_WIDTHS.halo,
+    "a stretch passed once glows further than a route line"
+  );
+  assert.equal(coloring.heatWeight(0), ROUTE_NEON.weight, "a stretch passed once is a route line's width");
   const shares = [0, 0.25, 0.5, 0.75, 1];
-  const widths = shares.map((share) => coloring.neonWidths(share));
-  widths.slice(1).forEach((width, index) => {
-    assert.ok(width.body > widths[index].body, "the tube widens with the passes");
-    assert.ok(width.core > widths[index].core, "and so does its white core");
-    assert.ok(width.core / width.body > widths[index].core / widths[index].body, "faster: more of it is white");
+  const weights = shares.map((share) => coloring.heatWeight(share));
+  weights.slice(1).forEach((weight, index) => {
+    assert.ok(weight > weights[index], "the line widens with the passes");
   });
-  assert.ok(widths.every(({ body, core }) => core < body), "the core stays inside the tube");
+  assert.equal(coloring.heatWeight(3), coloring.heatWeight(1), "and stops at the top band");
+  assert.ok(
+    coloring.neonWidths(coloring.heatWeight(1)).halo > coloring.neonWidths(coloring.heatWeight(0)).halo * 2,
+    "a hot stretch glows wider than a stretch passed once"
+  );
+  for (const weight of weights) {
+    const { body, core, halo } = coloring.neonWidths(weight);
+    assert.ok(
+      Math.abs((body - core) / 2 - ROUTE_NEON.edge) < 1e-9,
+      "the edges keep a route line's width however wide the line: it widens in its core"
+    );
+    assert.ok(
+      Math.abs((halo - body) / 2 / body - ROUTE_NEON.haloShare) < 1e-9,
+      "and the halo reaches past it by its share of the width"
+    );
+  }
+  const dark = coloring.routeNeon(false);
+  const light = coloring.routeNeon(true);
+  assert.ok(light.coreWhiten < dark.coreWhiten && light.haloOpacity < dark.haloOpacity, "a daylight map takes less");
+
+  // The halo pane's CSS blur is the canvas's.
+  const css = fs.readFileSync(path.join(repoRoot, "src/styles.css"), "utf8");
+  const paneBlur = /\.leaflet-heraclesRouteHalo-pane \{[^}]*filter: blur\((\d+(?:\.\d+)?)px\)/.exec(css);
+  assert.equal(Number(paneBlur?.[1]), ROUTE_NEON.haloBlur, "the halo pane blurs by ROUTE_NEON.haloBlur");
+
   const ramp = coloring.heatColors(false);
-  assert.equal(coloring.rampColorAt(ramp, 0, 1), "rgb(255, 255, 255)", "the core is white");
+  assert.equal(coloring.rampColorAt(ramp, 0, 1), "rgb(255, 255, 255)", "whitened in full, a core is white");
   assert.equal(coloring.rampColorAt(ramp, 0, 0), coloring.rampColorAt(ramp, 0), "the edge is the heat's own colour");
   // The reds' core leans warm, not pink: whitened, blue stays below green.
   const channels = (color) => color.match(/\d+/g).map(Number);
   for (const share of [0.75, 1]) {
-    const [, g, b] = channels(coloring.rampColorAt(ramp, share, 0.65, coloring.heatCores()));
+    const [, g, b] = channels(coloring.rampColorAt(ramp, share, dark.coreWhiten, coloring.heatCores()));
     assert.ok(b < g, `the red core at ${share} glows orange, not pink: g ${g}, b ${b}`);
   }
   assert.equal(
@@ -416,7 +447,7 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
   assert.ok(worst > 0.5, "and it is rounded, not left as a kink");
   // Round at any zoom: where two samples meet, the chord times the turn —
   // about eight times how far the samples stray from the true curve — stays
-  // under 15 cm, so no facet is ever two centimetres deep. A hairpin too.
+  // under 40 cm, so no facet is ever five centimetres deep. A hairpin too.
   const heading = (a, b) => {
     const [ax, ay] = toXY(a);
     const [bx, by] = toXY(b);
@@ -429,7 +460,7 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
       let turn = Math.abs(heading(samples[k], samples[k + 1]) - heading(samples[k - 1], samples[k]));
       turn = Math.min(turn, 2 * Math.PI - turn);
       const facet = turn * Math.max(chord(samples[k - 1], samples[k]), chord(samples[k], samples[k + 1]));
-      assert.ok(facet < 0.15, `sample ${k} of ${samples.length}: ${facet.toFixed(3)}`);
+      assert.ok(facet < 0.4, `sample ${k} of ${samples.length}: ${facet.toFixed(3)}`);
     }
   }
   assert.ok(curve.points.length < 40, `the straight legs cost no samples: ${curve.points.length}`);
@@ -525,6 +556,18 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
   const long = simplifyRoute(winding);
   assert.ok(long.length <= MAX_ROUTE_POINTS && long.length > MAX_ROUTE_POINTS / 3, `fits the budget: ${long.length}`);
   assert.equal(long.at(-1), winding.at(-1));
+}
+
+// --- A line's neon core ------------------------------------------------------
+{
+  assert.equal(coloring.whitenColor("#000000", 0.5), "rgb(128, 128, 128)", "half way to white");
+  assert.equal(coloring.whitenColor("#74c08f", 0), "rgb(116, 192, 143)", "nothing whitened is the colour itself");
+  assert.equal(
+    coloring.whitenColor(coloring.elevationColor(400, false), 1),
+    "rgb(255, 255, 255)",
+    "an elevation colour, written rgb(), whitens too"
+  );
+  assert.equal(coloring.whitenColor("currentColor", 0.4), "currentColor", "anything else is left alone");
 }
 
 // --- Ramps -----------------------------------------------------------------
