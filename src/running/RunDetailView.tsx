@@ -71,11 +71,15 @@ interface Stat {
   title?: string;
 }
 
+/** `MouseEvent.button` for the mouse's back button. */
+const MOUSE_BACK_BUTTON = 3;
+
 /**
  * One run, on the whole page.
  *
- * The back button is not the only way out: a screen reached by clicking a row
- * has to answer Escape, or the keyboard route in has no keyboard route out.
+ * Back is its button and the mouse's back button, as in a browser. Escape is
+ * not a way out: it closes what has a close button — a dialog, a menu — and
+ * this is a page.
  */
 export function RunDetailView({
   activity,
@@ -116,15 +120,27 @@ export function RunDetailView({
     loading && surface !== null && isOutdoorRunSurface(surface);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      // Something above this page — a menu, a dialog — may already have
-      // answered this Escape; one press closes one thing.
-      if (event.key === "Escape" && !event.defaultPrevented) {
+    // Taken on the way up and cancelled, where Chromium would otherwise go
+    // back in the window's own history. A mouse whose driver sends its back
+    // button as the Browser Back key arrives as that key instead.
+    const onMouseUp = (event: MouseEvent) => {
+      if (event.button === MOUSE_BACK_BUTTON) {
+        event.preventDefault();
         onBack();
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "BrowserBack") {
+        event.preventDefault();
+        onBack();
+      }
+    };
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [onBack]);
 
   const headline = useMemo<Stat[]>(() => {

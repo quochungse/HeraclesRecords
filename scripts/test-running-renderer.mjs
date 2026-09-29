@@ -373,7 +373,8 @@ async function main() {
 
   // -------------------------------------------------------------------------
   // A run handed over from another screen — Activities' "Open in Running" —
-  // goes Back to that screen, and its button says so.
+  // goes Back to that screen, and its button says so. The mouse's back button
+  // is Back too; Escape is not, since the page has no close button.
   // -------------------------------------------------------------------------
   {
     const target = RUNS[3];
@@ -388,13 +389,26 @@ async function main() {
     await harness("setProps", { openRequest: null });
     await settle();
     assert.equal(await harness("text", ".run-detail-back"), "Activities", "Back names the screen it returns to");
-    await harness("click", ".run-detail-back");
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+    await settle();
+    assert.equal(await harness("exists", ".run-detail"), true, "Escape leaves the page open");
+    assert.equal(await harness("callCount", "prop:onReturn"), 0, "and goes nowhere");
+    const cancelled = await win.webContents.executeJavaScript(
+      `(() => {
+        const event = new MouseEvent("mouseup", { button: 3, bubbles: true, cancelable: true });
+        document.querySelector(".run-detail-stats").dispatchEvent(event);
+        return event.defaultPrevented;
+      })()`,
+      true
+    );
     await settle();
     assert.deepEqual(
       (await harness("calls", "prop:onReturn")).map((call) => call.args),
       [["training"]],
-      "and returns there"
+      "the mouse's back button returns there"
     );
+    assert.equal(cancelled, true, "in place of the window's own history");
   }
 
   // -------------------------------------------------------------------------

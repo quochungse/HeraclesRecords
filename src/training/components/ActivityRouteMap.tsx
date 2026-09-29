@@ -1467,7 +1467,7 @@ function RouteMapModal({
 
   useEffect(() => {
     // Captured on the window and stopped there: the screen underneath may
-    // answer Escape itself — a run's page goes back to the list on it — and one
+    // answer Escape itself — the Calendar's day panel closes on it — and one
     // key press should close one thing. An open layer menu is that one thing:
     // the Escape is left to it.
     const handleKeyDown = (event: KeyboardEvent) => {
