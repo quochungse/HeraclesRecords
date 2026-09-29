@@ -57,7 +57,8 @@ const READS: Record<string, [doing: string, done: string]> = {
   propose_schedule_changes: ["Checking the changes against your calendar", "Checked the changes against your calendar"],
   delete_workout: ["Preparing the removal", "Prepared the removal"],
   request_plan_brief: ["Setting out the brief", "Set out the brief"],
-  request_coach_input: ["Preparing a question", "Prepared a question"]
+  request_coach_input: ["Preparing a question", "Prepared a question"],
+  recall_conversation: ["Looking back through this conversation", "Looked back through this conversation"]
 };
 
 /** A read, as a line. An unknown COROS MCP tool is still a read of COROS. */

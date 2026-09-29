@@ -166,7 +166,8 @@ assert.equal(
     ...dist("chatAnalyticsTools.js").CHAT_ANALYTICS_TOOL_NAMES,
     ...dist("chatSleepTools.js").CHAT_SLEEP_TOOL_NAMES,
     ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
-    ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
+    ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES,
+    ...dist("chatConversationTools.js").CHAT_CONVERSATION_TOOL_NAMES
   ];
   // Twelve: `upload_training_plan`, which never wrote anything, was removed,
   // and `revise_training_plan` and `get_plan_draft` were added.
@@ -195,7 +196,9 @@ assert.equal(
     "get_workout_library",
     // A proposal the athlete applies; it writes nothing (P3.3).
     "propose_schedule_changes",
-    "request_coach_input"
+    "request_coach_input",
+    // The conversation's own earlier turns, read back.
+    "recall_conversation"
   ]);
   // A brief is set out for the athlete to check and edit — nobody is there
   // to during a run, so an analysis may not start one (P2.1).

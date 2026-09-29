@@ -14,6 +14,7 @@ const distUrl = (file) =>
   pathToFileURL(path.join(repoRoot, "dist-electron", file)).href;
 
 const {
+  DEFAULT_CONTEXT_BUDGET,
   DEFAULT_COMPACT_CONTEXT,
   DEFAULT_CONTEXT_KEEP,
   DEFAULT_CONTEXT_LIMIT,
@@ -34,6 +35,9 @@ const {
   withCreationIndex
 } = await import(
   `${distUrl("chatContextCompaction.js")}?cacheBust=${Date.now()}`
+);
+const { foldForSearch, recallEarlierTurns } = await import(
+  `${distUrl("chatRecall.js")}?cacheBust=${Date.now()}`
 );
 
 const message = (index) => ({
@@ -289,6 +293,127 @@ for (const stored of [
   });
   assert.deepEqual(alsoForced.through, triggered.through);
   assert.deepEqual(contentsOf(alsoForced.tail), contentsOf(triggered.tail));
+}
+
+// The budget: a handful of long answers is compacted long before the entry
+// window would notice. Measured, a 16-entry conversation sent ~16k tokens a
+// turn and was never rolled.
+{
+  const long = (index, chars) => ({
+    kind: "message",
+    role: index % 2 === 0 ? "user" : "assistant",
+    content: `${index} `.padEnd(chars, "x")
+  });
+  // 16 entries, every answer ~3k tokens: over `rollAt`, far under the limit.
+  const heavy = Array.from({ length: 16 }, (_, index) => long(index, index % 2 ? 9_000 : 300));
+  const plan = planTranscriptContext(heavy, { through: 0 });
+  assert.ok(plan.toSummarise.length > 0, "a transcript over budget rolls below the entry limit");
+  const tailTokens = plan.tail.reduce((total, entry) => total + Math.ceil(entry.content.length / 3), 0);
+  assert.ok(
+    tailTokens <= DEFAULT_CONTEXT_BUDGET.keep,
+    `the tail is held to the budget (${tailTokens} > ${DEFAULT_CONTEXT_BUDGET.keep})`
+  );
+  assert.deepEqual(
+    [...contentsOf(plan.toSummarise), ...contentsOf(plan.tail)],
+    contentsOf(heavy),
+    "nothing is dropped"
+  );
+
+  // The question and the answer before it go in whole, however long.
+  const huge = [long(0, 300), long(1, 60_000), long(2, 300)];
+  const kept = planTranscriptContext(huge, { through: 0 }, DEFAULT_CONTEXT_WINDOW, { force: true });
+  assert.equal(kept.tail.length, 2, "the last answer is kept whole even past the budget");
+
+  // Over budget with barely anything to fold is not a roll: one long answer
+  // would otherwise be summarised a turn at a time.
+  const lone = [long(0, 300), long(1, 40_000), long(2, 300), long(3, 300), long(4, 300)];
+  assert.deepEqual(planTranscriptContext(lone, { through: 0 }).toSummarise, []);
+
+  // Cards cost nothing: they are not sent.
+  const cards = Array.from({ length: 40 }, () => ({
+    kind: "planDraft",
+    draft: { draftId: "d", name: "x".repeat(20_000) }
+  }));
+  assert.deepEqual(
+    planTranscriptContext([...cards, ...transcript(4)], { through: 0 }).toSummarise,
+    [],
+    "a transcript of cards is not over budget"
+  );
+
+  // A budget passed in is obeyed; the default leaves short transcripts alone.
+  assert.ok(
+    planTranscriptContext(transcript(30), { through: 0 }, DEFAULT_CONTEXT_WINDOW, {
+      budget: { rollAt: 10, keep: 5 }
+    }).toSummarise.length > 0
+  );
+  assert.deepEqual(planTranscriptContext(transcript(30), { through: 0 }).toSummarise, []);
+}
+
+// ---------------------------------------------------------------------------
+// Recall
+// ---------------------------------------------------------------------------
+
+{
+  assert.equal(foldForSearch("Tốc độ ĐẠP xe"), "toc do dap xe", "accents, đ and case fold away");
+
+  const earlier = [
+    { kind: "message", role: "user", content: "Pace easy của tôi nên là bao nhiêu?", mid: "1-019a0b1c2d3e-0001-aa" },
+    { kind: "message", role: "assistant", content: "Easy pace: 6:40–7:00/km, HR dưới 145." },
+    { kind: "activityVisual", preview: { previewId: "p1" } },
+    { kind: "message", role: "user", content: "Tuần sau tôi bị đau bắp chân." },
+    {
+      kind: "message",
+      role: "assistant",
+      content: ["Nghỉ hai ngày.", ...Array.from({ length: 30 }, (_, i) => `Đoạn ${i} `.padEnd(400, "y")), "Bắp chân: giãn cơ mỗi tối."].join("\n\n")
+    },
+    {
+      kind: "coachPrompt",
+      prompt: { promptId: "q", question: "Long run ngày nào?", choices: [{ label: "Chủ nhật" }], answer: "Chủ nhật" }
+    }
+  ];
+
+  // Accents optional, and the date comes off the entry's `mid`.
+  const pace = recallEarlierTurns(earlier, "toc do pace easy");
+  assert.match(pace, /1 of the 3 earlier exchanges/);
+  assert.match(pace, /Exchange 1 · 20\d\d-\d\d-\d\d/);
+  assert.match(pace, /6:40–7:00\/km/);
+
+  // A long answer is cut to its opening and the paragraphs that match.
+  const calf = recallEarlierTurns(earlier, "bap chan");
+  assert.match(calf, /Nghỉ hai ngày\./);
+  assert.match(calf, /giãn cơ mỗi tối/);
+  assert.ok(calf.length < 5_000, "a recall costs a bounded amount");
+
+  // A question Coach asked, and its answer, are an exchange too.
+  const asked = recallEarlierTurns(earlier, "long run");
+  assert.match(asked, /1 of the 3 earlier exchanges/);
+  assert.match(asked, /Coach: I need the athlete's answer[\s\S]*Long run ngày nào\?[\s\S]*\nAthlete: Chủ nhật/);
+
+  // Nothing found says so, rather than returning the nearest miss.
+  assert.match(recallEarlierTurns(earlier, "marathon"), /No earlier exchange mentions/);
+  assert.match(recallEarlierTurns([], "pace"), /Nothing in this conversation/);
+
+  // Best matches first, returned in the order they happened, and capped.
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    kind: "message",
+    role: i % 2 ? "assistant" : "user",
+    content: i === 10 ? "tempo tempo threshold" : `tempo ${i}`
+  }));
+  const both = recallEarlierTurns(many, "tempo threshold", 5);
+  assert.match(both, /1 of the 6 earlier exchanges/, "a near miss is not returned beside a full match");
+  assert.match(both, /tempo tempo threshold/);
+  const ranked = recallEarlierTurns(many, "tempo");
+  assert.match(ranked, /2 of the 6 earlier exchanges/, "two by default");
+  assert.ok(ranked.indexOf("Exchange 5") < ranked.indexOf("Exchange 6"), "oldest first");
+  assert.match(recallEarlierTurns(many, "tempo", 99), /5 of the 6/, "capped at five");
+
+  // Terms side by side as the query has them outrank the same terms apart.
+  const apart = [
+    { kind: "message", role: "user", content: "chân tôi ổn, bắp tay hơi mỏi" },
+    { kind: "message", role: "user", content: "bắp chân phải căng" },
+    { kind: "message", role: "user", content: "chân trái ổn, bắp đùi mỏi" }
+  ];
+  assert.match(recallEarlierTurns(apart, "bắp chân", 1), /Exchange 2[\s\S]*bắp chân phải căng/);
 }
 
 // ---------------------------------------------------------------------------

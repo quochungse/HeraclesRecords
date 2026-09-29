@@ -11,6 +11,7 @@ import type {
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "../../electron/types";
 import {
   DEFAULT_COMPACT_CONTEXT,
+  DEFAULT_CONTEXT_BUDGET,
   MAX_CONTEXT_LIMIT,
   MIN_CONTEXT_GAP,
   MIN_CONTEXT_KEEP,
@@ -305,6 +306,14 @@ export function ChatSettingsPanel({
           exchanges between one summariser call and the next; a smaller gap
           between the two numbers means summarising more often, and a summary of
           a summary keeps less each time.
+        </p>
+        <p className="chat-settings-copy">
+          Long answers are compacted sooner, whatever the count: once the
+          conversation holds about {DEFAULT_CONTEXT_BUDGET.rollAt / 1000}k tokens
+          past the summary, it is folded down to the last{" "}
+          {DEFAULT_CONTEXT_BUDGET.keep / 1000}k — never less than your question and
+          the answer before it. Nothing folded is lost: Coach can search the
+          earlier turns and read them word for word when the summary is not enough.
         </p>
         <p className="chat-settings-copy">
           Between {MIN_CONTEXT_KEEP + MIN_CONTEXT_GAP} and {MAX_CONTEXT_LIMIT},

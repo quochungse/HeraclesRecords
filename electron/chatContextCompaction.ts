@@ -95,6 +95,71 @@ export const DEFAULT_COMPACT_CONTEXT: CompactContextSettings = {
   ...DEFAULT_CONTEXT_WINDOW
 };
 
+/**
+ * The window above counts entries, and an entry is a line or four thousand
+ * words. Measured on a real account (2026-09-29): a 16-entry conversation sent
+ * ~16k tokens of history on every turn and was never compacted, while a
+ * 110-entry one sent ~12k — nine tenths of it the coach's own answers. So the
+ * transcript is held to a budget as well, measured on what goes on the wire
+ * (the cards are dropped there, and they are most of a row's bytes).
+ *
+ * `keep` bounds the tail sent verbatim and `rollAt` is when a roll is due; the
+ * gap between the two is what paces the summariser, which is a model call the
+ * athlete waits on before their answer. Replayed over the same account's 120
+ * turns, 12k / 4k cut the history sent by a fifth, rolls included, and rolled
+ * four times where the entry window alone rolled twice; 10k / 3k saved a few
+ * points more for a quarter less of the conversation kept word for word.
+ * What a roll folds away stays reachable through `recall_conversation`.
+ *
+ * Fixed rather than a setting: it is a guard against answers the athlete does
+ * not control the length of, and the entry window is already the knob.
+ */
+export interface ContextBudget {
+  /** Estimated tokens past the summary at which a roll is due. */
+  rollAt: number;
+  /** Estimated tokens the verbatim tail is held to. */
+  keep: number;
+}
+
+export const DEFAULT_CONTEXT_BUDGET: ContextBudget = { rollAt: 12_000, keep: 4_000 };
+
+/**
+ * A rough token count: English runs about four characters a token and
+ * Vietnamese, which most of these conversations are written in, nearer two
+ * and a half. Three is between them, and a budget needs no more than that.
+ */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
+/** What one entry costs on the wire. A card costs nothing: it is not sent. */
+function entryTokens(entry: PersistedChatEntry): number {
+  return toWireMessages([entry]).reduce(
+    (total, message) => total + estimateTokens(message.content),
+    0
+  );
+}
+
+/**
+ * How many of the newest entries the verbatim tail holds: at most `keep`
+ * entries and `budget` tokens, but never fewer than `MIN_CONTEXT_KEEP` entries
+ * that say something — the athlete's question and what came before it go in
+ * whole, however long the answer was.
+ */
+function tailLengthWithin(entries: PersistedChatEntry[], keep: number, budget: number): number {
+  let spent = 0;
+  let spoken = 0;
+  let taken = 0;
+  for (let index = entries.length - 1; index >= 0 && taken < keep; index -= 1) {
+    const cost = entryTokens(entries[index]!);
+    if (spoken >= MIN_CONTEXT_KEEP && spent + cost > budget) break;
+    spent += cost;
+    taken += 1;
+    if (cost > 0) spoken += 1;
+  }
+  return taken;
+}
+
 function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
@@ -401,10 +466,12 @@ export interface TranscriptContextPlan {
 export interface PlanTranscriptOptions {
   /**
    * Roll now, whatever the limit says — "Compact context" from the
-   * conversation menu. The tail is still `keep` entries, so a forced compact
+   * conversation menu. The tail is chosen as for any roll, so a forced compact
    * and one the window triggered leave the conversation in the same shape.
    */
   force?: boolean;
+  /** The token budget; `DEFAULT_CONTEXT_BUDGET` when absent. */
+  budget?: ContextBudget;
 }
 
 /**
@@ -438,21 +505,30 @@ export function planTranscriptContext(
   const through = valid ? stored.through : 0;
   const summary = valid ? stored.summary : undefined;
 
-  const live = entries.length - through;
-  // A forced compact still has a floor: below `keep` there is nothing the roll
-  // could remove, and rolling anyway would spend a model call to summarise
-  // turns it then sends in full anyway.
-  const ceiling = options.force ? window.keep : window.limit;
-  if (live <= ceiling) {
+  const budget = options.budget ?? DEFAULT_CONTEXT_BUDGET;
+  const liveEntries = entries.slice(through);
+  const live = liveEntries.length;
+  const keep = tailLengthWithin(liveEntries, window.keep, budget.keep);
+  // Past the budget, a roll is due only once it would fold a few entries away:
+  // a tail that is over budget on its own (one very long answer) would
+  // otherwise be summarised a turn at a time.
+  const overBudget = () =>
+    live - keep >= MIN_CONTEXT_GAP &&
+    liveEntries.reduce((total, entry) => total + entryTokens(entry), 0) > budget.rollAt;
+  // A forced compact still has a floor: with nothing outside the tail there is
+  // nothing the roll could remove, and rolling anyway would spend a model call
+  // to summarise turns it then sends in full anyway.
+  const due = options.force ? live > keep : live > window.limit || overBudget();
+  if (!due) {
     return {
       ...(summary ? { summary } : {}),
-      tail: entries.slice(through),
+      tail: liveEntries,
       toSummarise: [],
       through
     };
   }
 
-  const nextThrough = entries.length - window.keep;
+  const nextThrough = entries.length - keep;
   return {
     ...(summary ? { summary } : {}),
     tail: entries.slice(nextThrough),
@@ -539,8 +615,12 @@ export function buildRollingSummaryTurn(
     "newer turns. It is the only record of these turns the coach will have on",
     "future runs, so keep what a coach would need: the athlete's goals, races,",
     "injuries and constraints, decisions taken, and how the training has",
-    "actually gone. Drop pleasantries and anything already superseded. Write it",
-    "as notes, not as a letter, and reply with the summary and nothing else."
+    "actually gone. Keep every figure exactly as it was given — paces, heart",
+    "rates, distances, weights, dates — and what the coach prescribed, with its",
+    "numbers: those are what a summary of a summary loses first. Drop",
+    "pleasantries, explanations the coach can give again, and anything already",
+    "superseded. Write it as notes, not as a letter, and reply with the summary",
+    "and nothing else."
   ].join("\n");
 }
 

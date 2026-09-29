@@ -18,6 +18,7 @@ const { CHAT_ANALYTICS_TOOL_NAMES } = await load("chatAnalyticsTools.js");
 const { CHAT_SLEEP_TOOL_NAMES } = await load("chatSleepTools.js");
 const { CHAT_WORKOUT_TOOL_NAMES } = await load("chatWorkoutTools.js");
 const { CHAT_INTERACTION_TOOL_NAMES } = await load("chatInteractionTools.js");
+const { CHAT_CONVERSATION_TOOL_NAMES } = await load("chatConversationTools.js");
 
 // --- every local tool is placed -------------------------------------------
 // An unlisted local tool falls through to the MCP label, which is exactly the
@@ -27,7 +28,8 @@ const localTools = [
   ...CHAT_ANALYTICS_TOOL_NAMES,
   ...CHAT_SLEEP_TOOL_NAMES,
   ...CHAT_WORKOUT_TOOL_NAMES,
-  ...CHAT_INTERACTION_TOOL_NAMES
+  ...CHAT_INTERACTION_TOOL_NAMES,
+  ...CHAT_CONVERSATION_TOOL_NAMES
 ];
 for (const name of localTools) {
   assert.ok(LOCAL_CHAT_TOOL_SOURCES.has(name), `${name} has no source in chatToolSources`);

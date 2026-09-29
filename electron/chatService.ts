@@ -109,6 +109,14 @@ import {
   isChatInteractionTool,
   type ChatInteractionToolName
 } from "./chatInteractionTools";
+import {
+  getChatConversationTools,
+  handleChatConversationTool,
+  isChatConversationTool,
+  RECALL_CONVERSATION_TOOL,
+  summarisedThrough,
+  type ChatConversationToolName
+} from "./chatConversationTools";
 import { parseFunctionCallArguments } from "./chatToolArguments";
 import {
   buildResponsesRequest,
@@ -2197,7 +2205,7 @@ async function streamChatTurn(
         applyChatToolPolicy(
           runtimeConfig.toolsEnabled
             ? getAllChatTools()
-            : [...getChatWorkoutTools(), ...getChatInteractionTools()],
+            : [...getChatWorkoutTools(), ...getChatInteractionTools(), ...getChatConversationTools()],
           toolPolicy
         )
       );
@@ -2492,7 +2500,12 @@ const runTools = new Map<string, RunTools>();
 
 function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
   const run = runTools.get(requestId);
-  return run ? [...tools.filter((tool) => run.allow(tool.name)), ...run.extra] : tools;
+  // Recall reads what a summary stands in for, so a conversation without one
+  // has nothing for it to find, and its schema would ride on every round.
+  const offered = summarisedThrough(turnSessions.get(requestId)) > 0
+    ? tools
+    : tools.filter((tool) => tool.name !== RECALL_CONVERSATION_TOOL);
+  return run ? [...offered.filter((tool) => run.allow(tool.name)), ...run.extra] : offered;
 }
 
 /** What the simulated turn reads before it thinks, by the source each tool belongs to. */
@@ -2630,7 +2643,9 @@ const PIPELINE_WITHHELD_TOOLS = new Set([
   "draft_training_plan",
   "draft_workout",
   "revise_training_plan",
-  PLAN_BRIEF_TOOL
+  PLAN_BRIEF_TOOL,
+  // Nor the conversation's past: the brief and the outline carry what it needs (P2.4).
+  RECALL_CONVERSATION_TOOL
 ]);
 
 /** What the sessions step withholds: every writing tool but the one it writes the plan with. */
@@ -2911,7 +2926,8 @@ function getAllChatTools(): CorosMcpTool[] {
     ...getChatAnalyticsTools(),
     ...getChatSleepTools(),
     ...getChatWorkoutTools(),
-    ...getChatInteractionTools()
+    ...getChatInteractionTools(),
+    ...getChatConversationTools()
   ]);
 }
 
@@ -3133,7 +3149,9 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "get_workout_library",
   // A proposal the athlete applies from its card; it writes nothing (P3.3).
   "propose_schedule_changes",
-  "request_coach_input"
+  "request_coach_input",
+  // The conversation's own earlier turns, read back.
+  RECALL_CONVERSATION_TOOL
 ]);
 
 /**
@@ -3228,7 +3246,8 @@ export function getClaudeCodeTools(
       ...analyticsTools,
       ...sleepTools,
       ...workoutTools,
-      ...getChatInteractionTools()
+      ...getChatInteractionTools(),
+      ...getChatConversationTools()
     ]),
     toolPolicy
   );
@@ -3267,6 +3286,11 @@ async function executeChatTool(
     );
   }
 
+  if (isChatConversationTool(name)) {
+    return handleChatConversationTool(name as ChatConversationToolName, args, {
+      sessionId: turnSessions.get(requestId)
+    });
+  }
   if (isChatInteractionTool(name)) {
     return handleChatInteractionTool(
       name as ChatInteractionToolName,
@@ -3575,7 +3599,8 @@ export function withLiveToolInstructions(
       !isChatActivityTool(tool.name) &&
       !isChatAnalyticsTool(tool.name) &&
       !isChatSleepTool(tool.name) &&
-      !isChatInteractionTool(tool.name)
+      !isChatInteractionTool(tool.name) &&
+      !isChatConversationTool(tool.name)
   );
   const corosMcpTools = mcpTools.filter((tool) =>
     tool.name.startsWith("coros__")
@@ -3638,6 +3663,13 @@ export function withLiveToolInstructions(
   }
   if (planTools.length > 0) {
     sections.push(...workoutToolGuide(has, inlineSuggestions, planTools.map((tool) => tool.name)));
+  }
+  if (has(RECALL_CONVERSATION_TOOL)) {
+    sections.push(
+      "The start of this conversation reaches you as a summary. When the athlete refers back to something " +
+        "the summary does not hold word for word — a figure, a prescription, what they said — read it with " +
+        "recall_conversation before answering, rather than guessing or asking them to repeat it."
+    );
   }
   if (interactionTools.length > 0) {
     sections.push(

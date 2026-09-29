@@ -278,6 +278,13 @@ for (const absent of [/draft_workout/, /delete_workout/, /propose_schedule_chang
   assert.doesNotMatch(readOnlyGuide, absent, `a turn without the tool hears nothing of ${absent}`);
 }
 assert.match(readOnlyGuide, /list_training_plans and get_training_plan/);
+assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with no summary hears nothing of recall");
+// Recall is a local tool: its rule is stated beside it, and it is never listed as a server's.
+{
+  const recallGuide = withLiveToolInstructions("Coach.", [tool("recall_conversation")]);
+  assert.match(recallGuide, /read it with\s+recall_conversation before answering/);
+  assert.doesNotMatch(recallGuide, /Other connected MCP server tools/);
+}
 // Every provider sends the rules, then the tool guide, then what the turn read;
 // the Anthropic one keeps the last apart so the cache marker falls before it.
 {

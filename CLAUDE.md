@@ -1147,6 +1147,24 @@ Overview, Media, Data, and Settings are in the main bundle.
   words against the two draft tools it is always offered beside; a revised plan is validated as
   a new draft. That was a third 15 kB copy, ~3.8k tokens a round.
 
+  **A long conversation is sent as a summary and a tail, and the tail is held to tokens as well
+  as entries** (`planTranscriptContext`, `chatContextCompaction.ts`). The entry window (60 past
+  the summary, keep 20 — the athlete's setting) could not see what an entry weighs: measured on
+  2026-09-29, a 16-entry conversation sent ~16k tokens a turn and was never compacted, nine tenths
+  of it the coach's own answers. So `DEFAULT_CONTEXT_BUDGET` rolls once the part past the summary
+  is over ~12k estimated tokens (`estimateTokens`, three characters a token, between English and
+  Vietnamese) and keeps a ~4k tail — never less than the question and the answer before it, and
+  not a roll at all until it would fold four entries away, or one huge answer rolls every turn.
+  Counted on the wire, so cards cost nothing. Replayed over that account's 120 turns it cut the
+  history sent by a fifth, the rolls' own input included. **What a roll folds away stays
+  readable**: `recall_conversation` (`chatConversationTools.ts`, the search in node-free
+  `chatRecall.ts`) searches the summarised part word for word — accents folded, whole words,
+  neighbouring terms ranked up, at most five exchanges, a long answer cut to its opening and the
+  paragraphs that match. It is offered only while the conversation has a summary (`toolsForRun`),
+  never to a pipeline step, and is read-only. The summariser is told to keep every figure exactly.
+  **Claude Code's prompt cuts to the last 30 messages, and the summary rides ahead of the cut**
+  (`formatClaudePrompt`): it is the first message, and the cut used to take it.
+
   **The system prompt is three parts in a fixed order, and the order is for the cache.**
   `buildBaseCoachInstructions` is who the coach is and how it coaches, and **names no tool** — it
   is sent whatever a turn holds (an analysis is read-only, a pipeline step gets one writing
