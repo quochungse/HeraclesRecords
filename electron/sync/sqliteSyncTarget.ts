@@ -16,7 +16,7 @@ import { policyForTable, RECORD_ID_SEPARATOR } from "./syncPolicy";
 import { toSqlValue } from "./syncableStore";
 import { entryIdentity } from "./oplog";
 import { rowMergerFor } from "./rowMergers";
-import type { RepublishRow } from "./syncEngine";
+import type { ContentChange, RepublishRow } from "./syncEngine";
 import type { SyncTarget } from "./syncEngine";
 
 /** A localStorage write the renderer still has to perform. */
@@ -40,6 +40,8 @@ export class SqliteSyncTarget implements SyncTarget {
   readonly #pendingLocalStorage: PendingLocalStorageOp[] = [];
   readonly #incomplete = new Set<string>();
   readonly #republish: RepublishRow[] = [];
+  /** Keyed by identity, so a record folded from three entries is listed once. */
+  readonly #contentChanges = new Map<string, ContentChange>();
 
   /**
    * Rows whose merge produced something the vault does not hold, taken and
@@ -47,6 +49,24 @@ export class SqliteSyncTarget implements SyncTarget {
    */
   takeRepublish(): readonly RepublishRow[] {
     return this.#republish.splice(0, this.#republish.length);
+  }
+
+  /** See `SyncTarget.takeContentChanges`. */
+  takeContentChanges(): readonly ContentChange[] {
+    const taken = [...this.#contentChanges.values()];
+    this.#contentChanges.clear();
+    return taken;
+  }
+
+  #noteContentChange(table: string, recordId: string, removed: boolean): void {
+    const identity = entryIdentity({ scope: "table", key: table, recordId });
+    // A removal outranks an edit of the same record in the same merge.
+    const held = this.#contentChanges.get(identity);
+    this.#contentChanges.set(identity, {
+      table,
+      recordId,
+      removed: removed || Boolean(held?.removed)
+    });
   }
 
   /** See `SyncTarget.transaction`. `better-sqlite3` rolls back if `work`
@@ -157,10 +177,12 @@ export class SqliteSyncTarget implements SyncTarget {
     // wrote last. See `rowMergers.ts`.
     const merger = rowMergerFor(table);
     let republish = false;
+    let changed = false;
     if (merger) {
       const merged = merger(this.#readRow(table, shape, recordId), row, context);
       row = merged.row;
       republish = merged.republish;
+      changed = merged.changed;
     }
 
     // Drop columns this build does not have. An older machine writing a row
@@ -205,7 +227,7 @@ export class SqliteSyncTarget implements SyncTarget {
     const value = (column: string) => toSqlValue(row[column]);
 
     if (columns.length !== shape.columns.size && updatable.length > 0) {
-      const changed = requireDatabase()
+      const updated = requireDatabase()
         .prepare(
           `UPDATE ${table} SET ${updatable.map((c) => `${c} = ?`).join(", ")} ` +
             `WHERE ${keyMatch}`
@@ -217,8 +239,9 @@ export class SqliteSyncTarget implements SyncTarget {
       // A row that is not here yet cannot be updated into existence, so the
       // insert below still runs — and fails loudly if the payload cannot make a
       // complete row, which is the honest answer rather than a half-written one.
-      if (changed > 0) {
+      if (updated > 0) {
         this.#noteRepublish(table, shape, recordId, republish);
+        if (changed) this.#noteContentChange(table, recordId, false);
         return;
       }
     }
@@ -238,6 +261,10 @@ export class SqliteSyncTarget implements SyncTarget {
       .run(columns.map(value));
 
     this.#noteRepublish(table, shape, recordId, republish);
+    // After the write, never before: an entry this schema refuses throws above,
+    // and a change announced for a row that never landed would stop an
+    // analysis over nothing.
+    if (changed) this.#noteContentChange(table, recordId, false);
   }
 
   /**
@@ -271,7 +298,14 @@ export class SqliteSyncTarget implements SyncTarget {
     const where = shape.primaryKey
       .map((column) => `${column} = ?`)
       .join(" AND ");
-    requireDatabase().prepare(`DELETE FROM ${table} WHERE ${where}`).run(parts);
+    const removed = requireDatabase()
+      .prepare(`DELETE FROM ${table} WHERE ${where}`)
+      .run(parts).changes;
+    // A conversation deleted on another machine is the largest change its
+    // content can have. Only a merging table is watched this way.
+    if (removed > 0 && rowMergerFor(table)) {
+      this.#noteContentChange(table, recordId, true);
+    }
   }
 
   setSetting(key: string, value: string): void {

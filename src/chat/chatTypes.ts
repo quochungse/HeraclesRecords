@@ -1,5 +1,6 @@
 import type {
   ActivityVisualPreview,
+  AnalysisStopReason,
   ChatEntryAnalysisMarker,
   ChatMessage,
   ChatTokenUsage,
@@ -92,6 +93,15 @@ export interface ChatAnalysisSilentEntry {
   at: number;
 }
 
+/** An analysis stopped before answering, and why (sync, today). */
+export interface ChatAnalysisStoppedEntry {
+  kind: "automationStopped";
+  automation: ChatEntryAnalysisMarker;
+  /** Epoch milliseconds. */
+  at: number;
+  reason: AnalysisStopReason;
+}
+
 export interface ChatToolNoticeEntry {
   kind: "toolNotice";
   message: string;
@@ -157,6 +167,7 @@ export type ChatEntry = (
   | ChatFitnessTrendEntry
   | ChatHrZoneEntry
   | ChatAnalysisSilentEntry
+  | ChatAnalysisStoppedEntry
   | ChatToolNoticeEntry
   | ChatOpaqueEntry
 ) & {
@@ -328,6 +339,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   fitnessTrend: ["preview"],
   hrZoneSummary: ["preview"],
   automationSilent: ["automation", "at"],
+  automationStopped: ["automation", "at", "reason"],
   opaque: ["raw"]
 };
 
@@ -392,6 +404,14 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
       kind: "automationSilent",
       automation: entry.automation,
       at: entry.at
+    };
+  }
+  if (entry.kind === "automationStopped") {
+    return {
+      kind: "automationStopped",
+      automation: entry.automation,
+      at: entry.at,
+      reason: entry.reason
     };
   }
   if (entry.kind === "toolNotice") {
@@ -493,6 +513,14 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
       kind: "automationSilent",
       automation: entry.automation,
       at: entry.at
+    };
+  }
+  if (entry.kind === "automationStopped") {
+    return {
+      kind: "automationStopped",
+      automation: entry.automation,
+      at: entry.at,
+      reason: entry.reason
     };
   }
   return {

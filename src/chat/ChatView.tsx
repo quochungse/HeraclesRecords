@@ -715,16 +715,20 @@ function AnalysisPromptChip({
   marker,
   prompt,
   index,
-  highlighted
+  highlighted,
+  settled
 }: {
   marker: ChatEntryAnalysisMarker;
   prompt: string;
   index: number;
   highlighted: boolean;
+  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
+  settled: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div
+    <ChatRow
+      settled={settled}
       className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
@@ -741,7 +745,7 @@ function AnalysisPromptChip({
         <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
       </button>
       {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
-    </div>
+    </ChatRow>
   );
 }
 
@@ -778,15 +782,19 @@ function AnalysisSilentChip({
   marker,
   at,
   index,
-  highlighted
+  highlighted,
+  settled
 }: {
   marker: ChatEntryAnalysisMarker;
   at: number;
   index: number;
   highlighted: boolean;
+  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
+  settled: boolean;
 }) {
   return (
-    <div
+    <ChatRow
+      settled={settled}
       className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
@@ -799,7 +807,46 @@ function AnalysisSilentChip({
           · {formatLookedAt(at)}
         </span>
       </span>
-    </div>
+    </ChatRow>
+  );
+}
+
+/**
+ * An analysis stopped before it answered, because sync brought changes to this
+ * conversation from another device while it ran. It sits where the answer
+ * would have, at the end of the conversation as sync left it, so the athlete
+ * reads both what arrived and why no answer followed.
+ */
+function AnalysisStoppedChip({
+  marker,
+  at,
+  index,
+  highlighted,
+  settled
+}: {
+  marker: ChatEntryAnalysisMarker;
+  at: number;
+  index: number;
+  highlighted: boolean;
+  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
+  settled: boolean;
+}) {
+  return (
+    <ChatRow
+      settled={settled}
+      className={`chat-row chat-row-analysis${
+        highlighted ? " is-chat-jump-target" : ""
+      }`}
+      data-chat-entry-index={index}
+    >
+      <span className="chat-analysis-chip chat-analysis-chip-static chat-analysis-chip-stopped">
+        <RefreshCw size={12} aria-hidden="true" />
+        {marker.name} stopped: this conversation changed on another device while it ran
+        <span className="chat-analysis-chip-trigger">
+          · {formatLookedAt(at)}
+        </span>
+      </span>
+    </ChatRow>
   );
 }
 
@@ -1642,7 +1689,16 @@ export function ChatView({
       // The athlete may have switched conversations while this was in flight.
       if (activeSessionIdRef.current !== sessionId) return;
       persistedBaseRef.current = entries.length;
-      setTimeline(fromPersistedEntries(entries));
+      const next = fromPersistedEntries(entries);
+      // Drawn as they are, never faded in (see `ChatRow`). What a reload adds
+      // is an analysis's answer in place of its live bubble, or turns sync
+      // brought — and a fade that starts from nothing never finishes on a
+      // window that has stopped getting frames, which is exactly the window a
+      // run finishes behind: the athlete was in the browser a moment ago
+      // signing in to Google. The bubble went, the answer stayed invisible,
+      // and it only appeared once the conversation was opened again.
+      for (const entry of next) settledEntriesRef.current.add(entry);
+      setTimeline(next);
     } catch {
       // Keep what is on screen rather than blanking a readable transcript.
     }
@@ -1857,20 +1913,31 @@ export function ChatView({
         return;
       }
 
-      if (liveAnalysisRef.current?.runId === run.id) {
-        setLiveAnalysis(null);
-      }
+      const endLive = () =>
+        setLiveAnalysis((current) => (current?.runId === run.id ? null : current));
 
       // A skip never reached the model and adds nothing. A silent run does add
       // something now — the one-line trace saying the coach looked (5.5) — so
       // it reloads on the same path as an answer, and the trace is what
-      // explains the live bubble disappearing.
-      if (run.status !== "success" && run.status !== "silent") return;
+      // explains the live bubble disappearing. So does a run sync stopped: it
+      // leaves a line saying why, under the turns sync brought.
+      if (
+        run.status !== "success" &&
+        run.status !== "silent" &&
+        run.status !== "cancelled"
+      ) {
+        endLive();
+        return;
+      }
       // Reloaded straight away even mid-turn. Waiting for the athlete's turn to
       // end is worse than useless: their turn persists the whole timeline, so
       // the copy on screen — which predates the run — would be written over the
       // coach's answer before the deferred reload ever got to see it.
-      void reloadTranscript(run.sessionId);
+      //
+      // The live bubble goes only once the answer is in the timeline: taken
+      // down first, the conversation ended on the answer before this one for
+      // as long as the read took.
+      void reloadTranscript(run.sessionId).finally(endLive);
     });
   }, [api, showLiveAnalysis]);
 
@@ -4518,8 +4585,9 @@ export function ChatView({
                   (choice) => choice.id === entry.prompt.selectedChoiceId
                 );
                 return (
-                  <div
+                  <ChatRow
                     key={entry.prompt.promptId}
+                    settled={settledEntriesRef.current.has(entry)}
                     className="chat-row chat-row-assistant chat-asked-row"
                     data-chat-entry-index={index}
                   >
@@ -4528,7 +4596,7 @@ export function ChatView({
                     <span className="chat-asked-answer">
                       {chosen?.label ?? entry.prompt.answer ?? ""}
                     </span>
-                  </div>
+                  </ChatRow>
                 );
               }
               return (
@@ -4563,8 +4631,9 @@ export function ChatView({
 
             if (entry.kind === "planRefs") {
               return (
-                <div
+                <ChatRow
                   key={`refs#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4575,14 +4644,15 @@ export function ChatView({
                       {ref.scope === "plan" ? "" : ` · ${ref.label}`}
                     </span>
                   ))}
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "scheduleRefs") {
               return (
-                <div
+                <ChatRow
                   key={`scheduleRefs#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4592,7 +4662,7 @@ export function ChatView({
                       {ref.label}
                     </span>
                   ))}
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4600,8 +4670,9 @@ export function ChatView({
               const brief = planBriefs[entry.artifactId];
               if (!brief) return null;
               return (
-                <div
+                <ChatRow
                   key={`brief:${entry.artifactId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4632,7 +4703,7 @@ export function ChatView({
                       busy={streaming}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4642,21 +4713,23 @@ export function ChatView({
               if (outlineAnchors.get(entry.artifactId) !== index) {
                 // Redrawn below: the artifact keeps one outline, the latest card draws it.
                 return (
-                  <div
+                  <ChatRow
                     key={`outline:${entry.artifactId}:${entry.outlineVersion}#${index}`}
+                    settled={settledEntriesRef.current.has(entry)}
                     className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                     data-chat-entry-index={index}
                   >
                     <span className="chat-asked-kicker">Outline</span>
                     <span className="chat-asked-question">v{entry.outlineVersion}</span>
                     <span className="chat-version-note">Redrawn below</span>
-                  </div>
+                  </ChatRow>
                 );
               }
               const outlined = brief as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> };
               return (
-                <div
+                <ChatRow
                   key={`outline:${entry.artifactId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4678,7 +4751,7 @@ export function ChatView({
                       onRedraw={(note) => void drawOutline(brief.artifactId, note)}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4709,8 +4782,9 @@ export function ChatView({
                       ? "Changed in the Library"
                       : "Deleted on COROS";
               return (
-                <div
+                <ChatRow
                   key={`${event.eventId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                   data-chat-entry-index={index}
                 >
@@ -4740,7 +4814,7 @@ export function ChatView({
                       Undo
                     </button>
                   ) : null}
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4760,8 +4834,9 @@ export function ChatView({
                 // import made already has that event's line just before it.
                 if (eventedDraftIds.has(draft.draftId)) return null;
                 return (
-                  <div
+                  <ChatRow
                     key={`${draft.draftId}#${index}`}
+                    settled={settledEntriesRef.current.has(entry)}
                     className="chat-row chat-row-assistant chat-asked-row chat-version-row"
                     data-chat-entry-index={index}
                   >
@@ -4777,7 +4852,7 @@ export function ChatView({
                     >
                       View
                     </button>
-                  </div>
+                  </ChatRow>
                 );
               }
               const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
@@ -4785,8 +4860,9 @@ export function ChatView({
               // copy that used to live here was chosen by a width test, and
               // that test also decided whether the Creations button existed.
               return (
-                <div
+                <ChatRow
                   key={`${draft.draftId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4823,14 +4899,15 @@ export function ChatView({
                       }}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "workoutDelete") {
               return (
-                <div
+                <ChatRow
                   key={entry.preview.requestId}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4839,7 +4916,7 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <DeletePreviewCard preview={entry.preview} />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4849,8 +4926,9 @@ export function ChatView({
               const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
               return (
                 // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
-                <div
+                <ChatRow
                   key={`scheduleChange:${entry.changeSetId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4866,7 +4944,7 @@ export function ChatView({
                       onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4879,8 +4957,9 @@ export function ChatView({
                 // the row rather than to show what the transcript holds. The
                 // id still carries identity across an in-place upsert, which is
                 // what it is here for.
-                <div
+                <ChatRow
                   key={`${entry.preview.previewId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4889,14 +4968,15 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <ActivityVisualCard preview={entry.preview} />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "fitnessTrend") {
               return (
-                <div
+                <ChatRow
                   key={`${entry.preview.previewId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4905,14 +4985,15 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <FitnessTrendCard preview={entry.preview} />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "hrZoneSummary") {
               return (
-                <div
+                <ChatRow
                   key={`${entry.preview.previewId}#${index}`}
+                  settled={settledEntriesRef.current.has(entry)}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4921,7 +5002,7 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <HrZoneCard preview={entry.preview} />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4933,6 +5014,20 @@ export function ChatView({
                   at={entry.at}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
+                  settled={settledEntriesRef.current.has(entry)}
+                />
+              );
+            }
+
+            if (entry.kind === "automationStopped") {
+              return (
+                <AnalysisStoppedChip
+                  key={`analysis-stopped-${index}`}
+                  marker={entry.automation}
+                  at={entry.at}
+                  index={index}
+                  highlighted={highlightedChatEntryIndex === index}
+                  settled={settledEntriesRef.current.has(entry)}
                 />
               );
             }
@@ -4952,6 +5047,7 @@ export function ChatView({
                   prompt={entry.content}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
+                  settled={settledEntriesRef.current.has(entry)}
                 />
               );
             }

@@ -49,6 +49,15 @@ export interface RowMerge {
    * machine holds something the vault does not.
    */
   readonly republish: boolean;
+  /**
+   * The other direction: whether the result holds content this machine's row
+   * did not — an entry added, or one whose content moved on. It is what a
+   * reader of the row would see differently, which a coach analysis in the
+   * middle of that conversation has to know (it is answering the transcript it
+   * read). Bookkeeping is not content: an identity lent to an entry, or the
+   * same entries in another order, leaves this false.
+   */
+  readonly changed: boolean;
 }
 
 export interface RowMergeContext {
@@ -232,6 +241,32 @@ function identify(
   });
 }
 
+/**
+ * Whether two transcripts hold the same entries, counted as content.
+ *
+ * A multiset rather than a list: the union orders by id, and a row this machine
+ * saved in its own order can come back from a merge reordered with nothing in
+ * it changed.
+ */
+function sameContent(
+  left: PersistedChatEntry[],
+  right: PersistedChatEntry[]
+): boolean {
+  if (left.length !== right.length) return false;
+  const counts = new Map<string, number>();
+  for (const entry of left) {
+    const key = contentKey(entry);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const entry of right) {
+    const key = contentKey(entry);
+    const held = counts.get(key);
+    if (!held) return false;
+    counts.set(key, held - 1);
+  }
+  return true;
+}
+
 function parseTranscript(value: unknown): PersistedChatEntry[] | null {
   if (typeof value !== "string") return null;
   try {
@@ -335,26 +370,33 @@ const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
     // lost, in which case there is nothing left for it to say.
     if (localEntries) {
       const { messages_json: _unreadable, ...rest } = incoming;
-      return { row: winner ? rest : { id: incoming.id }, republish: false };
+      return {
+        row: winner ? rest : { id: incoming.id },
+        republish: false,
+        changed: false
+      };
     }
-    return { row: incoming, republish: false };
+    return { row: incoming, republish: false, changed: false };
   }
   // A row this machine has never seen. There is no second half to union, and
   // taking the entry whole is what every other table does.
   if (!localEntries) {
     return {
       row: winner ? incoming : onlyMerged(incoming.messages_json),
-      republish: false
+      republish: false,
+      changed: true
     };
   }
 
   const merged = mergeTranscripts(localEntries, incomingEntries);
   const mergedJson = JSON.stringify(merged);
+  const changed = !sameContent(localEntries, merged);
   if (mergedJson === incoming.messages_json) {
     // The incoming row already holds everything this machine does.
     return {
       row: winner ? incoming : onlyMerged(incoming.messages_json),
-      republish: false
+      republish: false,
+      changed
     };
   }
   return {
@@ -364,7 +406,8 @@ const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
     // Only what the vault does not hold. A loser's merge always differs from
     // the entry it came from — the winner's half is in it — so saying
     // "republish" on that alone would put a batch in the air on every pull.
-    republish: mergedJson !== JSON.stringify(localEntries)
+    republish: mergedJson !== JSON.stringify(localEntries),
+    changed
   };
 };
 

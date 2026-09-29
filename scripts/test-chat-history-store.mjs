@@ -699,6 +699,36 @@ assert.deepEqual(
   [{ kind: "automationSilent", automation: marker, at: lookedAt, note: "newer build" }]
 );
 
+// A run sync stopped leaves the line saying so, where its answer would have
+// gone. It round trips like the silent trace; a reason this build cannot say
+// is carried whole and not drawn, like any shape it cannot read.
+{
+  const stopped = { kind: "automationStopped", automation: marker, at: lookedAt, reason: "sync" };
+  const session = createChatSession("local", db);
+  saveChatSession(
+    session.id,
+    [{ kind: "message", role: "user", content: "Morning." }, stopped],
+    db
+  );
+  assert.deepEqual(getChatSession(session.id, db)[1], stopped, "the stopped line comes back whole");
+  assert.deepEqual(
+    stripMergeMeta(parseChatTranscriptJson(db.getSession(session.id).messages_json)[1]),
+    stopped,
+    "and it survives the JSON the row stores"
+  );
+  deleteChatSession(session.id, db);
+
+  for (const unreadable of [
+    { ...stopped, reason: "a reason from a newer build" },
+    { kind: "automationStopped", automation: marker, at: lookedAt },
+    { kind: "automationStopped", reason: "sync", at: lookedAt }
+  ]) {
+    const [parsed] = parseChatTranscriptJson(JSON.stringify([unreadable]));
+    assert.equal(parsed.kind, "opaque", `not drawn: ${JSON.stringify(unreadable)}`);
+    assert.deepEqual(parsed.raw, unreadable, "and kept exactly as the row held it");
+  }
+}
+
 // --- append-on-save: the renderer and the runner racing (section 5.6b) -----
 // The window holds its own copy of the transcript and saves the whole array.
 // A run writes from the main process behind its back, so between the run

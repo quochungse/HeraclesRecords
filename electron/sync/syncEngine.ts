@@ -74,6 +74,23 @@ export interface SyncTarget {
    * merges the union with a copy it already equals and reports nothing.
    */
   takeRepublish?(): readonly RepublishRow[];
+  /**
+   * Records of a merging table whose content this merge changed or removed,
+   * taken and cleared.
+   *
+   * The counts say something landed and the tables say where, but neither says
+   * whether a given conversation now reads differently — and a coach analysis
+   * streaming into one is answering the transcript it read. A merge that only
+   * lent identities, or brought nothing this machine lacked, is not listed.
+   */
+  takeContentChanges?(): readonly ContentChange[];
+}
+
+/** A record whose content a merge changed, or removed. */
+export interface ContentChange {
+  readonly table: string;
+  readonly recordId: string;
+  readonly removed: boolean;
 }
 
 /** A merged row on its way back out. Carries the row itself so the caller does

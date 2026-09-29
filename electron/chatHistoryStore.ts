@@ -1131,7 +1131,8 @@ const KNOWN_ENTRY_KINDS = new Set([
   "activityHrTrend",
   "fitnessTrend",
   "hrZoneSummary",
-  "automationSilent"
+  "automationSilent",
+  "automationStopped"
 ]);
 
 function opaqueEntry(
@@ -1306,6 +1307,23 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
           "automation",
           "at"
         ])
+      : null;
+  }
+
+  if (value.kind === "automationStopped") {
+    // Held to the reasons this build knows how to say. One it does not reads
+    // as a shape it cannot parse, which is kept whole and not drawn.
+    const automation = parseAnalysisMarker(value.automation);
+    const at =
+      typeof value.at === "number" && Number.isFinite(value.at)
+        ? value.at
+        : null;
+    return automation && at !== null && value.reason === "sync"
+      ? keepUnknownKeys(
+          { kind: "automationStopped" as const, automation, at, reason: "sync" as const },
+          value,
+          [...ENTRY_META_KEYS, "automation", "at", "reason"]
+        )
       : null;
   }
 

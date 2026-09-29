@@ -32837,6 +32837,17 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   cursor: default;
 }
 
+/* A run sync stopped: the same pill in the warning ink, and a sentence long
+   enough to need to wrap on a narrow conversation. */
+.chat-analysis-chip-stopped {
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(640px, 90%);
+  border-color: color-mix(in srgb, var(--warning-text) 45%, var(--glass-border));
+  background: color-mix(in srgb, var(--warning-text) 8%, transparent);
+  text-align: center;
+}
+
 .chat-analysis-chip-trigger,
 .chat-analysis-attribution-trigger {
   color: var(--text-muted);

@@ -87,6 +87,7 @@
     "test:running-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-running-renderer.mjs",
     "test:coach-analysis-plan-draft": "npm run build:electron && node scripts/test-coach-analysis-plan-draft.mjs",
     "test:renderer-ready": "node scripts/test-renderer-ready.mjs",
+    "test:analysis-startup-order": "node scripts/test-analysis-startup-order.mjs",
     "test:ipc-surface": "node scripts/test-ipc-surface.mjs",
     "test:sync-policy": "node scripts/test-sync-policy.mjs",
     "test:sync-obfuscation": "npm run build:electron && node scripts/test-sync-obfuscation.mjs",

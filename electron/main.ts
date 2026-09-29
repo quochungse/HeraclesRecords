@@ -301,6 +301,7 @@ import {
   emitAnalysisUpdate,
   getAnalysisPause,
   getAnalysisSpend,
+  noteConversationsChangedBySync,
   resumeAnalyses,
   runAnalysisNow,
   setAnalysisBudget
@@ -827,14 +828,14 @@ app.whenReady().then(() => {
   // starts it again for the rest of the run. With nothing to restore — the
   // usual case — the restore returns without touching the network, so this
   // costs the launch nothing.
+  //
+  // The coach analyses wait on all of it: see `startCoachAnalysesAfterSync`.
   void (async () => {
     // The status itself needs no forwarding from here: the service announces it
     // through `setTrainingHubSessionListener` above, which is the same path a
-    // mid-session expiry takes. What this wants is only whether it happened.
-    let restored = false;
+    // mid-session expiry takes.
     try {
-      const result = await restoreTrainingHubSessionAtStartup();
-      restored = result.restored;
+      await restoreTrainingHubSessionAtStartup();
     } catch (error) {
       console.warn("[trainingHub] startup COROS re-login could not run", error);
     }
@@ -846,28 +847,22 @@ app.whenReady().then(() => {
       return;
     }
 
-    // Signed out, this machine published nothing and pulled nothing, so the
-    // other one has been the only writer. Ask for its changes now instead of
-    // waiting out the idle interval. Only after a restore: an ordinary launch
-    // already polls from `start()`, and a second pass would buy nothing.
-    if (restored) {
-      syncLoopInstance?.resume();
-    }
-  })();
+    // The first pull, now rather than after the idle interval: the other
+    // machine may have written while this one was off — a turn, or the
+    // debrief of an activity this one is about to find new — and the analyses
+    // must see it before they start.
+    await firstPullAtStartup();
+  })().finally(startCoachAnalysesAfterSync);
 
   // Waking from sleep is the one moment worth polling immediately rather than
   // waiting out the idle interval: the machine has been away, so there is very
   // likely something to pull, and its network came back a moment ago.
   powerMonitor.on("resume", () => syncLoopInstance?.resume());
 
-  // Coach analyses follow the app process, not the window: with the window
-  // closed on macOS they keep running, and the athlete sees the results as
-  // unread next time a window exists. Deliberately not wired to createWindow.
   // A run in flight when the app quit has nothing left to finish it, so the
-  // run log would show it spinning forever (section 10).
+  // run log would show it spinning forever (section 10). Straight away, and
+  // before anything can start a run: it is a local write and waits on nothing.
   cancelStaleCoachAnalysisRuns();
-  startCoachActivityWatcher();
-  startCoachAnalysisScheduler();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -875,6 +870,66 @@ app.whenReady().then(() => {
     }
   });
 });
+
+/**
+ * How long the first pull may hold the analyses back.
+ *
+ * A pull reads the whole log, and on Drive that is a round trip per batch, so
+ * a large vault on a slow link can take a while. The analyses are worth more
+ * late than never, and a pull still in flight when they start is covered
+ * anyway: a run whose conversation it changes is stopped and says so
+ * (`noteConversationsChangedBySync`).
+ */
+const STARTUP_SYNC_WAIT_MS = 90_000;
+
+async function firstPullAtStartup(): Promise<void> {
+  const loop = syncLoopInstance;
+  if (!loop || !net.isOnline()) return;
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      loop.pull(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, STARTUP_SYNC_WAIT_MS);
+      })
+    ]);
+  } catch (error) {
+    // An unreachable vault is a sync problem. The analyses run on what this
+    // machine has, as they would with sync off.
+    console.warn("[sync] the first pull at startup failed", error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Set by `before-quit`, so a start-up still settling cannot start them after. */
+let coachAnalysesStopped = false;
+
+/**
+ * Coach analyses, once start-up has looked at the vault.
+ *
+ * They follow the app process, not the window: with the window closed on
+ * macOS they keep running, and the athlete sees the results as unread next
+ * time a window exists. Deliberately not wired to createWindow.
+ *
+ * **Not before the first pull.** They used to start in the same breath as the
+ * COROS re-login and the vault, so the first activity poll ran on whatever
+ * this machine last held. An analysis synced between machines carries its
+ * watermark, and the conversation it answers is synced too — so a machine
+ * opened after a day away analysed an activity the other one had already
+ * debriefed, into a transcript missing the turns written there, and the pull
+ * that landed a minute later then had two answers to reconcile. Waiting costs
+ * the launch nothing it would notice: the watcher's first poll is a COROS
+ * round trip anyway, and nothing here is on a schedule tighter than a minute.
+ * With sync off, or a vault that does not answer, there is nothing to wait for
+ * and they start as soon as that is known. "Run now" is never held — it is the
+ * athlete asking.
+ */
+function startCoachAnalysesAfterSync(): void {
+  if (coachAnalysesStopped) return;
+  startCoachActivityWatcher();
+  startCoachAnalysisScheduler();
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -899,6 +954,7 @@ let quitFlushStarted = false;
 app.on("before-quit", (event) => {
   // Idempotent, both, which is what lets the quit be cancelled and retried
   // below without them running against half-torn-down state.
+  coachAnalysesStopped = true;
   stopCoachActivityWatcher();
   stopCoachAnalysisScheduler();
 
@@ -1217,6 +1273,13 @@ function startSyncLoop(): SyncLoop | null {
       // window closed, and there is no second copy of either half anywhere.
       // `markRendererReady` is what delivers them once a window is listening.
       noteSyncApplied(result);
+      // An analysis answering one of these conversations is answering a
+      // transcript that is no longer the one on disk.
+      noteConversationsChangedBySync(
+        result.contentChanges
+          .filter((change) => change.table === "chat_sessions")
+          .map((change) => change.recordId)
+      );
     },
     onError: (error) => console.warn("[sync] loop error", error)
   });

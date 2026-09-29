@@ -1097,6 +1097,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   `test:chat-transcript-race` fails on either shortcut. When checking a paint bug
   over CDP, trust `getComputedStyle` read *before* `Page.captureScreenshot` — the
   capture forces a frame and finishes the animation it was meant to catch.
+  **Every row `reloadTranscript` mounts is settled too, and every timeline row is a
+  `ChatRow`** — cards and the analysis chips included. An analysis ends in a reload,
+  not a settle, so its prompt chip, answer and cards used to fade in from nothing in
+  place of its live bubble; reported 2026-09-28 as an answer that vanished the moment
+  the run finished (the window had just come back from the browser's Google sign-in)
+  and appeared only when the conversation was opened again. The live bubble now stays
+  until the reload has landed.
 
   **A tool schema is sent on every request round, so the draft schemas do not branch per
   sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
@@ -1243,6 +1250,22 @@ Overview, Media, Data, and Settings are in the main bundle.
   machines' vaults under those names), and the `automation` / `automationId` keys inside a
   stored chat entry — every transcript an athlete has spells them that way, and renaming
   either costs historical runs their attribution.
+
+  **An analysis answers the conversation as sync left it, or not at all.** The watcher and
+  the scheduler start only once start-up has re-logged in, opened the vault and pulled once
+  (`startCoachAnalysesAfterSync` in `main.ts`, the pull capped at `STARTUP_SYNC_WAIT_MS`;
+  sync off or unreachable starts them at once). They used to start alongside the vault, so a
+  machine opened after a day away could debrief an activity the other one already had, into
+  a transcript missing the turns written there.
+  After start-up, a pull that changes a running analysis's conversation stops it: the
+  `chat_sessions` merger reports `changed` (content only — a rename, lent ids or a reorder
+  do not count), `SqliteSyncTarget.takeContentChanges` lists the record (a delete too), the
+  loop hands it to `onApplied`, and `noteConversationsChangedBySync` aborts the run. It
+  writes an `automationStopped` anchor (`reason: "sync"`) at the end of the re-read
+  conversation and is logged `cancelled`, moving neither the watermark, `lastRunAt` nor
+  the backoff, so the activity is still owed. A change that lands before a model is asked
+  is simply read. `test:coach-analysis-runner`, `test:sync-engine`, `test:sync-twoway`,
+  `test:analysis-startup-order`.
 
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
   over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and

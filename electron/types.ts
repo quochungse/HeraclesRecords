@@ -1612,6 +1612,28 @@ export interface PersistedChatAnalysisSilentEntry {
   at: number;
 }
 
+/** Why an analysis stopped part-way. Only sync stops one today. */
+export type AnalysisStopReason = "sync";
+
+/**
+ * An analysis that stopped before answering, and why: sync brought changes to
+ * this conversation from another device while it ran, so its answer would
+ * have been about a transcript the athlete no longer has. Written where the
+ * answer would have gone, on the conversation as sync left it.
+ *
+ * An anchor in the sense of docs/coach-plan-canvas.md Q3 — the marker names
+ * the run, and the run log carries the rest — and a kind of its own rather than
+ * a field on `automationSilent` (Q1). A reason this build does not know reads
+ * as an entry it cannot parse, which is kept and not drawn.
+ */
+export interface PersistedChatAnalysisStoppedEntry {
+  kind: "automationStopped";
+  automation: ChatEntryAnalysisMarker;
+  /** Epoch milliseconds: when it stopped. */
+  at: number;
+  reason: AnalysisStopReason;
+}
+
 /**
  * How a `chat:saveSession` call describes what it is based on (5.6b). Lives
  * here rather than beside the store because the renderer declares the same
@@ -4064,6 +4086,7 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   (
   | PersistedChatMessageEntry
   | PersistedChatAnalysisSilentEntry
+  | PersistedChatAnalysisStoppedEntry
   | PersistedChatOpaqueEntry
   | { kind: "coachPrompt"; prompt: CoachInputPrompt }
   | { kind: "planDraft"; draft: PlanDraftPreview }

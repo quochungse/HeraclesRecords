@@ -1002,6 +1002,64 @@ export function cancelAnalysisRun(
 }
 
 // ---------------------------------------------------------------------------
+// A conversation sync rewrote mid-run
+// ---------------------------------------------------------------------------
+
+/** What the run log says about a run sync stopped. */
+export const ANALYSIS_STOPPED_BY_SYNC =
+  "Stopped: sync brought changes to this conversation from another device while the analysis was running.";
+export const ANALYSIS_SESSION_DELETED_BY_SYNC =
+  "Stopped: this conversation was deleted on another device while the analysis was running.";
+
+/**
+ * One run's interest in the conversation it is answering.
+ *
+ * A run reads the transcript once, near the start, and a turn takes as long as
+ * the provider does — minutes, for a playbook that walks a month of
+ * activities. A sync pull can land anywhere in that: a machine that has just
+ * been reconnected publishes a backlog, and it arrives while the run is still
+ * streaming. Before this existed the runner re-read the row at the end and
+ * appended, which kept the rows but answered a conversation that was no longer
+ * the one on disk.
+ *
+ * Only content counts (`SyncTarget.takeContentChanges`). A pull that did not
+ * touch this conversation, or touched only its title, leaves the run alone.
+ */
+interface ConversationWatch {
+  readonly sessionId: string;
+  /** Sync changed the transcript after the run read it. */
+  changed: boolean;
+  /** Set once the run is streaming: aborts it. */
+  abort?: () => void;
+}
+
+const conversationWatches = new Set<ConversationWatch>();
+
+function watchConversation(sessionId: string): ConversationWatch {
+  const watch: ConversationWatch = { sessionId, changed: false };
+  conversationWatches.add(watch);
+  return watch;
+}
+
+/**
+ * A sync pull changed these conversations' content, or deleted them.
+ *
+ * Called by the sync loop's owner after the merge has committed, so a run that
+ * reads the row from here reads what sync left. A run still preparing reads the
+ * conversation again before it asks anything of a model; one already asking
+ * is stopped (see `stopForSync` in `runInConversation`).
+ */
+export function noteConversationsChangedBySync(sessionIds: Iterable<string>): void {
+  const changed = new Set(sessionIds);
+  if (changed.size === 0) return;
+  for (const watch of conversationWatches) {
+    if (!changed.has(watch.sessionId) || watch.changed) continue;
+    watch.changed = true;
+    watch.abort?.();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Running one analysis
 // ---------------------------------------------------------------------------
 
@@ -1322,7 +1380,32 @@ async function runOneBinding(
   if (!checked.ok) {
     return skip(step, checked.reason, resolved);
   }
-  const knownSessionId = checked.target.sessionId;
+
+  // From here the run is answering the transcript it has just read, so it has
+  // to hear about sync rewriting that transcript underneath it.
+  const watch = watchConversation(checked.target.sessionId);
+  try {
+    return await runInConversation(step, checked.target, resolved, watch, cancellation);
+  } finally {
+    conversationWatches.delete(watch);
+  }
+}
+
+/**
+ * Guard rails 2b onward, and the run itself, for a conversation that exists.
+ *
+ * Split from `runOneBinding` at the moment the transcript is read, because
+ * that is when a sync pull starts to matter: see `ConversationWatch`.
+ */
+async function runInConversation(
+  step: QueuedRun,
+  target: SessionTarget,
+  resolved: CoachAnalysisRunnerDeps,
+  watch: ConversationWatch,
+  cancellation?: TriggerCancellation
+): Promise<CoachAnalysisRun> {
+  const { analysis, event } = step;
+  const knownSessionId = target.sessionId;
 
   // 2b. This activity is still owed. Two triggers can fan out from the same
   // watermark before either runs — a poll and a "Run now" seconds apart — and
@@ -1420,7 +1503,18 @@ async function runOneBinding(
     );
   }
 
-  const session = checked.target;
+  // Sync rewrote the conversation while the checks above were in flight — the
+  // COROS one is a network round trip. Nothing has been asked of a model yet,
+  // so the run reads it again and answers what is there now.
+  let session = target;
+  if (watch.changed) {
+    const reread = checkSessionTarget(step, resolved);
+    if (!reread.ok) {
+      return skip(step, reread.reason, resolved);
+    }
+    session = reread.target;
+    watch.changed = false;
+  }
 
   // 5.7: a year-old briefing thread must still cost one turn. Done here, while
   // the run is still being prepared, so the mid-preparation Stop check below
@@ -1532,6 +1626,62 @@ async function runOneBinding(
     return finish({ status: "cancelled", ...costOf(undefined) }, false);
   }
 
+  /**
+   * Sync changed this conversation while the run was answering it.
+   *
+   * The answer would be about a transcript the athlete no longer has — a turn
+   * written on the other machine is not in it, and the other machine may even
+   * have answered the same activity already. Appending it anyway is how a
+   * conversation ends up with two debriefs of one run, one of them blind to
+   * the other. So the run stops, and says so where the answer would have
+   * gone: on the conversation *as sync left it*, read back now.
+   *
+   * Nothing moves. The watermark stays put, so an activity is still owed and
+   * the next trigger takes it up against the new transcript; the run's clock
+   * stays put, so that is not held back by a cooldown this run never used; and
+   * the backoff is not touched, because a sync says nothing about whether the
+   * provider is healthy.
+   */
+  const stopForSync = (streamUsage?: ChatTokenUsage): CoachAnalysisRun => {
+    resolved.cancelRun(run.id);
+    const current = resolved.getSessionEntries(session.sessionId);
+    if (current) {
+      try {
+        resolved.saveSession(session.sessionId, [
+          ...current,
+          {
+            kind: "automationStopped",
+            automation: marker,
+            at: resolved.now().getTime(),
+            reason: "sync"
+          }
+        ]);
+      } catch {
+        // The run log below still says why.
+      }
+    }
+    return finish(
+      {
+        status: "cancelled",
+        error: current ? ANALYSIS_STOPPED_BY_SYNC : ANALYSIS_SESSION_DELETED_BY_SYNC,
+        ...costOf(streamUsage)
+      },
+      false
+    );
+  };
+  // A roll on the way in is a model call and takes as long as one.
+  if (watch.changed) {
+    return stopForSync();
+  }
+  // Heard by the race below, so the run stops when sync lands rather than when
+  // the provider gets round to honouring the abort.
+  const syncChanged = new Promise<void>((resolve) => {
+    watch.abort = () => {
+      resolved.cancelRun(run.id);
+      resolve();
+    };
+  });
+
   let timedOut = false;
   try {
     const streaming = resolved.streamChat(
@@ -1575,9 +1725,14 @@ async function runOneBinding(
       streaming,
       watchdog.expired.then(() => {
         timedOut = true;
-      })
+      }),
+      syncChanged
     ]);
   } catch (error) {
+    // The abort a sync change asks for can surface as the stream throwing.
+    if (watch.changed) {
+      return stopForSync(collector.usage());
+    }
     return finish({
       status: "failed",
       error: error instanceof Error ? error.message : "Analysis run failed.",
@@ -1585,6 +1740,13 @@ async function runOneBinding(
     });
   } finally {
     watchdog.stop();
+  }
+
+  // Before every other outcome: whatever the stream came back with — a whole
+  // answer, a cancellation from the abort, a timeout — it was about the
+  // transcript as it stood before sync changed it.
+  if (watch.changed) {
+    return stopForSync(collector.usage());
   }
 
   if (timedOut) {

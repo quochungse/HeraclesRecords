@@ -1654,6 +1654,127 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   );
 }
 
+// ---------------------------------------------------------------------------
+// What a merge changed, for whoever is answering the conversation right now.
+//
+// A coach analysis reads a transcript and streams for minutes. A pull landing
+// in that window may bring nothing this machine lacks (the usual poll), only a
+// rename, or a turn written on the other machine — and only the last one makes
+// the answer stale. So a merge says which, and bookkeeping (identities lent, an
+// order restored) does not count as a change.
+// ---------------------------------------------------------------------------
+{
+  const { rowMergerFor } = await load("sync/rowMergers.js");
+  const merger = rowMergerFor("chat_sessions");
+  const say = (mid, content, mrev = mid) => ({
+    kind: "message",
+    role: "assistant",
+    content,
+    mid,
+    mrev
+  });
+  const row = (entries, title = "FM") => ({
+    id: "watched",
+    provider: "claude-code",
+    title,
+    messages_json: JSON.stringify(entries),
+    created_at: "2026-09-01T00:00:00Z",
+    updated_at: "2026-09-28T00:00:00Z"
+  });
+  const local = [say("1-a", "shared"), say("1-c", "this machine's answer")];
+
+  assert.equal(
+    merger(row(local), row([local[0]]), { winner: true }).changed,
+    false,
+    "an entry that brings nothing this machine lacks changes nothing"
+  );
+  assert.equal(
+    merger(row(local), row(local, "Renamed there"), { winner: true }).changed,
+    false,
+    "nor does a rename: the title is not the conversation"
+  );
+  assert.equal(
+    merger(row(local), row([local[0], say("1-b", "a turn from the other machine")]), {
+      winner: false
+    }).changed,
+    true,
+    "a turn this machine did not have is a change, whichever entry won"
+  );
+  assert.equal(
+    merger(row(local), row([say("1-a", "shared, answered there", "1-z"), local[1]]), {
+      winner: true
+    }).changed,
+    true,
+    "and so is an entry whose content moved on"
+  );
+  const stripped = local.map(({ mid: _mid, mrev: _mrev, ...rest }) => rest);
+  assert.equal(
+    merger(row(stripped), row(local), { winner: true }).changed,
+    false,
+    "identities lent to this machine's copy change nothing it would read"
+  );
+  assert.equal(
+    merger(row([local[1], local[0]]), row(local), { winner: true }).changed,
+    false,
+    "nor does the same set of entries coming back in id order"
+  );
+  assert.equal(
+    merger(row(local), { id: "watched", messages_json: "{not json" }, { winner: true })
+      .changed,
+    false,
+    "nor a payload this build cannot read, which is left out of the row"
+  );
+
+  // The target lists what changed — after the write, once per record, and a
+  // deletion as the largest change there is.
+  const target = new SqliteSyncTarget();
+  const id = "watched-conversation";
+  const payload = (entries, title = "FM") => ({ ...row(entries, title), id });
+  target.upsertRow("chat_sessions", id, payload(local));
+  assert.deepEqual(
+    target.takeContentChanges(),
+    [{ table: "chat_sessions", recordId: id, removed: false }],
+    "a conversation this machine has never seen is content it did not have"
+  );
+  target.upsertRow("chat_sessions", id, payload([local[0]]), { winner: false });
+  target.upsertRow("chat_sessions", id, payload(local, "Renamed"), { winner: true });
+  assert.deepEqual(
+    target.takeContentChanges(),
+    [],
+    "a subset and a rename leave the conversation reading as it did"
+  );
+  target.upsertRow(
+    "chat_sessions",
+    id,
+    payload([...local, say("1-d", "from the other machine")]),
+    { winner: true }
+  );
+  target.upsertRow(
+    "chat_sessions",
+    id,
+    payload([...local, say("1-e", "and one more")]),
+    { winner: false }
+  );
+  assert.deepEqual(
+    target.takeContentChanges(),
+    [{ table: "chat_sessions", recordId: id, removed: false }],
+    "a record folded from two entries is listed once"
+  );
+  assert.deepEqual(target.takeContentChanges(), [], "and taken, not peeked at");
+  target.deleteRow("chat_sessions", id);
+  assert.deepEqual(
+    target.takeContentChanges(),
+    [{ table: "chat_sessions", recordId: id, removed: true }],
+    "a conversation deleted over there is listed as removed"
+  );
+  target.deleteRow("chat_sessions", id);
+  assert.deepEqual(
+    target.takeContentChanges(),
+    [],
+    "and deleting what is already gone changes nothing"
+  );
+}
+
 // Windows will not unlink a file that is still open, so the handle has to
 // go before the tree does.
 database.closeDatabase();
@@ -1668,5 +1789,6 @@ console.log(
     "applied twice, SQLite round trip, compaction snapshots and user backups " +
     "cannot shadow each other, compaction prunes what it covers and nothing " +
     "it does not, a batch arriving after a compaction is still read, and " +
-    "two machines appending to one conversation both keep their turn"
+    "two machines appending to one conversation both keep their turn, " +
+    "and a merge says when a conversation now reads differently"
 );

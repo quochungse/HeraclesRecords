@@ -36,7 +36,7 @@ import {
   type OpEntry
 } from "./oplog";
 import { Lease } from "./lease";
-import { applyEntries, type ApplyResult, type SyncTarget,
+import { applyEntries, type ApplyResult, type ContentChange, type SyncTarget,
   ChangeBuilder
 } from "./syncEngine";
 import type { StorageProvider } from "./storageProvider";
@@ -163,7 +163,7 @@ export interface SyncLoopDeps {
    */
   readonly outbox: OutboxStore;
   /** Called after inbound changes land, so the renderer can reload. */
-  readonly onApplied?: (result: ApplyResult) => void;
+  readonly onApplied?: (result: AppliedChanges) => void;
   readonly onError?: (error: unknown) => void;
 }
 
@@ -172,7 +172,14 @@ export interface FlushResult {
   readonly path: string | null;
 }
 
-export interface PullResult extends ApplyResult {
+/** What a pull wrote, and which accumulating records now read differently. */
+export interface AppliedChanges extends ApplyResult {
+  /** See `SyncTarget.takeContentChanges`. Committed by the time anyone sees
+   *  it: taken after the merge's transaction, never from inside it. */
+  readonly contentChanges: readonly ContentChange[];
+}
+
+export interface PullResult extends AppliedChanges {
   readonly entriesSeen: number;
 }
 
@@ -523,6 +530,7 @@ export class SyncLoop {
       // does not have.
       target.takeIncomplete?.();
       target.takeRepublish?.();
+      target.takeContentChanges?.();
 
       const merged = applyEntries(target, entries, {
         isApplied: (entry) => {
@@ -553,7 +561,11 @@ export class SyncLoop {
       }
       return merged;
     };
-    const result = target.transaction ? target.transaction(runMerge) : runMerge();
+    const merged = target.transaction ? target.transaction(runMerge) : runMerge();
+    const result: AppliedChanges = {
+      ...merged,
+      contentChanges: target.takeContentChanges?.() ?? []
+    };
 
     // A union neither side had has to go back out, or the vault's newest entry
     // for that row stays the incoming one — which does not hold this machine's
