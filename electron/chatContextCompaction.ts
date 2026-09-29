@@ -464,6 +464,11 @@ export function planTranscriptContext(
 /** How a summary turn begins, and so how one is recognised. */
 const SUMMARY_HEADER = "[Earlier in this conversation, summarised]";
 
+/** Whether a wire message is the summary `summaryContextMessage` built. */
+export function isSummaryContextMessage(message: ChatMessage): boolean {
+  return message.role === "user" && message.content.startsWith(SUMMARY_HEADER);
+}
+
 /** How many messages before its own a pipeline step's turn carries (P2.4). */
 export const PIPELINE_RECENT_MESSAGES = 6;
 
@@ -489,7 +494,7 @@ export function pipelineWire(
 ): ChatMessage[] {
   const last = messages.map((message) => message.role).lastIndexOf("user");
   const before = (last < 0 ? messages : messages.slice(0, last)).filter(
-    (message) => !(message.role === "user" && message.content.startsWith(SUMMARY_HEADER))
+    (message) => !isSummaryContextMessage(message)
   );
   const kept = before.slice(Math.max(0, before.length - recent));
   while (kept.length && kept[0]!.role !== "user") kept.shift();
