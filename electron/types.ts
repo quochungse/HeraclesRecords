@@ -941,10 +941,25 @@ export interface TrainingHubTrackPoint {
   lon?: number;
   elevation?: number;
   distance?: number;
+  /**
+   * Seconds of wall clock on the series' own clock, so a point and a sample
+   * taken together share a second. A pause is a gap in it, not a run of
+   * samples: COROS records nothing while paused. Carried on `route` only, and
+   * absent there where the source stamps no time or the stamps do not add up to
+   * the activity's own length.
+   */
+  elapsed?: number;
 }
 
 export interface TrainingHubActivityTrack {
+  /** Every reader's copy: decimated to 400 points, and without a clock. */
   points: TrainingHubTrackPoint[];
+  /**
+   * The route map's copy (`simplifyRoute`): the located points its line needs,
+   * as many as the route's shape and length call for, each with `elapsed`.
+   * Absent without two located points, and on a track merged from two sources.
+   */
+  route?: TrainingHubTrackPoint[];
 }
 
 /**
@@ -1176,6 +1191,13 @@ export interface TrainingHubActivityDetail {
   dynamics?: TrainingHubActivityDynamics;
   /** This activity's own HR zone distribution, empty when COROS sent none. */
   hrZones: TrainingHubActivityZoneBucket[];
+  /**
+   * The pace zones COROS scored this activity against, in seconds per
+   * kilometre: `low` is a bucket's fast edge and `high` its slow one. Numbered
+   * bucket for bucket as `hrZones` is, so index 0 is everything slower than
+   * zone 1 and carries only `low`. Empty when COROS sent none.
+   */
+  paceZones?: TrainingHubActivityZoneBucket[];
   effect?: TrainingHubActivityEffect;
   weather?: TrainingHubActivityWeather;
   track?: TrainingHubActivityTrack;

@@ -1333,8 +1333,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   (`ActivityRouteMap`) and the globe's street view (`ActivityGlobeStreetMap`). What they need
   is `constants.ts` (the styles), `baseLayers.ts` (`createBaseLayer`), `onewayArrows.ts` and
   `MapLayerControl.tsx`, and that is the whole of the directory. The route-flavoured names
-  went with the screen: `BASE_LAYERS`, `BASE_LAYER_ORDER`, `BaseLayerId`,
-  `TRAIL_OVERLAY_LAYERS`, `TrailOverlayId`, and `.basemap-*` in the CSS.
+  went with the screen: `BASE_LAYERS`, `BASE_LAYER_ORDER`, `BaseLayerId`, and `.basemap-*`
+  in the CSS. **There are no trail overlays** (removed 2026-09-28): the Waymarked Trails
+  hiking/cycle/MTB layers draw only routes someone has mapped as OSM route relations, and a
+  probe of their tiles found none at all around Hanoi, Ba Vì or Đà Lạt — a switch that turned
+  on nothing, with nothing to say so.
   **Base map styles all live in `BASE_LAYERS` (`src/mapBase/constants.ts`) and must
   stay keyless** — the app holds no map provider key, offers no field to enter one, and bakes
   none into the build, so a style that needs one is not a degraded map, it is no map.
@@ -1350,8 +1353,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   Three things hold the vector path up, and all are load-bearing:
   **`createBaseLayer` (`baseLayers.ts`) is the only way to build a base layer** — raster or
   vector — so no screen has to know which kind it asked for, and every base map lands in the
-  `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where trail overlays and
-  track lines always draw on top. That pane replaced the `bringToBack()` calls the raster-only
+  `heraclesBasemap` pane (z-index 190, below Leaflet's `tilePane`) where track lines and
+  markers always draw on top. That pane replaced the `bringToBack()` calls the raster-only
   code needed on every swap; a vector layer has no `bringToBack()` to call.
   **It also binds the map's max zoom, and that is not decoration.** Leaflet reads a zoom limit
   off a layer in exactly one place — `GridLayer.beforeAdd` — so a raster base map bounded the
@@ -1360,8 +1363,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   `getMaxZoom()`, so a track whose points share one spot resolves to zoom `Infinity`, the
   pixel origin goes infinite with it, and every polyline collapses to `M0 0` — a blank map on
   the two screens whose *default* style is vector. `createBaseLayer` calls `setMaxZoom` for
-  both kinds, which is also why the trail overlays carry `maxNativeZoom` rather than
-  `maxZoom`: an overlay must stretch its last tile, not drag the base map's zoom limit down.
+  both kinds. Any tile layer added over a base map must carry `maxNativeZoom` rather than
+  `maxZoom`: it has to stretch its last tile, not drag the base map's zoom limit down.
   **One-way arrows are corrected here, not taken as given** (`onewayArrows.ts`). OpenFreeMap's
   `oneway` sprite icon is drawn pointing up, while MapLibre rotates a line-placed icon so the
   icon's *horizontal* axis follows the line — so an unrotated icon lands across the road
@@ -1386,6 +1389,23 @@ Overview, Media, Data, and Settings are in the main bundle.
   "non-JavaScript MIME type text/html". `import workerUrl from
   "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"` is what makes it emit; do not remove
   that import because it looks unused.
+
+  **The route map draws `track.route`, and nothing else reads it.** `track.points` is every
+  other reader's copy — the coach's tools, the elevation chart, the globe — decimated to 400
+  by sample and without a clock, exactly as before the map needed one; a change there moves
+  what the coach is told. `route` (`electron/routeSimplification.ts`) is as many located
+  points as the line needs: Douglas–Peucker at 3 m, never a gap longer than the old 400 left
+  (10–100 m), both loosened together into a 2 000-point budget. Its `elapsed` is the series'
+  own clock — `readFrequencyElapsed` and `pickElapsedDivisor` are shared with the series
+  parser — because Performance joins a stretch to its samples by the second. The line is a
+  B-spline **bounded** to 2 m of the recorded one (`routeSmoothing.ts`: a control 6 m in from
+  each end of every longer chord), since a simplified route runs long chords into junctions
+  and an unbounded spline cut those by a sixth of the chord. Zones are coloured and named
+  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`, bucket 0 "Below Z1"), so
+  the map, the bar beside it and the coach call a stretch the same thing; renumbering them to
+  COROS's own zone 1–6 is one change across all three, not a map change.
+  `test:route-coloring` holds the arithmetic, `test:activity-detail` the clock and the
+  untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
   visit coordinates and names each cluster through `places:reverseGeocode`.
   **It asks more than one geocoder, because one host is a single point of failure the app

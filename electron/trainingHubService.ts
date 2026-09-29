@@ -45,6 +45,7 @@ import {
   upsertStrengthSessionDetail,
   upsertTrainingActivities
 } from "./database";
+import { simplifyRoute } from "./routeSimplification";
 import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
   ActivityDetailSummary,
@@ -6099,18 +6100,25 @@ function parseTrackFromFrequencyList(raw: unknown): TrainingHubTrackPoint[] {
     return [];
   }
 
+  const samples = raw.filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"
+  );
+  // The series' own clock, read the series' way — so a point and a sample of
+  // the same list share a second — and still in the unit it was written in:
+  // `checkTrackElapsed` settles that as `scaleSeriesElapsed` does.
+  const clock = readFrequencyElapsed(samples);
   const points: TrainingHubTrackPoint[] = [];
 
-  for (const item of raw) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const point = parseTrackPointObject(item as Record<string, unknown>);
+  samples.forEach((sample, index) => {
+    const point = parseTrackPointObject(sample);
     if (point) {
+      const elapsed = clock?.[index];
+      if (elapsed !== undefined) {
+        point.elapsed = elapsed;
+      }
       points.push(point);
     }
-  }
+  });
 
   return points;
 }
@@ -6140,6 +6148,9 @@ function mergeActivityTracks(
     return existing;
   }
 
+  // A track built from both below is left without a `route`: what is borrowed
+  // is borrowed point for point onto the 400 shared points, and the map's own
+  // points would be the one copy without it. The map draws from `points` then.
   if (incomingHasGps && !existingHasGps) {
     if (existingHasElevation && !incomingHasElevation) {
       return {
@@ -6186,6 +6197,7 @@ async function fetchActivityTrackFromGpx(
 
 function parseGpxTrack(gpx: string): TrainingHubActivityTrack | undefined {
   const points: TrainingHubTrackPoint[] = [];
+  let firstTime: number | undefined;
   const trackPointPattern =
     /<trkpt[^>]*\blat="([^"]+)"[^>]*\blon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/gi;
 
@@ -6200,22 +6212,44 @@ function parseGpxTrack(gpx: string): TrainingHubActivityTrack | undefined {
     const body = match[3] ?? "";
     const elevationMatch = /<ele>([^<]+)<\/ele>/i.exec(body);
     const elevation = elevationMatch ? Number(elevationMatch[1]) : undefined;
+    const timeMatch = /<time>([^<]+)<\/time>/i.exec(body);
+    const time = timeMatch ? Date.parse(timeMatch[1]!.trim()) : Number.NaN;
 
-    points.push({
+    const point: TrainingHubTrackPoint = {
       lat,
       lon,
       elevation:
         elevation !== undefined && Number.isFinite(elevation)
           ? elevation
           : undefined
-    });
+    };
+    if (Number.isFinite(time)) {
+      firstTime ??= time;
+      point.elapsed = (time - firstTime) / 1000;
+    }
+    points.push(point);
   }
 
   if (points.length < 2) {
     return undefined;
   }
 
-  return { points: decimateTrackPoints(points) };
+  return trackFromPoints(points);
+}
+
+/**
+ * A parsed track as the detail carries it. `points` is the copy every reader
+ * shares — the elevation chart, the coach's tools, the globe — decimated to
+ * 400 and without a clock, as it has always been. `route` is the route map's
+ * own (`simplifyRoute`): as many located points as its line needs, each with
+ * the `elapsed` the replay and the colouring read.
+ */
+function trackFromPoints(points: TrainingHubTrackPoint[]): TrainingHubActivityTrack {
+  const route = simplifyRoute(points);
+  return {
+    points: decimateTrackPoints(points.map(({ elapsed: _clock, ...point }) => point)),
+    ...(route ? { route } : {})
+  };
 }
 
 function hasRoutePoints(points: TrainingHubTrackPoint[]): boolean {
@@ -6351,11 +6385,14 @@ function combineTrackCandidates(
       continue;
     }
 
+    // The time of the fix, so it comes from the candidate the fix came from.
+    const elapsed = gpsPoint ? gpsPoint.elapsed : basePoint?.elapsed;
     combined.push({
       lat: gpsPoint?.lat ?? basePoint?.lat,
       lon: gpsPoint?.lon ?? basePoint?.lon,
       elevation: elevationPoint?.elevation ?? basePoint?.elevation,
-      distance: elevationPoint?.distance ?? basePoint?.distance ?? gpsPoint?.distance
+      distance: elevationPoint?.distance ?? basePoint?.distance ?? gpsPoint?.distance,
+      ...(elapsed !== undefined ? { elapsed } : {})
     });
   }
 
@@ -6386,7 +6423,35 @@ function collectGraphListCandidates(graphList: unknown): TrainingHubTrackPoint[]
   return candidates;
 }
 
-function parseActivityTrack(raw: Record<string, unknown>): TrainingHubActivityTrack | undefined {
+/**
+ * Put the track's clock into seconds, or drop it: the unit the series settles
+ * on for the same clock (`pickElapsedDivisor`), because nothing in a payload
+ * says what unit a stamp was in, and a clock off by a factor of a hundred would
+ * replay a run at the wrong pace rather than fail.
+ */
+function checkTrackElapsed(
+  points: TrainingHubTrackPoint[],
+  durationSeconds: number | undefined
+): TrainingHubTrackPoint[] {
+  let last: number | undefined;
+  for (let index = points.length - 1; index >= 0 && last === undefined; index -= 1) {
+    last = points[index]!.elapsed;
+  }
+  if (last === undefined) {
+    return points;
+  }
+  const divisor = pickElapsedDivisor(last, durationSeconds);
+  return points.map(({ elapsed, ...point }) =>
+    elapsed === undefined || divisor === undefined
+      ? point
+      : { ...point, elapsed: elapsed / divisor }
+  );
+}
+
+function parseActivityTrack(
+  raw: Record<string, unknown>,
+  durationSeconds?: number
+): TrainingHubActivityTrack | undefined {
   const candidates: TrainingHubTrackPoint[][] = [];
 
   if (Array.isArray(raw.frequencyList)) {
@@ -6404,13 +6469,16 @@ function parseActivityTrack(raw: Record<string, unknown>): TrainingHubActivityTr
     );
   }
 
-  const points = combineTrackCandidates(candidates);
+  const points = checkTrackElapsed(
+    combineTrackCandidates(candidates),
+    durationSeconds
+  );
 
   if (!hasRoutePoints(points) && !hasElevationPoints(points)) {
     return undefined;
   }
 
-  return { points: decimateTrackPoints(points) };
+  return trackFromPoints(points);
 }
 
 function parseNumericSeries(value: unknown): number[] | undefined {
@@ -6659,45 +6727,85 @@ function channelsFromFrequencyList(list: unknown[]): ActivitySeriesChannels {
     return {};
   }
 
-  const readChannel = (keys: string[]): (number | undefined)[] =>
-    points.map((point) => {
-      for (const key of keys) {
-        const value = toOptionalNumber(point[key]);
-        if (value !== undefined) {
-          return value;
-        }
-      }
-      return undefined;
-    });
-
   const channels: ActivitySeriesChannels = {};
   for (const [channel, keys] of Object.entries(FREQUENCY_POINT_KEYS) as [
     keyof ActivitySeriesChannels,
     string[]
   ][]) {
-    const values = readChannel(keys);
+    if (channel === "elapsed") {
+      continue;
+    }
+    const values = readSampleChannel(points, keys);
     if (values.some((value) => value !== undefined)) {
       channels[channel] = values as number[];
     }
   }
 
-  // No elapsed column under any of its own names, but the samples are stamped:
-  // COROS writes an absolute `timestamp` in hundredths of a second. Rebased on
-  // the first stamped sample it becomes an elapsed channel like any other, and
-  // `scaleSeriesElapsed` then checks the units against the activity's duration
-  // rather than trusting this. Kept separate from the loop above because the
-  // rebase is only ever right for an absolute clock.
-  if (channels.elapsed === undefined) {
-    const stamps = readChannel(["timestamp"]);
-    const base = stamps.find((value) => value !== undefined);
-    if (base !== undefined) {
-      channels.elapsed = stamps.map((value) =>
-        value === undefined ? undefined : value - base
-      ) as number[];
-    }
+  const elapsed = readFrequencyElapsed(points);
+  if (elapsed) {
+    channels.elapsed = elapsed as number[];
   }
 
   return channels;
+}
+
+/** Each sample's reading under the first of `keys` it carries, a hole where it carries none. */
+function readSampleChannel(
+  points: Record<string, unknown>[],
+  keys: readonly string[]
+): (number | undefined)[] {
+  return points.map((point) => {
+    for (const key of keys) {
+      const value = toOptionalNumber(point[key]);
+      if (value !== undefined) {
+        return value;
+      }
+    }
+    return undefined;
+  });
+}
+
+/**
+ * The clock of a `frequencyList`, one reading per sample object, in whatever
+ * unit it was written in (`pickElapsedDivisor` settles that). An elapsed column
+ * under one of its own names wins; failing that the samples' absolute
+ * `timestamp` (hundredths of a second on a live run), rebased on the first
+ * stamped sample — the rebase is only ever right for an absolute clock.
+ *
+ * The series and the route map's track both read their clock here, so a sample
+ * and a track point from the same list sit at the same second: the map colours
+ * the route by joining the two.
+ */
+function readFrequencyElapsed(
+  points: Record<string, unknown>[]
+): (number | undefined)[] | undefined {
+  const named = readSampleChannel(points, FREQUENCY_POINT_KEYS.elapsed);
+  if (named.some((value) => value !== undefined)) {
+    return named;
+  }
+
+  const stamps = readSampleChannel(points, ["timestamp"]);
+  const base = stamps.find((value) => value !== undefined);
+  return base === undefined
+    ? undefined
+    : stamps.map((value) => (value === undefined ? undefined : value - base));
+}
+
+/**
+ * Which unit a clock was written in: the divisor (1, 100 or 1000) that brings
+ * its last reading within 10% of the activity's own length, or undefined when
+ * none does — then the clock is a timestamp of some other kind.
+ */
+function pickElapsedDivisor(
+  lastReading: number,
+  durationSeconds: number | undefined
+): number | undefined {
+  return durationSeconds && durationSeconds > 0
+    ? [1, 100, 1000].find(
+        (candidate) =>
+          Math.abs(lastReading / candidate - durationSeconds) <= durationSeconds * 0.1
+      )
+    : undefined;
 }
 
 function collectSeriesCandidates(raw: Record<string, unknown>): TrainingHubActivitySeriesPoint[][] {
@@ -6759,14 +6867,7 @@ function scaleSeriesElapsed(
     return points;
   }
 
-  const divisor =
-    durationSeconds && durationSeconds > 0
-      ? [1, 100, 1000].find(
-          (candidate) =>
-            Math.abs(last.elapsed! / candidate - durationSeconds) <=
-            durationSeconds * 0.1
-        )
-      : undefined;
+  const divisor = pickElapsedDivisor(last.elapsed, durationSeconds);
 
   return points.map((point) => {
     if (point.elapsed === undefined) {
@@ -7128,6 +7229,7 @@ export function mergeActivityDetailWithList(
 
 /** COROS's HR zone channel in `zoneList`. 130 is pace, 134 power. */
 const COROS_HR_ZONE_TYPE = 126;
+const COROS_PACE_ZONE_TYPE = 130;
 
 // A weather temperature arrives in tenths of a degree. Anything outside this
 // band is a sentinel rather than a reading (`sweatLoss: 65535` in the same
@@ -7339,6 +7441,61 @@ export function parseActivityHrZones(
   return [];
 }
 
+/**
+ * The pace zones of `zoneList` (type 130). Each bucket runs from `leftScope`,
+ * its slow edge, to `rightScope`, its fast one, in milliseconds per kilometre
+ * — a live run reads zone 1 as 468000 to 397000. Bucket 0 repeats zone 1's
+ * scopes the way the heart-rate list does, and only its slow edge means
+ * anything: it is everything slower. The top bucket's fast edge is a sentinel
+ * (162000, 2:42/km).
+ */
+export function parseActivityPaceZones(
+  raw: Record<string, unknown>
+): TrainingHubActivityZoneBucket[] {
+  const seconds = (value: unknown) => {
+    const scope = positiveNumber(value);
+    return scope === undefined ? undefined : scope / 1000;
+  };
+  for (const entry of pickArray(raw, ["zoneList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const group = entry as Record<string, unknown>;
+    if (toOptionalNumber(group.type) !== COROS_PACE_ZONE_TYPE) {
+      continue;
+    }
+
+    const buckets = (pickArray(group, ["zoneItemList"]) ?? [])
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object"
+      )
+      .map((item, position): TrainingHubActivityZoneBucket => {
+        const index = toOptionalNumber(item.zoneIndex) ?? position;
+        return index > 0
+          ? {
+              index,
+              low: seconds(item.rightScope),
+              high: seconds(item.leftScope),
+              seconds: positiveNumber(item.second),
+              percent: toOptionalNumber(item.percent)
+            }
+          : {
+              index,
+              low: seconds(item.leftScope),
+              seconds: positiveNumber(item.second),
+              percent: toOptionalNumber(item.percent)
+            };
+      });
+
+    if (buckets.some((bucket) => bucket.seconds !== undefined)) {
+      return buckets;
+    }
+  }
+
+  return [];
+}
+
 export function parseActivityEffect(
   summary: Record<string, unknown>
 ): TrainingHubActivityEffect | undefined {
@@ -7454,7 +7611,6 @@ function parseActivityPauses(
 export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubActivityDetail {
   const summary = pickObject(raw, ["summaryInfo", "summary", "activitySummary"]) ?? raw;
   const laps = extractActivityLaps(raw);
-  const track = parseActivityTrack(raw);
 
   const elapsedRaw = pickActivityNumber(raw, summary, ["totalTime", "duration"]);
   const distanceRaw = pickActivityNumber(raw, summary, ["distance", "totalDistance"]);
@@ -7475,6 +7631,11 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     normalizeCorosDetailDurationSeconds(pickActivityNumber(raw, summary, ["workoutTime"])) ??
     elapsedDuration;
   const pauses = parseActivityPauses(raw, summary);
+  // The samples and the track run on the wall clock, so their unit is found
+  // against the span they cover — pauses included. Activity time would miss
+  // the 10% band on any run that stopped long enough to matter.
+  const wallClock = elapsedDuration ?? duration;
+  const track = parseActivityTrack(raw, wallClock);
 
   return {
     activityId:
@@ -7511,13 +7672,11 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     laps,
     dynamics: parseActivityDynamics(raw, summary),
     hrZones: parseActivityHrZones(raw),
+    paceZones: parseActivityPaceZones(raw),
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,
-    // The samples run on the wall clock, so their unit is found against the
-    // span they cover — pauses included. Activity time would miss the 10%
-    // band on any run that stopped long enough to matter.
-    series: parseActivitySeries(raw, elapsedDuration ?? duration),
+    series: parseActivitySeries(raw, wallClock),
     strength: parseStrengthDetail(raw)
   };
 }

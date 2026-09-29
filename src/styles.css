@@ -3148,6 +3148,12 @@ input::placeholder {
   animation: activity-globe-street-in 360ms var(--ease) forwards;
 }
 
+.activity-globe-street-map-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 .activity-globe-street-map .leaflet-container {
   width: 100%;
   height: 100%;
@@ -3157,22 +3163,6 @@ input::placeholder {
 
 .activity-globe-heat-canvas {
   pointer-events: none;
-}
-
-.activity-globe-street-map .leaflet-control-attribution {
-  background: rgba(10, 12, 14, 0.82);
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.activity-globe-street-map .leaflet-control-attribution a {
-  color: #74c08f;
-}
-
-.activity-globe-street-map .leaflet-control-zoom a {
-  background: rgba(10, 12, 14, 0.88);
-  color: var(--text-secondary);
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
 @keyframes activity-globe-street-in {
@@ -3255,16 +3245,6 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.55);
 }
 
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution,
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--text-muted);
-  border-color: rgba(20, 28, 36, 0.12);
-}
-
-:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a {
-  color: var(--accent-strong);
-}
 
 .activity-globe-status,
 .activity-globe-legend {
@@ -14192,8 +14172,8 @@ tr.data-intervals-row-missing {
  * Every keyless raster style is a daylight one, so a machine without WebGL was
  * handed a bright white map in a dark app. Inverting and rotating the hue back
  * turns it into a serviceable dark map — land dark, water blue, labels light.
- * Only the base map's own pane is touched, so the route line, the markers and
- * the trail overlays above it keep their real colours.
+ * Only the base map's own pane is touched, so the route line and the markers
+ * above it keep their real colours.
  */
 :root:not([data-theme="paper"]) .is-basemap-fallback .leaflet-heraclesBasemap-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.86) contrast(1.06)
@@ -14211,37 +14191,55 @@ tr.data-intervals-row-missing {
   background: rgba(0, 0, 0, 0.22);
 }
 
-.activity-route-map-canvas .leaflet-control-attribution {
+/* The tile credit and the zoom buttons, one look on every map: the route maps
+   and the globe's street map. The credit is named with both of its classes
+   because leaflet.css spells it `.leaflet-container .leaflet-control-attribution`
+   and arrives later, in the map's lazy chunk — at equal weight its white ground
+   won, and the dark theme drew a white credit. Its box — padding, corners, the
+   24px it stands level with its (i) at — is the `.map-frame` rule's, and the
+   route cover's own in running.css. */
+.activity-route-map-canvas .leaflet-control-attribution.leaflet-control,
+.activity-globe-street-map .leaflet-control-attribution.leaflet-control {
   margin: 0;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm) 0 0 0;
   background: rgba(10, 12, 14, 0.82);
   color: var(--text-muted);
   font-size: 10px;
 }
 
-.activity-route-map-canvas .leaflet-control-attribution a {
+.activity-route-map-canvas .leaflet-control-attribution a,
+.activity-globe-street-map .leaflet-control-attribution a {
   color: #74c08f;
 }
 
-.activity-route-map-canvas .leaflet-control-zoom {
+.activity-route-map-canvas .leaflet-control-zoom,
+.activity-globe-street-map .leaflet-control-zoom {
   border: 0;
   box-shadow: none;
 }
 
-.activity-route-map-canvas .leaflet-control-zoom a {
+.activity-route-map-canvas .leaflet-control-zoom a,
+.activity-globe-street-map .leaflet-control-zoom a {
   background: rgba(10, 12, 14, 0.88);
   color: var(--text-secondary);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.activity-route-map-canvas .leaflet-control-zoom a:hover {
+.activity-route-map-canvas .leaflet-control-zoom a:hover,
+.activity-globe-street-map .leaflet-control-zoom a:hover {
   background: rgba(20, 24, 28, 0.95);
   color: var(--text-primary);
 }
 
+.activity-route-map-frame {
+  position: relative;
+  /* Hugs the canvas even when the grid row is stretched, or the (i) and the
+     layer menu would be placed against empty space below the map. */
+  align-self: start;
+}
+
 .activity-route-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -14249,21 +14247,52 @@ tr.data-intervals-row-missing {
   font-size: 12px;
 }
 
-.activity-route-expand {
-  display: inline-flex;
+/* The full map's colouring: the mode, the metric under Performance, and the
+   ramp with what its two ends stand for. */
+.activity-route-coloring {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #74c08f;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  gap: 10px;
 }
 
-.activity-route-expand:hover {
-  text-decoration: underline;
+.activity-route-color-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-route-color-ramp {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.activity-route-color-ramp i {
+  width: 16px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+}
+
+.activity-route-color-gradient {
+  width: 88px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+}
+
+/* The heatmap's canvas: a picture of the route, never the target of a drag. */
+.activity-route-glow {
+  pointer-events: none;
+}
+
+/* The route lines' halo: a wide, faint copy of each line, blurred as one
+   layer — the pane is a single composited layer, so this is one blur of the
+   whole map's glow, not one per path. */
+.leaflet-heraclesRouteHalo-pane {
+  filter: blur(4px);
+  pointer-events: none;
 }
 
 .activity-route-modal-backdrop {
@@ -14329,38 +14358,152 @@ tr.data-intervals-row-missing {
   height: 100%;
 }
 
-.activity-route-modal-map .basemap-control {
+/*
+ * `.map-frame` — an interactive map with its two corner controls: the layer
+ * picker top-right and the tile credit's (i) bottom-right. The side-panel route
+ * map, the full route map and the globe's street map all wear it, so the three
+ * cannot drift apart. The frame itself is positioned by whoever owns it. The
+ * side-panel map puts Expand above the picker and the full map Replay below it,
+ * both in the picker's look.
+ */
+.map-frame {
+  /* The controls' z-indexes are for stacking over Leaflet's panes, not over the
+     page: without a context of its own, a side-panel map's picker and (i) drew
+     on top of the full-map dialog opened from it. */
+  isolation: isolate;
+}
+
+.map-frame .basemap-control {
   top: 12px;
   right: 12px;
+  /* Clear of the (i) in the corner below, so an open menu never covers it. */
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  /* The control spans the frame's height only to bound its menu; the empty
+     column under the button must not swallow a drag on the map. */
+  pointer-events: none;
+}
+
+.map-frame .basemap-toggle,
+.map-frame .basemap-menu {
+  pointer-events: auto;
+}
+
+/* Replay sits under the layer picker, in its look. Below the picker's own
+   layer, so an open layer menu covers it rather than the other way round. */
+.map-frame .map-replay {
+  position: absolute;
+  top: 54px;
+  right: 12px;
+  z-index: 1100;
+}
+
+/* Expand takes the corner and the picker moves down a place under it, so its
+   menu still opens below its own button. A route cover's corner is the same,
+   its picker holding only the route's colouring. */
+.map-frame .map-expand,
+.activity-route-cover .map-expand {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+}
+
+.map-frame:has(> .map-expand) .basemap-control {
+  top: 54px;
+}
+
+.activity-route-cover .basemap-control {
+  top: 54px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Only there to keep a click in the picker from opening the full map. */
+.activity-route-cover-layers {
+  display: contents;
+}
+
+.map-frame .basemap-toggle,
+.activity-route-cover .basemap-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+}
+
+/* A short map scrolls the menu rather than letting it run off the frame. */
+.map-frame .basemap-menu {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* A side-panel map is too short to hold its menu at all — the base maps alone
+   are taller than the Calendar's 200px map, which left the route's colouring a
+   scroll away in a box two options tall — so there the menu hangs below the
+   map, over what follows it, and the frame is lifted above the blocks after it
+   while it does. The panels around it scroll, so nothing clips it. */
+.activity-route-map-frame .basemap-control {
+  bottom: auto;
+}
+
+.activity-route-map-frame .basemap-menu {
+  max-height: none;
+}
+
+.activity-route-map-frame:has(> .basemap-control.is-open) {
+  z-index: 2;
 }
 
 /* Neutral dark glass — the route studio's green-tinted glass clashes with
    the training area's graphite look. */
-.activity-route-modal-map .basemap-menu,
-.activity-route-modal-map .basemap-toggle {
+.map-frame .basemap-menu,
+.map-frame .basemap-toggle,
+.activity-route-cover .basemap-menu,
+.activity-route-cover .basemap-toggle {
   background: rgba(13, 16, 20, 0.88);
 }
 
 /* The tile credit shows for five seconds, then folds into the (i) in the
    bottom-right corner — the collapse the OSM attribution guidelines allow. */
-.activity-route-modal-map .leaflet-bottom.leaflet-right {
+/* The credit stands level with its (i): the same 24px, the same bottom edge,
+   4px to its left. */
+.map-frame .leaflet-bottom.leaflet-right {
   right: 34px;
+  bottom: 4px;
 }
 
-.activity-route-modal-map .leaflet-control-attribution {
-  margin-bottom: 4px;
+/* A route map's canvas carries a 1px border and Leaflet places its corner
+   inside it, while the (i) is placed on the frame outside it. */
+.map-frame .activity-route-map-canvas .leaflet-bottom.leaflet-right {
+  right: 33px;
+  bottom: 3px;
+}
+
+/* 24px tall from its own leading, not a flex box: flex drops the spaces
+   between Leaflet's links and the credit ran together. A credit too long for
+   the map wraps upward from the same bottom edge. */
+.map-frame .leaflet-control-attribution.leaflet-control {
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 4px 8px;
+  line-height: 1.6;
   border-radius: var(--radius-sm);
   transition:
     opacity var(--dur-base) var(--ease),
     visibility var(--dur-base) var(--ease);
 }
 
-.activity-route-modal-map:not(.is-credit-open) .leaflet-control-attribution {
+.map-frame:not(.is-credit-open) .leaflet-control-attribution {
   opacity: 0;
   visibility: hidden;
 }
 
-.activity-route-credit-toggle {
+.map-credit-toggle {
   position: absolute;
   right: 6px;
   bottom: 4px;
@@ -14377,12 +14520,17 @@ tr.data-intervals-row-missing {
   cursor: pointer;
 }
 
-.activity-route-credit-toggle:hover,
-.activity-route-credit-toggle[aria-expanded="true"] {
+.map-credit-toggle:hover,
+.map-credit-toggle[aria-expanded="true"] {
   color: var(--text-primary);
 }
 
-:root[data-theme="paper"] .activity-route-credit-toggle {
+.map-credit-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-theme="paper"] .map-credit-toggle {
   background: rgba(255, 255, 255, 0.86);
 }
 
@@ -14392,19 +14540,43 @@ tr.data-intervals-row-missing {
   gap: 8px;
 }
 
+/* The start and finish: on the map as Leaflet div icons (16px, from the
+   icon) with the disc drawn by the span inside, in the legend at 10px. The
+   colour whitens out to the edge; the hairline ring keeps that white edge
+   from vanishing on a daylight map. */
+.activity-route-end > span,
+.activity-route-dot {
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
 .activity-route-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
+  width: 10px;
+  height: 10px;
 }
 
+/* Sized to the zoom by the map (`--route-end-scale`). The span is scaled,
+   never the icon: Leaflet places the icon with `transform`, and `scale`
+   composes with it, so a scaled icon had its position scaled too and slid
+   off the route towards the map's corner. It changes as a zoom starts, so it
+   eases alongside Leaflet's own zoom animation. */
+.activity-route-end > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  scale: var(--route-end-scale, 1);
+  transition: scale var(--dur-base) var(--ease);
+}
+
+.activity-route-end.is-start > span,
 .activity-route-dot.is-start {
-  background: #4da3ff;
+  background: radial-gradient(circle closest-side, #4da3ff 45%, #ffffff 100%);
 }
 
+.activity-route-end.is-end > span,
 .activity-route-dot.is-end {
-  background: #d89b22;
+  background: radial-gradient(circle closest-side, #d89b22 45%, #ffffff 100%);
 }
 
 .activity-route-empty,
@@ -22502,18 +22674,17 @@ tr.data-intervals-row-missing {
 .basemap-option.is-active strong {
   color: var(--accent-strong);
 }
+.basemap-option:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.basemap-option:disabled:hover {
+  background: transparent;
+}
 .basemap-divider {
   height: 1px;
   margin: 4px 6px;
   background: var(--glass-border);
-}
-.basemap-swatch {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 6px;
-  border-radius: var(--radius-pill);
-  vertical-align: baseline;
 }
 /* ==========================================================================
  * PAPER THEME OVERRIDES
@@ -22836,17 +23007,20 @@ tr.data-intervals-row-missing {
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution,
-:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a {
+:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a {
   background: rgba(255, 255, 255, 0.86);
   border-color: var(--glass-border);
 }
 
-:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a:hover {
+:root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-zoom a:hover,
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-zoom a:hover {
   background: rgba(255, 255, 255, 0.95);
 }
 
 :root[data-theme="paper"] .activity-route-map-canvas .leaflet-control-attribution a,
-:root[data-theme="paper"] .activity-route-expand {
+:root[data-theme="paper"] .activity-globe-street-map .leaflet-control-attribution a {
   color: var(--accent);
 }
 

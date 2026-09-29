@@ -18,8 +18,8 @@ import { applyOnewayArrows } from "./onewayArrows";
 setWorkerUrl(maplibreWorkerUrl);
 
 /**
- * Base maps live below Leaflet's own `tilePane` (z-index 200) so trail
- * overlays and route lines always draw on top. Without a pane of their own,
+ * Base maps live below Leaflet's own `tilePane` (z-index 200) so route lines
+ * and markers always draw on top. Without a pane of their own,
  * layer order would depend on the order things were added: swapping the base
  * map re-appends it last, which is why the raster-only code had to call
  * `bringToBack()` every time. A vector base map has no `bringToBack()` to

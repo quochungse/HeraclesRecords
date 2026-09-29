@@ -274,7 +274,7 @@ export function ActivityDetailPanel({
               <div className="activity-detail-visual-heading">
                 <h3>Route</h3>
               </div>
-              <ActivityRouteMap track={detail.track} />
+              <ActivityRouteMap track={detail.track} detail={detail} />
             </section>
 
             <section className="activity-detail-visual-panel">
