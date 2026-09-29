@@ -20591,6 +20591,23 @@ tr.data-intervals-row-missing {
   margin: 0 0 0 auto;
 }
 
+/* When a message was written. Under an answer it leads the foot line; beside
+   the athlete's own bubble it sits at the bubble's lower outside edge. */
+.chat-message-time {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.chat-row-user > .chat-message-time {
+  align-self: flex-end;
+  padding-bottom: 4px;
+}
+
 /* ---------------------------------------------------------------------------
    The composer as one box (R1): the words, and under them what the question
    is about and which AI answers it.

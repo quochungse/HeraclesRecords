@@ -46,6 +46,14 @@ export interface ChatMessageEntry {
    */
   usage?: ChatTokenUsage;
   model?: string;
+  /**
+   * When this message was written, epoch milliseconds, for the time under it.
+   * Never stored: `toPersistedEntries` leaves it out, so no field goes onto the
+   * stored entry. A message read back takes it from the store's `mid`
+   * (`entryTimeFromMid`); one written in this window takes it at creation.
+   * Absent on a message from before `mid` existed, which has no time to show.
+   */
+  at?: number;
 }
 
 export interface ChatPlanDraftEntry {
@@ -557,6 +565,24 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
       : {}),
     ...(entry.usage ? { usage: entry.usage } : {}),
     ...(entry.model ? { model: entry.model } : {}),
-    ...(entry.automation ? { automation: entry.automation } : {})
+    ...(entry.automation ? { automation: entry.automation } : {}),
+    ...entryTimeOf(entry.mid)
   };
+}
+
+/**
+ * When the store first saw an entry, read off its `mid`: a minted id is
+ * `1-<12 hex digits of epoch ms>-<counter>-<device>` (`nextMergeStamp`). A
+ * backfilled `0-` id and one anchored after another (`~`) say nothing about
+ * when, so they give no time rather than a wrong one.
+ */
+export function entryTimeFromMid(mid: string | undefined): number | undefined {
+  if (!mid || mid.includes("~")) return undefined;
+  const match = /^1-([0-9a-f]{12})-/.exec(mid);
+  return match ? parseInt(match[1], 16) : undefined;
+}
+
+function entryTimeOf(mid: string | undefined): { at?: number } {
+  const at = entryTimeFromMid(mid);
+  return at === undefined ? {} : { at };
 }

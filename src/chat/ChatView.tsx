@@ -865,27 +865,46 @@ function AnalysisPromptChip({
 }
 
 /**
- * When the coach looked. Absolute, not relative: a transcript entry is read
- * long after it was written, and "2h ago" becomes a lie the moment the
- * conversation is reopened.
+ * When an entry was written: a message, or when the coach looked. Absolute,
+ * not relative: a transcript entry is read long after it was written, and
+ * "2h ago" becomes a lie the moment the conversation is reopened.
+ *
+ * The formatters are built once — every message row asks on every render,
+ * a token of a streaming answer included (see `chatSessionGroups.ts`).
  */
-function formatLookedAt(at: number): string {
+const ENTRY_TIME = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const ENTRY_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const ENTRY_DAY_YEAR = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric"
+});
+const ENTRY_FULL = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" });
+
+function formatEntryTime(at: number): string {
   const when = new Date(at);
   if (Number.isNaN(when.getTime())) {
     return "";
   }
-  const time = when.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-  if (when.toDateString() === new Date().toDateString()) {
+  const time = ENTRY_TIME.format(when);
+  const now = new Date();
+  if (when.toDateString() === now.toDateString()) {
     return time;
   }
-  const day = when.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric"
-  });
+  const day = (when.getFullYear() === now.getFullYear() ? ENTRY_DAY : ENTRY_DAY_YEAR).format(when);
   return `${day}, ${time}`;
+}
+
+/** A message's time, quiet, with the full date on hover. */
+function MessageTime({ at }: { at?: number }) {
+  if (at === undefined) return null;
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) return null;
+  return (
+    <time className="chat-message-time" dateTime={when.toISOString()} title={ENTRY_FULL.format(when)}>
+      {formatEntryTime(at)}
+    </time>
+  );
 }
 
 /**
@@ -919,7 +938,7 @@ function AnalysisSilentChip({
         <Zap size={12} aria-hidden="true" />
         {marker.name} looked, nothing new
         <span className="chat-analysis-chip-trigger">
-          · {formatLookedAt(at)}
+          · {formatEntryTime(at)}
         </span>
       </span>
     </ChatRow>
@@ -958,7 +977,7 @@ function AnalysisStoppedChip({
         <RefreshCw size={12} aria-hidden="true" />
         {marker.name} stopped: this conversation changed on another device while it ran
         <span className="chat-analysis-chip-trigger">
-          · {formatLookedAt(at)}
+          · {formatEntryTime(at)}
         </span>
       </span>
     </ChatRow>
@@ -2460,7 +2479,8 @@ export function ChatView({
               // preparing for, and a cost the athlete can only see until they
               // switch conversations is not one they can act on.
               ...(usage ? { usage } : {}),
-              ...(model ? { model } : {})
+              ...(model ? { model } : {}),
+              at: Date.now()
             });
           }
           let next = settleTurnEntries(prev, turnStartRef.current, closing);
@@ -2674,7 +2694,8 @@ export function ChatView({
                       source,
                       reasoningSummary,
                       ...(payload.usage ? { usage: payload.usage } : {}),
-                      ...(payload.model ? { model: payload.model } : {})
+                      ...(payload.model ? { model: payload.model } : {}),
+                      at: Date.now()
                     }
                   ]
                 : []
@@ -3347,7 +3368,7 @@ export function ChatView({
           ...(scheduleRefs.length
             ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs.map(({ detail: _detail, sport: _sport, ...ref }) => ref) }]
             : []),
-          { kind: "message", role: "user", content: trimmed }
+          { kind: "message", role: "user", content: trimmed, at: Date.now() }
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
     if (scheduleRefs.length) setPendingScheduleRefs([]);
@@ -3779,7 +3800,7 @@ export function ChatView({
 
     const nextEntries: ChatEntry[] = [
       ...timeline,
-      { kind: "message", role: "user", content: trimmed }
+      { kind: "message", role: "user", content: trimmed, at: Date.now() }
     ];
     setTimeline(nextEntries);
     persistHistory(activeSessionIdRef.current, nextEntries, true);
@@ -3794,7 +3815,8 @@ export function ChatView({
           {
             kind: "message",
             role: "assistant",
-            content: formatLatestActivityExportMessage(result)
+            content: formatLatestActivityExportMessage(result),
+            at: Date.now()
           }
         ];
         persistHistory(activeSessionIdRef.current, next, true);
@@ -3810,7 +3832,8 @@ export function ChatView({
           {
             kind: "message",
             role: "assistant",
-            content: `I couldn't download the latest activity FIT file: ${message}`
+            content: `I couldn't download the latest activity FIT file: ${message}`,
+            at: Date.now()
           }
         ];
         persistHistory(activeSessionIdRef.current, next, true);
@@ -5279,8 +5302,9 @@ export function ChatView({
                       <AnswerBody content={entry.content} placement={placedAnswers.get(index)} />
                       {/* Where the answer came from and what it cost, as one
                           quiet line under it rather than two rows of pills. */}
-                      {entry.source || entry.usage ? (
+                      {entry.source || entry.usage || entry.at !== undefined ? (
                         <div className="chat-answer-foot">
+                          <MessageTime at={entry.at} />
                           {entry.source ? <SourceBadge source={entry.source} /> : null}
                           <TurnCostFooter usage={entry.usage} model={entry.model} />
                         </div>
@@ -5302,6 +5326,7 @@ export function ChatView({
                     </>
                   )}
                 </div>
+                {entry.role === "user" ? <MessageTime at={entry.at} /> : null}
               </ChatRow>
             );
           }))}
