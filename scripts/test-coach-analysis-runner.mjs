@@ -78,6 +78,11 @@ assert.equal(
   140,
   "the summary is capped for the badge"
 );
+assert.equal(
+  parseAnalysisOutput("[[chart:c1]]\nDecoupling came back.\n\n[[chart:c2]]").summary,
+  "Decoupling came back.",
+  "a chart placed on the first line is not the headline"
+);
 assert.deepEqual(parseAnalysisOutput("Just some prose.\nSecond line."), {
   silent: false,
   summary: "Just some prose."

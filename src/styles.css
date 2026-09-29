@@ -21985,6 +21985,22 @@ tr.data-intervals-row-missing {
   box-sizing: border-box;
 }
 
+/* A chart the answer placed among its words (chartPlacement.ts): the answer
+   takes the row's width, as a chart's own row does. */
+.chat-bubble-with-charts {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-inline-chart {
+  margin: 10px 0;
+}
+
+.chat-inline-chart > :is(.chat-visual-card, .chat-hr-trend-card) {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .chat-hr-trend-card-header,
 .chat-visual-card-header {
   display: flex;

@@ -79,6 +79,13 @@ import type {
   TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
+import {
+  chartHandle,
+  holdBackPartialPlaceholder,
+  placeCharts,
+  stripChartPlaceholders,
+  type AnswerSegment
+} from "../../electron/chartPlacement";
 import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
@@ -159,7 +166,10 @@ import {
   isChatVisualEntry,
   orderTurn,
   settleTurnEntries,
+  type ChatActivityVisualEntry,
   type ChatEntry,
+  type ChatFitnessTrendEntry,
+  type ChatHrZoneEntry,
   type SourceInfo
 } from "./chatTypes";
 import { formatTurnCost, formatTurnCostDetail } from "./turnCost";
@@ -283,6 +293,96 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
     </div>
   );
 });
+
+type ChatChartEntry = ChatActivityVisualEntry | ChatFitnessTrendEntry | ChatHrZoneEntry;
+
+/** A chart card, drawn the same in a row of its own and inside an answer. */
+function ChartCard({ entry }: { entry: ChatChartEntry }) {
+  if (entry.kind === "activityVisual") return <ActivityVisualCard preview={entry.preview} />;
+  if (entry.kind === "fitnessTrend") return <FitnessTrendCard preview={entry.preview} />;
+  return <HrZoneCard preview={entry.preview} />;
+}
+
+/** An answer cut where it places charts, and the charts it places by handle. */
+interface PlacedAnswer {
+  segments: AnswerSegment[];
+  charts: Map<string, ChatChartEntry>;
+}
+
+interface TurnChart {
+  entry: ChatChartEntry;
+  index: number;
+}
+
+/** The chart entries just above `index`, in order: the charts of the answer there. */
+function chartsAbove(timeline: ChatEntry[], index: number): TurnChart[] {
+  const charts: TurnChart[] = [];
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const entry = timeline[at];
+    if (!isChatVisualEntry(entry)) break;
+    charts.unshift({ entry, index: at });
+  }
+  return charts;
+}
+
+/**
+ * Where an answer places its turn's charts (`chartPlacement.ts`), or nothing
+ * when it names none. A handle is a chart's place among `charts`; every chart
+ * placed goes into `placed`, and its own row is then not drawn.
+ */
+function placeAnswerCharts(
+  content: string,
+  charts: readonly TurnChart[],
+  placed: Set<number>
+): PlacedAnswer | undefined {
+  if (!content.includes("[[chart:")) return undefined;
+  const byHandle = new Map(charts.map((chart, ordinal) => [chartHandle(ordinal), chart]));
+  const segments = placeCharts(content, (handle) => byHandle.has(handle));
+  const drawn = new Map<string, ChatChartEntry>();
+  for (const segment of segments) {
+    if (segment.kind !== "chart") continue;
+    const chart = byHandle.get(segment.handle);
+    if (!chart) continue;
+    drawn.set(segment.handle, chart.entry);
+    placed.add(chart.index);
+  }
+  return { segments, charts: drawn };
+}
+
+/** An answer's words, with the charts it placed among them. */
+function AnswerBody({
+  content,
+  placement,
+  streaming = false
+}: {
+  content: string;
+  placement?: PlacedAnswer;
+  streaming?: boolean;
+}) {
+  if (!placement) return <AssistantMarkdown content={content} streaming={streaming} />;
+  const last = placement.segments.length - 1;
+  return (
+    <>
+      {placement.segments.map((segment, at) => {
+        if (segment.kind === "text") {
+          return (
+            <AssistantMarkdown
+              key={`text-${at}`}
+              content={segment.text}
+              streaming={streaming && at === last}
+            />
+          );
+        }
+        const entry = placement.charts.get(segment.handle);
+        return entry ? (
+          <div key={`chart-${segment.handle}`} className="chat-inline-chart">
+            <ChartCard entry={entry} />
+          </div>
+        ) : null;
+      })}
+    </>
+  );
+}
 
 const ThinkingDisclosure = memo(function ThinkingDisclosure({
   content,
@@ -1198,9 +1298,11 @@ export function ChatView({
   // nothing else, so a run heading for silence has no other text in flight.
   // What has arrived is held back while it could still be that marker: it is a
   // control token, and the athlete watching the bubble must never read it.
+  // Its charts are drawn when the run's answer is read back, so a placeholder
+  // is only taken out here.
   const liveAnalysisText =
     liveAnalysis && !NOTHING_TO_REPORT.startsWith(liveAnalysis.text.trim())
-      ? liveAnalysis.text
+      ? stripChartPlaceholders(holdBackPartialPlaceholder(liveAnalysis.text))
       : "";
 
   // Ref so the push-event handlers filter on the current request without
@@ -4360,9 +4462,9 @@ export function ChatView({
     );
   }
 
-  /* The running turn's bubble sits where the turn began, above the cards it
-     produces as it runs, so its answer reads before them — as it will once
-     settled (`settleTurnEntries`). One array with keys, so nothing remounts.
+  /* The running turn's bubble sits under the charts its turn draws and above
+     its other cards, as it will once settled (`settleTurnEntries`). One array
+     with keys, so nothing remounts.
 
      A pipeline step is the exception for its progress (UAT): the trail that
      says Coach is drawing the outline or writing the sessions is a row of its
@@ -4394,32 +4496,61 @@ export function ChatView({
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
     </div>
   );
+  // Answers that place their charts, and the chart rows that then have no row
+  // of their own. A settled answer's charts are the ones just above it; the
+  // streaming answer's are the ones its turn has drawn so far, which is why a
+  // chart moves into the bubble when its placeholder arrives.
+  const placedCharts = new Set<number>();
+  const placedAnswers = new Map<number, PlacedAnswer>();
+  timeline.forEach((entry, index) => {
+    if (entry.kind !== "message" || entry.role !== "assistant") return;
+    const placement = placeAnswerCharts(
+      entry.content,
+      chatSettings.visualizationsEnabled ? chartsAbove(timeline, index) : [],
+      placedCharts
+    );
+    if (placement) placedAnswers.set(index, placement);
+  });
+  const shownStreamingText = holdBackPartialPlaceholder(streamingText);
+  const turnCharts: TurnChart[] = [];
+  if (turnHere && chatSettings.visualizationsEnabled) {
+    timeline.forEach((entry, index) => {
+      if (index >= turnStartRef.current && isChatVisualEntry(entry)) turnCharts.push({ entry, index });
+    });
+  }
+  const streamingPlacement =
+    turnHere && shownStreamingText
+      ? placeAnswerCharts(shownStreamingText, turnCharts, placedCharts)
+      : undefined;
   const streamedAnswer = streamingText ? (
     <>
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
-      <AssistantMarkdown content={streamingText} streaming />
+      <AnswerBody content={shownStreamingText} placement={streamingPlacement} streaming />
     </>
   ) : null;
-  const assistantRow = (key: string, children: ReactNode) => (
+  const assistantRow = (key: string, children: ReactNode, withCharts = false) => (
     <div key={key} className="chat-row chat-row-assistant">
       <div className="chat-avatar chat-avatar-assistant">
         <Sparkles size={16} aria-hidden="true" />
       </div>
-      <div className="chat-bubble chat-bubble-streaming">{children}</div>
+      <div className={`chat-bubble chat-bubble-streaming${withCharts ? " chat-bubble-with-charts" : ""}`}>
+        {children}
+      </div>
     </div>
   );
   const streamingRow = !turnHere
     ? null
     : stepActive
       ? streamedAnswer
-        ? assistantRow("streaming-turn", streamedAnswer)
+        ? assistantRow("streaming-turn", streamedAnswer, Boolean(streamingPlacement?.charts.size))
         : null
       : assistantRow(
           "streaming-turn",
           <>
             {streamedAnswer ?? pendingStatus}
             {currentSource ? <SourceBadge source={currentSource} /> : null}
-          </>
+          </>,
+          Boolean(streamingPlacement?.charts.size)
         );
   const stepTrailRow =
     stepActive && stepRun
@@ -4570,6 +4701,8 @@ export function ChatView({
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
+            // Drawn inside the answer that placed it.
+            if (placedCharts.has(index)) return null;
             if (isAutomaticOutlineStep(timeline, index)) return null;
 
             if (entry.kind === "toolNotice") {
@@ -4961,7 +5094,7 @@ export function ChatView({
               );
             }
 
-            if (entry.kind === "activityVisual") {
+            if (isChatVisualEntry(entry)) {
               return (
                 // Position as well as id. A `previewId` is unique by
                 // construction and duplicates are always a bug elsewhere — but
@@ -4979,41 +5112,7 @@ export function ChatView({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
-                    <ActivityVisualCard preview={entry.preview} />
-                  </div>
-                </ChatRow>
-              );
-            }
-
-            if (entry.kind === "fitnessTrend") {
-              return (
-                <ChatRow
-                  key={`${entry.preview.previewId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <FitnessTrendCard preview={entry.preview} />
-                  </div>
-                </ChatRow>
-              );
-            }
-
-            if (entry.kind === "hrZoneSummary") {
-              return (
-                <ChatRow
-                  key={`${entry.preview.previewId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <HrZoneCard preview={entry.preview} />
+                    <ChartCard entry={entry} />
                   </div>
                 </ChatRow>
               );
@@ -5083,7 +5182,11 @@ export function ChatView({
                     <User size={16} aria-hidden="true" />
                   )}
                 </div>
-                <div className="chat-bubble">
+                <div
+                  className={`chat-bubble${
+                    placedAnswers.get(index)?.charts.size ? " chat-bubble-with-charts" : ""
+                  }`}
+                >
                   {entry.automation ? (
                     <AnalysisAttribution marker={entry.automation} />
                   ) : null}
@@ -5092,7 +5195,7 @@ export function ChatView({
                       {entry.reasoningSummary ? (
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
-                      <AssistantMarkdown content={entry.content} />
+                      <AnswerBody content={entry.content} placement={placedAnswers.get(index)} />
                       {/* Where the answer came from and what it cost, as one
                           quiet line under it rather than two rows of pills. */}
                       {entry.source || entry.usage ? (

@@ -147,6 +147,15 @@ assert.deepEqual(
   []
 );
 
+// A chart placeholder names a chart of its own turn, so it is not replayed:
+// on a later turn it would name nothing, or the wrong chart.
+assert.deepEqual(
+  toWireMessages([
+    { kind: "message", role: "assistant", content: "The pace fell.\n\n[[chart:c1]]\n\nHR held [[chart:c2]] flat." }
+  ]),
+  [{ role: "assistant", content: "The pace fell.\n\nHR held flat." }]
+);
+
 // A coachPrompt is a turn of the conversation and is expanded, not dropped.
 // The main-process copy used to drop it, so a coach could not see what it had
 // asked and asked again; that divergence is why there is now one function.

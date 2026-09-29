@@ -10,6 +10,7 @@ import {
   streamChat
 } from "./chatService";
 import type { ChatStreamCollectorSink, ChatStreamSink } from "./chatService";
+import { stripChartPlaceholders } from "./chartPlacement";
 import {
   applyTranscriptContext,
   summaryContextMessage,
@@ -123,7 +124,8 @@ function trimMarkup(line: string): string {
 }
 
 export function parseAnalysisOutput(text: string): AnalysisOutput {
-  const trimmed = (text ?? "").trim();
+  // A chart placed on the first line is not the summary.
+  const trimmed = stripChartPlaceholders(text ?? "").trim();
   if (!trimmed) {
     return { silent: true };
   }

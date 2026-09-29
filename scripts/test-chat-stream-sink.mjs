@@ -26,7 +26,15 @@ Module._load = function patchedLoad(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 
-const { countableUsage, createCollectorSink, createWindowSink, untilAborted } = require(
+const {
+  countableUsage,
+  createCollectorSink,
+  createWindowSink,
+  drawChartForTests,
+  endRunForTests,
+  untilAborted,
+  withLiveToolInstructions
+} = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
 );
 const { parseChatTranscriptJson } = require(
@@ -205,6 +213,27 @@ runStream(mixed, [
 assert.deepEqual(
   mixed.entries().map((entry) => entry.kind),
   ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange", "fitnessTrend", "message"]
+);
+
+// --- a turn's charts are named in the order drawn --------------------------
+// The handle is the chart's place among the turn's stored charts, so it is
+// given when the chart is drawn and a chart drawn again keeps it.
+assert.equal(drawChartForTests("turn-a", "run:1"), "c1");
+assert.equal(drawChartForTests("turn-a", "trend"), "c2");
+assert.equal(drawChartForTests("turn-a", "run:1"), "c1", "the same chart keeps its handle");
+assert.equal(drawChartForTests("turn-b", "run:1"), "c1", "each turn counts its own");
+endRunForTests("turn-a");
+assert.equal(drawChartForTests("turn-a", "trend"), "c1", "a finished turn's handles go with it");
+endRunForTests("turn-a");
+endRunForTests("turn-b");
+const chartGuide = withLiveToolInstructions("Coach.", [
+  { name: "get_activity_detail", description: "", inputSchema: {} }
+]);
+assert.match(chartGuide, /write \[\[chart:c1\]\] on a line of its own/, "the prompt says how to place a chart");
+assert.doesNotMatch(
+  withLiveToolInstructions("Coach.", [{ name: "draft_workout", description: "", inputSchema: {} }]),
+  /\[\[chart:/,
+  "and says nothing of charts to a turn that cannot draw one"
 );
 
 // --- a re-emitted card replaces the first rather than appending ------------

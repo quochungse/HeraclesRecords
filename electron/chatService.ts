@@ -164,6 +164,7 @@ import {
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
 import { inlineSuggestionsSection } from "./chatCoachContext";
+import { chartHandle, chartHandleNote } from "./chartPlacement";
 import {
   createChatSession,
   deleteChatSession,
@@ -1700,6 +1701,7 @@ export async function streamChat(
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
     runCards.delete(requestId);
+    turnCharts.delete(requestId);
   }
 }
 
@@ -1717,6 +1719,30 @@ const turnSessions = new Map<string, string>();
 const runCards = new Map<string, Set<string>>();
 const ANALYSIS_CARD_LIMIT = 2;
 const CARD_TOOLS: ReadonlySet<string> = new Set(["draft_workout", "draft_training_plan", "propose_schedule_changes"]);
+
+/**
+ * The charts each turn in flight has drawn, by `previewId`, with the handle
+ * the answer places them by (`chartPlacement.ts`). A handle is given when the
+ * chart is drawn, not when its tool returns: the chart is stored either way,
+ * and a handle is its place among the turn's stored charts. Drawn again under
+ * the same id, it is the same chart and keeps its handle.
+ */
+const turnCharts = new Map<string, Map<string, string>>();
+
+function drawnChartHandle(requestId: string, previewId: string): string {
+  const handles = turnCharts.get(requestId) ?? new Map<string, string>();
+  turnCharts.set(requestId, handles);
+  const known = handles.get(previewId);
+  if (known) return known;
+  const handle = chartHandle(handles.size);
+  handles.set(previewId, handle);
+  return handle;
+}
+
+/** A tool's result, told which charts the call drew. Untouched when it drew none. */
+function withChartHandles(result: string, handles: readonly string[]): string {
+  return handles.length > 0 ? `${result}\n\n${chartHandleNote(handles)}` : result;
+}
 
 /**
  * A conversation's sources as a turn's reach (P2.0): the tools that read a
@@ -3314,10 +3340,12 @@ async function executeChatTool(
     }
   };
   if (isChatActivityTool(name)) {
-    return reportingFailure(() =>
+    const drawn: string[] = [];
+    const result = await reportingFailure(() =>
       handleChatActivityTool(name as ChatActivityToolName, args, {
         requestId,
         onActivityVisual: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "activityVisual",
@@ -3327,12 +3355,15 @@ async function executeChatTool(
         unitSystem
       })
     );
+    return withChartHandles(result, drawn);
   }
   if (isChatAnalyticsTool(name)) {
-    return reportingFailure(() =>
+    const drawn: string[] = [];
+    const result = await reportingFailure(() =>
       handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
         requestId,
         onFitnessTrend: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "fitnessTrend",
@@ -3340,6 +3371,7 @@ async function executeChatTool(
           });
         },
         onHrZoneSummary: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "hrZoneSummary",
@@ -3349,6 +3381,7 @@ async function executeChatTool(
         unitSystem
       })
     );
+    return withChartHandles(result, drawn);
   }
   if (isChatSleepTool(name)) {
     return reportingFailure(() =>
@@ -3372,8 +3405,14 @@ export function callChatToolForTests(
   return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
 }
 
+/** A chart drawn in a turn, for suites: the handle `executeChatTool` gives it. */
+export function drawChartForTests(requestId: string, previewId: string): string {
+  return drawnChartHandle(requestId, previewId);
+}
+
 export function endRunForTests(requestId: string): void {
   turnSessions.delete(requestId);
+  turnCharts.delete(requestId);
   runCards.delete(requestId);
 }
 
@@ -3566,7 +3605,12 @@ export function withLiveToolInstructions(
     );
   }
   if (activityTools.length + analyticsTools.length > 0) {
-    sections.push("Charts are drawn from these tools automatically.");
+    sections.push(
+      "Charts are drawn from these tools automatically, and a result that drew one names it: chart c1, c2… " +
+        "in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
+        "write [[chart:c1]] on a line of its own at that place — each chart once, and only charts this answer " +
+        "drew. A chart you do not place stays above."
+    );
   }
   if (corosMcpTools.length > 0) {
     sections.push(

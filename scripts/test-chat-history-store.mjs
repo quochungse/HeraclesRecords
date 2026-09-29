@@ -301,6 +301,17 @@ assert.ok(saved);
 assert.equal(saved.title, "Build a 5K plan");
 assert.equal(saved.preview, "Build a 5K plan");
 assert.equal(saved.messageCount, 1);
+// A chart placeholder is not part of the preview.
+const charted = createChatSession("chatgpt", db);
+assert.equal(
+  saveChatSession(
+    charted.id,
+    [{ kind: "message", role: "assistant", content: "[[chart:c1]]\nHere is the week." }],
+    db
+  ).preview,
+  "Here is the week."
+);
+deleteChatSession(charted.id, db);
 
 assert.deepEqual(getChatSession(first.id, db), [
   { kind: "message", role: "user", content: "Build a 5K plan" }

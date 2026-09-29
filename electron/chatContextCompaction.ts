@@ -12,6 +12,7 @@ import type {
   ScheduleRef
 } from "./types";
 import { briefLine, outlineLine } from "./planBrief";
+import { stripChartPlaceholders } from "./chartPlacement";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -169,7 +170,10 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
   };
   for (const entry of entries) {
     if (entry.kind === "message") {
-      if (entry.content.trim()) push({ role: entry.role, content: entry.content });
+      // A placeholder names a chart of the turn it was written in; on a later
+      // turn it would name nothing, or the wrong chart.
+      const content = entry.role === "assistant" ? stripChartPlaceholders(entry.content) : entry.content;
+      if (content.trim()) push({ role: entry.role, content });
     } else if (entry.kind === "planEvent") {
       events.push(planEventNote(entry.event));
     } else if (entry.kind === "planRefs") {

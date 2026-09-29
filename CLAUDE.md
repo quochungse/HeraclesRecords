@@ -1090,6 +1090,20 @@ Overview, Media, Data, and Settings are in the main bundle.
   `isChartEntry`, and the two kind lists must agree. From 2026-09-26 (e5d2b36) to this rule
   the answer went ahead of every card, charts included; rows written then are left as they
   are. `test:chat-stream-sink`, `test:chat-plan-card-renderer`.
+  **That is the default; the answer may place a chart among its words**
+  (`electron/chartPlacement.ts`). A tool result that drew charts names them — `c1`, `c2`… in
+  the order drawn (`drawnChartHandle`, given when the chart is drawn, not when its tool
+  returns) — and the answer writes `[[chart:c2]]` on a line of its own. **Nothing is stored
+  beside the entry**: a handle is the chart's place among the chart entries just above its
+  answer, which is exactly what the default order makes them, so no field goes onto an
+  existing kind; an older build shows the placeholder as text and the chart above. The
+  fallback is code, not prompt: an unknown handle is dropped, a chart is placed once, one
+  named inside a sentence, list or table waits for the block's end, a code fence is not read,
+  and a chart not placed keeps its row. While streaming, the start of a placeholder is held
+  back (`holdBackPartialPlaceholder`) and a chart moves into the bubble when named. Every
+  reader of the words as text strips them (`stripChartPlaceholders`): the run's summary,
+  the list preview, the live analysis bubble, and `toWireMessages` — a handle means nothing
+  on a later turn. `test:chat-chart-placement`, `test:chat-transcript-race`.
 
   **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
   `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:

@@ -9,6 +9,7 @@ import {
   setChatSessionTitleRow,
   updateChatSessionRow
 } from "./database";
+import { stripChartPlaceholders } from "./chartPlacement";
 import type {
   ActivityHrTrendPreview,
   ActivityVisualChannelSection,
@@ -1447,8 +1448,8 @@ export function deriveSessionTitleFromEntries(
 function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (entry.kind === "message" && entry.content.trim()) {
-      const preview = entry.content.trim().replace(/\s+/g, " ");
+    if (entry.kind === "message" && stripChartPlaceholders(entry.content).trim()) {
+      const preview = stripChartPlaceholders(entry.content).trim().replace(/\s+/g, " ");
       return preview.length > 80 ? `${preview.slice(0, 80)}…` : preview;
     }
     if (entry.kind === "coachPrompt" && !entry.prompt.answeredAt) {
