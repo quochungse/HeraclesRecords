@@ -17,6 +17,7 @@ import type {
   TrainingHubUpcomingWorkout
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
+import type { PrimaryView } from "../navigation/primaryNav";
 
 export interface TrainingTrendPoint {
   date: string;
@@ -236,6 +237,8 @@ export interface SportScreenRequest {
    * is asked to select from; this is what lets it widen first.
    */
   startTime?: number;
+  /** The screen it was handed from, which Running's Back returns to. */
+  from?: PrimaryView;
 }
 
 export type { TrainingHubDailyMetric };

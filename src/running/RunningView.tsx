@@ -27,6 +27,7 @@ import {
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
 import { RunEfficiencyChart } from "./RunEfficiencyChart";
 import { RunIntensityPanel } from "./RunIntensityPanel";
@@ -76,6 +77,8 @@ export interface RunningViewProps {
   openRequest?: SportScreenRequest | null;
   /** Taken, so the same run is not re-opened when the athlete closes it. */
   onOpenRequestHandled?: () => void;
+  /** Back on a run handed over from another screen: that screen, again. */
+  onReturn?: (view: PrimaryView) => void;
   /** Asks Coach about the run open, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
@@ -162,12 +165,16 @@ export function RunningView({
   onOpenOverview,
   openRequest = null,
   onOpenRequestHandled,
+  onReturn,
   onAskCoach
 }: RunningViewProps) {
   const { unitSystem } = useUnitSystem();
   const [surface, setSurface] = useState<RunSurface | null>(null);
   const [periodDays, setPeriodDays] = useState<number | null>(DEFAULT_PERIOD_DAYS);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  // Where Back goes from the run open: the screen that handed it over, or,
+  // for a run opened from this list, the list.
+  const [returnTo, setReturnTo] = useState<PrimaryView | null>(null);
   const [sort, setSort] = useState<RunSort>(DEFAULT_RUN_SORT);
   // The whole page is one scroll, title and filters included, so nothing sits
   // pinned over the content. The position is kept so the drill-down returns to
@@ -269,12 +276,19 @@ export function RunningView({
     (activity: TrainingHubActivity) => {
       pageScrollTop.current = pageRef.current?.scrollTop ?? 0;
       setSelectedRunId(activity.activityId);
+      setReturnTo(null);
       onSelectActivity(activity);
     },
     [onSelectActivity]
   );
 
-  const closeRun = useCallback(() => setSelectedRunId(null), []);
+  const closeRun = useCallback(() => {
+    setSelectedRunId(null);
+    setReturnTo(null);
+    if (returnTo && onReturn) {
+      onReturn(returnTo);
+    }
+  }, [onReturn, returnTo]);
 
   /*
    * A run handed over from Activities.
@@ -295,6 +309,7 @@ export function RunningView({
       (row) => row.activityId === openRequest.activityId
     );
     setSelectedRunId(openRequest.activityId);
+    setReturnTo(openRequest.from ?? null);
     if (activity) {
       onSelectActivity(activity);
     }
@@ -408,6 +423,10 @@ export function RunningView({
         detail={ownDetail}
         detailStatus={detailStatus}
         onBack={closeRun}
+        backLabel={
+          (returnTo && onReturn && PRIMARY_NAV_ITEMS.find((item) => item.id === returnTo)?.label) ||
+          "Running"
+        }
         onRetry={() => onSelectActivity(selectedRun)}
         onAskCoach={onAskCoach}
       />

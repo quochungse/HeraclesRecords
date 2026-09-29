@@ -42,6 +42,8 @@ interface RunDetailViewProps {
   /** This run's own detail request — never inferred from the app's `busy`. */
   detailStatus: TrainingHubLoadStatus;
   onBack: () => void;
+  /** Where Back goes, as its button reads: the list, or the screen the run came from. */
+  backLabel?: string;
   /** Fetches this run's detail again after a failed load. */
   onRetry: () => void;
   /** Asks Coach about this run, as the Calendar's Ask Coach does. */
@@ -80,6 +82,7 @@ export function RunDetailView({
   detail,
   detailStatus,
   onBack,
+  backLabel = "Running",
   onRetry,
   onAskCoach
 }: RunDetailViewProps) {
@@ -264,7 +267,7 @@ export function RunDetailView({
             <div className="run-detail-header-bar">
               <button type="button" className="run-detail-back" onClick={onBack}>
                 <ArrowLeft size={16} aria-hidden="true" />
-                <span>Running</span>
+                <span>{backLabel}</span>
               </button>
               {onAskCoach ? (
                 <button

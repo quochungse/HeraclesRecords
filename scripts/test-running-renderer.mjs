@@ -359,6 +359,7 @@ async function main() {
     assert.equal(await hasText("detail did not load"), false, "this run's detail arrived");
     assert.equal(await harness("exists", ".run-detail-skeleton"), false);
 
+    assert.equal(await harness("text", ".run-detail-back"), "Running", "Back from a run opened here names the list");
     await harness("click", ".run-detail-back");
     await waitFor(() => harness("exists", ".running-list-panel"), "back on the list");
     await settle();
@@ -367,8 +368,34 @@ async function main() {
       Math.abs(returnedTo - leftAt) <= 2,
       `the list returns to where it was left (left ${leftAt}, back at ${returnedTo})`
     );
+    assert.equal(await harness("callCount", "prop:onReturn"), 0, "and stays on this screen");
   }
 
+  // -------------------------------------------------------------------------
+  // A run handed over from another screen — Activities' "Open in Running" —
+  // goes Back to that screen, and its button says so.
+  // -------------------------------------------------------------------------
+  {
+    const target = RUNS[3];
+    await harness("mount", "RunningView", {
+      activities: RUNS,
+      activitiesStatus: "ready",
+      openRequest: { view: "running", activityId: target.activityId, from: "training" }
+    });
+    await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+    await waitFor(() => harness("exists", ".run-detail"), "the handed-over run opens");
+    // Taken, as the app takes it.
+    await harness("setProps", { openRequest: null });
+    await settle();
+    assert.equal(await harness("text", ".run-detail-back"), "Activities", "Back names the screen it returns to");
+    await harness("click", ".run-detail-back");
+    await settle();
+    assert.deepEqual(
+      (await harness("calls", "prop:onReturn")).map((call) => call.args),
+      [["training"]],
+      "and returns there"
+    );
+  }
 
   // -------------------------------------------------------------------------
   // The detail page in the narrowest column: seven lap columns, form stats and

@@ -2832,7 +2832,7 @@ export default function App() {
                   onConnect={() => setActiveView("overview")}
                   onRetry={() => void handleRunningActivitiesRetry()}
                   onOpenSportScreen={(request) => {
-                    setSportScreenRequest(request);
+                    setSportScreenRequest({ ...request, from: "training" });
                     setActiveView(request.view);
                   }}
                   onAskCoach={askCoach}
@@ -2861,10 +2861,10 @@ export default function App() {
                         (candidate) => candidate.activityId === activityId
                       );
                       if (activity && isRunSportType(activity.sportType)) {
-                        setSportScreenRequest({ view: "running", activityId, startTime: activity.startTime });
+                        setSportScreenRequest({ view: "running", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("running");
                       } else if (activity && isStrengthSportType(activity.sportType)) {
-                        setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime });
+                        setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("strength");
                       } else if (activity) {
                         void handleTrainingHubActivityDetail(activity);
@@ -2899,6 +2899,7 @@ export default function App() {
                       : null
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onReturn={setActiveView}
                   onAskCoach={askCoach}
                 />
               </Suspense>

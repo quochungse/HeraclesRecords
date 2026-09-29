@@ -302,6 +302,9 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           onSelectActivity={spy("onSelectActivity")}
           onRetryActivities={spy("onRetryActivities")}
           onOpenOverview={spy("onOpenOverview")}
+          openRequest={(options.openRequest as never) ?? null}
+          onOpenRequestHandled={spy("onOpenRequestHandled")}
+          onReturn={spy("onReturn")}
         />
       </main>
     );
