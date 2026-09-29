@@ -905,9 +905,9 @@ export interface TrainingHubActivityDynamics {
 }
 
 /**
- * One bucket of an activity's own zone distribution. `index` 0 is COROS's
- * below-zone-1 bucket — it repeats zone 1's bounds rather than carrying its
- * own, so only `high` is meaningful there.
+ * One bucket of an activity's own zone distribution. `index` n is COROS's
+ * Zone n+1; `index` 0, the time under the first bound, repeats zone 2's bounds
+ * rather than carrying its own, so only `high` is meaningful there.
  */
 export interface TrainingHubActivityZoneBucket {
   index: number;

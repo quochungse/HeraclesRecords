@@ -316,10 +316,9 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
   const replay = buildRouteReplay(points);
   const valuesOf = (metric) => coloring.stretchValues(replay, series, metric).values;
 
-  // Bucket for bucket, the zone bar's numbering: bucket 0 is "Below Z1",
-  // bucket n is "Zn", heart rate and pace alike, so the map and the bar
-  // beside it call a stretch the same thing.
-  assert.deepEqual([0, 1, 5].map(coloring.zoneLabel), ["Below Z1", "Z1", "Z5"]);
+  // COROS's numbering, which the zone bar and the coach use too: bucket n is
+  // Z(n+1), heart rate and pace alike, so all three call a stretch the same thing.
+  assert.deepEqual([0, 1, 5].map(coloring.zoneLabel), ["Z1", "Z2", "Z6"]);
   const hr = coloring.zoneColoring(valuesOf("hr"), "hr", [...hrZones].reverse());
   assert.equal(hr.steps[10], 1, "150 bpm is bucket 1");
   assert.equal(hr.steps[90], 4, "178 bpm is bucket 4");

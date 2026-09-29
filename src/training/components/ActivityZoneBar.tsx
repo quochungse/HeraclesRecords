@@ -5,28 +5,19 @@ interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
 }
 
+/**
+ * COROS's own zone number: bucket 0 is Zone 1, the one under the first bound.
+ * What each zone is called depends on the account's model (Max HR names them
+ * differently from the other two), which this bar is not told, so it states
+ * the number and the bounds and nothing it would have to guess.
+ */
 function zoneCaption(index: number): string {
-  switch (index) {
-    case 1:
-      return "Recovery & warm-up";
-    case 2:
-      return "Aerobic base";
-    case 3:
-      return "Steady aerobic";
-    case 4:
-      return "Threshold";
-    case 5:
-      return "VO2max";
-    case 6:
-      return "Anaerobic";
-    default:
-      return "Below zone 1";
-  }
+  return `Zone ${index + 1}`;
 }
 
 function bounds(zone: TrainingHubActivityZoneBucket): string | undefined {
-  // Index 0 is COROS's below-zone-1 bucket: it repeats zone 1's bounds rather
-  // than carrying its own, so only the ceiling means anything there.
+  // Index 0 is Zone 1: it repeats zone 2's bounds rather than carrying its
+  // own, so only the ceiling means anything there.
   if (zone.index === 0) {
     return zone.high === undefined ? undefined : `under ${Math.round(zone.high)} bpm`;
   }
@@ -80,7 +71,7 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
             >
               <i data-zone={Math.min(6, Math.max(0, zone.index))} aria-hidden="true" />
               <span className="activity-zones-name">
-                {zone.index === 0 ? "Below Z1" : `Z${zone.index}`}
+                {`Z${zone.index + 1}`}
               </span>
               <strong>{formatDurationSpan(seconds)}</strong>
               <span className="activity-zones-share">

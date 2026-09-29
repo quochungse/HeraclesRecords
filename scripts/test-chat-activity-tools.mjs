@@ -314,10 +314,12 @@ assert.match(dynamicsText, /power 160 W \(max 201\)/);
 assert.match(dynamicsText, /Training effect: aerobic 3\.8\/5 · anaerobic 0\.2\/5 · VO2max 47/);
 assert.match(dynamicsText, /Conditions: 30\.4 °C · feels like 31\.7 °C · humidity 61%/);
 assert.match(dynamicsText, /HR zones \(this activity\):/);
-assert.match(dynamicsText, /- Below Z1 \(<133 bpm\): 1:06 \(1%\)/);
-assert.match(dynamicsText, /- Z1 133–154 bpm: 47:51 \(63%\)/);
-assert.match(dynamicsText, /- Z2 155–168 bpm: 27:14 \(36%\)/);
-assert.doesNotMatch(dynamicsText, /- Z3/, "a zone with no time is not printed");
+// COROS's numbering, as get_training_zones prints it: bucket 0 is Z1.
+assert.match(dynamicsText, /- Z1 <133 bpm: 1:06 \(1%\)/);
+assert.match(dynamicsText, /- Z2 133–154 bpm: 47:51 \(63%\)/);
+assert.match(dynamicsText, /- Z3 155–168 bpm: 27:14 \(36%\)/);
+assert.doesNotMatch(dynamicsText, /Below Z1/);
+assert.doesNotMatch(dynamicsText, /- Z4/, "a zone with no time is not printed");
 assert.match(
   dynamicsText,
   /Lap \| Distance \| Duration \| Avg HR \| Max HR \| Pace \| Cad \| Stride \(m\) \| GCT \(ms\) \| Vert ratio \(%\) \| Power \(W\)/

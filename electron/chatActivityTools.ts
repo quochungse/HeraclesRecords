@@ -1686,6 +1686,11 @@ function formatStrengthDetailForChat(
  * The activity's own zone split, which is what makes "this easy run spent a
  * third of its time in Z3" sayable. Zones with no time are dropped rather than
  * printed as rows of zeros.
+ *
+ * Numbered as COROS numbers them: bucket 0 is Zone 1, the one under the first
+ * bound, so 155–168 on a heart-rate-reserve account is Z3 here exactly as it is
+ * in `get_training_zones` and on the watch. Calling bucket 0 "Below Z1" put
+ * every zone one step easier than COROS says it is.
  */
 function formatActivityHrZones(
   zones: TrainingHubActivityZoneBucket[] | undefined
@@ -1698,8 +1703,8 @@ function formatActivityHrZones(
   const rows = used.map((zone) => {
     const label =
       zone.index === 0
-        ? `Below Z1${zone.high !== undefined ? ` (<${zone.high} bpm)` : ""}`
-        : `Z${zone.index}` +
+        ? `Z1${zone.high !== undefined ? ` <${zone.high} bpm` : ""}`
+        : `Z${zone.index + 1}` +
           (zone.low !== undefined && zone.high !== undefined
             ? ` ${zone.low}–${zone.high} bpm`
             : "");

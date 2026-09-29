@@ -1448,9 +1448,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   B-spline **bounded** to 2 m of the recorded one (`routeSmoothing.ts`: a control 6 m in from
   each end of every longer chord), since a simplified route runs long chords into junctions
   and an unbounded spline cut those by a sixth of the chord. Zones are coloured and named
-  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`, bucket 0 "Below Z1"), so
-  the map, the bar beside it and the coach call a stretch the same thing; renumbering them to
-  COROS's own zone 1–6 is one change across all three, not a map change.
+  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`), so the map, the bar
+  beside it and the coach call a stretch the same thing — and all three number it as COROS
+  does, bucket n being Z(n+1). Bucket 0 used to be "Below Z1", which put every zone one step
+  easier than COROS and than the coach's own `get_training_zones` (a run at 155–168 on a
+  heart-rate-reserve account read "71% in Z2" where COROS says Z3).
   `test:route-coloring` holds the arithmetic, `test:activity-detail` the clock and the
   untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
