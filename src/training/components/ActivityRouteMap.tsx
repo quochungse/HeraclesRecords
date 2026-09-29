@@ -39,6 +39,7 @@ import {
 import { useTheme } from "../../theme/ThemeProvider";
 import { curveBetween, curveHead, smoothPath, type SmoothPath } from "./routeSmoothing";
 import {
+  COVER_REPLAY_MAX_MS,
   REPLAY_DELAY_MS,
   buildRouteReplay,
   replayDurationMs,
@@ -736,6 +737,7 @@ function RouteMapCanvas({
   visibleBand,
   baseLayer,
   animate = true,
+  replayCeilingMs,
   replayToken = 0,
   drawing,
   ariaLabel
@@ -752,6 +754,8 @@ function RouteMapCanvas({
    * look (the side panel): the route is drawn whole, finish marker in place.
    */
   animate?: boolean;
+  /** The longest the replay may run, in ms; see `replayDurationMs`. */
+  replayCeilingMs?: number;
   /** Raised to replay the route again, without rebuilding the map. */
   replayToken?: number;
   /**
@@ -871,7 +875,7 @@ function RouteMapCanvas({
     const endMarker = routeEndMarker(map, end, "end");
 
     let animationFrame = 0;
-    const replayMs = replayDurationMs(route.meters);
+    const replayMs = replayDurationMs(route.meters, replayCeilingMs);
 
     // The markers sit on the line as drawn, which the heatmap moves off the
     // recorded points.
@@ -962,7 +966,7 @@ function RouteMapCanvas({
       mapRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, replayCeilingMs]);
 
   useEffect(() => {
     if (replayToken > 0) {
@@ -1636,7 +1640,10 @@ interface ActivityRouteCoverProps {
 
 /**
  * The route as a picture behind a page's heading: nothing to drag or zoom, and
- * a click anywhere on it opens the full map. Renders nothing without a route —
+ * a click anywhere on it opens the full map. Its corner holds Expand and the
+ * layer picker, as the side-panel map's does, but the picker offers only how
+ * the route is coloured: the cover is drawn on the theme's own base map. Its
+ * replay is kept to `COVER_REPLAY_MAX_MS`. Renders nothing without a route —
  * the caller decides what the heading looks like then.
  */
 export function ActivityRouteCover({
@@ -1680,37 +1687,58 @@ function RouteCover({
   // The cover draws on the theme's own base map, whatever the full map shows.
   const { theme } = useTheme();
   const drawing = useRouteDrawing(analysis, isLightBaseLayer(themeBaseLayer(theme)));
+  const coverRef = useRef<HTMLDivElement>(null);
+  // A press that closes the layer menu closes only the menu: the click it
+  // ends in does not open the full map as well. Read on the way down, before
+  // the menu's own listener on `document` has closed it.
+  const menuWasOpenRef = useRef(false);
 
   return (
     <>
-      {/* The map itself is decorative; the button is the way in for a
+      {/* The map itself is decorative; the buttons are the way in for a
           keyboard, and the whole picture is the way in for a pointer. */}
       <div
+        ref={coverRef}
         className={`activity-route-cover${creditOpen ? " is-credit-open" : ""}${
           className ? ` ${className}` : ""
         }`}
-        onClick={() => setExpanded(true)}
+        onPointerDownCapture={() => {
+          menuWasOpenRef.current = coverRef.current ? hasOpenLayerMenu(coverRef.current) : false;
+        }}
+        onClick={() => {
+          const closedMenu = menuWasOpenRef.current;
+          menuWasOpenRef.current = false;
+          if (!closedMenu) {
+            setExpanded(true);
+          }
+        }}
       >
         <div className="activity-route-cover-map" aria-hidden="true">
           <RouteMapCanvas
             route={route}
             interactive={false}
             visibleBand={visibleBand}
+            replayCeilingMs={COVER_REPLAY_MAX_MS}
             drawing={drawing}
             ariaLabel="Route"
           />
         </div>
         <button
           type="button"
-          className="activity-route-cover-open"
+          className="basemap-toggle map-expand"
+          title="Expand map"
+          aria-label="Expand map"
           onClick={(event) => {
             event.stopPropagation();
             setExpanded(true);
           }}
         >
-          <Maximize2 size={13} aria-hidden="true" />
-          Full map
+          <Maximize2 size={16} aria-hidden="true" />
         </button>
+        {/* A click in the picker or its menu is the picker's, not the cover's. */}
+        <div className="activity-route-cover-layers" onClick={(event) => event.stopPropagation()}>
+          <MapLayerControl section={analysis.layerSection} />
+        </div>
         <MapCreditButton
           open={creditOpen}
           onToggle={toggleCredit}

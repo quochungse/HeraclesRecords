@@ -403,8 +403,8 @@
   padding: 4px 2px 0;
 }
 
-/* Back to the list, and Ask Coach beside it — on the left, because the
-   cover's Full map holds the top right corner. */
+/* Back, and Ask Coach beside it — on the left, because the cover's Expand
+   and layer picker hold the top right corner. */
 .run-detail-header-bar {
   display: flex;
   align-items: center;
@@ -502,7 +502,6 @@
 
 .run-detail-cover {
   position: relative;
-  z-index: 0;
   align-self: start;
   width: 100%;
   max-width: 100%;
@@ -511,30 +510,13 @@
      than the heading it sits under, plus a little so the last row of stats is
      still over the map. A percentage here is of the grid area, i.e. the hero. */
   min-height: calc(100% + var(--run-cover-tail));
-  border-radius: var(--radius-md);
-  overflow: hidden;
   cursor: zoom-in;
   /* Scrim strengths, dark first; see `::after` below. */
   --run-cover-scrim-top: 12%;
   --run-cover-scrim-mid: 18%;
   --run-cover-scrim-end: 32%;
-  /* Faded out by transparency, not painted over with the page colour: the page
-     behind is a glow, not a flat --bg-base, and a fade to a flat colour left a
-     visible edge running through the first row of stats. The fade is kept to
-     the part below the heading, so the stats sit over solid map all the way
-     down: the tail when the stats set the height, and the last 10% of the
-     width when three-to-one does (see margin-bottom). */
+  /* How much of the bottom fades out; see the picture's mask below. */
   --run-cover-fade: max(var(--run-cover-tail), 10cqw);
-  -webkit-mask-image: linear-gradient(
-    180deg,
-    #000 calc(100% - var(--run-cover-fade)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    180deg,
-    #000 calc(100% - var(--run-cover-fade)),
-    transparent 100%
-  );
   /* The faded tail lies under whatever follows instead of holding it down. On a
      wide window the stats fit one row and the heading ends well above the
      cover's bottom; counting the whole cover left a band of nothing there.
@@ -547,12 +529,41 @@
   cursor: default;
 }
 
+/* The picture, rounded and faded out by transparency rather than painted over
+   with the page colour: the page behind is a glow, not a flat --bg-base, and a
+   fade to a flat colour left a visible edge running through the first row of
+   stats. The fade is kept to the part below the heading, so the stats sit over
+   solid map all the way down: the tail when the stats set the height, and the
+   last 10% of the width when three-to-one does (see margin-bottom).
+
+   The picture clips and fades, not the cover: a cover that did would be a
+   layer of its own under the heading, and would clip and fade the layer menu
+   that hangs from its corner. Its buttons stand over the heading instead. */
+.run-detail-cover.run-skeleton,
+.run-detail-cover .activity-route-cover-map {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 calc(100% - var(--run-cover-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 calc(100% - var(--run-cover-fade)),
+    transparent 100%
+  );
+}
+
 .run-detail-cover .activity-route-cover-map,
 .run-detail-cover .activity-route-map-canvas {
   position: absolute;
   inset: 0;
   height: 100%;
   border: 0;
+}
+
+.run-detail-cover .activity-route-map-canvas {
   border-radius: 0;
 }
 
@@ -574,7 +585,8 @@
   --run-cover-scrim-end: 70%;
 }
 
-.run-detail-cover::after {
+.run-detail-cover.run-skeleton::after,
+.run-detail-cover .activity-route-cover-map::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -589,36 +601,13 @@
   );
 }
 
-.run-detail-cover .activity-route-cover-open {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--run-hairline);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.run-detail-cover .activity-route-cover-open:hover {
-  color: var(--text-primary);
-}
-
-/* The tile credit moves up out of the fade, below the Full map button and left
-   of its (i), in the page's glass rather than Leaflet's white. It shows for the
-   first five seconds and folds away after — the (i) brings it back. */
+/* The tile credit moves up out of the fade, under the layer picker and left of
+   its (i), in the page's glass rather than Leaflet's white. It shows for the
+   first five seconds and folds away after — the (i) brings it back. The (i) is
+   centred under the two 34px buttons above it. */
 .run-detail-cover .leaflet-top.leaflet-right {
-  top: 46px;
-  right: 40px;
+  top: 96px;
+  right: 45px;
 }
 
 /* Level with the (i): the same 24px and the same top edge, 4px to its left. */
@@ -643,8 +632,8 @@
 
 .run-detail-cover .activity-route-cover-credit {
   position: absolute;
-  top: 46px;
-  right: 12px;
+  top: 96px;
+  right: 17px;
   z-index: 2;
   display: grid;
   place-items: center;

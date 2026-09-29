@@ -25,7 +25,7 @@ const replayModule = await load("src/training/components/routeReplay.ts");
 const smoothing = await load("src/training/components/routeSmoothing.ts");
 const coloring = await load("src/training/components/routeColoring.ts");
 const simplification = await load("electron/routeSimplification.ts");
-const { buildRouteReplay, replayDurationMs, replayHead, replayPath } = replayModule;
+const { COVER_REPLAY_MAX_MS, buildRouteReplay, replayDurationMs, replayHead, replayPath } = replayModule;
 
 const METERS_PER_DEGREE_LAT = 111_195;
 
@@ -48,6 +48,8 @@ assert.equal(replayDurationMs(500), 1000, "a short route has the floor");
 assert.equal(replayDurationMs(2000), 1400, "2 km in 1.4 s");
 assert.equal(replayDurationMs(5000), 2600, "5 km in 2.6 s");
 assert.equal(replayDurationMs(42_195), 4000, "a marathon hits the 4 s ceiling");
+assert.equal(replayDurationMs(42_195, COVER_REPLAY_MAX_MS), 2000, "a cover draws it in 2 s");
+assert.equal(replayDurationMs(2000, COVER_REPLAY_MAX_MS), 1400, "and a short route in its own time");
 
 // --- Replay pace -----------------------------------------------------------
 // 1 km fast (10 m a second), then a 120 s pause, then 1 km slow (5 m a second).

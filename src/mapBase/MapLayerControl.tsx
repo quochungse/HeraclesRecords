@@ -24,16 +24,19 @@ export function hasOpenLayerMenu(root: ParentNode): boolean {
   return root.querySelector(".basemap-control.is-open") !== null;
 }
 
-/** Floating layer switcher (top-right of the map): the base map, then the map's own choices. */
+/**
+ * Floating layer switcher (top-right of the map): the base map, then the map's
+ * own choices. A map drawn on the theme's own base map offers no base map to
+ * pick, and leaves `value` and `onChange` out: its menu is `section` alone.
+ */
 export function MapLayerControl<T extends string = never>({
   value,
   onChange,
   section
-}: {
-  value: BaseLayerId;
-  onChange: (layer: BaseLayerId) => void;
-  section?: MapLayerSection<T>;
-}) {
+}: { section?: MapLayerSection<T> } & (
+  | { value: BaseLayerId; onChange: (layer: BaseLayerId) => void }
+  | { value?: undefined; onChange?: undefined }
+)) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -76,7 +79,7 @@ export function MapLayerControl<T extends string = never>({
       {open ? (
         <div className="basemap-menu">
           <div className="basemap-head">
-            <span>Base map</span>
+            <span>{onChange ? "Base map" : section?.title}</span>
             <button
               type="button"
               className="icon-button"
@@ -86,7 +89,7 @@ export function MapLayerControl<T extends string = never>({
               <X size={15} aria-hidden="true" />
             </button>
           </div>
-          {BASE_LAYER_ORDER.map((id) => {
+          {onChange ? BASE_LAYER_ORDER.map((id) => {
             const config = BASE_LAYERS[id];
             return (
               <button
@@ -103,13 +106,17 @@ export function MapLayerControl<T extends string = never>({
                 <em>{config.description}</em>
               </button>
             );
-          })}
+          }) : null}
           {section ? (
             <>
-              <div className="basemap-divider" />
-              <div className="basemap-head">
-                <span>{section.title}</span>
-              </div>
+              {onChange ? (
+                <>
+                  <div className="basemap-divider" />
+                  <div className="basemap-head">
+                    <span>{section.title}</span>
+                  </div>
+                </>
+              ) : null}
               {section.options.map((option) => (
                 <button
                   key={option.value}

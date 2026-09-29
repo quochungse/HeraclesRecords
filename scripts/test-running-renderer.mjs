@@ -369,6 +369,7 @@ async function main() {
     );
   }
 
+
   // -------------------------------------------------------------------------
   // The detail page in the narrowest column: seven lap columns, form stats and
   // effect cards must not take the page sideways either.
@@ -652,6 +653,90 @@ async function main() {
     await waitFor(async () => (await credit()).shown, "the (i) brings it back");
     assert.equal(await harness("exists", ".activity-route-modal"), false, "the (i) does not open the map");
 
+    // Expand, the layer picker and the (i) hold the corner, the two buttons in
+    // the side-panel map's look.
+    const corner = await win.webContents.executeJavaScript(
+      `(() => {
+        const cover = document.querySelector(".run-detail-cover");
+        const box = (el) => {
+          const rect = el?.getBoundingClientRect();
+          return rect && { top: rect.top, bottom: rect.bottom, right: rect.right, width: rect.width, height: rect.height };
+        };
+        return {
+          cover: box(cover),
+          expand: box(cover.querySelector(".map-expand.basemap-toggle")),
+          layer: box(cover.querySelector(".basemap-control .basemap-toggle")),
+          credit: box(cover.querySelector(".activity-route-cover-credit")),
+          label: cover.querySelector(".map-expand")?.getAttribute("aria-label")
+        };
+      })()`,
+      true
+    );
+    assert.ok(corner.expand && corner.layer, `Expand and the layer picker are on the cover: ${JSON.stringify(corner)}`);
+    assert.equal(corner.label, "Expand map", "Expand is named for a screen reader");
+    assert.equal(corner.expand.right, corner.cover.right - 12, "Expand holds the corner");
+    assert.ok(
+      corner.expand.bottom < corner.layer.top && corner.layer.bottom < corner.credit.top,
+      `Expand, then the picker, then the (i): ${JSON.stringify(corner)}`
+    );
+    assert.ok(
+      corner.expand.width === 34 && corner.layer.width === 34 && corner.layer.right === corner.expand.right,
+      `both at the side-panel map's 34px: ${JSON.stringify(corner)}`
+    );
+
+    // The picker offers only how the route is coloured — the cover is drawn on
+    // the theme's own base map — and nothing in it opens the full map.
+    const coverMenuOpen = () => harness("exists", ".run-detail-cover .basemap-control.is-open");
+    await harness("click", ".run-detail-cover .basemap-control .basemap-toggle");
+    await waitFor(coverMenuOpen, "the cover's layer menu opens");
+    const coverMenu = await win.webContents.executeJavaScript(
+      `(() => {
+        const options = [...document.querySelectorAll(".run-detail-cover .basemap-option")];
+        const last = options.at(-1).getBoundingClientRect();
+        const hit = document.elementFromPoint(last.left + last.width / 2, last.top + last.height / 2);
+        return {
+          heads: [...document.querySelectorAll(".run-detail-cover .basemap-head span")].map((head) => head.textContent),
+          options: options.map((option) => option.querySelector("strong").textContent),
+          lastOnTop: hit?.closest(".basemap-option") === options.at(-1)
+        };
+      })()`,
+      true
+    );
+    assert.deepEqual(coverMenu.heads, ["Route"], "one section, and no base map");
+    assert.deepEqual(coverMenu.options, ["Route", "Performance", "Heatmap"]);
+    assert.equal(coverMenu.lastOnTop, true, "the menu stands over the heading, not under it or clipped");
+    assert.equal(await harness("exists", ".activity-route-modal"), false, "opening the picker opens no map");
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".run-detail-cover .basemap-option")].find((option) => option.textContent.startsWith("Heatmap")).click()`,
+      true
+    );
+    await waitFor(() => harness("exists", ".run-detail-cover .activity-route-glow"), "the cover redraws as a heatmap");
+    assert.equal(await coverMenuOpen(), false, "picking closes the menu");
+    assert.equal(await harness("exists", ".activity-route-modal"), false, "and opens no map");
+
+    // With the menu open, a press on the map closes the menu and only the menu.
+    await harness("click", ".run-detail-cover .basemap-control .basemap-toggle");
+    await waitFor(coverMenuOpen, "the cover's layer menu opens again");
+    await win.webContents.executeJavaScript(
+      `(() => {
+        const box = document.querySelector(".run-detail-cover").getBoundingClientRect();
+        const target = document.elementFromPoint(box.left + box.width / 2, box.top + box.height * 0.2);
+        target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        target.click();
+      })()`,
+      true
+    );
+    await waitFor(async () => !(await coverMenuOpen()), "a press on the map closes the menu");
+    await settle();
+    assert.equal(await harness("exists", ".activity-route-modal"), false, "and does not open the full map too");
+    await harness("click", ".run-detail-cover .basemap-control .basemap-toggle");
+    await waitFor(coverMenuOpen, "the menu opens to put the route back");
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".run-detail-cover .basemap-option")].find((option) => option.textContent.startsWith("Route")).click()`,
+      true
+    );
+    await waitFor(async () => !(await harness("exists", ".run-detail-cover .activity-route-glow")), "one line again");
+
     // A click on the showing part of the map — found by hit-testing, so a
     // heading that swallowed the click would fail here — opens the full map.
     const hit = await win.webContents.executeJavaScript(
@@ -719,8 +804,8 @@ async function main() {
 
     // A backdrop click closes it for good rather than bubbling back into the
     // cover and opening it again.
-    await harness("click", ".activity-route-cover-open");
-    await waitFor(() => harness("exists", ".activity-route-modal"), "the button opens it too");
+    await harness("click", ".run-detail-cover .map-expand");
+    await waitFor(() => harness("exists", ".activity-route-modal"), "Expand opens it too");
     await harness("click", ".activity-route-modal-backdrop");
     await settle();
     assert.equal(await harness("exists", ".activity-route-modal"), false, "the backdrop closes it");
