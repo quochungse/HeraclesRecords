@@ -17646,6 +17646,33 @@ tr.data-intervals-row-missing {
   box-shadow: var(--shadow-soft);
 }
 
+/* The top of a conversation drawn from its tail (TranscriptEarlier). Never the
+   scroll anchor: it sits above what it brings in. */
+.chat-transcript-earlier {
+  align-self: center;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  overflow-anchor: none;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.chat-transcript-earlier:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.chat-transcript-earlier:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .chat-session-row-preview {
   overflow: hidden;
   color: var(--text-muted);

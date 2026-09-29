@@ -4,6 +4,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -153,6 +154,7 @@ import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
+import { TranscriptEarlier } from "./TranscriptEarlier";
 import { ModelOptionsContext } from "./modelOptionsContext";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
@@ -229,6 +231,18 @@ const EMPTY_INTENTS: readonly {
 const WORKBENCH_FOLD_WIDTH = 1600;
 /** Below this window width the Workbench is a sheet over the conversation. */
 const WORKBENCH_SHEET_WIDTH = 1180;
+/**
+ * How many entries a conversation opens with, from its end; the rest come in
+ * `TRANSCRIPT_STEP` at a time as the transcript is scrolled up to them.
+ *
+ * Every drawn row is laid out again on every width change, so a 110-entry
+ * conversation cost a full layout of ~12.8k boxes per step of a window resize
+ * (~100 ms) and its whole mount on every switch to it, for rows several
+ * screens above anything on view. Forty entries is several screens of any
+ * conversation, and every suite's transcript fits inside it.
+ */
+const TRANSCRIPT_TAIL = 40;
+const TRANSCRIPT_STEP = 40;
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -1355,6 +1369,55 @@ export function ChatView({
       if (!before.has(entry)) settledEntriesRef.current.add(entry);
     }
   };
+  /**
+   * The first entry drawn, per conversation (`TRANSCRIPT_TAIL`). Fixed when a
+   * conversation is first drawn and only ever lowered after that: a window
+   * that followed the tail would take rows away from above a reader while a
+   * turn appends below. Never above the tail's own start, so a window taken
+   * against another conversation's length cannot leave this one blank.
+   */
+  const [transcriptWindow, setTranscriptWindow] = useState<{
+    sessionId: string | null;
+    from: number;
+  }>({ sessionId: null, from: 0 });
+  const tailFrom = Math.max(0, timeline.length - TRANSCRIPT_TAIL);
+  if (transcriptWindow.sessionId !== activeSessionId) {
+    setTranscriptWindow({ sessionId: activeSessionId, from: tailFrom });
+  }
+  const renderFrom =
+    transcriptWindow.sessionId === activeSessionId
+      ? Math.min(transcriptWindow.from, tailFrom)
+      : tailFrom;
+  const revealTranscriptFrom = (index: number) => {
+    const from = Math.max(0, index);
+    if (from >= renderFrom) return;
+    // Drawn as they are, like a reload's rows (see `ChatRow`): they were
+    // always there, and a fade from nothing never finishes on a window that
+    // gets no frames.
+    for (const entry of timeline.slice(from, renderFrom)) settledEntriesRef.current.add(entry);
+    setTranscriptWindow({ sessionId: activeSessionId, from });
+  };
+  const pendingEntryScrollRef = useRef<(() => void) | null>(null);
+  /** Hands an entry's row to `scroll`, drawing the entries down to it first when it is above the window. */
+  const withEntryRow = (index: number, scroll: (row: HTMLElement) => void) => {
+    const run = () => {
+      const row = scrollRef.current?.querySelector<HTMLElement>(
+        `[data-chat-entry-index="${index}"]`
+      );
+      if (row) scroll(row);
+    };
+    if (index >= renderFrom) {
+      run();
+      return;
+    }
+    pendingEntryScrollRef.current = run;
+    revealTranscriptFrom(index);
+  };
+  useLayoutEffect(() => {
+    const run = pendingEntryScrollRef.current;
+    pendingEntryScrollRef.current = null;
+    run?.();
+  }, [renderFrom]);
   // Interaction cards are appended after the assistant's final text so the
   // question and its choices stay in a natural reading order.
   const pendingCoachPromptsRef = useRef<CoachInputPrompt[]>([]);
@@ -3663,29 +3726,28 @@ export function ChatView({
     // The card itself: it is drawn in the conversation, under its answer.
     const targetIndex = planIndex;
 
-    const transcript = scrollRef.current;
-    const target = transcript?.querySelector<HTMLElement>(
-      `[data-chat-entry-index="${targetIndex}"]`
-    );
-    if (!transcript || !target) return;
+    withEntryRow(targetIndex, (target) => {
+      const transcript = scrollRef.current;
+      if (!transcript) return;
 
-    const transcriptRect = transcript.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    const targetTop =
-      transcript.scrollTop +
-      targetRect.top -
-      transcriptRect.top -
-      Math.max(24, (transcript.clientHeight - targetRect.height) / 2);
+      const transcriptRect = transcript.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetTop =
+        transcript.scrollTop +
+        targetRect.top -
+        transcriptRect.top -
+        Math.max(24, (transcript.clientHeight - targetRect.height) / 2);
 
-    transcript.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
-    setHighlightedChatEntryIndex(targetIndex);
-    if (chatHighlightTimeoutRef.current) {
-      clearTimeout(chatHighlightTimeoutRef.current);
-    }
-    chatHighlightTimeoutRef.current = setTimeout(() => {
-      setHighlightedChatEntryIndex(null);
-      chatHighlightTimeoutRef.current = null;
-    }, 1800);
+      transcript.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      setHighlightedChatEntryIndex(targetIndex);
+      if (chatHighlightTimeoutRef.current) {
+        clearTimeout(chatHighlightTimeoutRef.current);
+      }
+      chatHighlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedChatEntryIndex(null);
+        chatHighlightTimeoutRef.current = null;
+      }, 1800);
+    });
   };
 
   const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
@@ -4655,14 +4717,21 @@ export function ChatView({
               onClick={() => {
                 const target = waitingIndices[waitingCursor % waitingIndices.length];
                 setWaitingCursor((value) => value + 1);
-                scrollRef.current
-                  ?.querySelector(`[data-chat-entry-index="${target}"]`)
-                  ?.scrollIntoView({ block: "center", behavior: "smooth" });
+                withEntryRow(target, (row) =>
+                  row.scrollIntoView({ block: "center", behavior: "smooth" })
+                );
               }}
             >
               {/* No arrow: what waits is as often above the reader as below. */}
               {waitingCount === 1 ? "1 thing waiting on you" : `${waitingCount} things waiting on you`} · Jump
             </button>
+          ) : null}
+          {renderFrom > 0 ? (
+            <TranscriptEarlier
+              hidden={renderFrom}
+              onReveal={() => revealTranscriptFrom(renderFrom - TRANSCRIPT_STEP)}
+              scrollRef={scrollRef}
+            />
           ) : null}
           {timeline.length === 0 && !turnHere ? (
             <div className="chat-empty">
@@ -4707,6 +4776,9 @@ export function ChatView({
           ) : null}
 
           {withStreamingRow(timeline.map((entry, index) => {
+            // Above the window: brought in by `TranscriptEarlier`. The row
+            // stays in the list as a null so a row's index is still its entry's.
+            if (index < renderFrom) return null;
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
