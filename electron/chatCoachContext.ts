@@ -1,4 +1,5 @@
 import { corosSportName } from "./corosSportTypes";
+import { coachStyleInstructions, type CoachStyle } from "./coachStyles";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   WORKOUT_SPORTS,
@@ -28,13 +29,21 @@ export function buildCoachInstructions(
   /** An analysis's role/remit, injected for that run only. */
   roleInstructions?: string,
   /** What the conversation does not share (P2.0); app-written, so rules rather than data. */
-  withheld?: Partial<Record<"activities" | "sleep" | "zones", boolean>>
+  withheld?: Partial<Record<"activities" | "sleep" | "zones", boolean>>,
+  /** How Coach sounds; `neutral` adds nothing. */
+  style?: CoachStyle
 ): string {
   const base = buildBaseCoachInstructions();
   const custom = sanitizeDelimitedBlock(customInstructions);
   const role = sanitizeDelimitedBlock(roleInstructions);
 
   let text = base;
+  // Before the athlete's own instructions, which may still ask for more (or
+  // less) of it: the style is a setting, their words are the last say on tone.
+  const styleBlock = coachStyleInstructions(style);
+  if (styleBlock) {
+    text += `\n\n${styleBlock}`;
+  }
   const withheldLines = conversationWithheldLines(withheld);
   if (withheldLines.length) {
     text += "\n\n## What the athlete shares in this conversation\n" + withheldLines.join("\n");

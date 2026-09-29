@@ -675,7 +675,7 @@ async function main() {
   // item. A regex could say the field exists; it could not say the athlete's
   // typed ceiling reaches the main process, which is the half that matters.
   {
-    await harness("mount", "ChatSettingsPanel", {}, {
+    await harness("mount", "ChatSettingsModal", {}, {
       getCoachAnalysisPause: null,
       getCoachAnalysisSpend: {
         monthStart: "2026-09-01T00:00:00.000Z",
@@ -707,10 +707,12 @@ async function main() {
       "and says nothing about uncounted runs when every run was counted"
     );
 
-    // The ceiling reaches the main process, and what comes back is what the
-    // field then shows — not the string the athlete typed.
+    // The ceiling reaches the main process when Save is pressed — and not
+    // before: typing is an edit the athlete can still discard.
     await harness("setValue", ".coach-analysis-budget input", "900000");
     await harness("blur", ".coach-analysis-budget input");
+    assert.equal(await harness("callCount", "setCoachAnalysisBudget"), 0, "typing a ceiling writes nothing yet");
+    await harness("clickText", ".chat-settings-modal-footer button", "Save");
     const [committed] = await waitFor(
       async () => {
         const made = await harness("calls", "setCoachAnalysisBudget");
@@ -724,6 +726,59 @@ async function main() {
       "and the field shows what came back"
     );
     await assertQuietConsole("the spend line");
+  }
+
+  // --- Coach settings are a draft: Save writes it, Discard drops it ---------
+  {
+    await harness("mount", "ChatSettingsModal", {}, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
+    await waitFor(() => harness("exists", ".chat-settings-modal .chat-custom-instructions"), "the dialog opens");
+    const footer = () => harness("text", ".chat-settings-modal-footer");
+    assert.match(await footer(), /All changes saved/);
+    assert.equal(
+      await harness("attr", ".chat-settings-modal-footer .primary-button", "disabled"),
+      "",
+      "nothing to save yet, so Save is off"
+    );
+
+    // An edit is held, not written.
+    await harness("setValue", ".chat-custom-instructions", "  I race in October.  ");
+    await waitFor(async () => /Unsaved changes/.test(await footer()), "an edit is said to be unsaved");
+    assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 0, "typing writes nothing");
+
+    // Discard puts the box back to what is saved.
+    await harness("clickText", ".chat-settings-modal-footer button", "Discard");
+    await waitFor(async () => (await harness("value", ".chat-custom-instructions")) === "", "Discard restores the saved text");
+    assert.match(await footer(), /All changes saved/);
+
+    // The style and the instructions go out together, once, on Save — trimmed.
+    await harness("setValue", ".chat-custom-instructions", "  I race in October.  ");
+    // The styles are chips, warmest to harshest, Neutral in the middle.
+    const chips = await win.webContents.executeJavaScript(
+      `Array.from(document.querySelectorAll('.chat-settings-modal [aria-label="How Coach sounds"] button')).map((chip) => chip.textContent.trim())`
+    );
+    assert.deepEqual(chips, ["Friendly", "Motivating", "Neutral", "Analytical", "Straight talk", "No filter"]);
+    await harness("clickText", '.chat-settings-modal [aria-label="How Coach sounds"] button', "No filter");
+    await harness("clickText", ".chat-settings-modal-footer button", "Save");
+    const [saved] = await waitFor(async () => {
+      const made = await harness("calls", "prop:onSaveChatSettings");
+      return made.length ? made : null;
+    }, "Save writes the draft");
+    assert.deepEqual(saved.args[0], { customInstructions: "I race in October.", coachStyle: "unfiltered" });
+    await waitFor(async () => /All changes saved/.test(await footer()), "and the dialog is clean again");
+    assert.match(await harness("text", ".chat-settings-panel"), /strong language and swearing/i, "the chosen style says what it does");
+
+    // Closing with an edit held asks first; Keep editing keeps it.
+    await harness("setValue", ".chat-custom-instructions", "Something else");
+    await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
+    await waitFor(async () => /Discard your unsaved changes\?/.test(await footer()), "a close with edits held asks first");
+    assert.equal(await harness("callCount", "prop:onClose"), 0, "and does not close");
+    await harness("clickText", ".chat-settings-modal-footer button", "Keep editing");
+    assert.equal(await harness("value", ".chat-custom-instructions"), "Something else", "Keep editing keeps the edit");
+    await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
+    await harness("clickText", ".chat-settings-modal-footer button", "Discard and close");
+    await waitFor(() => harness("callCount", "prop:onClose"), "Discard and close closes");
+    assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 1, "and saves nothing");
+    await assertQuietConsole("Coach settings' Save and Discard");
   }
 
   // --- a total that is short of the truth says so ---------------------------
@@ -1094,6 +1149,27 @@ async function main() {
       "and the screen around it is told, or the ⚡ mark never moves"
     );
     await assertQuietConsole("pausing an analysis from the popover");
+  }
+
+  // --- Coach settings wear the app's colours, not Coach's greys -------------
+  // Last in the file: the app stylesheet, once loaded, stays for every mount after it.
+  {
+    await harness("mount", "ChatSettingsModal", { styles: true, chatScope: true }, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
+    await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+    await waitFor(() => harness("exists", ".chat-view .chat-settings-modal"), "the dialog opens inside Coach, as in the app");
+    const tokens = await win.webContents.executeJavaScript(`(() => {
+      const read = (selector, name) => getComputedStyle(document.querySelector(selector)).getPropertyValue(name).trim();
+      return {
+        appAccent: read(":root", "--palette-accent"),
+        coachAccent: read(".chat-view", "--accent"),
+        dialogAccent: read(".chat-settings-modal", "--accent"),
+        appSurface: read(":root", "--surface"),
+        dialogSurface: read(".chat-settings-modal", "--surface")
+      };
+    })()`);
+    assert.notEqual(tokens.coachAccent, tokens.appAccent, "Coach's own scope is still grey");
+    assert.equal(tokens.dialogAccent, tokens.appAccent, "and its settings dialog takes the app's accent back");
+    assert.equal(tokens.dialogSurface, tokens.appSurface, "and the app's surface");
   }
 
   console.log("coach analysis renderer tests passed");

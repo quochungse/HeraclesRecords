@@ -1234,6 +1234,51 @@ assert.equal(
   false
 );
 
+// Coach style: tone only, set in Coach settings, and nothing at all for Neutral.
+{
+  const { COACH_STYLES, COACH_STYLE_CATALOG, coachStyleInstructions, normalizeCoachStyle } = await import(
+    `${distUrl("coachStyles.js")}?cacheBust=${Date.now()}`
+  );
+  assert.equal(buildCoachInstructions(undefined, undefined, undefined, "neutral"), baseCoachInstructions, "Neutral is the prompt as it was");
+  assert.equal(buildCoachInstructions(undefined, undefined, undefined, undefined), baseCoachInstructions);
+  assert.equal(normalizeCoachStyle("shouty"), "neutral", "an unknown style reads as Neutral");
+  for (const style of COACH_STYLES) {
+    assert.ok(COACH_STYLE_CATALOG[style].label && COACH_STYLE_CATALOG[style].detail, `${style} has a label and a detail`);
+    const block = coachStyleInstructions(style);
+    if (style === "neutral") {
+      assert.equal(block, undefined);
+      continue;
+    }
+    assert.match(block, /^## Coach style\n/);
+    assert.match(block, /Tone only: facts, advice and safety rules are unchanged/, `${style} changes tone, not facts`);
+    assert.match(block, /card text \(names, descriptions\) stays plain/, `${style} never reaches a card`);
+  }
+  const unfiltered = coachStyleInstructions("unfiltered");
+  assert.match(unfiltered, /Swear freely in the athlete's language/);
+  assert.match(unfiltered, /never at the person/);
+  assert.match(unfiltered, /no slurs/);
+  assert.match(unfiltered, /Drop it at any mention of pain, injury, illness or distress/, "and it stands down when the athlete is hurt");
+  assert.doesNotMatch(coachStyleInstructions("straight"), /[Ss]wear/, "Straight talk is blunt without the language");
+  for (const style of COACH_STYLES) {
+    assert.ok((COACH_STYLE_CATALOG[style].prompt ?? "").length < 260, `${style} is a line, not a paragraph: it is sent every turn`);
+  }
+
+  // The style sits after the rules and before the athlete's own words, which
+  // may still tune it.
+  const styled = buildCoachInstructions("Keep it short.", undefined, undefined, "unfiltered");
+  assert.ok(styled.startsWith(baseCoachInstructions));
+  assert.ok(styled.indexOf("## Coach style") < styled.indexOf("<athlete_custom_instructions>"));
+
+  const values = new Map();
+  const store = { get: (key) => values.get(key), set: (key, value) => values.set(key, value), delete: (key) => values.delete(key) };
+  const keys = { get: () => undefined, set: () => undefined, delete: () => undefined, hasApiKey: () => false };
+  const keyStores = { anthropic: keys, openRouter: keys, local: keys };
+  assert.equal(readChatSettingsFromStore(store, keyStores).coachStyle, "neutral", "Neutral until chosen");
+  saveChatSettingsToStore(store, keyStores, { ...readChatSettingsFromStore(store, keyStores), coachStyle: "unfiltered" });
+  assert.equal(values.get("chat.coach.style"), "unfiltered");
+  assert.equal(readChatSettingsFromStore(store, keyStores).coachStyle, "unfiltered");
+}
+
 // Unasked workout cards (P1.9, D4): said in the prompt when the setting is on
 // for the turn's provider, and only when the turn can make one.
 {

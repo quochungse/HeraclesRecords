@@ -1,3 +1,5 @@
+import type { CoachStyle } from "./coachStyles";
+
 export type BinaryName = "yt-dlp" | "ffmpeg";
 
 /** User-selected measurement system for Heracles Records presentation and writes. */
@@ -1931,9 +1933,13 @@ export interface ChatSettings {
    * for the rest.
    */
   inlineSuggestions?: InlineSuggestionsMode;
+  /** How Coach sounds (`coachStyles.ts`); tone only, never the facts or a card. */
+  coachStyle?: CoachStyle;
 }
 
 export type InlineSuggestionsMode = "auto" | "on" | "off";
+
+export type { CoachStyle } from "./coachStyles";
 
 /**
  * What a compaction pass decided, as the renderer sees it.

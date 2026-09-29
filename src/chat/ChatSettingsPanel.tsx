@@ -4,6 +4,7 @@ import { BrainCircuit, ChevronRight, Loader2, TriangleAlert, X } from "lucide-re
 import type {
   InlineSuggestionsMode,
   ChatSettings,
+  CoachStyle,
   CoachAnalysisPause,
   CoachAnalysisSpend
 } from "../../electron/types";
@@ -18,13 +19,26 @@ import {
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
+import {
+  COACH_STYLE_CATALOG,
+  COACH_STYLES,
+  normalizeCoachStyle
+} from "../../electron/coachStyles";
 
+/**
+ * The body of Coach settings. It edits the draft the dialog holds
+ * (`ChatSettingsModal`): `chatSettings` is what is saved with the draft laid
+ * over it, and `onUpdateChatSettings` changes the draft, never the store.
+ */
 export function ChatSettingsPanel({
   api,
   chatSettings,
   coachModelsSummary,
   onOpenCoachModels,
-  onUpdateChatSettings
+  onUpdateChatSettings,
+  pendingBudget,
+  onPendingBudgetChange,
+  savedSpend
 }: {
   api: CorosLinkApi | undefined;
   chatSettings: ChatSettings;
@@ -32,21 +46,14 @@ export function ChatSettingsPanel({
   coachModelsSummary: string | null;
   onOpenCoachModels: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
+  /** The analyses' monthly budget as edited, or `undefined` while it is the saved one. */
+  pendingBudget: number | null | undefined;
+  onPendingBudgetChange: (budget: number | null | undefined) => void;
+  /** What a save's budget write answered; the spend line shows it. */
+  savedSpend: CoachAnalysisSpend | null;
 }) {
-  const savedCustomInstructions = chatSettings.customInstructions ?? "";
-  const [customInstructionsDraft, setCustomInstructionsDraft] = useState(
-    savedCustomInstructions
-  );
-
-  useEffect(() => {
-    setCustomInstructionsDraft(savedCustomInstructions);
-  }, [savedCustomInstructions]);
-
-  const commitCustomInstructions = () => {
-    const next = customInstructionsDraft.trim();
-    if (next === savedCustomInstructions) return;
-    onUpdateChatSettings({ customInstructions: next });
-  };
+  const customInstructions = chatSettings.customInstructions ?? "";
+  const coachStyle = normalizeCoachStyle(chatSettings.coachStyle);
 
   const compactContext = chatSettings.compactContext ?? DEFAULT_COMPACT_CONTEXT;
   const compactEnabled = compactContext.enabled !== false;
@@ -119,6 +126,30 @@ export function ChatSettingsPanel({
       </button>
 
       <section className="chat-settings-section">
+        <h3>Coach style</h3>
+        {/* Chips, warmest to harshest, so the choice reads as a scale: where
+            Coach sits between the two ends is the thing being chosen. */}
+        <OptionGroup<CoachStyle>
+          label="How Coach sounds"
+          size="md"
+          fill
+          value={coachStyle}
+          onChange={(next) => onUpdateChatSettings({ coachStyle: next })}
+          options={COACH_STYLES.map((style) => ({
+            value: style,
+            label: COACH_STYLE_CATALOG[style].label,
+            title: COACH_STYLE_CATALOG[style].detail
+          }))}
+        />
+        <p className="chat-settings-copy">
+          {COACH_STYLE_CATALOG[coachStyle].detail} The style changes how Coach
+          sounds, never the figures or the advice, and it stays out of anything
+          saved to COROS — workout and plan names and descriptions are written
+          plainly in every style. Your custom instructions below can fine-tune it.
+        </p>
+      </section>
+
+      <section className="chat-settings-section">
         <h3>Display</h3>
         <label className="chat-local-tools">
           <input
@@ -164,7 +195,7 @@ export function ChatSettingsPanel({
         <h3>Coach instructions</h3>
         <p className="chat-settings-copy">
           Extra preferences appended to every coaching prompt — for example your
-          goal race, training days, equipment, or preferred tone.
+          goal race, training days or equipment.
         </p>
         <p className="chat-settings-copy">
           Your custom instructions will be used in conjunction with the{" "}
@@ -184,19 +215,12 @@ export function ChatSettingsPanel({
             rows={5}
             maxLength={MAX_CUSTOM_COACH_INSTRUCTIONS}
             placeholder="e.g. I race a marathon in October, I can only run Tue/Thu/Sat, and I have no gym access."
-            value={customInstructionsDraft}
-            onChange={(event) => setCustomInstructionsDraft(event.target.value)}
-            onBlur={commitCustomInstructions}
-            onKeyDown={(event) => {
-              // Escape closes the settings modal via a document listener
-              // before blur can fire; save the draft first.
-              if (event.key === "Escape") commitCustomInstructions();
-            }}
+            value={customInstructions}
+            onChange={(event) => onUpdateChatSettings({ customInstructions: event.target.value })}
           />
         </label>
         <p className="chat-settings-copy">
-          {customInstructionsDraft.length}/{MAX_CUSTOM_COACH_INSTRUCTIONS} characters.
-          Saved when you click outside the box.
+          {customInstructions.length}/{MAX_CUSTOM_COACH_INSTRUCTIONS} characters.
         </p>
         {baseInstructionsOpen ? (
           <BaseCoachInstructionsDialog
@@ -250,7 +274,7 @@ export function ChatSettingsPanel({
               onChange={(event) => setLimitDraft(event.target.value)}
               onBlur={commitWindow}
               onKeyDown={(event) => {
-                if (event.key === "Escape" || event.key === "Enter") commitWindow();
+                if (event.key === "Enter") commitWindow();
               }}
             />
           </label>
@@ -267,7 +291,7 @@ export function ChatSettingsPanel({
               onChange={(event) => setKeepDraft(event.target.value)}
               onBlur={commitWindow}
               onKeyDown={(event) => {
-                if (event.key === "Escape" || event.key === "Enter") commitWindow();
+                if (event.key === "Enter") commitWindow();
               }}
             />
           </label>
@@ -286,12 +310,17 @@ export function ChatSettingsPanel({
           Between {MIN_CONTEXT_KEEP + MIN_CONTEXT_GAP} and {MAX_CONTEXT_LIMIT},
           and &ldquo;compact after&rdquo; must stay at least {MIN_CONTEXT_GAP}{" "}
           above &ldquo;keep in full&rdquo;. Out-of-range values are pulled back
-          into it when you click away. Compact one conversation right now from
+          into it when you click away or press Enter. Compact one conversation right now from
           its &ldquo;⋯&rdquo; menu in the sidebar.
         </p>
       </section>
 
-      <AnalysesSettingsSection api={api} />
+      <AnalysesSettingsSection
+        api={api}
+        pendingBudget={pendingBudget}
+        onPendingBudgetChange={onPendingBudgetChange}
+        savedSpend={savedSpend}
+      />
     </div>
   );
 }
@@ -306,13 +335,31 @@ export function ChatSettingsPanel({
  * when an analysis became something that lives in one conversation, and these
  * two would otherwise have gone with it.
  */
-function AnalysesSettingsSection({ api }: { api: CorosLinkApi | undefined }) {
+function AnalysesSettingsSection({
+  api,
+  pendingBudget,
+  onPendingBudgetChange,
+  savedSpend
+}: {
+  api: CorosLinkApi | undefined;
+  pendingBudget: number | null | undefined;
+  onPendingBudgetChange: (budget: number | null | undefined) => void;
+  savedSpend: CoachAnalysisSpend | null;
+}) {
   const [pause, setPause] = useState<CoachAnalysisPause | null>(null);
   const [spend, setSpend] = useState<CoachAnalysisSpend | null>(null);
   const [resuming, setResuming] = useState(false);
-  /** Held while the field is focused so typing is not fought by a re-render. */
-  const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
+  /**
+   * The field's text, held apart from the draft budget so a half-typed or
+   * cleared number is not fought by a re-render; `null` shows the draft.
+   */
+  const [budgetText, setBudgetText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // A discard or a save puts the draft back to "unchanged": show the budget again.
+  useEffect(() => {
+    if (pendingBudget === undefined) setBudgetText(null);
+  }, [pendingBudget]);
 
   useEffect(() => {
     if (!api) return;
@@ -337,6 +384,11 @@ function AnalysesSettingsSection({ api }: { api: CorosLinkApi | undefined }) {
     };
   }, [api]);
 
+  // A save answers with the month as it now stands, the new ceiling included.
+  useEffect(() => {
+    if (savedSpend) setSpend(savedSpend);
+  }, [savedSpend]);
+
   // The trip usually happens with no window open at all — a scheduled run
   // finding COROS asking for a login code at 07:30 — so this panel follows the
   // push rather than only reading once on mount.
@@ -345,18 +397,16 @@ function AnalysesSettingsSection({ api }: { api: CorosLinkApi | undefined }) {
     return api.onCoachAnalysisPauseUpdate((next) => setPause(next));
   }, [api]);
 
-  const commitBudget = async (raw: string) => {
-    if (!api) return;
-    setBudgetDraft(null);
+  /** Into the dialog's draft, written on Save; an unusable number changes nothing. */
+  const editBudget = (raw: string) => {
+    setBudgetText(raw);
     const trimmed = raw.trim();
     const parsed = trimmed === "" ? null : Number(trimmed);
     if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) return;
-    try {
-      setSpend(await api.setCoachAnalysisBudget(parsed));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
+    onPendingBudgetChange(parsed === (spend?.budget ?? null) ? undefined : parsed);
   };
+
+  const shownBudget = pendingBudget !== undefined ? pendingBudget : (spend?.budget ?? null);
 
   const resume = async () => {
     if (!api) return;
@@ -446,15 +496,9 @@ function AnalysesSettingsSection({ api }: { api: CorosLinkApi | undefined }) {
               step={1000}
               placeholder="none"
               disabled={!api}
-              value={
-                budgetDraft ??
-                (spend.budget === null ? "" : String(spend.budget))
-              }
-              onChange={(event) => setBudgetDraft(event.target.value)}
-              onBlur={(event) => void commitBudget(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-              }}
+              value={budgetText ?? (shownBudget === null ? "" : String(shownBudget))}
+              onChange={(event) => editBudget(event.target.value)}
+              onBlur={() => setBudgetText(null)}
             />
           </label>
         </p>

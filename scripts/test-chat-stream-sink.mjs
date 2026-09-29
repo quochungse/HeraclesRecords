@@ -286,6 +286,11 @@ assert.match(readOnlyGuide, /list_training_plans and get_training_plan/);
   assert.doesNotMatch(service, /text: instructions, hasData/, "no provider sends the old snapshot-in-the-middle prompt");
   assert.match(service, /instructions: systemPrompt\.stable,\s*liveInstructions: systemPrompt\.live,/);
   assert.match(service, /const sections: string\[\] = \[today, ""\];/, "the date heads the part that changes");
+  assert.equal(
+    (service.match(/runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)\)/g) ?? []).length,
+    5,
+    "every provider's prompt carries the chosen Coach style"
+  );
 }
 // A plan with no brief tool is drafted at any length.
 assert.match(

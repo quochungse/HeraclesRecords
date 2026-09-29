@@ -221,6 +221,7 @@ import type {
   TrainingPlanGenerationRequest,
   TrainingPlanOutlineRevision,
   ScheduleChangeSet,
+  CoachStyle,
   UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
@@ -1905,7 +1906,8 @@ async function streamChatTurn(
         unitSystem,
         settings.customInstructions,
         roleInstructions,
-        runTools.get(requestId)?.context
+        runTools.get(requestId)?.context,
+        settings.coachStyle
       ));
       const systemPrompt = coachSystemPrompt(
         context,
@@ -2006,7 +2008,8 @@ async function streamChatTurn(
         unitSystem,
         settings.customInstructions,
         roleInstructions,
-        runTools.get(requestId)?.context
+        runTools.get(requestId)?.context,
+        settings.coachStyle
       ));
 
       await prepare(prepareToolSurface());
@@ -2103,7 +2106,8 @@ async function streamChatTurn(
         unitSystem,
         settings.customInstructions,
         roleInstructions,
-        runTools.get(requestId)?.context
+        runTools.get(requestId)?.context,
+        settings.coachStyle
       ));
       const systemPrompt = coachSystemPrompt(
         context,
@@ -2177,7 +2181,8 @@ async function streamChatTurn(
         unitSystem,
         settings.customInstructions,
         roleInstructions,
-        runTools.get(requestId)?.context
+        runTools.get(requestId)?.context,
+        settings.coachStyle
       ));
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
@@ -2275,7 +2280,8 @@ async function streamChatTurn(
       unitSystem,
       settings.customInstructions,
       roleInstructions,
-      runTools.get(requestId)?.context
+      runTools.get(requestId)?.context,
+      settings.coachStyle
     ));
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
@@ -3850,7 +3856,8 @@ async function buildTrainingContext(
   unitSystem: UnitSystem = "metric",
   customInstructions?: string,
   roleInstructions?: string,
-  scope?: TrainingContextScope
+  scope?: TrainingContextScope,
+  style?: CoachStyle
 ): Promise<TrainingContext> {
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
@@ -3858,7 +3865,8 @@ async function buildTrainingContext(
     roleInstructions,
     scope?.announce
       ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
-      : undefined
+      : undefined,
+    style
   );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +

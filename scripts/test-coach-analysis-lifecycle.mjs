@@ -910,7 +910,8 @@ assert.match(
   // The pause and the monthly budget are the only feature-wide controls left,
   // and the screen that used to host them is gone. They have to be somewhere
   // an athlete can reach, or a paused world has no Resume button.
-  const settings = read("src", "chat", "ChatSettingsPanel.tsx");
+  // The panel draws the controls; the dialog around it writes the budget on Save.
+  const settings = read("src", "chat", "ChatSettingsPanel.tsx") + read("src", "chat", "ChatSettingsModal.tsx");
   assert.match(
     settings,
     /resumeCoachAnalyses\(\)/,

@@ -3124,6 +3124,20 @@ export function ChatView({
     }
   };
 
+  /**
+   * Coach settings' Save. Unlike the quick toggles elsewhere, it is written
+   * before it is shown, and a failure goes back to the dialog to say so: the
+   * athlete pressed Save and is owed an answer.
+   */
+  const saveChatSettingsPatch = async (patch: Partial<ChatSettings>) => {
+    if (!api) throw new Error("Could not save Coach settings.");
+    try {
+      setChatSettings(await api.saveChatSettings({ ...chatSettings, ...patch }));
+    } catch (caught) {
+      throw new Error(remoteErrorMessage(caught, "Could not save Coach settings."));
+    }
+  };
+
   const handleUpdateChatSettings = async (patch: Partial<ChatSettings>) => {
     const nextSettings = { ...chatSettings, ...patch };
     setChatSettings(nextSettings);
@@ -4258,7 +4272,7 @@ export function ChatView({
       open={settingsOpen}
       chatSettings={chatSettings}
       onClose={() => setSettingsOpen(false)}
-      onUpdateChatSettings={(patch: Partial<ChatSettings>) => void handleUpdateChatSettings(patch)}
+      onSaveChatSettings={saveChatSettingsPatch}
       onCoachModelsChange={() => void reloadCoachSettings()}
     />
   );

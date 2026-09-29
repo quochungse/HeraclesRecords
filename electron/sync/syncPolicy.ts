@@ -225,6 +225,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.local.toolsEnabled": "preference",
   "chat.visualizations.enabled": "preference",
   "chat.coach.inlineSuggestions": "preference",
+  "chat.coach.style": "preference",
   "chat.compactContext.enabled": "preference",
   "chat.compactContext.limit": "preference",
   "chat.compactContext.keep": "preference",

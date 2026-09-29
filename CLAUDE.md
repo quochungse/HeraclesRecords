@@ -1329,6 +1329,26 @@ Overview, Media, Data, and Settings are in the main bundle.
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
   because shown whole there it buried that page's content.
+  **The dialog edits a draft and writes it on Save** (`ChatSettingsModal`): the panel is handed
+  the saved settings with the draft laid over them and changes only the draft, the monthly
+  budget included (written through `setCoachAnalysisBudget` on Save, whose answer the spend line
+  then shows); Discard drops it, and closing with a draft held asks first. Every control used to
+  save on change and the instructions box on blur, so a half-written instruction reached the
+  next turn and went out through sync with no way back. The Coach Models row and Resume are not
+  part of the draft — one is its own dialog, the other an action. `test:coach-analysis-renderer`.
+  **The dialog wears the app's colours, not Coach's.** It is mounted inside `.chat-view`, whose
+  grey `--accent` and own `--surface` it inherited unseen, so every chip and the Save button drew
+  grey; `.chat-settings-backdrop` points them back at `--palette-accent*` and `--palette-surface`
+  (declared on `:root` as `var(--surface)`, so it resolves per theme).
+  **Coach style** (`electron/coachStyles.ts`, `chat.coach.style`, `preference`) is the one place
+  a tone is chosen, since the base prompt carries none. Chips, warmest to harshest with Neutral
+  in the middle (`COACH_STYLES` is that order): Friendly, Motivating, Neutral (adds nothing),
+  Analytical, Straight talk, No filter (swearing allowed, aimed at excuses and never at the
+  person, dropped the moment pain, injury or distress comes up). Each is one line — it is sent
+  every turn, and `test:chat-service` bounds it. Its block goes
+  after the base rules and before the athlete's own instructions, which can still tune it, and
+  it says outright that it changes tone only and never what goes onto a card — names and
+  descriptions are saved to COROS and shown on the watch.
 
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9

@@ -47,6 +47,11 @@
   --text-muted: #6e6e73;
 
   --surface: #0c1814;
+  /* The app's surface under its own name, for a subtree that has to get it
+     back from a scope that repaints `--surface` (Coach's settings dialog,
+     inside `.chat-view`). Declared here with `var()`, so it resolves on the
+     root against whichever theme's `--surface` is in force. */
+  --palette-surface: var(--surface);
 
   /*
    * The ground under a floating menu. It is not --surface, which carries a
@@ -16849,6 +16854,23 @@ tr.data-intervals-row-missing {
   padding: 22px;
 }
 
+/* Coach settings is one of the app's dialogs, opened from inside Coach, and a
+   dialog inherits the tokens of where it is mounted: `.chat-view` repaints
+   the accent grey and the surface its own, so every chip, checkbox, focus
+   ring and the Save button drew in Coach's greys instead of the app's accent.
+   The app's tokens come back for the dialog's whole subtree — Coach Models
+   opens inside it too — as the conversation list takes them back for its own. */
+.chat-settings-backdrop {
+  --accent: var(--palette-accent);
+  --accent-strong: var(--palette-accent-strong);
+  --accent-2: var(--palette-accent-2);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-glow: var(--palette-accent-glow);
+  --accent-soft: var(--palette-accent-soft);
+  --accent-gradient: var(--palette-accent-gradient);
+  --surface: var(--palette-surface);
+}
+
 .chat-settings-modal,
 .app-modal {
   display: flex;
@@ -17151,13 +17173,27 @@ tr.data-intervals-row-missing {
 
 .chat-settings-modal .chat-settings-panel {
   height: auto;
-  max-height: calc(min(92vh, 900px) - 58px);
+  /* The header (58px) and the Save/Discard footer (61px) stand outside the
+     scroll, so the actions are always in reach. */
+  max-height: calc(min(92vh, 900px) - 58px - 61px);
   padding: 16px;
   gap: 16px;
 }
 
 .chat-settings-modal .chat-settings-section {
   padding: 16px;
+}
+
+/* The status reads at the start of the row, the actions at its end. */
+.chat-settings-footer-status {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.chat-settings-footer-status[role="alert"] {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .chat-settings-button {

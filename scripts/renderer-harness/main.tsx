@@ -27,6 +27,8 @@ import { ChatView } from "../../src/chat/ChatView";
 import { ConversationAnalyses } from "../../src/chat/analyses/ConversationAnalyses";
 import { AnalysisDetailView } from "../../src/chat/analyses/AnalysisDetail";
 import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
+import { ChatSettingsModal } from "../../src/chat/ChatSettingsModal";
+import type { ChatSettings } from "../../electron/types";
 import { RunningView } from "../../src/running/RunningView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
@@ -166,6 +168,39 @@ function createStubApi(): CorosLinkApi {
 }
 
 const api = createStubApi();
+
+const HARNESS_CHAT_SETTINGS = {
+  provider: "claude-code",
+  chatgpt: {} as never,
+  anthropic: {} as never,
+  claudeCode: {} as never,
+  openRouter: {} as never,
+  local: {} as never,
+  customInstructions: "",
+  coachStyle: "neutral",
+  compactContext: { enabled: true, limit: 60, keep: 20 }
+} as ChatSettings;
+
+function ChatSettingsModalHarness() {
+  const [settings, setSettings] = useState<ChatSettings>(HARNESS_CHAT_SETTINGS);
+  const [open, setOpen] = useState(true);
+  return (
+    <ChatSettingsModal
+      api={api}
+      open={open}
+      chatSettings={settings}
+      onClose={() => {
+        calls.push({ method: "prop:onClose", args: [] });
+        setOpen(false);
+      }}
+      onSaveChatSettings={async (patch) => {
+        calls.push({ method: "prop:onSaveChatSettings", args: [patch] });
+        setSettings((current) => ({ ...current, ...patch }));
+      }}
+    />
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // The components under test
@@ -627,8 +662,25 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       coachModelsSummary=""
       onOpenCoachModels={spy("onOpenCoachModels")}
       onUpdateChatSettings={spy("onUpdateChatSettings")}
+      pendingBudget={undefined}
+      onPendingBudgetChange={spy("onPendingBudgetChange")}
+      savedSpend={null}
     />
   ),
+  // The dialog around it, which holds the draft and writes it on Save. The
+  // saved settings are state here, as they are in ChatView, so a save shows.
+  // `chatScope` puts it where the app does, inside `.chat-view`, whose tokens
+  // it would otherwise inherit unseen — the grey accent, the chat's surface.
+  ChatSettingsModal: (options) => {
+    if (options.styles === true) loadAppStyles();
+    return options.chatScope === true ? (
+      <div className="chat-view">
+        <ChatSettingsModalHarness />
+      </div>
+    ) : (
+      <ChatSettingsModalHarness />
+    );
+  },
   ConversationAnalyses: (options) => (
     <ConversationAnalyses
       api={api}
