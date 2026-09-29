@@ -1081,6 +1081,16 @@ Overview, Media, Data, and Settings are in the main bundle.
   only a turn that produced nothing is undone. `streamedTextRef` exists for this —
   `streamingText` is state, stale inside the subscription.
 
+  **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the
+  answer last, so where the answer goes is decided at the end: under the turn's charts
+  (`activityVisual`, `fitnessTrend`, `hrZoneSummary` — what it reads from) and above its
+  other cards (a plan, a workout, a change set — what it proposes). `orderTurn`
+  (`chatTypes.ts`) does it for a settle and for the streaming bubble, so nothing moves when
+  a turn ends; `createCollectorSink` does it for a headless run with its own
+  `isChartEntry`, and the two kind lists must agree. From 2026-09-26 (e5d2b36) to this rule
+  the answer went ahead of every card, charts included; rows written then are left as they
+  are. `test:chat-stream-sink`, `test:chat-plan-card-renderer`.
+
   **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
   `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:
   both`, so a row is invisible until its animation runs, and it only runs while the

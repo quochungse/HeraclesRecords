@@ -1402,6 +1402,15 @@ function upsertEntry(
   entries.push(entry);
 }
 
+/** A chart card: the three kinds the renderer's `isChatVisualEntry` names. */
+function isChartEntry(entry: PersistedChatEntry): boolean {
+  return (
+    entry.kind === "activityVisual" ||
+    entry.kind === "fitnessTrend" ||
+    entry.kind === "hrZoneSummary"
+  );
+}
+
 export function createCollectorSink(
   marker?: ChatEntryAnalysisMarker
 ): ChatStreamCollectorSink {
@@ -1417,7 +1426,7 @@ export function createCollectorSink(
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
   let tokenModel: string | undefined;
-  /** Where the running turn's entries begin; its answer goes in front of its cards. */
+  /** Where the running turn's entries begin; its answer goes between its charts and its other cards. */
   let turnStart = 0;
 
   const reset = () => {
@@ -1591,10 +1600,13 @@ export function createCollectorSink(
     const prompts = pendingCoachPrompts;
     const turnSource = source ?? undefined;
 
+    // Under the charts this turn produced and above its other cards, as
+    // ChatView settles an interactive turn (`orderTurn`): a chart is what the
+    // answer reads from, a creation is what it proposes.
+    const turn = entries.splice(Math.min(turnStart, entries.length));
+    entries.push(...turn.filter(isChartEntry));
     if (fullText) {
-      // Before the cards this turn produced, as ChatView settles an
-      // interactive turn (`settleTurnEntries`): the answer introduces them.
-      entries.splice(Math.min(turnStart, entries.length), 0, {
+      entries.push({
         kind: "message",
         role: "assistant",
         content: fullText,
@@ -1610,6 +1622,7 @@ export function createCollectorSink(
         ...(marker ? { automation: marker } : {})
       });
     }
+    entries.push(...turn.filter((entry) => !isChartEntry(entry)));
     for (const prompt of prompts) {
       upsertEntry(
         entries,

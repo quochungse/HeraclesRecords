@@ -190,13 +190,34 @@ export function isChatVisualEntry(
 }
 
 /**
- * A finished turn's answer, put where the turn began.
+ * A turn's entries in reading order: its charts, then its answer, then the
+ * rest of its cards.
  *
- * The cards a turn produces (a plan, a chart) arrive while it runs and are
- * appended as they come; the answer arrives last. Appended too, it read below
- * the plan it introduces. `turnStart` is the timeline's length when the turn
- * was sent, so everything from there on is this turn's, and `closing` goes in
- * front of it. Clamped, so a timeline replaced mid-turn cannot throw.
+ * A chart is what the answer reads from, so it leads, as every answer did
+ * before 2026-09-26; a creation (a plan, a workout, a change set) is what the
+ * answer proposes, so it follows. Each group keeps the order it arrived in.
+ * The collector (`createCollectorSink`) orders a headless run the same way.
+ */
+export function orderTurn<T>(
+  turn: readonly T[],
+  answer: readonly T[],
+  isChart: (item: T) => boolean
+): T[] {
+  return [
+    ...turn.filter(isChart),
+    ...answer,
+    ...turn.filter((item) => !isChart(item))
+  ];
+}
+
+/**
+ * A finished turn's answer, put among the entries the turn produced.
+ *
+ * The cards a turn produces arrive while it runs and are appended as they
+ * come; the answer arrives last, and `orderTurn` says where it goes.
+ * `turnStart` is the timeline's length when the turn was sent, so everything
+ * from there on is this turn's. Clamped, so a timeline replaced mid-turn
+ * cannot throw.
  */
 export function settleTurnEntries(
   timeline: ChatEntry[],
@@ -204,7 +225,10 @@ export function settleTurnEntries(
   closing: ChatEntry[]
 ): ChatEntry[] {
   const at = Math.min(Math.max(0, Math.floor(turnStart)), timeline.length);
-  return [...timeline.slice(0, at), ...closing, ...timeline.slice(at)];
+  return [
+    ...timeline.slice(0, at),
+    ...orderTurn(timeline.slice(at), closing, isChatVisualEntry)
+  ];
 }
 
 /** A replacement keeps what a newer build stored beside the entry it replaces. */

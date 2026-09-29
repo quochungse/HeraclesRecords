@@ -9,8 +9,8 @@
 //     decided whether the Creations button existed;
 //   * an undated plan reads as its weeks, off the document the draft becomes,
 //     not as one "Unscheduled" pile with "0 weeks";
-//   * a turn's answer sits above the cards the turn produced, while it streams
-//     and once it has settled.
+//   * a turn's answer sits under the charts the turn produced and above its
+//     other cards, while it streams and once it has settled.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -316,7 +316,7 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // A turn's answer sits above the cards it produced
+  // A turn's answer sits under its charts and above its other cards
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
@@ -338,12 +338,25 @@ async function main() {
     kind: "planDraft",
     draft: { ...PREVIEW, draftId: "plan-2", name: "Four weeks" }
   });
+  // The chart arrives after the plan and is still drawn above the answer.
+  await harness("emit", "onChatStreamInfo", {
+    requestId,
+    kind: "fitnessTrend",
+    preview: {
+      previewId: "trend-1",
+      windowDays: 7,
+      trendPoints: [
+        { date: "2026-09-09", label: "Wed", trainingLoad: 120, rhr: 47 },
+        { date: "2026-09-10", label: "Thu", trainingLoad: 240, rhr: 48 }
+      ]
+    }
+  });
   await harness("emit", "onChatStreamToken", { requestId, delta: "Here is a four-week block." });
   await waitFor(() => harness("exists", ".chat-bubble-streaming"), "the answer is streaming");
   assert.deepEqual(
-    (await threadOrder()).slice(-3),
-    ["user", "streaming", "card"],
-    "while it streams, the answer is above the card it produced"
+    (await threadOrder()).slice(-4),
+    ["user", "visual", "streaming", "card"],
+    "while it streams, the answer is under the chart and above the card"
   );
 
   await harness("emit", "onChatStreamDone", {
@@ -352,15 +365,15 @@ async function main() {
   });
   await waitFor(async () => !(await harness("exists", ".chat-bubble-streaming")), "the turn settles");
   assert.deepEqual(
-    (await threadOrder()).slice(-3),
-    ["user", "assistant", "card"],
-    "once settled, the answer is still above the card"
+    (await threadOrder()).slice(-4),
+    ["user", "visual", "assistant", "card"],
+    "once settled, the answer is still between the chart and the card"
   );
   await settle();
   const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.deepEqual(
-    saved.slice(-2).map((entry) => entry.kind),
-    ["message", "planDraft"],
+    saved.slice(-3).map((entry) => entry.kind),
+    ["fitnessTrend", "message", "planDraft"],
     "and it is saved in that order"
   );
 

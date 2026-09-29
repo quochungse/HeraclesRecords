@@ -157,6 +157,7 @@ import {
   upsertHrZoneEntry,
   upsertPlanDraftEntry,
   isChatVisualEntry,
+  orderTurn,
   settleTurnEntries,
   type ChatEntry,
   type SourceInfo
@@ -4431,9 +4432,21 @@ export function ChatView({
           </>
         )
       : null;
+  // `rows` is the timeline mapped one to one, so a row's index is its entry's.
+  // The answer streams where it will settle (`settleTurnEntries`): under the
+  // turn's charts, above its other cards.
   const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
     const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
-    const placed = streamingRow ? [...rows.slice(0, at), streamingRow, ...rows.slice(at)] : rows;
+    const placed = streamingRow
+      ? [
+          ...rows.slice(0, at),
+          ...orderTurn(
+            rows.slice(at).map((row, offset) => ({ row, chart: isChatVisualEntry(timeline[at + offset]) })),
+            [{ row: streamingRow, chart: false }],
+            (item) => item.chart
+          ).map((item) => item.row)
+        ]
+      : rows;
     return stepTrailRow ? [...placed, stepTrailRow] : placed;
   };
 

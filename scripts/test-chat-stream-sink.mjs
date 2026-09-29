@@ -174,12 +174,37 @@ assert.equal(collector.cancelled(), false);
 assert.equal(collector.error(), undefined);
 assert.equal(collector.text(), "Easy 40min.");
 
-// Cards land as they stream; at done the assistant message goes in front of the
-// turn's cards, which it introduces, and prompts after them — the order
+// Cards land as they stream; at done the assistant message goes under the
+// turn's charts and above its other cards, and prompts after them — the order
 // ChatView's `settleTurnEntries` produces.
 assert.deepEqual(
   built.map((entry) => entry.kind),
-  ["message", "fitnessTrend", "coachPrompt"]
+  ["fitnessTrend", "message", "coachPrompt"]
+);
+
+// A chart leads the answer and a creation follows it, whichever arrived first.
+const mixed = createCollectorSink();
+runStream(mixed, [
+  ["chat:streamStart", {}],
+  ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: [] } }],
+  ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1" } }],
+  ["chat:streamInfo", { kind: "hrZoneSummary", preview: { previewId: "z1" } }],
+  ["chat:streamDone", { fullText: "Here is why." }]
+]);
+assert.deepEqual(
+  mixed.entries().map((entry) => entry.kind),
+  ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange"]
+);
+// A second turn in the same run leaves the first where it is.
+runStream(mixed, [
+  ["chat:streamStart", {}],
+  ["chat:streamInfo", { kind: "fitnessTrend", preview: { previewId: "t2" } }],
+  ["chat:streamDone", { fullText: "And the trend." }]
+]);
+assert.deepEqual(
+  mixed.entries().map((entry) => entry.kind),
+  ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange", "fitnessTrend", "message"]
 );
 
 // --- a re-emitted card replaces the first rather than appending ------------
@@ -198,15 +223,16 @@ runStream(upserts, [
   ["chat:streamDone", {}]
 ]);
 const upserted = upserts.entries();
+// Charts lead even with no answer to put between them and the rest.
 assert.deepEqual(
   upserted.map((entry) => entry.kind),
-  ["planDraft", "planDraft", "scheduleChange", "activityVisual", "hrZoneSummary"]
+  ["activityVisual", "hrZoneSummary", "planDraft", "planDraft", "scheduleChange"]
 );
-assert.deepEqual(upserted[0].draft.entries, ["x"], "same draftId replaced in place");
-assert.equal(upserted[1].draft.draftId, "d2", "a different id appends");
-assert.deepEqual(upserted[2], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
-assert.equal(upserted[3].preview.n, 2);
-assert.equal(upserted[4].preview.n, 2);
+assert.equal(upserted[0].preview.n, 2);
+assert.equal(upserted[1].preview.n, 2);
+assert.deepEqual(upserted[2].draft.entries, ["x"], "same draftId replaced in place");
+assert.equal(upserted[3].draft.draftId, "d2", "a different id appends");
+assert.deepEqual(upserted[4], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
 // A coachPrompt re-emitted under the same id collapses to one entry too.
 const dedupedPrompts = createCollectorSink();
 runStream(dedupedPrompts, [
@@ -218,7 +244,7 @@ runStream(dedupedPrompts, [
 assert.equal(dedupedPrompts.entries().length, 1);
 assert.equal(dedupedPrompts.entries()[0].prompt.v, 2);
 
-const assistant = built[0];
+const assistant = built[1];
 assert.equal(assistant.role, "assistant");
 assert.equal(assistant.content, "Easy 40min.");
 assert.equal(assistant.reasoningSummary, "checking yesterday");
@@ -319,7 +345,7 @@ assert.equal(copies.entries().length, 1);
 // parser drops would vanish the moment the athlete reopens the conversation.
 const persisted = parseChatTranscriptJson(JSON.stringify(built));
 assert.deepEqual(persisted, built, "every collected entry survives the store");
-assert.deepEqual(persisted[0].automation, marker);
+assert.deepEqual(persisted[1].automation, marker);
 
 // --- 13: a failed turn is not a refund -------------------------------------
 // Usage used to reach the collector only on `chat:streamDone`, which a stream
