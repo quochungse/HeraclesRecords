@@ -22051,6 +22051,13 @@ tr.data-intervals-row-missing {
   height: 140px;
 }
 
+/* Holds a chart's place until it comes near the screen (ChartWhenNear), at
+   the size of the shell it stands in. */
+.chat-chart-when-near {
+  width: 100%;
+  height: 100%;
+}
+
 .chat-hr-trend-empty,
 .chat-visual-empty {
   margin: 0;
