@@ -141,7 +141,7 @@ assert.match(weekText, /- Training load: last 7 days 350\n/);
 assert.match(weekText, /- Resting HR: 55 bpm on 09-11 Fri; 7-day average 52\n/);
 assert.match(
   weekText,
-  /- Overnight HRV: 60 vs baseline 62 on 09-11 Fri; below baseline on 7 of the last 7 readings/
+  /- Overnight HRV: 60 vs baseline 62 for the night ending 09-11 Fri; below baseline on 7 of the last 7 readings/
 );
 // Parsed off the same response all along, and never shown before.
 assert.match(
@@ -151,11 +151,26 @@ assert.match(
 assert.match(weekText, /- VO2max: 47 on 09-09 Wed\n/);
 assert.match(
   weekText,
-  /Day \| Load \| RHR \| HRV \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
+  /Daily \(HRV that night = the sleep after that day \(COROS files it under the next morning\)\):\nDay \| Load \| RHR \| HRV that night \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
 );
 assert.doesNotMatch(weekText, /RPE load/, "a column nobody fills is dropped");
 assert.match(weekText, /09-09 Wed \| 50 \| 55 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| 47/);
-assert.match(weekText, /09-11 Fri \| 50 \| 55 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| —/);
+assert.match(weekText, /09-11 Fri \| 50 \| 55 \| — \| 30 \| 1\.15 \| 40 \| —/, "today's night has not been slept");
+{
+  // COROS files a night under the morning it ended, so the night after a run
+  // is the next day's reading. The 09-26 run was followed by 59, not by the
+  // 48 of the night before it, which is what its own row carries.
+  const runWeek = [
+    { happenDay: "20260925", trainingLoad: 0, avgSleepHrv: 64, sleepHrvBase: 61 },
+    { happenDay: "20260926", trainingLoad: 288, avgSleepHrv: 48, sleepHrvBase: 61 },
+    { happenDay: "20260927", trainingLoad: 61, avgSleepHrv: 59, sleepHrvBase: 61 }
+  ];
+  const text = formatFitnessTrendsForChat(runWeek, 3, new Date(2026, 8, 27, 12));
+  assert.match(text, /\n09-25 Fri \| 0 \| 48 \(61\)\n/);
+  assert.match(text, /\n09-26 Sat \| 288 \| 59 \(61\)\n/);
+  assert.match(text, /\n09-27 Sun \| 61 \| —$/);
+  assert.match(text, /- Overnight HRV: 59 vs baseline 61 for the night ending 09-27 Sun;/);
+}
 
 // A month rolls up by week and keeps the last seven days daily.
 const month = trendWindow(dayList, 30, today);
@@ -174,7 +189,7 @@ assert.match(
 assert.match(monthText, /08-10 Mon \(partial\) \| 200 \| 50 \|/);
 assert.match(monthText, /08-17 Mon \| 350 \| 50 \|/);
 assert.match(monthText, /09-07 Mon \(partial\) \| 250 \| 53 \|/);
-assert.match(monthText, /Daily, last 7 days:\nDay \|/);
+assert.match(monthText, /Daily, last 7 days \(HRV that night = [^)]+\)\):\nDay \|/);
 
 assert.equal(
   formatFitnessTrendsForChat([], 7, today),

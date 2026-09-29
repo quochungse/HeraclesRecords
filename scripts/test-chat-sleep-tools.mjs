@@ -60,7 +60,10 @@ const week = formatSleepSummaryForChat(
   today
 );
 
-assert.match(week, /Sleep, last 7 nights \(dated by wake-up day; 4 of 7 recorded\):/);
+assert.match(
+  week,
+  /Sleep, last 7 nights \(dated by wake-up day, so the night after a day's training is the next date; 4 of 7 recorded\):/
+);
 // Averages and the deficit are taken over settled nights only: a night still
 // syncing reads as a short one and would put debt on the athlete that is not
 // there. 420 + 480 + 450 over three nights, against 3 × 8 h.

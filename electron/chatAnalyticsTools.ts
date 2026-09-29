@@ -62,7 +62,8 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
       name: "get_fitness_trends",
       description:
         "COROS load and recovery markers per day: training load (and RPE load), " +
-        "resting HR, overnight HRV vs baseline, Load Impact, load ratio " +
+        "resting HR, overnight HRV vs baseline (each night listed on the day " +
+        "it followed), Load Impact, load ratio " +
         "(acute:chronic, ~1.0 = steady), Base Fitness and VO2max (recorded on run " +
         "days only), plus daily steps, exercise minutes and average stress, led by " +
         "a summary of the latest values and 7-day totals. " +
@@ -297,13 +298,38 @@ function statusColumns<Row>(
 
 type Wellness = ReadonlyMap<string, TrainingHubDailyHealthRecord>;
 
+/**
+ * The reading that holds the night after a day. COROS files a night under the
+ * morning it ended, so a day's own `avgSleepHrv` is the night *before* its
+ * training — and on the same row as that day's load it was read as the night
+ * after: a coach called a pre-run 48 "the night after this run" when that
+ * night read 59. So the daily table puts the next day's reading on the row,
+ * and the newest day has none until it has been slept.
+ */
+function nightAfter(
+  window: TrainingHubDailyMetric[]
+): (day: TrainingHubDailyMetric) => TrainingHubDailyMetric | undefined {
+  const byDay = new Map(window.map((day) => [day.happenDay, day]));
+  return (day) => byDay.get(dayKeyDaysAgo(dateFromDayKey(day.happenDay), -1));
+}
+
+const NIGHT_AFTER_NOTE =
+  "HRV that night = the sleep after that day (COROS files it under the next morning)";
+
 function dailyTable(window: TrainingHubDailyMetric[], wellness: Wellness): string[] {
   const of = (day: TrainingHubDailyMetric) => wellness.get(day.happenDay);
+  const night = nightAfter(window);
   return pipeTable(window, { header: "Day", value: (day) => dayLabel(day.happenDay) }, [
     { header: "Load", value: (day) => rounded(day.trainingLoad) },
     { header: "RPE load", value: (day) => rounded(day.rpeLoad) },
     { header: "RHR", value: (day) => rounded(day.rhr) },
-    { header: "HRV (baseline)", value: (day) => hrvCell(day.avgSleepHrv, day.sleepHrvBase) },
+    {
+      header: "HRV that night (baseline)",
+      value: (day) => {
+        const after = night(day);
+        return hrvCell(after?.avgSleepHrv, after?.sleepHrvBase);
+      }
+    },
     ...statusColumns((day: TrainingHubDailyMetric) => day),
     { header: "Steps", value: (day) => rounded(of(day)?.steps) },
     { header: "Exercise min", value: (day) => rounded(of(day)?.exerciseMinutes) },
@@ -442,7 +468,7 @@ function trendSummary(
     lines.push(
       `- Overnight HRV: ${Math.round(hrv.value)}` +
         (latest?.sleepHrvBase !== undefined ? ` vs baseline ${Math.round(latest.sleepHrvBase)}` : "") +
-        ` on ${dayLabel(hrv.day)}` +
+        ` for the night ending ${dayLabel(hrv.day)}` +
         (paired.length > 0 ? `; below baseline on ${below} of the last ${paired.length} readings` : "")
     );
   }
@@ -519,7 +545,7 @@ export function formatFitnessTrendsForChat(
   ];
 
   if (days <= DAILY_TABLE_MAX_DAYS) {
-    lines.push("", "Daily:", ...dailyTable(window, wellness));
+    lines.push("", `Daily (${NIGHT_AFTER_NOTE}):`, ...dailyTable(window, wellness));
   } else {
     const tailStart = dayKeyDaysAgo(today, DAILY_TAIL_DAYS - 1);
     lines.push(
@@ -527,7 +553,7 @@ export function formatFitnessTrendsForChat(
       "Weekly (Mon–Sun; load and time summed, RHR and HRV averaged, COROS status as of the week's last reading):",
       ...weeklyTable(window, windowStart, windowEnd, wellness),
       "",
-      `Daily, last ${DAILY_TAIL_DAYS} days:`,
+      `Daily, last ${DAILY_TAIL_DAYS} days (${NIGHT_AFTER_NOTE}):`,
       ...dailyTable(window.filter((day) => day.happenDay >= tailStart), wellness)
     );
   }

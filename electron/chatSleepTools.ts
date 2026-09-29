@@ -454,7 +454,8 @@ export function formatSleepSummaryForChat(
 
   const settled = records.filter(isSettled);
   const lines = [
-    `Sleep, last ${nights} nights (dated by wake-up day; ${records.length} of ${nights} recorded):`
+    `Sleep, last ${nights} nights (dated by wake-up day, so the night after a day's training ` +
+      `is the next date; ${records.length} of ${nights} recorded):`
   ];
 
   if (settled.length > 0) {
