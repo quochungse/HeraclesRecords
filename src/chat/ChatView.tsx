@@ -2188,6 +2188,24 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, exportingLatestActivity]);
 
+  /**
+   * Coach's settings and the Claude account as the main process holds them.
+   * `isCurrent` lets an effect drop an answer that lands after it was torn down.
+   */
+  const reloadCoachSettings = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!api) return;
+      const [settings, claude] = await Promise.allSettled([
+        api.getChatSettings(),
+        api.getClaudeCodeStatus()
+      ]);
+      if (!isCurrent()) return;
+      if (settings.status === "fulfilled") setChatSettings(settings.value);
+      if (claude.status === "fulfilled") setClaudeStatus(claude.value);
+    },
+    [api]
+  );
+
   // Provider settings and the Claude account are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
@@ -2195,21 +2213,11 @@ export function ChatView({
   useEffect(() => {
     if (!api || !active || checkingAuth) return;
     let cancelled = false;
-
-    void (async () => {
-      const [settings, claude] = await Promise.allSettled([
-        api.getChatSettings(),
-        api.getClaudeCodeStatus()
-      ]);
-      if (cancelled) return;
-      if (settings.status === "fulfilled") setChatSettings(settings.value);
-      if (claude.status === "fulfilled") setClaudeStatus(claude.value);
-    })();
-
+    void reloadCoachSettings(() => !cancelled);
     return () => {
       cancelled = true;
     };
-  }, [active, api, checkingAuth]);
+  }, [active, api, checkingAuth, reloadCoachSettings]);
 
   // Ask about dead MCP sessions here rather than at launch: nothing opens an
   // OAuth window on the athlete's behalf any more, so this is the one place
@@ -4166,6 +4174,7 @@ export function ChatView({
       chatSettings={chatSettings}
       onClose={() => setSettingsOpen(false)}
       onUpdateChatSettings={(patch: Partial<ChatSettings>) => void handleUpdateChatSettings(patch)}
+      onCoachModelsChange={() => void reloadCoachSettings()}
     />
   );
 

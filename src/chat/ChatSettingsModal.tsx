@@ -15,13 +15,20 @@ export function ChatSettingsModal({
   open,
   chatSettings,
   onClose,
-  onUpdateChatSettings
+  onUpdateChatSettings,
+  onCoachModelsChange
 }: {
   api: CorosLinkApi | undefined;
   open: boolean;
   chatSettings: ChatSettings;
   onClose: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
+  /**
+   * The models dialog saved something or read a list again. Coach holds its
+   * own copy of the settings — the composer's AI chip and every picker read
+   * the lists from it — so it has to hear this, not only the summary here.
+   */
+  onCoachModelsChange?: () => void;
 }) {
   const [coachModelsOpen, setCoachModelsOpen] = useState(false);
   const [coachModels, setCoachModels] = useState<CoachModelsSummary | null>(
@@ -122,7 +129,10 @@ export function ChatSettingsModal({
         api={api}
         open={coachModelsOpen}
         onClose={() => setCoachModelsOpen(false)}
-        onChange={() => setCoachRefreshVersion((version) => version + 1)}
+        onChange={() => {
+          setCoachRefreshVersion((version) => version + 1);
+          onCoachModelsChange?.();
+        }}
       />
     </div>
   );
