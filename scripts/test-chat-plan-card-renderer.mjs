@@ -21,7 +21,10 @@ const { app, BrowserWindow } = require("electron");
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-app.commandLine.appendSwitch("no-sandbox");
+// No `no-sandbox`, unlike the other harness suites: this window is offscreen
+// (see `main`), and an offscreen window under `no-sandbox` dies at start-up on
+// Linux ("Creating shared memory in /dev/shm … failed", then the GPU process)
+// and leaves the suite waiting forever.
 app.disableHardwareAcceleration();
 
 const CHAT_SETTINGS = {
@@ -195,11 +198,17 @@ function threadOrder() {
 
 async function main() {
   await app.whenReady();
+  // Offscreen, because the stick-to-end steps below need a ResizeObserver to
+  // fire, and observers only run on a frame: with hardware acceleration off, a
+  // hidden window on Linux gets none at all — measured, not one rAF, RO or IO
+  // callback in two seconds — so the transcript was left 276px short of its
+  // end in the suite while the app, which gets frames, stayed there. An
+  // offscreen window keeps its own frame clock whatever its visibility.
   win = new BrowserWindow({
     show: false,
     width: 1400,
     height: 1100,
-    webPreferences: { backgroundThrottling: false }
+    webPreferences: { backgroundThrottling: false, offscreen: true }
   });
   await win.loadFile(path.join(repoRoot, "dist-harness", "index.html"));
   assert.equal(await harness("dev"), true, "the harness must be the dev build");
