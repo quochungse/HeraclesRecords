@@ -38,7 +38,11 @@ const kitImporters = fs
     /from "\.\/sampleActivityKit"/.test(fs.readFileSync(path.join(repoRoot, "electron", name), "utf8"))
   )
   .sort();
-assert.deepEqual(kitImporters, ["sampleHikes.ts", "sampleRides.ts"], "the shared kit serves the two samples and nothing else");
+assert.deepEqual(
+  kitImporters,
+  ["sampleHikes.ts", "sampleRides.ts", "sampleTrailRuns.ts"],
+  "the shared kit serves the three samples and nothing else"
+);
 
 const main = fs.readFileSync(path.join(repoRoot, "electron", "main.ts"), "utf8");
 for (const channel of [

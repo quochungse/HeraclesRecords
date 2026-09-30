@@ -898,8 +898,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   auto-pause on), heart rate following the climbing rate and the altitude, weekends dated
   back from today. The same door as the rides — only `main.ts` imports it, in the list,
   detail, raw and summaries handlers — and the same athlete: `electron/sampleActivityKit.ts`
-  holds what the two samples share (the athlete's heart-rate figures, seeded randomness,
-  polylines, load and zones) and nothing else imports it. `npm run test:sample-hikes`.
+  holds what the samples share (the athlete's heart-rate figures, seeded randomness,
+  polylines, the trail model `routeModel`, load and zones) and nothing else imports it.
+  `npm run test:sample-hikes`.
   **The sport colour Settings called "Trail" is "Hiking"** (`hiking`, `--sport-hiking`): it
   held COROS's hike and mountain-climb codes all along, and the trail run it also held is a
   run, on Running — so 102 moved to `run` (a trail-run workout too, `trailRun` in
@@ -933,6 +934,20 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   differ by their gradient. Rests and a worked-out moving time are left to Hiking: a run's
   time stays COROS's activity time, as everywhere else on Running. `test:run-metrics` holds the weeks, the rate and the chart
   channels; `test:running-renderer` holds the view and the page.
+  **`npm run dev:sample-trail-runs`** (`HERACLES_SAMPLE_TRAIL_RUNS=1`,
+  `electron/sampleTrailRuns.ts`) adds fifteen trail runs over twelve weeks for screenshots,
+  through the rides' and hikes' door and on the hikes' trails (no route of its own to fetch):
+  Hàm Lợn loops and doubles, repeats on its one runnable climb (`repeatClimb`, 500 m at
+  7–16% — its steepest pitches are over 25%, a hike), Ba Vì and Tam Đảo long runs, and a 21K
+  on Hàm Lợn run as a race. A run is a list of legs, each at its own share of the aerobic
+  reserve, run a second at a time: speed by **Minetti's cost of running on a grade**, a
+  power-hike at walking's cost past the runner's grade, descents capped by the ground,
+  climbs by a vertical rate; heart rate follows what a second *cost*, so it rises on the
+  climbs and falls on the way down; GAP is that cost read back as a flat speed. Power,
+  cadence, ground contact and oscillation follow the speed and the gait (a hiked sample
+  states no contact time), so every panel of the trail page has something to draw. Dated
+  from the Monday of last week back, plus the last weekday before today, so the hero's
+  "This week" always holds a run. `npm run test:sample-trail-runs`.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second
