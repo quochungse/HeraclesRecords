@@ -89,7 +89,6 @@ import {
   stripChartPlaceholders,
   type AnswerSegment
 } from "../../electron/chartPlacement";
-import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -147,7 +146,6 @@ import { ChatConversationHeader } from "./ChatConversationHeader";
 import {
   ChatComposer,
   isLatestActivityFileRequest,
-  type AboutOption,
   type ChatComposerHandle
 } from "./ChatComposer";
 import { formatSessionRelativeTime } from "./chatSessionGroups";
@@ -3953,62 +3951,11 @@ export function ChatView({
   const listedCreations = planDrafts.filter((draft) =>
     isLatestVersion(versionIndex, draft.draftId)
   );
-  /** The whole of a creation, as a question points at it. */
-  const wholeCreationRef = (draft: PlanDraftPreview): PlanRef => {
-    const versionInfo = versionIndex.get(draft.draftId);
-    return {
-      artifactId: versionInfo?.artifactId ?? draft.draftId,
-      draftId: draft.draftId,
-      ...(versionInfo ? { version: versionInfo.version } : {}),
-      name: draft.name,
-      artifactType: draft.artifactType === "workout" ? "workout" : "plan",
-      scope: "plan",
-      label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
-    };
-  };
+
   /** Versions an event line already speaks for, so their own line is not drawn too. */
   const eventedDraftIds = new Set(
     timeline.flatMap((entry) => (entry.kind === "planEvent" ? [entry.event.draftId] : []))
   );
-  /*
-   * What "About…" offers (R1): a week or a day of the calendar, and anything
-   * made in this conversation — the chips Ask Coach from the Calendar and the
-   * Library put here, reachable from the composer itself.
-   */
-  const aboutOptions: AboutOption[] = (() => {
-    const today = new Date();
-    const thisMonday = mondayOfDate(today);
-    const nextMonday = new Date(thisMonday);
-    nextMonday.setDate(nextMonday.getDate() + 7);
-    const weekRef = (monday: Date): ScheduleRef => {
-      const keys = Array.from({ length: 7 }, (_, index) => {
-        const day = new Date(monday);
-        day.setDate(day.getDate() + index);
-        return keyFromDate(day);
-      });
-      return { scope: "week", day: keys[0], label: `Week of ${weekRangeLabel(keys)}` };
-    };
-    const addScheduleRef = (ref: ScheduleRef) =>
-      setPendingScheduleRefs((current) =>
-        current.some((item) => scheduleRefKey(item) === scheduleRefKey(ref)) ? current : [...current, ref]
-      );
-    return [
-      {
-        key: "today",
-        group: "Your calendar",
-        label: "Today",
-        onPick: () => addScheduleRef({ scope: "day", day: keyFromDate(today), label: "Today" })
-      },
-      { key: "this-week", group: "Your calendar", label: "This week", onPick: () => addScheduleRef(weekRef(thisMonday)) },
-      { key: "next-week", group: "Your calendar", label: "Next week", onPick: () => addScheduleRef(weekRef(nextMonday)) },
-      ...listedCreations.map((draft) => ({
-        key: `creation:${draft.draftId}`,
-        group: "Made in this conversation",
-        label: draft.name,
-        onPick: () => addRef(wholeCreationRef(draft))
-      }))
-    ];
-  })();
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   /** Under the conversation's name: what it has made, and when it last moved. */
   const conversationSubtitle = [
@@ -4745,7 +4692,6 @@ export function ChatView({
         creations={listedCreations.length}
         creationsOpen={workbenchOpen}
         onToggleCreations={() => (workbenchOpen ? closeWorkbench() : setPlanPanelOpen(true))}
-        onOpenSettings={() => openSettings()}
         trailing={
           isChatGptProvider ? (
             <button
@@ -5423,7 +5369,7 @@ export function ChatView({
               composerRefs.length ? <ComposerRefs refs={composerRefs} /> : null
             }
             placeholder={refPlaceholder(composerRefs.map((item) => item.preview))}
-            aboutOptions={aboutOptions}
+            onOpenSettings={() => openSettings()}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
             streaming={turnHere}

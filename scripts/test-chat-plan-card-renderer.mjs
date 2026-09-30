@@ -1540,18 +1540,7 @@ async function main() {
   // Build me a base block · Three easy weeks · card · answered question line
   assert.deepEqual(avatars.slice(0, 3), ["none", "visible", "hidden"]);
 
-  await harness("click", ".chat-about-trigger");
-  await waitFor(() => harness("exists", ".chat-about-menu"), "About… opens");
-  await page(`[...document.querySelectorAll(".chat-about-option")].find((b) => b.textContent === "This week").click()`);
-  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "the week waits in the composer");
-  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
-  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
-  assert.equal(await harness("exists", ".chat-composer .chat-ref-header-kicker"), false, "no Asking about line (UAT)");
-  assert.equal(
-    await page(`[...document.querySelectorAll(".chat-about-option")].some((b) => b.textContent === "Hanoi Half base")`),
-    false,
-    "the menu closed on the pick"
-  );
+  assert.equal(await harness("exists", ".chat-about-trigger"), false, "the composer has no About menu");
 
   await harness("setValue", ".chat-composer textarea", "How does this week look?");
   await harness("click", ".chat-send");
@@ -1563,9 +1552,6 @@ async function main() {
   assert.equal(await page(`document.body.textContent.includes("Using list scheduled workouts")`), false);
   await harness("emit", "onChatStreamDone", { requestId: traced.args[0], fullText: "Looks balanced.", finishReason: "stop" });
   await settle();
-  const sentWithRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
-  assert.ok(sentWithRefs.some((entry) => entry.kind === "scheduleRefs"), "the week travels as the question's anchor");
-  await waitFor(() => harness("exists", ".chat-row-user .chat-refs-row .chat-ref-chip"), "and is drawn inside the question");
 
   // -------------------------------------------------------------------------
   // R3: what waits on the athlete, Coach's settings in the app's Settings,
@@ -1596,8 +1582,9 @@ async function main() {
   assert.equal(await harness("count", ".chat-session-row"), 2, "every conversation is listed, whichever AI answers it");
   assert.equal(await harness("text", ".chat-session-row-waiting"), "Question", "and the row says what waits");
   assert.equal(await harness("exists", ".chat-history-filters"), false, "the list has no All · Needs you filter (UAT)");
-  // The gear opens Coach's own settings as a dialog, not the app's Settings (UAT).
-  await harness("click", '.chat-header-icon[aria-label="Open settings"]');
+  // The gear in the composer opens Coach's own settings as a dialog, not the app's Settings (UAT).
+  assert.equal(await harness("exists", '.chat-header [aria-label="Open settings"]'), false, "the gear left the head");
+  await harness("click", '.chat-composer-settings[aria-label="Open settings"]');
   await waitFor(() => harness("exists", ".chat-settings-modal .chat-settings-panel"), "Coach's settings open in their dialog");
   await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
   await waitFor(async () => !(await harness("exists", ".chat-settings-modal")), "and close");

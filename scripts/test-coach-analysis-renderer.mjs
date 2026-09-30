@@ -721,10 +721,7 @@ async function main() {
       "the typed ceiling has to reach the main process"
     );
     assert.deepEqual(committed.args, [900_000], "as a number, not as the typed string");
-    await waitFor(
-      async () => (await harness("value", ".coach-analysis-budget input")) === "900000",
-      "and the field shows what came back"
-    );
+    await waitFor(() => harness("callCount", "prop:onClose"), "and the dialog closes once saved");
     await assertQuietConsole("the spend line");
   }
 
@@ -766,10 +763,13 @@ async function main() {
       return made.length ? made : null;
     }, "Save writes the draft");
     assert.deepEqual(saved.args[0], { customInstructions: "I race in October.", coachStyle: "unfiltered" });
-    await waitFor(async () => /All changes saved/.test(await footer()), "and the dialog is clean again");
-    assert.match(await harness("text", ".chat-settings-panel"), /strong language and swearing/i, "the chosen style says what it does");
+    await waitFor(() => harness("callCount", "prop:onClose"), "and the dialog closes once saved");
 
     // A press outside with an edit held does nothing, and the footer stays as it is.
+    await harness("mount", "ChatSettingsModal", {}, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
+    await waitFor(() => harness("exists", ".chat-settings-modal .chat-custom-instructions"), "the dialog opens again");
+    await harness("clickText", '.chat-settings-modal [aria-label="How Coach sounds"] button', "No filter");
+    assert.match(await harness("text", ".chat-settings-panel"), /strong language and swearing/i, "the chosen style says what it does");
     await harness("setValue", ".chat-custom-instructions", "Something else");
     await harness("click", ".chat-settings-backdrop");
     assert.equal(await harness("callCount", "prop:onClose"), 0, "a stray click outside does not close");
@@ -788,7 +788,7 @@ async function main() {
     await waitFor(() => harness("exists", ".tl-dialog"), "the close asks again");
     await harness("clickText", ".tl-dialog button", "Discard changes");
     await waitFor(() => harness("callCount", "prop:onClose"), "a confirmed close closes");
-    assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 1, "and saves nothing");
+    assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 0, "and saves nothing");
     // Discard confirmed closes Coach settings too, saving nothing.
     await harness("mount", "ChatSettingsModal", {}, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
     await waitFor(() => harness("exists", ".chat-settings-modal .chat-custom-instructions"), "the dialog opens again");

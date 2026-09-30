@@ -1,4 +1,4 @@
-import { BookOpen, PanelRightClose, PanelRightOpen, Settings2 } from "lucide-react";
+import { BookOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
@@ -8,8 +8,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * It replaced a header that said "Training Coach" — the rail already names
  * the screen — over a separate strip reading "Reads: … AI: …". The open
  * conversation's name appeared nowhere outside the list, and the strip was a
- * button that did not look like one. The AI is not here: it is in the
- * composer, where the next turn is sent from.
+ * button that did not look like one. The AI is not here, nor Coach settings:
+ * both are in the composer, where the next turn is sent from.
  */
 export function ChatConversationHeader({
   title,
@@ -21,7 +21,6 @@ export function ChatConversationHeader({
   creations,
   creationsOpen,
   onToggleCreations,
-  onOpenSettings,
   trailing
 }: {
   title: string;
@@ -36,7 +35,6 @@ export function ChatConversationHeader({
   creations: number;
   creationsOpen: boolean;
   onToggleCreations: () => void;
-  onOpenSettings: () => void;
   /** Anything a provider needs beside the rest, such as ChatGPT's Sign out. */
   trailing?: ReactNode;
 }) {
@@ -134,15 +132,6 @@ export function ChatConversationHeader({
           <span className="chat-creations-count">{creations}</span>
         </button>
         {trailing}
-        <button
-          type="button"
-          className="chat-header-icon"
-          onClick={onOpenSettings}
-          aria-label="Open settings"
-          title="Coach settings"
-        >
-          <Settings2 size={16} aria-hidden="true" />
-        </button>
       </div>
     </div>
   );

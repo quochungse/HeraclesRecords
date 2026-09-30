@@ -45,7 +45,7 @@ export function settingsDraftChanges(saved: ChatSettings, draft: SettingsDraft):
  * when it lost focus — so a half-written instruction went into the next turn's
  * prompt, a style tried and not liked went out to every machine through sync
  * before it could be taken back, and there was no way back at all. Now the
- * dialog holds the edits and Save writes them. Throwing them away — Discard,
+ * dialog holds the edits and Save writes them, then closes. Throwing them away — Discard,
  * or a close (the X, Escape) — is asked first in a dialog of its own, and a
  * yes closes Coach settings too; a press outside the dialog with edits held
  * does nothing, since a stray click is not a decision. The footer keeps
@@ -119,6 +119,7 @@ export function ChatSettingsModal({
       }
       setDraft({});
       setPendingBudget(undefined);
+      onClose();
     } catch (caught) {
       setSaveError(caught instanceof Error ? caught.message : "Could not save Coach settings.");
     } finally {

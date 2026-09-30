@@ -1,8 +1,7 @@
-import { AtSign, Loader2, Send, Square } from "lucide-react";
+import { Loader2, Send, Settings2, Square } from "lucide-react";
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -24,15 +23,6 @@ export interface ChatComposerHandle {
   setDraft: (value: string) => void;
 }
 
-/** One thing a question can point at, offered under "About…". */
-export interface AboutOption {
-  key: string;
-  /** The heading it sits under: "This conversation", "Your calendar". */
-  group: string;
-  label: string;
-  onPick: () => void;
-}
-
 interface ChatComposerProps {
   /** The AI this conversation answers with, and the way to change it. */
   providerControls: ReactNode;
@@ -40,7 +30,8 @@ interface ChatComposerProps {
   attachments?: ReactNode;
   /** The placeholder for what it points at: "Ask about this week…". */
   placeholder?: string;
-  aboutOptions?: readonly AboutOption[];
+  /** Opens Coach settings. */
+  onOpenSettings: () => void;
   initialDraft: string;
   apiAvailable: boolean;
   streaming: boolean;
@@ -76,7 +67,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       providerControls,
       attachments,
       placeholder,
-      aboutOptions = [],
+      onOpenSettings,
       initialDraft,
       apiAvailable,
       streaming,
@@ -94,11 +85,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
     ref
   ) {
     const [draft, setDraft] = useState(initialDraft);
-    const [aboutOpen, setAboutOpen] = useState(false);
     const draftRef = useRef(initialDraft);
     const submittingRef = useRef(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const aboutRef = useRef<HTMLDivElement>(null);
     const trimmedDraft = draft.trim();
     const latestActivityFileRequest = isLatestActivityFileRequest(trimmedDraft);
     const localProviderBlocked =
@@ -123,26 +112,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       }),
       [updateDraft]
     );
-
-    // A press outside the menu or Escape closes it; captured, as the other
-    // menus inside dialogs that close on Escape take it.
-    useEffect(() => {
-      if (!aboutOpen) return;
-      const onPointerDown = (event: MouseEvent) => {
-        if (!aboutRef.current?.contains(event.target as Node)) setAboutOpen(false);
-      };
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key !== "Escape") return;
-        event.stopPropagation();
-        setAboutOpen(false);
-      };
-      document.addEventListener("mousedown", onPointerDown);
-      document.addEventListener("keydown", onKeyDown, true);
-      return () => {
-        document.removeEventListener("mousedown", onPointerDown);
-        document.removeEventListener("keydown", onKeyDown, true);
-      };
-    }, [aboutOpen]);
 
     const submitDraft = async () => {
       if (blockedReason && trimmedDraft) {
@@ -173,8 +142,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       }
     };
 
-    const groups = [...new Set(aboutOptions.map((option) => option.group))];
-
     return (
       <div className="chat-composer">
         <div className={`chat-composer-inner${attachments ? " has-refs" : ""}`}>
@@ -203,47 +170,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
             disabled={exportingLatestActivity}
           />
           <div className="chat-composer-row">
-            {aboutOptions.length ? (
-              <div className="chat-about" ref={aboutRef}>
-                <button
-                  type="button"
-                  className="chat-about-trigger"
-                  aria-haspopup="menu"
-                  aria-expanded={aboutOpen}
-                  onClick={() => setAboutOpen((open) => !open)}
-                  title="Point the question at a week, a day or something made here"
-                >
-                  <AtSign size={13} aria-hidden="true" />
-                  About
-                </button>
-                {aboutOpen ? (
-                  <div className="chat-about-menu" role="menu">
-                    {groups.map((group) => (
-                      <div key={group} className="chat-about-group" role="group" aria-label={group}>
-                        <span className="chat-about-group-label">{group}</span>
-                        {aboutOptions
-                          .filter((option) => option.group === group)
-                          .map((option) => (
-                            <button
-                              key={option.key}
-                              type="button"
-                              role="menuitem"
-                              className="chat-about-option"
-                              onClick={() => {
-                                option.onPick();
-                                setAboutOpen(false);
-                                textareaRef.current?.focus();
-                              }}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <button
+              type="button"
+              className="chat-composer-settings"
+              onClick={onOpenSettings}
+              aria-label="Open settings"
+              title="Coach settings"
+            >
+              <Settings2 size={14} aria-hidden="true" />
+            </button>
             {providerControls}
             <span className="chat-composer-spacer" />
             {trimmedDraft && !streaming ? (

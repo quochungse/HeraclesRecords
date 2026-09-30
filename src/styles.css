@@ -20722,7 +20722,6 @@ tr.data-intervals-row-missing {
   box-shadow: none;
 }
 
-.chat-composer-row .chat-about-trigger,
 .chat-composer-row .chat-ai-chip {
   min-height: 26px;
   padding: 0 6px;
@@ -20732,8 +20731,6 @@ tr.data-intervals-row-missing {
   font-weight: 500;
 }
 
-.chat-composer-row .chat-about-trigger:hover,
-.chat-composer-row .chat-about-trigger[aria-expanded="true"],
 .chat-composer-row .chat-ai-chip:hover:not(:disabled) {
   border-color: transparent;
   background: var(--glass-bg);
@@ -20994,77 +20991,24 @@ tr.data-intervals-row-missing {
   width: auto;
 }
 
-.chat-about {
-  position: relative;
-}
-
-.chat-about-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--glass-border);
+.chat-composer-settings {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.chat-about-trigger:hover,
-.chat-about-trigger[aria-expanded="true"] {
-  color: var(--text-primary);
-  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
-}
-
-/* Opens upward: the composer is the bottom edge of the screen. */
-.chat-about-menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  display: grid;
-  gap: 8px;
-  min-width: 220px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 8px;
-  border-radius: var(--radius-md);
-  background: var(--menu-surface);
-  box-shadow: var(--shadow-elevated);
-}
-
-.chat-about-group {
-  display: grid;
-  gap: 2px;
-}
-
-.chat-about-group-label {
-  padding: 2px 8px;
   color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.chat-about-option {
-  padding: 6px 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
   cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
 }
 
-.chat-about-option:hover {
-  background: var(--glass-bg-hover);
+.chat-composer-settings:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
 }
 
 .chat-ref-chip {
