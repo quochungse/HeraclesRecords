@@ -24536,6 +24536,73 @@ tr.data-intervals-row-missing {
   gap: 6px;
 }
 
+/* --- stand-ins while the range is read --- */
+
+/* The Training Library's shimmer, on the calendar's own grounds: a bar in the
+   control wash with a light sweep crossing it, staggered down the grid's
+   diagonal so the cells read as one wave. The sweep is a lift in dark and
+   near-white in paper, where the wash under it is grey. */
+.calendar-view {
+  --calendar-shimmer: rgba(255, 255, 255, 0.09);
+}
+
+:root[data-theme="paper"] .calendar-view {
+  --calendar-shimmer: rgba(255, 255, 255, 0.9);
+}
+
+.calendar-skeleton {
+  position: relative;
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  overflow: hidden;
+}
+
+.calendar-skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 22%,
+    var(--calendar-shimmer) 50%,
+    transparent 78%
+  );
+  content: "";
+  transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-skeleton::after {
+    animation: calendar-shimmer 1.5s ease-in-out infinite;
+    animation-delay: var(--calendar-skeleton-delay, 0ms);
+  }
+}
+
+@keyframes calendar-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Short enough that a day holding two stays inside the cell's 132px: taller,
+   and every month row grew as it shimmered and shrank when the range landed. */
+.calendar-skeleton-chip {
+  height: 40px;
+}
+
+.calendar-skeleton-stat {
+  height: 10px;
+  margin-block: 3px;
+}
+
+/* The header's controls while the screen's chunk loads (`CalendarSkeleton`). */
+.calendar-skeleton-pill {
+  /* The Month/Week toggle's height, the tallest control in the row, so the
+     header — and the grid under it — sits where the real one will. */
+  height: 36px;
+  border-radius: var(--radius-pill);
+}
+
 /* --- chips --- */
 
 .calendar-chip {

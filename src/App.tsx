@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import {
   Component,
+  type ComponentProps,
+  type ComponentType,
   type ErrorInfo,
   type FormEvent,
   type ReactNode,
@@ -109,6 +111,8 @@ import {
   readStartupView,
   saveStartupView,
 } from "./navigation/startupView";
+import { CalendarSkeleton } from "./calendar/CalendarSkeleton";
+import { TrainingLibrarySkeleton } from "./training-library/TrainingLibrarySkeleton";
 import { SettingsView } from "./settings/SettingsView";
 import { DataView } from "./data/DataView";
 import {
@@ -178,7 +182,47 @@ const LazyActivitiesView = lazy(() =>
     default: ActivitiesView,
   })),
 );
-const LazyTrainingLibraryView = lazy(() =>
+/**
+ * A lazy screen whose chunk can be fetched ahead of its first visit.
+ *
+ * `lazy()` suspends on its first render however warm the module is — its
+ * factory hands back a promise, and a promise settles a tick later — so a
+ * preload alone still flashed the fallback for a frame. Once `preload` has
+ * landed, a mount renders the module's component directly and never touches
+ * Suspense. Which one a mount uses is fixed when it mounts: a component type
+ * that changed under a mounted screen would remount it and drop its state.
+ * A failed preload is forgotten, so the visit retries rather than inheriting
+ * the failure.
+ */
+function preloadableLazy<C extends ComponentType<any>>(
+  factory: () => Promise<{ default: C }>,
+) {
+  type Module = { default: C };
+  type Props = ComponentProps<C>;
+  let loaded: C | undefined;
+  let pending: Promise<Module> | undefined;
+  const preload = (): Promise<Module> =>
+    (pending ??= factory().then(
+      (module) => {
+        loaded = module.default;
+        return module;
+      },
+      (error: unknown): never => {
+        pending = undefined;
+        throw error;
+      },
+    ));
+  const Lazy = lazy(preload);
+  function PreloadableSurface(props: Props) {
+    const [Surface] = useState<ComponentType<Props>>(
+      () => (loaded ?? Lazy) as ComponentType<Props>,
+    );
+    return <Surface {...props} />;
+  }
+  return Object.assign(PreloadableSurface, { preload });
+}
+
+const LazyTrainingLibraryView = preloadableLazy(() =>
   import("./training-library/TrainingLibraryView").then(({ TrainingLibraryView }) => ({
     default: TrainingLibraryView,
   })),
@@ -198,7 +242,7 @@ const LazySleepDetailsView = lazy(() =>
     default: SleepDetailsView,
   })),
 );
-const LazyCalendarView = lazy(() =>
+const LazyCalendarView = preloadableLazy(() =>
   import("./calendar/CalendarView").then(({ CalendarView }) => ({
     default: CalendarView,
   })),
@@ -497,6 +541,23 @@ export default function App() {
   const installAcceptedVersionRef = useRef<string | null>(null);
   const effectiveUpdateSnapshot = devUpdateSimulation ?? appUpdateSnapshot;
 
+
+  /* The two screens most opened from a cold start are fetched once the first
+     paint has settled, so a visit after that mounts them directly — no
+     fallback at all. A visit before it still draws the screen's own skeleton,
+     never the generic spinner. */
+  useEffect(() => {
+    const preload = () => {
+      void LazyCalendarView.preload().catch(() => undefined);
+      void LazyTrainingLibraryView.preload().catch(() => undefined);
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(preload, { timeout: 2000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(preload, 500);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     if (!api) {
       return;
@@ -2841,7 +2902,15 @@ export default function App() {
             ) : null}
             {activeView === "library" ? (
               <TrainingLibraryErrorBoundary>
-                <Suspense fallback={<DeferredSurfaceFallback label="Training Library" />}>
+                <Suspense
+                  fallback={
+                    trainingHubStatus?.authenticated ? (
+                      <TrainingLibrarySkeleton />
+                    ) : (
+                      <DeferredSurfaceFallback label="Training Library" />
+                    )
+                  }
+                >
                   <LazyTrainingLibraryView
                     api={api}
                     status={trainingHubStatus}
@@ -2990,7 +3059,15 @@ export default function App() {
               />
             ) : null}
             {activeView === "calendar" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="calendar" />}>
+              <Suspense
+                fallback={
+                  trainingHubStatus?.authenticated ? (
+                    <CalendarSkeleton />
+                  ) : (
+                    <DeferredSurfaceFallback label="calendar" />
+                  )
+                }
+              >
                 <LazyCalendarView
                   api={api}
                   status={trainingHubStatus}

@@ -6,6 +6,9 @@ import { applyTheme, readStoredTheme } from "./theme/theme";
 import { applySportColors, readStoredSportColors } from "./training/sportColors";
 import { UnitSystemProvider } from "./units/UnitSystemProvider";
 import "./styles.css";
+// In the main bundle, after the base sheet, because the library's skeleton is
+// App's Suspense fallback and is drawn before the library's chunk has loaded.
+import "./training-library/trainingLibrary.css";
 
 // Apply the persisted theme before the first paint to avoid a dark→light flash.
 applyTheme(readStoredTheme());

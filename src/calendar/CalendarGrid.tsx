@@ -10,6 +10,7 @@ import {
   type CalendarWeek
 } from "./calendarTypes";
 import type { CalendarDragPayload } from "./calendarDrag";
+import { skeletonDelay } from "./CalendarSkeleton";
 import { DayCell } from "./DayCell";
 import { WEEKDAY_LABELS } from "./dateUtils";
 import { WeekStatsCell } from "./WeekStatsCell";
@@ -20,6 +21,12 @@ interface CalendarGridProps {
   loading: boolean;
   /** Whether the range on screen has been read at least once. */
   rangeLoaded: boolean;
+  /**
+   * Draw shimmering stand-ins where the range's sessions will go. Only while
+   * the range has never been read and nothing has failed: a failed read keeps
+   * an empty grid under its error, not a wave that promises an answer.
+   */
+  placeholder: boolean;
   busy: boolean;
   selectionMode: boolean;
   selectedWorkoutKeys: ReadonlySet<string>;
@@ -38,6 +45,7 @@ export function CalendarGrid({
   mode,
   loading,
   rangeLoaded,
+  placeholder,
   busy,
   selectionMode,
   selectedWorkoutKeys,
@@ -98,7 +106,7 @@ export function CalendarGrid({
   return (
     <div
       className={`calendar-grid ${mode === "week" ? "calendar-grid-week" : ""}`}
-      aria-busy={busy}
+      aria-busy={busy || placeholder}
     >
       <div className="calendar-grid-header">
         {WEEKDAY_LABELS.map((label) => (
@@ -112,7 +120,7 @@ export function CalendarGrid({
       </div>
 
       <div ref={bodyRef} className="calendar-grid-body">
-        {weeks.map((week) => {
+        {weeks.map((week, weekIndex) => {
           const containsToday = week.key === todayWeekKey;
           return (
             <div
@@ -120,11 +128,14 @@ export function CalendarGrid({
               ref={containsToday ? todayRowRef : undefined}
               className="calendar-grid-row"
             >
-              {week.days.map((day) => (
+              {week.days.map((day, dayIndex) => (
                 <DayCell
                   key={day.dateKey}
                   day={day}
                   mode={mode}
+                  placeholderDelayMs={
+                    placeholder ? skeletonDelay(weekIndex, dayIndex) : undefined
+                  }
                   busy={busy}
                   selectionMode={selectionMode}
                   isScheduledSelected={(entry) =>
@@ -141,6 +152,9 @@ export function CalendarGrid({
               <WeekStatsCell
                 stats={week.stats}
                 loaded={rangeLoaded}
+                placeholderDelayMs={
+                  placeholder ? skeletonDelay(weekIndex, 7) : undefined
+                }
                 onAskCoach={() => onAskCoachWeek(week)}
               />
             </div>

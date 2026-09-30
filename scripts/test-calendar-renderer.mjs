@@ -16,6 +16,14 @@
 //   is answered. The dialog's Escape must not also close the panel under it:
 //   both listen on `document` in the capture phase, and the panel registered
 //   first, so it hears the key first.
+// - **A range read once is drawn at once, and one never read shimmers.** The
+//   cache used to live inside the screen, so every visit waited on COROS again.
+//   It outlives the screen now: paging back, or leaving and returning, paints
+//   the range before the refresh behind it lands. Until a range has been read
+//   its days and weekly statistics draw stand-ins in the Library's shimmer.
+//   App draws the same stand-ins as the Suspense fallback while the screen's
+//   chunk loads, and the grid must sit where the screen's own will, or the
+//   chunk landing moves the whole month.
 //
 // Nothing here removes anything anywhere: `removeScheduledWorkout` is a stub
 // that records its arguments.
@@ -69,6 +77,8 @@ function pressOnDocument(key) {
 }
 
 const EMPTY_COPY = ".calendar-weekstats-empty";
+const SKELETON_CHIP = ".calendar-skeleton-chip";
+const SKELETON_STAT = ".calendar-skeleton-stat";
 const DIALOG = `.tl-dialog[role="alertdialog"]`;
 const CONFIRM = ".tl-dialog footer .primary-button";
 const CANCEL = ".tl-dialog footer .ghost-button";
@@ -123,9 +133,13 @@ async function main() {
       0,
       "a week nobody has asked COROS about yet must not say it has nothing in it"
     );
+    assert.ok((await harness("count", SKELETON_CHIP)) > 0, "the unread days shimmer");
+    assert.ok((await harness("count", SKELETON_STAT)) > 0, "the unread weeks' statistics shimmer");
 
     assert.equal(await harness("resolvePending", "listScheduledWorkouts", []), true);
     await settle();
+    assert.equal(await harness("count", SKELETON_CHIP), 0, "a read range drops its stand-ins");
+    assert.equal(await harness("count", SKELETON_STAT), 0);
     assert.equal(
       await harness("count", EMPTY_COPY),
       weekCells,
@@ -144,6 +158,11 @@ async function main() {
       weekCells,
       "a refresh of a range already read keeps its empty weeks' copy"
     );
+    assert.equal(
+      await harness("count", SKELETON_CHIP),
+      0,
+      "a refresh of a range already read does not shimmer"
+    );
     await harness("resolvePending", "listScheduledWorkouts", []);
     await settle();
 
@@ -157,12 +176,62 @@ async function main() {
       0,
       "paging to an unread month must not call its weeks empty before they are read"
     );
+    assert.ok((await harness("count", SKELETON_CHIP)) > 0, "the unread month shimmers");
     await harness("resolvePending", "listScheduledWorkouts", []);
     await settle();
     assert.ok(
       (await harness("count", EMPTY_COPY)) > 0,
       "the new month's empty weeks say so once it is read"
     );
+
+    // Back to the month read first: drawn from the cache, refreshed behind it.
+    await harness("setScript", { listScheduledWorkouts: "__pending" });
+    assert.equal(await harness("click", `[aria-label="Previous month"]`), true);
+    await settle();
+    assert.equal(await harness("count", SKELETON_CHIP), 0, "a month read before is drawn at once");
+    assert.ok((await harness("count", EMPTY_COPY)) > 0, "and reads as read");
+    assert.equal(await harness("exists", ".calendar-loading"), false, "without a loading line");
+    await harness("resolvePending", "listScheduledWorkouts", []);
+    await settle();
+
+    // Leaving the screen and coming back keeps what was read.
+    await mountCalendar({ listScheduledWorkouts: "__pending" });
+    assert.equal(
+      await harness("count", SKELETON_CHIP),
+      0,
+      "a return to the screen paints the month it read last time"
+    );
+    assert.ok((await harness("count", EMPTY_COPY)) > 0);
+    await harness("resolvePending", "listScheduledWorkouts", []);
+    await settle();
+  }
+
+  // -------------------------------------------------------------------------
+  // 1b. The fallback drawn while the chunk loads is the screen's own shimmer
+  // -------------------------------------------------------------------------
+  {
+    const gridBox = `(() => {
+      const grid = document.querySelector(".calendar-grid").getBoundingClientRect();
+      return [Math.round(grid.top), Math.round(grid.height), document.querySelectorAll(".calendar-grid-row").length];
+    })()`;
+    await harness("mount", "CalendarSkeleton", {}, EMPTY_RANGE);
+    await settle();
+    assert.ok((await harness("count", SKELETON_CHIP)) > 0, "the fallback shimmers");
+    assert.ok((await harness("count", SKELETON_STAT)) > 0);
+    assert.equal(await harness("count", ".empty-state"), 0, "and is not the generic spinner");
+    const fallback = await evaluate(gridBox);
+
+    // The month was read above, so the screen draws it at once, empty — which
+    // is also the size of the grid it will draw once any range has landed.
+    await mountCalendar({ listScheduledWorkouts: "__pending" });
+    const screen = await evaluate(gridBox);
+    assert.deepEqual(
+      fallback,
+      screen,
+      "the fallback's grid sits where the screen's does, and is as tall"
+    );
+    await harness("resolvePending", "listScheduledWorkouts", []);
+    await settle();
   }
 
   const entry = {
@@ -336,7 +405,7 @@ async function main() {
   assert.deepEqual(await harness("consoleErrors"), [], "the screen logged no errors");
 
   console.log(
-    "calendar renderer OK — an empty week waits for its range before saying so, both removals ask first in a portalled dialog, and its Escape leaves the panel open"
+    "calendar renderer OK — an unread range shimmers and a read one is drawn from cache at once, an empty week waits for its range before saying so, both removals ask first in a portalled dialog, and its Escape leaves the panel open"
   );
 }
 
