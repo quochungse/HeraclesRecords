@@ -551,7 +551,7 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation is not appended there (`appendVersion` takes the conversation it was asked from).
   **A creation is read in the Workbench** (`CoachCanvas`, `.chat-workbench`, lazy with the
   library's stylesheet; Coach Workbench review R2): one panel beside the conversation that is the
-  index while nothing is open (grouped Not saved · Saved · On the calendar) and a creation's
+  index while nothing is open (one list, newest first — no groups by state) and a creation's
   details once one is — the reader's ridge, week cards and session view, a version picker, a
   Versions tab whose lines come from `electron/planDiff.ts` (node-free, shared with
   `restorePlanDraftVersion`'s `planEvent`), and Restore, which writes the old content as a new

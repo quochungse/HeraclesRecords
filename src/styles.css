@@ -16370,22 +16370,9 @@ tr.data-intervals-row-missing {
     transparent;
 }
 
-.chat-plan-list-group {
-  display: grid;
-}
-
-/* A group's list is laid out by the body that scrolls, not a scroller itself. */
+/* The list is laid out by the body that scrolls, not a scroller itself. */
 .chat-plan-index-body .chat-plan-list {
   overflow: visible;
-}
-
-.chat-plan-list-group-label {
-  margin: 12px 14px 2px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .chat-plan-list-header {
@@ -16685,6 +16672,10 @@ tr.data-intervals-row-missing {
 
 .chat-canvas-body {
   display: grid;
+  /* One column no wider than the panel: an implicit column sizes to its
+     widest child's content, so a session's header row pushed the whole body
+     past the panel's edge and behind a sideways scrollbar. */
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   align-content: start;
   gap: 12px;
@@ -21100,10 +21091,6 @@ tr.data-intervals-row-missing {
 
 .chat-ref-remove:hover {
   color: var(--text-primary);
-}
-
-.chat-canvas-ask-session {
-  justify-self: start;
 }
 
 /* View and Undo on a one-line record: small, and after what they act on. At

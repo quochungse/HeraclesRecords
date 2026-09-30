@@ -169,10 +169,6 @@ function creationOf(
   return creations.find((creation) => sameCreation(creation.draftId, draftId, versionIndex)) ?? null;
 }
 
-/** Where a creation stands, as the Workbench's index groups them. */
-type IndexGroup = "Not saved" | "Saved" | "On the calendar";
-const INDEX_GROUPS: IndexGroup[] = ["Not saved", "Saved", "On the calendar"];
-
 function CreationIndex({
   creations,
   onCorosOf,
@@ -189,19 +185,13 @@ function CreationIndex({
   planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
 }) {
   /*
-   * Grouped by what is left to do with them (R2): what is not saved yet is
-   * what still wants a decision, so it comes first. One group is not headed.
+   * One list, newest first. `creations` holds each creation as its newest
+   * version, in transcript order, so the last is the one made or changed
+   * most recently. It used to be grouped Not saved · Saved · On the
+   * calendar; the row's status says as much, and a group per state put the
+   * creation just made anywhere but the top.
    */
-  const groupOf = (draft: PlanDraftPreview): IndexGroup =>
-    !creationStatus(draft, onCorosOf(draft.draftId)).saved
-      ? "Not saved"
-      : calendarOf?.(draft.draftId)?.running
-        ? "On the calendar"
-        : "Saved";
-  const groups = INDEX_GROUPS.map((group) => ({
-    group,
-    items: creations.filter((draft) => groupOf(draft) === group)
-  })).filter((entry) => entry.items.length);
+  const newestFirst = [...creations].reverse();
   return (
     <>
       <header className="chat-plan-list-header">
@@ -227,75 +217,51 @@ function CreationIndex({
           </button>
         </div>
       </header>
-      {/* One scroller under the header for every group (UAT): each group's
-          list sat directly in the panel, which clips, so a long Workbench
-          could not be scrolled at all. */}
+      {/* One scroller under the header (UAT): the list sat directly in the
+          panel, which clips, so a long Workbench could not be scrolled. */}
       <div className="chat-plan-index-body">
-        {groups.map(({ group, items }) => (
-          <section key={group} className="chat-plan-list-group" aria-label={group}>
-            {groups.length > 1 ? <h3 className="chat-plan-list-group-label">{group}</h3> : null}
-            <CreationRows
-              creations={items}
-              onCorosOf={onCorosOf}
-              onOpen={onOpen}
-              planSportStyle={planSportStyle}
-            />
-          </section>
-        ))}
+        <ol className="chat-plan-list">
+          {newestFirst.map((draft) => {
+            const status = creationStatus(draft, onCorosOf(draft.draftId));
+            const onCalendar = status.saved && Boolean(calendarOf?.(draft.draftId)?.running);
+            const isWorkout = draft.artifactType === "workout";
+            const primarySport = draft.entries[0]?.sport;
+            const SportIcon = sportTheme(primarySport).icon;
+            return (
+              <li key={draft.draftId}>
+                <button
+                  type="button"
+                  className="chat-plan-list-item"
+                  onClick={() => onOpen(draft.draftId)}
+                  aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${creations.indexOf(draft) + 1}`}`}
+                >
+                  <span className="chat-plan-list-sport" style={planSportStyle(primarySport)}>
+                    <SportIcon size={15} strokeWidth={2} aria-hidden="true" />
+                  </span>
+                  <span className="chat-plan-list-copy">
+                    <span className="chat-plan-list-kicker">
+                      {isWorkout ? "One-off workout" : "Training plan"}
+                    </span>
+                    <strong>{draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}</strong>
+                    <span className="chat-plan-list-meta">
+                      {!isWorkout ? (
+                        <span>
+                          {draft.entries.length} {draft.entries.length === 1 ? "session" : "sessions"}
+                        </span>
+                      ) : null}
+                      <span data-status={status.saved ? "saved" : "draft"}>
+                        {onCalendar ? "On calendar" : status.label}
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronRight size={15} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </>
-  );
-}
-
-function CreationRows({
-  creations,
-  onCorosOf,
-  onOpen,
-  planSportStyle
-}: {
-  creations: PlanDraftPreview[];
-  onCorosOf: (draftId: string) => boolean;
-  onOpen: (draftId: string) => void;
-  planSportStyle: (sport: PlanDraftPreview["entries"][number]["sport"]) => CSSProperties;
-}) {
-  return (
-    <ol className="chat-plan-list">
-      {creations.map((draft, index) => {
-        const status = creationStatus(draft, onCorosOf(draft.draftId));
-        const isWorkout = draft.artifactType === "workout";
-        const primarySport = draft.entries[0]?.sport;
-        const SportIcon = sportTheme(primarySport).icon;
-        return (
-          <li key={draft.draftId}>
-            <button
-              type="button"
-              className="chat-plan-list-item"
-              onClick={() => onOpen(draft.draftId)}
-              aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${index + 1}`}`}
-            >
-              <span className="chat-plan-list-sport" style={planSportStyle(primarySport)}>
-                <SportIcon size={15} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <span className="chat-plan-list-copy">
-                <span className="chat-plan-list-kicker">
-                  {isWorkout ? "One-off workout" : "Training plan"}
-                </span>
-                <strong>{draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}</strong>
-                <span className="chat-plan-list-meta">
-                  {!isWorkout ? (
-                    <span>
-                      {draft.entries.length} {draft.entries.length === 1 ? "session" : "sessions"}
-                    </span>
-                  ) : null}
-                  <span data-status={status.saved ? "saved" : "draft"}>{status.label}</span>
-                </span>
-              </span>
-              <ChevronRight size={15} aria-hidden="true" />
-            </button>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
@@ -456,6 +422,8 @@ function ArtifactView({
         unitSystem={unitSystem}
         api={api}
         onBack={isWorkout ? undefined : () => setOpenSession(null)}
+        backLabel="Weeks"
+        onAskCoach={onAsk ? () => onAsk(refTo("session", undefined, id)) : undefined}
         onStep={(direction) => {
           const next = sessions[index + direction];
           if (next) setOpenSession(next.entry.id);
@@ -574,19 +542,7 @@ function ArtifactView({
               <p className="chat-canvas-older">{supersededLine(shownInfo)}</p>
             ) : null}
             {openSession ? (
-              <>
-                {onAsk ? (
-                  <button
-                    type="button"
-                    className="chat-plan-panel-chat-link chat-canvas-ask-session"
-                    data-action="askSession"
-                    onClick={() => onAsk(refTo("session", undefined, openSession))}
-                  >
-                    Ask Coach about this session
-                  </button>
-                ) : null}
-                {sessionView(openSession)}
-              </>
+              sessionView(openSession)
             ) : isWorkout ? (
               sessions[0] ? (
                 sessionView(sessions[0].entry.id)
