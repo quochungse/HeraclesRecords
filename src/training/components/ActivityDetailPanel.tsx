@@ -14,7 +14,7 @@ import {
   formatPaceSecondsPerKm,
   formatTrainingTimestamp
 } from "../formatters";
-import { isCyclingSportType, isSwimSportType, resolveSportName } from "../sportTypes";
+import { isSpeedSport, isSwimSportType, resolveSportName } from "../sportTypes";
 import type { CorosLinkApi } from "../../coroslink-api";
 import type { TrainingHubDetailRequest } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -205,13 +205,12 @@ export function ActivityDetailPanel({
   const startTime = detail.startTime ?? listActivity?.startTime;
   const showLaps = hasPopulatedLaps(detail);
   const swim = isSwimSportType(detail.sportType ?? listActivity?.sportType);
-  const cycling =
-    isCyclingSportType(detail.sportType ?? listActivity?.sportType) ||
-    /bike|cycl|ride/i.test(sportName ?? "");
+  // A ride and a hike are read in km/h; see `isSpeedSport`.
+  const readsSpeed = isSpeedSport(detail.sportType ?? listActivity?.sportType, sportName);
   const distance = detail.distance ?? listActivity?.distance;
   const duration = detail.duration ?? listActivity?.duration;
   const performance = distance && duration
-    ? cycling
+    ? readsSpeed
       ? formatSpeedValue((distance / 1000) / (duration / 3600), unitSystem)
       : !swim
         ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
@@ -251,7 +250,7 @@ export function ActivityDetailPanel({
               value={formatDistanceMeters(detail.distance, unitSystem, swim)}
             />
             {performance ? (
-              <DetailStat label={cycling ? "Avg Speed" : "Avg Pace"} value={performance} />
+              <DetailStat label={readsSpeed ? "Avg Speed" : "Avg Pace"} value={performance} />
             ) : null}
             <DetailStat label="Avg HR" value={formatOptionalNumber(detail.avgHr)} />
             <DetailStat label="Max HR" value={formatOptionalNumber(detail.maxHr)} />

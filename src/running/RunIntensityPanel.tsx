@@ -3,8 +3,8 @@ import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/
 import { formatDurationSeconds } from "../training/formatters";
 import { intensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
 
-/** The sports this panel is drawn for, which change its words and nothing else. */
-export type IntensitySport = "run" | "ride";
+/** The sports this panel is drawn for, which change its words and its target. */
+export type IntensitySport = "run" | "ride" | "hike";
 
 interface RunIntensityPanelProps {
   /** Sessions of one sport, already narrowed by the screen's own filters. */
@@ -26,11 +26,19 @@ interface SportWords {
   many: string;
   /** The activity itself, as in "of running time". */
   doing: string;
+  /**
+   * Whether the 80/20 mark is held up against it. It is an endurance-training
+   * rule for runners and riders building a season; a walker is not trying to
+   * keep four fifths of a mountain easy — the climb decides — so a hike is
+   * shown its split and not measured against a target it never had.
+   */
+  target: boolean;
 }
 
 const WORDS: Record<IntensitySport, SportWords> = {
-  run: { one: "run", many: "runs", doing: "running" },
-  ride: { one: "ride", many: "rides", doing: "riding" }
+  run: { one: "run", many: "runs", doing: "running", target: true },
+  ride: { one: "ride", many: "rides", doing: "riding", target: true },
+  hike: { one: "hike", many: "hikes", doing: "hiking", target: false }
 };
 
 const BANDS: readonly { key: Band; label: string }[] = [
@@ -119,13 +127,15 @@ export function RunIntensityPanel({
             <span className="run-block-sub"> of {words.doing} time is easy</span>
           </h3>
         </div>
-        <p className="run-block-aside">
-          {Math.abs(offTarget) <= 5
-            ? "On the 80/20 mark"
-            : offTarget > 0
-              ? `${offTarget} points above the 80/20 mark`
-              : `${Math.abs(offTarget)} points below the 80/20 mark`}
-        </p>
+        {words.target ? (
+          <p className="run-block-aside">
+            {Math.abs(offTarget) <= 5
+              ? "On the 80/20 mark"
+              : offTarget > 0
+                ? `${offTarget} points above the 80/20 mark`
+                : `${Math.abs(offTarget)} points below the 80/20 mark`}
+          </p>
+        ) : null}
       </header>
 
       <IntensityBar title="By time" split={byTime} format={formatDurationSeconds} />

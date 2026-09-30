@@ -35,6 +35,7 @@ import {
 } from "../sportTypes";
 import { isRunSportType } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
+import { isHikeSportType } from "../../hiking/hikeType";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
@@ -82,6 +83,7 @@ const PAUSE_NOTICE_S = 60;
 const SPORT_SCREEN_LABELS: Record<SportScreenRequest["view"], string> = {
   running: "Running",
   cycling: "Cycling",
+  hiking: "Hiking",
   strength: "Strength"
 };
 
@@ -195,13 +197,16 @@ export function ActivityDetailPane({
   const swim = isSwimSportType(sportType);
   const cycling =
     isCyclingSportType(sportType) || /bike|cycl|ride/i.test(sportName ?? "");
+  // A hike is read in km/h as a ride is — a 19:40 /km pace says nothing to a
+  // walker — but its cadence is still steps, so the two stay apart.
+  const readsSpeed = cycling || isHikeSportType(sportType);
   const distance = detail.distance ?? listActivity.distance;
   const duration = detail.duration ?? listActivity.duration;
   const startTime = detail.startTime ?? listActivity.startTime;
 
   const performance =
     distance && duration
-      ? cycling
+      ? readsSpeed
         ? formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem)
         : !swim
           ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
@@ -231,7 +236,7 @@ export function ActivityDetailPane({
   if (performance) {
     headline.push({
       key: "performance",
-      label: cycling ? "Avg speed" : "Avg pace",
+      label: readsSpeed ? "Avg speed" : "Avg pace",
       value: performance
     });
   } else if (detail.avgHr) {
@@ -261,7 +266,7 @@ export function ActivityDetailPane({
       : null
   );
   push(
-    detail.adjustedPace && !cycling && !swim
+    detail.adjustedPace && !readsSpeed && !swim
       ? {
           key: "adjustedPace",
           label: "Grade-adj. pace",
@@ -407,19 +412,21 @@ export function ActivityDetailPane({
     (detail.elevationGain ?? 0) >= ELEVATION_PROFILE_MIN_GAIN_M;
 
   /*
-   * Which screen, if any, is built for this sport. Both answers are taken from
-   * the modules that own them rather than re-decided here — `isRunSportType`
-   * is where the deliberate exclusion of hikes and mountain climbs is written
-   * down, and a door that disagrees with the room behind it is worse than no
-   * door.
+   * Which screen, if any, is built for this sport. Every answer is taken from
+   * the module that owns it rather than re-decided here — `isRunSportType` is
+   * where hikes and mountain climbs are left out of Running, and
+   * `isHikeSportType` where Hiking takes them in — and a door that disagrees
+   * with the room behind it is worse than no door.
    */
   const sportScreen = isRunSportType(sportType)
     ? ("running" as const)
     : isRideSportType(sportType)
       ? ("cycling" as const)
-      : isStrengthSportType(sportType)
-        ? ("strength" as const)
-        : null;
+      : isHikeSportType(sportType)
+        ? ("hiking" as const)
+        : isStrengthSportType(sportType)
+          ? ("strength" as const)
+          : null;
 
   return (
     <div className="activity-detail-pane">
@@ -533,8 +540,15 @@ export function ActivityDetailPane({
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
               embedded
-              // A ride reads in km/h and rpm here as it does on Cycling.
-              motion={isRideSportType(sportType) ? "speed" : "pace"}
+              // A ride reads in km/h and rpm here as it does on Cycling, and a
+              // hike in km/h and metres an hour as it does on Hiking.
+              motion={
+                isRideSportType(sportType)
+                  ? "speed"
+                  : isHikeSportType(sportType)
+                    ? "hike"
+                    : "pace"
+              }
             />
           ) : null}
 
@@ -595,7 +609,7 @@ export function ActivityDetailPane({
                       </td>
                       <td className="is-numeric">
                         {lap.distance && lap.duration
-                          ? cycling
+                          ? readsSpeed
                             ? formatSpeedValue(
                                 lap.distance / 1000 / (lap.duration / 3600),
                                 unitSystem

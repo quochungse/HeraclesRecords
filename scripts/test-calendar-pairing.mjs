@@ -51,7 +51,7 @@ const { scheduledSportCategory, scheduledWorkoutSport, workoutSportLabel } =
 assert.equal(scheduledWorkoutSport(1), "run");
 assert.equal(scheduledSportCategory(1), "run");
 assert.equal(scheduledSportCategory(2), "bike");
-assert.equal(scheduledSportCategory(5), "trail");
+assert.equal(scheduledSportCategory(5), "run", "a trail run is a run");
 assert.equal(
   scheduledSportCategory(undefined),
   undefined,

@@ -30,7 +30,7 @@ export interface SportTheme {
 
 export const WORKOUT_SPORT_THEME: Record<WorkoutSport, SportTheme> = {
   run: { color: "var(--sport-run)", icon: RunnerIcon },
-  trailRun: { color: "var(--sport-trail)", icon: Mountain },
+  trailRun: { color: "var(--sport-run)", icon: Mountain },
   bike: { color: "var(--sport-bike)", icon: Bike },
   swim: { color: "#38b6e8", icon: Waves },
   strength: { color: "var(--sport-strength)", icon: Dumbbell },

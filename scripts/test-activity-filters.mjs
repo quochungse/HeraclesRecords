@@ -119,6 +119,7 @@ const mixed = [
   activity({ activityId: "road", sportType: 100, startTime: at(NOW - DAY) }),
   activity({ activityId: "indoor", sportType: 101, startTime: at(NOW - 2 * DAY) }),
   activity({ activityId: "trail", sportType: 102, startTime: at(NOW - 3 * DAY) }),
+  activity({ activityId: "hike", sportType: 104, startTime: at(NOW - 3 * DAY - 3600_000) }),
   activity({ activityId: "bike", sportType: 200, startTime: at(NOW - 4 * DAY) }),
   activity({ activityId: "gym", sportType: 402, startTime: at(NOW - 5 * DAY) }),
   activity({ activityId: "hybrid", sportType: 1200, startTime: at(NOW - 6 * DAY) })
@@ -130,8 +131,18 @@ assert.deepEqual(
     filters: { ...DEFAULT_ACTIVITY_FILTERS, sports: ["run"] },
     nowMs: NOW
   }).map((row) => row.activityId),
-  ["road", "indoor"],
-  "Run and Indoor Run are one category; Trail Run is its own"
+  ["road", "indoor", "trail"],
+  "Run, Indoor Run and Trail Run are one category — a trail run is a run"
+);
+
+assert.deepEqual(
+  filterActivities({
+    activities: mixed,
+    filters: { ...DEFAULT_ACTIVITY_FILTERS, sports: ["hiking"] },
+    nowMs: NOW
+  }).map((row) => row.activityId),
+  ["hike"],
+  "Hiking is the hike and the mountain climb, and no trail run"
 );
 
 assert.equal(
@@ -144,7 +155,7 @@ assert.equal(
   "no sports selected means every sport, not none"
 );
 
-assert.deepEqual(sportsPresent(mixed), ["run", "trail", "bike", "strength", "other"]);
+assert.deepEqual(sportsPresent(mixed), ["run", "hiking", "bike", "strength", "other"]);
 assert.deepEqual(
   sportsPresent([activity({ sportType: 402 })]),
   ["strength"],

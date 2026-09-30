@@ -1,0 +1,101 @@
+/*
+ * Hiking view.
+ *
+ * The page is Running's, as Cycling's is: it carries `.running-view` and draws
+ * with running.css, so the three sport screens share one layout. This file
+ * holds only what a hike has and a run does not — its two kinds and their
+ * colours, the ground a hike page splits its day into, and the marks on its
+ * legs and rests.
+ *
+ * A hike is the athlete's own hiking colour — COROS's hike and mountain codes
+ * already wear it everywhere else in the app — and a mountain climb is mixed
+ * off it towards violet, so the two read as one family. The same mix is
+ * resolved to hex for the charts in hikeTypeColors.ts; change both together.
+ */
+
+.hiking-view {
+  --hike-hike: var(--sport-hiking, #4c8dff);
+  --hike-mountain: color-mix(in srgb, var(--sport-hiking, #4c8dff) 45%, #8a5cf6);
+  /* The ground, which is data: warm going up, cool coming down, the flat the
+     muted ink between them. */
+  --hike-up: #e08a3c;
+  --hike-flat: var(--text-muted);
+  --hike-down: #38bdf8;
+}
+
+/* The chip is `.run-surface-chip` — its size and type are Running's — worn in
+   the hike's colour. */
+.hike-type-hike {
+  background: color-mix(in srgb, var(--hike-hike) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hike-hike) 45%, transparent);
+}
+
+.hike-type-mountain {
+  background: color-mix(in srgb, var(--hike-mountain) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hike-mountain) 45%, transparent);
+}
+
+/* A hike page states more than a run's — moving and total time, the highest
+   point, the book time — and at Running's 120px a label like "Highest point"
+   wrapped onto two lines. */
+.hiking-view .run-detail-stats {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+/* The biggest day's name, which is the athlete's own and can be long. */
+.hike-hero-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hike-terrain-up {
+  background: var(--hike-up);
+}
+
+.hike-terrain-flat {
+  background: var(--hike-flat);
+}
+
+.hike-terrain-down {
+  background: var(--hike-down);
+}
+
+/* Up or down, at the head of a leg's row. Colour is the datum, as the terrain
+   bar's is. */
+.hike-leg-dir {
+  display: inline-block;
+  min-width: 44px;
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--hike-leg-color) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hike-leg-color) 55%, transparent);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hike-leg-dir[data-direction="up"] {
+  --hike-leg-color: var(--hike-up);
+}
+
+.hike-leg-dir[data-direction="down"] {
+  --hike-leg-color: var(--hike-down);
+}
+
+/* A rest the watch paused for, rather than one it recorded through. */
+.hike-rest-paused {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--run-hairline);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

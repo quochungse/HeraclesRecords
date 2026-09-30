@@ -56,16 +56,6 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-/* The volume block's right-hand side: the year-ago figure and the measure
-   switch, which wrap under each other before either is squeezed. */
-.ride-volume-aside {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 16px;
-}
-
 /* A section inside the power panel — peak power, the zones — under a small
    heading of the intensity panel's kind. */
 .ride-power-section {

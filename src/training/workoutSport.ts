@@ -24,7 +24,7 @@ export const WORKOUT_SPORT_COLOR_CATEGORY: Record<
   SportColorCategory
 > = {
   run: "run",
-  trailRun: "trail",
+  trailRun: "run",
   bike: "bike",
   swim: "other",
   strength: "strength",

@@ -30,11 +30,22 @@ import type {
   TrainingHubActivityLap,
   TrainingHubActivityPause,
   TrainingHubActivitySeriesPoint,
-  TrainingHubActivityZoneBucket,
   TrainingHubTrackPoint
 } from "./types";
 import { summarizeActivityDetail } from "./activityMetrics";
 import { simplifyRoute } from "./routeSimplification";
+import {
+  SAMPLE_ATHLETE,
+  climbOf,
+  decimate,
+  decodePolyline,
+  haversine,
+  heartRateFigures,
+  insideDayWindow,
+  mean,
+  seededRandom,
+  wander
+} from "./sampleActivityKit";
 import { SAMPLE_RIDE_ROUTES, type SampleRideRouteKey } from "./sampleRideRoutes";
 
 export function sampleRidesEnabled(
@@ -62,14 +73,11 @@ const PLAN_FTP = 262;
 
 let riderFtp = PLAN_FTP;
 
-/** One athlete for every ride, so their figures read as one person's. */
+/** The athlete every sample activity shares, on a bike. */
 const RIDER = {
-  restingHr: 52,
-  maxHr: 188,
+  ...SAMPLE_ATHLETE,
   /** Rider, bike, bottles and kit. */
-  systemMassKg: 78,
-  /** The zone ceilings COROS would score against, LTHR 168. */
-  zoneCeilings: [133, 154, 168, 173, 183]
+  systemMassKg: 78
 } as const;
 
 interface BikeSetup {
@@ -329,66 +337,6 @@ function historyPlans(): RidePlan[] {
 
 // ------------------------------------------------------------------ maths --
 
-/** mulberry32 — small, seeded, and the same on every machine. */
-function seededRandom(seed: string): () => number {
-  let state = 2166136261;
-  for (const char of seed) {
-    state = Math.imul(state ^ char.charCodeAt(0), 16777619);
-  }
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** A slowly wandering value around 0 with the given spread. */
-function wander(random: () => number, persistence: number, spread: number) {
-  let value = 0;
-  const innovation = spread * Math.sqrt(1 - persistence * persistence);
-  return () => {
-    const gaussian =
-      Math.sqrt(-2 * Math.log(Math.max(random(), 1e-9))) * Math.cos(2 * Math.PI * random());
-    value = value * persistence + gaussian * innovation;
-    return value;
-  };
-}
-
-function decodePolyline(encoded: string): [number, number][] {
-  const points: [number, number][] = [];
-  let index = 0;
-  let lat = 0;
-  let lon = 0;
-  const next = () => {
-    let result = 0;
-    let shift = 0;
-    let byte: number;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20);
-    return result & 1 ? ~(result >> 1) : result >> 1;
-  };
-  while (index < encoded.length) {
-    lat += next();
-    lon += next();
-    points.push([lat / 1e5, lon / 1e5]);
-  }
-  return points;
-}
-
-function haversine(a: [number, number], b: [number, number]): number {
-  const rad = Math.PI / 180;
-  const dLat = (b[0] - a[0]) * rad;
-  const dLon = (b[1] - a[1]) * rad;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
-  return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
 /** A route as a function of distance: position, ground height, grade, bend. */
 interface RouteModel {
   length: number;
@@ -619,35 +567,7 @@ function simulate(plan: RidePlan, startMs: number): SimulatedRide {
 
 // ---------------------------------------------------------------- figures --
 
-function zoneOf(bpm: number): number {
-  const index = RIDER.zoneCeilings.findIndex((ceiling) => bpm <= ceiling);
-  return index === -1 ? RIDER.zoneCeilings.length : index;
-}
-
-/** Up and down over a 2 m hysteresis, as a barometric watch counts it. */
-function climbOf(series: readonly TrainingHubActivitySeriesPoint[]): { gain: number; loss: number } {
-  let gain = 0;
-  let loss = 0;
-  let anchor = series[0]?.altitude ?? 0;
-  for (const point of series) {
-    const altitude = point.altitude ?? anchor;
-    if (altitude - anchor >= 2) {
-      gain += altitude - anchor;
-      anchor = altitude;
-    } else if (anchor - altitude >= 2) {
-      loss += anchor - altitude;
-      anchor = altitude;
-    }
-  }
-  return { gain: Math.round(gain), loss: Math.round(loss) };
-}
-
-function mean(values: readonly number[]): number | undefined {
-  return values.length === 0 ? undefined : values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
 const LAP_METERS = 5000;
-const COROS_LOAD_SCALE = 1.2;
 
 function lapsOf(series: readonly TrainingHubActivitySeriesPoint[], powerMeter: boolean): TrainingHubActivityLap[] {
   const laps: TrainingHubActivityLap[] = [];
@@ -704,19 +624,8 @@ function summarise(
   const powers = series.map((point) => point.power ?? 0);
   const pedalled = series.map((point) => point.cadence ?? 0).filter((value) => value > 0);
 
-  // Banister's TRIMP, scaled by the 1.2 that puts it where COROS's own load
-  // lands for a ride at the same heart rate (checked against real trainer rides:
-  // 52 minutes at 143 bpm is 94).
-  let load = 0;
-  let aboveThreshold = 0;
-  const zoneSeconds = new Array<number>(RIDER.zoneCeilings.length + 1).fill(0);
-  for (const hr of hrs) {
-    const reserve = Math.min(1, Math.max(0, (hr - RIDER.restingHr) / (RIDER.maxHr - RIDER.restingHr)));
-    load += (1 / 60) * reserve * 0.64 * Math.exp(1.92 * reserve);
-    zoneSeconds[zoneOf(hr)] += 1;
-    if (hr > RIDER.zoneCeilings[2]) aboveThreshold += 1;
-  }
-  const trainingLoad = Math.round(load * COROS_LOAD_SCALE);
+  // Banister's TRIMP, on the athlete's zones — see `heartRateFigures`.
+  const { trainingLoad, aboveThreshold, hrZones } = heartRateFigures(hrs);
 
   // A ride's work in kilojoules is its calories near enough: the body turns
   // about a quarter of what it burns into the pedals, and a kcal is 4.18 kJ.
@@ -726,18 +635,6 @@ function summarise(
     0
   );
   const calories = Math.round(modelWork / 1000);
-
-  const hrZones: TrainingHubActivityZoneBucket[] = zoneSeconds.map((seconds, index) => {
-    const ceiling = RIDER.zoneCeilings[index];
-    const floor = index === 0 ? undefined : RIDER.zoneCeilings[index - 1]! + 1;
-    return {
-      index,
-      ...(floor !== undefined ? { low: floor } : {}),
-      ...(ceiling !== undefined ? { high: ceiling } : {}),
-      seconds,
-      percent: Math.round((seconds / duration) * 1000) / 10
-    };
-  });
 
   const startTime = Math.floor(startMs / 1000);
   const activity: TrainingHubActivity = {
@@ -801,17 +698,6 @@ function summarise(
   return { activity, detail, summary };
 }
 
-function decimate<T>(points: readonly T[], maxPoints: number): T[] {
-  if (points.length <= maxPoints) return [...points];
-  const step = points.length / maxPoints;
-  const result: T[] = [];
-  for (let index = 0; index < maxPoints; index += 1) {
-    result.push(points[Math.floor(index * step)]!);
-  }
-  result.push(points[points.length - 1]!);
-  return result;
-}
-
 // -------------------------------------------------------------- the door --
 
 let simulated: Map<string, SimulatedRide> | null = null;
@@ -845,11 +731,6 @@ function rides(): Map<string, SimulatedRide> {
   return simulated;
 }
 
-function happenDay(startTime: number): string {
-  const date = new Date(startTime * 1000);
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
 /**
  * The activity list the window asked for, with the sample rides in it: on the
  * first page only, so a paged read does not meet them twice, and only inside a
@@ -862,13 +743,7 @@ export function withSampleRides(
   if (request.page !== 1) return activities;
   const added = [...rides().values()]
     .map((ride) => ride.activity)
-    .filter((activity) => {
-      const day = happenDay(activity.startTime ?? 0);
-      return (
-        (request.startDay === undefined || day >= request.startDay) &&
-        (request.endDay === undefined || day <= request.endDay)
-      );
-    });
+    .filter((activity) => insideDayWindow(activity.startTime, request));
   return [...activities, ...added].sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0));
 }
 

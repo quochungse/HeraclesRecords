@@ -1,10 +1,10 @@
 import type { TrainingHubActivity } from "../../electron/types";
 
-export type SportColorCategory = "strength" | "trail" | "run" | "bike" | "other";
+export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "other";
 
 export const SPORT_COLOR_CATEGORIES: SportColorCategory[] = [
   "strength",
-  "trail",
+  "hiking",
   "run",
   "bike",
   "other"
@@ -14,7 +14,7 @@ export const SPORT_COLOR_CATEGORIES: SportColorCategory[] = [
 // src/styles.css mirror these values; test:sport-colors asserts they match.
 export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
   strength: "#e5484d",
-  trail: "#4c8dff",
+  hiking: "#4c8dff",
   run: "#2fbe91",
   bike: "#e6b800",
   other: "#7fd8cf"
@@ -22,25 +22,37 @@ export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
 
 export const SPORT_COLOR_LABELS: Record<SportColorCategory, string> = {
   strength: "Strength / Gym",
-  trail: "Trail",
+  hiking: "Hiking",
   run: "Running",
   bike: "Cycling",
   other: "Other"
 };
 
 const STORAGE_KEY = "coroslink.sportColors";
+
+/**
+ * Categories stored under an earlier name. "hiking" was stored as "trail" —
+ * it held COROS's hike and mountain-climb codes all along, and the trail run
+ * it also held was a run — so a colour an athlete picked for it then is read
+ * as the hiking colour now rather than dropped.
+ */
+const LEGACY_CATEGORY_KEYS: Partial<Record<SportColorCategory, string>> = {
+  hiking: "trail"
+};
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 // Stable COROS sportType codes → color category; keep the codes in sync with
 // electron/corosSportTypes.ts. Everything not listed (swim, triathlon, ski,
-// rowing, climbing, walk, unknown codes) falls back to "other".
+// rowing, climbing, walk, unknown codes) falls back to "other". A trail run is
+// a run — it is on the Running screen, a surface there — and wears the run
+// colour; hiking is the hike and the mountain climb, the Hiking screen's two.
 const SPORT_TYPE_CATEGORY: Record<number, SportColorCategory> = {
   100: "run", //      Run
   101: "run", //      Indoor Run
-  102: "trail", //    Trail Run
+  102: "run", //      Trail Run
   103: "run", //      Track Run
-  104: "trail", //    Hike
-  105: "trail", //    Mountain Climb
+  104: "hiking", //   Hike
+  105: "hiking", //   Mountain Climb
   200: "bike", //     Bike
   201: "bike", //     Indoor Bike
   202: "bike", //     Road E-Bike
@@ -74,7 +86,8 @@ export function parseSportColors(
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     for (const cat of SPORT_COLOR_CATEGORIES) {
-      const value = parsed[cat];
+      const legacy = LEGACY_CATEGORY_KEYS[cat];
+      const value = parsed[cat] ?? (legacy !== undefined ? parsed[legacy] : undefined);
       if (typeof value === "string" && HEX_RE.test(value)) {
         result[cat] = value;
       }

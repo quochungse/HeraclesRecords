@@ -8,7 +8,7 @@
      Mirrors DEFAULT_SPORT_COLORS in src/training/sportColors.ts (the source
      of truth) — test:sport-colors asserts the two stay in sync. */
   --sport-strength: #e5484d;
-  --sport-trail: #4c8dff;
+  --sport-hiking: #4c8dff;
   --sport-run: #2fbe91;
   --sport-bike: #e6b800;
   --sport-other: #7fd8cf;
@@ -13437,8 +13437,8 @@ td span {
   --sport-chip-color: var(--sport-strength);
 }
 
-.sport-chip[data-sport="trail"] {
-  --sport-chip-color: var(--sport-trail);
+.sport-chip[data-sport="hiking"] {
+  --sport-chip-color: var(--sport-hiking);
 }
 
 .sport-chip[data-sport="run"] {
@@ -24030,8 +24030,8 @@ td span {
 .calendar-chip.calendar-sport-strength {
   border-left-color: var(--sport-strength);
 }
-.calendar-chip.calendar-sport-trail {
-  border-left-color: var(--sport-trail);
+.calendar-chip.calendar-sport-hiking {
+  border-left-color: var(--sport-hiking);
 }
 .calendar-chip.calendar-sport-run {
   border-left-color: var(--sport-run);
@@ -24512,7 +24512,7 @@ td span {
 }
 
 .sched-detail.is-run { --detail-sport: var(--sport-run); }
-.sched-detail.is-trail { --detail-sport: var(--sport-trail); }
+.sched-detail.is-hiking { --detail-sport: var(--sport-hiking); }
 .sched-detail.is-bike { --detail-sport: var(--sport-bike); }
 .sched-detail.is-strength { --detail-sport: var(--sport-strength); }
 .sched-detail.is-other { --detail-sport: var(--sport-other); }
@@ -29169,7 +29169,7 @@ td span {
 }
 
 .workout-editor-sport.is-run { --workout-sport: var(--sport-run); }
-.workout-editor-sport.is-trail { --workout-sport: var(--sport-trail); }
+.workout-editor-sport.is-hiking { --workout-sport: var(--sport-hiking); }
 .workout-editor-sport.is-bike { --workout-sport: var(--sport-bike); }
 .workout-editor-sport.is-strength { --workout-sport: var(--sport-strength); }
 

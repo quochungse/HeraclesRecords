@@ -115,7 +115,7 @@ const PLATFORM_LABELS: Record<string, string> = {
     the sport. */
 const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   strength: Dumbbell,
-  trail: Mountain,
+  hiking: Mountain,
   run: RunnerIcon,
   bike: Bike,
   other: Ellipsis,

@@ -91,7 +91,7 @@ export function ScheduledWorkoutDetail({
   // a real intent (or the sport actually is running) to avoid a bogus "Run"
   // badge on swims/rides/strength sessions.
   const showCategoryChip =
-    category === "run" || category === "trail" || workoutCategory !== "Run";
+    category === "run" || workoutCategory !== "Run";
   const isStrength = isStrengthStyleWorkout(sport);
   const SportIcon = sportMeta?.icon ?? Activity;
 

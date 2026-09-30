@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   MessageCircle,
   Moon,
+  Mountain,
   Music,
   Settings,
   User,
@@ -24,6 +25,7 @@ export type PrimaryView =
   | "training"
   | "running"
   | "cycling"
+  | "hiking"
   | "library"
   | "strength"
   | "sleep"
@@ -57,7 +59,7 @@ export interface PrimaryNavSection {
 }
 
 /**
- * The rail reads as an index: four standing headings, twelve destinations,
+ * The rail reads as an index: four standing headings, thirteen destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
@@ -100,14 +102,15 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
   {
     id: "history",
     label: "History",
-    // What is behind. Activities holds every sport; Running, Cycling and
-    // Strength are separate destinations because they are read through
-    // different numbers, not because they are filters. The globe is the same
-    // history seen from above.
+    // What is behind. Activities holds every sport; Running, Cycling,
+    // Hiking and Strength are separate destinations because they are read
+    // through different numbers, not because they are filters. The globe is
+    // the same history seen from above.
     items: [
       { id: "training", label: "Activities", icon: Activity },
       { id: "running", label: "Running", icon: RunnerIcon },
       { id: "cycling", label: "Cycling", icon: Bike },
+      { id: "hiking", label: "Hiking", icon: Mountain },
       { id: "strength", label: "Strength", icon: Dumbbell },
       { id: "places", label: "Where you’ve been", icon: Globe },
     ],
@@ -129,7 +132,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to twelve rows that fit without folding.
+ * is what brings it down to thirteen rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   { id: "profile", label: "Personal", icon: User },

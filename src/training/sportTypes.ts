@@ -1,4 +1,5 @@
 import type { TrainingHubSportType } from "../../electron/types";
+import { isHikeSportType } from "../hiking/hikeType";
 
 // Keep in sync with electron/corosSportTypes.ts for renderer-side fallbacks.
 const KNOWN_SPORT_NAMES: Record<number, string> = {
@@ -103,10 +104,16 @@ export function isCyclingSportType(sportType?: number): boolean {
 /**
  * Whether an activity is read in speed rather than pace: a ride, by its COROS
  * code or, for a custom sport, its name — the rule the activity panes apply to
- * their own "Avg speed".
+ * their own "Avg speed" — and a hike or a mountain climb, which a walker reads
+ * in km/h. On the route map that also keeps a hike off COROS's pace zones,
+ * which are the account's running zones and put a whole hike below zone 1.
  */
 export function isSpeedSport(sportType?: number, sportName?: string): boolean {
-  return isCyclingSportType(sportType) || /bike|cycl|ride/i.test(sportName ?? "");
+  return (
+    isCyclingSportType(sportType) ||
+    isHikeSportType(sportType) ||
+    /bike|cycl|ride/i.test(sportName ?? "")
+  );
 }
 
 export function resolveSportName(
