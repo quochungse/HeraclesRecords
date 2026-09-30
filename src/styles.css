@@ -2222,8 +2222,6 @@ input::placeholder {
   width: 42px;
   height: 42px;
   place-items: center;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
   background: transparent;
   box-shadow: 0 0 20px var(--accent-glow);
 }
@@ -30928,7 +30926,6 @@ tr.data-intervals-row-missing {
 .settings-about-logo {
   width: 64px;
   height: 64px;
-  border-radius: var(--radius-lg);
   flex-shrink: 0;
 }
 
