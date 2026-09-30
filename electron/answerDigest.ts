@@ -2,7 +2,7 @@
  * The digest of a coach answer: what the condensed layer of a long
  * conversation carries in the answer's place (`CONTEXT_BUDGETS` in
  * `chatContextCompaction.ts`). The prompt and the check a digest must pass
- * before it is used; making one is `chatDigestService.ts`.
+ * before it is used; making one is `chatCompression.ts`.
  *
  * Measured on eight real answers (2026-09-30, Haiku 4.5): with a thinking
  * budget of 1,500 tokens a digest came out at 9–22% of the answer, in the
@@ -22,10 +22,10 @@ export const DIGEST_CHARS = 400;
 /** Thinking for a model that takes a budget rather than an effort (Haiku 4.5). */
 export const DIGEST_THINKING_BUDGET = 1_500;
 
-export function digestSystemPrompt(limit = DIGEST_CHARS): string {
+export function digestSystemPrompt(): string {
   return (
     "You compress one answer a running coach gave, so later turns of the conversation can carry it cheaply. " +
-    `Write notes, not prose, in the answer's own language, at most ${limit} characters. Keep, exactly as written: ` +
+    `Write notes, not prose, in the answer's own language, at most ${DIGEST_CHARS} characters. Keep, exactly as written: ` +
     "every figure that was prescribed or decided (paces, heart rates, zones, distances, durations, dates, weekdays), " +
     "what the athlete was told to do, and any conclusion drawn about their data. Drop explanation, reasoning, " +
     "tables of splits, pleasantries and anything the coach could say again. Reply with the notes only."
@@ -93,13 +93,12 @@ function figuresOf(text: string): { dates: Set<string>; numbers: Set<string>; re
 export function digestProblems(
   digest: string,
   answer: string,
-  question = "",
-  limit = DIGEST_CHARS
+  question = ""
 ): string[] {
   const text = digest.trim();
   if (!text) return ["it was empty"];
   const problems: string[] = [];
-  if (text.length > limit * 1.5) problems.push(`it ran to ${text.length} characters where ${limit} were asked for`);
+  if (text.length > DIGEST_CHARS * 1.5) problems.push(`it ran to ${text.length} characters where ${DIGEST_CHARS} were asked for`);
   const source = figuresOf(`${question}\n${answer}`);
   const stated = figuresOf(text);
   const invented = [...stated.dates].filter((date) => !source.dates.has(date));

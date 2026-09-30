@@ -1,9 +1,53 @@
 import type {
+  AnalysisRuntime,
   AnthropicEffort,
   ChatProvider,
   ChatSettings,
   ClaudeCodeStatus
 } from "./types";
+
+/** Every provider Coach can answer with. */
+export const CHAT_PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
+
+export function isChatProvider(value: unknown): value is ChatProvider {
+  return CHAT_PROVIDERS.includes(value as ChatProvider);
+}
+
+/** The model Coach has chosen for a provider, as its picker holds it (`""` is the provider's default). */
+export function settingsModel(settings: ChatSettings, provider: ChatProvider): string {
+  switch (provider) {
+    case "claude-api":
+      return settings.anthropic.model;
+    case "claude-code":
+      return settings.claudeCode.model ?? "";
+    case "openrouter":
+      return settings.openRouter.model;
+    case "chatgpt":
+      return settings.chatgpt.model ?? "";
+    case "local":
+      return settings.local.model;
+  }
+}
+
+/**
+ * One runtime over another — an analysis's over its conversation's (P2.0,
+ * D14), a text job's base over the conversation's. A provider and a model are
+ * one choice — a model picked for Claude means nothing to OpenRouter — so the
+ * pair comes whole from whichever side made it, `over` first; effort stands
+ * alone and is taken the same way.
+ */
+export function runtimeOver(
+  over: AnalysisRuntime,
+  under: AnalysisRuntime | undefined
+): AnalysisRuntime {
+  const pair = over.provider || over.model ? over : under ?? {};
+  const effort = over.effort || under?.effort;
+  return {
+    ...(pair.provider ? { provider: pair.provider } : {}),
+    ...(pair.model ? { model: pair.model } : {}),
+    ...(effort ? { effort } : {})
+  };
+}
 
 export interface ChatModelOption {
   value: string;

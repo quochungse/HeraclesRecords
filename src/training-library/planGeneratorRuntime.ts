@@ -23,6 +23,7 @@ import {
   describeChatModel,
   effortForModel,
   providerModelOptions,
+  settingsModel,
   supportsReasoningEffort,
   type ChatModelOption
 } from "../../electron/chatModels";
@@ -35,22 +36,6 @@ export interface GeneratorRuntime {
   /** `""` is the provider's own default ("Default model", "Auto"). */
   model: string;
   effort: AnthropicEffort;
-}
-
-/** The model Coach has chosen for a provider, as its picker holds it. */
-export function settingsModel(settings: ChatSettings, provider: ChatProvider): string {
-  switch (provider) {
-    case "claude-api":
-      return settings.anthropic.model;
-    case "claude-code":
-      return settings.claudeCode.model ?? "";
-    case "openrouter":
-      return settings.openRouter.model;
-    case "chatgpt":
-      return settings.chatgpt.model ?? "";
-    case "local":
-      return settings.local.model;
-  }
 }
 
 export function settingsEffort(settings: ChatSettings, provider: ChatProvider): AnthropicEffort {

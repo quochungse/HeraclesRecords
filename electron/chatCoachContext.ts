@@ -8,7 +8,7 @@ import {
   workoutSportFromType
 } from "./workoutCapabilities";
 import { formatPaceSeconds } from "./chatActivityTools";
-import { dateFromDayKey, isoFromDayKey } from "./chatDayKeys";
+import { dateFromDayKey, dayKey, isoFromDayKey } from "./chatDayKeys";
 import type {
   CorosProfile,
   TrainingHubActivity,
@@ -182,9 +182,7 @@ export function buildBaseCoachInstructions(): string {
 export function formatCoachToday(now: Date = new Date()): string {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
-  const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
-    .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0"))
-    .join("");
+  const day = dayKey(now);
   return `Today is ${weekday} ${isoFromDayKey(day)} (${day}), local time zone ${timeZone || "unknown"}.`;
 }
 

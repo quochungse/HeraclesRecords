@@ -293,10 +293,16 @@ assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with n
   assert.doesNotMatch(service, /text: instructions, hasData/, "no provider sends the old snapshot-in-the-middle prompt");
   assert.match(service, /instructions: systemPrompt\.stable,\s*liveInstructions: systemPrompt\.live,/);
   assert.match(service, /const sections: string\[\] = \[today, ""\];/, "the date heads the part that changes");
+  // One `turnContext` builds every provider's context, the chosen style with it.
+  assert.match(
+    service,
+    /buildTrainingContext\(\s*permissions,[\s\S]*?runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)/,
+    "the turn's context carries the chosen Coach style"
+  );
   assert.equal(
-    (service.match(/runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)\)/g) ?? []).length,
+    (service.match(/await prepare\(turnContext\(/g) ?? []).length,
     5,
-    "every provider's prompt carries the chosen Coach style"
+    "every provider's prompt is built through it"
   );
 }
 // A plan with no brief tool is drafted at any length.
@@ -653,14 +659,21 @@ assert.deepEqual(persisted[1].automation, marker);
   const whole = readSource(repoRoot, "electron", "chatService.ts");
   const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
   // The context and the tool surface are read through the turn's own two
-  // wrappers, which skip both for a text job and otherwise are the real calls.
-  const through = { prepareToolSurface: "turnToolSurface", buildTrainingContext: "turnContext" };
+  // wrappers, which skip both for a text job and otherwise are the real calls;
+  // the Claude Code status through one that lets a text job reuse a recent one.
+  const through = {
+    inspectClaudeCodeStatus: "claudeCodeStatusForTurn",
+    prepareToolSurface: "turnToolSurface",
+    buildTrainingContext: "turnContext"
+  };
   for (const step of ["inspectClaudeCodeStatus", "prepareToolSurface", "buildTrainingContext", "getValidToken"]) {
     assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
     assert.match(turn, new RegExp(`await prepare\\(${through[step] ?? step}\\(`), `${step} is prepared in a turn`);
   }
   assert.match(turn, /const turnToolSurface = \(\): Promise<void> => \(job \? Promise\.resolve\(\) : prepareToolSurface\(\)\);/);
-  assert.match(turn, /const turnContext: typeof buildTrainingContext = \(\.\.\.args\) =>\s*job \? [\s\S]{0,120}?: buildTrainingContext\(\.\.\.args\);/);
+  assert.match(turn, /const turnContext = \([\s\S]{0,160}?=>\s*job\s*\? [\s\S]{0,120}?: buildTrainingContext\(/);
+  const statusProbe = whole.slice(whole.indexOf("async function claudeCodeStatusForTurn("), whole.indexOf("function recordClaudeCodeStatus("));
+  assert.match(statusProbe, /if \(textJob && [\s\S]*?return held\.status;[\s\S]*?await inspectClaudeCodeStatus\(/, "only a text job reuses a status; a turn asks afresh");
   // The MCP connections ride inside prepareToolSurface, with the profile read
   // that decides the tool list, so Stop reaches them through the same prepare().
   assert.doesNotMatch(turn, /await ensureAllMcpConnected\(/, "the MCP connections are not awaited bare in a turn");

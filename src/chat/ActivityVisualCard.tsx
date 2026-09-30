@@ -2,7 +2,6 @@ import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
@@ -88,38 +87,36 @@ function ChatLapBarChart({
   return (
     <div className="chat-visual-chart-shell">
       <ChartWhenNear>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={trainingChartMargin}>
-            <XAxis
-              dataKey="label"
-              tick={{ fill: colors.text, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              minTickGap={16}
-            />
-            <YAxis
-              tick={{ fill: colors.text, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              width={36}
-              domain={["auto", "auto"]}
-            />
-            <Tooltip
-              content={(props) => (
-                <LapBarTooltip {...props} formatValue={formatValue} />
-              )}
-              cursor={{ fill: colors.cursor }}
-              contentStyle={trainingChartTooltipStyle}
-            />
-            <Bar
-              dataKey="value"
-              name={name}
-              fill={colors.accentBright}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        <BarChart data={data} margin={trainingChartMargin}>
+          <XAxis
+            dataKey="label"
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={16}
+          />
+          <YAxis
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+            domain={["auto", "auto"]}
+          />
+          <Tooltip
+            content={(props) => (
+              <LapBarTooltip {...props} formatValue={formatValue} />
+            )}
+            cursor={{ fill: colors.cursor }}
+            contentStyle={trainingChartTooltipStyle}
+          />
+          <Bar
+            dataKey="value"
+            name={name}
+            fill={colors.accentBright}
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
+        </BarChart>
       </ChartWhenNear>
     </div>
   );

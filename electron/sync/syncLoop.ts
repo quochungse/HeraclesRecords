@@ -443,7 +443,13 @@ export class SyncLoop {
    * caller that remembered it.
    */
   async pull(): Promise<PullResult> {
-    return this.#exclusive(() => this.#pull());
+    try {
+      return await this.#exclusive(() => this.#pull());
+    } finally {
+      // The poll's work, done early — at start-up or on "Sync now" — so the
+      // next poll counts from here rather than reading the vault again soon after.
+      this.#scheduleNextPoll();
+    }
   }
 
   async #pull(): Promise<PullResult> {

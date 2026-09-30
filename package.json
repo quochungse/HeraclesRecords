@@ -61,7 +61,7 @@
     "test:ref-preview": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-ref-preview.mjs",
     "test:composer-drafts": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-composer-drafts.mjs",
     "test:creation-choices": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-creation-choices.mjs",
-    "test:chat-entry-passthrough": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-chat-entry-passthrough.mjs",
+    "test:chat-entry-passthrough": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-chat-entry-passthrough.mjs",
     "test:chat-style-names": "node scripts/test-chat-style-names.mjs",
     "test:chat-turn-cost": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-chat-turn-cost.mjs",
     "test:chat-context-compaction": "npm run build:electron && node scripts/test-chat-context-compaction.mjs",

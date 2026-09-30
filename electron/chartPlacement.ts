@@ -5,8 +5,8 @@
  * result names it — `c1` for the turn's first chart, `c2` for the second —
  * and the answer may place it with `[[chart:c1]]` on a line of its own. A
  * chart the answer does not place keeps its default place, above the answer
- * (`orderTurn` in `src/chat/chatTypes.ts`), so a model that never uses a
- * placeholder, or uses one wrongly, reads exactly as before.
+ * (`orderTurn`), so a model that never uses a placeholder, or uses one
+ * wrongly, reads exactly as before.
  *
  * Nothing is stored beside the entry: a handle is the chart's place among the
  * turn's charts, and those are the chart entries just above the answer. No new
@@ -23,6 +23,37 @@ const FENCE = /^\s*(```|~~~)/;
 /** A next step the answer offers (`splitNextSteps`). */
 const NEXT_STEP = /\[\[next:([^\]\n]*)\]\]/g;
 const NEXT_STEP_LINE = /^\s*\[\[next:[^\]\n]*\]\]\s*$/;
+
+/**
+ * The entry kinds that are charts. One list for the renderer (`isChatVisualEntry`)
+ * and the headless collector (`createCollectorSink`): a handle is a chart's
+ * place among these, so the two must order a turn alike.
+ */
+const CHART_KINDS: ReadonlySet<string> = new Set(["activityVisual", "fitnessTrend", "hrZoneSummary"]);
+
+export function isChartKind(kind: string): boolean {
+  return CHART_KINDS.has(kind);
+}
+
+/**
+ * A turn's entries in reading order: its charts, then its answer, then the
+ * rest of its cards.
+ *
+ * A chart is what the answer reads from, so it leads, as every answer did
+ * before 2026-09-26; a creation (a plan, a workout, a change set) is what the
+ * answer proposes, so it follows. Each group keeps the order it arrived in.
+ */
+export function orderTurn<T>(
+  turn: readonly T[],
+  answer: readonly T[],
+  isChart: (item: T) => boolean
+): T[] {
+  return [
+    ...turn.filter(isChart),
+    ...answer,
+    ...turn.filter((item) => !isChart(item))
+  ];
+}
 
 /** The handle of a turn's chart, by its place among the turn's charts (0 = first). */
 export function chartHandle(ordinal: number): string {
@@ -119,11 +150,19 @@ export function placeCharts(
  */
 export function stripChartPlaceholders(text: string): string {
   if (!text.includes("[[chart:") && !text.includes("[[next:")) return text;
+  return withoutMarkers(text, [PLACEHOLDER_LINE, NEXT_STEP_LINE], [PLACEHOLDER, NEXT_STEP]);
+}
+
+/**
+ * The text with every line that is only a marker dropped and every marker
+ * inside a line taken out, the spaces it leaves closed up.
+ */
+function withoutMarkers(text: string, lines: readonly RegExp[], inline: readonly RegExp[]): string {
   return text
     .split("\n")
-    .filter((line) => !PLACEHOLDER_LINE.test(line) && !NEXT_STEP_LINE.test(line))
+    .filter((line) => !lines.some((pattern) => pattern.test(line)))
     .map((line) =>
-      line.replace(PLACEHOLDER, "").replace(NEXT_STEP, "").replace(/[ \t]{2,}/g, " ").trimEnd()
+      inline.reduce((rest, pattern) => rest.replace(pattern, ""), line).replace(/[ \t]{2,}/g, " ").trimEnd()
     )
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
@@ -136,7 +175,7 @@ export function stripChartPlaceholders(text: string): string {
  * words as the athlete's question. They live in the answer's text, so nothing
  * is stored beside the entry, for the reason charts are not.
  */
-export const MAX_NEXT_STEPS = 3;
+const MAX_NEXT_STEPS = 3;
 
 /** An answer's words, and the next steps it offers (at most three, each once). */
 export function splitNextSteps(text: string): { text: string; steps: string[] } {
@@ -144,14 +183,7 @@ export function splitNextSteps(text: string): { text: string; steps: string[] } 
   const steps = [
     ...new Set([...text.matchAll(NEXT_STEP)].map((match) => match[1].trim()).filter(Boolean))
   ].slice(0, MAX_NEXT_STEPS);
-  const words = text
-    .split("\n")
-    .filter((line) => !NEXT_STEP_LINE.test(line))
-    .map((line) => line.replace(NEXT_STEP, "").replace(/[ \t]{2,}/g, " ").trimEnd())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trimEnd();
-  return { text: words, steps };
+  return { text: withoutMarkers(text, [NEXT_STEP_LINE], [NEXT_STEP]).trimEnd(), steps };
 }
 
 /**

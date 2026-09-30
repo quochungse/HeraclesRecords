@@ -941,16 +941,20 @@ function MessageTime({ at }: { at?: number }) {
 }
 
 /**
- * 5.5: an analysis looked and had nothing to say. One line, the same pill as
- * the playbook chip, but nothing to open — the whole point is that there is no
- * content behind it.
+ * An analysis that left a line and no answer — the same pill as the playbook
+ * chip, but nothing to open. It looked and had nothing to say (5.5), or it
+ * stopped because sync brought changes to this conversation from another
+ * device while it ran; that one sits where the answer would have, at the end
+ * of the conversation as sync left it, so the athlete reads both what arrived
+ * and why no answer followed.
  */
-function AnalysisSilentChip({
+function AnalysisNoticeChip({
   marker,
   at,
   index,
   highlighted,
-  settled
+  settled,
+  stopped = false
 }: {
   marker: ChatEntryAnalysisMarker;
   at: number;
@@ -958,6 +962,7 @@ function AnalysisSilentChip({
   highlighted: boolean;
   /** See `ChatRow`: a row a reload mounts is drawn as it is. */
   settled: boolean;
+  stopped?: boolean;
 }) {
   return (
     <ChatRow
@@ -967,48 +972,10 @@ function AnalysisSilentChip({
       }`}
       data-chat-entry-index={index}
     >
-      <span className="chat-analysis-chip chat-analysis-chip-static">
-        <Zap size={12} aria-hidden="true" />
-        {marker.name} looked, nothing new
-        <span className="chat-analysis-chip-trigger">
-          · {formatEntryTime(at)}
-        </span>
-      </span>
-    </ChatRow>
-  );
-}
-
-/**
- * An analysis stopped before it answered, because sync brought changes to this
- * conversation from another device while it ran. It sits where the answer
- * would have, at the end of the conversation as sync left it, so the athlete
- * reads both what arrived and why no answer followed.
- */
-function AnalysisStoppedChip({
-  marker,
-  at,
-  index,
-  highlighted,
-  settled
-}: {
-  marker: ChatEntryAnalysisMarker;
-  at: number;
-  index: number;
-  highlighted: boolean;
-  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
-  settled: boolean;
-}) {
-  return (
-    <ChatRow
-      settled={settled}
-      className={`chat-row chat-row-analysis${
-        highlighted ? " is-chat-jump-target" : ""
-      }`}
-      data-chat-entry-index={index}
-    >
-      <span className="chat-analysis-chip chat-analysis-chip-static chat-analysis-chip-stopped">
-        <RefreshCw size={12} aria-hidden="true" />
-        {marker.name} stopped: this conversation changed on another device while it ran
+      <span className={`chat-analysis-chip chat-analysis-chip-static${stopped ? " chat-analysis-chip-stopped" : ""}`}>
+        {stopped ? <RefreshCw size={12} aria-hidden="true" /> : <Zap size={12} aria-hidden="true" />}
+        {marker.name}{" "}
+        {stopped ? "stopped: this conversation changed on another device while it ran" : "looked, nothing new"}
         <span className="chat-analysis-chip-trigger">
           · {formatEntryTime(at)}
         </span>
@@ -4803,12 +4770,14 @@ export function ChatView({
             // Drawn inside the answer that placed it.
             if (placedCharts.has(index)) return null;
             if (isAutomaticOutlineStep(timeline, index)) return null;
+            // See `ChatRow`: every row a settle or a reload mounts is drawn as it is.
+            const settled = settledEntriesRef.current.has(entry);
 
             if (entry.kind === "toolNotice") {
               return (
                 <ChatRow
                   key={`tool-notice-${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4832,7 +4801,7 @@ export function ChatView({
                 return (
                   <ChatRow
                     key={entry.prompt.promptId}
-                    settled={settledEntriesRef.current.has(entry)}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row"
                     data-chat-entry-index={index}
                   >
@@ -4847,7 +4816,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={entry.prompt.promptId}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4878,7 +4847,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`refs#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4897,7 +4866,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`scheduleRefs#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4917,7 +4886,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`brief:${entry.artifactId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4960,7 +4929,7 @@ export function ChatView({
                 return (
                   <ChatRow
                     key={`outline:${entry.artifactId}:${entry.outlineVersion}#${index}`}
-                    settled={settledEntriesRef.current.has(entry)}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                     data-chat-entry-index={index}
                   >
@@ -4974,7 +4943,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`outline:${entry.artifactId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -5029,7 +4998,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`${event.eventId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                   data-chat-entry-index={index}
                 >
@@ -5081,7 +5050,7 @@ export function ChatView({
                 return (
                   <ChatRow
                     key={`${draft.draftId}#${index}`}
-                    settled={settledEntriesRef.current.has(entry)}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row chat-version-row"
                     data-chat-entry-index={index}
                   >
@@ -5107,7 +5076,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={`${draft.draftId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -5152,7 +5121,7 @@ export function ChatView({
               return (
                 <ChatRow
                   key={entry.preview.requestId}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -5173,7 +5142,7 @@ export function ChatView({
                 // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
                 <ChatRow
                   key={`scheduleChange:${entry.changeSetId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -5204,7 +5173,7 @@ export function ChatView({
                 // what it is here for.
                 <ChatRow
                   key={`${entry.preview.previewId}#${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -5219,26 +5188,27 @@ export function ChatView({
 
             if (entry.kind === "automationSilent") {
               return (
-                <AnalysisSilentChip
+                <AnalysisNoticeChip
                   key={`analysis-silent-${index}`}
                   marker={entry.automation}
                   at={entry.at}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                 />
               );
             }
 
             if (entry.kind === "automationStopped") {
               return (
-                <AnalysisStoppedChip
+                <AnalysisNoticeChip
                   key={`analysis-stopped-${index}`}
                   marker={entry.automation}
                   at={entry.at}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
+                  stopped
                 />
               );
             }
@@ -5258,7 +5228,7 @@ export function ChatView({
                   prompt={entry.content}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                 />
               );
             }
@@ -5266,7 +5236,7 @@ export function ChatView({
             return (
               <ChatRow
                 key={`message-${index}`}
-                settled={settledEntriesRef.current.has(entry)}
+                settled={settled}
                 className={`chat-row chat-row-${entry.role}${
                   highlightedChatEntryIndex === index
                     ? " is-chat-jump-target"

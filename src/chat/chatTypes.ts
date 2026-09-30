@@ -14,6 +14,10 @@ import type {
   ScheduleRef,
   WorkoutDeletePreview
 } from "../../electron/types";
+import { isChartKind, orderTurn } from "../../electron/chartPlacement";
+import { entryTimeFromMid } from "../../electron/chatEntryTime";
+
+export { orderTurn };
 
 /** Where an assistant answer's data came from, for the source indicator. */
 export interface SourceInfo {
@@ -190,32 +194,7 @@ export type ChatEntry = (
 export function isChatVisualEntry(
   entry: ChatEntry
 ): entry is ChatActivityVisualEntry | ChatFitnessTrendEntry | ChatHrZoneEntry {
-  return (
-    entry.kind === "activityVisual" ||
-    entry.kind === "fitnessTrend" ||
-    entry.kind === "hrZoneSummary"
-  );
-}
-
-/**
- * A turn's entries in reading order: its charts, then its answer, then the
- * rest of its cards.
- *
- * A chart is what the answer reads from, so it leads, as every answer did
- * before 2026-09-26; a creation (a plan, a workout, a change set) is what the
- * answer proposes, so it follows. Each group keeps the order it arrived in.
- * The collector (`createCollectorSink`) orders a headless run the same way.
- */
-export function orderTurn<T>(
-  turn: readonly T[],
-  answer: readonly T[],
-  isChart: (item: T) => boolean
-): T[] {
-  return [
-    ...turn.filter(isChart),
-    ...answer,
-    ...turn.filter((item) => !isChart(item))
-  ];
+  return isChartKind(entry.kind);
 }
 
 /**
@@ -568,18 +547,6 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
     ...(entry.automation ? { automation: entry.automation } : {}),
     ...entryTimeOf(entry.mid)
   };
-}
-
-/**
- * When the store first saw an entry, read off its `mid`: a minted id is
- * `1-<12 hex digits of epoch ms>-<counter>-<device>` (`nextMergeStamp`). A
- * backfilled `0-` id and one anchored after another (`~`) say nothing about
- * when, so they give no time rather than a wrong one.
- */
-export function entryTimeFromMid(mid: string | undefined): number | undefined {
-  if (!mid || mid.includes("~")) return undefined;
-  const match = /^1-([0-9a-f]{12})-/.exec(mid);
-  return match ? parseInt(match[1], 16) : undefined;
 }
 
 function entryTimeOf(mid: string | undefined): { at?: number } {

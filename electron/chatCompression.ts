@@ -18,7 +18,7 @@ import {
   type AnswerDigestLookup,
   type DigestRequest
 } from "./chatContextCompaction";
-import { compressionModelFor, providerModelOptions } from "./chatModels";
+import { compressionModelFor, providerModelOptions, runtimeOver, settingsModel } from "./chatModels";
 import {
   DIGEST_THINKING_BUDGET,
   digestProblems,
@@ -28,7 +28,6 @@ import {
 import {
   ANALYSIS_DEFAULT_EFFORT,
   type AnalysisRuntime,
-  type ChatProvider,
   type ChatSettings,
   type ChatTokenUsage,
   type PersistedChatEntry
@@ -42,29 +41,13 @@ import {
  */
 
 /** How long a text job may emit nothing before it is given up on. */
-export const TEXT_JOB_IDLE_TIMEOUT_MS = 3 * 60_000;
+const TEXT_JOB_IDLE_TIMEOUT_MS = 3 * 60_000;
 
 /** What a text job runs on. */
 export interface CompressionRuntime {
   runtime: AnalysisRuntime;
   /** Set for a model that takes a thinking budget rather than an effort. */
   thinkingBudget?: number;
-}
-
-/** The provider's model setting a conversation that names none falls back to. */
-function savedModel(provider: ChatProvider, settings: ChatSettings): string | undefined {
-  switch (provider) {
-    case "claude-code":
-      return settings.claudeCode.model || undefined;
-    case "claude-api":
-      return settings.anthropic.model || undefined;
-    case "openrouter":
-      return settings.openRouter.model || undefined;
-    case "chatgpt":
-      return settings.chatgpt.model || undefined;
-    case "local":
-      return settings.local.model || undefined;
-  }
 }
 
 /**
@@ -88,12 +71,11 @@ export function resolveCompressionRuntime(
   settings: ChatSettings = getChatSettings()
 ): CompressionRuntime {
   const conversation = sessionId ? getConversationSettings(sessionId).runtime : undefined;
-  // A provider and a model are one choice, taken whole from whichever side
-  // made it (as `analysisRuntimeOver` does): a base naming only its provider
-  // must not borrow a model the conversation picked for another one.
-  const pair = base.provider || base.model ? base : conversation ?? {};
+  // A base naming only its provider must not borrow a model the conversation
+  // picked for another one.
+  const pair = runtimeOver(base, conversation);
   const provider = pair.provider ?? settings.provider;
-  const model = pair.model ?? savedModel(provider, settings);
+  const model = pair.model ?? (settingsModel(settings, provider) || undefined);
   const choice = normalizeCompactModelChoice(settings.compactContext?.model);
   const picked =
     choice.kind === "fixed"
@@ -189,7 +171,7 @@ export async function runTextJob(options: {
 // ---------------------------------------------------------------------------
 
 /** How a digest is keyed: the answer's text, as the wire carries it. */
-export function answerKey(answer: string): string {
+function answerKey(answer: string): string {
   return createHash("sha256").update(answer).digest("hex");
 }
 
@@ -199,18 +181,33 @@ export function answerKey(answer: string): string {
  * whole, and `requestDigests` does not try it again.
  */
 export function transcriptDigests(entries: readonly PersistedChatEntry[]): AnswerDigestLookup {
-  const answers = toWireMessages(entries)
-    .filter((message) => message.role === "assistant")
-    .map((message) => message.content);
+  // Hashed once here: a turn's planning looks the same answer up several times.
+  const keys = new Map<string, string>();
+  for (const message of toWireMessages(entries)) {
+    if (message.role === "assistant") keys.set(message.content, answerKey(message.content));
+  }
   const digests = new Map<string, string>();
-  for (const row of getChatAnswerDigestRows([...new Set(answers.map(answerKey))])) {
+  for (const row of getChatAnswerDigestRows([...new Set(keys.values())])) {
     if (row.digest) digests.set(row.answer_key, row.digest);
   }
-  return (answer) => digests.get(answerKey(answer));
+  return (answer) => digests.get(keys.get(answer) ?? answerKey(answer));
 }
 
 /** Answers being digested now, so a second turn does not start the same work. */
 const digesting = new Set<string>();
+
+/**
+ * How long a model that could not run a digest is left alone. A job that could
+ * not run — a provider signed out, a chosen model gone, a quota spent — says
+ * nothing about the answer and will fail the same way for the next one, so the
+ * batch stops there, and the turns after it do not start the same doomed jobs.
+ */
+const DIGEST_BACKOFF_MS = 10 * 60_000;
+const unavailableUntil = new Map<string, number>();
+
+function runtimeKey({ runtime }: CompressionRuntime): string {
+  return `${runtime.provider ?? ""}:${runtime.model ?? ""}`;
+}
 
 /**
  * Makes digests for these answers, one at a time, in the background. An answer
@@ -223,31 +220,29 @@ export async function requestDigests(
   requests: readonly DigestRequest[],
   base: AnalysisRuntime = {}
 ): Promise<void> {
-  const known = new Set(getChatAnswerDigestRows(requests.map((request) => answerKey(request.answer))).map((row) => row.answer_key));
-  const fresh = requests.filter((request) => {
-    const key = answerKey(request.answer);
-    if (known.has(key) || digesting.has(key)) return false;
-    digesting.add(key);
-    return true;
-  });
+  const keyed = requests.map((request) => ({ request, key: answerKey(request.answer) }));
+  const known = new Set(getChatAnswerDigestRows(keyed.map(({ key }) => key)).map((row) => row.answer_key));
+  const fresh = keyed.filter(({ key }) => !known.has(key) && !digesting.has(key));
   if (!fresh.length) return;
-  let compression: CompressionRuntime;
+  const compression = resolveCompressionRuntime(sessionId, base);
+  const backoff = runtimeKey(compression);
+  if ((unavailableUntil.get(backoff) ?? 0) > Date.now()) return;
+  for (const { key } of fresh) digesting.add(key);
   try {
-    compression = resolveCompressionRuntime(sessionId, base);
-  } catch (caught) {
-    for (const request of fresh) digesting.delete(answerKey(request.answer));
-    throw caught;
-  }
-  for (const request of fresh) {
-    const key = answerKey(request.answer);
-    try {
-      const made = await makeDigest(request, compression);
-      if (made.stored) putChatAnswerDigestRow(key, sessionId, made.digest, made.model ?? null);
-    } catch (caught) {
-      console.warn(`[coach] digest failed: ${caught instanceof Error ? caught.message : String(caught)}`);
-    } finally {
-      digesting.delete(key);
+    for (const { request, key } of fresh) {
+      try {
+        const made = await makeDigest(request, compression);
+        if (!made.stored) {
+          unavailableUntil.set(backoff, Date.now() + DIGEST_BACKOFF_MS);
+          return;
+        }
+        putChatAnswerDigestRow(key, sessionId, made.digest, made.model ?? null);
+      } catch (caught) {
+        console.warn(`[coach] digest failed: ${caught instanceof Error ? caught.message : String(caught)}`);
+      }
     }
+  } finally {
+    for (const { key } of fresh) digesting.delete(key);
   }
 }
 

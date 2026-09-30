@@ -31,6 +31,7 @@ import {
   writeSessionSummary
 } from "./chatContextService";
 import { requestDigests, transcriptDigests } from "./chatCompression";
+import { runtimeOver } from "./chatModels";
 import {
   chatSessionExists,
   createChatSession,
@@ -171,24 +172,8 @@ export function parseAnalysisOutput(text: string): AnalysisOutput {
 // import for the one constant behind its decision.
 export { ANALYSIS_DEFAULT_EFFORT };
 
-/**
- * An analysis's runtime over its conversation's (P2.0, D14). A provider and a
- * model are one choice — a model picked for Claude means nothing to OpenRouter —
- * so the pair comes whole from whichever side made it, the analysis first;
- * effort stands alone and is taken the same way.
- */
-export function analysisRuntimeOver(
-  analysis: AnalysisRuntime,
-  conversation: AnalysisRuntime | undefined
-): AnalysisRuntime {
-  const pair = analysis.provider || analysis.model ? analysis : conversation ?? {};
-  const effort = analysis.effort || conversation?.effort;
-  return {
-    ...(pair.provider ? { provider: pair.provider } : {}),
-    ...(pair.model ? { model: pair.model } : {}),
-    ...(effort ? { effort } : {})
-  };
-}
+/** An analysis's runtime over its conversation's (P2.0, D14): `runtimeOver`, the analysis first. */
+export const analysisRuntimeOver = runtimeOver;
 
 /** The runtime a run actually uses, with section 7's default filled in. */
 export function resolveAnalysisRuntime(

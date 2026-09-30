@@ -5,7 +5,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { constants as fsConstants } from "node:fs";
 import { z } from "zod";
-import { isSummaryContextMessage } from "./chatContextCompaction";
 import { formatClaudeModelName } from "./chatModels";
 import type { ChatModelOption } from "./chatModels";
 import type {
@@ -1080,12 +1079,11 @@ function jsonSchemaToZodShape(
 }
 
 function formatClaudePrompt(messages: ChatMessage[]): string {
-  // The summary a compacted conversation opens with stands in for everything
-  // before the tail, so the cut to the recent messages must not take it: a
-  // tail of 29 messages or more used to drop it, and the coach lost the whole
-  // head of the conversation for most of the stretch between two rolls.
-  const summary = messages[0] && isSummaryContextMessage(messages[0]) ? [messages[0]] : [];
-  const transcript = [...summary, ...messages.slice(summary.length).slice(-30)]
+  // Every message, as every other provider sends them: what a conversation
+  // sends is bounded where it is planned (`planTranscriptContext`). A cut to the
+  // last 30 here took the condensed layer between the summary and the tail —
+  // turns neither sent nor summarised, and past what recall could reach.
+  const transcript = messages
     .map(
       (message) =>
         `${message.role === "assistant" ? "Assistant" : "Athlete"}: ${message.content}`

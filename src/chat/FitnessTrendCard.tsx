@@ -4,7 +4,6 @@ import {
   AreaChart,
   ComposedChart,
   Line,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
@@ -69,40 +68,38 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
           <h5>Training load</h5>
           <div className="chat-visual-chart-shell">
             <ChartWhenNear>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={loadPoints} margin={trainingChartMargin}>
-                  <defs>
-                    <ChartAreaGradient id={`chatLoadFill-${preview.previewId}`} />
-                  </defs>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={36}
-                  />
-                  <Tooltip
-                    content={(props) => <TrendTooltip {...props} />}
-                    contentStyle={trainingChartTooltipStyle}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="trainingLoad"
-                    name="Load"
-                    stroke={colors.accentBright}
-                    fill={`url(#chatLoadFill-${preview.previewId})`}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={activeDot}
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <AreaChart data={loadPoints} margin={trainingChartMargin}>
+                <defs>
+                  <ChartAreaGradient id={`chatLoadFill-${preview.previewId}`} />
+                </defs>
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  content={(props) => <TrendTooltip {...props} />}
+                  contentStyle={trainingChartTooltipStyle}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="trainingLoad"
+                  name="Load"
+                  stroke={colors.accentBright}
+                  fill={`url(#chatLoadFill-${preview.previewId})`}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={activeDot}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
             </ChartWhenNear>
           </div>
         </section>
@@ -113,52 +110,50 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
           <h5>HRV vs baseline</h5>
           <div className="chat-visual-chart-shell">
             <ChartWhenNear>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={hrvPoints} margin={trainingChartMargin}>
-                  <defs>
-                    <ChartAreaGradient id={`chatHrvFill-${preview.previewId}`} />
-                  </defs>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={36}
-                  />
-                  <Tooltip
-                    content={(props) => <TrendTooltip {...props} />}
-                    contentStyle={trainingChartTooltipStyle}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="avgSleepHrv"
-                    name="HRV"
-                    stroke={colors.accentBright}
-                    fill={`url(#chatHrvFill-${preview.previewId})`}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={activeDot}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="sleepHrvBase"
-                    name="Baseline"
-                    stroke={colors.gold}
-                    strokeWidth={2}
-                    strokeDasharray="5 4"
-                    dot={false}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <ComposedChart data={hrvPoints} margin={trainingChartMargin}>
+                <defs>
+                  <ChartAreaGradient id={`chatHrvFill-${preview.previewId}`} />
+                </defs>
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  content={(props) => <TrendTooltip {...props} />}
+                  contentStyle={trainingChartTooltipStyle}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="avgSleepHrv"
+                  name="HRV"
+                  stroke={colors.accentBright}
+                  fill={`url(#chatHrvFill-${preview.previewId})`}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={activeDot}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="sleepHrvBase"
+                  name="Baseline"
+                  stroke={colors.gold}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+              </ComposedChart>
             </ChartWhenNear>
           </div>
         </section>
@@ -169,41 +164,39 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
           <h5>Resting heart rate</h5>
           <div className="chat-visual-chart-shell">
             <ChartWhenNear>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={rhrPoints} margin={trainingChartMargin}>
-                  <defs>
-                    <ChartAreaGradient id={`chatRhrFill-${preview.previewId}`} />
-                  </defs>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: colors.text, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={36}
-                  />
-                  <Tooltip
-                    content={(props) => <TrendTooltip {...props} />}
-                    contentStyle={trainingChartTooltipStyle}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="rhr"
-                    name="RHR"
-                    stroke={colors.accentBright}
-                    fill={`url(#chatRhrFill-${preview.previewId})`}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={activeDot}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <AreaChart data={rhrPoints} margin={trainingChartMargin}>
+                <defs>
+                  <ChartAreaGradient id={`chatRhrFill-${preview.previewId}`} />
+                </defs>
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: colors.text, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  content={(props) => <TrendTooltip {...props} />}
+                  contentStyle={trainingChartTooltipStyle}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="rhr"
+                  name="RHR"
+                  stroke={colors.accentBright}
+                  fill={`url(#chatRhrFill-${preview.previewId})`}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={activeDot}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+              </AreaChart>
             </ChartWhenNear>
           </div>
         </section>

@@ -289,8 +289,13 @@ export function zoneColor(bucket: number): string {
   return ZONE_COLORS[Math.min(ZONE_COLORS.length - 1, Math.max(0, bucket))]!;
 }
 
+/** COROS's own zone number for a bucket: bucket 0 is Zone 1, the one under the first bound. */
+export function zoneNumber(bucket: number): number {
+  return Math.max(0, bucket) + 1;
+}
+
 export function zoneLabel(bucket: number): string {
-  return `Z${Math.max(0, bucket) + 1}`;
+  return `Z${zoneNumber(bucket)}`;
 }
 
 export interface RouteZoneColoring {

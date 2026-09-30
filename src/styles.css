@@ -20369,26 +20369,6 @@ tr.data-intervals-row-missing {
   border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
 }
 
-.chat-header-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.chat-header-icon:hover {
-  border-color: var(--glass-border);
-  color: var(--text-primary);
-}
-
 /* The sheet's own layer sits inside this, over the whole window. */
 .coach-sheet {
   position: fixed;
@@ -21983,7 +21963,7 @@ tr.data-intervals-row-missing {
   margin: 10px 0;
 }
 
-.chat-inline-chart > :is(.chat-visual-card, .chat-hr-trend-card) {
+.chat-inline-chart > .chat-visual-card {
   width: 100%;
   box-sizing: border-box;
 }

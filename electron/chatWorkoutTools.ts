@@ -393,7 +393,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "draft_id must be the newest version's; if it is not, the newest is returned to revise instead. " +
         "Sessions are named by their key. A single workout takes only replace_session (with the whole new workout) and rename. " +
         "The revised plan is checked like a new draft; a refusal lists every problem, and nothing is changed.",
-      inputSchema: buildRevisePlanToolSchema()
+      inputSchema: buildRevisePlanInputSchema()
     },
     {
       name: "get_plan_draft",
@@ -1511,7 +1511,7 @@ async function readPlanDraftFromCoros(
   };
 }
 
-/** The optional follow-ups field (P1.8), the same on every tool that makes a version. */
+/** The optional `revises` field, the same on every tool that makes a version. */
 function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
   const properties = (schema.properties ?? {}) as Record<string, unknown>;
   return {
@@ -1584,10 +1584,6 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
     },
     required: ["draft_id", "summary", "ops"]
   };
-}
-
-export function buildRevisePlanToolSchema(): Record<string, unknown> {
-  return buildRevisePlanInputSchema();
 }
 
 async function handleListScheduledWorkouts(
@@ -2386,8 +2382,7 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
             ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
             ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {}),
-            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {}),
-            ...(stored.refinements?.length ? { refinements: stored.refinements } : {})
+            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {})
           }
         ];
       } catch {

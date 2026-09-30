@@ -221,22 +221,14 @@ export function AnalysisDetailView({
     setSaving(true);
     setError(null);
     try {
-      const result = await api.updateCoachAnalysis(analysisId, {
+      await api.updateCoachAnalysis(analysisId, {
         ...draft,
         trigger: trigger.trigger,
         conditions: trigger.conditions,
         deviceOnly: trigger.deviceOnly
       });
-      // The store clamps and normalizes, so show what was stored rather than
-      // leaving the form displaying a value that was never accepted.
-      if (result) {
-        const input = toInput(result);
-        const triggerDraft = toTriggerDraft(result);
-        setDraft(input);
-        setTrigger(triggerDraft);
-        setSaved(fingerprint(input, triggerDraft));
-      }
-      await refresh();
+      // Saving closes the analysis, so there is no form left to show the
+      // stored values in, and nothing to read again.
       await onChanged();
       onBack();
     } catch (caught) {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
+import { ResponsiveContainer } from "recharts";
 
 /** How far outside the transcript's visible part a chart is drawn ahead of time. */
 const LOOKAHEAD = "800px 0px";
@@ -17,9 +18,9 @@ const LOOKAHEAD = "800px 0px";
  *
  * Observed against the transcript rather than the window: the margin only
  * reaches past the root's own edge, and the transcript clips everything
- * outside it.
+ * outside it. The chart fills the shell, so every caller's container is this one.
  */
-export function ChartWhenNear({ children }: { children: ReactNode }) {
+export function ChartWhenNear({ children }: { children: ReactElement }) {
   const ref = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(() => typeof IntersectionObserver === "undefined");
 
@@ -41,7 +42,11 @@ export function ChartWhenNear({ children }: { children: ReactNode }) {
 
   return (
     <div ref={ref} className="chat-chart-when-near">
-      {near ? children : null}
+      {near ? (
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }

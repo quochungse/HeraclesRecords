@@ -1,6 +1,5 @@
 import type {
   ChatMessage,
-  ChatProvider,
   ChatTokenUsage,
   CompactContextSettings,
   CompactModelChoice,
@@ -16,6 +15,7 @@ import type {
 } from "./types";
 import { briefLine, outlineLine } from "./planBrief";
 import { stripChartPlaceholders } from "./chartPlacement";
+import { isChatProvider } from "./chatModels";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -98,8 +98,6 @@ export const DEFAULT_COMPACT_CONTEXT: CompactContextSettings = {
   ...DEFAULT_CONTEXT_WINDOW
 };
 
-export type { ContextDetail };
-
 /**
  * How much of a conversation reaches the model as it was written.
  *
@@ -150,14 +148,12 @@ export const CONTEXT_BUDGETS: Readonly<Record<ContextDetail, ContextBudget>> = {
   full: { rollAt: 12_000, keep: 6_000, middle: 10_000 }
 };
 
-export const DEFAULT_CONTEXT_DETAIL: ContextDetail = "balanced";
+const DEFAULT_CONTEXT_DETAIL: ContextDetail = "balanced";
 export const DEFAULT_CONTEXT_BUDGET: ContextBudget = CONTEXT_BUDGETS[DEFAULT_CONTEXT_DETAIL];
 
 export function normalizeContextDetail(value: unknown): ContextDetail {
   return value === "lean" || value === "balanced" || value === "full" ? value : DEFAULT_CONTEXT_DETAIL;
 }
-
-const COMPACT_PROVIDERS: readonly string[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
 
 /**
  * Reads a stored or handed model choice. A `fixed` choice with no provider or
@@ -180,12 +176,11 @@ export function normalizeCompactModelChoice(value: unknown): CompactModelChoice 
   if (choice.kind === "conversation") return { kind: "conversation" };
   if (
     choice.kind === "fixed" &&
-    typeof choice.provider === "string" &&
-    COMPACT_PROVIDERS.includes(choice.provider) &&
+    isChatProvider(choice.provider) &&
     typeof choice.model === "string" &&
     choice.model.trim()
   ) {
-    return { kind: "fixed", provider: choice.provider as ChatProvider, model: choice.model.trim() };
+    return { kind: "fixed", provider: choice.provider, model: choice.model.trim() };
   }
   return { kind: "auto" };
 }
@@ -200,12 +195,12 @@ export function serializeCompactModelChoice(choice: CompactModelChoice): string 
  * Vietnamese, which most of these conversations are written in, nearer two
  * and a half. Three is between them, and a budget needs no more than that.
  */
-export function estimateTokens(text: string): number {
+function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
 
 /**
- * The digest of a coach answer, when one has been made (`chatDigestService`).
+ * The digest of a coach answer, when one has been made (`requestDigests`).
  * A lookup rather than a map so this module stays free of the hashing the
  * store keys digests by — the renderer imports it.
  */
@@ -315,7 +310,7 @@ export function normalizeContextWindow(
  * How a condensed answer reads to the model: marked, so the coach knows it is
  * reading its own answer in brief and where the whole of it is.
  */
-export const CONDENSED_ANSWER_MARK = "[condensed]";
+const CONDENSED_ANSWER_MARK = "[condensed]";
 
 export function toWireMessages(
   entries: readonly PersistedChatEntry[],
@@ -357,13 +352,8 @@ export function toWireMessages(
       const digest = entry.role === "assistant" && content.trim() ? digestOf?.(content) : undefined;
       if (digest) push({ role: entry.role, content: `${CONDENSED_ANSWER_MARK} ${digest}` });
       else if (content.trim()) push({ role: entry.role, content });
-    } else if (entry.kind === "planEvent") {
-      events.push(planEventNote(entry.event));
-    } else if (entry.kind === "planRefs") {
-      // Rides on the question it was attached to, which follows it.
-      events.push(planRefsNote(entry.refs));
-    } else if (entry.kind === "scheduleRefs") {
-      events.push(scheduleRefsNote(entry.refs));
+    } else if (ridesOnNextMessage(entry)) {
+      events.push(wireNote(entry));
     } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
@@ -377,6 +367,23 @@ export function toWireMessages(
   }
   flushEvents();
   return wire;
+}
+
+type WireNoteEntry = Extract<PersistedChatEntry, { kind: "planEvent" | "planRefs" | "scheduleRefs" }>;
+
+/**
+ * An entry the wire sends as a note on the athlete's next message rather than
+ * as a message of its own: what happened to a creation, and what a question
+ * points at (which rides on the question it was attached to, after it).
+ */
+export function ridesOnNextMessage(entry: PersistedChatEntry): entry is WireNoteEntry {
+  return entry.kind === "planEvent" || entry.kind === "planRefs" || entry.kind === "scheduleRefs";
+}
+
+function wireNote(entry: WireNoteEntry): string {
+  if (entry.kind === "planEvent") return planEventNote(entry.event);
+  if (entry.kind === "planRefs") return planRefsNote(entry.refs);
+  return scheduleRefsNote(entry.refs);
 }
 
 /** What the athlete pointed at, as a line in front of their question. */
@@ -801,8 +808,6 @@ export interface TranscriptContextResult {
   tailStart: number;
   /** What the stored count is now — unchanged unless a roll landed. */
   through: number;
-  /** Where the verbatim turns begin, as stored now. */
-  condensedThrough: number;
   /** Whether a summariser turn actually ran. */
   rolled: boolean;
   /** A roll ran and produced nothing; the untrimmed tail is being sent. */
@@ -885,11 +890,7 @@ export async function applyTranscriptContext(
   });
   if (plan.toDigest.length) params.digest?.(plan.toDigest);
   const moved = plan.condensedThrough !== params.stored.condensedThrough;
-  const settled = {
-    tail: plan.tail,
-    tailStart: plan.condensedThrough,
-    condensedThrough: plan.condensedThrough
-  };
+  const settled = { tail: plan.tail, tailStart: plan.condensedThrough };
   if (!plan.toSummarise.length) {
     if (moved) params.storeCondensed?.(plan.condensedThrough);
     return {

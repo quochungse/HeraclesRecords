@@ -41,8 +41,7 @@ export function ChatSettingsPanel({
   onOpenCoachModels,
   onUpdateChatSettings,
   pendingBudget,
-  onPendingBudgetChange,
-  savedSpend
+  onPendingBudgetChange
 }: {
   api: CorosLinkApi | undefined;
   chatSettings: ChatSettings;
@@ -53,8 +52,6 @@ export function ChatSettingsPanel({
   /** The analyses' monthly budget as edited, or `undefined` while it is the saved one. */
   pendingBudget: number | null | undefined;
   onPendingBudgetChange: (budget: number | null | undefined) => void;
-  /** What a save's budget write answered; the spend line shows it. */
-  savedSpend: CoachAnalysisSpend | null;
 }) {
   const customInstructions = chatSettings.customInstructions ?? "";
   const coachStyle = normalizeCoachStyle(chatSettings.coachStyle);
@@ -226,7 +223,6 @@ export function ChatSettingsPanel({
         api={api}
         pendingBudget={pendingBudget}
         onPendingBudgetChange={onPendingBudgetChange}
-        savedSpend={savedSpend}
       />
     </div>
   );
@@ -279,20 +275,14 @@ function CompactContextSection({
     : [];
   const fixedModelKnown = model.kind === "fixed" && fixedOptions.some((option) => option.value === model.model);
 
-  const chooseKind = (kind: ModelChoiceKind) => {
-    if (kind !== "fixed") {
-      onChange({ model: { kind } });
-      return;
-    }
-    const provider = CHOOSABLE_PROVIDERS.includes(coachProvider) ? coachProvider : "claude-code";
-    const options = providerModelOptions(provider, chatSettings).filter((option) => option.value);
-    const first = compressionModelFor(provider, options) ?? options[0];
-    if (first) onChange({ model: { kind: "fixed", provider, model: first.value } });
-  };
   const chooseProvider = (provider: ChatProvider) => {
     const options = providerModelOptions(provider, chatSettings).filter((option) => option.value);
     const first = compressionModelFor(provider, options) ?? options[0];
     if (first) onChange({ model: { kind: "fixed", provider, model: first.value } });
+  };
+  const chooseKind = (kind: ModelChoiceKind) => {
+    if (kind === "fixed") chooseProvider(CHOOSABLE_PROVIDERS.includes(coachProvider) ? coachProvider : "claude-code");
+    else onChange({ model: { kind } });
   };
 
   return (
@@ -414,13 +404,11 @@ function CompactContextSection({
 function AnalysesSettingsSection({
   api,
   pendingBudget,
-  onPendingBudgetChange,
-  savedSpend
+  onPendingBudgetChange
 }: {
   api: CorosLinkApi | undefined;
   pendingBudget: number | null | undefined;
   onPendingBudgetChange: (budget: number | null | undefined) => void;
-  savedSpend: CoachAnalysisSpend | null;
 }) {
   const [pause, setPause] = useState<CoachAnalysisPause | null>(null);
   const [spend, setSpend] = useState<CoachAnalysisSpend | null>(null);
@@ -459,11 +447,6 @@ function AnalysesSettingsSection({
       cancelled = true;
     };
   }, [api]);
-
-  // A save answers with the month as it now stands, the new ceiling included.
-  useEffect(() => {
-    if (savedSpend) setSpend(savedSpend);
-  }, [savedSpend]);
 
   // The trip usually happens with no window open at all — a scheduled run
   // finding COROS asking for a login code at 07:30 — so this panel follows the

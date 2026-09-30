@@ -1,4 +1,5 @@
-import { toWireMessages } from "./chatContextCompaction";
+import { ridesOnNextMessage, toWireMessages } from "./chatContextCompaction";
+import { entryTimeFromMid } from "./chatEntryTime";
 import type { ChatEntryMergeMeta, ChatMessage, ChatRole, PersistedChatEntry } from "./types";
 
 /**
@@ -20,22 +21,6 @@ interface Exchange {
 }
 
 /**
- * When the store first saw an entry, from its `mid` — the rule
- * `entryTimeFromMid` in `src/chat/chatTypes.ts` states for the renderer.
- */
-function entryTime(entry: PersistedChatEntry): number | undefined {
-  const mid = (entry as ChatEntryMergeMeta).mid;
-  if (!mid || mid.includes("~")) return undefined;
-  const match = /^1-([0-9a-f]{12})-/.exec(mid);
-  return match ? parseInt(match[1]!, 16) : undefined;
-}
-
-/** Entries `toWireMessages` folds into the athlete message after them rather than sending as their own. */
-const RIDES_ON_NEXT = new Set<PersistedChatEntry["kind"]>(["planRefs", "scheduleRefs", "planEvent"]);
-/** Entries that are words on the wire; every other kind (a card) sends nothing. */
-const SENDS_WORDS = new Set<PersistedChatEntry["kind"]>(["message", "coachPrompt"]);
-
-/**
  * The entries as exchanges. One opens at each athlete message — except that a
  * question Coach asked on a card opens its own, so the answer the athlete
  * picked stays with the question rather than starting the next exchange.
@@ -52,7 +37,7 @@ function exchangesOf(entries: PersistedChatEntry[]): Exchange[] {
     toWireMessages(group).forEach((message, index) => {
       const opens = entry.kind === "coachPrompt" ? index === 0 : message.role === "user";
       if (opens || !current) {
-        const at = entryTime(entry);
+        const at = entryTimeFromMid((entry as ChatEntryMergeMeta).mid);
         current = { number: exchanges.length + 1, ...(at !== undefined ? { at } : {}), lines: [] };
         exchanges.push(current);
       }
@@ -62,8 +47,9 @@ function exchangesOf(entries: PersistedChatEntry[]): Exchange[] {
     });
   };
   for (const entry of entries) {
-    if (SENDS_WORDS.has(entry.kind)) add(entry);
-    else if (RIDES_ON_NEXT.has(entry.kind)) held.push(entry);
+    if (ridesOnNextMessage(entry)) held.push(entry);
+    // A card sends nothing, so the notes before it wait for the message after it.
+    else if (toWireMessages([entry]).length) add(entry);
   }
   const trailing = held.pop();
   if (trailing) add(trailing);

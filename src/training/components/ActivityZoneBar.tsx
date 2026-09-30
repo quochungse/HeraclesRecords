@@ -1,18 +1,19 @@
 import type { TrainingHubActivityZoneBucket } from "../../../electron/types";
 import { formatDurationSpan } from "../formatters";
+import { zoneLabel, zoneNumber } from "./routeColoring";
 
 interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
 }
 
 /**
- * COROS's own zone number: bucket 0 is Zone 1, the one under the first bound.
- * What each zone is called depends on the account's model (Max HR names them
+ * COROS's own zone number (`zoneNumber`), as the route map numbers it. What
+ * each zone is called depends on the account's model (Max HR names them
  * differently from the other two), which this bar is not told, so it states
  * the number and the bounds and nothing it would have to guess.
  */
 function zoneCaption(index: number): string {
-  return `Zone ${index + 1}`;
+  return `Zone ${zoneNumber(index)}`;
 }
 
 function bounds(zone: TrainingHubActivityZoneBucket): string | undefined {
@@ -71,7 +72,7 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
             >
               <i data-zone={Math.min(6, Math.max(0, zone.index))} aria-hidden="true" />
               <span className="activity-zones-name">
-                {`Z${zone.index + 1}`}
+                {zoneLabel(zone.index)}
               </span>
               <strong>{formatDurationSpan(seconds)}</strong>
               <span className="activity-zones-share">

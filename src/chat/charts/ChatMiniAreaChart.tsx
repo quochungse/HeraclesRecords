@@ -1,7 +1,6 @@
 import {
   Area,
   AreaChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
@@ -75,46 +74,44 @@ export function ChatMiniAreaChart({
   return (
     <div className="chat-visual-chart-shell">
       <ChartWhenNear>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={trainingChartMargin}>
-            <defs>
-              <ChartAreaGradient id={gradientId} />
-            </defs>
-            <XAxis
-              dataKey="label"
-              tick={{ fill: colors.text, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              minTickGap={24}
-            />
-            <YAxis
-              tick={{ fill: colors.text, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              width={36}
-              domain={["auto", "auto"]}
-              tickFormatter={yAxisFormatter}
-            />
-            <Tooltip
-              content={(props) => (
-                <MiniAreaTooltip {...props} formatValue={formatValue} />
-              )}
-              cursor={{ stroke: colors.cursor }}
-              contentStyle={trainingChartTooltipStyle}
-            />
-            <Area
-              type="monotone"
-              dataKey="value"
-              name={name}
-              stroke={colors.accentBright}
-              fill={`url(#${gradientId})`}
-              strokeWidth={2}
-              dot={false}
-              activeDot={activeDot}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <AreaChart data={data} margin={trainingChartMargin}>
+          <defs>
+            <ChartAreaGradient id={gradientId} />
+          </defs>
+          <XAxis
+            dataKey="label"
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={24}
+          />
+          <YAxis
+            tick={{ fill: colors.text, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+            domain={["auto", "auto"]}
+            tickFormatter={yAxisFormatter}
+          />
+          <Tooltip
+            content={(props) => (
+              <MiniAreaTooltip {...props} formatValue={formatValue} />
+            )}
+            cursor={{ stroke: colors.cursor }}
+            contentStyle={trainingChartTooltipStyle}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            name={name}
+            stroke={colors.accentBright}
+            fill={`url(#${gradientId})`}
+            strokeWidth={2}
+            dot={false}
+            activeDot={activeDot}
+            isAnimationActive={false}
+          />
+        </AreaChart>
       </ChartWhenNear>
     </div>
   );

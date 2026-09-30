@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Settings2, X } from "lucide-react";
-import type { ChatSettings, CoachAnalysisSpend } from "../../electron/types";
+import type { ChatSettings } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { CoachModelsModal } from "../settings/CoachModelsModal";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
@@ -26,7 +26,7 @@ function normalizeDraftValue<K extends DraftKey>(key: K, value: ChatSettings[K])
 }
 
 /** The draft's keys that differ from what is saved: what Save would write. */
-export function settingsDraftChanges(saved: ChatSettings, draft: SettingsDraft): SettingsDraft {
+function settingsDraftChanges(saved: ChatSettings, draft: SettingsDraft): SettingsDraft {
   const changes: SettingsDraft = {};
   for (const key of Object.keys(draft) as DraftKey[]) {
     const next = normalizeDraftValue(key, draft[key] as ChatSettings[typeof key]);
@@ -82,8 +82,6 @@ export function ChatSettingsModal({
   const [draft, setDraft] = useState<SettingsDraft>({});
   /** The monthly budget as edited; `undefined` while it is the saved one. */
   const [pendingBudget, setPendingBudget] = useState<number | null | undefined>(undefined);
-  /** What the last Save's budget write answered, for the spend line to show. */
-  const [savedSpend, setSavedSpend] = useState<CoachAnalysisSpend | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   /** The discard question is on screen: after Discard, or after a close. */
@@ -114,9 +112,7 @@ export function ChatSettingsModal({
     setSaveError(null);
     try {
       if (Object.keys(changes).length > 0) await onSaveChatSettings(changes);
-      if (pendingBudget !== undefined && api) {
-        setSavedSpend(await api.setCoachAnalysisBudget(pendingBudget));
-      }
+      if (pendingBudget !== undefined && api) await api.setCoachAnalysisBudget(pendingBudget);
       setDraft({});
       setPendingBudget(undefined);
       onClose();
@@ -231,7 +227,6 @@ export function ChatSettingsModal({
             onUpdateChatSettings={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             pendingBudget={pendingBudget}
             onPendingBudgetChange={setPendingBudget}
-            savedSpend={savedSpend}
           />
         </div>
         <footer className="app-modal-footer chat-settings-modal-footer">

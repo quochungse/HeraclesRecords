@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Heart } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type { HrZonePreview } from "../../electron/types";
@@ -161,28 +161,26 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
               <div className="chat-zone-donut" aria-hidden="true">
                 {chartData.length > 0 ? (
                   <ChartWhenNear>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          dataKey="percent"
-                          nameKey="label"
-                          innerRadius="58%"
-                          outerRadius="88%"
-                          paddingAngle={2}
-                          stroke="none"
-                          isAnimationActive={false}
-                        >
-                          {chartData.map((entry) => (
-                            <Cell key={entry.index} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          content={(props) => <ZoneTooltip {...props} />}
-                          contentStyle={trainingChartTooltipStyle}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        dataKey="percent"
+                        nameKey="label"
+                        innerRadius="58%"
+                        outerRadius="88%"
+                        paddingAngle={2}
+                        stroke="none"
+                        isAnimationActive={false}
+                      >
+                        {chartData.map((entry) => (
+                          <Cell key={entry.index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={(props) => <ZoneTooltip {...props} />}
+                        contentStyle={trainingChartTooltipStyle}
+                      />
+                    </PieChart>
                   </ChartWhenNear>
                 ) : (
                   <div className="chat-zone-empty-ring" />

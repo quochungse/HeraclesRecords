@@ -664,7 +664,6 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       onUpdateChatSettings={spy("onUpdateChatSettings")}
       pendingBudget={undefined}
       onPendingBudgetChange={spy("onPendingBudgetChange")}
-      savedSpend={null}
     />
   ),
   // The dialog around it, which holds the draft and writes it on Save. The

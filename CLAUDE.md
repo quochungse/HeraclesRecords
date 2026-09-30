@@ -1085,10 +1085,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the
   answer last, so where the answer goes is decided at the end: under the turn's charts
   (`activityVisual`, `fitnessTrend`, `hrZoneSummary` — what it reads from) and above its
-  other cards (a plan, a workout, a change set — what it proposes). `orderTurn`
-  (`chatTypes.ts`) does it for a settle and for the streaming bubble, so nothing moves when
-  a turn ends; `createCollectorSink` does it for a headless run with its own
-  `isChartEntry`, and the two kind lists must agree. From 2026-09-26 (e5d2b36) to this rule
+  other cards (a plan, a workout, a change set — what it proposes). `orderTurn` and the chart
+  kind list (`isChartKind`) live in node-free `electron/chartPlacement.ts`, and all three
+  readers go through them — a settle and the streaming bubble (`chatTypes.ts`), so nothing
+  moves when a turn ends, and `createCollectorSink` for a headless run, so a chart handle
+  names the same chart in both. From 2026-09-26 (e5d2b36) to this rule
   the answer went ahead of every card, charts included; rows written then are left as they
   are. `test:chat-stream-sink`, `test:chat-plan-card-renderer`.
   **That is the default; the answer may place a chart among its words**
@@ -1181,7 +1182,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   **1,500-token thinking budget** (`budget_tokens` on the Messages API, `thinking: {type:
   "enabled"}` through the Agent SDK — `effort` does not reach a model that takes none), and
   `digestProblems` refuses a digest stating a date or a figure its answer does not; one retry
-  with the reasons, then it is stored as refused (NULL) and not tried again. Digests are keyed
+  with the reasons, then it is stored as refused (NULL) and not tried again. A job that could
+  not run at all stores nothing, stops its batch and stands that model down for ten minutes
+  (`DIGEST_BACKOFF_MS`), or a signed-out provider fails the same batch every turn. Digests are keyed
   by a hash of the answer's text (`chat_answer_digests`, `derived`: another machine makes its
   own) and deleted with the conversation.
   **Digests and the rolling summary are text jobs** (`StreamChatOptions.textJob`, `runTextJob`):
@@ -1201,8 +1204,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   folded, whole words, neighbouring terms ranked up, two exchanges by default and five at most,
   a long answer cut to its opening and the paragraphs that match. It is offered only while there
   is something to recall (`toolsForRun`), never to a pipeline step, and is read-only.
-  **Claude Code's prompt cuts to the last 30 messages, and the summary rides ahead of the cut**
-  (`formatClaudePrompt`): it is the first message, and the cut used to take it.
+  **Claude Code's prompt is every message it is handed** (`formatClaudePrompt`), as every other
+  provider's is: what a conversation sends is bounded where it is planned. A cut to the last 30
+  used to take the condensed layer between the summary and the tail — turns neither sent nor
+  summarised, and past what recall could reach.
 
   **The system prompt is three parts in a fixed order, and the order is for the cache.**
   `buildBaseCoachInstructions` is who the coach is and how it coaches, and **names no tool** — it
@@ -1388,14 +1393,14 @@ Overview, Media, Data, and Settings are in the main bundle.
 
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
   over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
-  compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which Coach's header gear and the sign-in gates open: they are feature-wide and
+  compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which the composer's gear and the sign-in gates open: they are feature-wide and
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
   because shown whole there it buried that page's content.
   **The dialog edits a draft and writes it on Save** (`ChatSettingsModal`): the panel is handed
   the saved settings with the draft laid over them and changes only the draft, the monthly
-  budget included (written through `setCoachAnalysisBudget` on Save, whose answer the spend line
-  then shows); Discard drops it, and closing with a draft held asks first. Every control used to
+  budget included (written through `setCoachAnalysisBudget` on Save, which closes the dialog);
+  Discard drops it, and closing with a draft held asks first. Every control used to
   save on change and the instructions box on blur, so a half-written instruction reached the
   next turn and went out through sync with no way back. The Coach Models row and Resume are not
   part of the draft — one is its own dialog, the other an action. `test:coach-analysis-renderer`.

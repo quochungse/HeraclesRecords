@@ -173,7 +173,7 @@ import {
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
 import { inlineSuggestionsSection } from "./chatCoachContext";
-import { chartHandle, chartHandleNote } from "./chartPlacement";
+import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
   createChatSession,
   deleteChatSession,
@@ -586,6 +586,31 @@ export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTe
   };
   recordClaudeCodeStatus(status);
   return { ...result, status };
+}
+
+/**
+ * How long a signed-in Claude Code status is taken as read for a text job. A
+ * digest batch runs its jobs one after another, each up to twice, and every
+ * probe starts `claude auth status` before the SDK starts a CLI of its own.
+ */
+const TEXT_JOB_STATUS_TTL_MS = 60_000;
+let lastClaudeCodeStatus: { key: string; at: number; status: ClaudeCodeStatus } | undefined;
+
+/** The status a turn checks before it runs; a text job may reuse a recent signed-in one. */
+async function claudeCodeStatusForTurn(
+  executablePath: string | undefined,
+  configDir: string | undefined,
+  textJob: boolean
+): Promise<ClaudeCodeStatus> {
+  const key = `${executablePath ?? ""}\n${configDir ?? ""}`;
+  const held = lastClaudeCodeStatus;
+  if (textJob && held?.key === key && held.status.authenticated && Date.now() - held.at < TEXT_JOB_STATUS_TTL_MS) {
+    return held.status;
+  }
+  const status = await inspectClaudeCodeStatus(executablePath, configDir);
+  lastClaudeCodeStatus = { key, at: Date.now(), status };
+  recordClaudeCodeStatus(status);
+  return status;
 }
 
 function recordClaudeCodeStatus(status: ClaudeCodeStatus): void {
@@ -1431,15 +1456,6 @@ function upsertEntry(
   entries.push(entry);
 }
 
-/** A chart card: the three kinds the renderer's `isChatVisualEntry` names. */
-function isChartEntry(entry: PersistedChatEntry): boolean {
-  return (
-    entry.kind === "activityVisual" ||
-    entry.kind === "fitnessTrend" ||
-    entry.kind === "hrZoneSummary"
-  );
-}
-
 export function createCollectorSink(
   marker?: ChatEntryAnalysisMarker
 ): ChatStreamCollectorSink {
@@ -1633,9 +1649,9 @@ export function createCollectorSink(
     // ChatView settles an interactive turn (`orderTurn`): a chart is what the
     // answer reads from, a creation is what it proposes.
     const turn = entries.splice(Math.min(turnStart, entries.length));
-    entries.push(...turn.filter(isChartEntry));
+    const answer: PersistedChatEntry[] = [];
     if (fullText) {
-      entries.push({
+      answer.push({
         kind: "message",
         role: "assistant",
         content: fullText,
@@ -1651,7 +1667,7 @@ export function createCollectorSink(
         ...(marker ? { automation: marker } : {})
       });
     }
-    entries.push(...turn.filter((entry) => !isChartEntry(entry)));
+    entries.push(...orderTurn(turn, answer, (entry) => isChartKind(entry.kind)));
     for (const prompt of prompts) {
       upsertEntry(
         entries,
@@ -1823,10 +1839,8 @@ async function streamChatTurn(
   const roleInstructions = options.roleInstructions;
   const runtime = options.runtime ?? {};
   const job = options.textJob;
-  // Every provider below reads its context and tool surface through these two,
-  // so a text job skips both in one place rather than in five.
-  const turnContext: typeof buildTrainingContext = (...args) =>
-    job ? Promise.resolve({ head: job.system, live: "", hasData: false }) : buildTrainingContext(...args);
+  // Every provider below reads its tool surface through this, and its context
+  // through `turnContext`, so a text job skips both in one place rather than in five.
   const turnToolSurface = (): Promise<void> => (job ? Promise.resolve() : prepareToolSurface());
   // What this turn cost, summed across its tool rounds and across whichever
   // provider answered. Left undefined when nobody reported: a run that cost
@@ -1911,16 +1925,29 @@ async function streamChatTurn(
   let fullText = "";
   try {
     const settings = getChatSettings();
+    const turnContext = (
+      permissions?: Parameters<typeof buildTrainingContext>[0]
+    ): ReturnType<typeof buildTrainingContext> =>
+      job
+        ? Promise.resolve({ head: job.system, live: "", hasData: false })
+        : buildTrainingContext(
+            permissions,
+            unitSystem,
+            settings.customInstructions,
+            roleInstructions,
+            runTools.get(requestId)?.context,
+            settings.coachStyle
+          );
     // An analysis may run on a different provider than the interactive chat
     // without touching the saved settings (decision 2).
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
       const claudeConfigDir = getClaudeCodeConfigDir(settings);
-      const status = await prepare(inspectClaudeCodeStatus(
+      const status = await prepare(claudeCodeStatusForTurn(
         settings.claudeCode.executablePath,
-        claudeConfigDir
+        claudeConfigDir,
+        Boolean(job)
       ));
-      recordClaudeCodeStatus(status);
       if (!status.authenticated || !status.executablePath) {
         throw new ClaudeCodeProviderError(
           status.message,
@@ -1933,14 +1960,7 @@ async function streamChatTurn(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
-      const { hasData, ...context } = await prepare(turnContext(
-        settings.claudeCode.permissions,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context,
-        settings.coachStyle
-      ));
+      const { hasData, ...context } = await prepare(turnContext(settings.claudeCode.permissions));
       const systemPrompt = coachSystemPrompt(
         context,
         chatTools,
@@ -2037,14 +2057,7 @@ async function streamChatTurn(
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
-      const { hasData, ...context } = await prepare(turnContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context,
-        settings.coachStyle
-      ));
+      const { hasData, ...context } = await prepare(turnContext());
 
       await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
@@ -2136,14 +2149,7 @@ async function streamChatTurn(
 
       await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const { hasData, ...context } = await prepare(turnContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context,
-        settings.coachStyle
-      ));
+      const { hasData, ...context } = await prepare(turnContext());
       const systemPrompt = coachSystemPrompt(
         context,
         chatTools,
@@ -2211,14 +2217,7 @@ async function streamChatTurn(
     }
 
     if (provider === "local") {
-      const { hasData, ...context } = await prepare(turnContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context,
-        settings.coachStyle
-      ));
+      const { hasData, ...context } = await prepare(turnContext());
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
         ...(runtime.model ? { model: runtime.model } : {})
@@ -2310,27 +2309,21 @@ async function streamChatTurn(
     }
 
     const token = await prepare(getValidToken());
-    const { hasData, ...context } = await prepare(turnContext(
-      undefined,
-      unitSystem,
-      settings.customInstructions,
-      roleInstructions,
-      runTools.get(requestId)?.context,
-      settings.coachStyle
-    ));
+    const { hasData, ...context } = await prepare(turnContext());
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
     await prepare(turnToolSurface());
     // Under the turn's policy, as every other provider's list is: a text job
     // runs with `none`, and a list of every tool would be offered to it.
-    const tools = buildChatFunctionTools(toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)));
+    const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
+    const tools = buildChatFunctionTools(chatTools);
 
     // When live tools are available, steer the model to use them rather than
     // leaning on the brief snapshot in `instructions`.
     const systemPrompt = coachSystemPrompt(
       context,
-      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
+      chatTools,
       { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
     );
 
