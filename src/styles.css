@@ -24023,25 +24023,32 @@ tr.data-intervals-row-missing {
 }
 
 /* --- Settings: Appearance -> Themes --------------------------------------- */
-/* Dark/light sits in the section heading; the palette swatches sit under it, so
-   the two axes of the theme read as one control rather than two features. */
+/* Appearance is the last section of the About card. Dark/light sits on a row
+   of its own under the heading, at its own width; the palette swatches sit
+   under it, so the two axes of the theme read as one control rather than two
+   features. */
 
 /* Where the switch sits in its row, and nothing about how it looks — that is
-   OptionGroup's, on both of these screens and on every other one. */
-.settings-compact-head > .option-group,
-.settings-appearance-head > .option-group {
+   OptionGroup's, on this screen and on every other one. */
+.settings-compact-head > .option-group {
   flex: 0 0 auto;
   margin-left: auto;
 }
 
-/* The heading line of the Appearance card: title on the left, mode switch on
-   the right. */
-.settings-appearance-head {
+/* The About card's two preference sections, each opened by a hairline that
+   divides rather than encloses. */
+.settings-startup,
+.settings-appearance {
+  padding-top: 18px;
+  border-top: 1px solid var(--glass-border);
+}
+
+/* A block of its own width rather than an inline box, so no line box adds a
+   strut under it. */
+.settings-appearance > .option-group {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  width: fit-content;
+  margin: 14px 0 16px;
 }
 
 /* The palettes. A swatch is the whole control — the colour is the thing being
@@ -30831,13 +30838,6 @@ tr.data-intervals-row-missing {
   color: var(--accent);
 }
 
-.settings-appearance-panel {
-  padding: 20px;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 56%),
-    var(--glass-bg);
-}
 /* Activity colours as chips.
  *
  * This was five 64px rows, each with a 42px icon tile, a sentence of
@@ -31110,43 +31110,21 @@ button.settings-about-link {
   color: var(--accent);
 }
 
-/* Startup view: a static row under the About links, shaped like the navigable
-   settings rows but ending in a menu trigger instead of a chevron. */
-.settings-startup-row {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 13px;
-  padding: 12px 14px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
+/* Startup view: a section of the About card, headed like Appearance under it,
+   with the menu trigger at the end of its heading line. */
+.settings-startup {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.settings-startup-icon {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--glass-border));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-}
-
-.settings-startup-copy {
-  display: grid;
-  gap: 3px;
+.settings-startup > .settings-section-head {
   min-width: 0;
 }
 
-.settings-startup-copy strong {
-  font-size: 14px;
-}
-
-.settings-startup-copy > span {
-  color: var(--text-muted);
-  font-size: 12px;
+.settings-startup > .startup-view-menu {
+  flex: 0 0 auto;
 }
 
 /* The navigable settings row: icon, copy, control. Every row in Connections
@@ -31708,10 +31686,6 @@ button.settings-about-link {
 }
 
 @media (max-width: 720px) {
-  .settings-appearance-panel {
-    padding: 18px;
-  }
-
   .settings-about-header {
     flex-wrap: wrap;
   }

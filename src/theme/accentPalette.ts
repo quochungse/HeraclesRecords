@@ -38,35 +38,35 @@ export const ACCENT_PALETTE_DETAILS: Record<AccentPalette, AccentPaletteDetail> 
   {
     gold: {
       label: "Heracles Gold",
-      description: "Default. Taken from the app icon.",
+      description: "Burnished gold, earned one labour at a time.",
       swatch: ["#e7b04c", "#c78f38"],
       dark: { accent: "#e7b04c", strong: "#f3bf5c" },
       paper: { accent: "#915e13", strong: "#734a0e" }
     },
     teal: {
       label: "Original Teal",
-      description: "The palette the app shipped with.",
+      description: "Deep, calm water for the steady miles.",
       swatch: ["#2fbe91", "#1fb6a6"],
       dark: { accent: "#2fbe91", strong: "#4fd6a6" },
       paper: { accent: "#0f7859", strong: "#0c674d" }
     },
     indigo: {
       label: "Indigo",
-      description: "Cool and low-glare for long sessions.",
+      description: "Night-run blue, easy on the eyes after dark.",
       swatch: ["#818cf8", "#6470e2"],
       dark: { accent: "#818cf8", strong: "#96a0fa" },
       paper: { accent: "#535ec8", strong: "#3d46a6" }
     },
     rose: {
       label: "Rose",
-      description: "Warm contrast against the dark shell.",
+      description: "The warm flush of a hard effort.",
       swatch: ["#fb7185", "#e2596f"],
       dark: { accent: "#fb7185", strong: "#fc8b9b" },
       paper: { accent: "#be384b", strong: "#9c2537" }
     },
     sky: {
       label: "Sky",
-      description: "Bright blue, highest legibility on paper.",
+      description: "A clear morning sky, crisp in light mode.",
       swatch: ["#38bdf8", "#22a3e0"],
       dark: { accent: "#38bdf8", strong: "#5ecbfa" },
       paper: { accent: "#0070a2", strong: "#00587f" }
