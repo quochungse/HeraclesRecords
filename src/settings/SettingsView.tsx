@@ -446,8 +446,7 @@ export function SettingsView({
           <div className="settings-about-copy">
             <h3>Heracles Records</h3>
             <p>
-              Unofficial COROS companion for media, watch sync, and training
-              analytics.
+              Unofficial COROS companion for training analytics.
             </p>
             {updateStatusText ? (
               <p className="settings-update-status">{updateStatusText}</p>
@@ -504,20 +503,171 @@ export function SettingsView({
           <ResourcesMenu />
         </div>
 
-        <div className="settings-startup-row">
-          <span className="settings-startup-icon" aria-hidden="true">
-            <StartupViewIcon size={22} strokeWidth={1.9} />
-          </span>
-          <span className="settings-startup-copy">
-            <strong>Startup view</strong>
-            <span>The screen Heracles Records opens on next launch.</span>
-          </span>
+        <div className="settings-startup">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden="true">
+              <StartupViewIcon size={18} strokeWidth={1.9} />
+            </span>
+            <div>
+              <h2>Startup view</h2>
+              <p>The screen Heracles Records opens on next launch.</p>
+            </div>
+          </div>
           <StartupViewMenu
             labeled
             value={startupView}
             onChange={onStartupViewChange}
             showDevelopmentItems={showDevelopmentTools}
           />
+        </div>
+
+        {/* Appearance lives inside the About card rather than a card of its
+            own. The mode switch sits on its own row under the heading;
+            the five palettes sit under it as swatches, with the selected one
+            named beside them. The palettes were five 220px cards carrying a
+            sentence apiece — "Night-run blue, easy on the eyes after dark" — which is
+            read once and never again, and which cost the section four hundred
+            pixels for a choice made by looking at the colour. The sentence is
+            not lost: the active one is shown under the row, and each swatch
+            carries its own as a title. */}
+        <div className="settings-appearance">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden="true">
+              <Palette size={18} strokeWidth={1.9} />
+            </span>
+            <div>
+              <h2>Appearance</h2>
+              <p>Colour mode, accent palette and the colours sports wear.</p>
+            </div>
+          </div>
+          {/* The swap animates out of the point that was pressed, so the chip
+              that produced the change comes back with it. */}
+          <OptionGroup
+            label="Color mode"
+            size="md"
+            value={theme}
+            options={THEME_MODES.map((mode) => ({
+              value: mode.id,
+              label: mode.label,
+              icon: <mode.icon size={15} aria-hidden="true" />
+            }))}
+            onChange={(next, from) => {
+              const rect = from?.getBoundingClientRect();
+              setTheme(
+                next,
+                rect
+                  ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+                  : undefined
+              );
+            }}
+          />
+
+          <div className="settings-palette-row">
+            <ul className="settings-palette-swatches">
+              {ACCENT_PALETTES.map((palette) => {
+                const detail = ACCENT_PALETTE_DETAILS[palette];
+                const active = accent === palette;
+                const swatchStyle = {
+                  "--swatch-from": detail.swatch[0],
+                  "--swatch-to": detail.swatch[1]
+                } as CSSProperties;
+
+                return (
+                  <li key={palette}>
+                    <button
+                      className={`settings-palette-option${active ? " is-active" : ""}`}
+                      type="button"
+                      aria-pressed={active}
+                      title={`${detail.label} — ${detail.description}`}
+                      aria-label={detail.label}
+                      onClick={(event) => {
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        setAccent(palette, {
+                          x: rect.left + rect.width / 2,
+                          y: rect.top + rect.height / 2
+                        });
+                      }}
+                    >
+                      <span
+                        className="settings-theme-swatch"
+                        style={swatchStyle}
+                        aria-hidden="true"
+                      />
+                      {active ? (
+                        <Check size={15} strokeWidth={3} aria-hidden="true" />
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {/* The one sentence still worth showing, and it belongs to whichever
+                swatch is selected — so the row stays readable without five
+                copies of it. */}
+            <p className="settings-palette-caption">
+              <strong>{ACCENT_PALETTE_DETAILS[accent].label}</strong>
+              <span>{ACCENT_PALETTE_DETAILS[accent].description}</span>
+            </p>
+          </div>
+
+          {/* A secondary control, and sized like one. Five full rows with an
+              icon tile, a sentence of description and a 164px picker apiece ran
+              to roughly four hundred pixels for a preference most people set
+              once; the chips carry the same two facts — which sport, which
+              colour — in a fifth of the height. The per-sport descriptions went
+              with them: the label already names the sport, and the sentence
+              under it only listed examples of the thing it had just named. */}
+          <div className="settings-sport-subheading">
+            <div className="settings-sport-subheading-copy">
+              <strong>Activity colors</strong>
+              <span>
+                Used by the training load heatmap and the calendar. A day with one
+                sport is solid; several sports split into a wheel.
+              </span>
+            </div>
+            <button
+              className="settings-sport-reset"
+              type="button"
+              onClick={resetSportColors}
+            >
+              <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
+              Reset
+            </button>
+          </div>
+          <ul className="settings-sport-chips">
+            {SPORT_COLOR_CATEGORIES.map((cat) => {
+              const colorStyle = {
+                "--sport-color": sportColors[cat],
+              } as CSSProperties;
+
+              const SportIcon = SPORT_COLOR_ICONS[cat];
+
+              return (
+                <li key={cat} style={colorStyle}>
+                  <label className="settings-sport-chip">
+                    <input
+                      type="color"
+                      className="settings-sport-input"
+                      value={sportColors[cat]}
+                      onChange={(event) =>
+                        updateSportColor(cat, event.target.value)
+                      }
+                      aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
+                    />
+                    <span className="settings-sport-swatch" aria-hidden="true">
+                      <SportIcon size={14} strokeWidth={2.2} />
+                    </span>
+                    <span className="settings-sport-chip-label">
+                      {SPORT_COLOR_LABELS[cat]}
+                    </span>
+                    <span className="settings-sport-hex">
+                      {sportColors[cat].toUpperCase()}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
 
@@ -570,156 +720,6 @@ export function SettingsView({
       </div>
 
       <SyncPanel api={api} />
-
-      <div className="panel settings-appearance-panel">
-        {/* Both axes of the theme on one line: the mode switch, the five
-            palettes as swatches, and the selected palette named beside them.
-            The palettes were five 220px cards carrying a sentence apiece —
-            "Cool and low-glare for long sessions" — which is read once and
-            never again, and which cost the section four hundred pixels for a
-            choice made by looking at the colour. The sentence is not lost: the
-            active one is shown under the row, and each swatch carries its own
-            as a title. */}
-        <div className="settings-appearance-head">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden="true">
-              <Palette size={18} strokeWidth={1.9} />
-            </span>
-            <div>
-              <h2>Appearance</h2>
-              <p>Colour mode, accent palette and the colours sports wear.</p>
-            </div>
-          </div>
-          {/* The swap animates out of the point that was pressed, so the chip
-              that produced the change comes back with it. */}
-          <OptionGroup
-            label="Color mode"
-            size="md"
-            value={theme}
-            options={THEME_MODES.map((mode) => ({
-              value: mode.id,
-              label: mode.label,
-              icon: <mode.icon size={15} aria-hidden="true" />
-            }))}
-            onChange={(next, from) => {
-              const rect = from?.getBoundingClientRect();
-              setTheme(
-                next,
-                rect
-                  ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-                  : undefined
-              );
-            }}
-          />
-        </div>
-
-        <div className="settings-palette-row">
-          <ul className="settings-palette-swatches">
-            {ACCENT_PALETTES.map((palette) => {
-              const detail = ACCENT_PALETTE_DETAILS[palette];
-              const active = accent === palette;
-              const swatchStyle = {
-                "--swatch-from": detail.swatch[0],
-                "--swatch-to": detail.swatch[1]
-              } as CSSProperties;
-
-              return (
-                <li key={palette}>
-                  <button
-                    className={`settings-palette-option${active ? " is-active" : ""}`}
-                    type="button"
-                    aria-pressed={active}
-                    title={`${detail.label} — ${detail.description}`}
-                    aria-label={detail.label}
-                    onClick={(event) => {
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      setAccent(palette, {
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2
-                      });
-                    }}
-                  >
-                    <span
-                      className="settings-theme-swatch"
-                      style={swatchStyle}
-                      aria-hidden="true"
-                    />
-                    {active ? (
-                      <Check size={15} strokeWidth={3} aria-hidden="true" />
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {/* The one sentence still worth showing, and it belongs to whichever
-              swatch is selected — so the row stays readable without five
-              copies of it. */}
-          <p className="settings-palette-caption">
-            <strong>{ACCENT_PALETTE_DETAILS[accent].label}</strong>
-            <span>{ACCENT_PALETTE_DETAILS[accent].description}</span>
-          </p>
-        </div>
-
-        {/* A secondary control, and sized like one. Five full rows with an
-            icon tile, a sentence of description and a 164px picker apiece ran
-            to roughly four hundred pixels for a preference most people set
-            once; the chips carry the same two facts — which sport, which
-            colour — in a fifth of the height. The per-sport descriptions went
-            with them: the label already names the sport, and the sentence
-            under it only listed examples of the thing it had just named. */}
-        <div className="settings-sport-subheading">
-          <div className="settings-sport-subheading-copy">
-            <strong>Activity colors</strong>
-            <span>
-              Used by the training load heatmap and the calendar. A day with one
-              sport is solid; several sports split into a wheel.
-            </span>
-          </div>
-          <button
-            className="settings-sport-reset"
-            type="button"
-            onClick={resetSportColors}
-          >
-            <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
-            Reset
-          </button>
-        </div>
-        <ul className="settings-sport-chips">
-          {SPORT_COLOR_CATEGORIES.map((cat) => {
-            const colorStyle = {
-              "--sport-color": sportColors[cat],
-            } as CSSProperties;
-
-            const SportIcon = SPORT_COLOR_ICONS[cat];
-
-            return (
-              <li key={cat} style={colorStyle}>
-                <label className="settings-sport-chip">
-                  <input
-                    type="color"
-                    className="settings-sport-input"
-                    value={sportColors[cat]}
-                    onChange={(event) =>
-                      updateSportColor(cat, event.target.value)
-                    }
-                    aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
-                  />
-                  <span className="settings-sport-swatch" aria-hidden="true">
-                    <SportIcon size={14} strokeWidth={2.2} />
-                  </span>
-                  <span className="settings-sport-chip-label">
-                    {SPORT_COLOR_LABELS[cat]}
-                  </span>
-                  <span className="settings-sport-hex">
-                    {sportColors[cat].toUpperCase()}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
 
       <BackupPanel api={api} />
 
