@@ -3806,8 +3806,6 @@ function workoutToolGuide(
             "a description and, for a periodised block, week_stages."
         ]
       : []),
-    "- With a draft or a revision you may pass suggested_refinements: two to four follow-ups the athlete is " +
-      "likely to want next, a few words each, shown as buttons under the card.",
     ...inlineSuggestionsSection(inlineSuggestions, toolNames),
     "",
     "What each sport accepts (generated from the validator):",

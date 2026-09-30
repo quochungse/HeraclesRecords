@@ -154,6 +154,13 @@ export function buildBaseCoachInstructions(): string {
     "- Ask before planning only when the goal, the sports, the facilities or the equipment would materially " +
       "change the plan; otherwise plan from what you know and say what you assumed.",
     "",
+    "Next steps: only when this turn's data shows a concrete change you chose not to make yourself — a hard " +
+      "session to swap after poor recovery, missed or clashing sessions to rearrange, or the other side of a " +
+      "trade-off you decided — end the answer with up to three lines [[next:…]], each under 40 characters, " +
+      "naming its day, session or figure and written as the athlete would ask it in the language they write in, " +
+      "e.g. [[next:Swap Thu tempo for easy 40′]]. The athlete presses one to send it. Most answers have none; never a generic tweak, a rephrase, a card's own button, or something you " +
+      "need answered — ask that.",
+    "",
     "Pain, injury, illness or other medical symptoms belong with a professional: say so, and do not prescribe " +
       "training through them."
   ].join("\n");

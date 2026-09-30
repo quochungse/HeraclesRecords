@@ -945,25 +945,39 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // A follow-up under the card is a question about it (P1.8)
+  // Next steps: chips under the last answer only, and a press sends its words
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
-    getPlanArtifacts: [
-      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, refinements: ["Lighter week 3", "Add hills"] }
+    getChatSession: [
+      { kind: "message", role: "user", content: "How is my recovery?" },
+      { kind: "message", role: "assistant", content: "Fine.\n\n[[next:An old step]]" },
+      { kind: "message", role: "user", content: "And tomorrow?" },
+      {
+        kind: "message",
+        role: "assistant",
+        content: "HRV is down 18%.\n\n[[next:Swap Thu tempo for easy 40′]]\n[[next:Move Sat long run to Sun]]"
+      }
     ]
   });
-  await waitFor(
-    async () => (await harness("count", ".chat-composer-followups .chat-refine-chip")) === 2,
-    "Coach's own follow-ups, above the composer (R1)"
+  await waitFor(async () => (await harness("count", ".chat-next-step")) === 2, "the last answer's two next steps");
+  assert.equal(await page(`document.body.innerText.includes("[[next:")`), false, "no marker is drawn as words");
+  assert.equal(await page(`document.body.innerText.includes("An old step")`), false, "an earlier answer offers none");
+  await harness("click", ".chat-next-step");
+  const stepped = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
+  assert.match(stepped.args[1].at(-1).content, /Swap Thu tempo for easy 40′$/);
+  assert.equal(
+    stepped.args[1].some((message) => message.content.includes("[[next:")),
+    false,
+    "nor does one reach the model"
   );
-  assert.equal(await harness("exists", ".chat-creation-card .chat-refine-chip"), false, "and not under the card");
-  await harness("click", ".chat-composer-followups .chat-refine-chip");
-  const refined = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
-  assert.match(refined.args[1].at(-1).content, /asking about the plan "Hanoi Half base" v1 \(draft_id plan-1\) — the whole of it\.[\s\S]*Lighter week 3$/);
-  const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
-  assert.deepEqual(afterRefine.slice(-2).map((entry) => entry.kind), ["planRefs", "message"]);
-  assert.equal(afterRefine.at(-1).content, "Lighter week 3", "in the chip's own words");
+  const afterStep = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    [afterStep.at(-1).kind, afterStep.at(-1).content],
+    ["message", "Swap Thu tempo for easy 40′"],
+    "in the chip's own words, and nothing about it attached"
+  );
+  assert.equal(await harness("count", ".chat-next-step"), 0, "gone once it is asked");
 
   // -------------------------------------------------------------------------
   // A conversation says what it reads and which AI answers, and turns take it (P2.0)
@@ -1469,7 +1483,6 @@ async function main() {
   );
   const workoutCard = '[data-draft-id="workout-saved"]';
   await waitFor(() => harness("exists", workoutCard), "the saved workout is drawn");
-  assert.equal(await harness("exists", ".chat-composer-followups"), false, "a saved one-off workout offers no follow-ups");
   assert.equal(
     (await harness("text", `${workoutCard} .chat-creation-steps`)).includes("Not set"),
     false,

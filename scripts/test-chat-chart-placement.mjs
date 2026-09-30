@@ -15,6 +15,7 @@ const {
   chartHandleNote,
   holdBackPartialPlaceholder,
   placeCharts,
+  splitNextSteps,
   stripChartPlaceholders
 } = await import(
   pathToFileURL(path.join(repoRoot, "dist-electron", "chartPlacement.js")).href + `?cacheBust=${Date.now()}`
@@ -86,5 +87,32 @@ assert.equal(holdBackPartialPlaceholder("Before\n[[chart:c1]]"), "Before\n[[char
 assert.equal(holdBackPartialPlaceholder("See [the notes]"), "See [the notes]");
 assert.equal(holdBackPartialPlaceholder("A [[link]] here"), "A [[link]] here");
 assert.equal(holdBackPartialPlaceholder(""), "");
+
+// --- next steps: taken out of the words, at most three, each once -------------
+assert.deepEqual(splitNextSteps("No steps."), { text: "No steps.", steps: [] });
+assert.deepEqual(
+  splitNextSteps(
+    "HRV is down 18%.\n\n[[next:Swap Thu tempo for easy 40′]]\n[[next:  Move Sat long run to Sun ]]\n" +
+      "[[next:Swap Thu tempo for easy 40′]]\n[[next:]]\n[[next:Drop Fri strides]]\n[[next:A fourth]]"
+  ),
+  {
+    text: "HRV is down 18%.",
+    steps: ["Swap Thu tempo for easy 40′", "Move Sat long run to Sun", "Drop Fri strides"]
+  },
+  "repeats and empty ones dropped, three kept"
+);
+assert.deepEqual(splitNextSteps("Rest today [[next:Swap Thu tempo]] and see."), {
+  text: "Rest today and see.",
+  steps: ["Swap Thu tempo"]
+});
+// Every reader of the words as text loses them too — the model's own history included.
+assert.equal(
+  stripChartPlaceholders("[[chart:c1]]\nThe pace fell.\n\n[[next:Swap Thu tempo]]"),
+  "The pace fell.\n"
+);
+for (const partial of ["[[n", "[[next", "[[next:", "[[next:Swap Thu", "[[next:Swap Thu tempo]"]) {
+  assert.equal(holdBackPartialPlaceholder(`HRV is down.\n\n${partial}`), "HRV is down.\n\n", partial);
+}
+assert.equal(holdBackPartialPlaceholder("Done\n[[next:Swap]]"), "Done\n[[next:Swap]]");
 
 console.log("chat chart placement tests passed");

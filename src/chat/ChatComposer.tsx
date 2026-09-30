@@ -33,14 +33,6 @@ export interface AboutOption {
   onPick: () => void;
 }
 
-/** The follow-ups of the newest creation, above the box (R1). */
-export interface ComposerFollowUps {
-  /** What they are about: "Base to 10k". */
-  subject: string;
-  chips: readonly string[];
-  onPick: (text: string) => void;
-}
-
 interface ChatComposerProps {
   /** The AI this conversation answers with, and the way to change it. */
   providerControls: ReactNode;
@@ -49,7 +41,6 @@ interface ChatComposerProps {
   /** The placeholder for what it points at: "Ask about this week…". */
   placeholder?: string;
   aboutOptions?: readonly AboutOption[];
-  followUps?: ComposerFollowUps | null;
   initialDraft: string;
   apiAvailable: boolean;
   streaming: boolean;
@@ -86,7 +77,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       attachments,
       placeholder,
       aboutOptions = [],
-      followUps,
       initialDraft,
       apiAvailable,
       streaming,
@@ -189,25 +179,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       <div className="chat-composer">
         <div className={`chat-composer-inner${attachments ? " has-refs" : ""}`}>
           {attachments}
-          {/* The newest creation's follow-ups, inside the empty box as things
-              to try (UAT): above it they cost a row on every turn. They give
-              way to the words, and to what a question points at. */}
-          {followUps && followUps.chips.length && !draft.trim() && !attachments ? (
-            <div className="chat-composer-followups" aria-label={`Ask Coach to change ${followUps.subject}`}>
-              <span className="chat-composer-followups-subject">Try</span>
-              {followUps.chips.map((text) => (
-                <button
-                  key={text}
-                  type="button"
-                  className="chat-refine-chip"
-                  disabled={streaming || !apiAvailable}
-                  onClick={() => followUps.onPick(text)}
-                >
-                  {text}
-                </button>
-              ))}
-            </div>
-          ) : null}
           <textarea
             ref={textareaRef}
             className="chat-input"
@@ -226,8 +197,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
             placeholder={
               waitingForCoachAnswer
                 ? "Type another answer…"
-                : placeholder ??
-                  (followUps ? `Ask about ${followUps.subject}…` : "Ask Coach…")
+                : placeholder ?? "Ask Coach…"
             }
             rows={1}
             disabled={exportingLatestActivity}

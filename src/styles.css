@@ -20591,6 +20591,49 @@ tr.data-intervals-row-missing {
   min-width: 0;
 }
 
+/* What Coach offers to do next, under its last answer: questions the athlete
+   can send in one press, in the chat's own accent so they read as something
+   to act on rather than as the answer's small print. */
+.chat-next-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chat-next-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--chat-signal-border);
+  border-radius: var(--radius-pill);
+  background: var(--chat-signal-soft);
+  color: var(--chat-signal-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.chat-next-step svg {
+  flex: none;
+  opacity: 0.8;
+}
+
+.chat-next-step:hover:not(:disabled) {
+  border-color: var(--chat-signal);
+  background: color-mix(in srgb, var(--chat-signal) 22%, transparent);
+}
+
+.chat-next-step:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* Where an answer came from and what it cost: one quiet line under it. */
 .chat-answer-foot {
   display: flex;
@@ -20741,25 +20784,6 @@ tr.data-intervals-row-missing {
   .chat-composer-hint {
     display: none;
   }
-}
-
-/* The newest creation's follow-ups, inside the empty box as things to try. */
-.chat-composer-inner .chat-composer-followups {
-  max-width: none;
-  margin: 0;
-  gap: 4px;
-}
-
-.chat-composer-inner .chat-composer-followups-subject {
-  margin-right: 2px;
-  font-size: 11px;
-}
-
-.chat-composer-inner .chat-refine-chip {
-  padding: 2px 8px;
-  border-color: transparent;
-  background: var(--glass-bg);
-  font-size: 11px;
 }
 
 /* What the question points at, as a header on the box (UAT, proposal A):
@@ -21052,26 +21076,6 @@ tr.data-intervals-row-missing {
   background: var(--glass-bg-hover);
 }
 
-/* The newest creation's follow-ups, just above the box. */
-.chat-composer-followups {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  max-width: 760px;
-  margin-bottom: 8px;
-}
-
-.chat-composer-followups-subject {
-  max-width: 240px;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .chat-ref-chip {
   display: inline-flex;
   align-items: center;
@@ -21100,38 +21104,6 @@ tr.data-intervals-row-missing {
 
 .chat-canvas-ask-session {
   justify-self: start;
-}
-
-/* Follow-ups under a creation (P1.8): questions, drawn quieter than the
-   buttons that save it. */
-.chat-refine {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.chat-refine-chip {
-  padding: 3px 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.3;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.chat-refine-chip:hover:not(:disabled) {
-  background: var(--glass-bg);
-  color: var(--text-primary);
-}
-
-.chat-refine-chip:disabled {
-  opacity: 0.55;
-  cursor: default;
 }
 
 /* View and Undo on a one-line record: small, and after what they act on. At

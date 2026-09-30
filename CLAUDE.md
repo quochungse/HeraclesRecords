@@ -532,9 +532,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   question for the model. The Library reader's ⋯ offers **Ask Coach about this plan** for a plan
   Coach wrote, opening the conversation it came from (`chat:findDraftSession`, by any version's
   draft id) — or, when that conversation is gone, a new one with no chip, since the drafts went
-  with it. **Under a creation, follow-ups** (P1.8): the chips Coach offered with that version
-  (`suggested_refinements`, kept in the row's `refinements_json`) or a set that fits its kind
-  (`refinementChips`); a press sends the chip's words as a question about the creation.
+  with it. **A creation has no follow-up chips** (P1.8, removed 2026-09-30 as clutter): the
+  tools no longer take `suggested_refinements`; `refinements_json` is kept only so an older row
+  goes back out unchanged. **What Coach offers next is a next step instead** — see the chart
+  placement paragraph.
   **Coach may attach up to two workout cards unasked** (P1.9, `chat.coach.inlineSuggestions`:
   Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
   a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
@@ -1103,7 +1104,15 @@ Overview, Media, Data, and Settings are in the main bundle.
   back (`holdBackPartialPlaceholder`) and a chart moves into the bubble when named. Every
   reader of the words as text strips them (`stripChartPlaceholders`): the run's summary,
   the list preview, the live analysis bubble, and `toWireMessages` — a handle means nothing
-  on a later turn. `test:chat-chart-placement`, `test:chat-transcript-race`.
+  on a later turn.
+  **Next steps ride the same way** (`splitNextSteps`, same file): an answer may end with up
+  to three `[[next:…]]` lines — only for a concrete change Coach found and did not make (a
+  hard session after poor recovery, missed or clashing sessions, the other side of a
+  trade-off), one sentence of the base prompt. They are drawn as chips under the
+  conversation's **last** answer only, a press sends the chip's words with no refs (the
+  answer above is always sent word for word, and the chip names its day), and the same
+  strip keeps them off the wire, so they cost nothing after their turn. No tool, no table,
+  no field. `test:chat-chart-placement`, `test:chat-transcript-race`.
 
   **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
   `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:
@@ -1247,9 +1256,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation" states the AI as it stands too — provider, model and effort, whether it is
   Coach's default or chosen here, and whether it is set up. The sign-in gates keep the full
   pickers, scoped to Coach's own settings, because a gate is about Coach's provider. There is
-  no All · Needs you filter over the list; the row's badge says it. The newest creation's follow-up chips
-  sit inside the empty box as "Try …", not under every card, giving way to the words and to a
-  ref; a saved one-off workout has none. A question's `planRefs`/`scheduleRefs` anchors are
+  no All · Needs you filter over the list; the row's badge says it. The empty box offers no follow-up
+  chips. A question's `planRefs`/`scheduleRefs` anchors are
   drawn as a header line inside its bubble (`refsJoinQuestion`), the plan named once, with
   a way back to the creation in the Workbench. `test:ref-preview` holds the previews. One avatar per turn, none for the athlete. An ordinary turn shows
   its `runTrail` lines too (`StepRun.step === "turn"`); every local tool has a line there.

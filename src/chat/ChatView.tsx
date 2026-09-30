@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   CalendarRange,
   Cloud,
+  CornerDownRight,
   Database,
   ExternalLink,
   FileDown,
@@ -84,6 +85,7 @@ import {
   chartHandle,
   holdBackPartialPlaceholder,
   placeCharts,
+  splitNextSteps,
   stripChartPlaceholders,
   type AnswerSegment
 } from "../../electron/chartPlacement";
@@ -117,7 +119,6 @@ import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
-import { refinementChips } from "./creationChoices";
 import {
   requestRuntime,
   runtimeFromSettings,
@@ -395,6 +396,39 @@ function AnswerBody({
         ) : null;
       })}
     </>
+  );
+}
+
+/**
+ * What Coach offers to do next, under its last answer. A press sends the
+ * chip's words as the athlete's question — about the answer just above it,
+ * not about whatever the composer points at.
+ */
+function NextSteps({
+  steps,
+  disabled,
+  onPick
+}: {
+  steps: readonly string[];
+  disabled: boolean;
+  onPick: (text: string) => void;
+}) {
+  if (!steps.length) return null;
+  return (
+    <div className="chat-next-steps" aria-label="Next steps">
+      {steps.map((text) => (
+        <button
+          key={text}
+          type="button"
+          className="chat-next-step"
+          disabled={disabled}
+          onClick={() => onPick(text)}
+        >
+          <CornerDownRight size={13} aria-hidden="true" />
+          <span>{text}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -3932,33 +3966,10 @@ export function ChatView({
       label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
     };
   };
-  /*
-   * The follow-ups of the conversation's newest creation, above the composer
-   * (R1). They were under every card, so an old version's chips stayed on
-   * screen asking to change a plan that had since moved on. A saved one-off
-   * workout has none: nothing on COROS would follow.
-   */
-  const newestCreation = [...listedCreations].reverse().find((draft) => !draft.removedAt);
   /** Versions an event line already speaks for, so their own line is not drawn too. */
   const eventedDraftIds = new Set(
     timeline.flatMap((entry) => (entry.kind === "planEvent" ? [entry.event.draftId] : []))
   );
-  const newestSavedWorkout =
-    newestCreation?.artifactType === "workout" &&
-    Boolean(newestCreation.uploadedAt || newestCreation.uploadResult || uploadedPlans[newestCreation.draftId]);
-  const composerFollowUps =
-    newestCreation && !newestSavedWorkout && api
-      ? {
-          subject: newestCreation.name,
-          chips: refinementChips(
-            newestCreation,
-            versionIndex
-              .get(newestCreation.draftId)
-              ?.siblings.find((item) => item.draftId === newestCreation.draftId)?.refinements
-          ),
-          onPick: (text: string) => void sendMessage(text, undefined, [wholeCreationRef(newestCreation)])
-        }
-      : null;
   /*
    * What "About…" offers (R1): a week or a day of the calendar, and anything
    * made in this conversation — the chips Ask Coach from the Calendar and the
@@ -4615,13 +4626,22 @@ export function ChatView({
   timeline.forEach((entry, index) => {
     if (entry.kind !== "message" || entry.role !== "assistant") return;
     const placement = placeAnswerCharts(
-      entry.content,
+      splitNextSteps(entry.content).text,
       chatSettings.visualizationsEnabled ? chartsAbove(timeline, index) : [],
       placedCharts
     );
     if (placement) placedAnswers.set(index, placement);
   });
-  const shownStreamingText = holdBackPartialPlaceholder(streamingText);
+  const shownStreamingText = splitNextSteps(holdBackPartialPlaceholder(streamingText)).text;
+  // The conversation's last answer, the only one whose next steps are drawn:
+  // an earlier one's were offered about a moment that has passed.
+  const lastAnswerIndex = (() => {
+    for (let at = timeline.length - 1; at >= 0; at -= 1) {
+      const entry = timeline[at];
+      if (entry.kind === "message") return entry.role === "assistant" ? at : -1;
+    }
+    return -1;
+  })();
   const turnCharts: TurnChart[] = [];
   if (turnHere && chatSettings.visualizationsEnabled) {
     timeline.forEach((entry, index) => {
@@ -5315,7 +5335,17 @@ export function ChatView({
                       {entry.reasoningSummary ? (
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
-                      <AnswerBody content={entry.content} placement={placedAnswers.get(index)} />
+                      <AnswerBody
+                        content={splitNextSteps(entry.content).text}
+                        placement={placedAnswers.get(index)}
+                      />
+                      {index === lastAnswerIndex && !turnHere ? (
+                        <NextSteps
+                          steps={splitNextSteps(entry.content).steps}
+                          disabled={streaming || !api}
+                          onPick={(text) => void sendMessage(text, undefined, [])}
+                        />
+                      ) : null}
                       {/* Where the answer came from and what it cost, as one
                           quiet line under it rather than two rows of pills. */}
                       {entry.source || entry.usage || entry.at !== undefined ? (
@@ -5394,7 +5424,6 @@ export function ChatView({
             }
             placeholder={refPlaceholder(composerRefs.map((item) => item.preview))}
             aboutOptions={aboutOptions}
-            followUps={composerFollowUps}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
             streaming={turnHere}

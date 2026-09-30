@@ -20,6 +20,9 @@
 const PLACEHOLDER = /\[\[chart:(c\d+)\]\]/g;
 const PLACEHOLDER_LINE = /^\s*\[\[chart:(c\d+)\]\]\s*$/;
 const FENCE = /^\s*(```|~~~)/;
+/** A next step the answer offers (`splitNextSteps`). */
+const NEXT_STEP = /\[\[next:([^\]\n]*)\]\]/g;
+const NEXT_STEP_LINE = /^\s*\[\[next:[^\]\n]*\]\]\s*$/;
 
 /** The handle of a turn's chart, by its place among the turn's charts (0 = first). */
 export function chartHandle(ordinal: number): string {
@@ -109,15 +112,46 @@ export function placeCharts(
   return segments;
 }
 
-/** An answer as text, placeholders taken out: a summary, a preview, the model's own history. */
+/**
+ * An answer as text, placeholders and next steps taken out: a summary, a
+ * preview, the model's own history. A next step is for the athlete to press;
+ * on a later turn it would only be words Coach has to read again.
+ */
 export function stripChartPlaceholders(text: string): string {
-  if (!text.includes("[[chart:")) return text;
+  if (!text.includes("[[chart:") && !text.includes("[[next:")) return text;
   return text
     .split("\n")
-    .filter((line) => !PLACEHOLDER_LINE.test(line))
-    .map((line) => line.replace(PLACEHOLDER, "").replace(/[ \t]{2,}/g, " ").trimEnd())
+    .filter((line) => !PLACEHOLDER_LINE.test(line) && !NEXT_STEP_LINE.test(line))
+    .map((line) =>
+      line.replace(PLACEHOLDER, "").replace(NEXT_STEP, "").replace(/[ \t]{2,}/g, " ").trimEnd()
+    )
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
+}
+
+/*
+ * Next steps. An answer may end with up to three `[[next:…]]` lines, each a
+ * concrete change Coach found and chose not to make itself. They are drawn as
+ * chips under the conversation's last answer, and a press sends the chip's
+ * words as the athlete's question. They live in the answer's text, so nothing
+ * is stored beside the entry, for the reason charts are not.
+ */
+export const MAX_NEXT_STEPS = 3;
+
+/** An answer's words, and the next steps it offers (at most three, each once). */
+export function splitNextSteps(text: string): { text: string; steps: string[] } {
+  if (!text.includes("[[next:")) return { text, steps: [] };
+  const steps = [
+    ...new Set([...text.matchAll(NEXT_STEP)].map((match) => match[1].trim()).filter(Boolean))
+  ].slice(0, MAX_NEXT_STEPS);
+  const words = text
+    .split("\n")
+    .filter((line) => !NEXT_STEP_LINE.test(line))
+    .map((line) => line.replace(NEXT_STEP, "").replace(/[ \t]{2,}/g, " ").trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
+  return { text: words, steps };
 }
 
 /**
@@ -132,7 +166,12 @@ export function holdBackPartialPlaceholder(text: string): string {
   for (const start of starts) {
     if (start < 0) continue;
     const tail = text.slice(start);
-    if ("[[chart:c".startsWith(tail) || /^\[\[chart:c\d*\]?$/.test(tail)) {
+    if (
+      "[[chart:c".startsWith(tail) ||
+      /^\[\[chart:c\d*\]?$/.test(tail) ||
+      "[[next:".startsWith(tail) ||
+      /^\[\[next:[^\]\n]*\]?$/.test(tail)
+    ) {
       return text.slice(0, start);
     }
   }
