@@ -27,6 +27,7 @@ import {
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { distanceUnit, elevationUnit } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
 import { RunEfficiencyChart } from "./RunEfficiencyChart";
@@ -36,7 +37,9 @@ import { RunSurfacePanel } from "./RunSurfacePanel";
 import { RunBlockSkeleton, RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
+import { TrailRunningHero } from "./TrailRunningHero";
 import {
+  climbPerDistanceUnit,
   summariseRuns,
   surfacesPresent,
   type RunZoneScale
@@ -168,6 +171,11 @@ export function RunningView({
   );
 
   const totals = useMemo(() => summariseRuns(runs), [runs]);
+
+  // The Trail filter is also a way of reading: a trail run is running, and
+  // stays on this screen and in its load, but a week of it is read in hours
+  // and height rather than kilometres and pace.
+  const trail = surface === "trail";
 
   // Asked of the whole history, not the period: "nothing in the last four
   // weeks" and "never run at all" are different screens.
@@ -333,6 +341,8 @@ export function RunningView({
     totals.distance > 0 && totals.duration > 0
       ? totals.duration / (totals.distance / 1000)
       : undefined;
+  const climbPerKm =
+    totals.distance > 0 ? totals.elevationGain / (totals.distance / 1000) : undefined;
 
   return (
     <section className="running-view" ref={pageRef}>
@@ -371,13 +381,17 @@ export function RunningView({
       </div>
 
       <div className="running-body">
-        <RunningHero
-          runs={runsAllTime}
-          allRuns={allRuns}
-          snapshot={snapshot}
-          filtered={surface !== null}
-          nowMs={nowMs}
-        />
+        {trail ? (
+          <TrailRunningHero trailRuns={runsAllTime} allRuns={allRuns} nowMs={nowMs} />
+        ) : (
+          <RunningHero
+            runs={runsAllTime}
+            allRuns={allRuns}
+            snapshot={snapshot}
+            filtered={surface !== null}
+            nowMs={nowMs}
+          />
+        )}
 
         <div className="running-totals">
           <div className="running-stat">
@@ -392,10 +406,24 @@ export function RunningView({
             <span>Time</span>
             <strong>{formatDurationSeconds(totals.duration)}</strong>
           </div>
-          <div className="running-stat">
-            <span>Avg pace</span>
-            <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
-          </div>
+          {/* A trail's average pace is an average over its gradients, which
+              says how hilly the period was rather than how it was run. Its
+              climb per kilometre says the first thing honestly. */}
+          {trail ? (
+            <div className="running-stat">
+              <span>Climb/{distanceUnit(unitSystem)}</span>
+              <strong>
+                {climbPerKm === undefined
+                  ? "—"
+                  : `${Math.round(climbPerDistanceUnit(climbPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
+              </strong>
+            </div>
+          ) : (
+            <div className="running-stat">
+              <span>Avg pace</span>
+              <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
+            </div>
+          )}
           <div className="running-stat">
             <span>Climb</span>
             <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
@@ -404,14 +432,22 @@ export function RunningView({
 
         {runs.length > 0 ? (
           <>
+            {/* Keyed on the mode, so the Trail filter opens the chart on its
+                own measure and leaving it gives the road's back. */}
             <RunVolumeChart
+              key={trail ? "trail" : "road"}
               runs={runs}
               runsAllTime={runsAllTime}
               weeks={chartWeeks}
               surfaces={stackedSurfaces}
               nowMs={nowMs}
+              defaultMeasure={trail ? "time" : "distance"}
             />
-            {zonesSettled ? (
+            {/* Efficiency is ground covered per heartbeat, and on a trail the
+                gradient decides the ground covered: the chart would rank the
+                hilly weeks as unfit ones. So the trail view leaves it out
+                rather than draw it with a caveat. */}
+            {trail ? null : zonesSettled ? (
               <RunEfficiencyChart
                 runs={runs}
                 weeks={chartWeeks}
@@ -458,6 +494,7 @@ export function RunningView({
               sort={sort}
               onSortChange={setSort}
               onOpenRun={openRun}
+              trail={trail}
             />
           </div>
         )}

@@ -4,8 +4,9 @@
  * The page is Running's, as Cycling's is: it carries `.running-view` and draws
  * with running.css, so the three sport screens share one layout. This file
  * holds only what a hike has and a run does not — its two kinds and their
- * colours, the ground a hike page splits its day into, and the marks on its
- * legs and rests.
+ * colours and the mark on a paused rest. The ground a hike page splits its day
+ * into, and the marks on its legs, are running.css's: a trail run draws them
+ * too.
  *
  * A hike is the athlete's own hiking colour — COROS's hike and mountain codes
  * already wear it everywhere else in the app — and a mountain climb is mixed
@@ -16,11 +17,6 @@
 .hiking-view {
   --hike-hike: var(--sport-hiking, #4c8dff);
   --hike-mountain: color-mix(in srgb, var(--sport-hiking, #4c8dff) 45%, #8a5cf6);
-  /* The ground, which is data: warm going up, cool coming down, the flat the
-     muted ink between them. */
-  --hike-up: #e08a3c;
-  --hike-flat: var(--text-muted);
-  --hike-down: #38bdf8;
 }
 
 /* The chip is `.run-surface-chip` — its size and type are Running's — worn in
@@ -48,42 +44,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.hike-terrain-up {
-  background: var(--hike-up);
-}
-
-.hike-terrain-flat {
-  background: var(--hike-flat);
-}
-
-.hike-terrain-down {
-  background: var(--hike-down);
-}
-
-/* Up or down, at the head of a leg's row. Colour is the datum, as the terrain
-   bar's is. */
-.hike-leg-dir {
-  display: inline-block;
-  min-width: 44px;
-  margin-right: 8px;
-  padding: 2px 6px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--hike-leg-color) 24%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hike-leg-color) 55%, transparent);
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.hike-leg-dir[data-direction="up"] {
-  --hike-leg-color: var(--hike-up);
-}
-
-.hike-leg-dir[data-direction="down"] {
-  --hike-leg-color: var(--hike-down);
 }
 
 /* A rest the watch paused for, rather than one it recorded through. */

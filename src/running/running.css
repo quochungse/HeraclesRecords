@@ -56,6 +56,14 @@
   --run-trail: color-mix(in srgb, var(--sport-run, #2fbe91) 50%, #8a5a2b);
   --run-track: color-mix(in srgb, var(--sport-run, #2fbe91) 55%, var(--accent-gold, #d89b22));
   --run-treadmill: color-mix(in srgb, var(--sport-run, #2fbe91) 35%, var(--text-secondary));
+
+  /* The ground a hike or a trail run is split into, which is data: warm going
+     up, cool coming down, the flat the muted ink between them. Declared on the
+     page rather than on one screen because Hiking and Running's trail runs
+     both draw it. */
+  --terrain-up: #e08a3c;
+  --terrain-flat: var(--text-muted);
+  --terrain-down: #38bdf8;
 }
 
 /*
@@ -129,6 +137,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
+}
+
+/* A trail run states its ground as well — the highest point, the climbing
+   rate — and at 120px "Highest point" wraps onto two lines, as it did on the
+   hike page. */
+.run-detail.is-trail .run-detail-stats {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 /* Five totals split three and two in the narrowest window rather than four and
@@ -1052,6 +1067,44 @@
   height: 8px;
   border-radius: var(--radius-xs);
   margin-right: 8px;
+}
+
+/* ------------------------------------------------------------- terrain -- */
+
+.terrain-up {
+  background: var(--terrain-up);
+}
+
+.terrain-flat {
+  background: var(--terrain-flat);
+}
+
+.terrain-down {
+  background: var(--terrain-down);
+}
+
+/* Up or down, at the head of a leg's row. Colour is the datum, as the terrain
+   bar's is. */
+.terrain-leg-dir {
+  display: inline-block;
+  min-width: 44px;
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--terrain-leg-color) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--terrain-leg-color) 55%, transparent);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.terrain-leg-dir[data-direction="up"] {
+  --terrain-leg-color: var(--terrain-up);
+}
+
+.terrain-leg-dir[data-direction="down"] {
+  --terrain-leg-color: var(--terrain-down);
 }
 
 .run-legend i.is-bar {

@@ -37,13 +37,11 @@ import {
   hikeRests,
   hikeTerrain,
   naismithSeconds,
-  type HikeLeg,
-  type HikeStop,
-  type TerrainKind,
-  type TerrainShare
+  type HikeStop
 } from "./hikeAnalysis";
 import { hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType } from "./hikeType";
+import { ClimbsPanel, TerrainPanel } from "./TerrainPanels";
 
 interface HikeDetailViewProps {
   activity: TrainingHubActivity;
@@ -69,12 +67,6 @@ interface Stat {
   value: string;
   title?: string;
 }
-
-const TERRAIN_LABELS: Record<TerrainKind, string> = {
-  up: "Climbing",
-  flat: "Flat",
-  down: "Descending"
-};
 
 function lapSpeedKmh(lap: TrainingHubActivityLap): number | undefined {
   if (lap.distance !== undefined && lap.distance > 0 && lap.duration !== undefined && lap.duration > 0) {
@@ -343,7 +335,7 @@ export function HikeDetailView({
         </section>
       ) : null}
 
-      {terrain.length > 0 ? <HikeTerrainPanel terrain={terrain} /> : null}
+      {terrain.length > 0 ? <TerrainPanel terrain={terrain} reading="hike" /> : null}
 
       {series.length > 0 ? (
         <ActivitySeriesChart
@@ -357,7 +349,7 @@ export function HikeDetailView({
         />
       ) : null}
 
-      {legs.length > 0 ? <HikeLegsPanel legs={legs} /> : null}
+      {legs.length > 0 ? <ClimbsPanel legs={legs} /> : null}
 
       {hasSamples ? (
         <HikeRestsPanel
@@ -446,166 +438,6 @@ export function HikeDetailView({
           </p>
         </section>
       ) : null}
-    </section>
-  );
-}
-
-/**
- * Climbing, flat and descending, by the grade of every 25 m and on the moving
- * clock. The bar is time, because time is what the ground cost.
- */
-function HikeTerrainPanel({ terrain }: { terrain: readonly TerrainShare[] }) {
-  const { unitSystem } = useUnitSystem();
-  const totalSeconds = terrain.reduce((sum, share) => sum + share.seconds, 0);
-  const perHour = (meters: number) =>
-    `${Math.round(metersToElevation(meters, unitSystem))} ${elevationUnit(unitSystem)}/h`;
-
-  return (
-    <section className="panel run-detail-panel">
-      <p className="running-eyebrow">Terrain</p>
-      {totalSeconds > 0 ? (
-        <div className="run-surface-bar">
-          {terrain.map((share) => (
-            <div
-              key={share.kind}
-              className={`hike-terrain-${share.kind}`}
-              style={{ flexGrow: Math.max(share.seconds / totalSeconds, 0.02) }}
-              title={`${TERRAIN_LABELS[share.kind]}: ${Math.round((share.seconds / totalSeconds) * 100)}% of the moving time`}
-            />
-          ))}
-        </div>
-      ) : null}
-      <div className="run-table-scroll">
-        <table className="run-list run-surface-table">
-          <thead>
-            <tr>
-              <th scope="col">Ground</th>
-              <th scope="col" className="is-numeric">Distance</th>
-              <th scope="col" className="is-numeric">Time</th>
-              <th scope="col" className="is-numeric">Speed</th>
-              <th scope="col" className="is-numeric">Height</th>
-              <th
-                scope="col"
-                className="is-numeric"
-                title="Metres gained an hour on the climbs, lost an hour on the descents"
-              >
-                Vertical rate
-              </th>
-              <th scope="col" className="is-numeric">Avg HR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {terrain.map((share) => (
-              <tr key={share.kind}>
-                <td>
-                  <span className={`run-surface-swatch hike-terrain-${share.kind}`} />
-                  {TERRAIN_LABELS[share.kind]}
-                </td>
-                <td className="is-numeric">{formatDistanceMeters(share.distance, unitSystem)}</td>
-                <td className="is-numeric">{formatDurationSeconds(share.seconds)}</td>
-                <td className="is-numeric">
-                  {share.speed === undefined ? "—" : formatSpeedValue(share.speed, unitSystem)}
-                </td>
-                <td className="is-numeric">
-                  {share.kind === "flat"
-                    ? "—"
-                    : `${share.kind === "up" ? "+" : "−"}${formatElevationMeters(share.height, unitSystem)}`}
-                </td>
-                <td className="is-numeric">
-                  {share.verticalRate === undefined ? "—" : perHour(share.verticalRate)}
-                </td>
-                <td className="is-numeric">
-                  {share.avgHr === undefined ? "—" : Math.round(share.avgHr)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="run-block-note">
-        Steeper than 4% either way is climbing or descending. On a mountain the
-        way down is half the day: a descending rate close to the climbing one is
-        steep, technical ground rather than a slow walker.
-      </p>
-    </section>
-  );
-}
-
-/** The ascents and descents of the day, in the order they were walked. */
-function HikeLegsPanel({ legs }: { legs: readonly HikeLeg[] }) {
-  const { unitSystem } = useUnitSystem();
-  const ascents = legs.filter((leg) => leg.direction === "up").length;
-  const descents = legs.length - ascents;
-  const withHr = legs.some((leg) => leg.avgHr !== undefined);
-
-  return (
-    <section className="panel run-detail-panel">
-      <p className="running-eyebrow">
-        {[
-          ascents > 0 ? `${ascents} ${ascents === 1 ? "ascent" : "ascents"}` : null,
-          descents > 0 ? `${descents} ${descents === 1 ? "descent" : "descents"}` : null
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
-      <div className="run-table-scroll">
-        <table className="run-list run-surface-table">
-          <thead>
-            <tr>
-              <th scope="col">Leg</th>
-              <th scope="col" className="is-numeric">Altitude</th>
-              <th scope="col" className="is-numeric">Length</th>
-              <th scope="col" className="is-numeric">Height</th>
-              <th scope="col" className="is-numeric">Grade</th>
-              <th scope="col" className="is-numeric" title="Moving time on it">
-                Time
-              </th>
-              <th scope="col" className="is-numeric" title="Metres gained or lost an hour">
-                Rate
-              </th>
-              {withHr ? <th scope="col" className="is-numeric">Avg HR</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {legs.map((leg) => (
-              <tr key={leg.startMeters}>
-                <td>
-                  <span className="hike-leg-dir" data-direction={leg.direction}>
-                    {leg.direction === "up" ? "Up" : "Down"}
-                  </span>
-                  from {formatDistanceMeters(leg.startMeters, unitSystem)}
-                </td>
-                <td className="is-numeric">
-                  {Math.round(metersToElevation(leg.fromAltitude, unitSystem))}→
-                  {formatElevationMeters(leg.toAltitude, unitSystem)}
-                </td>
-                <td className="is-numeric">{formatDistanceMeters(leg.lengthMeters, unitSystem)}</td>
-                <td className="is-numeric">
-                  {leg.direction === "up" ? "+" : "−"}
-                  {formatElevationMeters(leg.height, unitSystem)}
-                </td>
-                <td className="is-numeric">{`${(leg.grade * 100).toFixed(0)}%`}</td>
-                <td className="is-numeric">{formatDurationSeconds(leg.seconds)}</td>
-                <td className="is-numeric">
-                  {leg.verticalRate === undefined
-                    ? "—"
-                    : `${Math.round(metersToElevation(leg.verticalRate, unitSystem))} ${elevationUnit(unitSystem)}/h`}
-                </td>
-                {withHr ? (
-                  <td className="is-numeric">
-                    {leg.avgHr === undefined ? "—" : Math.round(leg.avgHr)}
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="run-block-note">
-        A leg runs from a low point to the next high one, or back, carried
-        through any dip of less than 30 m; one that gains or loses under 60 m
-        is the ground rolling, and is left out. Time is moving time.
-      </p>
     </section>
   );
 }

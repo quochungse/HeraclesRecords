@@ -168,8 +168,16 @@ export interface RunWeek extends RunTotals {
   label: string;
   /** Metres of the week's single longest run. */
   longestRunMeters: number;
+  /** Seconds of the week's single longest run, by time — a trail week's long run. */
+  longestRunSeconds: number;
+  /** Metres climbed on the week's single biggest climb. */
+  biggestClimbMeters: number;
   /** Metres per surface in the week, for the volume chart's stacked bars. */
   distanceBySurface: Record<RunSurface, number>;
+  /** Seconds per surface, for the same bars measured in time. */
+  durationBySurface: Record<RunSurface, number>;
+  /** Metres climbed per surface, for the same bars measured in ascent. */
+  climbBySurface: Record<RunSurface, number>;
 }
 
 function emptyTotals(): RunTotals {
@@ -250,7 +258,11 @@ export function buildRunWeeks(
       weekStartMs,
       label: weekLabel(weekStartMs),
       longestRunMeters: 0,
+      longestRunSeconds: 0,
+      biggestClimbMeters: 0,
       distanceBySurface: emptySurfaceDistances(),
+      durationBySurface: emptySurfaceDistances(),
+      climbBySurface: emptySurfaceDistances(),
       ...emptyTotals()
     });
   }
@@ -269,8 +281,14 @@ export function buildRunWeeks(
 
     addToTotals(bucket, activity);
     const distance = positive(activity.distance) ?? 0;
+    const duration = runSeconds(activity) ?? 0;
+    const climb = positive(activity.elevationGain) ?? 0;
     bucket.distanceBySurface[surface] += distance;
+    bucket.durationBySurface[surface] += duration;
+    bucket.climbBySurface[surface] += climb;
     bucket.longestRunMeters = Math.max(bucket.longestRunMeters, distance);
+    bucket.longestRunSeconds = Math.max(bucket.longestRunSeconds, duration);
+    bucket.biggestClimbMeters = Math.max(bucket.biggestClimbMeters, climb);
   }
 
   return [...buckets.values()].sort(
@@ -350,6 +368,95 @@ export function runLoadBalance(
   nowMs: number = Date.now()
 ): LoadBalance {
   return acuteChronicLoad(activities, isRunSportType, nowMs);
+}
+
+/**
+ * Metres climbed an hour over a whole session, on its activity time. The
+ * figure a day in the hills is read by where a road run is read by pace —
+ * Hiking's list and hero, and a trail run's on Running.
+ */
+export function ascentPerHour(
+  activity: Pick<TrainingHubActivity, "elevationGain" | "duration">
+): number | undefined {
+  const gain = positive(activity.elevationGain);
+  const duration = positive(activity.duration);
+  if (gain === undefined || duration === undefined) {
+    return undefined;
+  }
+
+  return gain / (duration / SECONDS_PER_HOUR);
+}
+
+/** A session has to climb this much before its hourly rate says anything about the climber. */
+export const CLIMBING_RATE_MIN_GAIN_M = 300;
+
+export interface ClimbingRate {
+  /** Median metres an hour over the qualifying sessions. Absent with none. */
+  rate?: number;
+  /** How many sessions it is taken over. */
+  count: number;
+  /** The same over the window before, for the direction of travel. */
+  previousRate?: number;
+}
+
+function median(values: readonly number[]): number | undefined {
+  if (values.length === 0) {
+    return undefined;
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
+
+/**
+ * How fast the athlete gains height in one sport, over the sessions that
+ * climbed enough to say — a climber's fitness figure, as threshold pace is a
+ * road runner's. A median rather than a mean, so one flat outing or one sprint
+ * up a staircase does not move it, and compared with the window before so it
+ * reads as a trend. A lakeside loop climbs a few metres in an hour and says
+ * nothing about climbing, which is why the floor is there.
+ *
+ * Here rather than in either screen for the reason `acuteChronicLoad` is:
+ * Hiking reads it for hikes, Running for trail runs, and a copy of it a floor
+ * apart would be two answers to one question.
+ */
+export function climbingRateOf(
+  activities: readonly TrainingHubActivity[],
+  isSport: (sportType: number | undefined) => boolean,
+  { days, nowMs = Date.now() }: { days: number; nowMs?: number }
+): ClimbingRate {
+  const windowMs = days * MS_PER_DAY;
+  const current: number[] = [];
+  const previous: number[] = [];
+  for (const activity of activities) {
+    const at = startedAtMs(activity);
+    if (
+      at === undefined ||
+      at > nowMs ||
+      !isSport(activity.sportType) ||
+      (positive(activity.elevationGain) ?? 0) < CLIMBING_RATE_MIN_GAIN_M
+    ) {
+      continue;
+    }
+    const rate = ascentPerHour(activity);
+    if (rate === undefined) {
+      continue;
+    }
+    if (at >= nowMs - windowMs) {
+      current.push(rate);
+    } else if (at >= nowMs - 2 * windowMs) {
+      previous.push(rate);
+    }
+  }
+  const rate = median(current);
+  const previousRate = median(previous);
+  return {
+    count: current.length,
+    ...(rate !== undefined ? { rate } : {}),
+    ...(previousRate !== undefined ? { previousRate } : {})
+  };
 }
 
 export type RunIntensity = "easy" | "moderate" | "hard";

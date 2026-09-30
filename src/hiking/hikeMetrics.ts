@@ -1,5 +1,10 @@
 import type { TrainingHubActivity } from "../../electron/types";
-import { startOfRunWeekMs } from "../running/runMetrics";
+import {
+  ascentPerHour,
+  climbingRateOf,
+  startOfRunWeekMs,
+  type ClimbingRate
+} from "../running/runMetrics";
 import {
   HIKE_TYPES,
   classifyHikeType,
@@ -9,10 +14,13 @@ import {
 
 // "The last N weeks" is one definition across the sport screens — calendar
 // weeks from a Monday, this one included — owned by the run module; see
-// rideMetrics.ts, which reads it from there for the same reason.
+// rideMetrics.ts, which reads it from there for the same reason. So is the
+// climbing rate, which Running's trail view reads too.
 export {
+  CLIMBING_RATE_MIN_GAIN_M,
   climbPerDistanceUnit,
-  runWindowStartMs as hikeWindowStartMs
+  runWindowStartMs as hikeWindowStartMs,
+  type ClimbingRate
 } from "../running/runMetrics";
 
 const MS_PER_DAY = 86_400_000;
@@ -69,13 +77,7 @@ export function hikeSpeedKmh(
 export function hikeAscentRate(
   activity: Pick<TrainingHubActivity, "elevationGain" | "duration">
 ): number | undefined {
-  const gain = positive(activity.elevationGain);
-  const duration = hikeSeconds(activity);
-  if (gain === undefined || duration === undefined) {
-    return undefined;
-  }
-
-  return gain / (duration / SECONDS_PER_HOUR);
+  return ascentPerHour(activity);
 }
 
 export interface HikeTotals {
@@ -317,69 +319,14 @@ export function biggestHike(
   return best;
 }
 
-/** A hike has to climb this much before its hourly rate says anything about the climber. */
-export const CLIMBING_RATE_MIN_GAIN_M = 300;
-
-export interface ClimbingRate {
-  /** Median metres an hour over the qualifying hikes. Absent with none. */
-  rate?: number;
-  /** How many hikes it is taken over. */
-  count: number;
-  /** The same over the window before, for the direction of travel. */
-  previousRate?: number;
-}
-
-function median(values: readonly number[]): number | undefined {
-  if (values.length === 0) {
-    return undefined;
-  }
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? sorted[middle]!
-    : (sorted[middle - 1]! + sorted[middle]!) / 2;
-}
-
 /**
  * How fast the athlete gains height, over the hikes that climbed enough to
- * say — the fitness figure of a walker, as threshold pace is a runner's. A
- * median rather than a mean, so one flat stroll or one sprint up a staircase
- * does not move it, and compared with the window before so it can be read as
- * a trend. A lakeside walk climbs a few metres in an hour and says nothing
- * about climbing, which is why the floor is there.
+ * say — the fitness figure of a walker, as threshold pace is a runner's. The
+ * rule is `climbingRateOf`, shared with Running's trail view.
  */
 export function climbingRate(
   activities: readonly TrainingHubActivity[],
-  { days, nowMs = Date.now() }: { days: number; nowMs?: number }
+  window: { days: number; nowMs?: number }
 ): ClimbingRate {
-  const windowMs = days * MS_PER_DAY;
-  const current: number[] = [];
-  const previous: number[] = [];
-  for (const activity of activities) {
-    const at = startedAtMs(activity);
-    if (
-      at === undefined ||
-      at > nowMs ||
-      !isHikeSportType(activity.sportType) ||
-      (positive(activity.elevationGain) ?? 0) < CLIMBING_RATE_MIN_GAIN_M
-    ) {
-      continue;
-    }
-    const rate = hikeAscentRate(activity);
-    if (rate === undefined) {
-      continue;
-    }
-    if (at >= nowMs - windowMs) {
-      current.push(rate);
-    } else if (at >= nowMs - 2 * windowMs) {
-      previous.push(rate);
-    }
-  }
-  const rate = median(current);
-  const previousRate = median(previous);
-  return {
-    count: current.length,
-    ...(rate !== undefined ? { rate } : {}),
-    ...(previousRate !== undefined ? { previousRate } : {})
-  };
+  return climbingRateOf(activities, isHikeSportType, window);
 }

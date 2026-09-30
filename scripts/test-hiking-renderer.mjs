@@ -330,7 +330,7 @@ async function main() {
     }
     assert.equal(await hasText("Descending"), true, "the way down is half the day");
     assert.equal(await hasText("1 ascent · 1 descent"), true, "the legs, named");
-    assert.equal(await harness("count", ".hike-leg-dir"), 2);
+    assert.equal(await harness("count", ".terrain-leg-dir"), 2);
     assert.equal(await harness("count", ".hike-rest-paused"), 1, "the auto-pause is a rest, marked as one");
     assert.equal(
       await win.webContents.executeJavaScript(
@@ -366,7 +366,7 @@ async function main() {
       detail: hikeDetail(target.activityId),
       detailRequest: { activityId: target.activityId, status: "ready" }
     });
-    await waitFor(() => harness("exists", ".hike-leg-dir"), "the hike page draws its legs");
+    await waitFor(() => harness("exists", ".terrain-leg-dir"), "the hike page draws its legs");
     const overflow = await harness("overflowX", ".running-view");
     assert.equal(overflow, 0, `the hike page scrolls sideways by ${overflow}px in a ${width}px column`);
   }

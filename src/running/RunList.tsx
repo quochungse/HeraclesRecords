@@ -7,11 +7,13 @@ import type {
 import {
   formatDistanceMeters,
   formatDurationSeconds,
+  formatElevationMeters,
   formatPaceSecondsPerKm,
   formatTrainingTableWhen
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
+  ascentPerHour,
   efficiencyIndex,
   climbPerDistanceUnit,
   elevationPerKm,
@@ -23,7 +25,12 @@ import {
   classifyRunSurface,
   type RunSurface
 } from "./runSurface";
-import { distanceUnit, elevationUnit, type UnitSystem } from "../units/units";
+import {
+  distanceUnit,
+  elevationUnit,
+  metersToElevation,
+  type UnitSystem
+} from "../units/units";
 
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
@@ -41,6 +48,8 @@ interface RunListProps {
   sort: RunSort;
   onSortChange: (sort: RunSort) => void;
   onOpenRun: (activity: TrainingHubActivity) => void;
+  /** Under the Trail filter: the columns a trail run is read by. */
+  trail?: boolean;
 }
 
 export interface RunSort {
@@ -53,7 +62,9 @@ export type SortKey =
   | "distance"
   | "duration"
   | "pace"
+  | "elevationGain"
   | "elevationPerKm"
+  | "ascentRate"
   | "avgHr"
   | "efficiency"
   | "drift";
@@ -65,7 +76,9 @@ interface RunRow {
   distance: number | undefined;
   duration: number | undefined;
   pace: number | undefined;
+  elevationGain: number | undefined;
   elevationPerKm: number | undefined;
+  ascentRate: number | undefined;
   avgHr: number | undefined;
   efficiency: number | undefined;
   drift: number | undefined;
@@ -126,6 +139,28 @@ const COLUMNS: readonly ColumnDefinition[] = [
   }
 ];
 
+/**
+ * A trail run's columns. Efficiency and drift go: both are pace against heart
+ * rate, and on a trail the gradient moves the pace far more than the runner's
+ * fitness does — a hilly run reads as a bad day and a flat one as a
+ * breakthrough. The height takes their place, whole and by the hour.
+ */
+const TRAIL_COLUMNS: readonly ColumnDefinition[] = [
+  { key: "when", label: "When", numeric: false },
+  { key: "distance", label: "Distance", numeric: true },
+  { key: "duration", label: "Time", numeric: true },
+  { key: "pace", label: "Pace", numeric: true },
+  { key: "elevationGain", label: "Climb", numeric: true, title: "Sort by the height climbed" },
+  { key: "elevationPerKm", label: "Climb", numeric: true },
+  {
+    key: "ascentRate",
+    label: "Climb/h",
+    numeric: true,
+    title: "Metres climbed an hour, over the whole run"
+  },
+  { key: "avgHr", label: "Avg HR", numeric: true }
+];
+
 /** Which way a column wants to sort the first time it is pressed. */
 const FIRST_DIRECTION: Record<SortKey, "asc" | "desc"> = {
   when: "desc",
@@ -134,7 +169,9 @@ const FIRST_DIRECTION: Record<SortKey, "asc" | "desc"> = {
   // A faster run is a *smaller* number of seconds, so pace opens ascending or
   // the first press buries the best run at the bottom.
   pace: "asc",
+  elevationGain: "desc",
   elevationPerKm: "desc",
+  ascentRate: "desc",
   avgHr: "desc",
   efficiency: "desc",
   // Least drift first: the question this column answers is which runs held
@@ -158,7 +195,9 @@ function buildRow(
     distance: activity.distance,
     duration: runSeconds(activity),
     pace: paceSecondsPerKm(activity),
+    elevationGain: activity.elevationGain,
     elevationPerKm: elevationPerKm(activity),
+    ascentRate: ascentPerHour(activity),
     avgHr: activity.avgHr,
     efficiency: efficiencyIndex(activity),
     drift: summaries?.get(activity.activityId)?.decouplingPercent
@@ -191,15 +230,61 @@ function compareRows(left: RunRow, right: RunRow, key: SortKey, descending: bool
 
 export const DEFAULT_RUN_SORT: RunSort = { key: "when", descending: true };
 
+/** One cell's text, by its column. */
+function cellText(row: RunRow, key: SortKey, unitSystem: UnitSystem): string {
+  switch (key) {
+    case "when":
+      return formatTrainingTableWhen(row.when);
+    case "distance":
+      return formatDistanceMeters(row.distance, unitSystem);
+    case "duration":
+      return formatDurationSeconds(row.duration);
+    case "pace":
+      return formatPaceSecondsPerKm(row.pace, unitSystem);
+    case "elevationGain":
+      return row.elevationGain === undefined
+        ? "—"
+        : formatElevationMeters(row.elevationGain, unitSystem);
+    case "elevationPerKm":
+      return row.elevationPerKm === undefined
+        ? "—"
+        : `${Math.round(climbPerDistanceUnit(row.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`;
+    case "ascentRate":
+      return row.ascentRate === undefined
+        ? "—"
+        : `${Math.round(metersToElevation(row.ascentRate, unitSystem))} ${elevationUnit(unitSystem)}`;
+    case "avgHr":
+      return row.avgHr === undefined ? "—" : `${row.avgHr}`;
+    case "efficiency":
+      // Two decimals, not one: efficiency moves in hundredths, so a single
+      // decimal rounds a block's whole progress into three values and the
+      // column stops saying anything.
+      return row.efficiency === undefined ? "—" : row.efficiency.toFixed(2);
+    case "drift":
+      // Signed, because a negative reading is a real result — the second half
+      // cost less than the first — and an unsigned 3% would read as drift the
+      // run did not have.
+      return row.drift === undefined
+        ? "—"
+        : `${row.drift > 0 ? "+" : ""}${row.drift.toFixed(1)}%`;
+  }
+}
+
 export function RunList({
   runs,
   summaries,
   sort,
   onSortChange,
-  onOpenRun
+  onOpenRun,
+  trail = false
 }: RunListProps) {
   const { unitSystem } = useUnitSystem();
-  const { key: sortKey, descending } = sort;
+  const columns = trail ? TRAIL_COLUMNS : COLUMNS;
+  // A sort on a column this layout does not draw — efficiency, picked before
+  // the Trail filter was — would order the rows by a figure nobody can see.
+  const { key: sortKey, descending } = columns.some((column) => column.key === sort.key)
+    ? sort
+    : DEFAULT_RUN_SORT;
 
   const rows = useMemo(() => {
     const built = runs
@@ -227,7 +312,7 @@ export function RunList({
     <table className="run-list">
       <thead>
         <tr>
-          {COLUMNS.map((column) => {
+          {columns.map((column) => {
             const active = column.key === sortKey;
             return (
               <th
@@ -279,31 +364,13 @@ export function RunList({
                 </div>
               </div>
             </td>
-            <td className="is-numeric">{formatDistanceMeters(row.distance, unitSystem)}</td>
-            <td className="is-numeric">{formatDurationSeconds(row.duration)}</td>
-            <td className="is-numeric">{formatPaceSecondsPerKm(row.pace, unitSystem)}</td>
-            <td className="is-numeric">
-              {row.elevationPerKm === undefined
-                ? "—"
-                : `${Math.round(climbPerDistanceUnit(row.elevationPerKm, unitSystem))} ${elevationUnit(unitSystem)}`}
-            </td>
-            <td className="is-numeric">
-              {row.avgHr === undefined ? "—" : `${row.avgHr}`}
-            </td>
-            <td className="is-numeric">
-              {/* Two decimals, not one: efficiency moves in hundredths, so a
-                  single decimal rounds a block's whole progress into three
-                  values and the column stops saying anything. */}
-              {row.efficiency === undefined ? "—" : row.efficiency.toFixed(2)}
-            </td>
-            <td className="is-numeric">
-              {/* Signed, because a negative reading is a real result — the
-                  second half cost less than the first — and an unsigned 3%
-                  would read as drift the run did not have. */}
-              {row.drift === undefined
-                ? "—"
-                : `${row.drift > 0 ? "+" : ""}${row.drift.toFixed(1)}%`}
-            </td>
+            {columns
+              .filter((column) => column.key !== "when")
+              .map((column) => (
+                <td key={column.key} className="is-numeric">
+                  {cellText(row, column.key, unitSystem)}
+                </td>
+              ))}
           </tr>
         ))}
       </tbody>

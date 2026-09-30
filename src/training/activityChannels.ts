@@ -38,8 +38,12 @@ export type ActivityChannelKey =
  * 450 m an hour, and a 19:40/km pace says nothing to them at all. Speed and
  * the climbing rate are worked out from the samples (`withSpeed`,
  * `withVerticalSpeed`), so no parser has to know about either.
+ *
+ * A trail run is read as a run — pace and grade-adjusted pace, which is still
+ * how a runner speaks — with a hike's climbing rate beside them, because on a
+ * trail the pace mostly says how steep the ground was.
  */
-export type ActivityMotion = "pace" | "speed" | "hike";
+export type ActivityMotion = "pace" | "speed" | "hike" | "trail";
 
 /** A sample as the chart reads it: the series point, plus what the chart derives from it. */
 export type ActivityChannelPoint = TrainingHubActivitySeriesPoint & {
@@ -127,13 +131,14 @@ const MIN_ALTITUDE_RANGE_METERS = 10;
 /**
  * The channels that belong to one way of reading movement and no other. Pace
  * is read one way, speed the other, never both on one chart; the climbing rate
- * is a hike's. A channel not listed here is offered whenever it was recorded.
+ * is read on foot in the hills. A channel not listed here is offered whenever
+ * it was recorded.
  */
 const MOTION_ONLY: Partial<Record<ActivityChannelKey, readonly ActivityMotion[]>> = {
-  pace: ["pace"],
-  adjustedPace: ["pace"],
+  pace: ["pace", "trail"],
+  adjustedPace: ["pace", "trail"],
   speed: ["speed", "hike"],
-  verticalSpeed: ["hike"]
+  verticalSpeed: ["hike", "trail"]
 };
 
 function isOtherMotion(key: ActivityChannelKey, motion: ActivityMotion): boolean {
@@ -277,13 +282,21 @@ export function availableActivityChannels(
  * against heart rate where it was not, which the fallback below arrives at on
  * its own because speed is offered ahead of heart rate.
  */
-const PREFERRED_CHANNELS: Record<ActivityMotion, readonly ActivityChannelKey[]> = {
+const PREFERRED_CHANNELS: Record<
+  ActivityMotion,
+  readonly (ActivityChannelKey | readonly ActivityChannelKey[])[]
+> = {
   pace: ["pace", "hr"],
   speed: ["power", "hr"],
   // A hike opens on how fast height was gained against what it cost, over the
   // elevation backdrop: the climbs are where the day was decided, and a speed
   // along the trail mostly says how steep it was.
-  hike: ["verticalSpeed", "hr"]
+  hike: ["verticalSpeed", "hr"],
+  // A trail run opens on grade-adjusted pace against heart rate, over the
+  // elevation: whether the effort held across the hills, which raw pace hides
+  // under the gradient. Raw pace stands in where the watch sent no GAP — a
+  // list entry is one slot, filled by the first of its keys the run has.
+  trail: [["adjustedPace", "pace"], "hr"]
 };
 
 export function defaultSelectedChannels(
@@ -294,7 +307,12 @@ export function defaultSelectedChannels(
     .filter((channel) => !channel.background)
     .map((channel) => channel.key);
 
-  const chosen = PREFERRED_CHANNELS[motion].filter((key) => axisKeys.includes(key));
+  const chosen = PREFERRED_CHANNELS[motion].flatMap((slot) => {
+    const key = (typeof slot === "string" ? [slot] : slot).find((option) =>
+      axisKeys.includes(option)
+    );
+    return key === undefined ? [] : [key];
+  });
 
   // Pace and heart rate are not a fixed pair — they are the pair *worth*
   // opening on. Whatever the watch did record fills any gap, so an indoor run

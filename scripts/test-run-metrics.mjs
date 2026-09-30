@@ -20,8 +20,11 @@ const {
 } = await import(moduleUrl("runSurface.ts"));
 
 const {
+  CLIMBING_RATE_MIN_GAIN_M,
+  ascentPerHour,
   buildRunEfficiencyWeeks,
   buildRunWeeks,
+  climbingRateOf,
   countsForEfficiency,
   runIntensityMix,
   runSurfaceBreakdown,
@@ -706,5 +709,87 @@ assert.equal(countsForEfficiency(run({ duration: 600 })), false, "a shakeout is 
 assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 })), true, "no zones: every long run");
 assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 }), scale), false, "zone 3 is not easy");
 assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), scale), true);
+
+// ---------------------------------------------------------------------------
+// The trail view reads a week in hours and height, per surface, and the
+// climbing rate is Hiking's rule read over trail runs.
+// ---------------------------------------------------------------------------
+
+{
+  const week = buildRunWeeks(
+    [
+      run({ activityId: "road", sportType: 100, startTime: secondsAgo(0), duration: 3000, distance: 10_000, elevationGain: 40 }),
+      run({ activityId: "ridge", sportType: 102, startTime: secondsAgo(0), duration: 7200, distance: 14_000, elevationGain: 900 }),
+      run({ activityId: "hill", sportType: 102, startTime: secondsAgo(0), duration: 3600, distance: 9_000, elevationGain: 350 })
+    ],
+    { weeks: 1, nowMs: NOW }
+  )[0];
+  assert.equal(week.durationBySurface.trail, 10_800, "a surface's hours are its own runs' time");
+  assert.equal(week.durationBySurface.road, 3000);
+  assert.equal(week.climbBySurface.trail, 1250, "and its height their climb");
+  assert.equal(week.climbBySurface.road, 40);
+  assert.equal(week.longestRunSeconds, 7200, "the longest run by time is the ridge");
+  assert.equal(week.longestRunMeters, 14_000);
+  assert.equal(week.biggestClimbMeters, 900);
+  assert.equal(
+    week.durationBySurface.trail + week.durationBySurface.road,
+    week.duration,
+    "the stack adds up to the bar"
+  );
+}
+
+{
+  const isTrail = (sportType) => classifyRunSurface(sportType) === "trail";
+  const trail = (days, gain, duration = 3600) =>
+    run({ sportType: 102, startTime: secondsAgo(days), elevationGain: gain, duration });
+  const list = [
+    trail(3, 600), //       600 m/h
+    trail(10, 900, 5400), // 600 m/h
+    trail(20, 400, 3600), // 400 m/h
+    trail(30, 250), //       under the floor: rolling ground says nothing about climbing
+    run({ sportType: 100, startTime: secondsAgo(2), elevationGain: 800, duration: 3600 }), // a road run, however steep
+    trail(100, 500) //       the twelve weeks before
+  ];
+  const rate = climbingRateOf(list, isTrail, { days: 84, nowMs: NOW });
+  assert.equal(rate.count, 3, `only trail runs over ${CLIMBING_RATE_MIN_GAIN_M} m count`);
+  assert.equal(rate.rate, 600, "the median, so one slow day does not drag it");
+  assert.equal(rate.previousRate, 500);
+  assert.equal(ascentPerHour({ elevationGain: 900, duration: 5400 }), 600);
+  assert.equal(ascentPerHour({ elevationGain: 0, duration: 5400 }), undefined, "no climb is no rate, not zero");
+}
+
+// A trail run's chart reads pace like a run and the climbing rate like a hike,
+// and opens on grade-adjusted pace — raw pace standing in when there is none.
+{
+  const { availableActivityChannels, defaultSelectedChannels, withVerticalSpeed } = await import(
+    `${pathToFileURL(path.join(repoRoot, "src", "training", "activityChannels.ts")).href}${bust}`
+  );
+  const samples = (withGap) =>
+    withVerticalSpeed(
+      Array.from({ length: 120 }, (_, index) => ({
+        elapsed: index * 10,
+        distance: index * 25,
+        altitude: 100 + index * 2,
+        pace: 400,
+        ...(withGap ? { adjustedPace: 330 } : {}),
+        hr: 150
+      }))
+    );
+  const keys = (series, motion) => availableActivityChannels(series, motion).map((channel) => channel.key);
+  const trailKeys = keys(samples(true), "trail");
+  assert.ok(trailKeys.includes("pace") && trailKeys.includes("adjustedPace"), "a trail run keeps its pace");
+  assert.ok(trailKeys.includes("verticalSpeed"), "and gains the climbing rate");
+  assert.ok(!trailKeys.includes("speed"), "never a km/h");
+  assert.ok(!keys(samples(true), "pace").includes("verticalSpeed"), "a road run has no climbing-rate channel");
+  assert.deepEqual(
+    defaultSelectedChannels(availableActivityChannels(samples(true), "trail"), "trail"),
+    ["adjustedPace", "hr"]
+  );
+  assert.deepEqual(
+    defaultSelectedChannels(availableActivityChannels(samples(false), "trail"), "trail"),
+    ["pace", "hr"],
+    "no GAP: raw pace takes its slot, still ahead of heart rate"
+  );
+}
 
 console.log("run metrics: OK");

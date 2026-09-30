@@ -81,9 +81,9 @@ interface ActivitySeriesChartProps {
    */
   embedded?: boolean;
   /**
-   * Pace for a run, speed for a ride, speed and climbing rate for a hike. Also
-   * decides the cadence unit — steps a minute on foot, revolutions on a bike —
-   * and what the whole of it is called.
+   * Pace for a run, speed for a ride, speed and climbing rate for a hike, pace
+   * and climbing rate for a trail run. Also decides the cadence unit — steps a
+   * minute on foot, revolutions on a bike — and what the whole of it is called.
    */
   motion?: ActivityMotion;
 }
@@ -96,8 +96,14 @@ type ChartRow = ActivityChannelPoint & {
 const ACTIVITY_NOUN: Record<ActivityMotion, string> = {
   pace: "run",
   speed: "ride",
-  hike: "hike"
+  hike: "hike",
+  trail: "run"
 };
+
+/** Whether a whole activity's movement is stated as a pace — a run's, on the road or a trail. */
+function readsPace(motion: ActivityMotion): boolean {
+  return motion === "pace" || motion === "trail";
+}
 
 function cadenceUnit(motion: ActivityMotion): string {
   return motion === "speed" ? "rpm" : "spm";
@@ -269,6 +275,9 @@ export function ActivitySeriesChart({
     if (motion === "hike") {
       return withVerticalSpeed(withSpeed(sampled));
     }
+    if (motion === "trail") {
+      return withVerticalSpeed(sampled);
+    }
     return motion === "speed" ? withSpeed(sampled) : sampled;
   }, [motion, series]);
 
@@ -418,12 +427,13 @@ export function ActivitySeriesChart({
       // every coasting second reads 0, and counting them put the segment 15 rpm
       // under the ride's own figure on the same page. A hike's over the walking,
       // for the same reason: its watch keeps recording through every rest.
-      cadence: mean("cadence", motion !== "pace"),
+      cadence: mean("cadence", !readsPace(motion)),
       // Only a ride states it: a run's power is the watch's own estimate, and
       // the Running screen has never put it beside the segment's figures.
       power: motion === "speed" ? mean("power") : undefined,
-      // What a walker asks of a stretch first: how much height it gained.
-      gain: motion === "hike" ? stretchGain(source) : undefined
+      // What a walker asks of a stretch first: how much height it gained. A
+      // trail runner asks it second, after the pace.
+      gain: motion === "hike" || motion === "trail" ? stretchGain(source) : undefined
     };
   }, [activityTime, axis, motion, range, series, visible]);
 
@@ -657,10 +667,10 @@ export function ActivitySeriesChart({
           {segment.duration !== undefined ? (
             <span>{formatDurationSeconds(segment.duration)}</span>
           ) : null}
-          {motion === "pace" && segment.pace !== undefined ? (
+          {readsPace(motion) && segment.pace !== undefined ? (
             <span>{formatChannelValue("pace", segment.pace, unitSystem, motion)}</span>
           ) : null}
-          {motion !== "pace" && segment.speed !== undefined ? (
+          {!readsPace(motion) && segment.speed !== undefined ? (
             <span>{formatChannelValue("speed", segment.speed, unitSystem, motion)}</span>
           ) : null}
           {segment.gain !== undefined && segment.gain > 0 ? (

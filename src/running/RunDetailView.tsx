@@ -20,8 +20,19 @@ import {
   formatTrainingTimestamp
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { formatTemperatureValue } from "../units/units";
+import {
+  elevationUnit,
+  formatTemperatureValue,
+  metersToElevation
+} from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
+import {
+  altitudeRange,
+  hikeLegs,
+  hikeMovement,
+  hikeTerrain
+} from "../hiking/hikeAnalysis";
+import { ClimbsPanel, TerrainPanel } from "../hiking/TerrainPanels";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import { useBackGesture } from "./sportPage";
 import {
@@ -90,6 +101,7 @@ export function RunDetailView({
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const surface = classifyRunSurface(activity.sportType);
+  const trail = surface === "trail";
 
   const laps = detail?.laps ?? [];
   // On activity time, which is what the laps, the headline and every figure
@@ -98,6 +110,24 @@ export function RunDetailView({
     () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
     [detail]
   );
+
+  // A trail run's ground, read as the hike page reads a day in the hills —
+  // the same analysis, which never asked what sport it was reading. It takes
+  // the series on the wall clock, pauses and all, because that is how it
+  // tells a pause from a stop. A road run is not read this way: 4% either side
+  // of a city street is a bridge, not terrain.
+  const ground = useMemo(() => {
+    if (!trail) {
+      return null;
+    }
+    const raw = detail?.series ?? [];
+    const movement = hikeMovement(raw, detail?.pauses ?? []);
+    return {
+      terrain: hikeTerrain(raw, movement),
+      legs: hikeLegs(raw, movement),
+      range: altitudeRange(raw)
+    };
+  }, [detail, trail]);
 
   // Set from a lap row below, consumed by the chart, then cleared — a lap stays
   // selectable a second time, and the chart is not re-focused on every render.
@@ -169,17 +199,42 @@ export function RunDetailView({
       stats.push({ label: "Climb", value: formatElevationMeters(climb, unitSystem) });
     }
 
+    if (ground) {
+      const descent = detail?.elevationLoss;
+      if (descent !== undefined && descent > 0) {
+        stats.push({ label: "Descent", value: formatElevationMeters(descent, unitSystem) });
+      }
+      if (ground.range) {
+        stats.push({
+          label: "Highest point",
+          value: formatElevationMeters(ground.range.highest, unitSystem),
+          title: `Lowest ${formatElevationMeters(ground.range.lowest, unitSystem)}`
+        });
+      }
+      const up = ground.terrain.find((share) => share.kind === "up");
+      if (up?.verticalRate !== undefined) {
+        stats.push({
+          label: "Climbing rate",
+          value: `${Math.round(metersToElevation(up.verticalRate, unitSystem))} ${elevationUnit(unitSystem)}/h`,
+          title: "Metres gained an hour on the climbing stretches, stops out"
+        });
+      }
+    }
+
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
       stats.push({ label: "Load", value: formatOptionalNumber(Math.round(load)) });
     }
 
     return stats;
-  }, [activity, detail, unitSystem]);
+  }, [activity, detail, ground, unitSystem]);
 
+  // Decoupling compares the pace a heartbeat bought in the first half with the
+  // second, and on a trail the halves differ by their gradient: a run out up a
+  // climb and back down reads as a heart that recovered. Not stated there.
   const decouplingStat = useMemo<Stat | null>(
     () =>
-      decoupling === undefined
+      decoupling === undefined || trail
         ? null
         : {
             label: "Decoupling",
@@ -187,7 +242,7 @@ export function RunDetailView({
             title:
               "How far pace and heart rate drifted apart between the first and second half, with the first ten minutes left out as warm-up. Under 5% is a run held together."
           },
-    [decoupling]
+    [decoupling, trail]
   );
 
   const dynamics = useMemo<Stat[]>(() => {
@@ -245,7 +300,7 @@ export function RunDetailView({
   }, [detail]);
 
   return (
-    <section className="running-view run-detail">
+    <section className={`running-view run-detail${trail ? " is-trail" : ""}`}>
       {/* The route sits under the heading as a cover rather than in a panel of
           its own. An outdoor run whose detail is still on its way keeps the
           cover's space, so the heading does not jump when the map lands. */}
@@ -355,6 +410,10 @@ export function RunDetailView({
         </section>
       ) : null}
 
+      {ground && ground.terrain.length > 0 ? (
+        <TerrainPanel terrain={ground.terrain} reading="trail" />
+      ) : null}
+
       {series.length > 0 ? (
         <ActivitySeriesChart
           series={series}
@@ -363,8 +422,11 @@ export function RunDetailView({
           focusLapIndex={focusLapIndex}
           onFocusLapHandled={clearFocusLap}
           activityTime={detail?.duration ?? activity.duration}
+          motion={trail ? "trail" : "pace"}
         />
       ) : null}
+
+      {ground && ground.legs.length > 0 ? <ClimbsPanel legs={ground.legs} /> : null}
 
       {laps.length > 0 ? (
         <section className="panel run-detail-panel">

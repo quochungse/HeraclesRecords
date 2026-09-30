@@ -30,6 +30,10 @@ const { app, BrowserWindow } = require("electron");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 app.commandLine.appendSwitch("no-sandbox");
+// Pinned as Cycling's and Hiking's suites pin it: on a display scaled to 125%
+// every box is a few thousandths of a pixel off, and "Expand holds the corner"
+// compares two of them exactly.
+app.commandLine.appendSwitch("force-device-scale-factor", "1");
 app.disableHardwareAcceleration();
 
 const DAY_SECONDS = 86_400;
@@ -1135,6 +1139,153 @@ async function main() {
 
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors, [], "the page logged errors");
+
+  // -------------------------------------------------------------------------
+  // The Trail filter is a way of reading, not only a narrower list: hours and
+  // height where the road reads kilometres and pace, the load ratio still over
+  // every run, and no pace-per-heartbeat figure the gradient would decide.
+  // -------------------------------------------------------------------------
+  {
+    const trailRun = (index, overrides = {}) =>
+      run(100 + index, {
+        activityId: `trail-${index}`,
+        name: `Trail ${index}`,
+        sportType: 102,
+        startTime: nowSeconds - (index * 3 + 1) * DAY_SECONDS,
+        duration: 5400,
+        distance: 12_000,
+        elevationGain: 700,
+        ...overrides
+      });
+    const trails = Array.from({ length: 8 }, (_, index) => trailRun(index));
+    const target = trails[0];
+
+    // Flat, 300 m up a 10% climb, and back down it, run and not walked.
+    const series = [];
+    let t = 0;
+    let d = 0;
+    let alt = 300;
+    const go = (meters, grade, speed) => {
+      for (let s = 0; s < Math.round(meters / speed); s += 1) {
+        series.push({
+          elapsed: t,
+          distance: d,
+          altitude: alt,
+          hr: grade > 0 ? 165 : 140,
+          pace: 1000 / speed,
+          adjustedPace: 330,
+          cadence: 170
+        });
+        t += 1;
+        d += speed;
+        alt += speed * grade;
+      }
+    };
+    go(1000, 0, 3.3);
+    go(3000, 0.1, 2.2);
+    go(3000, -0.1, 3.5);
+    const detail = {
+      activityId: target.activityId,
+      name: target.name,
+      sportType: 102,
+      duration: series.length,
+      distance: Math.round(d),
+      avgHr: 152,
+      elevationGain: 300,
+      elevationLoss: 300,
+      adjustedPace: 330,
+      trainingLoad: 120,
+      laps: [],
+      hrZones: [],
+      series
+    };
+
+    const pressedIn = (scope) =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(${JSON.stringify(`${scope} button[aria-checked=true]`)})].map((chip) => chip.textContent.trim())`,
+        true
+      );
+    const pickSurface = (label) =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".running-controls .option-group button")].find((chip) => chip.textContent.trim() === ${JSON.stringify(label)}).click()`,
+        true
+      );
+    const listHeads = () =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".running-list-panel thead th")].map((th) => th.textContent.trim())`,
+        true
+      );
+    const volumeHeading = () =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".run-block")].find((block) => block.textContent.includes("Weekly volume")).querySelector("h3").textContent`,
+        true
+      );
+
+    await mountRunning({ activities: [...RUNS, ...trails], activitiesStatus: "ready", width: 1000, detail });
+    assert.deepEqual(await pressedIn(".sport-volume-aside"), ["Distance"], "the road reads its week in kilometres");
+    assert.equal(await hasText("VO₂max"), true);
+
+    await pickSurface("Trail");
+    await settle();
+    for (const label of ["Climb this week", "Ascent per hour · 12 weeks", "Load ratio · all runs"]) {
+      assert.equal(await hasText(label), true, `the trail hero states ${label}`);
+    }
+    assert.equal(await hasText("VO₂max"), false, "VO₂max and threshold pace are the road's");
+    assert.equal(await hasText("Threshold"), false);
+    assert.equal(await hasText("Aerobic efficiency"), false, "ground per heartbeat is the gradient's on a trail");
+    assert.equal(await hasText("Avg pace"), false, "an average pace over gradients says how hilly, not how run");
+    assert.deepEqual(await pressedIn(".sport-volume-aside"), ["Time"], "a trail week opens in hours");
+    assert.match(await volumeHeading(), /^\d+ h/, "and the heading counts them");
+    const heads = await listHeads();
+    assert.ok(heads.includes("Climb/h") && heads.includes("Climb"), `the list reads the height: ${heads}`);
+    assert.ok(!heads.includes("EF") && !heads.includes("Drift"), `and drops pace-per-beat: ${heads}`);
+    assert.equal(await harness("count", ".running-list-panel tbody tr"), trails.length);
+
+    await pickSurface("All");
+    await settle();
+    assert.deepEqual(await pressedIn(".sport-volume-aside"), ["Distance"], "leaving Trail gives the road's measure back");
+    assert.equal(await hasText("VO₂max"), true);
+    assert.ok((await listHeads()).includes("Drift"));
+
+    await pickSurface("Trail");
+    await settle();
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".running-list-panel tbody tr")].find((row) => row.textContent.includes(${JSON.stringify(target.name)})).click()`,
+      true
+    );
+    await waitFor(() => harness("exists", ".activity-chart-chips"), "the trail run's chart draws");
+    await settle();
+    assert.equal(await harness("exists", ".run-detail.is-trail"), true);
+    const chips = await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".activity-chart-chips button")].map((b) => b.textContent.trim())`,
+      true
+    );
+    assert.ok(chips.includes("Climbing rate"), `a trail run's chart reads the climbing rate: ${chips}`);
+    assert.ok(chips.includes("Grade-adjusted pace") && chips.includes("Pace"), `and pace, as a run: ${chips}`);
+    assert.ok(!chips.includes("Speed"), `never a km/h: ${chips}`);
+    for (const label of ["Terrain", "Descending", "Highest point", "Climbing rate", "1 ascent · 1 descent"]) {
+      assert.equal(await hasText(label), true, `the trail page states ${label}`);
+    }
+    assert.equal(await harness("count", ".terrain-leg-dir"), 2);
+    assert.equal(await hasText("Decoupling"), false, "the halves of a hill run differ by their gradient");
+
+    // Mounted afresh at each width, as the hike page's check is: a hidden
+    // window fires no resize observer, so a chart laid out at 1000px keeps
+    // that width through a narrowing and reads as overflow that is not there.
+    for (const width of [1000, 620]) {
+      await mountRunning({
+        activities: [...RUNS, ...trails],
+        activitiesStatus: "ready",
+        width,
+        openRequest: { view: "running", activityId: target.activityId },
+        detail,
+        detailRequest: { activityId: target.activityId, status: "ready" }
+      });
+      await waitFor(() => harness("exists", ".terrain-leg-dir"), "the trail page draws its climbs");
+      const overflow = await harness("overflowX", ".running-view");
+      assert.equal(overflow, 0, `the trail page scrolls sideways by ${overflow}px in a ${width}px column`);
+    }
+  }
 
   console.log("running renderer tests passed");
 }
