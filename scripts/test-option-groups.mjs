@@ -66,16 +66,6 @@ const EXEMPT = [
     why: "The floating base-map popup mixes a base-map choice with overlay switches under a divider; it is a menu, not one group."
   },
   {
-    file: "src/data/components/ActivityBackupPanel.tsx",
-    marker: "Export format",
-    why: "Each format carries a sentence describing it; nested in a chip there is nowhere for that to go."
-  },
-  {
-    file: "src/data/components/ActivityBackupPanel.tsx",
-    marker: "training-backup-format-option",
-    why: "Same control as above — the cards themselves."
-  },
-  {
     file: "src/training-library/GeneratorGoalStep.tsx",
     marker: "plan-generator-segmented",
     why: "A difficulty card is two lines: the name and what it means for the plan."

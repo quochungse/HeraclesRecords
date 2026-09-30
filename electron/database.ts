@@ -557,6 +557,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   dropLegacyAutomationTables(db);
   dropRetiredMapTables(db);
   dropRetiredCollectionTable(db);
+  dropRetiredIntervalsSettings(db);
   dropLocalTrainingPlans(db);
   migrateChatTranscriptsToSessions(db);
 
@@ -818,6 +819,22 @@ function dropRetiredMapTables(database: Database.Database): void {
     if (!tableExists(database, table)) continue;
     console.log(`[db] dropping retired maps table: ${table}`);
     database.exec(`DROP TABLE ${table}`);
+  }
+}
+
+/**
+ * Deletes what the Data screen's intervals.icu import kept: an API key, the
+ * athlete id and the ids it had imported. The screen is gone, so the key would
+ * sit in the store with nothing to use it or offer a way to remove it. All
+ * three were `device` tier and never left the machine, so there is nothing to
+ * do anywhere else.
+ */
+function dropRetiredIntervalsSettings(database: Database.Database): void {
+  const removed = database
+    .prepare("DELETE FROM app_settings WHERE key LIKE 'intervals.%'")
+    .run().changes;
+  if (removed > 0) {
+    console.log(`[db] removed ${removed} retired intervals.icu setting(s)`);
   }
 }
 

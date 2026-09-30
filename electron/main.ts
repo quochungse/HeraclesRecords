@@ -99,12 +99,6 @@ import {
   saveSpotifyConfig,
   syncSpotifyPlaylist
 } from "./spotifyService";
-import {
-  cancelActivityBackup,
-  getActivityBackupProgress,
-  setActivityBackupProgressListener,
-  startActivityBackup
-} from "./activityBackupService";
 import { getAppInfo, openAppStorageLocation } from "./appInfoService";
 import {
   backfillFeelTypes,
@@ -187,17 +181,6 @@ import {
   updateTrainingPlanMetadata
 } from "./trainingLibraryService";
 import { normalizeUnitSystem } from "./unitSystem.js";
-import {
-  getIntervalsStatus,
-  connectIntervals,
-  disconnectIntervals,
-  listIntervalsActivities,
-  downloadIntervalsFit,
-  recordIntervalsImport,
-  getRecentlyImportedIds,
-  RECENT_IMPORT_WINDOW_MS
-} from "./intervalsService";
-import { isAlreadyOnCoros } from "./intervalsMatch";
 import { reverseGeocodeLocation } from "./reverseGeocodeService";
 import { buildManualTcx } from "./tcxBuilder";
 import type {
@@ -210,7 +193,6 @@ import type {
   TrainingHubExportResult,
   WatchConnectionSmokeOptionId,
   YouTubeMusicConfig,
-  IntervalsActivityWithStatus,
   ManualActivityInput,
   WatchTransferProgress
 } from "./types";
@@ -464,13 +446,6 @@ function sanitizeExportFileName(name?: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
-}
-
-function formatYyyymmddDay(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}${month}${day}`;
 }
 
 function pickLatestTrainingHubActivity(
@@ -803,11 +778,6 @@ app.whenReady().then(() => {
   });
   setTrainingHubSessionListener((status) => {
     announceTrainingHubSessionChanged(status);
-  });
-  setActivityBackupProgressListener((progress) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("trainingHub:backupProgress", progress);
-    }
   });
   createWindow();
   applyAppIcon();
@@ -2368,32 +2338,6 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle("trainingHub:chooseBackupFolder", async () => {
-    const options: Electron.OpenDialogOptions = {
-      title: "Choose a backup folder",
-      properties: ["openDirectory", "createDirectory"]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    return result.canceled ? null : result.filePaths[0] ?? null;
-  });
-
-  ipcMain.handle(
-    "trainingHub:startActivityBackup",
-    (_event, folder: string, fileType: TrainingHubActivityFileType = 4) =>
-      startActivityBackup(folder, fileType)
-  );
-
-  ipcMain.handle("trainingHub:cancelActivityBackup", () =>
-    cancelActivityBackup()
-  );
-
-  ipcMain.handle("trainingHub:getActivityBackupProgress", () =>
-    getActivityBackupProgress()
-  );
-
   ipcMain.handle("trainingHub:getTrainingAnalytics", () =>
     getTrainingAnalytics()
   );
@@ -2454,98 +2398,6 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getDailyHealthData", (_event, days?: number) =>
     getTrainingDailyHealthData(days ?? 1)
-  );
-
-  ipcMain.handle("intervals:getStatus", () => getIntervalsStatus());
-
-  ipcMain.handle("intervals:connect", (_event, apiKey: string, athleteId: string) =>
-    connectIntervals(apiKey, athleteId)
-  );
-
-  ipcMain.handle("intervals:disconnect", () => disconnectIntervals());
-
-  ipcMain.handle(
-    "intervals:listMissing",
-    async (_event, daysBack: number): Promise<IntervalsActivityWithStatus[]> => {
-      const intervals = await listIntervalsActivities(daysBack);
-      // Pull enough COROS activities to cover the SAME daysBack window used for
-      // the intervals.icu query, not just the newest 200 — otherwise older
-      // activities fall outside the compare set and are falsely reported as
-      // "Missing". listTrainingHubActivities filters on startDay/endDay
-      // (YYYYMMDD) and pages at `size` per call with no total count, so we
-      // page through the window until a short page signals the end.
-      // listIntervalsActivities computes its from/to bound in UTC
-      // (toISOString), while formatYyyymmddDay/formatScheduleDay use local
-      // calendar days (matching the COROS endpoint's convention). Pad the
-      // COROS window by one extra day on each side so local/UTC boundary
-      // drift can only widen the compare set (superset), never narrow it —
-      // a superset can't cause a false "Missing".
-      const toDay = formatYyyymmddDay(new Date(Date.now() + 86_400_000));
-      const fromDay = formatYyyymmddDay(
-        new Date(Date.now() - (daysBack + 1) * 86_400_000)
-      );
-      const corosRaw: TrainingHubActivity[] = [];
-      const INTERVALS_MATCH_PAGE_SIZE = 100;
-      const INTERVALS_MATCH_MAX_PAGES = 50;
-      for (let page = 1; page <= INTERVALS_MATCH_MAX_PAGES; page += 1) {
-        const pageActivities = await listTrainingHubActivities(
-          page,
-          INTERVALS_MATCH_PAGE_SIZE,
-          fromDay,
-          toDay
-        );
-        corosRaw.push(...pageActivities);
-        if (pageActivities.length < INTERVALS_MATCH_PAGE_SIZE) {
-          break;
-        }
-      }
-      const coros = corosRaw.map((a) => ({
-        startEpochMs: (a.startTime ?? 0) * 1000,
-        // Elapsed, to match what parseIntervalsActivities reads on the other side.
-        movingSec: a.elapsedDuration ?? a.duration ?? 0,
-        distanceM: a.distance ?? 0
-      }));
-      const recentlyImported = getRecentlyImportedIds(RECENT_IMPORT_WINDOW_MS);
-      return intervals.map((a) => ({
-        ...a,
-        onCoros:
-          isAlreadyOnCoros(
-            {
-              startEpochMs: a.startEpochMs,
-              movingSec: a.movingSec,
-              distanceM: a.distanceM
-            },
-            coros
-          ) || recentlyImported.has(a.intervalsId)
-      }));
-    }
-  );
-
-  ipcMain.handle(
-    "intervals:import",
-    async (
-      _event,
-      intervalsId: string,
-      fileExt: "fit" | "tcx" | "unknown"
-    ): Promise<{ importId: string }> => {
-      const tmpExt = fileExt === "tcx" ? "tcx" : "fit";
-      const tmp = path.join(
-        os.tmpdir(),
-        `coroslink-intervals-${intervalsId}.${tmpExt}`
-      );
-      try {
-        await downloadIntervalsFit(intervalsId, tmp);
-        const result = await uploadActivityFitToCoros(tmp);
-        recordIntervalsImport(intervalsId);
-        return result;
-      } finally {
-        try {
-          fs.rmSync(tmp);
-        } catch {
-          /* best effort */
-        }
-      }
-    }
   );
 
   ipcMain.handle(

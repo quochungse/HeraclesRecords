@@ -114,7 +114,6 @@ import {
 import { CalendarSkeleton } from "./calendar/CalendarSkeleton";
 import { TrainingLibrarySkeleton } from "./training-library/TrainingLibrarySkeleton";
 import { SettingsView } from "./settings/SettingsView";
-import { DataView } from "./data/DataView";
 import {
   LibrarySyncLayout,
   LocalLibraryPanel,
@@ -3029,13 +3028,6 @@ export default function App() {
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>
-            ) : null}
-            {activeView === "data" ? (
-              <DataView
-                api={api}
-                status={trainingHubStatus}
-                onOpenTraining={() => setActiveView("overview")}
-              />
             ) : null}
             {activeView === "settings" ? (
               <SettingsView
